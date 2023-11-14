@@ -454,21 +454,13 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
 
-    (`dictionary` only) The source of the contents to initialize a dictionary with. One
-    of:
+    (`dictionary` only) The contents to initialize a dictionary with. One of:
     - `void`: Create the dictionary empty.
-    - `parent`: A dictionary offered by `parent`, whose path is given by `extends`.
-    - `#<child-name>`: A dictionary exposed by `#<child-name>`, whose path is given by
-      `extends`.
-    - `self`: A path to a dictionary provided by this component, whose path is given
-      by `extends`.
-- `extends`: (_optional `string`_) Path to a dictionary provided by the source. Must be set if `from` is `parent`,
-    `self`, or `#<child-name>`.
-
-    `extends` may be the name of a dictionary or a path. If it is a path, it
-    represents a nested dictionary. For example, `dict/a/b` refers to the
-    dictionary `a/b` nested in `dict`, where `dict` is provided by the
-    source.
+    - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
+    - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
+    - `self/<relative_path>`: A path to a dictionary defined by this component.
+    `<relative_path>` may be either a name, identifying a dictionary capability), or
+    a path with multiple parts, identifying a nested dictionary.
 - `backing_dir`: (_optional `string`_) (`storage` only) The [name](#name) of the directory capability backing the storage. The
     capability must be available from the component referenced in `from`.
 - `subdir`: (_optional `string`_) (`storage` only) A subdirectory within `backing_dir` where per-component isolated storage
@@ -512,13 +504,6 @@ this component and the capability's source.
         requested capability is derived.
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
-- `in`: (_optional `string`_) (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    name refers to a capability in this dictionary, instead of a capability provided
-    directly by the source.
-
-    `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    `dict`, where `dict` is provided by the source.
 - `path`: (_optional `string`_) The path at which to install the capability in the component's namespace. For protocols,
     defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
     disallowed for declarations with arrays of capability names and for runner capabilities.
@@ -607,13 +592,6 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     - `framework`: The Component Framework runtime.
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
-- `in`: (_optional `string`_) (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    name refers to a capability in this dictionary, instead of a capability provided
-    directly by the source.
-
-    `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    `dict`, where `dict` is provided by the source.
 - `as`: (_optional `string`_) The [name](#name) for the capability as it will be known by the target. If omitted,
     defaults to the original name. `as` cannot be used when an array of multiple capability
     names is provided.
@@ -703,13 +681,6 @@ instance or a [child collection][doc-collections].
         directory, or runner capabilities.
     - `void`: The source is intentionally omitted. Only valid when `availability` is
         `optional` or `transitional`.
-- `in`: (_optional `string`_) (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    name refers to a capability in this dictionary, instead of a capability provided
-    directly by the source.
-
-    `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    `dict`, where `dict` is provided by the source.
 - `to`: (_`string or array of strings`_) Capability target(s). One of:
     - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
       or an array of references.

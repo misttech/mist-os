@@ -26,7 +26,7 @@ use {
     maplit::{hashmap, hashset},
     paste::paste,
     reference_doc::ReferenceDoc,
-    serde::{de, Deserialize, Serialize},
+    serde::{de, ser, Deserialize, Serialize},
     serde_json::{Map, Value},
     std::{
         cmp,
@@ -493,7 +493,7 @@ pub struct OneOrManyPaths;
 /// Generates deserializer for `OneOrMany<ExposeFromRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"framework\", \"self\", or \"#<child-name>\"",
+    expected = "one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path",
     inner_type = "ExposeFromRef",
     min_length = 1,
     unique_items = true
@@ -503,7 +503,7 @@ pub struct OneOrManyExposeFromRefs;
 /// Generates deserializer for `OneOrMany<OfferToRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"#<child-name>\" or \"#<collection-name>\", with unique elements",
+    expected = "one or an array of \"#<child-name>\", \"#<collection-name>\", or a dictionary path, with unique elements",
     inner_type = "OfferToRef",
     min_length = 1,
     unique_items = true
@@ -513,7 +513,7 @@ pub struct OneOrManyOfferToRefs;
 /// Generates deserializer for `OneOrMany<OfferFromRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", or \"#<collection-name>\"",
+    expected = "one or an array of \"parent\", \"framework\", \"self\", \"#<child-name>\", \"#<collection-name>\", or a dictionary path",
     inner_type = "OfferFromRef",
     min_length = 1,
     unique_items = true
@@ -594,6 +594,8 @@ pub enum AnyRef<'a> {
     Self_,
     /// An intentionally omitted reference.
     Void,
+    /// A reference to a dictionary. Parsed as a dictionary path.
+    Dictionary(&'a DictionaryRef),
 }
 
 /// Format an `AnyRef` as a string.
@@ -606,6 +608,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Debug => write!(f, "debug"),
             Self::Self_ => write!(f, "self"),
             Self::Void => write!(f, "void"),
+            Self::Dictionary(d) => write!(f, "{}", d),
         }
     }
 }
@@ -613,7 +616,7 @@ impl fmt::Display for AnyRef<'_> {
 /// A reference in a `use from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
 #[reference(
-    expected = "\"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", or none"
+    expected = "\"parent\", \"framework\", \"debug\", \"self\", \"#<capability-name>\", \"#<child-name>\", dictionary path, or none"
 )]
 pub enum UseFromRef {
     /// A reference to the parent.
@@ -634,6 +637,8 @@ pub enum UseFromRef {
     Named(Name),
     /// A reference to this component.
     Self_,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 /// The scope of an event.
@@ -656,6 +661,8 @@ pub enum ExposeFromRef {
     Self_,
     /// An intentionally omitted source.
     Void,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 /// A reference in an `expose to`.
@@ -670,7 +677,9 @@ pub enum ExposeToRef {
 
 /// A reference in an `offer from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"parent\", \"framework\", \"self\", \"void\", or \"#<child-name>\"")]
+#[reference(
+    expected = "\"parent\", \"framework\", \"self\", \"void\", \"#<child-name>\", or a dictionary path"
+)]
 pub enum OfferFromRef {
     /// A reference to a child or collection.
     Named(Name),
@@ -682,6 +691,8 @@ pub enum OfferFromRef {
     Self_,
     /// An intentionally omitted source.
     Void,
+    /// A reference to a dictionary.
+    Dictionary(DictionaryRef),
 }
 
 impl OfferFromRef {
@@ -728,16 +739,109 @@ pub enum EnvironmentRef {
 
 /// A reference in a `storage from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"parent\", \"self\", \"#<child-name>\", or \"void\"")]
+#[reference(expected = "\"parent\", \"self\", \"#<child-name>\", \"void\", or a dictionary path")]
 pub enum CapabilityFromRef {
+    /// (storage) A reference to a child.
+    Named(Name),
+    /// (storage) A reference to the parent.
+    Parent,
+    /// (storage) A reference to this component.
+    Self_,
+    /// (dictionary) Create empty from scratch.
+    Void,
+    /// (dictionary) Initialize with the contents of another dictionary.
+    Dictionary(DictionaryRef),
+}
+
+/// A reference to a (possibly nested) dictionary.
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+pub struct DictionaryRef {
+    /// Path to the dictionary relative to `root_dictionary`.
+    pub path: RelativePath,
+    pub root: RootDictionaryRef,
+}
+
+impl FromStr for DictionaryRef {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, ParseError> {
+        let path = RelativePath::new(s)?;
+        let path = path.as_str();
+        match path.find('/') {
+            Some(n) => {
+                let root = path[..n].parse().map_err(|_| ParseError::InvalidValue)?;
+                let path = RelativePath::new(&path[n + 1..])?;
+                Ok(Self { root, path })
+            }
+            None => Err(ParseError::InvalidValue),
+        }
+    }
+}
+
+impl fmt::Display for DictionaryRef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}/{}", self.root, self.path)
+    }
+}
+
+impl ser::Serialize for DictionaryRef {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::ser::Serializer,
+    {
+        format!("{}", self).serialize(serializer)
+    }
+}
+
+const DICTIONARY_REF_EXPECT_STR: &str = "a path to a dictionary no more \
+    than 4095 characters in length";
+
+impl<'de> de::Deserialize<'de> for DictionaryRef {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        struct Visitor;
+
+        impl<'de> de::Visitor<'de> for Visitor {
+            type Value = DictionaryRef;
+
+            fn expecting(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(DICTIONARY_REF_EXPECT_STR)
+            }
+
+            fn visit_str<E>(self, s: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                s.parse().map_err(|err| match err {
+                    ParseError::InvalidValue => {
+                        E::invalid_value(de::Unexpected::Str(s), &DICTIONARY_REF_EXPECT_STR)
+                    }
+                    ParseError::TooLong | ParseError::Empty => {
+                        E::invalid_length(s.len(), &DICTIONARY_REF_EXPECT_STR)
+                    }
+                    e => {
+                        panic!("unexpected parse error: {:?}", e);
+                    }
+                })
+            }
+        }
+
+        deserializer.deserialize_string(Visitor)
+    }
+}
+
+/// A reference to a root dictionary.
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
+#[reference(expected = "\"parent\", \"self\", \"#<child-name>\"")]
+pub enum RootDictionaryRef {
     /// A reference to a child.
     Named(Name),
     /// A reference to the parent.
     Parent,
     /// A reference to this component.
     Self_,
-    /// (`dictionary` only) A reference meaning no component.
-    Void,
 }
 
 /// A reference in an environment registration.
@@ -2187,26 +2291,15 @@ pub struct Capability {
     /// - `#<child-name>`: A [reference](#references) to a child component
     ///     instance.
     ///
-    /// (`dictionary` only) The source of the contents to initialize a dictionary with. One
-    /// of:
+    /// (`dictionary` only) The contents to initialize a dictionary with. One of:
     /// - `void`: Create the dictionary empty.
-    /// - `parent`: A dictionary offered by `parent`, whose path is given by `extends`.
-    /// - `#<child-name>`: A dictionary exposed by `#<child-name>`, whose path is given by
-    ///   `extends`.
-    /// - `self`: A path to a dictionary provided by this component, whose path is given
-    ///   by `extends`.
+    /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
+    /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
+    /// - `self/<relative_path>`: A path to a dictionary defined by this component.
+    /// `<relative_path>` may be either a name, identifying a dictionary capability), or
+    /// a path with multiple parts, identifying a nested dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<CapabilityFromRef>,
-
-    /// Path to a dictionary provided by the source. Must be set if `from` is `parent`,
-    /// `self`, or `#<child-name>`.
-    ///
-    /// `extends` may be the name of a dictionary or a path. If it is a path, it
-    /// represents a nested dictionary. For example, `dict/a/b` refers to the
-    /// dictionary `a/b` nested in `dict`, where `dict` is provided by the
-    /// source.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extends: Option<RelativePath>,
 
     /// (`storage` only) The [name](#name) of the directory capability backing the storage. The
     /// capability must be available from the component referenced in `from`.
@@ -2395,16 +2488,6 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub from: Option<UseFromRef>,
 
-    /// (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    /// name refers to a capability in this dictionary, instead of a capability provided
-    /// directly by the source.
-    ///
-    /// `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    /// nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    /// `dict`, where `dict` is provided by the source.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub r#in: Option<RelativePath>,
-
     /// The path at which to install the capability in the component's namespace. For protocols,
     /// defaults to `/svc/${protocol}`.  Required for `directory` and `storage`. This property is
     /// disallowed for declarations with arrays of capability names and for runner capabilities.
@@ -2526,15 +2609,6 @@ pub struct Expose {
     ///     instance.
     pub from: OneOrMany<ExposeFromRef>,
 
-    /// (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    /// name refers to a capability in this dictionary, instead of a capability provided
-    /// directly by the source.
-    ///
-    /// `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    /// nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    /// `dict`, where `dict` is provided by the source.
-    pub r#in: Option<RelativePath>,
-
     /// The [name](#name) for the capability as it will be known by the target. If omitted,
     /// defaults to the original name. `as` cannot be used when an array of multiple capability
     /// names is provided.
@@ -2601,7 +2675,6 @@ impl Expose {
             resolver: None,
             dictionary: None,
             r#as: None,
-            r#in: None,
             to: None,
             rights: None,
             subdir: None,
@@ -2709,15 +2782,6 @@ pub struct Offer {
     /// - `void`: The source is intentionally omitted. Only valid when `availability` is
     ///     `optional` or `transitional`.
     pub from: OneOrMany<OfferFromRef>,
-
-    /// (Optional) Path to a dictionary provided by the source. If this is set, the capability
-    /// name refers to a capability in this dictionary, instead of a capability provided
-    /// directly by the source.
-    ///
-    /// `in` may be the name of a dictionary or a path. If it is a path, it represents a
-    /// nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
-    /// `dict`, where `dict` is provided by the source.
-    pub r#in: Option<RelativePath>,
 
     /// Capability target(s). One of:
     /// - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
@@ -2920,10 +2984,6 @@ pub struct Collection {
 
 pub trait FromClause {
     fn from_(&self) -> OneOrMany<AnyRef<'_>>;
-}
-
-pub trait InClause {
-    fn in_(&self) -> Option<&RelativePath>;
 }
 
 pub trait CapabilityClause: Clone + PartialEq {
@@ -3510,24 +3570,6 @@ impl FromClause for Offer {
     }
 }
 
-impl InClause for Use {
-    fn in_(&self) -> Option<&RelativePath> {
-        self.r#in.as_ref()
-    }
-}
-
-impl InClause for Expose {
-    fn in_(&self) -> Option<&RelativePath> {
-        self.r#in.as_ref()
-    }
-}
-
-impl InClause for Offer {
-    fn in_(&self) -> Option<&RelativePath> {
-        self.r#in.as_ref()
-    }
-}
-
 impl Canonicalize for Offer {
     fn canonicalize(&mut self) {
         // Sort the names of the capabilities. Only capabilities with OneOrMany values are included here.
@@ -3709,7 +3751,6 @@ pub fn format_cml(buffer: &str, file: &std::path::Path) -> Result<Vec<u8>, Error
         "event",
         "event_stream",
         "from",
-        "in",
         "as",
         "to",
         "rights",
@@ -3868,7 +3909,6 @@ impl Offer {
             from,
             to,
             r#as: None,
-            r#in: None,
             service: None,
             directory: None,
             runner: None,
@@ -4114,7 +4154,6 @@ mod tests {
             from: OneOrMany::One(OfferFromRef::Self_),
             to: OneOrMany::Many(vec![]),
             r#as: None,
-            r#in: None,
             rights: None,
             subdir: None,
             dependency: None,
@@ -4133,7 +4172,6 @@ mod tests {
             directory: None,
             storage: None,
             from: None,
-            r#in: None,
             path: None,
             rights: None,
             subdir: None,

@@ -9,11 +9,11 @@ use {
         offer_to_all_would_duplicate, validate,
         validate::ProtocolRequirements,
         AnyRef, AsClause, Availability, Capability, CapabilityClause, Child, Collection, ConfigKey,
-        ConfigNestedValueType, ConfigRuntimeSource, ConfigValueType, DebugRegistration, Document,
-        Environment, EnvironmentExtends, EnvironmentRef, EventScope, Expose, ExposeFromRef,
-        ExposeToRef, FromClause, InClause, Offer, OfferFromRef, OfferToRef, OneOrMany, Path,
-        PathClause, Program, ResolverRegistration, RightsClause, RunnerRegistration,
-        SourceAvailability, Use, UseFromRef,
+        ConfigNestedValueType, ConfigRuntimeSource, ConfigValueType, DebugRegistration,
+        DictionaryRef, Document, Environment, EnvironmentExtends, EnvironmentRef, EventScope,
+        Expose, ExposeFromRef, ExposeToRef, FromClause, Offer, OfferFromRef, OfferToRef, OneOrMany,
+        Path, PathClause, Program, ResolverRegistration, RightsClause, RootDictionaryRef,
+        RunnerRegistration, SourceAvailability, Use, UseFromRef,
     },
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -283,8 +283,8 @@ fn translate_use(
     let mut out_uses = vec![];
     for use_ in use_in {
         if let Some(n) = use_.service() {
-            let source = extract_use_source(options, use_, all_capability_names, all_children)?;
-            let source_dictionary = extract_source_dictionary(options, use_)?;
+            let (source, source_dictionary) =
+                extract_use_source(options, use_, all_capability_names, all_children)?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
             let source_names = n.into_iter();
@@ -304,8 +304,8 @@ fn translate_use(
                 }));
             }
         } else if let Some(n) = use_.protocol() {
-            let source = extract_use_source(options, use_, all_capability_names, all_children)?;
-            let source_dictionary = extract_source_dictionary(options, use_)?;
+            let (source, source_dictionary) =
+                extract_use_source(options, use_, all_capability_names, all_children)?;
             let target_paths =
                 all_target_use_paths(use_, use_).ok_or_else(|| Error::internal("no capability"))?;
             let source_names = n.into_iter();
@@ -325,8 +325,8 @@ fn translate_use(
                 }));
             }
         } else if let Some(n) = &use_.directory {
-            let source = extract_use_source(options, use_, all_capability_names, all_children)?;
-            let source_dictionary = extract_source_dictionary(options, use_)?;
+            let (source, source_dictionary) =
+                extract_use_source(options, use_, all_capability_names, all_children)?;
             let target_path = one_target_use_path(use_, use_)?;
             let rights = extract_required_rights(use_, "use")?;
             let subdir = extract_use_subdir(use_);
@@ -366,7 +366,8 @@ fn translate_use(
                     None => None,
                 };
                 let internal_error = format!("Internal error in all_target_use_paths when translating an EventStream. Please file a bug.");
-                let source = extract_use_source(options, use_, all_capability_names, all_children)?;
+                let (source, _source_dictionary) =
+                    extract_use_source(options, use_, all_capability_names, all_children)?;
                 out_uses.push(fdecl::Use::EventStream(fdecl::UseEventStream {
                     source_name: Some(name),
                     scope: match scopes {
@@ -408,8 +409,8 @@ fn translate_use(
                 }));
             }
         } else if let Some(n) = &use_.runner {
-            let source = extract_use_source(&options, use_, all_capability_names, all_children)?;
-            let source_dictionary = extract_source_dictionary(options, use_)?;
+            let (source, source_dictionary) =
+                extract_use_source(&options, use_, all_capability_names, all_children)?;
             out_uses.push(fdecl::Use::Runner(fdecl::UseRunner {
                 source: Some(source),
                 source_name: Some(n.clone().into()),
@@ -438,13 +439,12 @@ fn translate_expose(
         if let Some(source_names) = expose.service() {
             // When there are many `sources` exposed under the same `target_name`, aggregation
             // will happen during routing.
-            let sources = extract_all_expose_sources(options, expose, Some(all_collections));
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let sources = extract_all_expose_sources(options, expose, Some(all_collections))?;
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
             for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
             {
-                for source in &sources {
+                for (source, source_dictionary) in &sources {
                     let (source, availability) = derive_source_and_availability(
                         expose.availability.as_ref(),
                         source.clone(),
@@ -465,8 +465,8 @@ fn translate_expose(
                 }
             }
         } else if let Some(n) = expose.protocol() {
-            let source = extract_single_expose_source(options, expose, Some(all_capability_names))?;
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let (source, source_dictionary) =
+                extract_single_expose_source(options, expose, Some(all_capability_names))?;
             let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -491,8 +491,7 @@ fn translate_expose(
                 }))
             }
         } else if let Some(n) = expose.directory() {
-            let source = extract_single_expose_source(options, expose, None)?;
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let (source, source_dictionary) = extract_single_expose_source(options, expose, None)?;
             let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -521,8 +520,7 @@ fn translate_expose(
                 }))
             }
         } else if let Some(n) = expose.runner() {
-            let source = extract_single_expose_source(options, expose, None)?;
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let (source, source_dictionary) = extract_single_expose_source(options, expose, None)?;
             let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -538,8 +536,7 @@ fn translate_expose(
                 }))
             }
         } else if let Some(n) = expose.resolver() {
-            let source = extract_single_expose_source(options, expose, None)?;
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let (source, source_dictionary) = extract_single_expose_source(options, expose, None)?;
             let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -555,8 +552,7 @@ fn translate_expose(
                 }))
             }
         } else if let Some(n) = expose.dictionary() {
-            let source = extract_single_expose_source(options, expose, None)?;
-            let source_dictionary = extract_source_dictionary(options, expose)?;
+            let (source, source_dictionary) = extract_single_expose_source(options, expose, None)?;
             let source_names = n.into_iter();
             let target_names = all_target_capability_names(expose, expose)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -1165,7 +1161,7 @@ fn translate_runner_registration(
     options: &CompileOptions<'_>,
     reg: &RunnerRegistration,
 ) -> Result<fdecl::RunnerRegistration, Error> {
-    let source = extract_single_offer_source(options, reg, None)?;
+    let (source, _source_dictionary) = extract_single_offer_source(options, reg, None)?;
     Ok(fdecl::RunnerRegistration {
         source_name: Some(reg.runner.clone().into()),
         source: Some(source),
@@ -1178,7 +1174,7 @@ fn translate_resolver_registration(
     options: &CompileOptions<'_>,
     reg: &ResolverRegistration,
 ) -> Result<fdecl::ResolverRegistration, Error> {
-    let source = extract_single_offer_source(options, reg, None)?;
+    let (source, _source_dictionary) = extract_single_offer_source(options, reg, None)?;
     Ok(fdecl::ResolverRegistration {
         resolver: Some(reg.resolver.clone().into()),
         source: Some(source),
@@ -1201,7 +1197,7 @@ fn translate_debug_capabilities(
     let mut out_capabilities = vec![];
     for capability in capabilities {
         if let Some(n) = capability.protocol() {
-            let source =
+            let (source, _source_dictionary) =
                 extract_single_offer_source(options, capability, Some(all_capability_names))?;
             let targets = all_target_capability_names(capability, capability)
                 .ok_or_else(|| Error::internal("no capability"))?;
@@ -1239,7 +1235,7 @@ fn extract_use_source(
     in_obj: &Use,
     all_capability_names: &BTreeSet<&Name>,
     all_children_names: &BTreeSet<&Name>,
-) -> Result<fdecl::Ref, Error> {
+) -> Result<(fdecl::Ref, Option<String>), Error> {
     let ref_ = match in_obj.from.as_ref() {
         Some(UseFromRef::Parent) => fdecl::Ref::Parent(fdecl::ParentRef {}),
         Some(UseFromRef::Framework) => fdecl::Ref::Framework(fdecl::FrameworkRef {}),
@@ -1257,9 +1253,15 @@ fn extract_use_source(
                 )));
             }
         }
+        Some(UseFromRef::Dictionary(d)) => {
+            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            return Ok(dictionary_ref_to_source(&d));
+        }
         None => fdecl::Ref::Parent(fdecl::ParentRef {}), // Default value.
     };
-    Ok(ref_)
+    Ok((ref_, None))
 }
 
 fn extract_use_availability(in_obj: &Use) -> Result<fdecl::Availability, Error> {
@@ -1321,8 +1323,8 @@ fn expose_source_from_ref(
     reference: &ExposeFromRef,
     all_capability_names: Option<&BTreeSet<&Name>>,
     all_collections: Option<&BTreeSet<&Name>>,
-) -> fdecl::Ref {
-    match reference {
+) -> Result<(fdecl::Ref, Option<String>), Error> {
+    let ref_ = match reference {
         ExposeFromRef::Named(name) => {
             if all_capability_names.is_some() && all_capability_names.unwrap().contains(&name) {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() })
@@ -1335,17 +1337,24 @@ fn expose_source_from_ref(
         ExposeFromRef::Framework => fdecl::Ref::Framework(fdecl::FrameworkRef {}),
         ExposeFromRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
         ExposeFromRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
-    }
+        ExposeFromRef::Dictionary(d) => {
+            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            return Ok(dictionary_ref_to_source(&d));
+        }
+    };
+    Ok((ref_, None))
 }
 
 fn extract_single_expose_source(
     options: &CompileOptions<'_>,
     in_obj: &Expose,
     all_capability_names: Option<&BTreeSet<&Name>>,
-) -> Result<fdecl::Ref, Error> {
+) -> Result<(fdecl::Ref, Option<String>), Error> {
     match &in_obj.from {
         OneOrMany::One(reference) => {
-            Ok(expose_source_from_ref(options, &reference, all_capability_names, None))
+            expose_source_from_ref(options, &reference, all_capability_names, None)
         }
         OneOrMany::Many(many) => {
             return Err(Error::internal(format!(
@@ -1360,7 +1369,7 @@ fn extract_all_expose_sources(
     options: &CompileOptions<'_>,
     in_obj: &Expose,
     all_collections: Option<&BTreeSet<&Name>>,
-) -> Vec<fdecl::Ref> {
+) -> Result<Vec<(fdecl::Ref, Option<String>)>, Error> {
     in_obj.from.iter().map(|e| expose_source_from_ref(options, e, None, all_collections)).collect()
 }
 
@@ -1397,13 +1406,13 @@ fn extract_single_offer_source<T>(
     options: &CompileOptions<'_>,
     in_obj: &T,
     all_capability_names: Option<&BTreeSet<&Name>>,
-) -> Result<fdecl::Ref, Error>
+) -> Result<(fdecl::Ref, Option<String>), Error>
 where
     T: FromClause,
 {
     match in_obj.from_() {
         OneOrMany::One(reference) => {
-            Ok(any_ref_to_decl(options, reference, all_capability_names, None))
+            any_ref_to_decl(options, reference, all_capability_names, None)
         }
         many => {
             return Err(Error::internal(format!(
@@ -1419,7 +1428,7 @@ fn extract_all_offer_sources<T: FromClause>(
     in_obj: &T,
     all_capability_names: &BTreeSet<&Name>,
     all_collections: &BTreeSet<&Name>,
-) -> Vec<fdecl::Ref> {
+) -> Result<Vec<(fdecl::Ref, Option<String>)>, Error> {
     in_obj
         .from_()
         .into_iter()
@@ -1466,12 +1475,11 @@ fn extract_offer_sources_and_targets(
 ) -> Result<Vec<(fdecl::Ref, Option<String>, Name, fdecl::Ref, Name)>, Error> {
     let mut out = vec![];
 
-    let sources = extract_all_offer_sources(options, offer, all_capability_names, all_collections);
-    let source_dictionary = extract_source_dictionary(options, offer)?;
+    let sources = extract_all_offer_sources(options, offer, all_capability_names, all_collections)?;
     let target_names = all_target_capability_names(offer, offer)
         .ok_or_else(|| Error::internal("no capability".to_string()))?;
 
-    for source in sources {
+    for (source, source_dictionary) in sources {
         for to in &offer.to {
             for target_name in &target_names {
                 // When multiple source names are provided, there is no way to alias each one,
@@ -1614,18 +1622,6 @@ fn extract_environment_ref(r: Option<&EnvironmentRef>) -> Option<cm::Name> {
     })
 }
 
-fn extract_source_dictionary(
-    options: &CompileOptions<'_>,
-    o: &impl InClause,
-) -> Result<Option<String>, Error> {
-    if o.in_().is_some()
-        && !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries)
-    {
-        return Err(Error::validate("dictionaries are not enabled"));
-    }
-    Ok(o.in_().map(|e| e.clone().into()))
-}
-
 pub fn translate_capabilities(
     options: &CompileOptions<'_>,
     capabilities_in: &Vec<Capability>,
@@ -1696,8 +1692,8 @@ pub fn translate_capabilities(
                 .clone()
                 .into();
 
-            let source =
-                any_ref_to_decl(options, capability.from.as_ref().unwrap().into(), None, None);
+            let (source, _source_dictionary) =
+                any_ref_to_decl(options, capability.from.as_ref().unwrap().into(), None, None)?;
             out_capabilities.push(fdecl::Capability::Storage(fdecl::Storage {
                 name: Some(n.clone().into()),
                 backing_dir: Some(backing_dir),
@@ -1745,9 +1741,8 @@ pub fn translate_capabilities(
                 }));
             }
         } else if let Some(n) = &capability.dictionary {
-            let source =
-                any_ref_to_decl(options, capability.from.as_ref().unwrap().into(), None, None);
-            let source_dictionary = capability.extends.as_ref().map(|c| c.clone().into());
+            let (source, source_dictionary) =
+                any_ref_to_decl(options, capability.from.as_ref().unwrap().into(), None, None)?;
             out_capabilities.push(fdecl::Capability::Dictionary(fdecl::Dictionary {
                 name: Some(n.clone().into()),
                 source: Some(source),
@@ -1799,13 +1794,15 @@ where
     }
 }
 
+/// Takes an `AnyRef` and returns the `fdecl::Ref` equivalent and the dictionary path, if
+/// the ref was a dictionary ref.
 pub fn any_ref_to_decl(
     options: &CompileOptions<'_>,
     reference: AnyRef<'_>,
     all_capability_names: Option<&BTreeSet<&Name>>,
     all_collection_names: Option<&BTreeSet<&Name>>,
-) -> fdecl::Ref {
-    match reference {
+) -> Result<(fdecl::Ref, Option<String>), Error> {
+    let ref_ = match reference {
         AnyRef::Named(name) => {
             if all_capability_names.is_some() && all_capability_names.unwrap().contains(&name) {
                 fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() })
@@ -1822,7 +1819,26 @@ pub fn any_ref_to_decl(
         AnyRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
         AnyRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
         AnyRef::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
-    }
+        AnyRef::Dictionary(d) => {
+            if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
+                return Err(Error::validate("dictionaries are not enabled"));
+            }
+            return Ok(dictionary_ref_to_source(&d));
+        }
+    };
+    Ok((ref_, None))
+}
+
+/// Takes a `DictionaryRef` and returns the `fdecl::Ref` equivalent and the dictionary path.
+fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
+    let root = match &d.root {
+        RootDictionaryRef::Named(name) => {
+            fdecl::Ref::Child(fdecl::ChildRef { name: name.clone().into(), collection: None })
+        }
+        RootDictionaryRef::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
+        RootDictionaryRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
+    };
+    (root, Some(d.path.to_string()))
 }
 
 #[cfg(test)]
@@ -2680,11 +2696,7 @@ mod tests {
                     { "protocol": "fuchsia.sys2.LegacyRealm", "from": "framework" },
                     { "protocol": "fuchsia.sys2.StorageAdmin", "from": "#data-storage" },
                     { "protocol": "fuchsia.sys2.DebugProto", "from": "debug" },
-                    {
-                        "protocol": "fuchsia.sys2.DictionaryProto",
-                        "from": "#logger",
-                        "in": "in/dict",
-                    },
+                    { "protocol": "fuchsia.sys2.DictionaryProto", "from": "#logger/in/dict" },
                     { "protocol": "fuchsia.sys2.Echo", "from": "self", "availability": "transitional" },
                     { "directory": "assets", "rights" : ["read_bytes"], "path": "/data/assets" },
                     {
@@ -2927,8 +2939,7 @@ mod tests {
                     },
                     {
                         "protocol": "D",
-                        "from": "#logger",
-                        "in": "in/dict",
+                        "from": "#logger/in/dict",
                         "as": "E",
                     },
                     {
@@ -3490,8 +3501,7 @@ mod tests {
                     },
                     {
                         "protocol": "fuchsia.sys2.FromDict",
-                        "from": "parent",
-                        "in": "in/dict",
+                        "from": "parent/in/dict",
                         "to": [ "#modular" ],
                     },
                     {
@@ -4052,8 +4062,7 @@ mod tests {
                 "offer": [
                     {
                         "protocol": "A",
-                        "from": "parent",
-                        "in": "dict/1",
+                        "from": "parent/dict/1",
                         "to": "#dict",
                     },
                     {
@@ -4063,8 +4072,7 @@ mod tests {
                     },
                     {
                         "service": "B",
-                        "from": "parent",
-                        "in": "dict/2",
+                        "from": "parent/dict/2",
                         "to": "#dict",
                         "as": "C",
                     },
@@ -4078,8 +4086,7 @@ mod tests {
                 "capabilities": [
                     {
                         "dictionary": "dict",
-                        "from": "parent",
-                        "extends": "dict/3",
+                        "from": "parent/dict/3",
                     },
                 ],
             }),
@@ -4316,13 +4323,11 @@ mod tests {
                     },
                     {
                         "dictionary": "dict2",
-                        "from": "parent",
-                        "extends": "in/a",
+                        "from": "parent/in/a",
                     },
                     {
                         "dictionary": "dict3",
-                        "from": "#minfs",
-                        "extends": "b",
+                        "from": "#minfs/b",
                     },
                 ],
                 "children": [

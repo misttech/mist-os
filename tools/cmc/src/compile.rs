@@ -1096,7 +1096,7 @@ mod tests {
             );
             assert_matches!(
                 result,
-                Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent\", expected one or an array of \"framework\", \"self\", or \"#<child-name>\""
+                Err(Error::Parse { err, .. }) if &err == "invalid value: string \"parent\", expected one or an array of \"framework\", \"self\", \"#<child-name>\", or a dictionary path"
             );
         }
         // Compilation failed so output should not exist.
