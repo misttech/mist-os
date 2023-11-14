@@ -677,6 +677,8 @@ sdk_final_manifest_golden("firmware_manifest_golden") {
 }
 
 sdk_collection("firmware_collection") {
+  visibility += [ "*" ]
+
   category = "experimental"
 
   deps = [

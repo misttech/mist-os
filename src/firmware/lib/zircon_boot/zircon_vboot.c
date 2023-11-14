@@ -113,6 +113,7 @@ static AvbIOResult GetUniqueGuidForPartition(AvbOps* ops, const char* partition,
                                              size_t guid_buf_size) {
   VBootContext* context = (VBootContext*)ops->user_data;
   ZirconBootOps* zb_ops = (ZirconBootOps*)context->ops;
+  memset(guid_buf, 0, guid_buf_size);
   size_t part_size;
   bool res = ZIRCON_BOOT_OPS_CALL(zb_ops, verified_boot_get_partition_size, partition, &part_size);
   return res ? AVB_IO_RESULT_OK : AVB_IO_RESULT_ERROR_NO_SUCH_PARTITION;
