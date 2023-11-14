@@ -9,6 +9,36 @@
 
 namespace compat {
 
+namespace {
+
+void CollectMetadataFrom(fidl::VectorView<fuchsia_driver_compat::wire::Metadata> metadata,
+                         const std::unordered_set<MetadataKey>& forward_metadata,
+                         DeviceServer* server) {
+  for (auto& metadata : metadata) {
+    auto find_result = forward_metadata.find(metadata.type);
+    if (find_result != forward_metadata.end()) {
+      size_t size;
+      zx_status_t status =
+          metadata.data.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to get metadata vmo size: %s", zx_status_get_string(status));
+        continue;
+      }
+
+      Metadata data(size);
+      status = metadata.data.read(data.data(), 0, data.size());
+      if (status != ZX_OK) {
+        FDF_LOG(ERROR, "Failed to read metadata vmo: %s", zx_status_get_string(status));
+        continue;
+      }
+
+      server->AddMetadata(metadata.type, data.data(), data.size());
+    }
+  }
+}
+
+}  // namespace
+
 namespace fcd = fuchsia_component_decl;
 
 void DeviceServer::Init(std::string name, std::string topological_path,
@@ -251,6 +281,137 @@ void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
                          reinterpret_cast<uint64_t>(result.ctx));
 }
 
+void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
+                            const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                            const std::optional<std::string>& node_name,
+                            const std::unordered_set<MetadataKey>& forward_metadata) {
+  auto node_name_val = node_name.value_or("NA");
+
+  // First connect to all the parents.
+  auto parent_devices = ConnectToParentDevices(incoming.get());
+  if (parent_devices.is_error()) {
+    FDF_LOG(WARNING, "Failed to get parent devices: %s. Assuming root.",
+            parent_devices.status_string());
+
+    // In case that there are no parents, assume we are the root and create
+    // the topological path from scratch.
+    topological_path_ = "/" + node_name_val + "/" + name_;
+    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+    return;
+  }
+
+  // Now we have out parent clients, store them.
+  fidl::WireSyncClient<fuchsia_driver_compat::Device> default_parent_client;
+  std::unordered_map<std::string, fidl::WireSyncClient<fuchsia_driver_compat::Device>>
+      parent_clients;
+  for (auto& parent : parent_devices.value()) {
+    if (parent.name == "default") {
+      default_parent_client.Bind(std::move(parent.client));
+      continue;
+    }
+
+    // TODO(fxbug.dev/100985): When services stop adding extra instances
+    // separated by ',' then remove this check.
+    if (parent.name.find(',') != std::string::npos) {
+      continue;
+    }
+
+    parent_clients[parent.name] =
+        fidl::WireSyncClient<fuchsia_driver_compat::Device>(std::move(parent.client));
+  }
+
+  // No default parent found.
+  if (!default_parent_client.is_valid()) {
+    FDF_LOG(WARNING, "Failed to find the default parent.");
+
+    // In case that there is no default parent, assume we are the root and create
+    // the topological path from scratch.
+    topological_path_ = "/" + node_name_val + "/" + name_;
+    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+    return;
+  }
+
+  // Get the topological path from the default parent.
+  fidl::WireResult topological_path_result = default_parent_client->GetTopologicalPath();
+  if (!topological_path_result.ok()) {
+    FDF_LOG(WARNING, "Failed to get topological path from the parent: %s. Assuming root.",
+            topological_path_result.status_string());
+
+    // In case that getting the topological path fails, assume we are the root and create
+    // the topological path from scratch.
+    topological_path_ = "/" + node_name_val + "/" + name_;
+    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+    return;
+  }
+
+  // If we are a composite then we have to add the name of our composite device
+  // to our primary parent. The composite device's name is the node_name.
+  if (!parent_clients.empty()) {
+    topological_path_ =
+        std::string(topological_path_result->path.get()) + "/" + node_name_val + "/" + name_;
+  } else {
+    topological_path_ = std::string(topological_path_result->path.get()) + "/" + name_;
+  }
+
+  // We can just serve and return if no metadata is needed.
+  if (forward_metadata.empty()) {
+    ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+    return;
+  }
+
+  // Forward metadata
+  if (parent_clients.empty()) {
+    fidl::WireResult metadata_result = default_parent_client->GetMetadata();
+    if (!metadata_result.ok()) {
+      FDF_LOG(WARNING, "Failed to get metadata from default parent. %s",
+              metadata_result.status_string());
+      ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+      return;
+    }
+
+    if (!metadata_result.value().is_error()) {
+      FDF_LOG(WARNING, "Failed to get metadata from default parent. %s",
+              zx_status_get_string(metadata_result.value().error_value()));
+      ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+      return;
+    }
+
+    CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata, this);
+  } else {
+    for (auto& [parent_name, parent_client] : parent_clients) {
+      fidl::WireResult metadata_result = parent_client->GetMetadata();
+      if (!metadata_result.ok()) {
+        FDF_LOG(WARNING, "Failed to get metadata from parent %s. %s", parent_name.c_str(),
+                metadata_result.status_string());
+        continue;
+      }
+
+      if (!metadata_result.value().is_error()) {
+        FDF_LOG(WARNING, "Failed to get metadata from parent %s. %s", parent_name.c_str(),
+                zx_status_get_string(metadata_result.value().error_value()));
+        continue;
+      }
+
+      CollectMetadataFrom(metadata_result->value()->metadata, forward_metadata, this);
+    }
+  }
+
+  ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
+}
+
+void DeviceServer::ServeAndSetInitializeResult(
+    async_dispatcher_t* dispatcher, const std::shared_ptr<fdf::OutgoingDirectory>& outgoing) {
+  zx_status_t serve_result =
+      Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing.get());
+  if (serve_result != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to serve: %s", zx_status_get_string(serve_result));
+    state_.emplace<Initialized>(dispatcher, zx::error(serve_result));
+    return;
+  }
+
+  state_.emplace<Initialized>(dispatcher, zx::ok());
+}
+
 void DeviceServer::BeginAsyncInit() {
   AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
   ZX_ASSERT(init_state != nullptr);
@@ -366,28 +527,7 @@ void DeviceServer::OnMetadataResult(
     return;
   }
 
-  for (auto& metadata : result.value().value()->metadata) {
-    auto find_result = init_state->forward_metadata.find(metadata.type);
-    if (find_result != init_state->forward_metadata.end()) {
-      size_t size;
-      zx_status_t status =
-          metadata.data.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get metadata vmo size: %s", zx_status_get_string(status));
-        continue;
-      }
-
-      Metadata data(size);
-      status = metadata.data.read(data.data(), 0, data.size());
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read metadata vmo: %s", zx_status_get_string(status));
-        continue;
-      }
-
-      AddMetadata(metadata.type, data.data(), data.size());
-    }
-  }
-
+  CollectMetadataFrom(result.value().value()->metadata, init_state->forward_metadata, this);
   init_state->in_flight_metadata--;
   if (init_state->in_flight_metadata == 0) {
     CompleteInitialization(zx::ok());

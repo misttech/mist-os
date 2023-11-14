@@ -18,6 +18,11 @@ using EntriesCallback = fit::callback<void(zx::result<std::vector<std::string>>)
 void FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
                           async_dispatcher_t* dispatcher, EntriesCallback cb);
 
+// Make an synchronous call to the directory to get all of the existing entries, returns
+// a vector of strings for each entry.
+zx::result<std::vector<std::string>> FindDirectoryEntries(
+    fidl::ClientEnd<fuchsia_io::Directory> dir);
+
 struct ParentDevice {
   std::string name;
   fidl::ClientEnd<fuchsia_driver_compat::Device> client;
@@ -27,6 +32,9 @@ using ConnectCallback = fit::callback<void(zx::result<std::vector<ParentDevice>>
 // Asynchronously connect to each of the parent devices.
 void ConnectToParentDevices(async_dispatcher_t* dispatcher, const fdf::Namespace* ns,
                             ConnectCallback cb);
+
+// Synchronously connect to each of the parent devices.
+zx::result<std::vector<ParentDevice>> ConnectToParentDevices(const fdf::Namespace* ns);
 
 }  // namespace compat
 

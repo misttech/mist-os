@@ -80,6 +80,16 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
   // Async initialization. Will internally query the parent for topological path and forwarded
   // metadata and serve on the outgoing directory when it is ready.
+  //
+  // |dispatcher|, |incoming|, |outgoing|, |node_name| can be grabbed through the
+  // DriverBase methods of the same name.
+  //
+  // |child_node_name| is the name given to the |fdf::NodeAddArgs|'s name field.
+  //
+  // |forward_metadata| will be the list of metadata keys that this should forward from the
+  // parent(s) of this driver.
+  //
+  // |banjo_config| contains the banjo protocol information that this should serve.
   DeviceServer(async_dispatcher_t* dispatcher, const std::shared_ptr<fdf::Namespace>& incoming,
                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                const std::optional<std::string>& node_name, std::string_view child_node_name,
@@ -90,6 +100,29 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
         name_(child_node_name),
         banjo_config_(std::move(banjo_config)) {
     BeginAsyncInit();
+  }
+
+  // Sync initialization. Will internally query the parent for topological path and forwarded
+  // metadata and serve on the outgoing directory synchronously.
+  //
+  // |incoming|, |outgoing|, |node_name| can be grabbed through the
+  // DriverBase methods of the same name.
+  //
+  // |child_node_name| is the name given to the |fdf::NodeAddArgs|'s name field.
+  //
+  // |forward_metadata| will be the list of metadata keys that this should forward from the
+  // parent(s) of this driver.
+  //
+  // |banjo_config| contains the banjo protocol information that this should serve.
+  DeviceServer(const std::shared_ptr<fdf::Namespace>& incoming,
+               const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+               const std::optional<std::string>& node_name, std::string_view child_node_name,
+               const std::unordered_set<MetadataKey>& forward_metadata = {},
+               std::optional<BanjoConfig> banjo_config = std::nullopt)
+      : state_(std::in_place_type<Initialized>),
+        name_(child_node_name),
+        banjo_config_(std::move(banjo_config)) {
+    SyncInit(incoming, outgoing, node_name, forward_metadata);
   }
 
   // Initialize with known topological path.
@@ -124,6 +157,14 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   void GetMetadata(GetMetadataCompleter::Sync& completer) override;
   void GetBanjoProtocol(GetBanjoProtocolRequestView request,
                         GetBanjoProtocolCompleter::Sync& completer) override;
+
+  // Synchronous initialization.
+  void SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
+                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                const std::optional<std::string>& node_name,
+                const std::unordered_set<MetadataKey>& forward_metadata);
+  void ServeAndSetInitializeResult(async_dispatcher_t* dispatcher,
+                                   const std::shared_ptr<fdf::OutgoingDirectory>& outgoing);
 
   // Helpers for async initialization.
   void BeginAsyncInit();
