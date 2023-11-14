@@ -58,9 +58,9 @@ use crate::{
         binder_uintptr_t, binder_version, binder_write_read, flat_binder_object, mode, pid_t,
         release_after, release_on_error, statfs, struct_with_union_into_bytes,
         transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType, OpenFlags, OwnedRef, Releasable,
-        ReleaseGuard, TempRef, TempRefKey, WeakRef, BINDERFS_SUPER_MAGIC,
-        BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER,
-        BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+        ReleaseGuard, TempRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
+        BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA,
+        BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
     },
 };
 use derivative::Derivative;
@@ -71,7 +71,7 @@ use fuchsia_zircon as zx;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
 use std::{
-    collections::{btree_map, BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -1504,80 +1504,16 @@ impl BinderObjectRef {
     }
 }
 
-/// Instructs the [`BinderDriver`] on what to do on an object after an ref count
-/// operation.
-#[derive(Debug)]
-enum RefCountAction {
-    /// Send a ReleaseRef command to the owning process.
-    Release(Arc<BinderObject>),
-    /// Send a IncRef command to the owning process.
-    IncRefs(Arc<BinderObject>),
-    /// Send a DecRef command to the owning process.
-    DecRefs(Arc<BinderObject>),
-}
+/// A set of `BinderObject` whose reference counts may have changed. Releasing it will enqueue all
+/// the corresponding actions and remove any freed object from the owner process.
+type RefCountActions = ReleaseGuard<HashSet<ArcKey<BinderObject>>>;
 
-impl RefCountAction {
-    /// Enqueue the action to the `BinderProcess`. If the actions is a reference decrease and the
-    /// object has no reference left, return a pair with the `BinderProcess` and the `BinderObject`
-    /// so that the object can be removed from the process table.
-    fn enqueue(&self) -> Option<(TempRef<'_, BinderProcess>, Arc<BinderObject>)> {
-        match self {
-            Self::Release(object) => {
-                if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.enqueue_command(Command::ReleaseRef(object.local));
-                    if !object.has_ref() {
-                        return Some((binder_process, Arc::clone(object)));
-                    }
-                }
-            }
-            Self::IncRefs(object) => {
-                if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.enqueue_command(Command::IncRef(object.local));
-                }
-            }
-            Self::DecRefs(object) => {
-                if let Some(binder_process) = object.owner.upgrade() {
-                    binder_process.enqueue_command(Command::DecRef(object.local));
-                    if !object.has_ref() {
-                        return Some((binder_process, Arc::clone(object)));
-                    }
-                }
-            }
-        }
-        None
-    }
-}
-
-/// A list of `RefCountAction` that is releasable. Releasing the list will enqueue each actions and
-/// remove any freed object from the process.
-type RefCountActions = ReleaseGuard<Vec<RefCountAction>>;
-
-impl Releasable for Vec<RefCountAction> {
+impl Releasable for HashSet<ArcKey<BinderObject>> {
     type Context<'a> = ();
 
     fn release(self, _context: ()) {
-        let mut cleanables =
-            HashMap::<TempRefKey<'_, BinderProcess>, HashSet<ArcKey<BinderObject>>>::default();
-        for action in &self {
-            if let Some((binder_process, object)) = action.enqueue() {
-                cleanables.entry(TempRefKey(binder_process)).or_default().insert(ArcKey(object));
-            }
-        }
-        for (process, objects) in cleanables.into_iter() {
-            let mut process_state = process.lock();
-            for object in objects {
-                if !object.has_ref() {
-                    // The object might have been reused since it was last considered. It is then
-                    // possible that it has already been removed, and replaced with a new value.
-                    // Check that the current object in the map is the expected one.
-                    let entry = process_state.objects.entry(object.local.weak_ref_addr);
-                    if let btree_map::Entry::Occupied(v) = entry {
-                        if Arc::ptr_eq(v.get(), &object) {
-                            v.remove_entry();
-                        }
-                    }
-                }
-            }
+        for object in &self {
+            object.apply_deferred_refcounts();
         }
     }
 }
@@ -2078,60 +2014,117 @@ impl Command {
 }
 
 /// The state of a given reference count for an object (strong or weak).
-#[derive(Debug, Default, PartialEq, Eq)]
+///
+/// The client only has an eventually-consistent view of the reference count, because 1) the actual
+/// reference count is maintained by the Binder driver and 2) the increment (BR_ACQUIRE/BR_INCREFS)
+/// and decrement (BR_RELEASE/BR_DECREFS) commands to inform the clients of variations are
+/// asynchronously delivered through multiple queues. Furthermore, clients may not process them in
+/// order, as they usually handle the received commands in a thread pool.
+///
+/// In order to guarantee that a decrease is always processed by the client after the corresponding
+/// increase (otherwise the client may incorrectly free the object), the Binder protocol mandates
+/// that increase commands (BR_ACQUIRE/BR_INCREFS) must be acknowledged
+/// (BC_ACQUIRE_DONE/BC_INCREFS_DONE) and, only then, the corresponding decrease
+/// (BR_RELEASE/BR_DECREFS) can be enqueued.
+///
+/// As an optimization, we only report actionable transitions to the client, i.e. from 0 to 1 and
+/// from 1 to 0.
+///
+/// The three states in this enum correspond to the three possible client states from the driver's
+/// point of view, and the parameter is the actual reference count maintained by the Binder driver.
+/// Note that there is no "transitioning from 1 to 0" state, because it is safe to pretend that
+/// enqueued decreases take effect instantly.
+///
+/// Because of lock order constraints, it may not be possible for users of this class to enqueue
+/// increase/decrease commands at the same time as the corresponding manipulations to the reference
+/// count. In order to support this scenario, this class supports "deferred" operations, which are
+/// equivalent to the "immediate" ones but they are divided in two steps: a first step that simply
+/// records the updated reference count, and a second step which determines what commands should be
+/// enqueued to propagate the new reference count to the client.
+#[derive(Debug, PartialEq, Eq)]
 enum ObjectReferenceCount {
-    /// The client is considered to have no reference count.
-    #[default]
-    NoRef,
-    /// The client has been send an increase to its reference count, but didn't yet acknowledge it.
-    /// The parameter is the actual reference count.
+    /// The count as known to the client is zero (this is both the initial state and the state after
+    /// a decrease from one to zero).
+    NoRef(usize),
+    /// The client is transitioning from zero to one (i.e. it has been sent an increase to its
+    /// reference count, but didn't yet acknowledge it).
     WaitingAck(usize),
-    /// The client did notified that it took into account an increase of the reference count, and
-    /// has not been send a decrease since.
-    /// The parameter is the actual reference count.
+    /// The count as known to the client is one (i.e. the client did notify that it took into
+    /// account an increase of the reference count, and has not been sent a decrease since).
     HasRef(usize),
 }
 
+impl Default for ObjectReferenceCount {
+    fn default() -> ObjectReferenceCount {
+        ObjectReferenceCount::NoRef(0)
+    }
+}
+
 impl ObjectReferenceCount {
+    /// Returns true if the client's view of the reference count is either one or transitioning to
+    /// one.
     fn has_ref(&self) -> bool {
-        *self != ObjectReferenceCount::NoRef
+        match self {
+            Self::NoRef(_) => false,
+            Self::WaitingAck(_) | Self::HasRef(_) => true,
+        }
     }
 
+    /// Returns the actual reference count.
     fn count(&self) -> usize {
-        match self {
-            Self::NoRef => 0,
-            Self::WaitingAck(x) | Self::HasRef(x) => *x,
-        }
+        let (Self::NoRef(x) | Self::WaitingAck(x) | Self::HasRef(x)) = self;
+        *x
     }
 
-    /// Increment the reference count of the object. Returns whether this object is now awaiting an
-    /// acknowledgement.
-    fn inc(&mut self) -> bool {
-        match self {
-            Self::NoRef => {
-                *self = Self::WaitingAck(1);
-                true
-            }
-            Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x) => {
-                *x += 1;
-                false
-            }
-        }
+    /// Increments the reference count of the object and applies it immediately to the client state.
+    ///
+    /// If it returns true, the caller *MUST* enqueue an increment command.
+    #[must_use]
+    fn inc_immediate(&mut self) -> bool {
+        self.inc_deferred();
+        self.apply_deferred_inc()
+    }
+
+    /// Increments the reference count of the object.
+    fn inc_deferred(&mut self) {
+        let (Self::NoRef(ref mut x) | Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x)) = self;
+        *x += 1;
     }
 
     /// Decrements the reference count of the object.
-    fn dec(&mut self) {
-        match self {
-            Self::NoRef => {
-                panic!("dec called with no reference");
+    fn dec_deferred(&mut self) {
+        let (Self::NoRef(ref mut x) | Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x)) = self;
+        if *x == 0 {
+            panic!("dec called with no reference");
+        } else {
+            *x -= 1;
+        }
+    }
+
+    /// Applies any deferred increment to the client state.
+    ///
+    /// If it returns true, the caller *MUST* enqueue an increment command.
+    #[must_use]
+    fn apply_deferred_inc(&mut self) -> bool {
+        match *self {
+            ObjectReferenceCount::NoRef(n) if n > 0 => {
+                *self = ObjectReferenceCount::WaitingAck(n);
+                true
             }
-            Self::WaitingAck(ref mut x) | Self::HasRef(ref mut x) => {
-                if *x == 0 {
-                    panic!("dec called with no reference");
-                } else {
-                    *x -= 1;
-                }
-            }
+            _ => false,
+        }
+    }
+
+    /// Applies any deferred decrement to the client state.
+    ///
+    /// If it returns true, the caller *MUST* enqueue a decrement command.
+    #[must_use]
+    fn apply_deferred_dec(&mut self) -> bool {
+        if *self == ObjectReferenceCount::HasRef(0) {
+            *self = ObjectReferenceCount::NoRef(0);
+            true
+        } else {
+            false
         }
     }
 
@@ -2149,16 +2142,6 @@ impl ObjectReferenceCount {
     /// Returns whether this reference count is waiting an acknowledgement for an increase.
     fn is_waiting_ack(&self) -> bool {
         matches!(self, ObjectReferenceCount::WaitingAck(_))
-    }
-
-    /// Reset the state to NoRef if the current reference count is 0. Returns true if it happened.
-    fn try_release(&mut self) -> bool {
-        if *self == ObjectReferenceCount::HasRef(0) {
-            *self = ObjectReferenceCount::NoRef;
-            true
-        } else {
-            false
-        }
     }
 }
 
@@ -2223,9 +2206,8 @@ struct StrongRefReleaser {}
 impl RefReleaser for StrongRefReleaser {
     /// Decrements the strong reference count of the binder object.
     fn dec_ref(binder_object: &Arc<BinderObject>, actions: &mut RefCountActions) {
-        let mut state = binder_object.lock();
-        state.strong_count.dec();
-        binder_object.compute_decrease_actions(&mut state, actions);
+        binder_object.lock().strong_count.dec_deferred();
+        actions.insert(ArcKey(binder_object.clone()));
     }
 }
 
@@ -2236,9 +2218,8 @@ struct WeakRefReleaser {}
 impl RefReleaser for WeakRefReleaser {
     /// Decrements the weak reference count of the binder object.
     fn dec_ref(binder_object: &Arc<BinderObject>, actions: &mut RefCountActions) {
-        let mut state = binder_object.lock();
-        state.weak_count.dec();
-        binder_object.compute_decrease_actions(&mut state, actions)
+        binder_object.lock().weak_count.dec_deferred();
+        actions.insert(ArcKey(binder_object.clone()));
     }
 }
 
@@ -2317,6 +2298,7 @@ impl BinderObject {
     /// Returns whether the object has any reference, or is waiting for an acknowledgement from the
     /// owning process. The object cannot be removed from the object table has long as this is
     /// true.
+    #[cfg(any(test, debug_assertions))]
     fn has_ref(&self) -> bool {
         let state = self.lock();
         state.weak_count.has_ref() || state.strong_count.has_ref()
@@ -2324,11 +2306,9 @@ impl BinderObject {
 
     /// Increments the strong reference count of the binder object. Allows to raise the strong
     /// count from 0 to 1.
-    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
-    /// `BinderProcess`.
     fn inc_strong_unchecked(self: &Arc<Self>, binder_thread: &Arc<BinderThread>) -> StrongRefGuard {
         let mut state = self.lock();
-        if state.strong_count.inc() {
+        if state.strong_count.inc_immediate() {
             binder_thread.lock().enqueue_command(Command::AcquireRef(self.local));
         }
         StrongRefGuard::new(Arc::clone(self))
@@ -2336,14 +2316,15 @@ impl BinderObject {
 
     /// Increments the strong reference count of the binder object. Fails is the current strong
     /// count is 0.
-    /// Takes a `RefCountActions` that must be `release`d without holding a lock on
-    /// `BinderProcess`.
     fn inc_strong_checked(self: &Arc<Self>) -> Result<StrongRefGuard, Errno> {
         let mut state = self.lock();
         if state.strong_count.count() == 0 {
             return error!(EINVAL);
         }
-        assert!(!state.strong_count.inc());
+        assert!(
+            !state.strong_count.inc_immediate(),
+            "tried to resurrect an object that had no strong references in its owner"
+        );
         Ok(StrongRefGuard::new(Arc::clone(self)))
     }
 
@@ -2351,9 +2332,8 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn inc_weak(self: &Arc<Self>, actions: &mut RefCountActions) -> WeakRefGuard {
-        if self.lock().weak_count.inc() {
-            actions.push(RefCountAction::IncRefs(self.clone()));
-        }
+        self.lock().weak_count.inc_deferred();
+        actions.insert(ArcKey(self.clone()));
         WeakRefGuard::new(self.clone())
     }
 
@@ -2361,9 +2341,8 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn ack_acquire(self: &Arc<Self>, actions: &mut RefCountActions) -> Result<(), Errno> {
-        let mut state = self.lock();
-        state.strong_count.ack()?;
-        self.compute_decrease_actions(&mut state, actions);
+        self.lock().strong_count.ack()?;
+        actions.insert(ArcKey(self.clone()));
         Ok(())
     }
 
@@ -2371,33 +2350,62 @@ impl BinderObject {
     /// Takes a `RefCountActions` that must be `release`d without holding a lock on
     /// `BinderProcess`.
     fn ack_incref(self: &Arc<Self>, actions: &mut RefCountActions) -> Result<(), Errno> {
-        let mut state = self.lock();
-        state.weak_count.ack()?;
-        self.compute_decrease_actions(&mut state, actions);
+        self.lock().weak_count.ack()?;
+        actions.insert(ArcKey(self.clone()));
         Ok(())
     }
 
-    /// Compute the list of `RefCountAction` to send to the client following a dec or an ack.
-    ///
-    /// A number of references decrements might have been enqueued while waiting for an
-    /// acknowledgement.
-    /// This method will compute these and returns the actions to send to the client.
-    fn compute_decrease_actions(
-        self: &Arc<Self>,
-        state: &mut BinderObjectMutableState,
-        actions: &mut RefCountActions,
-    ) {
-        // No decrease action are sent when waiting for any acknowledgement.
-        if state.strong_count.is_waiting_ack() || state.weak_count.is_waiting_ack() {
+    fn apply_deferred_refcounts(self: &Arc<Self>) {
+        let Some(process) = self.owner.upgrade() else {
             return;
+        };
+
+        let mut commands = Vec::new();
+
+        {
+            let mut process_state = process.lock();
+            let mut object_state = self.lock();
+
+            // Enqueue increase actions.
+            assert!(
+                !object_state.strong_count.apply_deferred_inc(),
+                "The strong refcount is never incremented deferredly"
+            );
+            if object_state.weak_count.apply_deferred_inc() {
+                commands.push(Command::IncRef(self.local));
+            }
+
+            // No decrease actions are enqueued while waiting for any acknowledgement.
+            let mut did_decrease = false;
+            if !object_state.strong_count.is_waiting_ack()
+                && !object_state.weak_count.is_waiting_ack()
+            {
+                if object_state.strong_count.apply_deferred_dec() {
+                    commands.push(Command::ReleaseRef(self.local));
+                    did_decrease = true;
+                }
+                if object_state.weak_count.apply_deferred_dec() {
+                    commands.push(Command::DecRef(self.local));
+                    did_decrease = true;
+                }
+            }
+
+            // Forget this object if we have just remove the last reference to it.
+            if did_decrease
+                && !object_state.strong_count.has_ref()
+                && !object_state.weak_count.has_ref()
+            {
+                let removed = process_state.objects.remove(&self.local.weak_ref_addr);
+                assert_eq!(
+                    removed.as_ref().map(Arc::as_ptr),
+                    Some(Arc::as_ptr(self)),
+                    "Did not remove the expected BinderObject"
+                );
+            }
         }
-        // If the current ref count is 0, and the client has a reference, notify the client that
-        // it can release its reference.
-        if state.strong_count.try_release() {
-            actions.push(RefCountAction::Release(self.clone()));
-        }
-        if state.weak_count.try_release() {
-            actions.push(RefCountAction::DecRefs(self.clone()));
+
+        for command in commands {
+            process.enqueue_command(command)
         }
     }
 }
@@ -4427,16 +4435,14 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let (transaction_ref, guard) = BinderObject::new(
+        let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0xffffffffffffffff),
-                strong_ref_addr: UserAddress::from(0x1111111111111111),
-            },
-            0,
+            UserAddress::from(0xffffffffffffffff),
+            UserAddress::from(0x1111111111111111),
         );
         scopeguard::defer! {
             transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+            transaction_ref.apply_deferred_refcounts();
         }
 
         // Insert the transaction once.
@@ -4481,16 +4487,14 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let (transaction_ref, guard) = BinderObject::new(
+        let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0xffffffffffffffff),
-                strong_ref_addr: UserAddress::from(0x1111111111111111),
-            },
-            0,
+            UserAddress::from(0xffffffffffffffff),
+            UserAddress::from(0x1111111111111111),
         );
         scopeguard::defer! {
             transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+            transaction_ref.apply_deferred_refcounts();
         }
 
         // Transactions always take a strong reference to binder objects.
@@ -4524,13 +4528,10 @@ pub mod tests {
         let proc_1 = test.new_process();
         let proc_2 = test.new_process();
 
-        let (transaction_ref, guard) = BinderObject::new(
+        let (transaction_ref, guard) = register_binder_object(
             &proc_1.proc,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0xffffffffffffffff),
-                strong_ref_addr: UserAddress::from(0x1111111111111111),
-            },
-            0,
+            UserAddress::from(0xffffffffffffffff),
+            UserAddress::from(0x1111111111111111),
         );
 
         // Keep guard to simulate another process keeping a reference.
@@ -4541,8 +4542,7 @@ pub mod tests {
             other_process_guard.release(&mut RefCountActions::default_released());
             // Ack the initial acquire.
             transaction_ref.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
-            // Ack the subsequent incref from the test.
-            transaction_ref.ack_incref(&mut RefCountActions::default_released()).expect("ack_incref");
+            transaction_ref.apply_deferred_refcounts();
         }
 
         // The handle starts with a strong ref.
@@ -4930,14 +4930,12 @@ pub mod tests {
         let test = TranslateHandlesTestFixture::new();
         let proc = test.new_process();
 
-        let (object, guard) = BinderObject::new(
+        let (object, guard) = register_binder_object(
             &proc.proc,
-            LocalBinderObject {
-                weak_ref_addr: UserAddress::from(0x0000000000000010),
-                strong_ref_addr: UserAddress::from(0x0000000000000100),
-            },
-            0,
+            UserAddress::from(0x0000000000000010),
+            UserAddress::from(0x0000000000000100),
         );
+
         // Simulate another process keeping a strong reference.
         let other_process_guard = object.inc_strong_checked();
 
@@ -4980,6 +4978,7 @@ pub mod tests {
 
         // Simulate another process droppping its reference.
         other_process_guard.release(&mut RefCountActions::default_released());
+        object.apply_deferred_refcounts();
         // Ack the initial acquire.
         object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
         // Ack the subsequent incref from the test.
@@ -4992,6 +4991,7 @@ pub mod tests {
         handle_table
             .dec_weak(handle.object_index(), &mut RefCountActions::default_released())
             .expect("dec_weak 0");
+        object.apply_deferred_refcounts();
 
         // Another removal attempt will prove the handle has been removed.
         handle_table
@@ -5440,13 +5440,14 @@ pub mod tests {
         let mut allocations =
             receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
-        let local_binder_object = LocalBinderObject {
-            weak_ref_addr: UserAddress::from(0x0000000000000010),
-            strong_ref_addr: UserAddress::from(0x0000000000000100),
-        };
-        let (binder_object, guard) = BinderObject::new(&receiver.proc, local_binder_object, 0);
+        let (binder_object, guard) = register_binder_object(
+            &receiver.proc,
+            UserAddress::from(0x0000000000000010),
+            UserAddress::from(0x0000000000000100),
+        );
         scopeguard::defer! {
             binder_object.ack_acquire(&mut RefCountActions::default_released()).expect("ack_acquire");
+            binder_object.apply_deferred_refcounts();
         }
 
         // Pretend the binder object was given to the sender earlier, so it can be sent back.
@@ -5492,8 +5493,8 @@ pub mod tests {
         expected_transaction_data.extend(struct_with_union_into_bytes!(flat_binder_object {
             hdr.type_: BINDER_TYPE_BINDER,
             flags: 0,
-            cookie: local_binder_object.strong_ref_addr.ptr() as u64,
-            __bindgen_anon_1.binder: local_binder_object.weak_ref_addr.ptr() as u64,
+            cookie: binder_object.local.strong_ref_addr.ptr() as u64,
+            __bindgen_anon_1.binder: binder_object.local.weak_ref_addr.ptr() as u64,
         }));
         assert_eq!(&expected_transaction_data, &transaction_data);
     }
