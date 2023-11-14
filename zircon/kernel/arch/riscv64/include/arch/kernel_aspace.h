@@ -23,4 +23,9 @@
 #define USER_ASPACE_BASE 0x0000000000200000UL
 #define USER_ASPACE_SIZE ((1UL << 38) - USER_ASPACE_BASE)
 
+// Size of the restricted mode address space in unified address spaces.
+// We set the top of the restricted aspace to exactly halfway through the top
+// level page table.
+#define USER_RESTRICTED_ASPACE_SIZE ((1UL << 37) - USER_ASPACE_BASE)
+
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_INCLUDE_ARCH_KERNEL_ASPACE_H_

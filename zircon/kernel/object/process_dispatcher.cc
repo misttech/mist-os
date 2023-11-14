@@ -38,7 +38,7 @@
 namespace {
 
 constexpr vaddr_t kPrivateAspaceBase = USER_ASPACE_BASE;
-constexpr vaddr_t kPrivateAspaceSize = PAGE_ALIGN(USER_ASPACE_SIZE / 2);
+constexpr vaddr_t kPrivateAspaceSize = USER_RESTRICTED_ASPACE_SIZE;
 
 // We leave a 1 page gap in between the private and shared regions to prevent cross-aspace reads
 // and writes from working.

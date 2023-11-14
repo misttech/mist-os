@@ -23,4 +23,8 @@
 // See //docs/concepts/kernel/sysret_problem.md for why we subtract 4k here.
 #define USER_ASPACE_SIZE ((1ULL << 47) - 4096 - USER_ASPACE_BASE)
 
+// Size of the restricted mode address space in unified address spaces.
+// We set the top of the restricted aspace to exactly halfway through the PML4.
+#define USER_RESTRICTED_ASPACE_SIZE ((1ULL << 46) - USER_ASPACE_BASE)
+
 #endif  // ZIRCON_KERNEL_ARCH_X86_INCLUDE_ARCH_KERNEL_ASPACE_H_

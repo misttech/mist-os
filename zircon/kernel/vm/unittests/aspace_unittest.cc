@@ -484,7 +484,7 @@ static bool vmaspace_unified_accessed_test() {
 
   // Create a unified aspace.
   constexpr vaddr_t kPrivateAspaceBase = USER_ASPACE_BASE;
-  constexpr vaddr_t kPrivateAspaceSize = PAGE_ALIGN(USER_ASPACE_SIZE / 2);
+  constexpr vaddr_t kPrivateAspaceSize = USER_RESTRICTED_ASPACE_SIZE;
   constexpr vaddr_t kSharedAspaceBase = kPrivateAspaceBase + kPrivateAspaceSize + PAGE_SIZE;
   constexpr vaddr_t kSharedAspaceSize = USER_ASPACE_BASE + USER_ASPACE_SIZE - kSharedAspaceBase;
   fbl::RefPtr<VmAspace> restricted_aspace =
