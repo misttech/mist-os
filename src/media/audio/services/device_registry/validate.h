@@ -23,20 +23,21 @@ zx_status_t ValidateSupportedFormats(
 zx_status_t ValidateGainState(
     const fuchsia_hardware_audio::GainState& gain_state,
     std::optional<const fuchsia_hardware_audio::StreamProperties> stream_properties = std::nullopt);
-zx_status_t ValidatePlugState(
-    const fuchsia_hardware_audio::PlugState& plug_state,
-    std::optional<const fuchsia_hardware_audio::StreamProperties> stream_properties = std::nullopt);
+zx_status_t ValidatePlugState(const fuchsia_hardware_audio::PlugState& plug_state,
+                              std::optional<fuchsia_hardware_audio::PlugDetectCapabilities>
+                                  plug_detect_capabilities = std::nullopt);
 bool ValidateDeviceInfo(const fuchsia_audio_device::Info& device_info);
 
-zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& format);
 zx_status_t ValidateRingBufferProperties(
     const fuchsia_hardware_audio::RingBufferProperties& rb_props);
+zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& format);
+zx_status_t ValidateFormatCompatibility(uint8_t bytes_per_sample,
+                                        fuchsia_hardware_audio::SampleFormat sample_format);
 zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
                                   const fuchsia_hardware_audio::Format& format);
 zx_status_t ValidateDelayInfo(
     const fuchsia_hardware_audio::DelayInfo& delay_info,
-    const std::optional<const fuchsia_hardware_audio::RingBufferProperties>& rb_props,
-    const fuchsia_hardware_audio::PcmFormat& format);
+    const std::optional<const fuchsia_hardware_audio::RingBufferProperties>& rb_props);
 
 }  // namespace media_audio
 

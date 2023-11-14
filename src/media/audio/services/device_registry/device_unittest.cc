@@ -88,12 +88,6 @@ TEST_F(DeviceTest, EmptyHealthResponse) {
   EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
 }
 
-// TODO(fxbug.dev/117826): manufacturer and product strings that are 256 chars long
-
-// TODO(fxbug.dev/117826): unittest ValidateStreamProperties
-
-// TODO(fxbug.dev/117826): unittest ValidateSupportedFormats
-
 TEST_F(DeviceTest, DistinctTokenIds) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
@@ -141,10 +135,6 @@ TEST_F(DeviceTest, ClockInOtherDomain) {
   EXPECT_EQ(fake_device_presence_watcher_->error_devices().size(), 0u);
 }
 
-// TODO(fxbug.dev/117826): unittest ValidateGainState
-
-// TODO(fxbug.dev/117826): unittest ValidatePlugState
-
 TEST_F(DeviceTest, CreateDeviceInfo) {
   InitializeDeviceForFakeDriver();
   ASSERT_TRUE(InInitializedState(device_));
@@ -156,10 +146,6 @@ TEST_F(DeviceTest, CreateDeviceInfo) {
   EXPECT_TRUE(info.clock_domain());
   EXPECT_EQ(*info.clock_domain(), fuchsia_hardware_audio::kClockDomainMonotonic);
 }
-
-// TODO(fxbug.dev/117826): unittest ValidateDeviceInfo
-
-// TODO(fxbug.dev/117826): unittest TranslateFormatSets
 
 // TODO(fxbug.dev/117826): unittest RetrieveCurrentlyPermittedFormats
 

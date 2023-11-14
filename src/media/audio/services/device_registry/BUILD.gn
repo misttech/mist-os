@@ -81,6 +81,7 @@ executable("device_registry_unittests_bin") {
     "provider_server_unittest.cc",
     "registry_server_unittest.cc",
     "ring_buffer_server_unittest.cc",
+    "validate_unittest.cc",
   ]
 
   deps = [
@@ -103,6 +104,7 @@ executable("device_registry_warning_unittests_bin") {
     "provider_server_warning_unittest.cc",
     "registry_server_warning_unittest.cc",
     "ring_buffer_server_warning_unittest.cc",
+    "validate_warning_unittest.cc",
   ]
 
   deps = [ ":unittest_base" ]

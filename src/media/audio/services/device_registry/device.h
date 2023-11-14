@@ -20,11 +20,9 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
-#include <map>
 #include <memory>
 #include <optional>
 #include <string_view>
-#include <unordered_set>
 
 #include "src/media/audio/lib/clock/clock.h"
 #include "src/media/audio/services/common/vector_of_weak_ptr.h"
@@ -88,7 +86,7 @@ class Device : public std::enable_shared_from_this<Device>,
     fuchsia_audio_device::RingBufferProperties properties;
   };
   bool CreateRingBuffer(const fuchsia_hardware_audio::Format& format,
-                        uint32_t min_ring_buffer_bytes,
+                        uint32_t requested_ring_buffer_bytes,
                         fit::callback<void(RingBufferInfo)> create_ring_buffer_callback);
 
   std::optional<bool> supports_set_active_channels() const { return supports_set_active_channels_; }
