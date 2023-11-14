@@ -710,14 +710,10 @@ instance or a [child collection][doc-collections].
     `in` may be the name of a dictionary or a path. If it is a path, it represents a
     nested dictionary. For example, `dict/a/b` refers to the dictionary `a/b` nested in
     `dict`, where `dict` is provided by the source.
-- `to`: (_optional `string or array of strings`_) Capability target(s). One of:
+- `to`: (_`string or array of strings`_) Capability target(s). One of:
     - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
       or an array of references.
     - `all`: Short-hand for an `offer` clause containing all child [references](#references).
-- `into`: (_optional `string or array of strings`_) Dictionary targets. Either `dict` or [`dict`, ...]. Designates the name of a dictionary
-    defined in `capabilities` to add a capability to.
-
-    Either `into` or `to` must be set, but not both.
 - `as`: (_optional `string`_) An explicit [name](#name) for the capability as it will be known by the target. If omitted,
     defaults to the original name. `as` cannot be used when an array of multiple names is
     provided.

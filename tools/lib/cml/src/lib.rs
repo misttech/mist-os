@@ -2723,13 +2723,7 @@ pub struct Offer {
     /// - `#<target-name>` or [`#name1`, ...]: A [reference](#references) to a child or collection,
     ///   or an array of references.
     /// - `all`: Short-hand for an `offer` clause containing all child [references](#references).
-    pub to: Option<OneOrMany<OfferToRef>>,
-
-    /// Dictionary targets. Either `dict` or [`dict`, ...]. Designates the name of a dictionary
-    /// defined in `capabilities` to add a capability to.
-    ///
-    /// Either `into` or `to` must be set, but not both.
-    pub into: Option<OneOrMany<Name>>,
+    pub to: OneOrMany<OfferToRef>,
 
     /// An explicit [name](#name) for the capability as it will be known by the target. If omitted,
     /// defaults to the original name. `as` cannot be used when an array of multiple names is
@@ -3817,10 +3811,10 @@ pub fn offer_to_all_would_duplicate(
         return Ok(false);
     }
 
-    let to_field_matches =
-        specific_offer.to.iter().flatten().any(
-            |specific_offer_to| matches!(specific_offer_to, OfferToRef::Named(c) if c == target),
-        );
+    let to_field_matches = specific_offer
+        .to
+        .iter()
+        .any(|specific_offer_to| matches!(specific_offer_to, OfferToRef::Named(c) if c == target));
 
     if !to_field_matches {
         return Ok(false);
@@ -3872,8 +3866,7 @@ impl Offer {
         Self {
             protocol: None,
             from,
-            to: Some(to),
-            into: None,
+            to,
             r#as: None,
             r#in: None,
             service: None,
@@ -4119,8 +4112,7 @@ mod tests {
             resolver: None,
             dictionary: None,
             from: OneOrMany::One(OfferFromRef::Self_),
-            to: None,
-            into: None,
+            to: OneOrMany::Many(vec![]),
             r#as: None,
             r#in: None,
             rights: None,
