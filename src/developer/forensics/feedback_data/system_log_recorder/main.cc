@@ -92,7 +92,7 @@ int main() {
   controller.SetStop([&] {
     recorder.Flush(kStopMessageStr);
     lifecycle_binding.Close(ZX_OK);
-    // Don't stop the loop so incoming logs can be persisted while appmgr is waiting to terminate v1
+    // Don't stop the loop so incoming logs can be persisted while waiting to terminate
     // components.
   });
 
