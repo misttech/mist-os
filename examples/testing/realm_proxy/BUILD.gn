@@ -18,7 +18,7 @@ rustc_test("bin") {
   sources = [ source_root ]
   name = "echo_server_test"
   deps = [
-    "../testing/fidl:test.echoserver_rust",
+    "testing/fidl:test.echoserver_rust",
     "//examples/components/routing/fidl:echo_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -49,7 +49,7 @@ fuchsia_component("test-root") {
 fuchsia_test_package("echo_server-test") {
   test_components = [ ":test-root" ]
   subpackages = [
-    "../testing/realm-factory",
+    "testing/realm-factory",
     ":test-suite",
   ]
 }

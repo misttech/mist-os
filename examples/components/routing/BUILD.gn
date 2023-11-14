@@ -40,7 +40,6 @@ group("hermetic_tests") {
   deps = [
     "integration_tests/cpp:echo_integration_test_cpp",
     "integration_tests/rust:echo_integration_test_rust",
-    "rust/echo_server/tests",
     "with_subpackages:hermetic_tests",
   ]
 }
