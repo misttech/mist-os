@@ -23,7 +23,10 @@ use fidl::{
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use std::sync::Arc;
-use vfs::{attributes, directory, execution_scope, file, path, ToObjectRequest};
+use vfs::{
+    attributes, directory, directory::entry::DirectoryEntry, execution_scope, file, path,
+    ToObjectRequest,
+};
 
 /// Returns a handle implementing a fuchsia.io.Node delegating to the given `file`.
 pub fn serve_file(
@@ -50,13 +53,7 @@ pub fn serve_file_at(
     let starnix_file = StarnixNodeConnection::new(system_task, file);
     kernel.kthreads.ehandle.spawn_detached(async move {
         let scope = execution_scope::ExecutionScope::new();
-        directory::entry::DirectoryEntry::open(
-            starnix_file,
-            scope.clone(),
-            open_flags.into(),
-            path::Path::dot(),
-            server_end,
-        );
+        starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
         scope.wait().await;
     });
     Ok(())
@@ -240,8 +237,7 @@ impl StarnixNodeConnection {
             };
 
             let starnix_file = StarnixNodeConnection::new(self.task.clone(), file);
-            directory::entry::DirectoryEntry::open(
-                starnix_file,
+            starnix_file.open(
                 scope,
                 flags,
                 path::Path::dot(),
