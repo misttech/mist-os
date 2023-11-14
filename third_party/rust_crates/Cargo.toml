@@ -693,7 +693,6 @@ group_visibility = { import = "//third_party/rust_crates/private_visibility.gni"
 deps = [
   ":bytes-v1_0_1",
   ":libc-v0_2_149",
-  ":memchr-v2_4_0",
   ":mio-v0_8_5",
   ":num_cpus-v1_13_0",
   ":signal-hook-registry-v1_3_0",
@@ -708,14 +707,12 @@ rustflags = [
   "--cfg=feature=\\\"process\\\"",
   "--cfg=feature=\\\"io-util\\\"",
   "--cfg=feature=\\\"bytes\\\"",
-  "--cfg=feature=\\\"memchr\\\"",
   "--cfg=feature=\\\"signal-hook-registry\\\"",
   "--cfg=feature=\\\"rt\\\"",
   "--cfg=feature=\\\"rt-multi-thread\\\"",
   "--cfg=feature=\\\"socket2\\\"",
   "--cfg=feature=\\\"sync\\\"",
   "--cfg=feature=\\\"time\\\"",
-  "--cfg=feature=\\\"winapi\\\"",
 ]
 
 # TODO(fxbug.dev/106164) This manual configuration enables the "log" so that

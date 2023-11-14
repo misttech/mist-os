@@ -15297,7 +15297,6 @@ rust_library("tokio-v1_25_2") {
   if (!(current_os == "fuchsia")) {
     deps += [ ":bytes-v1_0_1" ]
     deps += [ ":libc-v0_2_149" ]
-    deps += [ ":memchr-v2_4_0" ]
     deps += [ ":mio-v0_8_5" ]
     deps += [ ":num_cpus-v1_13_0" ]
     deps += [ ":signal-hook-registry-v1_3_0" ]
@@ -15325,14 +15324,12 @@ rust_library("tokio-v1_25_2") {
       "--cfg=feature=\"process\"",
       "--cfg=feature=\"io-util\"",
       "--cfg=feature=\"bytes\"",
-      "--cfg=feature=\"memchr\"",
       "--cfg=feature=\"signal-hook-registry\"",
       "--cfg=feature=\"rt\"",
       "--cfg=feature=\"rt-multi-thread\"",
       "--cfg=feature=\"socket2\"",
       "--cfg=feature=\"sync\"",
       "--cfg=feature=\"time\"",
-      "--cfg=feature=\"winapi\"",
     ]
   }
 
