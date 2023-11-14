@@ -313,7 +313,7 @@ mod tests {
         let msg1_verified = make_verified(keyframe, Role::Supplicant, &protection)
             .expect("error verifying group frame");
         handshake
-            .on_eapol_key_frame(&mut update_sink, 0, msg1_verified)
+            .on_eapol_key_frame(&mut update_sink, msg1_verified)
             .expect("error processing msg1 of Group Key Handshake");
 
         // Verify correct GTK was derived.
@@ -339,7 +339,7 @@ mod tests {
         let msg1_verified = make_verified(keyframe, Role::Supplicant, &protection)
             .expect("error verifying group frame");
         handshake
-            .on_eapol_key_frame(&mut update_sink, 0, msg1_verified)
+            .on_eapol_key_frame(&mut update_sink, msg1_verified)
             .expect("error processing msg1 of Group Key Handshake");
 
         // Verify correct GTK was derived.
@@ -368,7 +368,7 @@ mod tests {
         let msg1_verified = make_verified(keyframe, Role::Supplicant, &protection)
             .expect("error verifying group frame");
         handshake
-            .on_eapol_key_frame(&mut update_sink, 0, msg1_verified)
+            .on_eapol_key_frame(&mut update_sink, msg1_verified)
             .expect("error processing msg1 of Group Key Handshake");
 
         // Verify correct GTK was derived.

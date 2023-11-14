@@ -151,7 +151,6 @@ impl GroupKey {
     pub fn on_eapol_key_frame<B: ByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
-        _key_replay_counter: u64,
         frame: Dot11VerifiedKeyFrame<B>,
     ) -> Result<(), Error> {
         match &mut self.0 {

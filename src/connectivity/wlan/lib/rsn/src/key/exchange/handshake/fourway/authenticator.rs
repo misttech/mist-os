@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::key::exchange::handshake::fourway::{self, Config, FourwayHandshakeFrame};
+use crate::key::exchange::handshake::fourway::{
+    self, AuthenticatorKeyReplayCounter, Config, FourwayHandshakeFrame, SupplicantKeyReplayCounter,
+};
 use crate::key::exchange::{compute_mic_from_buf, Key};
 use crate::key::gtk::Gtk;
 use crate::key::igtk::Igtk;
@@ -29,7 +31,7 @@ pub enum State {
         pmk: Vec<u8>,
         cfg: Config,
         anonce: Nonce,
-        last_key_replay_counter: u64,
+        key_replay_counter: AuthenticatorKeyReplayCounter,
     },
     AwaitingMsg4 {
         pmk: Vec<u8>,
@@ -37,7 +39,7 @@ pub enum State {
         gtk: Gtk,
         igtk: Option<Igtk>,
         cfg: Config,
-        last_key_replay_counter: u64,
+        key_replay_counter: AuthenticatorKeyReplayCounter,
     },
     Completed {
         cfg: Config,
@@ -49,17 +51,20 @@ pub fn new(cfg: Config, pmk: Vec<u8>) -> State {
 }
 
 impl State {
-    pub fn initiate(self, update_sink: &mut UpdateSink, key_replay_counter: u64) -> Self {
+    /// If [`self`] is in [`State::Idle`], then this function will push a
+    /// [`SecAssocUpdate::TxEapolKeyFrame`] into [`update_sink`] and result [`self`]. Otherwise,
+    /// this function is a no-op.
+    pub fn initiate(
+        self,
+        update_sink: &mut UpdateSink,
+        s_key_replay_counter: SupplicantKeyReplayCounter,
+    ) -> Self {
+        let key_replay_counter = AuthenticatorKeyReplayCounter::next_after(*s_key_replay_counter);
         match self {
             State::Idle { cfg, pmk } => {
                 let anonce = cfg.nonce_rdr.next();
                 match initiate_internal(update_sink, &cfg, key_replay_counter, &anonce[..]) {
-                    Ok(()) => State::AwaitingMsg2 {
-                        anonce,
-                        cfg,
-                        pmk,
-                        last_key_replay_counter: key_replay_counter + 1,
-                    },
+                    Ok(()) => State::AwaitingMsg2 { anonce, cfg, pmk, key_replay_counter },
                     Err(e) => {
                         error!("error: {}", e);
                         State::Idle { cfg, pmk }
@@ -73,7 +78,6 @@ impl State {
     pub fn on_eapol_key_frame<B: ByteSlice>(
         self,
         update_sink: &mut UpdateSink,
-        _key_replay_counter: u64,
         frame: FourwayHandshakeFrame<B>,
     ) -> Self {
         match self {
@@ -81,7 +85,7 @@ impl State {
                 error!("received EAPOL Key frame before initiate 4-Way Handshake");
                 State::Idle { cfg, pmk }
             }
-            State::AwaitingMsg2 { pmk, cfg, anonce, last_key_replay_counter } => {
+            State::AwaitingMsg2 { pmk, cfg, anonce, key_replay_counter } => {
                 // Safe since the frame is only used for deriving the message number.
                 match frame.message_number() {
                     fourway::MessageNumber::Message2 => {
@@ -90,21 +94,15 @@ impl State {
                             &pmk[..],
                             &cfg,
                             &anonce[..],
-                            last_key_replay_counter,
-                            last_key_replay_counter + 1,
+                            key_replay_counter,
                             frame,
                         ) {
-                            Ok((ptk, gtk, igtk)) => State::AwaitingMsg4 {
-                                pmk,
-                                ptk,
-                                gtk,
-                                igtk,
-                                cfg,
-                                last_key_replay_counter: last_key_replay_counter + 1,
-                            },
+                            Ok((ptk, gtk, igtk, key_replay_counter)) => {
+                                State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, key_replay_counter }
+                            }
                             Err(e) => {
                                 warn!("Unable to process second EAPOL handshake key frame from supplicant: {}", e);
-                                State::AwaitingMsg2 { pmk, cfg, anonce, last_key_replay_counter }
+                                State::AwaitingMsg2 { pmk, cfg, anonce, key_replay_counter }
                             }
                         }
                     }
@@ -113,24 +111,24 @@ impl State {
                             "error: {:?}",
                             Error::UnexpectedHandshakeMessage(unexpected_msg.into())
                         );
-                        State::AwaitingMsg2 { pmk, cfg, anonce, last_key_replay_counter }
+                        State::AwaitingMsg2 { pmk, cfg, anonce, key_replay_counter }
                     }
                 }
             }
-            State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, last_key_replay_counter } => {
+            State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, key_replay_counter } => {
                 match process_message_4(
                     update_sink,
                     &cfg,
                     &ptk,
                     &gtk,
                     &igtk,
-                    last_key_replay_counter,
+                    key_replay_counter,
                     frame,
                 ) {
                     Ok(()) => State::Completed { cfg },
                     Err(e) => {
                         error!("error: {}", e);
-                        State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, last_key_replay_counter }
+                        State::AwaitingMsg4 { pmk, ptk, gtk, igtk, cfg, key_replay_counter }
                     }
                 }
             }
@@ -184,11 +182,10 @@ impl State {
 fn initiate_internal(
     update_sink: &mut UpdateSink,
     cfg: &Config,
-    key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
     anonce: &[u8],
 ) -> Result<(), anyhow::Error> {
     let protection = NegotiatedProtection::from_protection(&cfg.s_protection)?;
-    let key_replay_counter = key_replay_counter + 1;
     let msg1 = create_message_1(anonce, &protection, key_replay_counter)?;
     update_sink.push(SecAssocUpdate::TxEapolKeyFrame { frame: msg1, expect_response: true });
     Ok(())
@@ -199,11 +196,10 @@ fn process_message_2<B: ByteSlice>(
     pmk: &[u8],
     cfg: &Config,
     anonce: &[u8],
-    last_key_replay_counter: u64,
-    next_key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
     frame: FourwayHandshakeFrame<B>,
-) -> Result<(Ptk, Gtk, Option<Igtk>), anyhow::Error> {
-    let ptk = handle_message_2(&pmk[..], &cfg, &anonce[..], last_key_replay_counter, frame)?;
+) -> Result<(Ptk, Gtk, Option<Igtk>, AuthenticatorKeyReplayCounter), anyhow::Error> {
+    let ptk = handle_message_2(&pmk[..], &cfg, &anonce[..], key_replay_counter, frame)?;
     let gtk = cfg
         .gtk_provider
         .as_ref()
@@ -237,6 +233,7 @@ fn process_message_2<B: ByteSlice>(
         None => None,
     };
     let protection = NegotiatedProtection::from_protection(&cfg.s_protection)?;
+    let key_replay_counter = AuthenticatorKeyReplayCounter::next_after(*key_replay_counter);
     let msg3 = create_message_3(
         &cfg,
         ptk.kck(),
@@ -245,11 +242,11 @@ fn process_message_2<B: ByteSlice>(
         &igtk,
         &anonce[..],
         &protection,
-        next_key_replay_counter,
+        key_replay_counter,
     )?;
 
     update_sink.push(SecAssocUpdate::TxEapolKeyFrame { frame: msg3, expect_response: true });
-    Ok((ptk, gtk, igtk))
+    Ok((ptk, gtk, igtk, key_replay_counter))
 }
 
 fn process_message_4<B: ByteSlice>(
@@ -258,10 +255,10 @@ fn process_message_4<B: ByteSlice>(
     ptk: &Ptk,
     gtk: &Gtk,
     igtk: &Option<Igtk>,
-    last_key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
     frame: FourwayHandshakeFrame<B>,
 ) -> Result<(), anyhow::Error> {
-    handle_message_4(cfg, ptk.kck(), last_key_replay_counter, frame)?;
+    handle_message_4(cfg, ptk.kck(), key_replay_counter, frame)?;
     update_sink.push(SecAssocUpdate::Key(Key::Ptk(ptk.clone())));
     update_sink.push(SecAssocUpdate::Key(Key::Gtk(gtk.clone())));
     if let Some(igtk) = igtk.as_ref() {
@@ -274,7 +271,7 @@ fn process_message_4<B: ByteSlice>(
 fn create_message_1<B: ByteSlice>(
     anonce: B,
     protection: &NegotiatedProtection,
-    key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
 ) -> Result<eapol::KeyFrameBuf, anyhow::Error> {
     let version = derive_key_descriptor_version(eapol::KeyDescriptor::IEEE802DOT11, protection);
     let key_info = eapol::KeyInformation(0)
@@ -297,7 +294,7 @@ fn create_message_1<B: ByteSlice>(
             eapol::KeyDescriptor::IEEE802DOT11,
             key_info,
             key_len,
-            key_replay_counter,
+            *key_replay_counter,
             eapol::to_array(&anonce),
             [0u8; 16], // iv
             0,         // rsc
@@ -315,7 +312,7 @@ pub fn handle_message_2<B: ByteSlice>(
     pmk: &[u8],
     cfg: &Config,
     anonce: &[u8],
-    key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
     frame: FourwayHandshakeFrame<B>,
 ) -> Result<Ptk, anyhow::Error> {
     // Safe: The nonce must be accessed to compute the PTK. The frame will still be fully verified
@@ -348,9 +345,9 @@ pub fn handle_message_2<B: ByteSlice>(
         }
     };
     ensure!(
-        frame.key_frame_fields.key_replay_counter.to_native() == key_replay_counter,
+        frame.key_frame_fields.key_replay_counter.to_native() == *key_replay_counter,
         "error, expected Supplicant response to message {:?} but was {:?} in msg #2",
-        key_replay_counter,
+        *key_replay_counter,
         frame.key_frame_fields.key_replay_counter.to_native()
     );
 
@@ -368,7 +365,7 @@ fn create_message_3(
     igtk: &Option<Igtk>,
     anonce: &[u8],
     protection: &NegotiatedProtection,
-    key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
 ) -> Result<eapol::KeyFrameBuf, anyhow::Error> {
     // Construct key data which contains the Beacon's RSNE and a GTK KDE.
     let mut w = kde::Writer::new(vec![]);
@@ -409,7 +406,7 @@ fn create_message_3(
             eapol::KeyDescriptor::IEEE802DOT11,
             key_info,
             key_len,
-            key_replay_counter,
+            *key_replay_counter,
             eapol::to_array(anonce),
             key_iv,
             0, // rsc
@@ -428,7 +425,7 @@ fn create_message_3(
 pub fn handle_message_4<B: ByteSlice>(
     cfg: &Config,
     kck: &[u8],
-    key_replay_counter: u64,
+    key_replay_counter: AuthenticatorKeyReplayCounter,
     frame: FourwayHandshakeFrame<B>,
 ) -> Result<(), anyhow::Error> {
     let protection = NegotiatedProtection::from_protection(&cfg.s_protection)?;
@@ -446,9 +443,9 @@ pub fn handle_message_4<B: ByteSlice>(
         }
     };
     ensure!(
-        frame.key_frame_fields.key_replay_counter.to_native() == key_replay_counter,
+        frame.key_frame_fields.key_replay_counter.to_native() == *key_replay_counter,
         "error, expected Supplicant response to message {:?} but was {:?} in msg #4",
-        key_replay_counter,
+        *key_replay_counter,
         frame.key_frame_fields.key_replay_counter.to_native()
     );
 

@@ -280,7 +280,7 @@ impl EssSa {
 
                 self.ptksa.replace_state(|state| state.initialize(pmk));
                 if let Ptksa::Initialized { method } = self.ptksa.as_mut() {
-                    method.initiate(update_sink, self.key_replay_counter)?;
+                    method.initiate(update_sink, self.key_replay_counter.into())?;
                 } else {
                     return Err(format_rsn_err!("PTKSA not initialized"));
                 }
@@ -587,18 +587,14 @@ impl EssSa {
             match self.ptksa.as_mut() {
                 Ptksa::Uninitialized { .. } => Ok(()),
                 Ptksa::Initialized { method } | Ptksa::Established { method, .. } => {
-                    method.on_eapol_key_frame(update_sink, self.key_replay_counter, verified_frame)
+                    method.on_eapol_key_frame(update_sink, verified_frame)
                 }
             }
         } else if raw_frame.key_frame_fields.key_info().key_type() == eapol::KeyType::GROUP_SMK {
             match self.gtksa.as_mut() {
                 Gtksa::Uninitialized { .. } => Ok(()),
                 Gtksa::Initialized { method } | Gtksa::Established { method, .. } => match method {
-                    Some(method) => method.on_eapol_key_frame(
-                        update_sink,
-                        self.key_replay_counter,
-                        verified_frame,
-                    ),
+                    Some(method) => method.on_eapol_key_frame(update_sink, verified_frame),
                     None => {
                         error!("received group key EAPOL Key frame with GTK re-keying disabled");
                         Ok(())

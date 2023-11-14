@@ -17,7 +17,10 @@ use crate::ProtectionInfo;
 use crate::{rsn_ensure, Error};
 use eapol;
 use ieee80211::MacAddr;
-use std::sync::{Arc, Mutex};
+use std::{
+    ops::Deref,
+    sync::{Arc, Mutex},
+};
 use wlan_common::ie::rsn::{cipher::Cipher, rsne::Rsne, suite_filter::DEFAULT_GROUP_MGMT_CIPHER};
 use wlan_statemachine::StateMachine;
 use zerocopy::ByteSlice;
@@ -28,6 +31,44 @@ pub enum MessageNumber {
     Message2 = 2,
     Message3 = 3,
     Message4 = 4,
+}
+
+/// Represents the current value of an Authenticator's Key Replay Counter
+/// as defined in IEEE 802.11-2016 12.7.2 EAPOL-Key frames.
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub struct AuthenticatorKeyReplayCounter(u64);
+
+impl Deref for AuthenticatorKeyReplayCounter {
+    type Target = u64;
+
+    fn deref(&self) -> &u64 {
+        &self.0
+    }
+}
+
+impl AuthenticatorKeyReplayCounter {
+    pub fn next_after(key_replay_counter: u64) -> Self {
+        Self(key_replay_counter + 1)
+    }
+}
+
+/// Represents the current value of a Supplicant's Key Replay Counter
+/// as defined in IEEE 802.11-2016 12.7.2 EAPOL-Key frames.
+#[derive(Debug, Clone, Copy)]
+pub struct SupplicantKeyReplayCounter(u64);
+
+impl Deref for SupplicantKeyReplayCounter {
+    type Target = u64;
+
+    fn deref(&self) -> &u64 {
+        &self.0
+    }
+}
+
+impl From<u64> for SupplicantKeyReplayCounter {
+    fn from(a: u64) -> Self {
+        Self(a)
+    }
 }
 
 /// Struct which carries EAPOL key frames which comply with IEEE Std 802.11-2016, 12.7.2 and
@@ -298,12 +339,12 @@ impl Fourway {
     pub fn initiate(
         &mut self,
         update_sink: &mut Vec<SecAssocUpdate>,
-        key_replay_counter: u64,
+        s_key_replay_counter: SupplicantKeyReplayCounter,
     ) -> Result<(), Error> {
         match self {
             Fourway::Authenticator(state_machine) => {
                 state_machine
-                    .replace_state(|state| state.initiate(update_sink, key_replay_counter));
+                    .replace_state(|state| state.initiate(update_sink, s_key_replay_counter));
                 Ok(())
             }
             // TODO(hahnr): Supplicant cannot initiate yet.
@@ -314,15 +355,12 @@ impl Fourway {
     pub fn on_eapol_key_frame<B: ByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,
-        key_replay_counter: u64,
         frame: Dot11VerifiedKeyFrame<B>,
     ) -> Result<(), Error> {
         match self {
             Fourway::Authenticator(state_machine) => {
                 let frame = FourwayHandshakeFrame::from_verified(frame, Role::Authenticator, None)?;
-                state_machine.replace_state(|state| {
-                    state.on_eapol_key_frame(update_sink, key_replay_counter, frame)
-                });
+                state_machine.replace_state(|state| state.on_eapol_key_frame(update_sink, frame));
                 Ok(())
             }
             Fourway::Supplicant(state_machine) => {
@@ -603,21 +641,41 @@ mod tests {
         },
     };
 
+    #[test]
+    fn correct_value_returned_by_authenticator_key_replay_counter() {
+        let key_replay_counter = AuthenticatorKeyReplayCounter(5);
+        assert_eq!(*key_replay_counter, 5);
+    }
+
+    #[test]
+    fn correct_value_returned_by_supplicant_key_replay_counter() {
+        let key_replay_counter = SupplicantKeyReplayCounter(5);
+        assert_eq!(*key_replay_counter, 5);
+    }
+
+    #[test]
+    fn next_replay_counter_is_next_integer() {
+        let s_key_replay_counter = SupplicantKeyReplayCounter(5);
+        let next_key_replay_counter =
+            AuthenticatorKeyReplayCounter::next_after(*s_key_replay_counter);
+        assert_eq!(*next_key_replay_counter, 6);
+    }
+
     // Create an Authenticator and Supplicant and performs the entire 4-Way Handshake.
     #[test]
     fn test_supplicant_with_authenticator() {
         let mut env = test_util::FourwayTestEnv::new();
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12);
+        let msg1 = env.initiate(12.into());
         assert_eq!(msg1.keyframe().eapol_fields.version, eapol::ProtocolVersion::IEEE802DOT1X2004);
-        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
+        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
         assert_eq!(msg2.keyframe().eapol_fields.version, eapol::ProtocolVersion::IEEE802DOT1X2004);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         assert_eq!(msg3.keyframe().eapol_fields.version, eapol::ProtocolVersion::IEEE802DOT1X2004);
-        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 13);
+        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 12.into());
         assert_eq!(msg4.keyframe().eapol_fields.version, eapol::ProtocolVersion::IEEE802DOT1X2004);
-        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         // Finally verify that Supplicant and Authenticator derived the same keys.
         assert_eq!(s_ptk, a_ptk);
@@ -633,19 +691,22 @@ mod tests {
         let protection = test_util::get_wpa3_protection();
 
         let mut update_sink = UpdateSink::default();
-        authenticator.initiate(&mut update_sink, 12).expect("initiating Authenticator");
+        authenticator.initiate(&mut update_sink, 11.into()).expect("initiating Authenticator");
         let msg1_buf = test_util::expect_eapol_resp(&update_sink[..]);
         let msg1 = msg1_buf.keyframe();
 
-        let update_sink = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0, &protection);
+        let update_sink =
+            test_util::send_msg_to_fourway(&mut supplicant, msg1, 11.into(), &protection);
         let msg2_buf = test_util::expect_eapol_resp(&update_sink[..]);
         let msg2 = msg2_buf.keyframe();
 
-        let update_sink = test_util::send_msg_to_fourway(&mut authenticator, msg2, 0, &protection);
+        let update_sink =
+            test_util::send_msg_to_fourway(&mut authenticator, msg2, 12.into(), &protection);
         let msg3_buf = test_util::expect_eapol_resp(&update_sink[..]);
         let msg3 = msg3_buf.keyframe();
 
-        let update_sink = test_util::send_msg_to_fourway(&mut supplicant, msg3, 0, &protection);
+        let update_sink =
+            test_util::send_msg_to_fourway(&mut supplicant, msg3, 12.into(), &protection);
         test_util::expect_eapol_resp(&update_sink[..]);
 
         (authenticator, supplicant)
@@ -669,13 +730,13 @@ mod tests {
         let protection = test_util::get_wpa3_protection();
         let msg1_buf = test_util::get_wpa3_4whs_msg1(&anonce[..]);
         let msg1 = msg1_buf.keyframe();
-        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0, &protection);
+        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0.into(), &protection);
         let msg2 = test_util::expect_eapol_resp(&updates[..]);
         let a_ptk =
             test_util::get_wpa3_ptk(&anonce[..], &msg2.keyframe().key_frame_fields.key_nonce[..]);
         let msg3_buf = &test_util::get_wpa3_4whs_msg3(&a_ptk, &anonce[..], &gtk[..], igtk);
         let msg3 = msg3_buf.keyframe();
-        (a_ptk, test_util::send_msg_to_fourway(&mut supplicant, msg3, 0, &protection))
+        (a_ptk, test_util::send_msg_to_fourway(&mut supplicant, msg3, 0.into(), &protection))
     }
 
     #[test]
@@ -714,13 +775,13 @@ mod tests {
         let anonce = [0xab; 32];
         let msg1_buf = test_util::get_wpa1_4whs_msg1(&anonce[..]);
         let msg1 = msg1_buf.keyframe();
-        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0, &protection);
+        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0.into(), &protection);
         let msg2 = test_util::expect_eapol_resp(&updates[..]);
         let a_ptk =
             test_util::get_wpa1_ptk(&anonce[..], &msg2.keyframe().key_frame_fields.key_nonce[..]);
         let msg3_buf = &test_util::get_wpa1_4whs_msg3(&a_ptk, &anonce[..]);
         let msg3 = msg3_buf.keyframe();
-        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg3, 0, &protection);
+        let updates = test_util::send_msg_to_fourway(&mut supplicant, msg3, 0.into(), &protection);
 
         // Verify that we completed the exchange and computed the same PTK as our fake AP would.
         test_util::expect_eapol_resp(&updates[..]);
@@ -733,15 +794,15 @@ mod tests {
         let mut env = test_util::FourwayTestEnv::new();
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12);
-        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
-        let (_, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 13);
+        let msg1 = env.initiate(12.into());
+        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
+        let (_, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 12.into());
 
         // Replay third message pretending Authenticator did not receive Supplicant's response.
         let mut update_sink = UpdateSink::default();
 
-        env.send_msg3_to_supplicant_capture_updates(msg3.keyframe(), 13, &mut update_sink);
+        env.send_msg3_to_supplicant_capture_updates(msg3.keyframe(), 12.into(), &mut update_sink);
         let msg4 = test_util::expect_eapol_resp(&update_sink[..]);
 
         for update in update_sink {
@@ -751,7 +812,7 @@ mod tests {
         }
 
         // Let Authenticator process 4th message.
-        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         // Finally verify that Supplicant and Authenticator derived the same keys.
         assert_eq!(s_ptk, a_ptk);
@@ -763,11 +824,11 @@ mod tests {
         let mut env = test_util::FourwayTestEnv::new();
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12);
+        let msg1 = env.initiate(11.into());
         let anonce = msg1.keyframe().key_frame_fields.key_nonce.clone();
-        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
-        let (_, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 13);
+        let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
+        let (_, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 12.into());
 
         // Replay third message pretending Authenticator did not receive Supplicant's response.
         // Modify GTK to simulate GTK rotation while 4-Way Handshake was in progress.
@@ -777,7 +838,7 @@ mod tests {
             msg3.key_frame_fields.key_replay_counter.set_from_native(42);
         });
         let mut update_sink = UpdateSink::default();
-        env.send_msg3_to_supplicant_capture_updates(msg3.keyframe(), 13, &mut update_sink);
+        env.send_msg3_to_supplicant_capture_updates(msg3.keyframe(), 13.into(), &mut update_sink);
 
         // Ensure Supplicant rejected and dropped 3rd message without replying.
         assert_eq!(update_sink.len(), 0);
@@ -789,24 +850,24 @@ mod tests {
     fn test_random_iv_msg1_v1() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(1);
+        let msg1 = env.initiate(1.into());
         let mut buf = vec![];
         let mut msg1 = msg1.copy_keyframe_mut(&mut buf);
         msg1.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2001;
         msg1.key_frame_fields.key_iv = [0xFFu8; 16];
-        env.send_msg1_to_supplicant_expect_err(msg1, 1);
+        env.send_msg1_to_supplicant_expect_err(msg1, 1.into());
     }
 
     #[test]
     fn test_random_iv_msg1_v2() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(1);
+        let msg1 = env.initiate(1.into());
         let mut buf = vec![];
         let mut msg1 = msg1.copy_keyframe_mut(&mut buf);
         msg1.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2004;
         msg1.key_frame_fields.key_iv = [0xFFu8; 16];
-        env.send_msg1_to_supplicant_expect_err(msg1, 1);
+        env.send_msg1_to_supplicant_expect_err(msg1, 1.into());
     }
 
     // EAPOL Key frames can carry a random IV in the third message of the 4-Way Handshake if
@@ -818,17 +879,17 @@ mod tests {
     fn test_random_iv_msg3_v2001() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg1 = env.initiate(11.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
         msg3.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2001;
         msg3.key_frame_fields.key_iv = [0xFFu8; 16];
         test_util::finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
-        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 13);
-        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
+        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         assert_eq!(s_ptk, a_ptk);
         assert_eq!(s_gtk, a_gtk);
@@ -838,17 +899,17 @@ mod tests {
     fn test_random_iv_msg3_v2004() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg1 = env.initiate(11.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
         msg3.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2004;
         msg3.key_frame_fields.key_iv = [0xFFu8; 16];
         test_util::finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
-        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 13);
-        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
+        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         assert_eq!(s_ptk, a_ptk);
         assert_eq!(s_gtk, a_gtk);
@@ -858,17 +919,17 @@ mod tests {
     fn test_zeroed_iv_msg3_v2004() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg1 = env.initiate(11.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
         msg3.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2004;
         msg3.key_frame_fields.key_iv = [0u8; 16];
         test_util::finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
-        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 13);
-        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (msg4, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
+        let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         assert_eq!(s_ptk, a_ptk);
         assert_eq!(s_gtk, a_gtk);
@@ -878,16 +939,16 @@ mod tests {
     fn test_random_iv_msg3_v2010() {
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg1 = env.initiate(11.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
         msg3.eapol_fields.version = eapol::ProtocolVersion::IEEE802DOT1X2010;
         msg3.key_frame_fields.key_iv = [0xFFu8; 16];
         test_util::finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
-        env.send_msg3_to_supplicant_expect_err(msg3, 13);
+        env.send_msg3_to_supplicant_expect_err(msg3, 12.into());
     }
 
     #[test]
@@ -895,16 +956,16 @@ mod tests {
         const GTK_RSC: u64 = 981234;
         let mut env = test_util::FourwayTestEnv::new();
 
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12, 13);
+        let msg1 = env.initiate(11.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
+        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
         msg3.key_frame_fields.key_rsc = BigEndianU64::from_native(GTK_RSC);
         test_util::finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
-        let (msg4, _, s_gtk) = env.send_msg3_to_supplicant(msg3, 13);
-        env.send_msg4_to_authenticator(msg4.keyframe(), 13);
+        let (msg4, _, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
+        env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
         // Verify Supplicant picked up the Authenticator's GTK RSC.
         assert_eq!(s_gtk.rsc, GTK_RSC);

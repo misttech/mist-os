@@ -230,6 +230,13 @@ pub enum Dot11VerifiedKeyFrame<B: ByteSlice> {
 }
 
 impl<B: ByteSlice> Dot11VerifiedKeyFrame<B> {
+    // [`key_replay_counter`] is the current value of the Key Replay Counter[1] in either the
+    // Supplicant or Authenticator. The Supplicant initializes its Key Replay Counter to 0 and
+    // updates the counter to the counter value contained in each valid message from the
+    // Authenticator. The Authenticator initializes its Key Replay Counter to 0 and updates
+    // the counter to the counter value contained in each message the Authenticator sends.
+    //
+    // [1]: IEEE 802.11-2016 12.7.2 EAPOL-Key frames
     pub fn from_frame(
         frame: eapol::KeyFrameRx<B>,
         role: &Role,
@@ -364,7 +371,6 @@ impl<B: ByteSlice> Dot11VerifiedKeyFrame<B> {
             eapol::KeyType::GROUP_SMK => {}
         };
 
-        // IEEE Std 802.11-2016, 12.7.2, d)
         if key_replay_counter > 0 {
             match sender {
                 // Supplicant responds to messages from the Authenticator with the same
@@ -379,6 +385,10 @@ impl<B: ByteSlice> Dot11VerifiedKeyFrame<B> {
                     );
                 }
                 // Authenticator must send messages with a strictly larger key replay counter.
+                //
+                // TODO(b/310698434): This logic only runs upon receipt of messages. It seems
+                // that an Authenticator should actually verify the current Key Replay Counter
+                // is equal to the Key Replay Counter value received.
                 Role::Authenticator => {
                     rsn_ensure!(
                         frame.key_frame_fields.key_replay_counter.to_native() > key_replay_counter,
@@ -580,8 +590,8 @@ mod tests {
         let mut env = test_util::FourwayTestEnv::new();
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12);
-        let (msg2_base, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
+        let msg1 = env.initiate(11.into());
+        let (msg2_base, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
 
         // IEEE 802.11 compliant key length.
         let mut buf = vec![];
@@ -608,8 +618,8 @@ mod tests {
         let mut env = test_util::FourwayTestEnv::new();
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12);
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12);
+        let msg1 = env.initiate(12.into());
+        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg2 = msg2.copy_keyframe_mut(&mut buf);
 
