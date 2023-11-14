@@ -235,13 +235,13 @@ TEST_F(ObserverServerTest, InitialGainState) {
   bool received_callback = false;
   observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), kGainDb);
         EXPECT_TRUE(*result->state()->muted());
         EXPECT_TRUE(*result->state()->agc_enabled());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -267,13 +267,13 @@ TEST_F(ObserverServerTest, GainChange) {
   bool received_callback = false;
   observer->client()->WatchGainState().Then(
       [&received_callback](fidl::Result<Observer::WatchGainState>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), 0.0f);
         EXPECT_FALSE(*result->state()->muted());
         EXPECT_FALSE(*result->state()->agc_enabled());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -282,13 +282,13 @@ TEST_F(ObserverServerTest, GainChange) {
   received_callback = false;
   observer->client()->WatchGainState().Then(
       [&received_callback, kGainDb](fidl::Result<Observer::WatchGainState>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         ASSERT_TRUE(result->state()->gain_db());
         EXPECT_EQ(*result->state()->gain_db(), kGainDb);
         EXPECT_TRUE(*result->state()->muted());
         EXPECT_TRUE(*result->state()->agc_enabled());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
@@ -331,12 +331,12 @@ TEST_F(ObserverServerTest, InitialPlugState) {
   bool received_callback = false;
   observer->client()->WatchPlugState().Then(
       [&received_callback, initial_plug_time](fidl::Result<Observer::WatchPlugState>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_EQ(*result->plug_time(), initial_plug_time.get());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -363,13 +363,12 @@ TEST_F(ObserverServerTest, PlugChange) {
   bool received_callback = false;
   observer->client()->WatchPlugState().Then(
       [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
-        FX_LOGS(DEBUG) << "Received callback 1";
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kPlugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_LT(*result->plug_time(), time_of_plug_change.get());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -377,13 +376,12 @@ TEST_F(ObserverServerTest, PlugChange) {
   received_callback = false;
   observer->client()->WatchPlugState().Then(
       [&received_callback, time_of_plug_change](fidl::Result<Observer::WatchPlugState>& result) {
-        FX_LOGS(DEBUG) << "Received callback 2";
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->state());
         EXPECT_EQ(*result->state(), fuchsia_audio_device::PlugState::kUnplugged);
         ASSERT_TRUE(result->plug_time());
         EXPECT_EQ(*result->plug_time(), time_of_plug_change.get());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_FALSE(received_callback);
@@ -412,11 +410,11 @@ TEST_F(ObserverServerTest, GetReferenceClock) {
   bool received_callback = false;
   observer->client()->GetReferenceClock().Then(
       [&received_callback](fidl::Result<Observer::GetReferenceClock>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->reference_clock());
         zx::clock clock = std::move(*result->reference_clock());
         EXPECT_TRUE(clock.is_valid());
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -446,8 +444,8 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfDriverRingBufferDrops) {
             .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
                 std::move(ring_buffer_server_end))}})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
@@ -487,8 +485,8 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientRingBufferDrops) {
               .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
                   std::move(ring_buffer_server_end))}})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-          received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          received_callback = true;
         });
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);
@@ -518,15 +516,17 @@ TEST_F(ObserverServerTest, ObserverDoesNotDropIfClientControlDrops) {
     auto [ring_buffer_client, ring_buffer_server_end] = CreateRingBufferClient();
     bool received_callback = false;
     control->client()
-        ->CreateRingBuffer(
-            {{.options =
-                  fuchsia_audio_device::RingBufferOptions{
-                      {.format = kDefaultRingBufferFormat, .ring_buffer_min_bytes = 2000}},
-              .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
-                  std::move(ring_buffer_server_end))}})
+        ->CreateRingBuffer({{
+            .options = fuchsia_audio_device::RingBufferOptions{{
+                .format = kDefaultRingBufferFormat,
+                .ring_buffer_min_bytes = 2000,
+            }},
+            .ring_buffer_server = fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(
+                std::move(ring_buffer_server_end)),
+        }})
         .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-          received_callback = true;
           ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+          received_callback = true;
         });
     RunLoopUntilIdle();
     EXPECT_TRUE(received_callback);

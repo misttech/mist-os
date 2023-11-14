@@ -404,8 +404,6 @@ TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes
               fidl::ServerEnd<fuchsia_audio_device::RingBuffer>(std::move(ring_buffer_server_end)),
       }})
       .Then([&received_callback](fidl::Result<Control::CreateRingBuffer>& result) {
-        received_callback = true;
-
         if (result.is_ok()) {
           FX_LOGS(ERROR) << "RingBufferProperties";
           FX_LOGS(ERROR) << "    valid_bits_per_sample: "
@@ -449,6 +447,8 @@ TEST_F(ControlServerWarningTest, DISABLED_CreateRingBufferHugeRingBufferMinBytes
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreateRingBufferError::kBadRingBufferOption)
             << result.error_value().FormatDescription();
+
+        received_callback = true;
       });
 
   RunLoopUntilIdle();

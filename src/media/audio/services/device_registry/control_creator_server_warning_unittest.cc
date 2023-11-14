@@ -34,13 +34,13 @@ TEST_F(ControlCreatorServerWarningTest, MissingId) {
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreatorError::kInvalidTokenId)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -86,13 +86,13 @@ TEST_F(ControlCreatorServerWarningTest, BadId) {
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end)),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreatorError::kDeviceNotFound)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -138,13 +138,13 @@ TEST_F(ControlCreatorServerWarningTest, MissingServerEnd) {
           // Missing server_end
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreatorError::kInvalidControl)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
 
   RunLoopUntilIdle();
@@ -192,15 +192,16 @@ TEST_F(ControlCreatorServerWarningTest, BadServerEnd) {
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(),  // Bad server_end
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_framework_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().framework_error().status(), ZX_ERR_INVALID_ARGS)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 0u);
 }
 
 TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
@@ -244,8 +245,8 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end1)),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
@@ -262,13 +263,13 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
           .control_server = fidl::ServerEnd<fuchsia_audio_device::Control>(std::move(server_end2)),
       }})
       .Then([&received_callback](fidl::Result<ControlCreator::Create>& result) mutable {
-        received_callback = true;
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ControlCreatorError::kDeviceAlreadyAllocated)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);

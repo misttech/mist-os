@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <zircon/errors.h>
 
@@ -70,8 +70,8 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
   observer->client()->WatchGainState().Then(
       [&received_initial_callback](
           fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
-        received_initial_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
+        received_initial_callback = true;
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_initial_callback);
@@ -86,30 +86,24 @@ TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
 
   // The third `WatchGainState` call should fail immediately (domain error WATCH_ALREADY_PENDING)
   // since the second call has not yet completed.
-  bool received_expected_error_callback = false;
+  bool received_callback = false;
   observer->client()->WatchGainState().Then(
-      [&received_expected_error_callback](
+      [&received_callback](
           fidl::Result<fuchsia_audio_device::Observer::WatchGainState>& result) mutable {
-        received_expected_error_callback =
-            result.is_error() && result.error_value().is_domain_error() &&
-            (result.error_value().domain_error() ==
-             fuchsia_audio_device::ObserverWatchGainStateError::kWatchAlreadyPending);
-
         ASSERT_TRUE(result.is_error()) << "Unexpected success to third WatchGainState";
         ASSERT_TRUE(result.error_value().is_domain_error())
-            << "Unexpected framework error for third WatchGainState: "
             << result.error_value().FormatDescription();
-        ASSERT_EQ(result.error_value().domain_error(),
-                  result.error_value().domain_error().kWatchAlreadyPending)
-            << "Unexpected domain error for third WatchGainState: "
+        EXPECT_EQ(result.error_value().domain_error(),
+                  fuchsia_audio_device::ObserverWatchGainStateError::kWatchAlreadyPending)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_expected_error_callback);
+  EXPECT_TRUE(received_callback);
   EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
 }
 
-TEST_F(ObserverServerWarningTest, WatchPlugStateWhileAlreadyWatching) {
+TEST_F(ObserverServerWarningTest, WatchPlugStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
@@ -143,24 +137,20 @@ TEST_F(ObserverServerWarningTest, WatchPlugStateWhileAlreadyWatching) {
 
   // The third `WatchPlugState` call should fail immediately (domain error WATCH_ALREADY_PENDING)
   // since the second call has not yet completed.
-  bool received_expected_error_callback = false;
+  bool received_callback = false;
   observer->client()->WatchPlugState().Then(
-      [&received_expected_error_callback](
+      [&received_callback](
           fidl::Result<fuchsia_audio_device::Observer::WatchPlugState>& result) mutable {
-        received_expected_error_callback =
-            result.is_error() && result.error_value().is_domain_error() &&
-            (result.error_value().domain_error() ==
-             fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending);
-
         ASSERT_TRUE(result.is_error());
         ASSERT_TRUE(result.error_value().is_domain_error())
             << result.error_value().FormatDescription();
         EXPECT_EQ(result.error_value().domain_error(),
                   fuchsia_audio_device::ObserverWatchPlugStateError::kWatchAlreadyPending)
             << result.error_value().FormatDescription();
+        received_callback = true;
       });
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_expected_error_callback);
+  EXPECT_TRUE(received_callback);
   EXPECT_EQ(observer_fidl_error_status_.value_or(ZX_OK), ZX_OK);
 }
 
