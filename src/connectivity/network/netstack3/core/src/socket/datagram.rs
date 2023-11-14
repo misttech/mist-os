@@ -25,6 +25,7 @@ use net_types::{
 use packet::{BufferMut, Serializer};
 use packet_formats::ip::IpProtoExt;
 use thiserror::Error;
+use tracing::warn;
 
 use crate::{
     algorithm::ProtocolFlowId,
@@ -3490,9 +3491,13 @@ pub(crate) fn disconnect_connected<
         let dual_stack_context = sync_ctx.dual_stack_context();
         let make_listener_ip = match dual_stack_context {
             MaybeDualStack::DualStack(dual_stack) => {
-                if dual_stack.dual_stack_enabled(socket.options()) {
-                    todo!("https://fxbug.dev/21198: Support disconnecting dual-stack sockets")
-                }
+                // TODO(https://fxbug.dev/21198): If the connection was in the
+                // other stack, construct a DualStackListenerIpAddr.
+                warn!(
+                    "dualstack disconnect not supported; restoring socket {:?} to a listener in \
+                        this stack",
+                    id
+                );
                 let converter = dual_stack.converter();
                 MaybeDualStack::DualStack(move |ListenerIpAddr { addr, identifier }| {
                     converter.convert_back(DualStackListenerIpAddr::ThisStack(ListenerIpAddr {
@@ -3608,6 +3613,12 @@ pub(crate) fn shutdown_connected<
     })
 }
 
+/// TODO(https://fxbug.dev/21198): Remove once get_shutdown_connected is
+/// supported for dual-stack sockets.
+#[derive(GenericOverIp)]
+#[generic_over_ip()]
+pub struct DualStackNotImplementedError;
+
 pub(crate) fn get_shutdown_connected<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
@@ -3617,12 +3628,12 @@ pub(crate) fn get_shutdown_connected<
     sync_ctx: &mut SC,
     _ctx: &C,
     id: S::SocketId<I>,
-) -> Option<ShutdownType> {
+) -> Result<Option<ShutdownType>, DualStackNotImplementedError> {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_)
             | SocketState::Bound(BoundSocketState::Listener { state: _, sharing: _ }) => {
-                return None
+                return Ok(None)
             }
             SocketState::Bound(BoundSocketState::Connected { state, sharing: _ }) => state,
         };
@@ -3634,9 +3645,10 @@ pub(crate) fn get_shutdown_connected<
                         DualStackConnState::ThisStack(state) => state,
                         DualStackConnState::OtherStack(state) => {
                             dual_stack.assert_dual_stack_enabled(state);
-                            todo!(
-                                "https://fxbug.dev/21198: Support dual-stack get shutdown connected"
-                            );
+                            // TODO(https://fxbug.dev/21198): Support dual-stack
+                            // get shutdown connected.
+                            warn!("get_shutdown not supported for dual-stack connected sockets");
+                            return Err(DualStackNotImplementedError);
                         }
                     }
                 }
@@ -3645,12 +3657,12 @@ pub(crate) fn get_shutdown_connected<
                 }
             };
         let Shutdown { send, receive } = shutdown;
-        Some(match (send, receive) {
-            (false, false) => return None,
+        Ok(Some(match (send, receive) {
+            (false, false) => return Ok(None),
             (true, false) => ShutdownType::Send,
             (false, true) => ShutdownType::Receive,
             (true, true) => ShutdownType::SendAndReceive,
-        })
+        }))
     })
 }
 
@@ -3666,6 +3678,8 @@ pub enum SendError<SE> {
     IpSock(IpSockSendError),
     /// There was a problem when serializing the packet.
     SerializeError(SE),
+    /// TODO(https://fxbug.dev/21198): Remove once dual-stack send is supported.
+    DualStackNotImplemented,
 }
 
 pub(crate) fn send_conn<
@@ -3700,7 +3714,9 @@ pub(crate) fn send_conn<
                 DualStackConnState::ThisStack(state) => state,
                 DualStackConnState::OtherStack(state) => {
                     dual_stack.assert_dual_stack_enabled(state);
-                    todo!("https://fxbug.dev/21198: Support dual-stack send connected");
+                    // TODO(https://fxbug.dev/21198): Support dual-stack send.
+                    warn!("dualstack send not supported");
+                    return Err(SendError::DualStackNotImplemented);
                 }
             },
             MaybeDualStack::NotDualStack(not_dual_stack) => {
@@ -3737,6 +3753,8 @@ pub enum SendToError<SE> {
     RemoteUnexpectedlyMapped,
     /// The provided buffer is not vailid.
     SerializeError(SE),
+    /// TODO(https://fxbug.dev/21198) Support dual-stack send-to.
+    DualStackNotImplemented,
 }
 
 pub(crate) fn send_to<
@@ -3776,7 +3794,10 @@ pub(crate) fn send_to<
                             DualStackConnState::ThisStack(state) => state,
                             DualStackConnState::OtherStack(state) => {
                                 dual_stack.assert_dual_stack_enabled(&state);
-                                todo!("https://fxbug.dev/21198: Support dual-stack send_to");
+                                // TODO(https://fxbug.dev/21198): Support
+                                // send-to from dual-stack connected.
+                                warn!("sendto not supported from a dualstack connected socket");
+                                return Err(Either::Right(SendToError::DualStackNotImplemented));
                             }
                         }
                     }
@@ -3812,9 +3833,10 @@ pub(crate) fn send_to<
                             }
                             DualStackListenerIpAddr::OtherStack(_) => {
                                 dual_stack.assert_dual_stack_enabled(state);
-                                // To implement: perform a one-shot send on the
-                                // other IP stack's transport context.
-                                todo!("https://fxbug.dev/21198: implement dual-stack send")
+                                // TODO(https://fxbug.dev/21198): Support
+                                // send-to from dual-stack listener.
+                                warn!("sendto not supported from a dualstack listener socket");
+                                return Err(Either::Right(SendToError::DualStackNotImplemented));
                             }
                         }
                     }
@@ -3843,6 +3865,7 @@ pub(crate) fn send_to<
             Some(_addr) => {}
             None => {
                 // Prevent sending to ipv4-mapped-ipv6 addrs for now.
+                warn!("dualstack sendto ipv4-mapped-ipv6 not supported");
                 return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped));
             }
         }

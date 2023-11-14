@@ -23,7 +23,7 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.NoReusePortFollowingReusePort/TCP",
 
                 // Netstack3 does not support dual-stack sockets.
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReservesEverything/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4EphemeralPortReserved/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedAnyOnlyReservesV4/*",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V4MappedEphemeralPortReserved/*",
@@ -64,8 +64,29 @@
                 "BadSocketPairArgs.ValidateErrForBadCallsToSocketPair",
                 "SocketInetLoopbackTest.LoopbackAddressRangeConnect",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.PortReuseTwoSockets/TCP",
-                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/*",
+                "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
+
+                // TODO(https://fxbug.dev/21198): Netstack3 doesn't fully support dual-stack
+                // datagramsockets.
+                "All/DualStackSocketTest.AddressOperations/V4AnyBindConnectSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4AnyBindSendToConnect",
+                "All/DualStackSocketTest.AddressOperations/V4AnyConnectBindSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4AnyConnectSendToBind",
+                "All/DualStackSocketTest.AddressOperations/V4AnySendToBindConnect",
+                "All/DualStackSocketTest.AddressOperations/V4AnySendToConnectBind",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindConnectSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindSendToConnect",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackConnectBindSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackConnectSendToBind",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToBindConnect",
+                "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToConnectBind",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackBindConnectSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackBindSendToConnect",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackConnectBindSendTo",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackConnectSendToBind",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackSendToBindConnect",
+                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackSendToConnectBind",
 
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
@@ -126,11 +147,7 @@
                 // Netstack3 does not support SO_REUSEADDR and only partially supports
                 // SO_REUSEPORT for UDP sockets.
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThread/*",
-
-                // Netstack3 does not support dual-stack sockets.
-                "All/DualStackSocketTest.AddressOperations/*",
                 "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV4Loopback_ConnectV4MappedLoopback",
-                "All/SocketInetReusePortTest.UdpPortReuseMultiThreadShort/ListenV6Any_ConnectV4Loopback",
 
                 // Cases fail on TCP.
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.DualStackV6AnyReuseAddrDoesNotReserveV4Any/*",

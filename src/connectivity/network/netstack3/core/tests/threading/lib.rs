@@ -282,7 +282,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
             &sync_ctx,
             &mut non_sync_ctx,
             &socket,
-            None,
+            SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
             Some(LOCAL_PORT),
         )
         .unwrap();
@@ -416,7 +416,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
             &sync_ctx,
             &mut non_sync_ctx,
             &socket,
-            None,
+            SpecifiedAddr::new(I::DEVICE_ADDR).map(|a| ZonedAddr::Unzoned(a).into()),
             Some(LOCAL_PORT),
         )
         .unwrap();

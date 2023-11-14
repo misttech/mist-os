@@ -228,6 +228,9 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
             RemoteAddress<I, WeakDeviceId<C>, Self::RemoteIdentifier>,
             Error = fposix::Errno,
         >;
+    // TODO(https://fxbug.dev/21198): Remove once datagram sockets support
+    // dual-stack get_shutdown_connected.
+    type GetShutdownError: IntoErrno;
 
     fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId;
 
@@ -264,7 +267,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> Option<ShutdownType>;
+    ) -> Result<Option<ShutdownType>, Self::GetShutdownError>;
 
     fn get_socket_info<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
@@ -391,6 +394,7 @@ impl<I: IpExt> TransportState<I> for Udp {
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = NonZeroU16;
     type SocketInfo<C: NonSyncContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
+    type GetShutdownError = fposix::Errno;
 
     fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
         udp::create_udp(ctx)
@@ -437,8 +441,9 @@ impl<I: IpExt> TransportState<I> for Udp {
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> Option<ShutdownType> {
+    ) -> Result<Option<ShutdownType>, Self::GetShutdownError> {
         udp::get_shutdown(sync_ctx, ctx, id)
+            .map_err(|core_datagram::DualStackNotImplementedError| fposix::Errno::Eopnotsupp)
     }
 
     fn get_socket_info<C: NonSyncContext>(
@@ -644,6 +649,7 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = u16;
     type SocketInfo<C: NonSyncContext> = icmp::SocketInfo<I::Addr, WeakDeviceId<C>>;
+    type GetShutdownError = Never;
 
     fn create_unbound<C: NonSyncContext>(ctx: &SyncCtx<C>) -> Self::SocketId {
         icmp::new_socket(ctx)
@@ -690,8 +696,8 @@ impl<I: IpExt> TransportState<I> for IcmpEcho {
         sync_ctx: &SyncCtx<C>,
         ctx: &C,
         id: &Self::SocketId,
-    ) -> Option<ShutdownType> {
-        icmp::get_shutdown(sync_ctx, ctx, id)
+    ) -> Result<Option<ShutdownType>, Self::GetShutdownError> {
+        Ok(icmp::get_shutdown(sync_ctx, ctx, id))
     }
 
     fn get_socket_info<C: NonSyncContext>(
@@ -805,6 +811,8 @@ impl<E> IntoErrno for core_datagram::SendError<E> {
             core_datagram::SendError::NotWriteable => fposix::Errno::Epipe,
             core_datagram::SendError::IpSock(err) => err.into_errno(),
             core_datagram::SendError::SerializeError(_e) => fposix::Errno::Einval,
+            // TODO(https://fxbug.dev/21198): Support dual-stack send.
+            core_datagram::SendError::DualStackNotImplemented => fposix::Errno::Eopnotsupp,
         }
     }
 }
@@ -822,6 +830,8 @@ impl<E> IntoErrno for core_datagram::SendToError<E> {
             }
             core_datagram::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Einval,
             core_datagram::SendToError::SerializeError(_e) => fposix::Errno::Einval,
+            // TODO(https://fxbug.dev/21198): Support dual-stack send.
+            core_datagram::SendToError::DualStackNotImplemented => fposix::Errno::Eopnotsupp,
         }
     }
 }
@@ -1848,7 +1858,8 @@ where
                 // another thread setting the shutdown flag, then this check
                 // executing, could result in a race that causes this this code
                 // to signal EOF with a packet still waiting.
-                let shutdown = T::get_shutdown(sync_ctx, non_sync_ctx, id);
+                let shutdown =
+                    T::get_shutdown(sync_ctx, non_sync_ctx, id).map_err(IntoErrno::into_errno)?;
                 return match shutdown {
                     Some(ShutdownType::Receive | ShutdownType::SendAndReceive) => {
                         // Return empty data to signal EOF.

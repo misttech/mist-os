@@ -3731,7 +3731,11 @@ impl<I: datagram::IpExt, C: IcmpNonSyncCtx<I>, SC: StateContext<I, C> + IcmpStat
     }
 
     fn get_shutdown(&mut self, ctx: &C, id: &SocketId<I>) -> Option<ShutdownType> {
-        datagram::get_shutdown_connected(self, ctx, id.clone())
+        datagram::get_shutdown_connected(self, ctx, id.clone()).unwrap_or_else(
+            |datagram::DualStackNotImplementedError| {
+                unreachable!("cannot have a dual-stack ICMP socket")
+            },
+        )
     }
 
     fn close(&mut self, ctx: &mut C, id: SocketId<I>) {

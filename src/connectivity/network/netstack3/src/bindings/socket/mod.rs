@@ -617,6 +617,8 @@ impl IntoErrno for udp::SendToError {
             Self::CreateSock(err) => err.into_errno(),
             Self::Zone(err) => err.into_errno(),
             Self::Mtu => Errno::Emsgsize,
+            // TODO(https://fxbug.dev/21198): Support dual-stack send-to.
+            Self::DualStackNotImplemented => Errno::Eopnotsupp,
         }
     }
 }
@@ -626,6 +628,8 @@ impl IntoErrno for udp::SendError {
         match self {
             Self::IpSock(err) => err.into_errno(),
             Self::NotWriteable => Errno::Epipe,
+            // TODO(https://fxbug.dev/21198): Support dual-stack send.
+            Self::DualStackNotImplemented => Errno::Eopnotsupp,
         }
     }
 }
