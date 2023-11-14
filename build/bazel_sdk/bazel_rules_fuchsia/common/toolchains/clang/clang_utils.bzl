@@ -4,6 +4,17 @@
 
 """Utilities related to Clang."""
 
+load(
+    "//platforms:utils.bzl",
+    "all_target_tags",
+    "target_tag_dict_to_select_keys",
+    "to_bazel_cpu_name",
+    "to_bazel_os_name",
+    "to_fuchsia_cpu_name",
+    "to_fuchsia_os_name",
+    "to_target_os_cpu_pair",
+)
+
 def process_clang_builtins_output(probe_output):
     """Get Clang builtin data
 
@@ -59,47 +70,203 @@ def process_clang_builtins_output(probe_output):
 
     return (short_version, long_version, builtin_include_paths)
 
-def to_clang_target_tuple(target_os, target_cpu):
-    """Find the Clang target tuple corresponding to a given (os, cpu) pair.
+_TARGET_TRIPLE_MAP = {
+    "fuchsia-x64": "x86_64-unknown-fuchsia",
+    "fuchsia-arm64": "aarch64-unknown-fuchsia",
+    "fuchsia-riscv64": "riscv64-unknown-fuchsia",
+    "linux-x64": "x86_64-unknown-linux-gnu",
+    "linux-arm64": "aarch64-unknown-linux-gnu",
+    "linux-riscv64": "riscv64-unknown-linux-gnu",
+    "mac-x64": "x86_64-apple-darwin",
+    "mac-arm64": "aarch64-apple-darwin",
+}
+
+def to_clang_target_tuple(target_os, target_arch):
+    """Return the Clang/GCC target triple for a given (os,arch) pair.
 
     Args:
       target_os: Target os name, following Fuchsia or Bazel conventions.
       target_cpu: Target cpu name, following Fuchsia or Bazel conventions.
     Returns:
-      A Clang target tuple.
+      Clang target tuple string (e.g. "x86_64-unknown-linux-gnu")
     """
+    target_key = "%s-%s" % (
+        to_fuchsia_os_name(target_os),
+        to_fuchsia_cpu_name(target_arch),
+    )
+    triple = _TARGET_TRIPLE_MAP.get(target_key)
+    if not triple:
+        fail("Unknown os/arch combo: %s, %s" % (target_os, target_arch))
+    return triple
 
-    clang_arch = {
-        # Fuchsia-only conventions first.
-        "x64": "x86_64",
+# Used internally by format_target_tag_labels_dict() below.
+def _get_target_tag_template_dict(target_tag):
+    target_os, target_cpu = to_target_os_cpu_pair(target_tag)
+    return {
+        "os": to_fuchsia_os_name(target_os),
+        "cpu": to_fuchsia_cpu_name(target_cpu),
+        "bazel_os": to_bazel_os_name(target_os),
+        "bazel_cpu": to_bazel_cpu_name(target_cpu),
+        "clang_target_tuple": to_clang_target_tuple(target_os, target_cpu),
+    }
 
-        # Bazel-only conventions second.
-        "k8": "x86_64",
-        "x86_64": "x86_64",
+def format_target_tag_labels_dict(input_dict, extra_dict = None):
+    """Format the labels in a { target_tag -> label_list } dictionary.
 
-        # Common names.
-        "aarch64": "aarch64",
-        "arm64": "aarch64",
-        "riscv64": "riscv64",
-    }.get(target_cpu)
+    Replace each label in the dictionary's values by a formatted string,
+    recognizing the following hard-coded substitutions:
 
-    if not clang_arch:
-        fail("Unknown target_cpu value: %s" % target_cpu)
+      {os} -> Fuchsia OS name matching the target_tag
+      {cpu} -> Fuchsia CPU name matching the target_tag
+      {bazel_os} -> Bazel OS name
+      {bazel_cpu} -> Bazel CPU name
+      {clang_target_tuple} -> Clang target tuple for the target_tag.
 
-    clang_os = {
-        # Fuchsia-only conventions first
-        "mac": "apple-darwin",
+    If it possible to pass additional formatting arguments using
+    the extra_dict argument.
 
-        # Bazel conventions second
-        "osx": "apple-darwin",
-        "macos": "apple-darwin",
+    Args:
+        input_dict: A dictionary whose keys are target tag strings,
+          and whose values are list of label strings.
+        extra_dict: An optional dictionary containing additional
+          arguments for the string formatting.
 
-        # Common names
-        "fuchsia": "unknown-fuchsia",
-        "linux": "unknown-linux-gnu",
-    }.get(target_os)
+    Return:
+        A new { target_tag -> label_list } dictionary.
 
-    if not clang_os:
-        fail("Uknown target_os value: %s" % target_os)
+    Example:
+       For the following input dictionary:
 
-    return "%s-%s" % (clang_arch, clang_os)
+          {
+            "linux-x64": [ "//{dir}:name_{os}_{cpu}" ],
+            "macos-aarch64": [ "//{dir}:name_{os}_{cpu}" ],
+          }
+
+       format_target_tag_labels_dict(input_dict, { "dir": "package" })
+       will return:
+
+          {
+            "linux-x64": [ "//package:name_linux_x64" ],
+            "macos-aarch64": [ "//package:name_mac_arm64" ],
+          }
+    """
+    extra_dict = extra_dict or {}
+    return {
+        target_tag: [
+            label.format(**(extra_dict | _get_target_tag_template_dict(target_tag)))
+            for label in labels
+        ]
+        for target_tag, labels in input_dict.items()
+    }
+
+def format_labels_list_to_target_tag_dict(
+        labels,
+        target_tags = None,
+        extra_dict = None):
+    """Format a list of labels into a { target_tag -> label_list } dictionary.
+
+    The dictionary will have target_tag keys, associated with expanded strings
+    matching the tag.
+
+    Args:
+        labels: A list of label strings which can contain substitution
+           expressions that will be expanded by this function.
+        target_tags: An optional list of target tags to populate the
+           result dictionary's keys. The default is all supported
+           target tags will be used.
+        extra_dict: An optional dictionary containing additional arguments
+           for the string expansion.
+
+    Example:
+
+        format_labels_list_to_target_tag_dict([
+            "//{pkg}:name_{os}_{cpu}",
+        ], extra_dict = { "pkg": "package" })
+
+    Returns
+
+        {
+          "fuchsia-x64": [ "//package:name_fuchsia_x64" ],
+          "fuchsia-arm64": [ "//package:name_fuchsia_arm64" ],
+          "fuchsia-riscv64": [ "//package:name_fuchsia_riscv64" ],
+          "linux-x64": [ "package:name_linux_x64" ],
+          "linux-arm64":  [ "package:name_linux_arm64" ]
+          "mac-x64": [ "package:name_mac_x64" ],
+          "mac-arm64": [ "package:name_mac_arm64" ],
+        }
+    """
+    target_tags = target_tags or all_target_tags
+    extra_dict = extra_dict or {}
+    return {
+        target_tag: [
+            label.format(**(extra_dict | _get_target_tag_template_dict(target_tag)))
+            for label in labels
+        ]
+        for target_tag in target_tags
+    }
+
+def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None):
+    """Format a list of label patterns into a select() statement.
+
+    The result is a select() statement whose keys are config_setting() labels
+    matching the target_tags, and whose values are native.glob() calls
+    taking lists of expanded label patterns as input.
+
+    Args:
+        labels: A list of label strings which can contain substitution
+           expressions that will be expanded by this function.
+        target_tags: An optional list of target tags to populate the
+           result dictionary's keys. If None (the default), all supported
+           target tags will be used.
+        extra_dict: An optional dictionary containing additional arguments
+           for the string expansion.
+
+    Example:
+
+        format_labels_list_to_target_native_glob_select([
+            "//{dir}{clang_target_tuple}/**",
+        ], extra_dict = { "dir": "package:" })
+
+    Returns
+
+        select({
+            "@fuchsia_sdk_common//platforms:is_fuchsia_x64": native.glob([
+                "//package:x86_64-unknown-fuchsia/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_fuchsia_arm64": native.glob([
+                "//package:aarch64-unknown-fuchsia/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_fuchsia_riscv64": native.glob([
+                "//package:riscv64-unknown-fuchsia/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_linux_x64": native.glob([
+                "//package:x86_64-unknown-linux-gnu/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_linux_arm64": native.glob([
+                "//package:aarch64-unknown-linux-gnu/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_mac_x64": native.glob([
+                "//package:x86_64-apple-darwin/**",
+            ]),
+            "@fuchsia_sdk_common//platforms:is_mac_arm64": native.glob([
+                "//package:aarch64-apple-darwin/**",
+            ]),
+            "//conditions:default": [],
+        })
+    """
+    target_tags = target_tags or all_target_tags
+    extra_dict = extra_dict or {}
+
+    return select(target_tag_dict_to_select_keys(
+        {
+            target_tag: native.glob(labels)
+            for target_tag, labels in format_labels_list_to_target_tag_dict(
+                labels,
+                target_tags = target_tags,
+                extra_dict = extra_dict,
+            ).items()
+        },
+        [],
+    ))
+
+clang_all_target_tags = all_target_tags

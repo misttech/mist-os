@@ -2,9 +2,12 @@
 
 load(
     "//:repository_utils.bzl",
-    "get_clang_target_triple",
     "get_fuchsia_host_arch",
     "get_fuchsia_host_os",
+)
+load(
+    "//:toolchains/clang/clang_utils.bzl",
+    "to_clang_target_tuple",
 )
 
 def _get_fuchsia_source_relative_path(repo_ctx, path):
@@ -121,7 +124,7 @@ def _get_rbe_config(repo_ctx):
 def _fuchsia_build_config_repository_impl(repo_ctx):
     host_os = get_fuchsia_host_os(repo_ctx)
     host_arch = get_fuchsia_host_arch(repo_ctx)
-    host_target_triple = get_clang_target_triple(host_os, host_arch)
+    host_target_triple = to_clang_target_tuple(host_os, host_arch)
     host_tag = "%s-%s" % (host_os, host_arch)
     host_tag_alt = "%s_%s" % (host_os, host_arch)
 
