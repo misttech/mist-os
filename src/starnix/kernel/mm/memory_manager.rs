@@ -123,9 +123,20 @@ bitflags! {
     }
 }
 
+// The low three bits of MappingFlags match ProtectionFlags.
 const_assert_eq!(MappingFlags::READ.bits(), PROT_READ);
 const_assert_eq!(MappingFlags::WRITE.bits(), PROT_WRITE);
 const_assert_eq!(MappingFlags::EXEC.bits(), PROT_EXEC);
+
+// The next bits of MappingFlags match MappingOptions, shifted up.
+const_assert_eq!(MappingFlags::SHARED.bits(), MappingOptions::SHARED.bits() << 3);
+const_assert_eq!(MappingFlags::ANONYMOUS.bits(), MappingOptions::ANONYMOUS.bits() << 3);
+const_assert_eq!(MappingFlags::LOWER_32BIT.bits(), MappingOptions::LOWER_32BIT.bits() << 3);
+const_assert_eq!(MappingFlags::GROWSDOWN.bits(), MappingOptions::GROWSDOWN.bits() << 3);
+const_assert_eq!(MappingFlags::ELF_BINARY.bits(), MappingOptions::ELF_BINARY.bits() << 3);
+const_assert_eq!(MappingFlags::DONTFORK.bits(), MappingOptions::DONTFORK.bits() << 3);
+const_assert_eq!(MappingFlags::WIPEONFORK.bits(), MappingOptions::WIPEONFORK.bits() << 3);
+const_assert_eq!(MappingFlags::DONT_SPLIT.bits(), MappingOptions::DONT_SPLIT.bits() << 3);
 
 impl MappingFlags {
     fn prot_flags(&self) -> ProtectionFlags {
