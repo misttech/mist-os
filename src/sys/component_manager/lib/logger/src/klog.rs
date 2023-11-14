@@ -216,6 +216,7 @@ mod tests {
     #[should_panic(expected = "panic_test")]
     // TODO(fxbug.dev/88496): LeakSanitizer flags leaks caused by panic.
     #[cfg_attr(feature = "variant_asan", ignore)]
+    #[cfg_attr(feature = "variant_hwasan", ignore)]
     fn log_panic_test() {
         let mut rng = rand::thread_rng();
         let logged_value: u64 = rng.gen();
