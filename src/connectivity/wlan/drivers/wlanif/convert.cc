@@ -197,17 +197,38 @@ fuchsia_wlan_ieee80211::wire::CipherSuiteType ConvertCipherSuiteType(const ciphe
   }
 }
 
-void ConvertSetKeyDescriptor(const set_key_descriptor_t& in,
-                             fuchsia_wlan_fullmac::wire::SetKeyDescriptor* out,
-                             fidl::AnyArena& arena) {
+fuchsia_wlan_common::wire::WlanProtection ConvertWlanProtection(const wlan_protection_t& in) {
+  switch (in) {
+    case WLAN_PROTECTION_NONE:
+      return fuchsia_wlan_common::wire::WlanProtection::kNone;
+    case WLAN_PROTECTION_RX:
+      return fuchsia_wlan_common::wire::WlanProtection::kRx;
+    case WLAN_PROTECTION_TX:
+      return fuchsia_wlan_common::wire::WlanProtection::kTx;
+    case WLAN_PROTECTION_RX_TX:
+      return fuchsia_wlan_common::wire::WlanProtection::kRxTx;
+    default:
+      ZX_PANIC("Unknown protection %u", in);
+  }
+}
+
+fuchsia_wlan_common::wire::WlanKeyConfig ConvertWlanKeyConfig(const wlan_key_config_t& in,
+                                                              fidl::AnyArena& arena) {
   auto key_vec = std::vector<uint8_t>(in.key_list, in.key_list + in.key_count);
-  out->key = fidl::VectorView<uint8_t>(arena, key_vec);
-  out->key_id = in.key_id;
-  out->key_type = ConvertWlanKeyType(in.key_type);
-  memcpy(out->address.data(), in.address, out->address.size());
-  out->rsc = in.rsc;
-  memcpy(out->cipher_suite_oui.data(), in.cipher_suite_oui, 3);
-  out->cipher_suite_type = ConvertCipherSuiteType(in.cipher_suite_type);
+
+  fidl::Array<uint8_t, ETH_ALEN> peer_addr;
+  memcpy(peer_addr.data(), in.peer_addr, ETH_ALEN);
+
+  return fuchsia_wlan_common::wire::WlanKeyConfig::Builder(arena)
+      .protection(ConvertWlanProtection(in.protection))
+      .cipher_oui({in.cipher_oui[0], in.cipher_oui[1], in.cipher_oui[2]})
+      .cipher_type(ConvertCipherSuiteType(in.cipher_type))
+      .key_type(ConvertWlanKeyType(in.key_type))
+      .peer_addr(peer_addr)
+      .key_idx(in.key_idx)
+      .key(fidl::VectorView<uint8_t>(arena, key_vec))
+      .rsc(in.rsc)
+      .Build();
 }
 
 void ConvertDeleteKeyDescriptor(const delete_key_descriptor_t& in,
@@ -229,9 +250,7 @@ void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
   auto sae_password =
       std::vector<uint8_t>(in.sae_password_list, in.sae_password_list + in.sae_password_count);
   builder.sae_password(fidl::VectorView<uint8_t>(arena, sae_password));
-  fuchsia_wlan_fullmac::wire::SetKeyDescriptor set_key_descriptor;
-  ConvertSetKeyDescriptor(in.wep_key, &set_key_descriptor, arena);
-  builder.wep_key(set_key_descriptor);
+  builder.wep_key(ConvertWlanKeyConfig(in.wep_key, arena));
   auto security_ie =
       std::vector<uint8_t>(in.security_ie_list, in.security_ie_list + in.security_ie_count);
   builder.security_ie(fidl::VectorView<uint8_t>(arena, security_ie));

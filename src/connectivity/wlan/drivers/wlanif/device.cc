@@ -471,13 +471,8 @@ void Device::SetKeysReq(const wlan_fullmac_set_keys_req_t* req,
 
   set_keys_req.num_keys = num_keys;
 
-  // Initialize all the WlanKeyTypes to pass FIDL check.
-  for (size_t i = 0; i < fuchsia_wlan_fullmac::wire::kWlanMaxKeylistSize; i++) {
-    set_keys_req.keylist.data()[i].key_type = fuchsia_wlan_common::wire::WlanKeyType::kPairwise;
-  }
-
   for (size_t desc_ndx = 0; desc_ndx < num_keys; desc_ndx++) {
-    ConvertSetKeyDescriptor(req->keylist[desc_ndx], &set_keys_req.keylist.data()[desc_ndx], *arena);
+    set_keys_req.keylist[desc_ndx] = ConvertWlanKeyConfig(req->keylist[desc_ndx], *arena);
   }
 
   auto result = client_.buffer(*arena)->SetKeysReq(set_keys_req);

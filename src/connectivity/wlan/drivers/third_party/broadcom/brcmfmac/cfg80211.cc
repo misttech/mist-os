@@ -2590,15 +2590,34 @@ static zx_status_t brcmf_cfg80211_del_key(struct net_device* ndev, uint8_t key_i
 }
 
 static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
-                                          const fuchsia_wlan_fullmac_wire::SetKeyDescriptor* req) {
+                                          const fuchsia_wlan_common::wire::WlanKeyConfig* req) {
+  if (!(req->has_key() && req->has_key_idx() && req->has_peer_addr() && req->has_cipher_type())) {
+    BRCMF_ERR(
+        "Key config missing required fields: has_key %u has_key_idx %u has_peer_addr %u has_cipher_type %u",
+        req->has_key(), req->has_key_idx(), req->has_peer_addr(), req->has_cipher_type());
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (req->has_cipher_oui()) {
+    // If a cipher OUI is specified, check that it's the IEEE OUI. Other OUIs indicate a custom
+    // cipher type which the broadcom driver doesn't support.
+
+    // IEEE 802.11-2016 3.2 (c.f. "vendor organizationally unique identifier")
+    constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
+    if (!std::equal(req->cipher_oui().begin(), req->cipher_oui().begin() + req->cipher_oui().size(),
+                    kIeeeOui, kIeeeOui + std::size(kIeeeOui))) {
+      BRCMF_ERR("Custom cipher OUI is not supported");
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+  }
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_wsec_key* key;
   int32_t val;
   int32_t wsec;
   zx_status_t err;
   bool ext_key;
-  uint8_t key_idx = req->key_id;
-  const uint8_t* mac_addr = req->address.data();
+  uint8_t key_idx = req->key_idx();
+  const uint8_t* mac_addr = req->peer_addr().data();
 
   BRCMF_DBG(TRACE, "Enter");
   BRCMF_DBG(CONN, "key index (%d)", key_idx);
@@ -2612,19 +2631,19 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
     return ZX_ERR_INVALID_ARGS;
   }
 
-  if (req->key.count() == 0) {
+  if (req->key().count() == 0) {
     return brcmf_cfg80211_del_key(ndev, key_idx);
   }
 
-  if (req->key.count() > sizeof(key->data)) {
-    BRCMF_ERR("Too long key length (%zu)", req->key.count());
+  if (req->key().count() > sizeof(key->data)) {
+    BRCMF_ERR("Too long key length (%zu)", req->key().count());
     return ZX_ERR_INVALID_ARGS;
   }
 
   ext_key = false;
   if (mac_addr && !address_is_multicast(mac_addr) &&
-      (req->cipher_suite_type != fuchsia_wlan_ieee80211_wire::CipherSuiteType::kWep40) &&
-      (req->cipher_suite_type != fuchsia_wlan_ieee80211_wire::CipherSuiteType::kWep104)) {
+      (req->cipher_type() != fuchsia_wlan_ieee80211_wire::CipherSuiteType::kWep40) &&
+      (req->cipher_type() != fuchsia_wlan_ieee80211_wire::CipherSuiteType::kWep104)) {
     BRCMF_DBG(TRACE, "Ext key, mac " FMT_MAC, FMT_MAC_ARGS(mac_addr));
     ext_key = true;
   }
@@ -2634,14 +2653,14 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
   if ((ext_key) && (!address_is_multicast(mac_addr))) {
     memcpy((char*)&key->ea, (void*)mac_addr, ETH_ALEN);
   }
-  key->len = req->key.count();
+  key->len = req->key().count();
   key->index = key_idx;
-  memcpy(key->data, req->key.data(), key->len);
+  memcpy(key->data, req->key().data(), key->len);
   if (!ext_key) {
     key->flags = BRCMF_PRIMARY_KEY;
   }
 
-  switch (req->cipher_suite_type) {
+  switch (req->cipher_type()) {
     case fuchsia_wlan_ieee80211_wire::CipherSuiteType::kWep40:
       key->algo = CRYPTO_ALGO_WEP1;
       val = WEP_ENABLED;
@@ -2670,7 +2689,7 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
       BRCMF_DBG(CONN, "WPA_CIPHER_CCMP_128");
       break;
     default:
-      BRCMF_ERR("Unsupported cipher (0x%x)", req->cipher_suite_type);
+      BRCMF_ERR("Unsupported cipher (0x%x)", req->cipher_type());
       err = ZX_ERR_INVALID_ARGS;
       goto done;
   }
@@ -3678,7 +3697,6 @@ void brcmf_if_connect_req(net_device* ndev,
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_profile* profile = &ifp->vif->profile;
-  fuchsia_wlan_fullmac::WlanFullmacImplConnectRequest* saved_req = &ifp->connect_req;
 
   if (!ndev->if_proto.is_valid()) {
     BRCMF_IFDBG(WLANIF, ndev, "interface stopped -- skipping connect request");
@@ -3706,7 +3724,13 @@ void brcmf_if_connect_req(net_device* ndev,
   }
 
   if (req->has_wep_key()) {
-    if (req->wep_key().key.count() > 0 &&
+    if (!req->wep_key().has_key()) {
+      BRCMF_DBG(WLANIF,
+                "Connect request from SME exited: WEP key configuration does not have key data");
+      result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
+      goto fail;
+    }
+    if (req->wep_key().key().count() > 0 &&
         !(req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kSharedKey ||
           req->auth_type() == fuchsia_wlan_fullmac_wire::WlanAuthType::kOpenSystem)) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unexpected WEP key in request");
@@ -3714,9 +3738,9 @@ void brcmf_if_connect_req(net_device* ndev,
       goto fail;
     }
 
-    if (req->wep_key().key.count() > MAX_SUPPORTED_WEP_KEY_LEN) {
+    if (req->wep_key().key().count() > MAX_SUPPORTED_WEP_KEY_LEN) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: WEP key len %zu larger than %d",
-                req->wep_key().key.count(), MAX_SUPPORTED_WEP_KEY_LEN);
+                req->wep_key().key().count(), MAX_SUPPORTED_WEP_KEY_LEN);
       result.result_code = fuchsia_wlan_ieee80211_wire::StatusCode::kJoinFailure;
       goto fail;
     }
@@ -3730,7 +3754,9 @@ void brcmf_if_connect_req(net_device* ndev,
 #endif /* !defined(NDEBUG) */
 
   // Saving the request as FIDL natural type.
-  *saved_req = fidl::ToNatural(*req);
+  // Note that below this point, `req` and `ifp->connect_req` refer to the same connect request and
+  // are equivalent.
+  ifp->connect_req = fidl::ToNatural(*req);
 
   memcpy(profile->bssid, req->selected_bss().bssid.data(), ETH_ALEN);
 
@@ -3741,7 +3767,7 @@ void brcmf_if_connect_req(net_device* ndev,
     goto fail;
   }
 
-  if (req->has_wep_key() && ifp->connect_req.wep_key()->key().size() > 0) {
+  if (req->has_wep_key() && req->wep_key().has_key() && req->wep_key().key().count() > 0) {
     auto add_key_result = brcmf_cfg80211_add_key(ndev, &req->wep_key());
     if (add_key_result != ZX_OK) {
       BRCMF_DBG(WLANIF, "Connect request from SME exited: unable to set WEP key");

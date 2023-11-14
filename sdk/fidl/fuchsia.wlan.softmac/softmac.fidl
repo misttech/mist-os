@@ -245,6 +245,7 @@ type WlanTxInfo = struct {
     mcs uint8;
 };
 
+// TODO(b/309634989) Soft transition to use fuchsia.wlan.common.WlanProtection
 @available(added=15)
 type WlanProtection = strict enum : uint8 {
     NONE = 0;
@@ -253,6 +254,7 @@ type WlanProtection = strict enum : uint8 {
     RX_TX = 3;
 };
 
+// TODO(b/309634989) Soft transition to use fuchsia.wlan.common.WlanKeyConfiguration
 @available(added=15)
 type WlanKeyConfiguration = table {
     /// Which path to protect: None, TX, RX, or TX and RX.

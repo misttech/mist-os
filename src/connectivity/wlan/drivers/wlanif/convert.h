@@ -28,9 +28,10 @@ void ConvertConnectReq(const wlan_fullmac_impl_connect_request_t& in,
 fuchsia_wlan_fullmac::wire::WlanAuthResult ConvertAuthResult(uint8_t in);
 
 fuchsia_wlan_common::wire::WlanKeyType ConvertWlanKeyType(const wlan_key_type_t& in);
-void ConvertSetKeyDescriptor(const set_key_descriptor_t& in,
-                             fuchsia_wlan_fullmac::wire::SetKeyDescriptor* out,
-                             fidl::AnyArena& arena);
+
+fuchsia_wlan_common::wire::WlanKeyConfig ConvertWlanKeyConfig(const wlan_key_config_t& in,
+                                                              fidl::AnyArena& arena);
+
 void ConvertDeleteKeyDescriptor(const delete_key_descriptor_t& in,
                                 fuchsia_wlan_fullmac::wire::DeleteKeyDescriptor* out);
 

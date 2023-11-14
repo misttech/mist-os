@@ -40,8 +40,13 @@ KeyRing::~KeyRing() {
   }
 }
 
-zx_status_t KeyRing::AddKey(const fuchsia_wlan_fullmac::wire::SetKeyDescriptor& key) {
-  if (key.key.count() == 0) {
+zx_status_t KeyRing::AddKey(const fuchsia_wlan_common::wire::WlanKeyConfig& key) {
+  // Only the fields that are used are checked here
+  if (!(key.has_key() && key.has_peer_addr() && key.has_rsc() && key.has_key_idx() &&
+        key.has_cipher_type())) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+  if (key.key().count() == 0) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -49,31 +54,32 @@ zx_status_t KeyRing::AddKey(const fuchsia_wlan_fullmac::wire::SetKeyDescriptor& 
       MLAN_IOCTL_SEC_CFG, MLAN_ACT_SET, bss_index_,
       mlan_ds_sec_cfg{
           .sub_command = MLAN_OID_SEC_CFG_ENCRYPT_KEY,
-          .param{.encrypt_key{.key_index = key.key_id, .key_flags = KEY_FLAG_SET_TX_KEY}}});
+          .param{.encrypt_key{.key_index = key.key_idx(), .key_flags = KEY_FLAG_SET_TX_KEY}}});
 
   auto& encrypt_key = request.UserReq().param.encrypt_key;
 
-  if (key.key.count() > sizeof(encrypt_key.key_material)) {
-    NXPF_ERR("Key length %zu exceeds maximum possible size of %zu", key.key.count(),
+  if (key.key().count() > sizeof(encrypt_key.key_material)) {
+    NXPF_ERR("Key length %zu exceeds maximum possible size of %zu", key.key().count(),
              sizeof(encrypt_key.key_material));
     return ZX_ERR_INVALID_ARGS;
   }
 
-  memcpy(encrypt_key.key_material, key.key.data(), key.key.count());
-  encrypt_key.key_len = static_cast<uint32_t>(key.key.count());
-  memcpy(encrypt_key.mac_addr, key.address.data(), sizeof(encrypt_key.mac_addr));
-  if (is_broadcast_mac(key.address.data())) {
+  memcpy(encrypt_key.key_material, key.key().data(), key.key().count());
+  encrypt_key.key_len = static_cast<uint32_t>(key.key().count());
+  memcpy(encrypt_key.mac_addr, key.peer_addr().data(), sizeof(encrypt_key.mac_addr));
+  if (is_broadcast_mac(key.peer_addr().data())) {
     encrypt_key.key_flags |= KEY_FLAG_GROUP_KEY;
   }
 
-  if (key.rsc) {
+  if (key.has_rsc() && key.rsc()) {
     // mlan has 16 bytes of rx sequence but we only have 8, make sure they go in the least
     // significant bytes.
-    memcpy(&encrypt_key.pn[sizeof(encrypt_key.pn) - sizeof(key.rsc)], &key.rsc, sizeof(key.rsc));
+    memcpy(&encrypt_key.pn[sizeof(encrypt_key.pn) - sizeof(key.rsc())], &key.rsc(),
+           sizeof(key.rsc()));
     encrypt_key.key_flags |= KEY_FLAG_RX_SEQ_VALID;
   }
 
-  switch (key.cipher_suite_type) {
+  switch (key.cipher_type()) {
     case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep40:
     case fuchsia_wlan_ieee80211::wire::CipherSuiteType::kWep104:
       break;
@@ -112,7 +118,7 @@ zx_status_t KeyRing::AddKey(const fuchsia_wlan_fullmac::wire::SetKeyDescriptor& 
       encrypt_key.key_flags |= KEY_FLAG_CCMP_256;
       break;
     default:
-      NXPF_ERR("Unsupported cipher suite: %u", key.cipher_suite_type);
+      NXPF_ERR("Unsupported cipher suite: %u", key.cipher_type());
       return ZX_ERR_INVALID_ARGS;
   }
 

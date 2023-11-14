@@ -69,16 +69,15 @@ TEST_F(KeyRingTest, AddPrivateKey) {
                                0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0};
   constexpr uint64_t kRsc = 0x23847387efa;
 
-  const fuchsia_wlan_fullmac::wire::SetKeyDescriptor key{
-      .key =
-          fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kKeyData), sizeof(kKeyData)),
-      .key_id = kKeyId,
-      .address =
-          {
-              .data_{0x01, 0x02, 0x03, 0x04, 0x05, 0x06},
-          },
-      .rsc = kRsc,
-      .cipher_suite_type = fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128};
+  fidl::Arena arena;
+  auto key = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(arena)
+                 .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kKeyData),
+                                                              sizeof(kKeyData)))
+                 .key_idx(kKeyId)
+                 .rsc(kRsc)
+                 .cipher_type(fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128)
+                 .peer_addr({0x01, 0x02, 0x03, 0x04, 0x05, 0x06})
+                 .Build();
 
   sync_completion_t completion;
   mlan_mock_.SetOnMlanIoctl([&](void*, pmlan_ioctl_req req) -> mlan_status {
@@ -89,7 +88,7 @@ TEST_F(KeyRingTest, AddPrivateKey) {
     EXPECT_EQ(kKeyId, encrypt_key.key_index);
     EXPECT_EQ(sizeof(kKeyData), encrypt_key.key_len);
     EXPECT_BYTES_EQ(kKeyData, encrypt_key.key_material, sizeof(kKeyData));
-    EXPECT_BYTES_EQ(key.address.data(), encrypt_key.mac_addr, key.address.size());
+    EXPECT_BYTES_EQ(key.peer_addr().data(), encrypt_key.mac_addr, key.peer_addr().size());
     // It's a CCMP 128 so no specific key flags needed, we provided an RSC so RX_SEQ_VALID should be
     // set. It's not a group key (because the address is not the broadcast address) so the group key
     // flag should not be set. Currently all keys are tx keys (rx is always implied).
@@ -111,16 +110,15 @@ TEST_F(KeyRingTest, AddGroupKey) {
                                0xF7, 0xF6, 0xF5, 0xF4, 0xF3, 0xF2, 0xF1, 0xF0};
   constexpr uint64_t kRsc = 0x23847387efa;
 
-  const fuchsia_wlan_fullmac::wire::SetKeyDescriptor key{
-      .key =
-          fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kKeyData), sizeof(kKeyData)),
-      .key_id = kKeyId,
-      .address =
-          {
-              .data_{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-          },
-      .rsc = kRsc,
-      .cipher_suite_type = fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128};
+  fidl::Arena arena;
+  auto key = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(arena)
+                 .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(kKeyData),
+                                                              sizeof(kKeyData)))
+                 .key_idx(kKeyId)
+                 .rsc(kRsc)
+                 .cipher_type(fuchsia_wlan_ieee80211::wire::CipherSuiteType::kCcmp128)
+                 .peer_addr({0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+                 .Build();
 
   mlan_mock_.SetOnMlanIoctl([&](void*, pmlan_ioctl_req req) -> mlan_status {
     EXPECT_EQ(MLAN_ACT_SET, req->action);
@@ -132,7 +130,7 @@ TEST_F(KeyRingTest, AddGroupKey) {
     EXPECT_EQ(kKeyId, encrypt_key.key_index);
     EXPECT_EQ(sizeof(kKeyData), encrypt_key.key_len);
     EXPECT_BYTES_EQ(kKeyData, encrypt_key.key_material, sizeof(kKeyData));
-    EXPECT_BYTES_EQ(key.address.data(), encrypt_key.mac_addr, key.address.size());
+    EXPECT_BYTES_EQ(key.peer_addr().data(), encrypt_key.mac_addr, key.peer_addr().size());
     // Verify that the group key flag is set
     EXPECT_EQ(KEY_FLAG_SET_TX_KEY | KEY_FLAG_GROUP_KEY | KEY_FLAG_RX_SEQ_VALID,
               encrypt_key.key_flags);

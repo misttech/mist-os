@@ -897,12 +897,12 @@ mod handle_mlme_request_tests {
             assert_eq!(*sae_password, vec![2u8, 3, 4]);
 
             assert_eq!(*wep_key, vec![5u8, 6]);
-            assert_eq!(req.wep_key.key_id, 7);
+            assert_eq!(req.wep_key.key_idx, 7);
             assert_eq!(req.wep_key.key_type, banjo_wlan_common::WlanKeyType::GROUP);
-            assert_eq!(req.wep_key.address, [8u8; 6]);
+            assert_eq!(req.wep_key.peer_addr, [8u8; 6]);
             assert_eq!(req.wep_key.rsc, 9);
-            assert_eq!(req.wep_key.cipher_suite_oui, [10u8; 3]);
-            assert_eq!(req.wep_key.cipher_suite_type, banjo_wlan_ieee80211::CipherSuiteType(11));
+            assert_eq!(req.wep_key.cipher_oui, [10u8; 3]);
+            assert_eq!(req.wep_key.cipher_type, banjo_wlan_ieee80211::CipherSuiteType(11));
 
             assert_eq!(*security_ie, vec![12u8, 13]);
         });
@@ -1111,15 +1111,12 @@ mod handle_mlme_request_tests {
         let (driver_req, driver_req_keys) = assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req, keys }) => (req, keys));
         assert_eq!(driver_req.num_keys, 1);
         assert_eq!(driver_req_keys[0], vec![5u8, 6]);
-        assert_eq!(driver_req.keylist[0].key_id, 7);
+        assert_eq!(driver_req.keylist[0].key_idx, 7);
         assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_common::WlanKeyType::GROUP);
-        assert_eq!(driver_req.keylist[0].address, [8u8; 6]);
+        assert_eq!(driver_req.keylist[0].peer_addr, [8u8; 6]);
         assert_eq!(driver_req.keylist[0].rsc, 9);
-        assert_eq!(driver_req.keylist[0].cipher_suite_oui, [10u8; 3]);
-        assert_eq!(
-            driver_req.keylist[0].cipher_suite_type,
-            banjo_wlan_ieee80211::CipherSuiteType(11)
-        );
+        assert_eq!(driver_req.keylist[0].cipher_oui, [10u8; 3]);
+        assert_eq!(driver_req.keylist[0].cipher_type, banjo_wlan_ieee80211::CipherSuiteType(11));
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
         assert_eq!(
@@ -1159,7 +1156,7 @@ mod handle_mlme_request_tests {
         let (driver_req, _driver_req_keys) = assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req, keys }) => (req, keys));
         assert_eq!(driver_req.num_keys, NUM_KEYS as u64);
         for i in 0..NUM_KEYS {
-            assert_eq!(driver_req.keylist[i].key_id, i as u16);
+            assert_eq!(driver_req.keylist[i].key_idx, i as u8);
         }
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);

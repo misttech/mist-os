@@ -76,31 +76,33 @@ fn convert_key_type(key_type: &fidl_mlme::KeyType) -> banjo_wlan_common::WlanKey
 
 fn convert_set_key_descriptor(
     descriptor: &fidl_mlme::SetKeyDescriptor,
-) -> BanjoReturnType<'_, banjo_wlan_fullmac::SetKeyDescriptor> {
-    BanjoReturnType::new(banjo_wlan_fullmac::SetKeyDescriptor {
+) -> BanjoReturnType<'_, banjo_wlan_common::WlanKeyConfig> {
+    BanjoReturnType::new(banjo_wlan_common::WlanKeyConfig {
+        protection: banjo_wlan_common::WlanProtection::RX_TX,
         key_list: descriptor.key.as_ptr(),
         key_count: descriptor.key.len(),
-        key_id: descriptor.key_id,
+        key_idx: descriptor.key_id as u8,
         key_type: convert_key_type(&descriptor.key_type),
-        address: descriptor.address,
+        peer_addr: descriptor.address,
         rsc: descriptor.rsc,
-        cipher_suite_oui: descriptor.cipher_suite_oui,
-        cipher_suite_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(
+        cipher_oui: descriptor.cipher_suite_oui,
+        cipher_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(
             descriptor.cipher_suite_type.into_primitive(),
         ),
     })
 }
 
-fn dummy_set_key_descriptor() -> banjo_wlan_fullmac::SetKeyDescriptor {
-    banjo_wlan_fullmac::SetKeyDescriptor {
+fn dummy_wlan_key_config() -> banjo_wlan_common::WlanKeyConfig {
+    banjo_wlan_common::WlanKeyConfig {
+        protection: banjo_wlan_common::WlanProtection::RX_TX,
         key_list: std::ptr::null(),
         key_count: 0,
-        key_id: 0,
+        key_idx: 0,
         key_type: banjo_wlan_common::WlanKeyType(0),
-        address: [0; 6],
+        peer_addr: [0; 6],
         rsc: 0,
-        cipher_suite_oui: [0; 3],
-        cipher_suite_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(0),
+        cipher_oui: [0; 3],
+        cipher_type: banjo_fuchsia_wlan_ieee80211::CipherSuiteType(0),
     }
 }
 
@@ -177,7 +179,7 @@ pub fn convert_connect_request(
         sae_password_count: req.sae_password.len(),
         wep_key: match &req.wep_key {
             Some(wep_key) => convert_set_key_descriptor(&*wep_key).0,
-            None => dummy_set_key_descriptor(),
+            None => dummy_wlan_key_config(),
         },
         security_ie_list: req.security_ie.as_ptr(),
         security_ie_count: req.security_ie.len(),
@@ -321,7 +323,7 @@ pub fn convert_set_keys_request(
         bail!("keylist len {} higher than max {}", req.keylist.len(), MAX_NUM_KEYS);
     }
     let num_keys = min(req.keylist.len(), MAX_NUM_KEYS as usize);
-    let mut keylist = [dummy_set_key_descriptor(); MAX_NUM_KEYS as usize];
+    let mut keylist = [dummy_wlan_key_config(); MAX_NUM_KEYS as usize];
     for i in 0..num_keys {
         keylist[i] = convert_set_key_descriptor(&req.keylist[i]).0;
     }

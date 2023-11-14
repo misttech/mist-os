@@ -233,3 +233,42 @@ type JoinBssRequest = table {
     3: remote bool;
     4: beacon_period uint16; // in TU
 };
+
+@available(added=HEAD)
+type WlanProtection = strict enum : uint8 {
+    NONE = 0;
+    RX = 1;
+    TX = 2;
+    RX_TX = 3;
+};
+
+@available(added=HEAD)
+type WlanKeyConfig = table {
+    /// Which path to protect: None, TX, RX, or TX and RX.
+    1: protection WlanProtection;
+    /// IEEE Cipher suite selector.
+    /// See IEEE Std 802.11-2016, 9.4.2.25.2, Table 9-131
+    /// Optional. If not specified, it's assumed that this is the IEEE OUI.
+    2: cipher_oui array<uint8, 3>;
+    /// The cipher type.
+    /// Required.
+    3: cipher_type fuchsia.wlan.ieee80211.CipherSuiteType;
+    /// Whether this key is a pairwise, group or peer key.
+    /// Required.
+    4: key_type WlanKeyType;
+    /// The peer MAC address for pairwise and peer keys.
+    /// For group keys this value is always the broadcast address.
+    /// Required.
+    5: peer_addr fuchsia.wlan.ieee80211.MacAddr;
+    /// Index for rotating keys, e.g. group keys.
+    /// This value is always 0 for key types which aren't rotating, e.g. pairwise keys.
+    /// Required.
+    6: key_idx uint8;
+    /// They key's actual bytes.
+    /// Required.
+    7: key vector<uint8>:fuchsia.wlan.ieee80211.MAX_KEY_LEN;
+    /// Receive Sequence Counter for group keys only.
+    /// In all other cases the RSC will be 0.
+    /// Optional.
+    8: rsc uint64;
+};

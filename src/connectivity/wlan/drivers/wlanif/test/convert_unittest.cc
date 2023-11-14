@@ -8,6 +8,7 @@
 #include <wlan/drivers/test/log_overrides.h>
 
 #include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
+#include "fuchsia/wlan/common/c/banjo.h"
 
 namespace wlan::drivers {
 
@@ -159,18 +160,19 @@ TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
   in.sae_password_list = kFakeKey;
   in.sae_password_count = wlan_ieee80211::kMaxKeyLen;
 
-  set_key_descriptor_t set_key;
-  set_key.key_list = kFakeKey;
-  set_key.key_count = wlan_ieee80211::kMaxKeyLen;
-  set_key.key_id = kRandomPopulaterUint16;
-  set_key.key_type = kFakeBanjoKeyType;
-  memcpy(set_key.address, kFakeMacAddr, sizeof(kFakeMacAddr));
-  set_key.rsc = kRandomPopulaterUint64;
+  wlan_key_config_t key_config;
+  key_config.protection = WLAN_PROTECTION_RX_TX;
+  key_config.key_list = kFakeKey;
+  key_config.key_count = wlan_ieee80211::kMaxKeyLen;
+  key_config.key_idx = kRandomPopulaterUint8;
+  key_config.key_type = kFakeBanjoKeyType;
+  memcpy(key_config.peer_addr, kFakeMacAddr, sizeof(kFakeMacAddr));
+  key_config.rsc = kRandomPopulaterUint64;
   for (size_t i = 0; i < wlan_ieee80211::kOuiLen; i++) {
-    set_key.cipher_suite_oui[i] = kFakeOui[i];
+    key_config.cipher_oui[i] = kFakeOui[i];
   }
-  set_key.cipher_suite_type = kFakeBanjoCipherSuiteType;
-  in.wep_key = set_key;
+  key_config.cipher_type = kFakeBanjoCipherSuiteType;
+  in.wep_key = key_config;
 
   in.security_ie_list = kFakeIeBytes;
   in.security_ie_count = kFakeIeLen;
@@ -197,17 +199,17 @@ TEST_F(ConvertTest, ToFidlQueryConnectReqRequest) {
   EXPECT_EQ(0, memcmp(out.sae_password().data(), kFakeKey, wlan_ieee80211::kMaxKeyLen));
   EXPECT_EQ(wlan_ieee80211::kMaxKeyLen, out.sae_password().count());
 
-  EXPECT_EQ(0, memcmp(out.wep_key().key.data(), kFakeKey, wlan_ieee80211::kMaxKeyLen));
-  EXPECT_EQ(wlan_ieee80211::kMaxKeyLen, out.wep_key().key.count());
+  EXPECT_EQ(0, memcmp(out.wep_key().key().data(), kFakeKey, wlan_ieee80211::kMaxKeyLen));
+  EXPECT_EQ(wlan_ieee80211::kMaxKeyLen, out.wep_key().key().count());
 
-  EXPECT_EQ(kRandomPopulaterUint16, out.wep_key().key_id);
-  EXPECT_EQ(kFakeFidlKeyType, out.wep_key().key_type);
-  EXPECT_EQ(0, memcmp(out.wep_key().address.data(), kFakeMacAddr, sizeof(kFakeMacAddr)));
-  EXPECT_EQ(kRandomPopulaterUint64, out.wep_key().rsc);
+  EXPECT_EQ(kRandomPopulaterUint8, out.wep_key().key_idx());
+  EXPECT_EQ(kFakeFidlKeyType, out.wep_key().key_type());
+  EXPECT_EQ(0, memcmp(out.wep_key().peer_addr().data(), kFakeMacAddr, sizeof(kFakeMacAddr)));
+  EXPECT_EQ(kRandomPopulaterUint64, out.wep_key().rsc());
   for (size_t i = 0; i < wlan_ieee80211::kOuiLen; i++) {
-    EXPECT_EQ(kFakeOui[i], out.wep_key().cipher_suite_oui[i]);
+    EXPECT_EQ(kFakeOui[i], out.wep_key().cipher_oui()[i]);
   }
-  EXPECT_EQ(kFakeFidlCipherSuiteType, out.wep_key().cipher_suite_type);
+  EXPECT_EQ(kFakeFidlCipherSuiteType, out.wep_key().cipher_type());
   EXPECT_EQ(0, memcmp(out.security_ie().data(), kFakeIeBytes, kFakeIeLen));
   EXPECT_EQ(kFakeIeLen, out.security_ie().count());
 }
