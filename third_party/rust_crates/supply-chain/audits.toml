@@ -260,6 +260,12 @@ criteria = ["safe-to-deploy", "ub-risk-2"]
 delta = "1.0.1 -> 1.1.7"
 notes = "Reviewed on https://fxrev.dev/906819"
 
+[[audits.tokio]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "1.19.2 -> 1.20.5"
+notes = "Reviewed on http://fxrev.dev/904806"
+
 [[audits.tokio-stream]]
 who = "David Koloski <dkoloski@google.com>"
 criteria = ["ub-risk-1", "safe-to-deploy"]
