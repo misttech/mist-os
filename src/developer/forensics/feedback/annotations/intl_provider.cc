@@ -24,7 +24,7 @@ IntlProvider::IntlProvider(async_dispatcher_t* dispatcher,
       ::fit::bind_member<&IntlProvider::GetInternationalization>(this);
 
   property_provider_ptr_.set_error_handler([this](const zx_status_t status) {
-    if (status == ZX_ERR_UNAVAILABLE) {
+    if (status == ZX_ERR_UNAVAILABLE || status == ZX_ERR_NOT_FOUND) {
       FX_PLOGS(WARNING, status) << "fuchsia.intl.PropertyProvider unavailable, will not retry";
 
       Annotations annotations;
