@@ -45,9 +45,6 @@ struct ArchPhysHandoff {
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG) payload.
   ktl::optional<zbi_dcfg_generic32_watchdog_t> generic32_watchdog_driver;
 
-  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_AS370_POWER) payload.
-  bool as370_power_driver = false;
-
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_MOTMOT_POWER) payload.
   bool motmot_power_driver = false;
 };

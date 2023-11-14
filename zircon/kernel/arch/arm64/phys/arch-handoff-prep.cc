@@ -79,10 +79,6 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
               *reinterpret_cast<const zbi_dcfg_generic32_watchdog_t*>(payload.data());
           SaveForMexec(header, payload);
           break;
-        case ZBI_KERNEL_DRIVER_AS370_POWER:
-          ZX_ASSERT(payload.size() == 0);
-          arch_handoff.as370_power_driver = true;
-          break;
         case ZBI_KERNEL_DRIVER_MOTMOT_POWER:
           ZX_ASSERT(payload.size() == 0);
           arch_handoff.motmot_power_driver = true;

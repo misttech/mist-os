@@ -129,8 +129,6 @@ template("boot_shim") {
 shims = [
   "imx8mmevk",
   "motmot",
-  "pinecrest",
-  "visalia",
 ]
 
 foreach(shim, shims) {
