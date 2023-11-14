@@ -270,10 +270,11 @@ std::shared_ptr<ControlServer> AudioDeviceRegistry::CreateControlServer(
   auto control =
       ControlServer::Create(thread_, std::move(server_end), shared_from_this(), device_to_control);
 
-  if (!device_to_control->SetControl(control)) {
-    return nullptr;
+  if (device_to_control->SetControl(control)) {
+    return control;
   }
-  return control;
+  control->Shutdown();
+  return nullptr;
 }
 
 std::shared_ptr<RingBufferServer> AudioDeviceRegistry::CreateRingBufferServer(

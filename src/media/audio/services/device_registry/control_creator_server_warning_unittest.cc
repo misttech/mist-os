@@ -232,10 +232,11 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
     RunLoopUntilIdle();
   }
   ASSERT_TRUE(added_device_id);
+  ASSERT_EQ(ControlServer::count(), 0u);
 
   zx::channel server_end1, client_end1;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end1, &client_end1));
-  auto control_client_unused_1 = fidl::Client<fuchsia_audio_device::Control>(
+  auto control_client_1 = fidl::Client<fuchsia_audio_device::Control>(
       fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end1)), dispatcher(),
       control_fidl_handler_.get());
   auto received_callback = false;
@@ -250,10 +251,12 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
       });
   RunLoopUntilIdle();
   ASSERT_TRUE(received_callback);
+  ASSERT_EQ(ControlServer::count(), 1u);
+  EXPECT_TRUE(control_client_1.is_valid());
 
   zx::channel server_end2, client_end2;
   ASSERT_EQ(ZX_OK, zx::channel::create(0, &server_end2, &client_end2));
-  auto control_client_unused_2 = fidl::Client<fuchsia_audio_device::Control>(
+  auto control_client_2 = fidl::Client<fuchsia_audio_device::Control>(
       fidl::ClientEnd<fuchsia_audio_device::Control>(std::move(client_end2)), dispatcher(),
       control_fidl_handler_.get());
   received_callback = false;
@@ -273,6 +276,7 @@ TEST_F(ControlCreatorServerWarningTest, IdAlreadyControlled) {
       });
   RunLoopUntilIdle();
   EXPECT_TRUE(received_callback);
+  EXPECT_EQ(ControlServer::count(), 1u);
 }
 
 // TODO(fxbug/dev:117199): When Health can change post-initialization, test: Healthy device becomes
