@@ -29,7 +29,7 @@ use crate::{
     types::signals::{SIGINT, SIGKILL},
     types::{
         mode, release_on_error, Capabilities, DeviceType, MountFlags, OpenFlags, ReleasableByRef,
-        WeakRef, SI_KERNEL,
+        WeakRef,
     },
 };
 
@@ -225,27 +225,13 @@ async fn serve_component_controller(
             Event::Controller(request) => match request {
                 Ok(ComponentControllerRequest::Stop { .. }) => {
                     if let Some(task) = task.upgrade() {
-                        signals::send_signal(
-                            task.as_ref(),
-                            signals::SignalInfo::new(
-                                SIGINT,
-                                SI_KERNEL as i32,
-                                signals::SignalDetail::default(),
-                            ),
-                        );
+                        signals::send_standard_signal(task.as_ref(), SIGINT);
                         log_info!("Sent SIGINT to program {:}", task.command().to_string_lossy());
                     }
                 }
                 Ok(ComponentControllerRequest::Kill { .. }) => {
                     if let Some(task) = task.upgrade() {
-                        signals::send_signal(
-                            &task,
-                            signals::SignalInfo::new(
-                                SIGKILL,
-                                SI_KERNEL as i32,
-                                signals::SignalDetail::default(),
-                            ),
-                        );
+                        signals::send_standard_signal(&task, SIGKILL);
                         log_info!("Sent SIGKILL to program {:}", task.command().to_string_lossy());
                         controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
                             fcomponent::Error::InstanceDied.into_primitive() as i32,

@@ -185,7 +185,6 @@
                 "request_key03",
                 "rt_sigpending02",
                 "rt_sigprocmask01",
-                "rt_sigqueueinfo01",
                 "rt_sigtimedwait01",
                 "runpwtests03",
                 "runpwtests04",
@@ -238,7 +237,6 @@
                 "syslog12",
                 "tee01",
                 "tee02",
-                "tgkill02",
                 "time-schedule01",
 
                 // fxbug.dev/127682

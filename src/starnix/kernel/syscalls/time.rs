@@ -575,13 +575,13 @@ mod test {
             .spawn(move || {
                 interruption_target.sleep();
                 if let Some(thread_group) = thread_group.upgrade() {
-                    let signal_info = crate::signals::SignalInfo::default(signals::SIGALRM);
+                    let signal = signals::SIGALRM;
                     let signal_target = thread_group
                         .read()
-                        .get_signal_target(signal_info.signal.into())
+                        .get_signal_target(signal.into())
                         .map(TempRef::into_static);
                     if let Some(task) = signal_target {
-                        crate::signals::send_signal(&task, signal_info);
+                        crate::signals::send_standard_signal(&task, signal);
                     }
                 }
             })

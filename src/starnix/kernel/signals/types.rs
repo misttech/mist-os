@@ -238,6 +238,10 @@ impl SignalState {
         self.iter_queued_by_number(signal).next().is_some()
     }
 
+    pub fn num_queued(&self) -> usize {
+        self.queue.len()
+    }
+
     #[cfg(test)]
     pub fn queued_count(&self, signal: Signal) -> usize {
         self.iter_queued_by_number(signal).count()

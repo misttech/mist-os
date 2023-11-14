@@ -153,7 +153,7 @@ impl IntervalTimer {
 
                 if let Some(target) = &signal_target {
                     if let Some(signal_info) = self.signal_info() {
-                        send_signal(target, signal_info)
+                        send_signal(target, signal_info).expect("Failed to send timer signal");
                     }
                 }
             }

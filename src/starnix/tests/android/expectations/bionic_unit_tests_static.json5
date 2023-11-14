@@ -15,9 +15,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/119476): Implement pidfd
-                "pidfd_DeathTest.pidfd_send_signal",
-
                 // These tests expect /proc/version to exist
                 "dirent.scandir_filter",
                 "fcntl.fcntl_smoke",
@@ -94,16 +91,8 @@
                 "setjmp.setjmp_signal_mask",
                 "setjmp.sigsetjmp_1_signal_mask",
                 "signal.pthread_sigqueue_other",
-                "signal.rt_tgsigqueueinfo",
-                "signal.sigqueue",
                 "signal.sigsuspend64_sigpending64",
                 "signal.sigsuspend_sigpending",
-                "signal.sigtimedwait",
-                "signal.sigtimedwait64_SIGRTMIN",
-                "signal.sigwait64_SIGRTMIN",
-                "signal.sigwait_SIGALRM",
-                "signal.sigwaitinfo",
-                "signal.sigwaitinfo64_SIGRTMIN",
                 "spawn.posix_spawn_POSIX_SPAWN_SETSIGDEF",
                 "spawn.posix_spawn_POSIX_SPAWN_SETSIGMASK",
                 "spawn.posix_spawn_dup2_CLOEXEC",

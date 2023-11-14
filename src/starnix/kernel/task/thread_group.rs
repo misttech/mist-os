@@ -18,10 +18,13 @@ use crate::{
     auth::Credentials,
     device::terminal::{ControllingSession, Terminal},
     drop_notifier::DropNotifier,
-    logging::{log_error, not_implemented},
+    logging::{log_error, log_warn, not_implemented},
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::SeLinuxThreadGroupState,
-    signals::{send_signal, syscalls::WaitingOptions, SignalActions, SignalDetail, SignalInfo},
+    signals::{
+        send_signal, send_standard_signal, syscalls::WaitingOptions, SignalActions, SignalDetail,
+        SignalInfo,
+    },
     task::{
         interval_timer::IntervalTimerHandle, ptrace_detach, AtomicStopState, ClockId,
         ControllingTerminal, CurrentTask, ExitStatus, Kernel, PidTable, ProcessGroup,
@@ -389,7 +392,7 @@ impl ThreadGroup {
 
         for task in tasks {
             task.set_exit_status(&mut *task.write(), exit_status.clone());
-            send_signal(&task, SignalInfo::default(SIGKILL));
+            send_standard_signal(&task, SIGKILL);
         }
     }
 
@@ -487,7 +490,9 @@ impl ThreadGroup {
                     if let Some(signal_target) = parent.get_signal_target(exit_signal.into()) {
                         let mut signal_info = zombie.to_wait_result().as_signal_info();
                         signal_info.signal = exit_signal;
-                        send_signal(&signal_target, signal_info);
+                        send_signal(&signal_target, signal_info).unwrap_or_else(|e| {
+                            log_warn!("Failed to send exit signal: {}", e);
+                        });
                     }
                 }
                 parent.zombie_children.push(zombie);

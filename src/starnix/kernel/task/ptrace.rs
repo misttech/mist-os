@@ -8,7 +8,8 @@ use crate::{
     not_implemented,
     signals::syscalls::WaitingOptions,
     signals::{
-        send_signal, send_signal_first, SignalDetail, SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
+        send_signal, send_signal_first, send_standard_signal, SignalDetail, SignalInfo,
+        SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
     types::errno::{errno, error, Errno},
@@ -211,7 +212,7 @@ pub fn ptrace_dispatch(
         PTRACE_KILL => {
             let mut siginfo = SignalInfo::default(SIGKILL);
             siginfo.code = (linux_uapi::SIGTRAP | PTRACE_KILL << 8) as i32;
-            send_signal(&tracee, siginfo);
+            send_signal(&tracee, siginfo).expect("Failed to send SIGKILL.");
             return Ok(());
         }
         PTRACE_INTERRUPT => {
@@ -399,7 +400,7 @@ pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), E
 
     current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
     do_attach(&current_task.thread_group, weak_task.clone())?;
-    send_signal(&tracee, SignalInfo::default(SIGSTOP));
+    send_standard_signal(&tracee, SIGSTOP);
     Ok(())
 }
 

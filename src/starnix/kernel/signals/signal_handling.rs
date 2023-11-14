@@ -20,13 +20,13 @@ use crate::{
         ERESTART_RESTARTBLOCK,
     },
     types::signals::{
-        SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO,
-        SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM,
-        SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
-        SIGXFSZ,
+        SigSet, Signal, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT,
+        SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS,
+        SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH,
+        SIGXCPU, SIGXFSZ,
     },
     types::user_address::UserAddress,
-    types::{sigaction_t, SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN},
+    types::{sigaction_t, Resource, SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN},
 };
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::RwLockWriteGuard;
@@ -39,15 +39,27 @@ enum SignalPriority {
     Last,
 }
 
+// `send_signal*()` calls below may fail only for real-time signals (with EAGAIN). They are
+// expected to succeed for all othe rsignals.
 pub fn send_signal_first(task: &Task, siginfo: SignalInfo) {
     send_signal_prio(task, siginfo, SignalPriority::First)
+        .expect("send_signal(SignalPriority::First) is not expected to fail")
 }
 
-pub fn send_signal(task: &Task, siginfo: SignalInfo) {
+// Sends `signal` to `task`. The signal must be a standard (i.e. not real-time) signal.
+pub fn send_standard_signal(task: &Task, signal: Signal) {
+    if signal.is_real_time() {
+        panic!("send_standard_signal() can't be used for real-time signals.")
+    }
+    send_signal_prio(task, SignalInfo::default(signal), SignalPriority::Last)
+        .expect("send_signal(SignalPriority::First) is not expected to fail")
+}
+
+pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {
     send_signal_prio(task, siginfo, SignalPriority::Last)
 }
 
-fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) {
+fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) -> Result<(), Errno> {
     let mut task_state = task.write();
 
     let is_masked = task_state.signals.mask().has_signal(siginfo.signal);
@@ -56,6 +68,13 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) {
     let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
     let action = action_for_signal(&siginfo, sigaction);
 
+    if siginfo.signal.is_real_time() && prio != SignalPriority::First {
+        if task_state.signals.num_queued()
+            >= task.thread_group.get_rlimit(Resource::SIGPENDING) as usize
+        {
+            return error!(EAGAIN);
+        }
+    }
     // Enqueue any signal that is blocked by the current mask or blocked by the original mask,
     // since it can be unmasked later.
     // But don't enqueue an ignored signal. See SigtimedwaitTest.IgnoredUnmaskedSignal gvisor test.
@@ -86,6 +105,8 @@ fn send_signal_prio(task: &Task, siginfo: SignalInfo, prio: SignalPriority) {
         task.thread_group.set_stopped(StopState::ForceWaking, Some(siginfo), false);
         task.set_stopped(&mut *task.write(), StopState::ForceWaking, None);
     }
+
+    Ok(())
 }
 
 /// Represents the action to take when signal is delivered.

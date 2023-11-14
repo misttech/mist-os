@@ -10,7 +10,7 @@ use std::{
 
 use crate::{
     mutable_state::{state_accessor, state_implementation},
-    signals::{send_signal, SignalInfo},
+    signals::send_standard_signal,
     task::{Session, ThreadGroup},
     types::signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
     types::{pid_t, TempRef},
@@ -150,7 +150,7 @@ impl ProcessGroup {
                 })
                 .collect::<Vec<_>>();
             for task in tasks {
-                send_signal(&task, SignalInfo::default(*signal));
+                send_standard_signal(&task, *signal);
             }
         }
     }

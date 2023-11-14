@@ -24,6 +24,10 @@ impl UncheckedSignal {
     pub fn new(value: u64) -> UncheckedSignal {
         UncheckedSignal(value)
     }
+
+    pub fn is_zero(self) -> bool {
+        self.0 == 0
+    }
 }
 impl From<Signal> for UncheckedSignal {
     fn from(signal: Signal) -> UncheckedSignal {

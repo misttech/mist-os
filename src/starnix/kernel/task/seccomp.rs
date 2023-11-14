@@ -17,7 +17,7 @@ use crate::{
     fs::{fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps},
     logging::log_warn,
     mm::MemoryAccessorExt,
-    signals::{send_signal, SignalDetail, SignalInfo},
+    signals::{send_signal, send_standard_signal, SignalDetail, SignalInfo},
     syscalls::{decls::Syscall, SyscallArg, SyscallResult},
     task::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
@@ -340,7 +340,7 @@ impl SeccompState {
             && syscall.decl.number as u32 != __NR_read
             && syscall.decl.number as u32 != __NR_write
         {
-            send_signal(task, SignalInfo::default(SIGKILL));
+            send_standard_signal(task, SIGKILL);
             return Some(Err(errno_from_code!(0)));
         }
         None
@@ -449,7 +449,7 @@ impl SeccompState {
                     force: true,
                 };
 
-                send_signal(current_task, siginfo);
+                send_signal(current_task, siginfo).expect("Failed to send SIGSYS");
                 Some(Err(errno_from_code!(-(syscall.decl.number as i16))))
             }
             SeccompAction::UserNotif => {

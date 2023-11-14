@@ -119,11 +119,19 @@ pub struct ResourceLimits {
 const INFINITE_LIMIT: rlimit =
     rlimit { rlim_cur: RLIM_INFINITY as u64, rlim_max: RLIM_INFINITY as u64 };
 
-// See <https://github.com/google/gvisor/blob/master/pkg/abi/linux/limits.go>.
-const DEFAULT_LIMITS: [(Resource, rlimit); 6] = [
+// Most default limit values are the same that are used in GVisor, see
+// https://github.com/google/gvisor/blob/master/pkg/abi/linux/limits.go .
+
+const NPROC_LIMIT: u64 = 0x1FFFFFFF;
+
+// GVisor sets defaults for `SIGPENDING` to 0, but that's incorrect since it would block all
+// real-time signals. Set it to `max_threads / 2` (same as `NPROC_LIMIT`).
+const SIGPENDING_LIMIT: u64 = 0x1FFFFFFF;
+
+const DEFAULT_LIMITS: [(Resource, rlimit); 7] = [
     (Resource::STACK, rlimit { rlim_cur: uapi::_STK_LIM as u64, rlim_max: RLIM_INFINITY as u64 }),
     (Resource::CORE, rlimit { rlim_cur: 0, rlim_max: uapi::RLIM_INFINITY as u64 }),
-    // TODO: Resource::NPROC has a default limit, but we need to find a source for the value.
+    (Resource::NPROC, rlimit { rlim_cur: NPROC_LIMIT, rlim_max: NPROC_LIMIT }),
     (
         Resource::NOFILE,
         rlimit { rlim_cur: uapi::INR_OPEN_CUR as u64, rlim_max: uapi::INR_OPEN_MAX as u64 },
@@ -132,7 +140,7 @@ const DEFAULT_LIMITS: [(Resource, rlimit); 6] = [
         Resource::MEMLOCK,
         rlimit { rlim_cur: uapi::MLOCK_LIMIT as u64, rlim_max: uapi::MLOCK_LIMIT as u64 },
     ),
-    (Resource::SIGPENDING, rlimit { rlim_cur: 0, rlim_max: 0 }),
+    (Resource::SIGPENDING, rlimit { rlim_cur: SIGPENDING_LIMIT, rlim_max: SIGPENDING_LIMIT }),
     (
         Resource::MSGQUEUE,
         rlimit { rlim_cur: uapi::MQ_BYTES_MAX as u64, rlim_max: uapi::MQ_BYTES_MAX as u64 },

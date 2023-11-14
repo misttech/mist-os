@@ -2126,7 +2126,8 @@ impl CurrentTask {
             send_signal(
                 self,
                 SignalInfo { code: SI_KERNEL as i32, force: true, ..SignalInfo::default(SIGSEGV) },
-            );
+            )
+            .expect("Failed to send SIGSEGV");
             return Err(err);
         }
 

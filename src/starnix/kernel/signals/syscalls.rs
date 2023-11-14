@@ -35,6 +35,9 @@ use crate::{
 
 pub use super::signal_handling::sys_restart_syscall;
 
+// Rust will let us do this cast in a const assignment but not in a const generic constraint.
+const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
+
 pub fn sys_rt_sigaction(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -284,36 +287,51 @@ pub fn sys_signalfd4(
 }
 
 fn send_unchecked_signal(
-    task: &Task,
+    current_task: &CurrentTask,
+    target: &Task,
     unchecked_signal: UncheckedSignal,
     si_code: i32,
 ) -> Result<(), Errno> {
+    if !current_task.can_signal(&target, unchecked_signal) {
+        return error!(EPERM);
+    }
+
     // 0 is a sentinel value used to do permission checks.
-    let sentinel_signal = UncheckedSignal::from(0);
-    if unchecked_signal == sentinel_signal {
+    if unchecked_signal.is_zero() {
         return Ok(());
     }
 
     send_signal(
-        task,
+        target,
         SignalInfo { code: si_code, ..SignalInfo::default(Signal::try_from(unchecked_signal)?) },
-    );
-    Ok(())
+    )
 }
 
 fn send_unchecked_signal_info(
-    task: &Task,
+    current_task: &CurrentTask,
+    target: &Task,
     unchecked_signal: UncheckedSignal,
-    info: SignalInfo,
+    siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
+    if !current_task.can_signal(&target, unchecked_signal) {
+        return error!(EPERM);
+    }
+
     // 0 is a sentinel value used to do permission checks.
-    let sentinel_signal = UncheckedSignal::from(0);
-    if unchecked_signal == sentinel_signal {
+    if unchecked_signal.is_zero() {
+        // Check we can read siginfo.
+        current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
         return Ok(());
     }
 
-    send_signal(task, info);
-    Ok(())
+    let signal = Signal::try_from(unchecked_signal)?;
+    let siginfo = read_siginfo(current_task, signal, siginfo_ref)?;
+    if target.get_pid() != current_task.get_pid() && (siginfo.code >= 0 || siginfo.code == SI_TKILL)
+    {
+        return error!(EINVAL);
+    }
+
+    send_signal(&target, siginfo)
 }
 
 pub fn sys_kill(
@@ -358,7 +376,7 @@ pub fn sys_kill(
             if !current_task.can_signal(&target, unchecked_signal) {
                 return error!(EPERM);
             }
-            send_unchecked_signal(&target, unchecked_signal, SI_USER as i32)?;
+            send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)?;
         }
         pid if pid == -1 => {
             // "If pid equals -1, then sig is sent to every process for which
@@ -409,21 +427,32 @@ pub fn sys_kill(
     Ok(())
 }
 
+fn verify_tgid_for_task(task: &Task, tgid: pid_t) -> Result<(), Errno> {
+    let thread_group = match task.thread_group.kernel.pids.read().get_process(tgid) {
+        Some(ProcessEntryRef::Process(proc)) => proc,
+        Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
+        None => return error!(ESRCH),
+    };
+    if !Arc::ptr_eq(&task.thread_group, &thread_group) {
+        return error!(EINVAL);
+    } else {
+        Ok(())
+    }
+}
+
 pub fn sys_tkill(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     tid: pid_t,
     unchecked_signal: UncheckedSignal,
 ) -> Result<(), Errno> {
+    // Linux returns EINVAL when the tgid or tid <= 0.
     if tid <= 0 {
         return error!(EINVAL);
     }
-    let weak_target = current_task.get_task(tid);
-    let target = Task::from_weak(&weak_target)?;
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
-    send_unchecked_signal(&target, unchecked_signal, SI_TKILL)
+    let thread_weak = current_task.get_task(tid);
+    let thread = Task::from_weak(&thread_weak)?;
+    send_unchecked_signal(current_task, &thread, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_tgkill(
@@ -437,25 +466,10 @@ pub fn sys_tgkill(
     if tgid <= 0 || tid <= 0 {
         return error!(EINVAL);
     }
-
     let weak_target = current_task.get_task(tid);
-    let target = Task::from_weak(&weak_target)?;
-
-    let thread_group = match current_task.kernel().pids.read().get_process(tgid) {
-        Some(ProcessEntryRef::Process(proc)) => proc,
-        Some(ProcessEntryRef::Zombie(_)) => return error!(EINVAL),
-        None => return error!(ESRCH),
-    };
-
-    if !Arc::ptr_eq(&target.thread_group, &thread_group) {
-        return error!(EINVAL);
-    }
-
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
-
-    send_unchecked_signal(&target, unchecked_signal, SI_TKILL)
+    let thread = Task::from_weak(&weak_target)?;
+    verify_tgid_for_task(&thread, tgid)?;
+    send_unchecked_signal(current_task, &thread, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_rt_sigreturn(
@@ -471,9 +485,6 @@ fn read_siginfo(
     signal: Signal,
     siginfo_ref: UserAddress,
 ) -> Result<SignalInfo, Errno> {
-    // Rust will let us do this cast in a const assignment but not in a const generic constraint.
-    const SI_MAX_SIZE_AS_USIZE: usize = SI_MAX_SIZE as usize;
-
     let siginfo_mem = current_task.read_memory_to_array::<SI_MAX_SIZE_AS_USIZE>(siginfo_ref)?;
     let header = SignalInfoHeader::read_from(&siginfo_mem[..SI_HEADER_SIZE]).unwrap();
 
@@ -488,6 +499,20 @@ fn read_siginfo(
     Ok(SignalInfo { signal, errno: header.errno, code: header.code, detail: details, force: false })
 }
 
+pub fn sys_rt_sigqueueinfo(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    tgid: pid_t,
+    unchecked_signal: UncheckedSignal,
+    siginfo_ref: UserAddress,
+) -> Result<(), Errno> {
+    let weak_task = current_task.kernel().pids.read().get_task(tgid);
+    let thread_group = Task::from_weak(&weak_task)?.thread_group.clone();
+    let lock = thread_group.read();
+    let target = lock.get_signal_target(unchecked_signal).ok_or_else(|| errno!(ESRCH))?;
+    send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
+}
+
 pub fn sys_rt_tgsigqueueinfo(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
@@ -496,25 +521,10 @@ pub fn sys_rt_tgsigqueueinfo(
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
 ) -> Result<(), Errno> {
-    let signal = Signal::try_from(unchecked_signal)?;
-    let signal_info = read_siginfo(current_task, signal, siginfo_ref)?;
-
-    let this_pid = current_task.get_pid();
-    if this_pid == tgid && (signal_info.code >= 0 || signal_info.code == SI_TKILL) {
-        return error!(EINVAL);
-    }
-
-    let weak_target = current_task.get_task(tid);
-    let target = Task::from_weak(&weak_target)?;
-    if target.get_pid() != tgid {
-        return error!(EINVAL);
-    }
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
-    }
-
-    send_unchecked_signal_info(&target, unchecked_signal, signal_info)?;
-    Ok(())
+    let thread_weak = current_task.get_task(tid);
+    let thread = Task::from_weak(&thread_weak)?;
+    verify_tgid_for_task(&thread, tgid)?;
+    send_unchecked_signal_info(current_task, &thread, unchecked_signal, siginfo_ref)
 }
 
 pub fn sys_pidfd_send_signal(
@@ -533,25 +543,11 @@ pub fn sys_pidfd_send_signal(
     let target = current_task.get_task(file.as_pid()?);
     let target = target.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
-    let signal = Signal::try_from(unchecked_signal)?;
-    let signal_info = if siginfo_ref.is_null() {
-        SignalInfo {
-            signal,
-            errno: 0,
-            code: SI_USER as i32,
-            detail: Default::default(),
-            force: false,
-        }
+    if siginfo_ref.is_null() {
+        send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32)
     } else {
-        read_siginfo(current_task, signal, siginfo_ref)?
-    };
-
-    if !current_task.can_signal(&target, unchecked_signal) {
-        return error!(EPERM);
+        send_unchecked_signal_info(current_task, &target, unchecked_signal, siginfo_ref)
     }
-
-    send_unchecked_signal_info(&target, unchecked_signal, signal_info)?;
-    Ok(())
 }
 
 /// Sends a signal to all thread groups in `thread_groups`.
@@ -565,7 +561,7 @@ pub fn sys_pidfd_send_signal(
 /// # Returns
 /// Returns Ok(()) if at least one signal was sent, otherwise the last error that was encountered.
 fn signal_thread_groups<F>(
-    task: &Task,
+    current_task: &CurrentTask,
     unchecked_signal: UncheckedSignal,
     thread_groups: F,
 ) -> Result<(), Errno>
@@ -583,12 +579,12 @@ where
             .get_signal_target(unchecked_signal)
             .map(TempRef::into_static)
             .ok_or_else(|| errno!(ESRCH))?;
-        if !task.can_signal(&target, unchecked_signal) {
+        if !current_task.can_signal(&target, unchecked_signal) {
             last_error = errno!(EPERM);
             continue;
         }
 
-        match send_unchecked_signal(&target, unchecked_signal, SI_USER as i32) {
+        match send_unchecked_signal(current_task, &target, unchecked_signal, SI_USER as i32) {
             Ok(_) => sent_signal = true,
             Err(errno) => last_error = errno,
         }
@@ -857,7 +853,7 @@ mod tests {
     use crate::{
         auth::Credentials,
         mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
-        signals::testing::dequeue_signal_for_test,
+        signals::{send_standard_signal, testing::dequeue_signal_for_test},
         task::{ExitStatus, ProcessExitInfo},
         testing::*,
         types::errno::ERESTARTSYS,
@@ -1837,7 +1833,7 @@ mod tests {
 
         // Send a signal to the task. `wait_on_pid` should realize there is a signal pending when
         // entering a wait and return with `EINTR`.
-        send_signal(&task, SignalInfo::default(SIGUSR1));
+        send_standard_signal(&task, SIGUSR1);
 
         let errno = wait_on_pid(
             &task,
@@ -1854,7 +1850,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(0, Some(SIGCHLD));
 
         // Send SIGKILL to the child. As kill is handled immediately, no need to dequeue signals.
-        send_signal(&child, SignalInfo::default(SIGKILL));
+        send_standard_signal(&child, SIGKILL);
         dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 
@@ -1873,7 +1869,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(0, exit_signal);
 
         // Send the signal to the child.
-        send_signal(&child, SignalInfo::default(sig));
+        send_standard_signal(&child, sig);
         dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 
