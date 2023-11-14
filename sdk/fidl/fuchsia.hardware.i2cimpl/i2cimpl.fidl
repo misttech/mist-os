@@ -15,6 +15,11 @@ type I2cImplOp = struct {
     stop bool;
 };
 
+/// The result of one read transaction.
+type ReadData = struct {
+    data vector<uint8>:MAX;
+};
+
 /// Low-level protocol for i2c drivers.
 @discoverable
 @transport("Driver")
@@ -31,9 +36,14 @@ open protocol I2cImpl {
     /// |Transact| assumes that all ops buf are not null.
     /// |Transact| assumes that all ops length are not zero.
     /// |Transact| assumes that at least the last op has stop set to true.
+    ///
+    /// For each read-transaction, there will be a corresponding ReadData
+    /// returned. Write-transactions produce no data result.
     flexible Transact(struct {
         op vector<I2cImplOp>:MAX;
-    }) -> () error zx.Status;
+    }) -> (struct {
+        read vector<ReadData>:MAX;
+    }) error zx.Status;
 };
 
 service Service {
