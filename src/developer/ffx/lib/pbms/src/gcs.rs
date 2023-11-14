@@ -116,10 +116,7 @@ where
 {
     tracing::debug!("handle_new_access_token");
     let access_token = match auth_flow {
-        AuthFlowChoice::Default
-        | AuthFlowChoice::Pkce
-        | AuthFlowChoice::Oob
-        | AuthFlowChoice::Device => {
+        AuthFlowChoice::Default | AuthFlowChoice::Pkce | AuthFlowChoice::Device => {
             let credentials = credentials::Credentials::load_or_new().await;
             let access_token = match auth::new_access_token(&credentials.gcs_credentials()).await {
                 Ok(a) => a,
@@ -231,9 +228,6 @@ where
     let refresh_token = match auth_flow {
         AuthFlowChoice::Default | AuthFlowChoice::Pkce => {
             auth::pkce::new_refresh_token(ui).await.context("get refresh token")?
-        }
-        AuthFlowChoice::Oob => {
-            auth::oob::new_refresh_token().await.context("get oob refresh token")?
         }
         AuthFlowChoice::Device => {
             auth::device::new_refresh_token(ui).await.context("get device refresh token")?

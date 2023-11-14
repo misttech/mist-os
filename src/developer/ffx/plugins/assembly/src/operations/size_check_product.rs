@@ -196,7 +196,6 @@ async fn get_gcs_client_with_auth(auth_mode: AuthMode) -> Result<Client> {
     let auth_flow = match auth_mode {
         AuthMode::Default => AuthFlowChoice::Default,
         AuthMode::Pkce => AuthFlowChoice::Pkce,
-        AuthMode::Oob => AuthFlowChoice::Oob,
         AuthMode::Exec(p) => AuthFlowChoice::Exec(p),
     };
 

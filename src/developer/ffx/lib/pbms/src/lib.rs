@@ -64,21 +64,10 @@ pub enum AuthFlowChoice {
     Default,
     Device,
     Exec(PathBuf),
-    Oob,
     Pkce,
 }
 
 const PRODUCT_BUNDLE_PATH_KEY: &str = "product.path";
-
-/// Convert common cli switches to AuthFlowChoice.
-pub fn select_auth(oob_auth: bool, auth_flow: &AuthFlowChoice) -> &AuthFlowChoice {
-    if oob_auth {
-        eprintln!("\n\nPlease use `--auth oob` rather than `--oob-auth`\n\n");
-        &AuthFlowChoice::Oob
-    } else {
-        auth_flow
-    }
-}
 
 /// Convert CLI arg or config strings to AuthFlowChoice.
 impl FromStr for AuthFlowChoice {
@@ -89,7 +78,6 @@ impl FromStr for AuthFlowChoice {
             "no-auth" => Ok(AuthFlowChoice::NoAuth),
             "default" => Ok(AuthFlowChoice::Default),
             "device-experimental" => Ok(AuthFlowChoice::Device),
-            "oob" => Ok(AuthFlowChoice::Oob),
             "pkce" => Ok(AuthFlowChoice::Pkce),
             exec => {
                 let path = Path::new(exec);

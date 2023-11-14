@@ -17,7 +17,6 @@
 
 pub mod device;
 pub mod info;
-pub mod oob;
 pub mod pkce;
 
 use {

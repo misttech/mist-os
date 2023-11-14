@@ -242,8 +242,6 @@ pub enum AuthMode {
     Default,
     /// expects a path to a tool which will print an access token to stdout and exit 0.
     Exec(PathBuf),
-    /// uses Out-of-Band auth (cmd-line friendly).
-    Oob,
     /// uses PKCE auth flow to obtain an access token (requires GUI browser)
     Pkce,
 }
@@ -254,14 +252,13 @@ impl FromStr for AuthMode {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.as_ref() {
             "default" => Ok(AuthMode::Default),
-            "oob" => Ok(AuthMode::Oob),
             "pkce" => Ok(AuthMode::Pkce),
             exec => {
                 let path = Path::new(exec);
                 if path.is_file() {
                     Ok(AuthMode::Exec(path.to_path_buf()))
                 } else {
-                    Err("Unknown auth flow choice. Use one of oob, \
+                    Err("Unknown auth flow choice. Use one of \
                         pkce, default, or a path to an executable \
                         which prints an access token to stdout."
                         .to_string())

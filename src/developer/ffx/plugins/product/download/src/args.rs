@@ -16,7 +16,6 @@ use std::path::PathBuf;
     example = "\
     Auth flow choices for --auth include:\
     \n  `--auth no-auth` do not use auth.\
-    \n  `--auth oob` to use Out-of-Band auth (deprecated).\
     \n  `--auth pkce` to use PKCE auth flow (requires GUI browser).\
     \n  `--auth device-experimental` to use device flow.\
     \n  `--auth <path/to/exe>` run tool at given path which will print an \
