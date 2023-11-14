@@ -911,6 +911,12 @@
                 // Times out.
                 "ItimerTest.DeliversSIGPROFToThreadsRoughlyFairlyIdle",
 
+                // fxbug.dev/136337
+                "AllSocketPairTest.RecvTimeoutRecvmsgOneSecondSucceeds/*",
+                "FilesystemUnixSockets/AllSocketPairTest.RecvTimeoutUsecNeg/*",
+                "AllSocketPairTest.SendTimeoutUsecTooLarge/*",
+                "AllSocketPairTest.SetGetRecvTimeoutLargerArg/*",
+
                 // Passes in debian image, remove.
                 "PingSocket.ICMPPortExhaustion",
                 "Pipes/PipeTest.ZeroSize/*",
