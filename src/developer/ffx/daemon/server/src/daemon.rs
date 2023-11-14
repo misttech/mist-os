@@ -10,7 +10,7 @@ use ffx_build_version::build_info;
 use ffx_config::EnvironmentContext;
 use ffx_daemon_core::events::{self, EventHandler};
 use ffx_daemon_events::{
-    DaemonEvent, TargetConnectionState, TargetEvent, TargetInfo, WireTrafficType,
+    DaemonEvent, TargetConnectionState, TargetEvent, TargetEventInfo, WireTrafficType,
 };
 use ffx_daemon_protocols::create_protocol_register_map;
 use ffx_daemon_target::{
@@ -161,7 +161,7 @@ impl DaemonEventHandler {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn handle_zedboot(&self, t: TargetInfo) {
+    async fn handle_zedboot(&self, t: TargetEventInfo) {
         tracing::trace!(
             "Found new target via zedboot: {}",
             t.nodename.as_deref().unwrap_or("<unknown>")

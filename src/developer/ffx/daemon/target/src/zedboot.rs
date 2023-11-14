@@ -7,7 +7,7 @@ use anyhow::{anyhow, bail, Context as _, Result};
 use async_io::Async;
 use async_net::UdpSocket;
 use ffx_daemon_core::events;
-use ffx_daemon_events::{DaemonEvent, TargetInfo, TryIntoTargetInfo, WireTrafficType};
+use ffx_daemon_events::{DaemonEvent, TargetEventInfo, TryIntoTargetEventInfo, WireTrafficType};
 use fuchsia_async::{Task, Timer};
 use netext::{get_mcast_interfaces, IsLocalAddr};
 use netsvc_proto::netboot::{
@@ -149,7 +149,7 @@ async fn recv_loop(sock: Arc<UdpSocket>, e: events::Queue<DaemonEvent>) {
             continue;
         }
 
-        match ZedbootPacket(msg).try_into_target_info(addr) {
+        match ZedbootPacket(msg).try_into_target_event_info(addr) {
             Ok(info) => {
                 tracing::trace!(
                     "zedboot packet from {} ({}) on {}",
@@ -175,10 +175,10 @@ pub enum ZedbootConvertError {
 /// orphan rules.
 struct ZedbootPacket<B: ByteSlice>(NetbootPacket<B>);
 
-impl<B: ByteSlice> TryIntoTargetInfo for ZedbootPacket<B> {
+impl<B: ByteSlice> TryIntoTargetEventInfo for ZedbootPacket<B> {
     type Error = ZedbootConvertError;
 
-    fn try_into_target_info(self, src: SocketAddr) -> Result<TargetInfo, Self::Error> {
+    fn try_into_target_event_info(self, src: SocketAddr) -> Result<TargetEventInfo, Self::Error> {
         let Self(packet) = self;
         let mut nodename = None;
         let msg = std::str::from_utf8(packet.payload().as_ref())
@@ -194,7 +194,7 @@ impl<B: ByteSlice> TryIntoTargetInfo for ZedbootPacket<B> {
         }
         let nodename = nodename.ok_or(ZedbootConvertError::NodenameMissing)?;
         let mut addrs: HashSet<TargetAddr> = [src.into()].iter().cloned().collect();
-        Ok(TargetInfo {
+        Ok(TargetEventInfo {
             nodename: Some(nodename.to_string()),
             addresses: addrs.drain().collect(),
             ..Default::default()

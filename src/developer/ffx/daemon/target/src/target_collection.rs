@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use async_utils::event::Event;
 use chrono::Utc;
 use ffx_daemon_core::events::{self, EventSynthesizer};
-use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo};
+use ffx_daemon_events::{DaemonEvent, TargetEvent, TargetEventInfo};
 use fidl_fuchsia_developer_ffx as ffx;
 use netext::IsLocalAddr;
 use std::{
@@ -1035,7 +1035,7 @@ impl TargetQuery {
         matches!(self, TargetQuery::AddrPort(..) | TargetQuery::Addr(..))
     }
 
-    pub fn match_info(&self, t: &TargetInfo) -> bool {
+    pub fn match_info(&self, t: &TargetEventInfo) -> bool {
         match self {
             Self::NodenameOrSerial(arg) => {
                 if let Some(ref nodename) = t.nodename {
@@ -1372,7 +1372,7 @@ mod tests {
         // Target returned from queries should be consistent.
         assert!(Rc::ptr_eq(&query_name, &query_serial));
 
-        // The state of both targets are merged together when requesting TargetInfo:
+        // The state of both targets are merged together when requesting TargetEventInfo:
         let targets = tc.targets(None);
         let [target_info] = &targets[..] else {
             panic!("Too many target info structs: {targets:?}");
@@ -1450,7 +1450,7 @@ mod tests {
         assert_eq!(vec.len(), 1);
         assert_eq!(
             vec.iter().next().expect("events empty"),
-            &DaemonEvent::NewTarget(TargetInfo {
+            &DaemonEvent::NewTarget(TargetEventInfo {
                 nodename: Some("clopperdoop".to_owned()),
                 ..Default::default()
             })
@@ -1472,17 +1472,17 @@ mod tests {
         let events = tc.synthesize_events().await;
         assert_eq!(events.len(), 3);
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetInfo {
+            == &DaemonEvent::NewTarget(TargetEventInfo {
                 nodename: Some("clam-chowder-is-tasty".to_owned()),
                 ..Default::default()
             })));
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetInfo {
+            == &DaemonEvent::NewTarget(TargetEventInfo {
                 nodename: Some("this-is-a-crunchy-falafel".to_owned()),
                 ..Default::default()
             })));
         assert!(events.iter().any(|e| e
-            == &DaemonEvent::NewTarget(TargetInfo {
+            == &DaemonEvent::NewTarget(TargetEventInfo {
                 nodename: Some("i-should-probably-eat-lunch".to_owned()),
                 ..Default::default()
             })));
@@ -1519,7 +1519,7 @@ mod tests {
     #[async_trait(?Send)]
     impl events::EventHandler<DaemonEvent> for EventPusher {
         async fn on_event(&self, event: DaemonEvent) -> Result<events::Status> {
-            if let DaemonEvent::NewTarget(TargetInfo { nodename: Some(s), .. }) = event {
+            if let DaemonEvent::NewTarget(TargetEventInfo { nodename: Some(s), .. }) = event {
                 self.got.send(s).await.unwrap();
                 Ok(events::Status::Waiting)
             } else {
@@ -2023,7 +2023,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_both_zero_port() {
         let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
@@ -2037,7 +2037,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_zero_port_to_standard_ssh_port_fails() {
         let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
@@ -2051,7 +2051,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_standard_port_to_no_port() {
         let tq = TargetQuery::from("127.0.0.1:22");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
@@ -2065,7 +2065,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_both_standard_port() {
         let tq = TargetQuery::from("127.0.0.1:22");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
@@ -2079,7 +2079,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_random_port_no_target_port_fails() {
         let tq = TargetQuery::from("127.0.0.1:2342");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
@@ -2093,7 +2093,7 @@ mod tests {
     #[test]
     fn test_target_query_from_socketaddr_zero_port_to_random_target_port_fails() {
         let tq = TargetQuery::from("127.0.0.1:0");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(2223),
             ..Default::default()
@@ -2107,7 +2107,7 @@ mod tests {
     #[test]
     fn test_target_query_from_sockaddr() {
         let tq = TargetQuery::from("127.0.0.1:8022");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("127.0.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(8022),
             ..Default::default()
@@ -2118,7 +2118,7 @@ mod tests {
         assert!(tq.match_info(&ti));
 
         let tq = TargetQuery::from("[::1]:8022");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(8022),
             ..Default::default()
@@ -2129,7 +2129,7 @@ mod tests {
         assert!(tq.match_info(&ti));
 
         let tq = TargetQuery::from("[::1]");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: None,
             ..Default::default()
@@ -2138,7 +2138,7 @@ mod tests {
         assert!(tq.match_info(&ti));
 
         let tq = TargetQuery::from("[fe80::1]:22");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("fe80::1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
@@ -2149,7 +2149,7 @@ mod tests {
         assert!(tq.match_info(&ti));
 
         let tq = TargetQuery::from("192.168.0.1:22");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("192.168.0.1".parse::<IpAddr>().unwrap(), 0, 0)],
             ssh_port: Some(22),
             ..Default::default()
@@ -2161,7 +2161,7 @@ mod tests {
 
         // Note: socketaddr only supports numeric scopes
         let tq = TargetQuery::from("[fe80::1%1]:22");
-        let ti = TargetInfo {
+        let ti = TargetEventInfo {
             addresses: vec![TargetAddr::new("fe80::1".parse::<IpAddr>().unwrap(), 1, 0)],
             ssh_port: Some(22),
             ..Default::default()
@@ -2186,6 +2186,6 @@ mod tests {
             0,
         );
         let tq = TargetQuery::from("fe80::dead:beef:beef:beef");
-        assert!(tq.match_info(&TargetInfo { addresses: vec![addr], ..Default::default() }))
+        assert!(tq.match_info(&TargetEventInfo { addresses: vec![addr], ..Default::default() }))
     }
 }

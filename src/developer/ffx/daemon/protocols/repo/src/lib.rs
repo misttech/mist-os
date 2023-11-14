@@ -6,7 +6,7 @@ use {
     async_lock::RwLock,
     async_trait::async_trait,
     ffx_daemon_core::events::{EventHandler, Status as EventStatus},
-    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetInfo},
+    ffx_daemon_events::{DaemonEvent, TargetEvent, TargetEventInfo},
     ffx_daemon_target::target::Target,
     ffx_ssh::ssh::build_ssh_command,
     fidl::endpoints::ServerEnd,
@@ -1175,7 +1175,7 @@ struct DaemonEventHandler<R: Registrar> {
 
 impl<R: Registrar> DaemonEventHandler<R> {
     /// pub(crate) so that this is visible to tests.
-    pub(crate) fn build_matcher(t: TargetInfo) -> Option<String> {
+    pub(crate) fn build_matcher(t: TargetEventInfo) -> Option<String> {
         if let Some(nodename) = t.nodename {
             Some(nodename)
         } else {
@@ -4604,18 +4604,18 @@ mod tests {
     #[test]
     fn test_build_matcher_nodename() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
                 nodename: Some(TARGET_NODENAME.to_string()),
-                ..TargetInfo::default()
+                ..TargetEventInfo::default()
             }),
             Some(TARGET_NODENAME.to_string())
         );
 
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
                 nodename: Some(TARGET_NODENAME.to_string()),
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
-                ..TargetInfo::default()
+                ..TargetEventInfo::default()
             }),
             Some(TARGET_NODENAME.to_string())
         )
@@ -4624,9 +4624,9 @@ mod tests {
     #[test]
     fn test_build_matcher_missing_nodename_no_port() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
-                ..TargetInfo::default()
+                ..TargetEventInfo::default()
             }),
             Some("fe80::1%1000".to_string())
         )
@@ -4635,10 +4635,10 @@ mod tests {
     #[test]
     fn test_build_matcher_missing_nodename_with_port() {
         assert_eq!(
-            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetInfo {
+            DaemonEventHandler::<RealRegistrar>::build_matcher(TargetEventInfo {
                 addresses: vec![TargetAddr::from_str("[fe80::1%1000]:0").unwrap()],
                 ssh_port: Some(9182),
-                ..TargetInfo::default()
+                ..TargetEventInfo::default()
             }),
             Some("[fe80::1%1000]:9182".to_string())
         )

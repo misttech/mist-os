@@ -6,14 +6,14 @@ use addr::TargetAddr;
 use rcs::RcsConnection;
 use std::{net::SocketAddr, time::Instant};
 
-pub trait TryIntoTargetInfo: Sized {
+pub trait TryIntoTargetEventInfo: Sized {
     type Error;
 
     /// Attempts, given a source socket address, to determine whether the
     /// received message was from a Fuchsia target, and if so, what kind. Attempts
     /// to fill in as much information as possible given the message, consuming
     /// the underlying object in the process.
-    fn try_into_target_info(self, src: SocketAddr) -> Result<TargetInfo, Self::Error>;
+    fn try_into_target_event_info(self, src: SocketAddr) -> Result<TargetEventInfo, Self::Error>;
 }
 
 #[derive(Debug, Hash, Copy, Clone, PartialEq, Eq)]
@@ -26,7 +26,7 @@ pub enum FastbootInterface {
 /// Represents a target that an event has produced. Not to be confused with the FIDL equivalent
 /// under fuchsia.developer.ffx.
 #[derive(Debug, Default, Hash, Clone, PartialEq, Eq)]
-pub struct TargetInfo {
+pub struct TargetEventInfo {
     pub nodename: Option<String>,
     pub addresses: Vec<TargetAddr>,
     pub serial: Option<String>,
@@ -41,7 +41,7 @@ pub struct TargetInfo {
 // TODO(b/287780199): Remove once the usage in Zedboot discovery is removed/refactored.
 #[derive(Debug, Hash, Clone, PartialEq, Eq)]
 pub enum WireTrafficType {
-    Zedboot(TargetInfo),
+    Zedboot(TargetEventInfo),
 }
 
 /// Encapsulates an event that occurs on the daemon.
@@ -54,10 +54,10 @@ pub enum DaemonEvent {
     /// A peer with the contained NodeId has been dropped from the
     /// Overnet mesh (there are no remaining known routes to this peer).
     OvernetPeerLost(u64),
-    NewTarget(TargetInfo),
+    NewTarget(TargetEventInfo),
     /// An event when a target (which is not necessarily new) has been
     /// updated with more information.
-    UpdatedTarget(TargetInfo),
+    UpdatedTarget(TargetEventInfo),
     // TODO(awdavies): Stale target event, target shutdown event, etc.
 }
 

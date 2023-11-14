@@ -13,7 +13,7 @@ use chrono::{DateTime, Utc};
 use compat_info::{CompatibilityInfo, CompatibilityState};
 use ffx::{TargetAddrInfo, TargetIpPort};
 use ffx_daemon_core::events::{self, EventSynthesizer};
-use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetInfo};
+use ffx_daemon_events::{FastbootInterface, TargetConnectionState, TargetEvent, TargetEventInfo};
 use ffx_fastboot::common::fastboot::tcp_proxy;
 use ffx_fastboot::common::fastboot_interface::Fastboot;
 use ffx_fastboot::usb_discovery::open_interface_with_serial;
@@ -454,7 +454,7 @@ impl Target {
         target
     }
 
-    pub fn from_target_info(mut t: TargetInfo) -> Rc<Self> {
+    pub fn from_target_event_info(mut t: TargetEventInfo) -> Rc<Self> {
         if let Some(s) = t.serial {
             Self::new_for_usb(&s)
         } else {
@@ -465,11 +465,11 @@ impl Target {
         }
     }
 
-    pub fn from_netsvc_target_info(mut t: TargetInfo) -> Rc<Self> {
+    pub fn from_netsvc_target_info(mut t: TargetEventInfo) -> Rc<Self> {
         Self::new_with_netsvc_addrs(t.nodename.take(), t.addresses.drain(..).collect())
     }
 
-    pub fn from_fastboot_target_info(mut t: TargetInfo) -> Result<Rc<Self>> {
+    pub fn from_fastboot_target_info(mut t: TargetEventInfo) -> Result<Rc<Self>> {
         Ok(Self::new_with_fastboot_addrs(
             t.nodename.take(),
             t.serial.take(),
@@ -508,10 +508,10 @@ impl Target {
         }
     }
 
-    pub fn target_info(&self) -> TargetInfo {
+    pub fn target_info(&self) -> TargetEventInfo {
         let fastboot_interface = self.infer_fastboot_interface();
 
-        TargetInfo {
+        TargetEventInfo {
             nodename: self.nodename(),
             addresses: self.addrs(),
             serial: self.serial(),

@@ -9,7 +9,7 @@ use crate::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx::DaemonError;
-use ffx_daemon_events::{TargetConnectionState, TargetInfo};
+use ffx_daemon_events::{TargetConnectionState, TargetEventInfo};
 use ffx_daemon_target::{target::Target, target_collection::TargetCollection};
 use fidl::{
     endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, Request, RequestStream},
@@ -253,7 +253,7 @@ impl FakeDaemonBuilder {
     }
 
     pub fn target(self, target: ffx::TargetInfo) -> Self {
-        let t = TargetInfo {
+        let t = TargetEventInfo {
             nodename: target.nodename,
             addresses: target
                 .addresses
@@ -262,7 +262,7 @@ impl FakeDaemonBuilder {
             ssh_host_address: target.ssh_host_address.map(|a| a.address),
             ..Default::default()
         };
-        let built_target = Target::from_target_info(t.into());
+        let built_target = Target::from_target_event_info(t.into());
         built_target.update_connection_state(|_| TargetConnectionState::Mdns(Instant::now()));
 
         // Need to set for `ssh` target testing.
