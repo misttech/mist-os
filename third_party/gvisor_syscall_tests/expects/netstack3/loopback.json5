@@ -89,6 +89,7 @@
                 "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackSendToConnectBind",
 
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
+                "All/DualStackAfMismatchTest.*/TCP",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4Loopback_ConnectV4MappedLoopback",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV4MappedAny_ConnectV4Any",

@@ -77,6 +77,9 @@
                 // https://fxbug.dev/67016
                 "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
+
+                // https://fxbug.dev/136359
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
             ],
         },
         {
@@ -93,6 +96,9 @@
                 // Tests that flake in Fuchsia's CQ.
                 // https://fxbug.dev/114419
                 "AllInetTests/UdpSocketTest.SendToAddressOtherThanConnected/*",
+
+                // https://fxbug.dev/136359
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",
             ],
         },
     ],

@@ -41,6 +41,9 @@
                 // TODO(https://fxbug.dev/47321): Implement ICMP sockets in Netstack3.
                 "AllInetTests/UdpSocketTest.ConnectWriteToInvalidPort/*",
                 "AllInetTests/UdpSocketTest.ConnectAndSendNoReceiver/*",
+
+                // https://fxbug.dev/136358
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",
             ],
         },
         {
@@ -154,6 +157,9 @@
 
                 // https://fxbug.dev/74639
                 "AllUDPSockets/AllSocketPairTest.GetSetSocketRcvlowatOption/*",
+
+                // https://fxbug.dev/136358
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
             ],
         },
     ],
