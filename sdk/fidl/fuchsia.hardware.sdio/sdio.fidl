@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 library fuchsia.hardware.sdio;
 
+using fuchsia.hardware.sdmmc;
 using zx;
 
-/// SDIO max block size is 2048, so this is an arbitrary limit of 1024 blocks.
-const MAX_TRANSFER_SIZE uint32 = 0x200000;
+// TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.
+const MAX_VMOS_PER_TRANSFER uint32 = 40;
 
 type SdioFuncHwInfo = struct {
     manufacturer_id uint32;
@@ -52,23 +53,14 @@ type SdioHwInfo = struct {
 
 type SdioRwTxn = resource struct {
     addr uint32;
-    data_size uint32;
     incr bool;
     write bool;
-    use_dma bool;
-    /// Used if use_dma is true
-    dma_vmo zx.Handle:<VMO, optional>;
-    /// Used if use_dma is false
-    virt vector<uint8>:<MAX_TRANSFER_SIZE, optional>;
-    /// offset into dma_vmo or virt
-    buf_offset uint64;
+    buffers vector<fuchsia.hardware.sdmmc.SdmmcBufferRegion>:MAX;
 };
 
 closed protocol Device {
     strict GetDevHwInfo() -> (struct {
         hw_info SdioHwInfo;
-        /// The function number of this device.
-        function uint8;
     }) error zx.Status;
     strict EnableFn() -> () error zx.Status;
     strict DisableFn() -> () error zx.Status;
@@ -81,11 +73,6 @@ closed protocol Device {
     strict GetBlockSize() -> (struct {
         cur_blk_size uint16;
     }) error zx.Status;
-    strict DoRwTxn(resource struct {
-        txn SdioRwTxn;
-    }) -> (resource struct {
-        txn SdioRwTxn;
-    }) error zx.Status;
     strict DoRwByte(struct {
         write bool;
         addr uint32;
@@ -93,9 +80,15 @@ closed protocol Device {
     }) -> (struct {
         read_byte uint8;
     }) error zx.Status;
+    /// Returns a virtual interrupt that will be triggered by the SDIO driver when the card signals
+    /// an interrupt corresponding to this function. No additional interrupts will be triggered
+    /// until `AckInBandIntr()` is called.
     strict GetInBandIntr() -> (resource struct {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
+    /// See above. Clients should call `AckInBandIntr()` after starting to wait on the interrupt
+    /// object just in case there is already an in-band interrupt pending for this function.
+    strict AckInBandIntr();
     /// The following functions access the card common control registers (CCCR) on function 0.
     /// Aborts an I/O operation occurring on the specified function.
     strict IoAbort() -> () error zx.Status;
@@ -111,4 +104,67 @@ closed protocol Device {
     }) -> (struct {
         read_byte uint8;
     }) error zx.Status;
+
+    // See fuchsia.hardware.sdmmc.
+    strict RegisterVmo(resource struct {
+        vmo_id uint32;
+        vmo zx.Handle:VMO;
+        offset uint64;
+        size uint64;
+        vmo_rights uint32;
+    }) -> () error zx.Status;
+    strict UnregisterVmo(struct {
+        vmo_id uint32;
+    }) -> (resource struct {
+        vmo zx.Handle:VMO;
+    }) error zx.Status;
+
+    /// Clients are responsible for performing the following cache operations:
+    ///
+    /// After read requests:
+    /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE on buffers that
+    ///   have been mapped by the client.
+    /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN_INVALIDATE on all other buffers.
+    ///
+    /// Note that writing to any portion of a buffer before DoRwTxn has returned can corrupt the
+    /// received data.
+    ///
+    /// Before write requests:
+    /// - Call zx_cache_flush with ZX_CACHE_FLUSH_DATA on buffers that have been mapped by the
+    ///   client.
+    /// - Call zx_vmo_op_range with ZX_VMO_OP_CACHE_CLEAN on all other buffers.
+    strict DoRwTxn(resource struct {
+        txn SdioRwTxn;
+    }) -> () error zx.Status;
+
+    /// Requests that the core driver hard reset the card and perform the SDIO initialization
+    /// sequence again. The callback will be called after the card has been re-initialized, and in
+    /// the meantime all IO calls from this client will return ZX_ERR_SHOULD_WAIT. If an error
+    /// occurs during initialization then all subsequent IO calls will return ZX_ERR_IO_NOT_PRESENT.
+    /// The only way to recover from this situation would be to call `RequestCardReset()` again.
+    ///
+    /// The SDIO core driver will wait for all clients to call this method before performing the
+    /// reset and re-initialization. After the reset clients will have to perform their own
+    /// initialization steps again, such as calling `EnableFnIntr()` or `UpdateBlockSize()`.
+    ///
+    /// VMO registration methods can always be called regardless of the reset state.
+    ///
+    /// The specific method used to hard reset the card is platform- or board-specific; examples
+    /// include toggling a reset GPIO or power cycling the card.
+    strict RequestCardReset() -> () error zx.Status;
+
+    /// Perform tuning in the background. Clients can use this to update the host controller delay
+    /// settings in case the bus delay has changed due to temperature or other factors. For example,
+    /// clients could call this periodically, or only in response to data CRC errors. The amount of
+    /// time this call takes (and the amount of time that other requests are blocked for) is
+    /// controller-dependent.
+    ///
+    /// Returns `ZX_ERR_ALREADY_BOUND` if another call to `PerformTuning()` is already pending.
+    /// Otherwise returns `ZX_OK` or an error value if the SDMMC driver's tuning process failed (see
+    /// the [SDMMC protocol](/sdk/banjo/fuchsia.hardware.sdmmc/sdmmc.fidl)).
+    strict PerformTuning() -> () error zx.Status;
+};
+
+service Service {
+    device client_end:Device;
 };

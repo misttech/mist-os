@@ -16,6 +16,7 @@
     },
     capabilities: [
         { service: "fuchsia.hardware.rpmb.Service" },
+        { service: "fuchsia.hardware.sdio.Service" },
     ],
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
@@ -24,6 +25,10 @@
     expose: [
         {
             service: "fuchsia.hardware.rpmb.Service",
+            from: "self",
+        },
+        {
+            service: "fuchsia.hardware.sdio.Service",
             from: "self",
         },
     ],

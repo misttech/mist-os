@@ -19,11 +19,11 @@ constexpr char kUsageMessage[] = R"""(Usage: sdio <device> <command> [options]
     info - Display information about the host controller and the card
     read-byte <address> - Read one byte from the SDIO function
     write-byte <address> <byte> - Write one byte to the SDIO function
-    read-stress <address> <size> <loops> [--fifo] [--dma] - Read a number of blocks from the SDIO
-                                                            function and measure the throughput
+    read-stress <address> <size> <loops> [--fifo] - Read a number of blocks from the SDIO
+                                                    function and measure the throughput
 
     Example:
-    sdio /dev/class/sdio/001 read-stress 0x01234 256 100 dma
+    sdio /dev/class/sdio/001 read-stress 0x01234 256 100
 )""";
 
 constexpr char kVersion[] = "1";
@@ -116,15 +116,16 @@ int Info(SdioClient client) {
 
   auto result = client->GetDevHwInfo();
   if (!result.ok()) {
-    fprintf(stderr, "FIDL call GetDevHwInfo failed: %d\n", result.status());
+    fprintf(stderr, "FIDL call GetDevHwInfo failed: %s\n", zx_status_get_string(result.status()));
     return 1;
   }
   if (result->is_error()) {
-    fprintf(stderr, "GetDevHwInfo failed: %d\n", result->error_value());
-    return 1;
+    fprintf(stderr, "Failed to get Dev HW info err: %s",
+            zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
 
-  const SdioHwInfo& info = result->value()->hw_info;
+  const SdioHwInfo& info = result.value()->hw_info;
   const SdioDeviceHwInfo& dev_info = info.dev_hw_info;
   printf("Host:\n    Max transfer size: %u\n\n", info.host_max_transfer_size);
   printf("Card:\n");
@@ -167,11 +168,11 @@ int ReadByte(SdioClient client, uint32_t address, int argc, const char** argv) {
     return 1;
   }
   if (result->is_error()) {
-    fprintf(stderr, "DoRwByte failed: %d\n", result->error_value());
+    fprintf(stderr, "Failed to read byte: %s", zx_status_get_string(result->error_value()));
     return 1;
   }
 
-  printf("0x%02x\n", result->value()->read_byte);
+  printf("0x%02x\n", result.value()->read_byte);
   return 0;
 }
 
@@ -193,7 +194,7 @@ int WriteByte(SdioClient client, uint32_t address, int argc, const char** argv) 
     return 1;
   }
   if (result->is_error()) {
-    fprintf(stderr, "DoRwByte failed: %d\n", result->error_value());
+    fprintf(stderr, "Failed to write byte: %s", zx_status_get_string(result->error_value()));
     return 1;
   }
 
@@ -218,13 +219,10 @@ int ReadStress(SdioClient client, uint32_t address, int argc, const char** argv)
   }
 
   bool incr = true;
-  bool use_dma = false;
 
   for (int i = 2; i < argc; i++) {
     if (strcmp(argv[i], "--fifo") == 0) {
       incr = false;
-    } else if (strcmp(argv[i], "--dma") == 0) {
-      use_dma = true;
     } else {
       fprintf(stderr, "Unexpected option: %s\n", argv[i]);
       PrintUsage();
@@ -232,47 +230,49 @@ int ReadStress(SdioClient client, uint32_t address, int argc, const char** argv)
     }
   }
 
-  std::unique_ptr<uint8_t[]> buffer;
-
   zx::vmo dma_vmo;
-  if (use_dma) {
-    zx_status_t status = zx::vmo::create(size, 0, &dma_vmo);
-    if (status != ZX_OK) {
-      fprintf(stderr, "Failed to create VMO: %d\n", status);
-      return 1;
-    }
-  } else {
-    buffer = std::unique_ptr<uint8_t[]>(new uint8_t[size]);
+  zx_status_t status = zx::vmo::create(size, 0, &dma_vmo);
+  if (status != ZX_OK) {
+    fprintf(stderr, "Failed to create VMO: %s\n", zx_status_get_string(status));
+    return 1;
   }
 
   const zx::time start = zx::clock::get_monotonic();
 
   for (unsigned long i = 0; i < loops; i++) {
-    SdioRwTxn txn = {};
-    txn.addr = address;
-    txn.data_size = size;
-    txn.incr = incr;
-    txn.write = false;
-    txn.use_dma = use_dma;
-    txn.buf_offset = 0;
-
-    if (use_dma) {
-      txn.dma_vmo = std::move(dma_vmo);
-    } else {
-      txn.virt = fidl::VectorView<uint8_t>::FromExternal(buffer.get(), size);
+    zx::vmo dup_dma_vmo;
+    zx_status_t status = dma_vmo.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup_dma_vmo);
+    if (status != ZX_OK) {
+      fprintf(stderr, "Failed to duplicate VMO handle for SDIO test: %s\n",
+              zx_status_get_string(status));
+      return 1;
     }
+    fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion buffers[1];
+    buffers[0] = fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion{
+        .buffer = fuchsia_hardware_sdmmc::wire::SdmmcBuffer::WithVmo(std::move(dup_dma_vmo)),
+        .type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle,
+        .offset = 0,
+        .size = size,
+    };
+    SdioRwTxn txn{
+        .addr = address,
+        .incr = incr,
+        .write = false,
+        .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+            buffers, 1),
+    };
 
     auto result = client->DoRwTxn(std::move(txn));
     if (!result.ok()) {
-      fprintf(stderr, "FIDL call DoRwTxn failed: %d\n", result.status());
+      fprintf(stderr, "FIDL call DoRwTxn failed on iteration %lu status: %s\n", i,
+              zx_status_get_string(result.status()));
       return 1;
     }
     if (result->is_error()) {
-      fprintf(stderr, "DoRwTxn failed: %d\n", result->error_value());
+      fprintf(stderr, "DoRwTxn failed on iteration %lu status: %s", i,
+              zx_status_get_string(result->error_value()));
       return 1;
     }
-
-    dma_vmo = std::move(result->value()->txn.dma_vmo);
   }
 
   const zx::duration elapsed = zx::clock::get_monotonic() - start;

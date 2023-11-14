@@ -1032,32 +1032,5 @@ void brcmf_sdio_exit(brcmf_bus* bus) {
 }
 
 zx_status_t brcmf_sdio_request_card_reset(struct brcmf_sdio_dev* sdiod) {
-  libsync::Completion completed;
-  zx_status_t status = ZX_ERR_INTERNAL;
-
-  struct Cookie {
-    libsync::Completion* completion;
-    zx_status_t* status;
-  } cookie{
-      .completion = &completed,
-      .status = &status,
-  };
-
-  auto callback = [](void* cookie, zx_status_t s) {
-    auto* c = static_cast<Cookie*>(cookie);
-    *c->status = s;
-    c->completion->Signal();
-  };
-
-  sdio_request_card_reset(&sdiod->sdio_proto_fn1, callback, &cookie);
-
-  // This timeout value was somewhat arbitrary but was empirically enough during testing to avoid
-  // any issues with timeouts during correct operation.
-  constexpr zx::duration kTimeout = zx::duration(500);
-  if (completed.Wait(kTimeout) != ZX_OK) {
-    BRCMF_ERR("Failed to reset sdio: waiting too long");
-    return ZX_ERR_TIMED_OUT;
-  }
-
-  return status;
+  return sdio_request_card_reset(&sdiod->sdio_proto_fn1);
 }

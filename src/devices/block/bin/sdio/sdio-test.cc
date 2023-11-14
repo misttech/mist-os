@@ -6,6 +6,7 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fdf/arena.h>
 
 #include <vector>
 
@@ -17,7 +18,7 @@ namespace {
 
 class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_sdio::Device> {
  public:
-  SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
+  SdioTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread), arena_(fdf::Arena('S')) {
     zx::result endpoints = fidl::CreateEndpoints<Device>();
     ASSERT_OK(endpoints.status_value());
     client_ = std::move(endpoints->client);
@@ -26,7 +27,8 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   }
 
   void GetDevHwInfo(GetDevHwInfoCompleter::Sync& completer) override {
-    completer.ReplySuccess({}, 1);
+    fuchsia_hardware_sdio::wire::SdioHwInfo fidl_hw_info = {};
+    completer.ReplySuccess(fidl_hw_info);
   }
 
   void EnableFn(EnableFnCompleter::Sync& completer) override {
@@ -55,17 +57,16 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
   }
 
   void DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::Sync& completer) override {
-    txns_.emplace_back(wire::SdioRwTxn{
-        .addr = request->txn.addr,
-        .data_size = request->txn.data_size,
-        .incr = request->txn.incr,
-        .write = request->txn.write,
-        .use_dma = request->txn.use_dma,
-        .dma_vmo = {},
-        .virt = {},
-        .buf_offset = 0,
-    });
-    completer.ReplySuccess(std::move(request->txn));
+    fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> buffers(
+        arena_, request->txn.buffers.count());
+    for (size_t i = 0; i < request->txn.buffers.count(); i++) {
+      buffers[i] = std::move(request->txn.buffers[i]);
+    }
+    txns_.emplace_back(wire::SdioRwTxn{.addr = request->txn.addr,
+                                       .incr = request->txn.incr,
+                                       .write = request->txn.write,
+                                       .buffers = std::move(buffers)});
+    completer.ReplySuccess();
   }
 
   void DoRwByte(DoRwByteRequestView request, DoRwByteCompleter::Sync& completer) override {
@@ -93,6 +94,22 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
                              DoVendorControlRwByteCompleter::Sync& completer) override {
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
+  void AckInBandIntr(AckInBandIntrCompleter::Sync& completer) override {}
+
+  void RegisterVmo(RegisterVmoRequestView request, RegisterVmoCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void UnregisterVmo(UnregisterVmoRequestView request,
+                     UnregisterVmoCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  void RequestCardReset(RequestCardResetCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+  void PerformTuning(PerformTuningCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
 
  protected:
   void set_byte(uint8_t byte) { byte_ = byte; }
@@ -102,19 +119,28 @@ class SdioTest : public zxtest::Test, public fidl::WireServer<fuchsia_hardware_s
 
   static void ExpectTxnsEqual(const wire::SdioRwTxn& lhs, const wire::SdioRwTxn& rhs) {
     EXPECT_EQ(lhs.addr, rhs.addr);
-    EXPECT_EQ(lhs.data_size, rhs.data_size);
     EXPECT_EQ(lhs.incr, rhs.incr);
     EXPECT_EQ(lhs.write, rhs.write);
-    EXPECT_EQ(lhs.use_dma, rhs.use_dma);
+    EXPECT_EQ(lhs.buffers.count(), rhs.buffers.count());
+    EXPECT_EQ(lhs.buffers.count(), 1);
+    EXPECT_EQ(lhs.buffers.begin()->type, rhs.buffers.begin()->type);
+    EXPECT_EQ(lhs.buffers.begin()->offset, rhs.buffers.begin()->offset);
+    EXPECT_EQ(lhs.buffers.begin()->size, rhs.buffers.begin()->size);
   }
 
   async::Loop loop_;
   fidl::ClientEnd<Device> client_;
+  fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion kExpectedBuffer = {
+      .type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle,
+      .offset = 0,
+      .size = 256,
+  };
 
  private:
   uint8_t byte_ = 0;
   uint32_t address_ = 0;
   std::vector<wire::SdioRwTxn> txns_;
+  fdf::Arena arena_;
 };
 
 TEST_F(SdioTest, NoArguments) {
@@ -171,34 +197,10 @@ TEST_F(SdioTest, ReadStress) {
 
   const wire::SdioRwTxn kExpectedTxn = {
       .addr = 0x10000,
-      .data_size = 256,
       .incr = true,
       .write = false,
-      .use_dma = false,
-      .dma_vmo = {},
-      .virt = {},
-      .buf_offset = 0,
-  };
-
-  for (const wire::SdioRwTxn& txn : get_txns()) {
-    ASSERT_NO_FATAL_FAILURE(ExpectTxnsEqual(txn, kExpectedTxn));
-  }
-}
-
-TEST_F(SdioTest, ReadStressDma) {
-  const char* argv[] = {"read-stress", "0x10000", "256", "20", "--dma"};
-  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 5, argv));
-  EXPECT_EQ(get_txns().size(), 20);
-
-  const wire::SdioRwTxn kExpectedTxn = {
-      .addr = 0x10000,
-      .data_size = 256,
-      .incr = true,
-      .write = false,
-      .use_dma = true,
-      .dma_vmo = {},
-      .virt = {},
-      .buf_offset = 0,
+      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+          &kExpectedBuffer, 1),
   };
 
   for (const wire::SdioRwTxn& txn : get_txns()) {
@@ -213,55 +215,10 @@ TEST_F(SdioTest, ReadStressFifo) {
 
   const wire::SdioRwTxn kExpectedTxn = {
       .addr = 0x10000,
-      .data_size = 256,
       .incr = false,
       .write = false,
-      .use_dma = false,
-      .dma_vmo = {},
-      .virt = {},
-      .buf_offset = 0,
-  };
-
-  for (const wire::SdioRwTxn& txn : get_txns()) {
-    ASSERT_NO_FATAL_FAILURE(ExpectTxnsEqual(txn, kExpectedTxn));
-  }
-}
-
-TEST_F(SdioTest, ReadStressDmaFifo) {
-  const char* argv[] = {"read-stress", "0x10000", "256", "20", "--dma", "--fifo"};
-  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 6, argv));
-  EXPECT_EQ(get_txns().size(), 20);
-
-  const wire::SdioRwTxn kExpectedTxn = {
-      .addr = 0x10000,
-      .data_size = 256,
-      .incr = false,
-      .write = false,
-      .use_dma = true,
-      .dma_vmo = {},
-      .virt = {},
-      .buf_offset = 0,
-  };
-
-  for (const wire::SdioRwTxn& txn : get_txns()) {
-    ASSERT_NO_FATAL_FAILURE(ExpectTxnsEqual(txn, kExpectedTxn));
-  }
-}
-
-TEST_F(SdioTest, ReadStressFifoDma) {
-  const char* argv[] = {"read-stress", "0x10000", "256", "20", "--fifo", "--dma"};
-  EXPECT_EQ(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 6, argv));
-  EXPECT_EQ(get_txns().size(), 20);
-
-  const wire::SdioRwTxn kExpectedTxn = {
-      .addr = 0x10000,
-      .data_size = 256,
-      .incr = false,
-      .write = false,
-      .use_dma = true,
-      .dma_vmo = {},
-      .virt = {},
-      .buf_offset = 0,
+      .buffers = fidl::VectorView<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>::FromExternal(
+          &kExpectedBuffer, 1),
   };
 
   for (const wire::SdioRwTxn& txn : get_txns()) {
@@ -270,18 +227,13 @@ TEST_F(SdioTest, ReadStressFifoDma) {
 }
 
 TEST_F(SdioTest, ReadStressBadAddress) {
-  const char* argv[] = {"read-stress", "0x20000", "256", "20", "--fifo", "--dma"};
-  EXPECT_NE(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 6, argv));
+  const char* argv[] = {"read-stress", "0x20000", "256", "20", "--fifo"};
+  EXPECT_NE(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 5, argv));
 }
 
 TEST_F(SdioTest, ReadStressNotEnoughArguments) {
   const char* argv[] = {"read-stress", "0x10000", "256"};
   EXPECT_NE(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 3, argv));
-}
-
-TEST_F(SdioTest, ReadStressSizeTooBig) {
-  const char* argv[] = {"read-stress", "0x10000", "0x200001", "20"};
-  EXPECT_NE(0, sdio::RunSdioTool(SdioClient(std::move(client_)), 4, argv));
 }
 
 TEST_F(SdioTest, GetTxnStats) {

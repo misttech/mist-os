@@ -71,8 +71,8 @@ class SdioControllerDevice : public SdioControllerDeviceType,
                               uint64_t size, uint32_t vmo_rights);
   zx_status_t SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo* out_vmo);
   zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn);
-  void SdioRequestCardReset(sdio_request_card_reset_callback callback, void* cookie) TA_EXCL(lock_);
-  void SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie);
+  zx_status_t SdioRequestCardReset() TA_EXCL(lock_);
+  zx_status_t SdioPerformTuning();
 
   void InBandInterruptCallback();
 
@@ -162,7 +162,6 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   sdio_device_hw_info_t hw_info_ TA_GUARDED(lock_);
   bool tuned_ = false;
   std::atomic<bool> tuning_in_progress_ = false;
-
   inspect::Inspector inspector_;
   inspect::Node root_;
   inspect::UintProperty tx_errors_;

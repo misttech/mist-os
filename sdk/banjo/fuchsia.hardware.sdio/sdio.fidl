@@ -179,7 +179,6 @@ closed protocol Sdio {
     ///
     /// The specific method used to hard reset the card is platform- or board-specific; examples
     /// include toggling a reset GPIO or power cycling the card.
-    @async
     strict RequestCardReset() -> (struct {
         status zx.Status;
     });
@@ -193,7 +192,6 @@ closed protocol Sdio {
     /// Returns `ZX_ERR_ALREADY_BOUND` if another call to `PerformTuning()` is already pending.
     /// Otherwise returns `ZX_OK` or an error value if the SDMMC driver's tuning process failed (see
     /// the [SDMMC protocol](/sdk/banjo/fuchsia.hardware.sdmmc/sdmmc.fidl)).
-    @async
     strict PerformTuning() -> (struct {
         status zx.Status;
     });

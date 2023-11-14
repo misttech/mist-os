@@ -1519,12 +1519,7 @@ TEST_F(SdioControllerDeviceTest, RequestCardReset) {
   EXPECT_EQ(sdmmc_.bus_freq(), 208'000'000);
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_SDR104);
 
-  zx_status_t status = ZX_ERR_IO;
-  dut_->SdioRequestCardReset(
-      [](void* ctx, zx_status_t reset_status) {
-        *reinterpret_cast<zx_status_t*>(ctx) = reset_status;
-      },
-      &status);
+  zx_status_t status = dut_->SdioRequestCardReset();
 
   EXPECT_OK(status);
   EXPECT_EQ(sdmmc_.signal_voltage(), SDMMC_VOLTAGE_V180);
@@ -1548,11 +1543,7 @@ TEST_F(SdioControllerDeviceTest, PerformTuning) {
   EXPECT_OK(dut_->Probe(CreateMetadata()));
   EXPECT_OK(dut_->AddDevice());
 
-  zx_status_t status = ZX_ERR_IO;
-
-  dut_->SdioPerformTuning(
-      [](void* cookie, zx_status_t status) { *reinterpret_cast<zx_status_t*>(cookie) = status; },
-      &status);
+  zx_status_t status = dut_->SdioPerformTuning();
 
   fdf_testing_run_until_idle();
 

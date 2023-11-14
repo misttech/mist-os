@@ -654,10 +654,9 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
   return sdmmc_->UnregisterVmo(vmo_id, fn_idx, out_vmo);
 }
 
-void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback callback,
-                                                void* cookie) {
+zx_status_t SdioControllerDevice::SdioRequestCardReset() {
   if (dead_) {
-    return callback(cookie, ZX_ERR_CANCELED);
+    return ZX_ERR_CANCELED;
   }
 
   fbl::AutoLock lock(&lock_);
@@ -675,28 +674,26 @@ void SdioControllerDevice::SdioRequestCardReset(sdio_request_card_reset_callback
     zxlogf(ERROR, "Card reset failed: %s", zx_status_get_string(status));
   }
 
-  callback(cookie, status);
+  return status;
 }
 
-void SdioControllerDevice::SdioPerformTuning(sdio_perform_tuning_callback callback, void* cookie) {
+zx_status_t SdioControllerDevice::SdioPerformTuning() {
   if (dead_) {
-    return callback(cookie, ZX_ERR_CANCELED);
+    return ZX_ERR_CANCELED;
   }
 
   if (!tuned_) {
     // Tuning was not performed during initialization, so there is no need to do it now.
-    return callback(cookie, ZX_OK);
+    return ZX_OK;
   }
 
   if (tuning_in_progress_.exchange(true)) {
-    return callback(cookie, ZX_ERR_ALREADY_BOUND);
+    return ZX_ERR_ALREADY_BOUND;
   }
 
-  async::PostTask(dispatcher_, [this, cookie, callback]() {
-    zx_status_t status = sdmmc_->PerformTuning(SD_SEND_TUNING_BLOCK);
-    callback(cookie, status);
-    tuning_in_progress_.store(false);
-  });
+  zx_status_t status = sdmmc_->PerformTuning(SD_SEND_TUNING_BLOCK);
+  tuning_in_progress_.store(false);
+  return status;
 }
 
 zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {
