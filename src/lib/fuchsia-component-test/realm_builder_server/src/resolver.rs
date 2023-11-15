@@ -212,13 +212,20 @@ impl Registry {
         self: &Arc<Self>,
         component_url: &str,
     ) -> Result<fresolution::Component, fresolution::ResolverError> {
-        let parsed_url =
-            Url::parse(&component_url).map_err(|_| fresolution::ResolverError::Internal)?;
+        let parsed_url = Url::parse(&component_url).map_err(|e| {
+            // Don't swallow the root cause of the error without a trace. It may
+            // be impossible to correlate resulting error to its root cause
+            // otherwise.
+            error!("URL parse error: url={}: {}", &component_url, e);
+            fresolution::ResolverError::Internal
+        })?;
         let component_decls_guard = self.component_decls.lock().await;
         if let Some(resolvable_component) = component_decls_guard.get(&parsed_url).cloned() {
-            Self::load_absolute_url(component_url, resolvable_component)
-                .await
-                .map_err(|_| fresolution::ResolverError::Internal)
+            Self::load_absolute_url(component_url, resolvable_component).await.map_err(|e| {
+                // See similar above.
+                error!("URL resolution error for: url={}: {}", &component_url, e);
+                fresolution::ResolverError::Internal
+            })
         } else {
             Self::load_fragment_only_url(parsed_url, component_decls_guard).await
         }
@@ -345,7 +352,10 @@ impl Registry {
         Ok(fresolution::Component {
             url: Some(component_url.clone()),
             resolution_context: None,
-            decl: Some(encode(component_decl).map_err(|_| fresolution::ResolverError::Internal)?),
+            decl: Some(encode(component_decl).map_err(|e| {
+                error!("while encoding component decl: {}", e);
+                fresolution::ResolverError::Internal
+            })?),
             package: Some(fresolution::Package {
                 url: Some(component_url),
                 directory: Some(client_end),
