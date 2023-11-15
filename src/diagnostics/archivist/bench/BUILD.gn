@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/testing/perf/test.gni")
 import("//src/diagnostics/archivist/build/archivist.gni")
 
 archivist_optimized_binary("logging-bin") {
@@ -41,14 +42,17 @@ archivist_optimized_binary("formatter-bin") {
   sources = [ "src/formatter.rs" ]
 }
 
+_formatter_benchmark_component = "formatter"
+_logging_benchmark_component = "logging"
+
 fuchsia_component("formatter-benchmarks-component") {
-  component_name = "formatter"
+  component_name = _formatter_benchmark_component
   deps = [ ":formatter-bin" ]
   manifest = "meta/formatter.cml"
 }
 
 fuchsia_component("logging-benchmarks-component") {
-  component_name = "logging"
+  component_name = _logging_benchmark_component
   deps = [ ":logging-bin" ]
   manifest = "meta/logging.cml"
 }
@@ -60,7 +64,22 @@ fuchsia_package("archivist-benchmarks") {
   ]
 }
 
+fuchsia_component_perf_test("archivist-formatter-benchmark") {
+  package = ":archivist-benchmarks"
+  component_name = _formatter_benchmark_component
+  expected_metric_names_filename = "fuchsia.archivist.formatter.txt"
+}
+
+fuchsia_component_perf_test("archivist-logging-benchmark") {
+  package = ":archivist-benchmarks"
+  component_name = _logging_benchmark_component
+  expected_metric_names_filename = "fuchsia.archivist.logging.txt"
+}
+
 group("bench") {
   testonly = true
-  deps = [ ":archivist-benchmarks" ]
+  deps = [
+    ":archivist-formatter-benchmark",
+    ":archivist-logging-benchmark",
+  ]
 }

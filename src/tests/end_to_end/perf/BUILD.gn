@@ -6,7 +6,7 @@ import("//build/dart/dart_library.gni")
 import("//build/dart/test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test_data.gni")
-import("//src/tests/end_to_end/perf/python_perf_test.gni")
+import("//build/testing/perf/test.gni")
 
 # This directory contains Dart wrappers for running performance tests
 # that are defined elsewhere in the Fuchsia tree.
@@ -175,50 +175,18 @@ foreach(test, shard_test_list) {
 
 _tests = [
   {
-    name = "archivist_benchmark"
-    expected_metric_filenames = [
-      "fuchsia.archivist.formatter.txt",
-      "fuchsia.archivist.logging.txt",
-    ]
-  },
-  {
-    name = "diagnostics_log_rust_benchmark"
-    expected_metric_filenames = [
-      "fuchsia.diagnostics_log_rust.core.txt",
-      "fuchsia.diagnostics_log_rust.encoding.txt",
-    ]
-  },
-  {
     name = "flatland_benchmark"
-    expected_metric_filenames = [
-      # TODO(b/305080561): enable trace publishing and add this expected metric names.
-      # "fuchsia.flatland_latency.txt"
-    ]
+    expected_metric_filename = "fuchsia.flatland_latency.txt"
   },
   {
     name = "input_latency_benchmark"
-    expected_metric_filenames = [
-      # TODO(b/305080563): enable trace publishing and add this expected metric names.
-      # "fuchsia.input_latency.simplest_app.txt"
-    ]
+    expected_metric_filename = "fuchsia.input_latency.simplest_app.txt"
     transport = "sl4f"
   },
   {
     name = "perf_publish_example"
-    expected_metric_filenames = [ "fuchsia.example.txt" ]
+    expected_metric_filename = "fuchsia.example.txt"
     libraries = [ "//src/performance/lib/perf_publish" ]
-  },
-  {
-    name = "rust_inspect_benchmark"
-    expected_metric_filenames = [
-      "fuchsia.rust_inspect.benchmarks.txt",
-      "fuchsia.rust_inspect.reader_benchmarks.txt",
-      "fuchsia.rust_inspect.selectors.txt",
-    ]
-  },
-  {
-    name = "selectors_benchmark"
-    expected_metric_filenames = [ "fuchsia.diagnostics.txt" ]
   },
 ]
 
@@ -229,9 +197,11 @@ foreach(test, _tests) {
   if (is_host) {
     python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
-      expected_metric_filenames = test.expected_metric_filenames
+      expected_metric_names_filename = test.expected_metric_filename
+      libraries =
+          [ "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test" ]
       if (defined(test.libraries)) {
-        libraries = test.libraries
+        libraries += test.libraries
       }
       if (defined(test.transport)) {
         transport = test.transport
@@ -399,13 +369,6 @@ group("test") {
 
   foreach(target_name, test_list) {
     deps += [ ":$target_name($host_toolchain)" ]
-  }
-
-  # TODO(https://fxbug.dev/131000): diagnostics_log_encoding_bench
-  # currently fails to build for ARM64/VIM3 due to a toolchain bug.
-  # Re-enable it for ARM64 when the bug is fixed.
-  if (target_cpu == "arm64") {
-    deps -= [ ":py_diagnostics_log_rust_benchmark($host_toolchain)" ]
   }
 }
 

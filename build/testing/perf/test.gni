@@ -1,0 +1,179 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_mobly_test.gni")
+import("//build/testing/host_test_data.gni")
+
+# Define a Python-driven performance test, specifying a Python host-side entry point specific to
+# the test. This is for tests that involve some test-specific host-side logic. If your test consists
+# of a Fuchsia component that generates a fuchsiaperf file and that requires no test-specific
+# host-side logic, you can use fuchsia_component_perf_test instead.
+#
+# Parameters
+#   main_source (required)
+#     The entrypoint that contains the __main__ to execute the test.
+#     Type: path
+#
+#   expected_metric_names_filename (required)
+#     The file containing the expected metrics.
+#     Type: list(string)
+#
+#   libraries (optional)
+#     Additional libraries that the test depends on if any.
+#     Type: list(string)
+#     Default: empty list
+#
+#   target_deps (optional)
+#     Fuchsia dependencies to bring into the build graph that the test needs.
+#     Type: list(string)
+#     Default: empty list
+#
+#   environments (optional)
+#     Additional environments in which the test can run.
+#     Type: list(string)
+#     Default: empty list, will use the default environments only (vim3, nuc)
+#
+#   transport (optional)
+#     Force a specific host->device transport.
+#     Any transport supported by honeydew can be used here, but recommended
+#     values are "sl4f", "fc", or "fuchsia-controller".
+#     Type: string
+#     Default: "fuchsia-controller"
+template("python_perf_test") {
+  if (is_host) {
+    assert(defined(invoker.main_source), "main_source is required")
+    assert(defined(invoker.expected_metric_names_filename),
+           "expected_metric_names_filename is required")
+
+    _test_target_name = "${target_name}_test"
+    _runtime_deps_target = "${_test_target_name}_runtime_deps"
+    _runtime_deps_dir = "${target_out_dir}/${_test_target_name}/runtime_deps"
+    host_test_data(_runtime_deps_target) {
+      sources = [
+        "${root_out_dir}/catapult_converter",
+        "${root_out_dir}/trace2json",
+        "//src/tests/end_to_end/perf/expected_metric_names/${invoker.expected_metric_names_filename}",
+      ]
+      outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
+      deps = [
+        "//src/performance/trace2json:bin",
+        "//src/testing/catapult_converter:converter_bin",
+      ]
+    }
+    python_mobly_test("${_test_target_name}") {
+      test_name = "${target_name}"
+      forward_variables_from(invoker,
+                             [
+                               "main_source",
+                               "params_source",
+                               "params_source_deps",
+                             ])
+      if (defined(invoker.libraries)) {
+        libraries = invoker.libraries
+      }
+
+      deps = [ ":${_runtime_deps_target}" ]
+      if (defined(invoker.deps)) {
+        deps += invoker.deps
+      }
+
+      environments = [
+        nuc_env,
+        vim3_env,
+      ]
+      if (defined(invoker.environments)) {
+        environments += invoker.environments
+      }
+
+      transport = "fuchsia-controller"
+      if (defined(invoker.transport)) {
+        transport = invoker.transport
+      }
+    }
+  } else {
+    not_needed(invoker, "*")
+  }
+
+  group("${target_name}") {
+    testonly = true
+    deps = [ ":${target_name}_test($host_toolchain)" ]
+    if (defined(invoker.target_deps)) {
+      foreach(target_dep, invoker.target_deps) {
+        deps += [ "${target_dep}($target_toolchain)" ]
+      }
+    }
+  }
+}
+
+# This template is for tests where the test consists of a Fuchsia component that generates a
+# fuchsiaperf file and that requires no test-specific host-side logic. If your test requires
+# test-specific host-side logic, use python_perf_test instead.
+#
+# Parameters
+#   package (required)
+#     The label of the package that provides the performance tests.
+#     type: string
+#
+#   package_name (optional)
+#     The name of the package that the given package label generates. This is only necessary if the
+#     name of the package that the label generates doesn't match the name of the label.
+#     type: string
+#     Default: get_label_info(package, "name")
+#
+#   component_name (required)
+#     The name of the test component inside the given package.
+#     Type: string
+#
+#   expected_metric_names_filename (required)
+#     The names of the files containing expected metric names to validate against.
+#     Type: list(string)
+#
+template("fuchsia_component_perf_test") {
+  assert(defined(invoker.component_name), "component_name is required")
+  assert(defined(invoker.expected_metric_names_filename),
+         "expected_metric_names_filename is required")
+  assert(defined(invoker.package), "package is required")
+
+  if (defined(invoker.package_name)) {
+    _package_name = invoker.package_name
+  } else {
+    _package_name = get_label_info(invoker.package, "name")
+  }
+
+  _config_file = "${target_gen_dir}/${target_name}_config.json"
+  generated_file("${target_name}_generated_config") {
+    output_conversion = "json"
+    _package = _package_name
+    _component = invoker.component_name
+    contents = {
+      ffx_test_url =
+          "fuchsia-pkg://fuchsia.com/${_package}#meta/${_component}.cm"
+      expected_metric_names_filename = invoker.expected_metric_names_filename
+      ffx_test_options = [
+        "--",
+        "/custom_artifacts/results.fuchsiaperf.json",
+      ]
+    }
+    outputs = [ _config_file ]
+  }
+
+  python_perf_test(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "environments",
+                             "expected_metric_names_filename",
+                           ])
+    main_source =
+        "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"
+    params_source = _config_file
+    params_source_deps = [ ":${target_name}_generated_config" ]
+    libraries = [
+      "//src/performance/lib/perf_publish",
+      "//src/testing/end_to_end/honeydew",
+      "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
+      "//third_party/mobly",
+    ]
+    target_deps = [ invoker.package ]
+  }
+}

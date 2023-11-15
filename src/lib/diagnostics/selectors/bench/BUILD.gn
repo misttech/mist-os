@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/testing/perf/test.gni")
 
 rustc_binary("bin") {
   output_name = "selectors_benchmarks"
@@ -22,10 +23,13 @@ fuchsia_package_with_single_component("selectors-benchmarks") {
   manifest = "meta/selectors-benchmarks.cml"
 }
 
+fuchsia_component_perf_test("selectors-benchmark") {
+  package = ":selectors-benchmarks"
+  component_name = "selectors-benchmarks"
+  expected_metric_names_filename = "fuchsia.diagnostics.txt"
+}
+
 group("bench") {
   testonly = true
-  deps = [
-    ":bin",
-    ":selectors-benchmarks",
-  ]
+  deps = [ ":selectors-benchmark" ]
 }
