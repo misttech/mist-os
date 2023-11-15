@@ -57,12 +57,6 @@ pub enum ScanReason {
     BssSelectionAugmentation,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-struct SmeNetworkIdentifier {
-    ssid: types::Ssid,
-    protection: types::SecurityTypeDetailed,
-}
-
 #[async_trait]
 pub trait ScanRequestApi: Send + Sync {
     async fn perform_scan(
@@ -244,7 +238,8 @@ async fn perform_scan(
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
 ) -> (fidl_sme::ScanRequest, Result<Vec<types::ScanResult>, types::ScanError>) {
-    let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
+    let mut bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> =
+        HashMap::new();
     let mut scan_event_inspect_data = ScanEventInspectData::new();
     let mut scan_defects: Vec<ScanIssue> = vec![];
 
@@ -278,20 +273,10 @@ async fn perform_scan(
                 };
                 bss_by_network =
                     bss_to_network_map(results, &target_ssids, &mut scan_event_inspect_data);
-                // TODO(fxbug.dev/123619): remove the SmeNetworkIdentifier type to simplify this.
-                // Consider passing in scan results and reading the "ScanObservation" from there.
-                // (creates a single source of truth for "ScanObservation")
+                // TODO(fxbug.dev/136384) Consider passing in scan results and reading the
+                // "ScanObservation" there to create a single source of truth for "ScanObservation".
                 saved_networks_manager
-                    .record_scan_result(
-                        target_ssids,
-                        bss_by_network
-                            .keys()
-                            .map(|n| types::NetworkIdentifierDetailed {
-                                ssid: n.ssid.clone(),
-                                security_type: n.protection,
-                            })
-                            .collect(),
-                    )
+                    .record_scan_result(target_ssids, bss_by_network.keys().collect())
                     .await;
                 break;
             }
@@ -367,12 +352,13 @@ fn bss_to_network_map(
     scan_result_list: Vec<wlan_common::scan::ScanResult>,
     target_ssids: &Vec<types::Ssid>,
     scan_event_inspect_data: &mut ScanEventInspectData,
-) -> HashMap<SmeNetworkIdentifier, Vec<types::Bss>> {
-    let mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>> = HashMap::new();
+) -> HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> {
+    let mut bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>> =
+        HashMap::new();
     for scan_result in scan_result_list.into_iter() {
-        let protection: types::SecurityTypeDetailed =
+        let security_type: types::SecurityTypeDetailed =
             scan_result.bss_description.protection().into();
-        if (protection) == types::SecurityTypeDetailed::Unknown {
+        if security_type == types::SecurityTypeDetailed::Unknown {
             // Log a space-efficient version of the IEs.
             let readable_ie =
                 scan_result.bss_description.ies().iter().map(|n| n.to_string()).join(",");
@@ -380,9 +366,9 @@ fn bss_to_network_map(
             scan_event_inspect_data.unknown_protection_ies.push(readable_ie);
         };
         let entry = bss_by_network
-            .entry(SmeNetworkIdentifier {
+            .entry(types::NetworkIdentifierDetailed {
                 ssid: scan_result.bss_description.ssid.clone(),
-                protection,
+                security_type,
             })
             .or_insert(vec![]);
 
@@ -412,11 +398,11 @@ fn bss_to_network_map(
 }
 
 fn network_map_to_scan_result(
-    mut bss_by_network: HashMap<SmeNetworkIdentifier, Vec<types::Bss>>,
+    mut bss_by_network: HashMap<types::NetworkIdentifierDetailed, Vec<types::Bss>>,
 ) -> Vec<types::ScanResult> {
     let mut scan_results: Vec<types::ScanResult> = bss_by_network
         .drain()
-        .map(|(SmeNetworkIdentifier { ssid, protection }, bss_entries)| {
+        .map(|(types::NetworkIdentifierDetailed { ssid, security_type }, bss_entries)| {
             let compatibility = if bss_entries.iter().any(|bss| bss.is_compatible()) {
                 fidl_policy::Compatibility::Supported
             } else {
@@ -424,7 +410,7 @@ fn network_map_to_scan_result(
             };
             types::ScanResult {
                 ssid,
-                security_type_detailed: protection,
+                security_type_detailed: security_type,
                 entries: bss_entries,
                 compatibility,
             }
@@ -1169,9 +1155,9 @@ mod tests {
             },
         ];
 
-        let expected_id = SmeNetworkIdentifier {
+        let expected_id = types::NetworkIdentifierDetailed {
             ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
-            protection: fidl_sme::Protection::Wpa3Personal,
+            security_type: types::SecurityTypeDetailed::Wpa3Personal,
         };
 
         // We should only see one entry for the duplicated BSSs in the scan results, and a second

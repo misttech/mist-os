@@ -87,7 +87,8 @@ pub struct ScanResult {
 }
 
 // Only derive(Debug) in tests, we should never directly print this in non-test code
-#[cfg_attr(test, derive(Debug, PartialEq, Eq, PartialOrd, Ord))]
+#[cfg_attr(test, derive(Debug, PartialOrd, Ord, Clone))]
+#[derive(Hash, PartialEq, Eq)]
 pub struct NetworkIdentifierDetailed {
     pub ssid: Ssid,
     pub security_type: SecurityTypeDetailed,

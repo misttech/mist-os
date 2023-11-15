@@ -257,10 +257,10 @@ impl SavedNetworksManagerApi for FakeSavedNetworksManager {
     async fn record_scan_result(
         &self,
         target_ssids: Vec<client_types::Ssid>,
-        results: Vec<client_types::NetworkIdentifierDetailed>,
+        results: Vec<&client_types::NetworkIdentifierDetailed>,
     ) {
         let mut records = self.scan_result_records.lock().await;
-        records.push((target_ssids, results));
+        records.push((target_ssids, results.into_iter().cloned().collect()));
     }
 
     async fn get_networks(&self) -> Vec<NetworkConfig> {
