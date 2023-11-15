@@ -39,21 +39,13 @@ class RootDriver : public fdf::DriverBase {
       return CompleteStart(compat_result.take_error());
     }
 
-    // Set the symbols of the node that a driver will have access to.
-    compat_device_.name = "v1";
-    compat_device_.proto_ops.ops = reinterpret_cast<void*>(0xabcdef);
-
-    fdf::NodeSymbol symbol(
-        {.name = compat::kDeviceSymbol, .address = reinterpret_cast<uint64_t>(&compat_device_)});
-
     // Set the properties of the node that a driver will bind to.
     fdf::NodeProperty property =
         fdf::MakeProperty(1 /* BIND_PROTOCOL */, bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD);
 
     auto offers = child_.CreateOffers();
 
-    fdf::NodeAddArgs args(
-        {.name = "v1", .offers = offers, .symbols = {{symbol}}, .properties = {{property}}});
+    fdf::NodeAddArgs args({.name = "v1", .offers = offers, .properties = {{property}}});
 
     // Create endpoints of the `NodeController` for the node.
     auto endpoints = fidl::CreateEndpoints<fdf::NodeController>();
@@ -72,24 +64,32 @@ class RootDriver : public fdf::DriverBase {
           }
 
           controller_.Bind(std::move(client), dispatcher());
+          CompleteStart(zx::ok());
         });
-    CompleteStart(zx::ok());
   }
 
  private:
+  compat::DeviceServer::BanjoConfig get_banjo_config() {
+    compat::DeviceServer::BanjoConfig config{0};
+    config.callbacks[0] = []() {
+      return compat::DeviceServer::GenericProtocol{.ops = nullptr, .ctx = nullptr};
+    };
+    return config;
+  }
+
   fidl::SharedClient<fdf::Node> node_;
   fidl::SharedClient<fdf::NodeController> controller_;
 
-  zx_protocol_device_t ops_ = {
-      .get_protocol = [](void*, uint32_t, void*) { return ZX_OK; },
-  };
-
   std::optional<fdf::StartCompleter> start_completer_;
 
-  compat::device_t compat_device_ = compat::kDefaultDevice;
-  compat::DeviceServer child_{dispatcher(), incoming(), outgoing(),
-                              node_name(),  "v1",       std::unordered_set<uint32_t>{},
-                              std::nullopt};
+  compat::DeviceServer child_{dispatcher(),
+                              incoming(),
+                              outgoing(),
+                              node_name(),
+                              "v1",
+                              std::nullopt,
+                              std::unordered_set<uint32_t>{},
+                              get_banjo_config()};
 };
 
 }  // namespace

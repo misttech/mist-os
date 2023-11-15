@@ -33,18 +33,14 @@ class InputReportDriver : public fdf::DriverBase {
         devfs_connector_(fit::bind_member<&InputReportDriver::Serve>(this)) {}
 
   zx::result<> Start() override {
-    auto parent_symbol =
-        fdf_internal::GetSymbol<compat::device_t*>(symbols(), compat::kDeviceSymbol);
-
-    hid_device_protocol_t proto = {};
-    if (parent_symbol->proto_ops.id != ZX_PROTOCOL_HID_DEVICE) {
-      FDF_LOG(ERROR, "Didn't find HID_DEVICE protocol");
-      return zx::error(ZX_ERR_NOT_FOUND);
+    zx::result client_result = compat::ConnectBanjo<ddk::HidDeviceProtocolClient>(incoming());
+    if (client_result.is_error()) {
+      FDF_LOG(ERROR, "Failed to connect to HidDeviceProtocolClient. %s",
+              client_result.status_string());
+      return client_result.take_error();
     }
-    proto.ctx = parent_symbol->context;
-    proto.ops = reinterpret_cast<const hid_device_protocol_ops_t*>(parent_symbol->proto_ops.ops);
 
-    ddk::HidDeviceProtocolClient hiddev(&proto);
+    ddk::HidDeviceProtocolClient hiddev = client_result.value();
     if (!hiddev.is_valid()) {
       FDF_LOG(ERROR, "Failed to create hiddev");
       return zx::error(ZX_ERR_INTERNAL);

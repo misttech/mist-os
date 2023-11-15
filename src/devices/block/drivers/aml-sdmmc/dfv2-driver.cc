@@ -190,17 +190,10 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   offers[compat_offers.size()] =
       fuchsia_component_decl::wire::Offer::WithService(arena, sdmmc_service);
 
-  fidl::VectorView<fuchsia_driver_framework::wire::NodeSymbol> symbols(arena, 1);
-  symbols[0] = fuchsia_driver_framework::wire::NodeSymbol::Builder(arena)
-                   .name(arena, banjo_server_.symbol().name().value())
-                   .address(banjo_server_.symbol().address().value())
-                   .Build();
-
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
                         .offers(offers)
                         .properties(properties)
-                        .symbols(symbols)
                         .Build();
 
   auto result = parent_->AddChild(args, std::move(controller_endpoints->server), {});

@@ -334,7 +334,9 @@ class TestDevice : public fidl::WireServer<fuchsia_driver_compat::Device> {
     auto iter = banjo_protocols_.find(request->proto_id);
     if (iter == banjo_protocols_.end()) {
       completer.ReplyError(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
+      return;
     }
+
     auto& protocol = iter->second;
     completer.ReplySuccess(protocol.ops, protocol.ctx);
   }
@@ -898,7 +900,7 @@ TEST_F(DriverTest, Start_GetBackingMemory) {
 TEST_F(DriverTest, Start_BindFailed) {
   auto driver = StartDriver({
       .v1_driver_path = "/pkg/driver/v1_test.so",
-      .expected_driver_status = ZX_ERR_NOT_SUPPORTED,
+      .expected_driver_status = ZX_ERR_PROTOCOL_NOT_SUPPORTED,
   });
 
   // Verify that v1_test.so has set a context.
@@ -917,7 +919,7 @@ TEST_F(DriverTest, Start_BindFailed) {
   EXPECT_TRUE(node().children().empty());
 
   EXPECT_TRUE(v1_test->did_bind);
-  EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, v1_test->status);
+  EXPECT_EQ(ZX_ERR_PROTOCOL_NOT_SUPPORTED, v1_test->status);
 
   EXPECT_FALSE(v1_test->did_create);
   EXPECT_FALSE(v1_test->did_release);

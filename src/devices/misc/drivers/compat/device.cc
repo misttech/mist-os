@@ -326,11 +326,6 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
     return ZX_ERR_BAD_STATE;
   }
   device_t compat_device = {
-      .proto_ops =
-          {
-              .ops = zx_args->proto_ops,
-              .id = zx_args->proto_id,
-          },
       .name = zx_args->name,
       .context = zx_args->ctx,
   };
@@ -368,19 +363,35 @@ zx_status_t Device::Add(device_add_args_t* zx_args, zx_device_t** out) {
   }
 
   DeviceServer::BanjoConfig banjo_config{zx_args->proto_id};
+
+  // Set the callback specifically for the base proto_id if there is one.
+  if (zx_args->proto_ops != nullptr && zx_args->proto_id != 0) {
+    banjo_config.callbacks[zx_args->proto_id] = [ops = zx_args->proto_ops, ctx = zx_args->ctx]() {
+      return DeviceServer::GenericProtocol{.ops = const_cast<void*>(ops), .ctx = ctx};
+    };
+  }
+
+  // Set a generic callback for other proto_ids.
   banjo_config.generic_callback =
       [device =
            std::weak_ptr(device)](uint32_t proto_id) -> zx::result<DeviceServer::GenericProtocol> {
-    DeviceServer::GenericProtocol protocol;
     std::shared_ptr dev = device.lock();
     if (!dev) {
       return zx::error(ZX_ERR_BAD_STATE);
     }
-    zx_status_t status = dev->GetProtocol(proto_id, &protocol);
-    if (status != ZX_OK) {
-      return zx::error(status);
+
+    DeviceServer::GenericProtocol protocol;
+    if (HasOp(dev->ops_, &zx_protocol_device_t::get_protocol)) {
+      zx_status_t status =
+          dev->ops_->get_protocol(dev->compat_symbol_.context, proto_id, &protocol);
+      if (status != ZX_OK) {
+        return zx::error(status);
+      }
+
+      return zx::ok(protocol);
     }
-    return zx::ok(protocol);
+
+    return zx::error(ZX_ERR_PROTOCOL_NOT_SUPPORTED);
   };
 
   device->device_server_.Init(outgoing_name, device->topological_path_, std::move(service_offers),
@@ -749,8 +760,19 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
     return ops_->get_protocol(compat_symbol_.context, proto_id, out);
   }
 
-  if ((compat_symbol_.proto_ops.id != proto_id) || (compat_symbol_.proto_ops.ops == nullptr)) {
-    return ZX_ERR_NOT_SUPPORTED;
+  if (!device_server_.has_banjo_config()) {
+    if (driver_ == nullptr) {
+      FDF_LOGL(ERROR, *logger_, "Driver is null");
+      return ZX_ERR_BAD_STATE;
+    }
+
+    return driver_->GetProtocol(proto_id, out);
+  }
+
+  compat::DeviceServer::GenericProtocol device_server_out;
+  zx_status_t status = device_server_.GetProtocol(proto_id, &device_server_out);
+  if (status != ZX_OK) {
+    return status;
   }
 
   if (!out) {
@@ -763,8 +785,8 @@ zx_status_t Device::GetProtocol(uint32_t proto_id, void* out) const {
   };
 
   auto proto = static_cast<GenericProtocol*>(out);
-  proto->ops = compat_symbol_.proto_ops.ops;
-  proto->ctx = compat_symbol_.context;
+  proto->ctx = device_server_out.ctx;
+  proto->ops = device_server_out.ops;
   return ZX_OK;
 }
 

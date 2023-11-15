@@ -13,7 +13,13 @@ namespace {
 
 zx_status_t v1_bind(void* ctx, zx_device_t* dev) {
   zxlogf(INFO, "v1_bind");
-  zx_status_t status = device_get_protocol(dev, 0, nullptr);
+
+  struct GenericProtocol {
+    const void* ops;
+    void* ctx;
+  };
+  GenericProtocol proto;
+  zx_status_t status = device_get_protocol(dev, 0, &proto);
   if (status != ZX_OK) {
     return status;
   }

@@ -75,13 +75,14 @@ class Dfv2Driver : public fdf::DriverBase, public ddk::SdmmcProtocol<Dfv2Driver>
 
   std::optional<fdf::StartCompleter> start_completer_;
 
-  compat::BanjoServer banjo_server_{name().data(), ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_SDMMC, this, &sdmmc_protocol_ops_};
   compat::DeviceServer compat_server_{
       dispatcher(),
       incoming(),
       outgoing(),
       node_name(),
       name(),
+      std::nullopt,
       std::unordered_set<uint32_t>{DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO},
       get_banjo_config()};
 };

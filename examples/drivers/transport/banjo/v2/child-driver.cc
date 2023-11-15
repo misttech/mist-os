@@ -4,8 +4,8 @@
 
 #include <fidl/fuchsia.device.fs/cpp/fidl.h>
 #include <fuchsia/examples/gizmo/cpp/banjo.h>
+#include <lib/driver/async-helpers/cpp/task_group.h>
 #include <lib/driver/compat/cpp/compat.h>
-#include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
@@ -20,34 +20,41 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
 
   void Start(fdf::StartCompleter completer) override {
     parent_node_.Bind(std::move(node()));
+    start_completer_.emplace(std::move(completer));
 
     // Connect to the `fuchsia.examples.gizmo.Misc` protocol provided by the parent.
-    zx::result client = compat::ConnectBanjo<ddk::MiscProtocolClient>(symbols());
-    if (client.is_error()) {
-      FDF_SLOG(ERROR, "Failed to connect client", KV("status", client.status_string()));
-      completer(client.take_error());
-      return;
-    }
-    client_ = *client;
+    auto async_task = compat::ConnectBanjo<ddk::MiscProtocolClient>(
+        incoming(), [this](zx::result<ddk::MiscProtocolClient> client) {
+          if (client.is_error()) {
+            FDF_SLOG(ERROR, "Failed to connect client", KV("status", client.status_string()));
+            CompleteStart(client.take_error());
+            return;
+          }
+          client_ = *client;
 
-    zx_status_t status = QueryParent();
-    if (status != ZX_OK) {
-      parent_node_ = {};
-      completer(zx::error(status));
-      return;
-    }
+          zx_status_t status = QueryParent();
+          if (status != ZX_OK) {
+            parent_node_ = {};
+            CompleteStart(zx::error(status));
+            return;
+          }
 
+          QueryTopologicalPath();
+        });
+    task_group_.AddTask(std::move(async_task));
+  }
+
+  void QueryTopologicalPath() {
     auto compat = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
     ZX_ASSERT(compat.is_ok());
     compat_.Bind(std::move(compat.value()), dispatcher());
 
     compat_->GetTopologicalPath().Then(
-        [this, completer = std::move(completer)](
-            fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>&
-                result) mutable {
+        [this](fidl::WireUnownedResult<fuchsia_driver_compat::Device::GetTopologicalPath>&
+                   result) mutable {
           if (!result.ok()) {
             FDF_LOG(ERROR, "Failed to get child topo path: %s", result.FormatDescription().c_str());
-            completer(zx::error(result.error().status()));
+            CompleteStart(zx::error(result.error().status()));
             return;
           }
 
@@ -55,18 +62,18 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
           std::string actual = std::string(result->path.get());
           if (actual != expected) {
             FDF_LOG(INFO, "Unexpected child topo path: %s", actual.c_str());
-            completer(zx::error(ZX_ERR_INTERNAL));
+            CompleteStart(zx::error(ZX_ERR_INTERNAL));
             return;
           }
 
           zx::result add_result = AddChild();
           if (add_result.is_error()) {
             FDF_SLOG(ERROR, "Failed to add child", KV("status", add_result.status_string()));
-            completer(add_result.take_error());
+            CompleteStart(add_result.take_error());
             return;
           }
 
-          completer(zx::ok());
+          CompleteStart(zx::ok());
         });
   }
 
@@ -124,6 +131,14 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
     return zx::ok();
   }
 
+  void CompleteStart(zx::result<> result) {
+    ZX_ASSERT(start_completer_.has_value());
+    start_completer_.value()(result);
+    start_completer_.reset();
+  }
+
+  std::optional<fdf::StartCompleter> start_completer_;
+
   fidl::WireClient<fuchsia_driver_compat::Device> compat_;
 
   ddk::MiscProtocolClient client_;
@@ -133,6 +148,8 @@ class ChildBanjoTransportDriver : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  fdf::async_helpers::TaskGroup task_group_;
 };
 
 }  // namespace banjo_transport

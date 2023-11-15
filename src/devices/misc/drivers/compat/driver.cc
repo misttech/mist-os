@@ -505,7 +505,7 @@ zx_status_t Driver::RunOnDispatcher(fit::callback<zx_status_t()> task) {
     return status;
   }
   completion.Wait();
-  return status;
+  return task_status;
 }
 
 void Driver::PrepareStop(fdf::PrepareStopCompleter completer) {
@@ -910,6 +910,39 @@ zx_status_t Driver::ServeDiagnosticsDir() {
     return result.status_value();
   }
   return ZX_OK;
+}
+
+zx_status_t Driver::GetProtocol(uint32_t proto_id, void* out) {
+  return RunOnDispatcher([proto_id, out, &client = parent_client_, &logger = logger_]() {
+    static uint64_t process_koid = []() {
+      zx_info_handle_basic_t basic;
+      ZX_ASSERT(zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &basic, sizeof(basic), nullptr,
+                                              nullptr) == ZX_OK);
+      return basic.koid;
+    }();
+
+    fidl::WireResult result = client.sync()->GetBanjoProtocol(proto_id, process_koid);
+    if (!result.ok()) {
+      FDF_LOGL(ERROR, *logger, "Failed to send request to get banjo protocol: %s",
+               result.status_string());
+      return result.status();
+    }
+    if (result->is_error()) {
+      FDF_LOGL(ERROR, *logger, "Failed to get banjo protocol: %s",
+               zx_status_get_string(result->error_value()));
+      return result->error_value();
+    }
+
+    struct GenericProtocol {
+      const void* ops;
+      void* ctx;
+    };
+
+    auto proto = static_cast<GenericProtocol*>(out);
+    proto->ops = reinterpret_cast<const void*>(result->value()->ops);
+    proto->ctx = reinterpret_cast<void*>(result->value()->context);
+    return ZX_OK;
+  });
 }
 
 zx_status_t Driver::GetFragmentProtocol(const char* fragment, uint32_t proto_id, void* out) {

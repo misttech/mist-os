@@ -11,6 +11,7 @@ sdk_source_set("cpp") {
   sdk_name = "driver_compat"
   include_base = "//sdk"
   sources = [
+    "banjo_client.cc",
     "banjo_client.h",
     "banjo_server.h",
     "compat.h",
@@ -28,6 +29,7 @@ sdk_source_set("cpp") {
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/async-helpers/cpp",
     "//sdk/lib/driver/component/cpp:cpp",
   ]
 }

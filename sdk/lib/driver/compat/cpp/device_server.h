@@ -39,6 +39,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
     std::shared_ptr<fdf::OutgoingDirectory> outgoing;
     std::string node_name;
     std::string child_node_name;
+    std::optional<std::string> child_additional_path;
     std::unordered_set<MetadataKey> forward_metadata;
     uint32_t in_flight_metadata = 0;
     std::optional<fit::callback<void(zx::result<>)>> callback;
@@ -86,6 +87,10 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   //
   // |child_node_name| is the name given to the |fdf::NodeAddArgs|'s name field.
   //
+  // |child_additional_path| is used in the case that there are intermediary nodes that are
+  // owned by this driver before the target child node. Each intermediate node should be separated
+  // with a '/' and it should end with a trailing '/'. Eg: "node-a/node-b/"
+  //
   // |forward_metadata| will be the list of metadata keys that this should forward from the
   // parent(s) of this driver.
   //
@@ -93,10 +98,11 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   DeviceServer(async_dispatcher_t* dispatcher, const std::shared_ptr<fdf::Namespace>& incoming,
                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                const std::optional<std::string>& node_name, std::string_view child_node_name,
+               const std::optional<std::string>& child_additional_path,
                const std::unordered_set<MetadataKey>& forward_metadata = {},
                std::optional<BanjoConfig> banjo_config = std::nullopt)
       : state_(AsyncInit{dispatcher, incoming, outgoing, node_name.value_or("NA"),
-                         std::string(child_node_name), forward_metadata}),
+                         std::string(child_node_name), child_additional_path, forward_metadata}),
         name_(child_node_name),
         banjo_config_(std::move(banjo_config)) {
     BeginAsyncInit();
@@ -110,6 +116,10 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   //
   // |child_node_name| is the name given to the |fdf::NodeAddArgs|'s name field.
   //
+  // |child_additional_path| is used in the case that there are intermediary nodes that are
+  // owned by this driver before the target child node. Each intermediate node should be separated
+  // with a '/' and it should end with a trailing '/'. Eg: "node-a/node-b/"
+  //
   // |forward_metadata| will be the list of metadata keys that this should forward from the
   // parent(s) of this driver.
   //
@@ -117,12 +127,13 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   DeviceServer(const std::shared_ptr<fdf::Namespace>& incoming,
                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                const std::optional<std::string>& node_name, std::string_view child_node_name,
+               const std::optional<std::string>& child_additional_path,
                const std::unordered_set<MetadataKey>& forward_metadata = {},
                std::optional<BanjoConfig> banjo_config = std::nullopt)
       : state_(std::in_place_type<Initialized>),
         name_(child_node_name),
         banjo_config_(std::move(banjo_config)) {
-    SyncInit(incoming, outgoing, node_name, forward_metadata);
+    SyncInit(incoming, outgoing, node_name, child_additional_path, forward_metadata);
   }
 
   // Initialize with known topological path.
@@ -136,6 +147,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   zx_status_t AddMetadata(MetadataKey type, const void* data, size_t size);
   zx_status_t GetMetadata(MetadataKey type, void* buf, size_t buflen, size_t* actual);
   zx_status_t GetMetadataSize(MetadataKey type, size_t* out_size);
+  zx_status_t GetProtocol(BanjoProtoId proto_id, GenericProtocol* out) const;
 
   // Serve this interface in an outgoing directory.
   zx_status_t Serve(async_dispatcher_t* dispatcher, component::OutgoingDirectory* outgoing);
@@ -150,6 +162,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   BanjoProtoId proto_id() const {
     return banjo_config_.has_value() ? banjo_config_->default_proto_id : 0;
   }
+  bool has_banjo_config() const { return banjo_config_.has_value(); }
 
  private:
   // fuchsia.driver.compat.Compat
@@ -162,6 +175,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   void SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
                 const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                 const std::optional<std::string>& node_name,
+                const std::optional<std::string>& child_additional_path,
                 const std::unordered_set<MetadataKey>& forward_metadata);
   void ServeAndSetInitializeResult(async_dispatcher_t* dispatcher,
                                    const std::shared_ptr<fdf::OutgoingDirectory>& outgoing);

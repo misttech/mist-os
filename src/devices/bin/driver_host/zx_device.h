@@ -318,15 +318,15 @@ struct zx_device
 
   // most devices implement a single
   // protocol beyond the base device protocol
-  uint32_t protocol_id() const { return dfv2_symbol_.proto_ops.id; }
+  uint32_t protocol_id() const { return protocol_id_; }
 
   void set_protocol_id(uint32_t protocol_id) {
-    dfv2_symbol_.proto_ops.id = protocol_id;
+    protocol_id_ = protocol_id;
     inspect_->set_protocol_id(protocol_id);
   }
 
-  const void* protocol_ops() const { return dfv2_symbol_.proto_ops.ops; }
-  void set_protocol_ops(const void* ops) { dfv2_symbol_.proto_ops.ops = ops; }
+  const void* protocol_ops() const { return protocol_ops_; }
+  void set_protocol_ops(const void* ops) { protocol_ops_ = ops; }
 
   inline void* ctx() const { return dfv2_symbol_.context; }
   void set_ctx(void* ctx) { dfv2_symbol_.context = ctx; }
@@ -534,6 +534,8 @@ struct zx_device
   zx_protocol_device_t ops_ = {};
 
   compat::device_t dfv2_symbol_ = compat::kDefaultDevice;
+  uint32_t protocol_id_ = 0;
+  const void* protocol_ops_ = nullptr;
 
   // parent in the device tree
   fbl::RefPtr<zx_device_t> parent_;

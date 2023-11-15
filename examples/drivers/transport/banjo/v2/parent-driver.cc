@@ -36,7 +36,6 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
     auto args = fuchsia_driver_framework::NodeAddArgs({
         .name = std::string(name()),
         .offers = child_.CreateOffers(),
-        .symbols = {{banjo_server_.symbol()}},
         .properties = {{banjo_server_.property()}},
     });
 
@@ -91,9 +90,14 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
 
   std::optional<fdf::StartCompleter> start_completer_;
 
-  compat::BanjoServer banjo_server_{name().data(), ZX_PROTOCOL_MISC, this, &misc_protocol_ops_};
-  compat::DeviceServer child_{dispatcher(),      incoming(), outgoing(),
-                              node_name(),       name(),     std::unordered_set<uint32_t>{},
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_MISC, this, &misc_protocol_ops_};
+  compat::DeviceServer child_{dispatcher(),
+                              incoming(),
+                              outgoing(),
+                              node_name(),
+                              name(),
+                              std::nullopt,
+                              std::unordered_set<uint32_t>{},
                               get_banjo_config()};
 };
 

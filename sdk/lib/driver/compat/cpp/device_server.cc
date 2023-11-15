@@ -122,6 +122,41 @@ zx_status_t DeviceServer::GetMetadataSize(uint32_t type, size_t* out_size) {
   return ZX_OK;
 }
 
+zx_status_t DeviceServer::GetProtocol(BanjoProtoId proto_id, GenericProtocol* out) const {
+  ZX_ASSERT(std::holds_alternative<Initialized>(state_));
+
+  if (!banjo_config_.has_value()) {
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  // If there is a specific entry for the proto_id, use it.
+  auto specific_entry = banjo_config_->callbacks.find(proto_id);
+  if (specific_entry != banjo_config_->callbacks.end()) {
+    auto& get_banjo_protocol = specific_entry->second;
+    if (out) {
+      *out = get_banjo_protocol();
+    }
+
+    return ZX_OK;
+  }
+
+  // Otherwise use the generic one if one was provided.
+  if (!banjo_config_->generic_callback) {
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  zx::result generic_result = banjo_config_->generic_callback(proto_id);
+  if (generic_result.is_error()) {
+    return ZX_ERR_NOT_FOUND;
+  }
+
+  if (out) {
+    *out = generic_result.value();
+  }
+
+  return ZX_OK;
+}
+
 zx_status_t DeviceServer::Serve(async_dispatcher_t* dispatcher,
                                 component::OutgoingDirectory* outgoing) {
   auto device = [this, dispatcher](
@@ -249,32 +284,11 @@ void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
     return;
   }
 
-  // Check if no banjo config was set.
-  if (!banjo_config_.has_value()) {
-    completer.ReplyError(ZX_ERR_NOT_FOUND);
-    return;
-  }
-
-  // If there is a specific entry for the proto_id, use it. Otherwise use the generic one
-  // if one was provided.
   GenericProtocol result;
-  auto entry = banjo_config_->callbacks.find(request->proto_id);
-  if (entry == banjo_config_->callbacks.end()) {
-    if (!banjo_config_->generic_callback) {
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-      return;
-    }
-
-    zx::result generic_result = banjo_config_->generic_callback(request->proto_id);
-    if (generic_result.is_error()) {
-      completer.ReplyError(ZX_ERR_NOT_FOUND);
-      return;
-    }
-
-    result = generic_result.value();
-  } else {
-    auto& get_banjo_protocol = entry->second;
-    result = get_banjo_protocol();
+  zx_status_t status = GetProtocol(request->proto_id, &result);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+    return;
   }
 
   completer.ReplySuccess(reinterpret_cast<uint64_t>(result.ops),
@@ -284,8 +298,10 @@ void DeviceServer::GetBanjoProtocol(GetBanjoProtocolRequestView request,
 void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
                             const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                             const std::optional<std::string>& node_name,
+                            const std::optional<std::string>& child_additional_path,
                             const std::unordered_set<MetadataKey>& forward_metadata) {
   auto node_name_val = node_name.value_or("NA");
+  auto additional_path = child_additional_path.value_or("");
 
   // First connect to all the parents.
   auto parent_devices = ConnectToParentDevices(incoming.get());
@@ -295,7 +311,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
     // In case that there are no parents, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + name_;
+    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
     ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
     return;
   }
@@ -326,7 +342,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
     // In case that there is no default parent, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + name_;
+    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
     ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
     return;
   }
@@ -339,7 +355,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
 
     // In case that getting the topological path fails, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + node_name_val + "/" + name_;
+    topological_path_ = "/" + node_name_val + "/" + additional_path + name_;
     ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
     return;
   }
@@ -347,10 +363,11 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
   // If we are a composite then we have to add the name of our composite device
   // to our primary parent. The composite device's name is the node_name.
   if (!parent_clients.empty()) {
-    topological_path_ =
-        std::string(topological_path_result->path.get()) + "/" + node_name_val + "/" + name_;
+    topological_path_ = std::string(topological_path_result->path.get()) + "/" + node_name_val +
+                        "/" + additional_path + name_;
   } else {
-    topological_path_ = std::string(topological_path_result->path.get()) + "/" + name_;
+    topological_path_ =
+        std::string(topological_path_result->path.get()) + "/" + additional_path + name_;
   }
 
   // We can just serve and return if no metadata is needed.
@@ -430,7 +447,9 @@ void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_
 
     // In case that there are no parents, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + init_state->node_name + "/" + init_state->child_node_name;
+    topological_path_ = "/" + init_state->node_name + "/" +
+                        init_state->child_additional_path.value_or("") +
+                        init_state->child_node_name;
 
     CompleteInitialization(zx::ok());
     return;
@@ -474,7 +493,9 @@ void DeviceServer::OnTopologicalPathResult(
 
     // In case that getting the topological path fails, assume we are the root and create
     // the topological path from scratch.
-    topological_path_ = "/" + init_state->node_name + "/" + init_state->child_node_name;
+    topological_path_ = "/" + init_state->node_name + "/" +
+                        init_state->child_additional_path.value_or("") +
+                        init_state->child_node_name;
     CompleteInitialization(zx::ok());
     return;
   }
@@ -483,9 +504,12 @@ void DeviceServer::OnTopologicalPathResult(
   // to our primary parent. The composite device's name is the node_name.
   if (!parent_clients_.empty()) {
     topological_path_ = std::string(result->path.get()) + "/" + init_state->node_name + "/" +
+                        init_state->child_additional_path.value_or("") +
                         init_state->child_node_name;
   } else {
-    topological_path_ = std::string(result->path.get()) + "/" + init_state->child_node_name;
+    topological_path_ = std::string(result->path.get()) + "/" +
+                        init_state->child_additional_path.value_or("") +
+                        init_state->child_node_name;
   }
 
   if (init_state->forward_metadata.empty()) {

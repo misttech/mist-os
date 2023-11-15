@@ -5,27 +5,14 @@
 #ifndef LIB_DRIVER_COMPAT_CPP_SYMBOLS_H_
 #define LIB_DRIVER_COMPAT_CPP_SYMBOLS_H_
 
-#include <stdint.h>
-
 namespace compat {
 
-struct device_proto_ops_t {
-  const void* ops;
-  uint32_t id;
-};
-
 struct device_t {
-  device_proto_ops_t proto_ops;
   const char* name;
   void* context;
 };
 
 constexpr device_t kDefaultDevice = {
-    .proto_ops =
-        {
-            .ops = nullptr,
-            .id = 0,
-        },
     .name = "compat-device",
     .context = nullptr,
 };

@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/compat/cpp/symbols.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fit/function.h>
 
@@ -15,35 +14,21 @@ namespace compat {
 
 class BanjoServer {
  public:
-  BanjoServer(const char* name, uint32_t proto_id, void* ctx, void* ops) {
-    // Set the symbols of the node that a driver will have access to.
-    compat_device_.name = name;
-    compat_device_.context = ctx;
-    compat_device_.proto_ops.id = proto_id;
-    compat_device_.proto_ops.ops = ops;
-  }
-
-  fuchsia_driver_framework::NodeSymbol symbol(std::string_view symbol_name = kDeviceSymbol) const {
-    return fuchsia_driver_framework::NodeSymbol{{
-        .name = std::string(symbol_name),
-        .address = reinterpret_cast<uint64_t>(&compat_device_),
-    }};
-  }
+  BanjoServer(uint32_t proto_id, void* ctx, void* ops)
+      : proto_id_(proto_id), ctx_(ctx), ops_(ops) {}
 
   fuchsia_driver_framework::NodeProperty property() const {
-    return fdf::MakeProperty(1 /*BIND_PROTOCOL */, compat_device_.proto_ops.id);
+    return fdf::MakeProperty(1 /*BIND_PROTOCOL */, proto_id_);
   }
 
   DeviceServer::SpecificGetBanjoProtoCb callback() {
-    return [this]() -> DeviceServer::GenericProtocol { return proto(); };
+    return [this]() { return DeviceServer::GenericProtocol{.ops = ops_, .ctx = ctx_}; };
   }
 
  private:
-  DeviceServer::GenericProtocol proto() {
-    return {.ops = const_cast<void*>(compat_device_.proto_ops.ops), .ctx = compat_device_.context};
-  }
-
-  device_t compat_device_ = kDefaultDevice;
+  uint32_t proto_id_;
+  void* ctx_;
+  void* ops_;
 };
 
 }  // namespace compat
