@@ -2669,7 +2669,7 @@ TEST_P(NetDatagramSocketsCmsgTimestampTest, RecvCmsgUnalignedControlBuffer) {
         // Do not access the unaligned control header directly as that would be an undefined
         // behavior. Copy the content to a properly aligned variable first.
         char aligned_cmsg[CMSG_SPACE(sizeof(timeval))];
-        memcpy(&aligned_cmsg, unaligned_cmsg, sizeof(aligned_cmsg));
+        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
         cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
         EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(timeval)));
         EXPECT_EQ(cmsg->cmsg_level, SOL_SOCKET);
@@ -2778,7 +2778,7 @@ TEST_P(NetDatagramSocketsCmsgTimestampNsTest, RecvCmsgUnalignedControlBuffer) {
         // Do not access the unaligned control header directly as that would be an undefined
         // behavior. Copy the content to a properly aligned variable first.
         char aligned_cmsg[CMSG_SPACE(sizeof(timespec))];
-        memcpy(&aligned_cmsg, unaligned_cmsg, sizeof(aligned_cmsg));
+        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
         cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
         EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(timespec)));
         EXPECT_EQ(cmsg->cmsg_level, SOL_SOCKET);
@@ -2992,7 +2992,7 @@ TEST_P(NetDatagramSocketsCmsgIpTtlTest, SendCmsg) {
         EXPECT_EQ(cmsg->cmsg_level, SOL_IP);
         EXPECT_EQ(cmsg->cmsg_type, IP_TTL);
         int recv_ttl;
-        memcpy(&recv_ttl, CMSG_DATA(cmsg), sizeof(recv_ttl));
+        memcpy(&recv_ttl, reinterpret_cast<std::byte*>(CMSG_DATA(cmsg)), sizeof(recv_ttl));
         EXPECT_EQ(recv_ttl, kTtl);
         EXPECT_EQ(CMSG_NXTHDR(&recv_msghdr, cmsg), nullptr);
       }));
@@ -3096,7 +3096,7 @@ TEST_P(NetDatagramSocketsCmsgIpv6TClassTest, RecvCmsgUnalignedControlBuffer) {
 
         // Copy the content to a properly aligned variable.
         char aligned_cmsg[CMSG_SPACE(sizeof(kTClass))];
-        memcpy(&aligned_cmsg, unaligned_cmsg, sizeof(aligned_cmsg));
+        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
         cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
         EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(kTClass)));
         EXPECT_EQ(cmsg->cmsg_level, SOL_IPV6);
@@ -3230,7 +3230,8 @@ TEST_P(NetDatagramSocketsCmsgIpv6HopLimitTest, SendCmsgDefaultValue) {
         EXPECT_EQ(cmsg->cmsg_level, SOL_IPV6);
         EXPECT_EQ(cmsg->cmsg_type, IPV6_HOPLIMIT);
         int recv_hoplimit;
-        memcpy(&recv_hoplimit, CMSG_DATA(cmsg), sizeof(recv_hoplimit));
+        memcpy(&recv_hoplimit, reinterpret_cast<std::byte*>(CMSG_DATA(cmsg)),
+               sizeof(recv_hoplimit));
         EXPECT_EQ(recv_hoplimit, kConfiguredHopLimit);
         EXPECT_EQ(CMSG_NXTHDR(&recv_msghdr, cmsg), nullptr);
       }));
@@ -3329,7 +3330,7 @@ TEST_P(NetDatagramSocketsCmsgIpv6PktInfoTest, RecvCmsgUnalignedControlBuffer) {
 
         // Copy the content to a properly aligned variable.
         char aligned_cmsg[CMSG_SPACE(sizeof(in6_pktinfo))];
-        memcpy(&aligned_cmsg, unaligned_cmsg, sizeof(aligned_cmsg));
+        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
         cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
         EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(in6_pktinfo)));
         EXPECT_EQ(cmsg->cmsg_level, SOL_IPV6);

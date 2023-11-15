@@ -12,7 +12,7 @@ using InitTest = UfsTest;
 namespace {
 inline uint64_t UnalignedLoad64(const uint64_t* ptr) {
   uint64_t value;
-  memcpy(&value, ptr, sizeof(uint64_t));
+  memcpy(&value, reinterpret_cast<const std::byte*>(ptr), sizeof(uint64_t));
   return value;
 }
 }  // namespace
