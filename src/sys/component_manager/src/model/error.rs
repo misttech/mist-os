@@ -198,7 +198,8 @@ pub enum OpenOutgoingDirError {
 impl OpenOutgoingDirError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::InstanceNotRunning | Self::InstanceNonExecutable => zx::Status::UNAVAILABLE,
+            Self::InstanceNotRunning => zx::Status::NOT_FOUND,
+            Self::InstanceNonExecutable => zx::Status::NOT_FOUND,
             Self::Fidl(_) => zx::Status::INTERNAL,
         }
     }
@@ -408,6 +409,24 @@ pub enum ResolveActionError {
     },
 }
 
+impl ResolveActionError {
+    fn as_zx_status(&self) -> zx::Status {
+        match self {
+            ResolveActionError::DiscoverActionError { .. }
+            | ResolveActionError::InstanceShutDown { .. }
+            | ResolveActionError::InstanceDestroyed { .. }
+            | ResolveActionError::ComponentAddressParseError { .. }
+            | ResolveActionError::AbiCompatibilityError { .. } => zx::Status::NOT_FOUND,
+            ResolveActionError::ExposeDirError { .. }
+            | ResolveActionError::NamespaceDirError { .. }
+            | ResolveActionError::AddStaticChildError { .. }
+            | ResolveActionError::StructuredConfigError { .. }
+            | ResolveActionError::PackageDirProxyCreateError { .. } => zx::Status::INTERNAL,
+            ResolveActionError::ResolverError { err, .. } => err.as_zx_status(),
+        }
+    }
+}
+
 // This is implemented for fuchsia.sys2.LifecycleController protocol
 impl Into<fsys::ResolveError> for ResolveActionError {
     fn into(self) -> fsys::ResolveError {
@@ -474,7 +493,7 @@ impl PkgDirError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
             Self::NoPkgDir => zx::Status::NOT_FOUND,
-            Self::OpenFailed { .. } => zx::Status::IO,
+            Self::OpenFailed { .. } => zx::Status::INTERNAL,
         }
     }
 }
@@ -543,13 +562,13 @@ pub enum CapabilityProviderError {
 impl CapabilityProviderError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::StreamCreationError => zx::Status::BAD_HANDLE,
+            Self::StreamCreationError => zx::Status::INTERNAL,
             Self::BadPath => zx::Status::INVALID_ARGS,
             Self::ComponentInstanceError { err } => err.as_zx_status(),
+            Self::CmNamespaceError { .. } => zx::Status::INTERNAL,
             Self::PkgDirError { err } => err.as_zx_status(),
             Self::EventSourceError { err } => err.as_zx_status(),
             Self::ComponentProviderError { err } => err.as_zx_status(),
-            Self::CmNamespaceError { .. } => zx::Status::INTERNAL,
         }
     }
 }
@@ -674,11 +693,16 @@ pub enum StartActionError {
 impl StartActionError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
-            Self::ResolveRunnerError { err, .. } => err.as_zx_status(),
-            Self::InstanceDestroyed { .. } | Self::InstanceShutDown { .. } => zx::Status::NOT_FOUND,
-            Self::CreateNamespaceError { err, .. } => err.as_zx_status(),
-            _ => zx::Status::INTERNAL,
+            StartActionError::InstanceDestroyed { .. } | Self::InstanceShutDown { .. } => {
+                zx::Status::NOT_FOUND
+            }
+            StartActionError::StartProgramError { .. }
+            | StartActionError::StructuredConfigError { .. }
+            | StartActionError::EagerStartError { .. } => zx::Status::INTERNAL,
+            StartActionError::RebootOnTerminateForbidden { err, .. } => err.as_zx_status(),
+            StartActionError::ResolveRunnerError { err, .. } => err.as_zx_status(),
+            StartActionError::CreateNamespaceError { err, .. } => err.as_zx_status(),
+            StartActionError::ResolveActionError { err, .. } => err.as_zx_status(),
         }
     }
 }
@@ -859,10 +883,10 @@ pub enum CreateNamespaceError {
 impl CreateNamespaceError {
     fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::ClonePkgDirFailed(_) => zx::Status::IO,
-            Self::UseDeclWithoutPath(_) => zx::Status::INVALID_ARGS,
+            Self::ClonePkgDirFailed(_) => zx::Status::INTERNAL,
+            Self::UseDeclWithoutPath(_) => zx::Status::NOT_FOUND,
             Self::InstanceNotInInstanceIdIndex(e) => e.as_zx_status(),
-            Self::NamespaceError(_) => zx::Status::INVALID_ARGS,
+            Self::NamespaceError(_) => zx::Status::NOT_FOUND,
         }
     }
 }

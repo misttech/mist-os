@@ -1641,7 +1641,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model
             .check_use(
                 vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
@@ -1649,7 +1649,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -1721,7 +1721,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model
             .check_use(
                 vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
@@ -1729,7 +1729,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -1801,14 +1801,14 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let test = T::new("a", components).build().await;
         test.check_use(
             vec!["b", "c"].try_into().unwrap(),
-            CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+            CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
         )
         .await;
         test.check_use(
             vec!["b", "c"].try_into().unwrap(),
             CheckUse::Protocol {
                 path: default_service_capability(),
-                expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
             },
         )
         .await;
@@ -1881,7 +1881,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model
             .check_use(
                 vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
@@ -1889,7 +1889,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -2045,7 +2045,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model
             .check_use(
                 vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
@@ -2053,7 +2053,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["c"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -2125,7 +2125,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         model
             .check_use(
                 vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
             )
             .await;
         model
@@ -2133,7 +2133,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: default_service_capability(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -2930,7 +2930,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 Moniker::root(),
                 CheckUse::Protocol {
                     path: "/svc/valid".parse().unwrap(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -2983,7 +2983,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 vec!["b"].try_into().unwrap(),
                 CheckUse::Protocol {
                     path: "/svc/valid".parse().unwrap(),
-                    expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
                 },
             )
             .await;

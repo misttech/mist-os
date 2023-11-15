@@ -218,7 +218,7 @@ mod tests {
                     storage_relation: Some(InstancedMoniker::try_from(vec!["consumer:0"]).unwrap()),
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await;

@@ -103,9 +103,9 @@ pub enum AnalyzerModelError {
 impl AnalyzerModelError {
     pub fn as_zx_status(&self) -> zx_status::Status {
         match self {
-            Self::SourceInstanceNotExecutable(_) => zx_status::Status::UNAVAILABLE,
-            Self::InvalidSourceCapability(_, _) => zx_status::Status::UNAVAILABLE,
-            Self::MissingEventSourceProtocol(_) => zx_status::Status::UNAVAILABLE,
+            Self::SourceInstanceNotExecutable(_) => zx_status::Status::NOT_FOUND,
+            Self::InvalidSourceCapability(_, _) => zx_status::Status::NOT_FOUND,
+            Self::MissingEventSourceProtocol(_) => zx_status::Status::NOT_FOUND,
             Self::MissingResolverForScheme(_) => zx_status::Status::NOT_FOUND,
             Self::ComponentInstanceError(err) => err.as_zx_status(),
             Self::RoutingError(err) => err.as_zx_status(),

@@ -42,8 +42,10 @@ impl ComponentInstanceError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             ComponentInstanceError::ResolveFailed { .. }
-            | ComponentInstanceError::InstanceNotFound { .. } => zx::Status::NOT_FOUND,
-            _ => zx::Status::UNAVAILABLE,
+            | ComponentInstanceError::InstanceNotFound { .. }
+            | ComponentInstanceError::ComponentManagerInstanceUnavailable {}
+            | ComponentInstanceError::NoAbsoluteUrl { .. } => zx::Status::NOT_FOUND,
+            ComponentInstanceError::MalformedUrl { .. } => zx::Status::INTERNAL,
         }
     }
 
@@ -286,9 +288,39 @@ impl RoutingError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            RoutingError::PolicyError(_) => zx::Status::ACCESS_DENIED,
+            RoutingError::UseFromRootEnvironmentNotAllowed { .. } => zx::Status::ACCESS_DENIED,
+            RoutingError::StorageFromChildExposeNotFound { .. }
+            | RoutingError::ComponentNotInIdIndex { .. }
+            | RoutingError::UseFromComponentManagerNotFound { .. }
+            | RoutingError::RegisterFromComponentManagerNotFound { .. }
+            | RoutingError::OfferFromComponentManagerNotFound { .. }
+            | RoutingError::UseFromParentNotFound { .. }
+            | RoutingError::UseFromChildInstanceNotFound { .. }
+            | RoutingError::UseFromEnvironmentNotFound { .. }
+            | RoutingError::EnvironmentFromParentNotFound { .. }
+            | RoutingError::EnvironmentFromChildExposeNotFound { .. }
+            | RoutingError::EnvironmentFromChildInstanceNotFound { .. }
+            | RoutingError::OfferFromParentNotFound { .. }
+            | RoutingError::StorageFromParentNotFound { .. }
+            | RoutingError::OfferFromChildInstanceNotFound { .. }
+            | RoutingError::OfferFromCollectionNotFound { .. }
+            | RoutingError::OfferFromChildExposeNotFound { .. }
+            | RoutingError::CapabilityFromFrameworkNotFound { .. }
+            | RoutingError::CapabilityFromCapabilityNotFound { .. }
+            | RoutingError::CapabilityFromComponentManagerNotFound { .. }
+            | RoutingError::ExposeFromChildInstanceNotFound { .. }
+            | RoutingError::ExposeFromCollectionNotFound { .. }
+            | RoutingError::ExposeFromChildExposeNotFound { .. }
+            | RoutingError::ExposeFromFrameworkNotFound { .. }
+            | RoutingError::UseFromChildExposeNotFound { .. }
+            | RoutingError::UnsupportedRouteSource { .. }
+            | RoutingError::UnsupportedCapabilityType { .. }
+            | RoutingError::EventsRoutingError(_)
+            | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
+            RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
-            _ => zx::Status::UNAVAILABLE,
+            RoutingError::RightsRoutingError(err) => err.as_zx_status(),
+            RoutingError::PolicyError(err) => err.as_zx_status(),
         }
     }
 
@@ -470,7 +502,10 @@ pub enum RightsRoutingError {
 impl RightsRoutingError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
-        zx::Status::UNAVAILABLE
+        match self {
+            RightsRoutingError::Invalid { .. } => zx::Status::ACCESS_DENIED,
+            RightsRoutingError::MissingRightsSource => zx::Status::NOT_FOUND,
+        }
     }
 }
 

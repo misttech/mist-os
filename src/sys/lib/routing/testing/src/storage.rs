@@ -273,7 +273,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::ACCESS_DENIED),
                 },
             )
             .await;
@@ -994,7 +994,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -1051,7 +1051,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -1105,7 +1105,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await;
@@ -1186,7 +1186,7 @@ impl<T: RoutingTestModelBuilder> CommonStorageTest<T> {
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await;

@@ -527,6 +527,32 @@ pub enum ResolverError {
 }
 
 impl ResolverError {
+    pub fn as_zx_status(&self) -> zx::Status {
+        match self {
+            ResolverError::PackageNotFound(_)
+            | ResolverError::ManifestNotFound(_)
+            | ResolverError::ManifestInvalid(_)
+            | ResolverError::ConfigValuesInvalid(_)
+            | ResolverError::Io(_)
+            | ResolverError::ConfigValuesIo(_)
+            | ResolverError::AbiRevisionNotFound
+            | ResolverError::AbiRevisionInvalid(_)
+            | ResolverError::SchemeNotRegistered
+            | ResolverError::MalformedUrl(_)
+            | ResolverError::NoParentContext(_)
+            | ResolverError::RelativeUrlMissingContext(_)
+            | ResolverError::RemoteInvalidData
+            | ResolverError::PackageUrlMissing
+            | ResolverError::PackageDirectoryMissing
+            | ResolverError::UnexpectedRelativePath(_) => zx::Status::NOT_FOUND,
+
+            ResolverError::Internal(_)
+            | ResolverError::RelativeUrlNotExpected(_)
+            | ResolverError::RoutingError(_)
+            | ResolverError::FidlError(_) => zx::Status::INTERNAL,
+        }
+    }
+
     pub fn internal(err: impl Into<Error>) -> Self {
         Self::Internal(err.into().into())
     }

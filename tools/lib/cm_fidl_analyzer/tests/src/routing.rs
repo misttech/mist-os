@@ -651,7 +651,7 @@ mod tests {
                     path: "/foo".parse().unwrap(),
                     instance: ServiceInstance::Named("".into()),
                     member: "".into(),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             )
             .await

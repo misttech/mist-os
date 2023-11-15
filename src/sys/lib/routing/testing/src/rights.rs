@@ -146,7 +146,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         model
             .check_use(
                 vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
     }
@@ -278,7 +278,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         model
             .check_use(
                 vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
     }
@@ -410,7 +410,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         model
             .check_use(
                 vec!["c"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
     }
@@ -472,7 +472,7 @@ impl<T: RoutingTestModelBuilder> CommonRightsTest<T> {
         model
             .check_use(
                 vec!["b"].try_into().unwrap(),
-                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::UNAVAILABLE)),
+                CheckUse::default_directory(ExpectedResult::Err(zx_status::Status::ACCESS_DENIED)),
             )
             .await;
     }

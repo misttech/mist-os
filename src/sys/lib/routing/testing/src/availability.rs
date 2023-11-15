@@ -466,23 +466,23 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     path: "/svc/fuchsia.examples.EchoService".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
                 CheckUse::Protocol {
                     path: "/svc/fuchsia.examples.Echo".parse().unwrap(),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
                 CheckUse::Directory {
                     path: "/dir".parse().unwrap(),
                     file: PathBuf::from("hippo"),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
                 CheckUse::Storage {
                     path: "/data".parse().unwrap(),
                     storage_relation: None,
                     from_cm_namespace: false,
                     storage_subdir: None,
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             ] {
                 model.check_use(vec!["c"].try_into().unwrap(), check_use).await;
@@ -775,16 +775,16 @@ impl<T: RoutingTestModelBuilder> CommonAvailabilityTest<T> {
                     path: "/svc/fuchsia.examples.EchoService_a".parse().unwrap(),
                     instance: ServiceInstance::Named("default".to_owned()),
                     member: "echo".to_owned(),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
                 CheckUse::Protocol {
                     path: "/svc/fuchsia.examples.Echo_a".parse().unwrap(),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
                 CheckUse::Directory {
                     path: "/dir_a".parse().unwrap(),
                     file: PathBuf::from("hippo"),
-                    expected_res: ExpectedResult::Err(zx_status::Status::UNAVAILABLE),
+                    expected_res: ExpectedResult::Err(zx_status::Status::NOT_FOUND),
                 },
             ] {
                 model.check_use(Moniker::root(), check_use).await;

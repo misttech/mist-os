@@ -218,7 +218,7 @@ async fn framework_directory_incompatible_rights() {
         .await;
     test.check_use(
         vec!["b"].try_into().unwrap(),
-        CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+        CheckUse::default_directory(ExpectedResult::Err(zx::Status::ACCESS_DENIED)),
     )
     .await;
 }

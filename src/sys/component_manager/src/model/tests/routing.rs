@@ -396,14 +396,14 @@ async fn use_in_collection_not_offered() {
     .await;
     test.check_use(
         vec!["b", "coll:c"].try_into().unwrap(),
-        CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+        CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
     )
     .await;
     test.check_use(
         vec!["b", "coll:c"].try_into().unwrap(),
         CheckUse::Protocol {
             path: default_service_capability(),
-            expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -528,7 +528,7 @@ async fn dynamic_offer_from_parent() {
         vec!["b", "coll:d"].try_into().unwrap(),
         CheckUse::Protocol {
             path: default_service_capability(),
-            expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -608,7 +608,7 @@ async fn dynamic_offer_from_parent_with_collision() {
         vec!["coll:b"].try_into().unwrap(),
         CheckUse::Protocol {
             path: default_service_capability(),
-            expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -944,7 +944,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
         vec!["coll:c"].try_into().unwrap(),
         CheckUse::Protocol {
             path: default_service_capability(),
-            expected_res: ExpectedResult::Err(zx::Status::UNAVAILABLE),
+            expected_res: ExpectedResult::Err(zx::Status::NOT_FOUND),
         },
     )
     .await;
@@ -1073,7 +1073,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
 
     test.check_use(
         vec!["coll:c"].try_into().unwrap(),
-        CheckUse::default_directory(ExpectedResult::Err(zx::Status::UNAVAILABLE)),
+        CheckUse::default_directory(ExpectedResult::Err(zx::Status::NOT_FOUND)),
     )
     .await;
 }
