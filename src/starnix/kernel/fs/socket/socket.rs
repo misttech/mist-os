@@ -34,19 +34,20 @@ use crate::{
     },
     logging::log_warn,
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
-    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    types::as_any::AsAny,
-    types::auth::CAP_NET_RAW,
-    types::errno::{errno, error, Errno, ErrnoCode},
-    types::time::{duration_from_timeval, timeval_from_duration},
-    types::user_address::{UserAddress, UserRef},
-    types::user_buffer::UserBuffer,
-    types::{
+    syscalls::{
         c_char, ifreq, in_addr, mode, sockaddr, sockaddr_in, struct_with_union_into_bytes, ucred,
-        OpenFlags, AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU,
-        SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO,
-        SO_SNDTIMEO, SO_TYPE,
+        OpenFlags, SyscallArg, SyscallResult, AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR,
+        SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK,
+        SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE, SUCCESS,
+    },
+    task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
+    types::{
+        as_any::AsAny,
+        auth::CAP_NET_RAW,
+        errno::{errno, error, Errno, ErrnoCode},
+        time::{duration_from_timeval, timeval_from_duration},
+        user_address::{UserAddress, UserRef},
+        user_buffer::UserBuffer,
     },
 };
 

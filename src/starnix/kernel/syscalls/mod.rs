@@ -10,5 +10,10 @@ pub mod table;
 pub use syscall_arg::*;
 pub use syscall_result::*;
 
+// Here we reexport common items needed for syscall implementations. This way you can quickly get
+// most things you need by importing crate::syscalls::*.
+pub(crate) use crate::logging::{log_trace, not_implemented};
+pub use crate::types::*;
+
 mod misc;
 pub mod time;

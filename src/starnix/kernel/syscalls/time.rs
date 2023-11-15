@@ -7,9 +7,15 @@ use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
-    logging::{log_trace, not_implemented},
     mm::MemoryAccessorExt,
     signals::{RunState, SignalEvent},
+    syscalls::{
+        itimerspec, itimerval, log_trace, not_implemented, pid_t, sigevent, timespec, timeval,
+        timezone, tms, uapi, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC,
+        CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME,
+        CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID,
+        MAX_CLOCKS, TIMER_ABSTIME,
+    },
     task::{ClockId, CurrentTask, TimerId},
     time::utc::utc_now,
     types::errno::{errno, error, from_status_like_fdio, Errno, EINTR},
@@ -18,12 +24,6 @@ use crate::{
         timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
     },
     types::user_address::UserRef,
-    types::{
-        itimerspec, itimerval, pid_t, sigevent, timespec, timeval, timezone, tms, uapi,
-        CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
-        CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-        CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
-    },
 };
 
 pub fn sys_clock_getres(
