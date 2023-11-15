@@ -63,10 +63,14 @@ pub async fn start_component(
     let ns = start_info.ns.take().ok_or_else(|| anyhow!("Missing namespace"))?;
 
     let mut maybe_pkg = None;
+    let mut maybe_svc = None;
     for entry in ns {
         if let (Some(dir_path), Some(dir_handle)) = (entry.path, entry.directory) {
             match dir_path.as_str() {
-                "/svc" => continue,
+                "/svc" => {
+                    maybe_svc =
+                        Some(fio::DirectorySynchronousProxy::new(dir_handle.into_channel()));
+                }
                 "/custom_artifacts" | "/test_data" => {
                     // Mount custom_artifacts and test_data directory at root of container
                     // We may want to transition to have these directories unique per component
@@ -165,6 +169,7 @@ pub async fn start_component(
             &component_features,
             system_task.kernel(),
             &mut start_info.outgoing_dir,
+            maybe_svc,
         )
         .unwrap_or_else(|e| {
             log_error!("failed to set component features for {} - {:?}", url, e);

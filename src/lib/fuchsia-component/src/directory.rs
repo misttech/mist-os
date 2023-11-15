@@ -32,6 +32,18 @@ impl Directory for fio::DirectoryProxy {
     }
 }
 
+impl Directory for fio::DirectorySynchronousProxy {
+    fn open(
+        &self,
+        path: &str,
+        flags: fio::OpenFlags,
+        server_end: zx::Channel,
+    ) -> Result<(), Error> {
+        let () = self.open(flags, fio::ModeType::empty(), path, server_end.into())?;
+        Ok(())
+    }
+}
+
 impl Directory for ClientEnd<fio::DirectoryMarker> {
     fn open(
         &self,
@@ -55,6 +67,12 @@ pub trait AsRefDirectory {
 }
 
 impl AsRefDirectory for fio::DirectoryProxy {
+    fn as_ref_directory(&self) -> &dyn Directory {
+        self
+    }
+}
+
+impl AsRefDirectory for fio::DirectorySynchronousProxy {
     fn as_ref_directory(&self) -> &dyn Directory {
         self
     }

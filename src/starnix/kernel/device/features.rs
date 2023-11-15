@@ -16,6 +16,7 @@ use fuchsia_zircon as zx;
 use selinux::security_server;
 use std::sync::Arc;
 
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_sysinfo as fsysinfo;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_input3 as fuiinput;
@@ -140,6 +141,7 @@ pub fn run_component_features(
     entries: &Vec<String>,
     kernel: &Arc<Kernel>,
     outgoing_dir: &mut Option<fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>>,
+    mut maybe_svc: Option<fio::DirectorySynchronousProxy>,
 ) -> Result<(), Errno> {
     for entry in entries {
         match entry.as_str() {
@@ -162,11 +164,16 @@ pub fn run_component_features(
                     fuipolicy::DeviceListenerRegistryMarker,
                 >()
                 .expect("Failed to connect to device listener registry");
-                kernel.framebuffer.start_server(
-                    view_bound_protocols,
-                    view_identity,
-                    outgoing_dir.take().unwrap(),
-                );
+                kernel
+                    .framebuffer
+                    .start_server(
+                        kernel,
+                        view_bound_protocols,
+                        view_identity,
+                        outgoing_dir.take().unwrap(),
+                        maybe_svc.take(),
+                    )
+                    .expect("Failed to start framebuffer server");
                 kernel.input_device.start_relay(
                     touch_source_proxy,
                     keyboard,

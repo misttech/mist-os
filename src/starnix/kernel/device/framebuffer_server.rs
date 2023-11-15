@@ -10,8 +10,13 @@
 //! To display the `Framebuffer` as its view, a component must add the `framebuffer` feature to its
 //! `.cml`.
 
+use crate::task::Kernel;
 use anyhow::anyhow;
-use fidl::{endpoints::create_proxy, HandleBased};
+use fidl::{
+    endpoints::{create_proxy, create_request_stream},
+    HandleBased,
+};
+use fidl_fuchsia_element as felement;
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_sysmem as fsysmem;
 use fidl_fuchsia_ui_app as fuiapp;
@@ -21,9 +26,12 @@ use flatland_frame_scheduling_lib::{
     PresentationInfo, PresentedInfo, SchedulingLib, ThroughputScheduler,
 };
 use fuchsia_async as fasync;
-use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
+use fuchsia_component::{
+    client::{connect_to_protocol_at_dir_root, connect_to_protocol_sync},
+    server::ServiceFs,
+};
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
-use fuchsia_scenic::BufferCollectionTokenPair;
+use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
 use starnix_lock::Mutex;
@@ -305,6 +313,76 @@ pub fn spawn_view_provider(
             }
         });
     }).expect("able to create threads");
+}
+
+pub fn present_view(
+    kernel: &Arc<Kernel>,
+    server: Arc<FramebufferServer>,
+    view_bound_protocols: fuicomposition::ViewBoundProtocols,
+    view_identity: fuiviews::ViewIdentityOnCreation,
+    incoming_svc_dir: fidl_fuchsia_io::DirectorySynchronousProxy,
+) {
+    kernel.kthreads.spawner().spawn(|_| {
+        let mut executor = fasync::LocalExecutor::new();
+        let mut view_bound_protocols = Some(view_bound_protocols);
+        let mut view_identity = Some(view_identity);
+        let mut maybe_view_controller_proxy = None;
+        executor.run_singlethreaded(async move {
+            let link_token_pair =
+                ViewCreationTokenPair::new().expect("failed to create ViewCreationTokenPair");
+            // We don't actually care about the parent viewport at the moment, because we don't resize.
+            let (_parent_viewport_watcher, parent_viewport_watcher_request) =
+                create_proxy::<fuicomposition::ParentViewportWatcherMarker>()
+                    .expect("failed to create ParentViewportWatcherProxy");
+            server
+                .flatland
+                .create_view2(
+                    link_token_pair.view_creation_token,
+                    view_identity
+                        .take()
+                        .expect("cannot create view because view identity has been consumed"),
+                    view_bound_protocols.take().expect(
+                        "cannot create view because view bound protocols have been consumed",
+                    ),
+                    parent_viewport_watcher_request,
+                )
+                .expect("FIDL error");
+
+            // Now that the view has been created, start presenting.
+            start_presenting(server.clone());
+
+            let graphical_presenter = connect_to_protocol_at_dir_root::<
+                felement::GraphicalPresenterMarker,
+            >(&incoming_svc_dir)
+            .map_err(|_| errno!(ENOENT))
+            .expect("Failed to connect to GraphicalPresenter");
+
+            let (view_controller_proxy, view_controller_server_end) =
+                fidl::endpoints::create_proxy::<felement::ViewControllerMarker>()
+                    .expect("failed to create ViewControllerProxy");
+            let _ = maybe_view_controller_proxy.insert(view_controller_proxy);
+
+            let view_spec = felement::ViewSpec {
+                annotations: None,
+                viewport_creation_token: Some(link_token_pair.viewport_creation_token),
+                ..Default::default()
+            };
+
+            // TODO: b/307790211 - Service annotation controller stream.
+            let (annotation_controller_client_end, _annotation_controller_stream) =
+                create_request_stream::<felement::AnnotationControllerMarker>().unwrap();
+
+            graphical_presenter
+                .present_view(
+                    view_spec,
+                    Some(annotation_controller_client_end),
+                    Some(view_controller_server_end),
+                )
+                .await
+                .expect("failed to present view")
+                .unwrap_or_else(|e| println!("{:?}", e));
+        });
+    });
 }
 
 /// Starts a flatland presentation loop, using the flatland proxy in `server`.

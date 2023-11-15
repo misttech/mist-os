@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::framebuffer_server::{init_viewport_scene, spawn_view_provider, FramebufferServer};
+use super::framebuffer_server::{
+    init_viewport_scene, present_view, spawn_view_provider, FramebufferServer,
+};
 use crate::{
     device::{features::AspectRatio, DeviceMode, DeviceOps},
     fs::{
@@ -11,7 +13,7 @@ use crate::{
         kobject::KObjectDeviceAttribute,
         FileObject, FileOps, FsNode, VmoFileObject,
     },
-    logging::{impossible_error, log_warn},
+    logging::{impossible_error, log_info, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
@@ -24,11 +26,13 @@ use crate::{
     },
 };
 
+use fidl_fuchsia_io as fio;
 use fidl_fuchsia_math as fmath;
 use fidl_fuchsia_ui_composition as fuicomposition;
 use fidl_fuchsia_ui_display_singleton as fuidisplay;
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_fs::directory as ffs_dir;
 use fuchsia_zircon as zx;
 use starnix_lock::RwLock;
 use std::sync::Arc;
@@ -92,20 +96,65 @@ impl Framebuffer {
         }
     }
 
-    /// Starts serving a view based on this framebuffer in `outgoing_dir`.
+    /// Starts presenting a view based on this framebuffer.
+    /// If GraphicalPresenter is detected as an incoming service among
+    /// `maybe_svc`, connect to that protocol and PresentView. Otherwise, serve
+    /// ViewProvider. This is a transitionary measure while ViewProvider is
+    /// being deprecated.
     ///
     /// # Parameters
-    /// * `view_bound_protocols`: handles to input clients which will be associated with the view
-    /// * `outgoing_dir`: the path under which the `ViewProvider` protocol will be served
+    /// * `view_bound_protocols`: handles to input clients which will be
+    ///    associated with the view
+    /// * `view_identify`: the identity used to create view with flatland
+    /// * `outgoing_dir`: the path under which the `ViewProvider` protocol will
+    ///    be served
+    /// * `maybe_svc`: the incoming service directory under which the
+    ///    `GraphicalPresenter` protocol might be retrieved.
     pub fn start_server(
         &self,
+        kernel: &Arc<Kernel>,
         view_bound_protocols: fuicomposition::ViewBoundProtocols,
         view_identity: fuiviews::ViewIdentityOnCreation,
-        outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
-    ) {
+        outgoing_dir: fidl::endpoints::ServerEnd<fio::DirectoryMarker>,
+        maybe_svc: Option<fio::DirectorySynchronousProxy>,
+    ) -> Result<(), anyhow::Error> {
         if let Some(server) = &self.server {
+            // Attempt to find and connect to GraphicalPresenter.
+            //
+            // TODO: b/307788344 - DirectorySynchronousProxy is not ideal,
+            // since it blocks this thread until the FIDL call returns. Use
+            // DirectoryProxy instead of DirectorySynchronousProxy when we
+            // remove spawn_view_provider.
+            if let Some(svc_dir_proxy) = maybe_svc {
+                let (status, buf) = svc_dir_proxy
+                    .read_dirents(fio::MAX_BUF, zx::Time::INFINITE)
+                    .expect("Calling read dirents");
+                zx::Status::ok(status).expect("Failed reading directory entries");
+                for entry in ffs_dir::parse_dir_entries(&buf)
+                    .into_iter()
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("Failed parsing directory entries")
+                {
+                    if entry.name == "fuchsia.element.GraphicalPresenter" {
+                        log_info!("Presenting view using GraphicalPresenter");
+                        present_view(
+                            kernel,
+                            server.clone(),
+                            view_bound_protocols,
+                            view_identity,
+                            svc_dir_proxy,
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+
+            // Fallback to serving ViewProvider.
+            log_info!("Serving ViewProvider");
             spawn_view_provider(server.clone(), view_bound_protocols, view_identity, outgoing_dir);
         }
+
+        Ok(())
     }
 
     /// Starts presenting a child view instead of the framebuffer.
