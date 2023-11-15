@@ -4523,11 +4523,12 @@ mod tests {
         {"topological_path": "abcde"},
         {"any": true}
     ], "naming_scheme": [
-        { "dynamic": "device_class" },
-        { "static": "x" },
-        { "dynamic": "normalized_mac" },
-        { "dynamic": "bus_type" },
-        { "dynamic": "bus_path" }
+        { "type": "dynamic", "rule": "device_class" },
+        { "type": "static", "value": "x" },
+        { "type": "dynamic", "rule": "normalized_mac" },
+        { "type": "dynamic", "rule": "bus_type" },
+        { "type": "dynamic", "rule": "bus_path" },
+        { "type": "default" }
     ] } ]
 }
 "#;
@@ -4594,19 +4595,20 @@ mod tests {
                 interface::MatchingRule::Any(true),
             ]),
             naming_scheme: vec![
-                interface::NameCompositionRule::Dynamic(
-                    interface::DynamicNameCompositionRule::DeviceClass,
-                ),
-                interface::NameCompositionRule::Static("x".to_owned()),
-                interface::NameCompositionRule::Dynamic(
-                    interface::DynamicNameCompositionRule::NormalizedMac,
-                ),
-                interface::NameCompositionRule::Dynamic(
-                    interface::DynamicNameCompositionRule::BusType,
-                ),
-                interface::NameCompositionRule::Dynamic(
-                    interface::DynamicNameCompositionRule::BusPath,
-                ),
+                interface::NameCompositionRule::Dynamic {
+                    rule: interface::DynamicNameCompositionRule::DeviceClass,
+                },
+                interface::NameCompositionRule::Static { value: "x".to_owned() },
+                interface::NameCompositionRule::Dynamic {
+                    rule: interface::DynamicNameCompositionRule::NormalizedMac,
+                },
+                interface::NameCompositionRule::Dynamic {
+                    rule: interface::DynamicNameCompositionRule::BusType,
+                },
+                interface::NameCompositionRule::Dynamic {
+                    rule: interface::DynamicNameCompositionRule::BusPath,
+                },
+                interface::NameCompositionRule::Default,
             ],
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
@@ -4908,7 +4910,7 @@ mod tests {
   "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
   "interface_naming_policy": [{
     "matchers": [ { "any": true } ],
-    "naming_scheme": [ { "speling": "" } ]
+    "naming_scheme": [ { "type": "speling" } ]
   }]
 }
 "#,
@@ -4925,7 +4927,7 @@ mod tests {
   "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
   "interface_naming_policy": [{
     "matchers": [ { "any": true } ],
-    "naming_scheme": [ { "dynamic": "speling" } ]
+    "naming_scheme": [ { "type": "dynamic", "rule": "speling" } ]
   }]
 }
 "#,
