@@ -3,10 +3,18 @@
 // found in the LICENSE file.
 
 /// Test realm factory library for the Timekeeper subsystem.
+///
+/// The API exposed here is used to create a test realm for testing Timekeeper
+/// and close collaborators.
+///
+/// The realm is created by calling `RealmFactory.CreateRealm`, which allows
+/// configuring some realm parameters. Refer to the appropriate docs below for
+/// details.
 library test.time.realm;
 
 using fuchsia.hardware.rtc;
 using fuchsia.io;
+using fuchsia.metrics.test;
 using fuchsia.testing.harness;
 using fuchsia.time.external;
 using zx;
@@ -46,24 +54,29 @@ const MAX_TIME_UPDATES uint64 = 100;
 /// complex, set `RealmOptions.rtc.rtc_handle` instead.
 open protocol RtcUpdates {
     /// Reads the RTC updates that the clock received so far.
-    flexible Get(@generated_name("GetRequest") resource table {}) -> (@generated_name("GetResponse") resource struct {
-       /// List the RTC updates that happened since the last call.
-       ///
-       /// If more than the maximum number of updates happened, an
-       /// error `OperationError.FAILED` will be returned instead.
-       ///
-       /// This behavior *may* be modified if we regularly start encountering
-       /// more than a maximum number of allowed updates.
-       updates vector<fuchsia.hardware.rtc.Time>:MAX_TIME_UPDATES;
+    flexible Get(@generated_name("GetRequest") resource table {}) -> (
+        @generated_name("GetResponse") resource struct {
+           /// List the RTC updates that happened since the last call.
+           ///
+           /// If more than the maximum number of updates happened, an
+           /// error `OperationError.FAILED` will be returned instead.
+           ///
+           /// This behavior *may* be modified if we regularly start encountering
+           /// more than a maximum number of allowed updates.
+           updates vector<fuchsia.hardware.rtc.Time>:MAX_TIME_UPDATES;
 
-       /// Optionals, added for expansion.
-       opts @generated_name("GetResponseOpts") resource table {};
-    }) error fuchsia.testing.harness.OperationError ;
+           /// Optionals, added for expansion.
+           opts @generated_name("GetResponseOpts") resource table {};
+        }
+    ) error fuchsia.testing.harness.OperationError;
 };
 
 @discoverable
 open protocol RealmFactory {
     /// Creates the realm using the given options.
+    ///
+    /// The obtained realm is isolated from any other realms created from repeated
+    /// calls to `CreateRealm`.
     flexible CreateRealm(resource struct {
         /// The options for creating the Timekeeper realm factory.
         options @generated_name("RealmOptions") resource table {
@@ -103,7 +116,6 @@ open protocol RealmFactory {
                 /// If set, this will be the RTC time to be used for fake RTC reporting.
                 2: initial_rtc_time zx.Time;
             };
-
         };
 
         /// The UTC clock handle that Timekeeper will manage.
@@ -112,14 +124,21 @@ open protocol RealmFactory {
         /// A standardized `RealmProxy`, for connecting to some of the
         /// exported FIDL protocols in the created test realm.
         realm_server server_end:fuchsia.testing.harness.RealmProxy;
-    }) -> (@generated_name("CreateResponse") resource table {
+    }) -> (@generated_name("CreateResponse") resource struct {
         /// The push source puppet. It is returned as a client_end because of
         /// the impedance mismatch between the test realm internals and this FIDL
         /// API.
-        1: push_source_puppet client_end:PushSourcePuppet;
+        push_source_puppet client_end:PushSourcePuppet;
 
-        /// The channel for retrieving the RTC updates. Used only if the realm
-        /// is created with RealmOptions.rtc.rtc_handle.
-        2: rtc_updates client_end:RtcUpdates;
+        opts @generated_name("CreateResponseOpts") resource table {
+            /// The channel for retrieving the RTC updates. To be be populated
+            /// only if the realm is created with `RealmOptions.rtc.rtc_handle`.
+            1: rtc_updates client_end:RtcUpdates;
+        };
+
+        /// The cobalt metric querier. Used to collect the metrics information.
+        /// Refer to `fuchsia.metrics.test.MetricEventLoggerQuerier` docs
+        /// for usage details.
+        cobalt_metric_client client_end:fuchsia.metrics.test.MetricEventLoggerQuerier;
     }) error fuchsia.testing.harness.OperationError;
 };

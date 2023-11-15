@@ -22,6 +22,7 @@ fidl("test.time.realm") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.rtc",
     "//sdk/fidl/fuchsia.io",
+    "//sdk/fidl/fuchsia.metrics.test",
     "//sdk/fidl/fuchsia.testing.harness",
     "//sdk/fidl/fuchsia.time.external",
   ]

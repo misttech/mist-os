@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Context;
 use fidl_test_time_realm;
+use parking_lot::Mutex;
 use {
     chrono::{Datelike, TimeZone, Timelike},
     fidl::endpoints::ServerEnd,
@@ -31,7 +33,6 @@ use {
         Future, FutureExt, SinkExt,
     },
     lazy_static::lazy_static,
-    parking_lot::Mutex,
     push_source::{PushSource, TestUpdateAlgorithm, Update},
     std::{ops::Deref, sync::Arc},
     time_metrics_registry::PROJECT_ID,
@@ -103,6 +104,7 @@ impl NestedTimekeeper {
         let timekeeper = builder
             .add_child("timekeeper_test", timekeeper_url, ChildOptions::new().eager())
             .await
+            .with_context(|| format!("while starting up timekeeper_test from: {timekeeper_url}"))
             .unwrap();
 
         let timesource_server = builder
@@ -117,6 +119,7 @@ impl NestedTimekeeper {
                 ChildOptions::new(),
             )
             .await
+            .context("while starting up timesource_mock")
             .unwrap();
 
         let maintenance_server = builder
@@ -128,6 +131,7 @@ impl NestedTimekeeper {
                 ChildOptions::new(),
             )
             .await
+            .context("while starting up maintenance_mock")
             .unwrap();
 
         // Launch fake clock if needed.
@@ -145,6 +149,7 @@ impl NestedTimekeeper {
                         .to(Ref::parent()),
                 )
                 .await
+                .context("while setting up FakeClockControl")
                 .unwrap();
 
             builder
@@ -156,6 +161,7 @@ impl NestedTimekeeper {
                         .to(&timekeeper),
                 )
                 .await
+                .context("while setting up FakeClock")
                 .unwrap();
 
             builder
@@ -166,6 +172,7 @@ impl NestedTimekeeper {
                         .to(&fake_clock),
                 )
                 .await
+                .context("while setting up LogSink")
                 .unwrap();
         };
 
@@ -177,6 +184,7 @@ impl NestedTimekeeper {
                     .to(&timekeeper),
             )
             .await
+            .context("while setting up Maintenance")
             .unwrap();
 
         builder
@@ -246,11 +254,43 @@ impl NestedTimekeeper {
         let cobalt_querier = realm_instance
             .root
             .connect_to_protocol_at_exposed_dir::<MetricEventLoggerQuerierMarker>()
-            .unwrap();
+            .expect("the connection succeeds");
 
         let nested_timekeeper = Self { _realm_instance: realm_instance };
 
         (nested_timekeeper, push_source_puppet, rtc_updates, cobalt_querier, fake_clock_control)
+    }
+}
+
+pub struct RemotePushSourcePuppet {
+    proxy: fidl_test_time_realm::PushSourcePuppetProxy,
+}
+
+impl RemotePushSourcePuppet {
+    /// Creates a new [RemotePushSourcePuppet].
+    pub fn new(proxy: fidl_test_time_realm::PushSourcePuppetProxy) -> Arc<Self> {
+        Arc::new(Self { proxy })
+    }
+
+    /// Set the next sample reported by the time source.
+    pub async fn set_sample(&self, sample: TimeSample) {
+        self.proxy.set_sample(&sample).await.expect("original API was infallible");
+    }
+
+    /// Set the next status reported by the time source.
+    pub async fn set_status(&self, status: Status) {
+        self.proxy.set_status(status).await.expect("original API was infallible");
+    }
+
+    /// Simulate a crash by closing client channels and wiping state.
+    pub async fn simulate_crash(&self) {
+        self.proxy.crash().await.expect("original local API was infallible");
+    }
+
+    /// Returns the number of cumulative connections served. This allows asserting
+    /// behavior such as whether Timekeeper has restarted a connection.
+    pub async fn lifetime_served_connections(&self) -> u32 {
+        self.proxy.get_lifetime_served_connections().await.expect("original API was infallible")
     }
 }
 
@@ -271,6 +311,7 @@ impl PushSourcePuppet {
 
     /// Serve the `PushSource` service to a client.
     fn serve_client(&self, server_end: ServerEnd<PushSourceMarker>) {
+        tracing::debug!("serve_client entry");
         let mut inner = self.inner.lock();
         // Timekeeper should only need to connect to a push source once, except when it is
         // restarting a time source. This case appears to the test as a second connection to the
@@ -284,12 +325,14 @@ impl PushSourcePuppet {
 
     /// Set the next sample reported by the time source.
     pub async fn set_sample(&self, sample: TimeSample) {
-        self.inner.lock().update(sample.into()).await;
+        let mut sink = self.inner.lock().get_sink();
+        sink.send(sample.into()).await.unwrap();
     }
 
     /// Set the next status reported by the time source.
     pub async fn set_status(&self, status: Status) {
-        self.inner.lock().update(status.into()).await;
+        let mut sink = self.inner.lock().get_sink();
+        sink.send(status.into()).await.unwrap();
     }
 
     /// Simulate a crash by closing client channels and wiping state.
@@ -342,9 +385,12 @@ impl PushSourcePuppetInner {
         }));
     }
 
-    /// Send an update to the PushSource.
-    async fn update(&mut self, update: Update) {
-        self.update_sink.send(update).await.unwrap()
+    /// Obtains the sink used to send commands to the push source puppet.
+    ///
+    /// The sink is detached from the puppet, so can be used whenever needed
+    /// without locking.
+    fn get_sink(&self) -> Sender<Update> {
+        self.update_sink.clone()
     }
 }
 
@@ -356,6 +402,26 @@ impl RtcUpdates {
     /// Get all received RTC times as a vec.
     pub fn to_vec(&self) -> Vec<fidl_fuchsia_hardware_rtc::Time> {
         self.0.lock().clone()
+    }
+}
+
+/// Remote RTC updates - peek into the life of the RTC on the other side of a
+/// RTC connection.
+pub struct RemoteRtcUpdates {
+    proxy: fidl_test_time_realm::RtcUpdatesProxy,
+}
+
+impl RemoteRtcUpdates {
+    pub async fn to_vec(&self) -> Vec<fidl_fuchsia_hardware_rtc::Time> {
+        self.proxy
+            .get(fidl_test_time_realm::GetRequest::default())
+            .await
+            .expect("no errors or overflows") // Original API was infallible.
+            .unwrap()
+            .0
+    }
+    pub fn new(proxy: fidl_test_time_realm::RtcUpdatesProxy) -> Self {
+        RemoteRtcUpdates { proxy }
     }
 }
 
@@ -550,11 +616,13 @@ async fn serve_fake_rtc(
     while let Some(req) = stream.try_next().await.unwrap() {
         match req {
             DeviceRequest::Get { responder } => {
+                tracing::debug!("serve_fake_rtc: DeviceRequest::Get");
                 // Since timekeeper only pulls a time off of the RTC device once on startup, we
                 // don't attempt to update the sent time.
                 responder.send(Ok(&zx_time_to_rtc_time(initial_time))).unwrap();
             }
             DeviceRequest::Set { rtc, responder } => {
+                tracing::debug!("serve_fake_rtc: DeviceRequest::Set");
                 rtc_updates.0.lock().push(rtc);
                 responder.send(zx::Status::OK.into_raw()).unwrap();
             }
@@ -643,8 +711,14 @@ pub const BETWEEN_SAMPLES: zx::Duration = zx::Duration::from_seconds(5);
 pub const STD_DEV: zx::Duration = zx::Duration::from_millis(50);
 
 /// Create a new clock with backstop time set to `BACKSTOP_TIME`.
+// TODO: b/306024715 - To be removed once all tests are migrated to TTRF.
 pub fn new_clock() -> Arc<zx::Clock> {
-    Arc::new(zx::Clock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME)).unwrap())
+    Arc::new(new_nonshareable_clock())
+}
+
+/// Create a new clock with backstop time set to `BACKSTOP_TIME`.
+pub fn new_nonshareable_clock() -> zx::Clock {
+    zx::Clock::create(zx::ClockOpts::empty(), Some(*BACKSTOP_TIME)).unwrap()
 }
 
 fn zx_time_to_rtc_time(zx_time: zx::Time) -> fidl_fuchsia_hardware_rtc::Time {
@@ -674,7 +748,7 @@ pub fn create_cobalt_event_stream(
     async_utils::hanging_get::client::HangingGetStream::new(proxy, move |p| {
         p.watch_logs(PROJECT_ID, log_method)
     })
-    .map(|res| futures::stream::iter(res.unwrap().0))
+    .map(|res| futures::stream::iter(res.expect("there should be a valid result here").0))
     .flatten()
     .boxed()
 }
@@ -688,6 +762,26 @@ macro_rules! poll_until_some {
             &$crate::SourceLocation::new(file!(), line!(), column!()),
         )
     };
+}
+
+/// Repeatedly evaluates an async `condition` until it returns `Some(v)`. Returns `v`.
+/// Use if your condition is an async fn.
+#[macro_export]
+macro_rules! poll_until_some_async {
+    ($condition:expr) => {{
+        let loc = $crate::SourceLocation::new(file!(), line!(), column!());
+        tracing::info!("=> poll_until_some_async() for {}", &loc);
+        let mut result = None;
+        loop {
+            result = $condition.await;
+            if result.is_some() {
+                break;
+            }
+            fasync::Timer::new(fasync::Time::after($crate::RETRY_WAIT_DURATION)).await;
+        }
+        tracing::info!("=> poll_until_some_async() done for {}", &loc);
+        result.expect("we loop around while result is None")
+    }};
 }
 
 /// Repeatedly evaluates `condition` to create a `Future`, and then awaits the `Future`.
@@ -713,7 +807,8 @@ macro_rules! poll_until {
     };
 }
 
-const RETRY_WAIT_DURATION: zx::Duration = zx::Duration::from_millis(10);
+/// Wait duration for polling.
+pub const RETRY_WAIT_DURATION: zx::Duration = zx::Duration::from_millis(10);
 
 pub struct SourceLocation {
     file: &'static str,

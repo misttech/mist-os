@@ -10,7 +10,7 @@ use fuchsia_zircon as zx;
 use futures::StreamExt;
 use tracing::info;
 
-#[fuchsia::main(logging_tags=["time"])]
+#[fuchsia::main(logging_tags=["time", "dev_time_source"])]
 async fn main() {
     let time_source_control = connect_to_protocol::<TimeSourceControlMarker>()
         .expect("failed to connect to control service");

@@ -39,6 +39,13 @@ fuchsia_component("svc") {
   deps = [ ":fake_clock_svc" ]
 }
 
+# Useful for subpackaging in tests.
+fuchsia_package("pkg") {
+  testonly = true
+  package_name = "fake_clock"
+  deps = [ ":svc" ]
+}
+
 fuchsia_unittest_package("tests") {
   package_name = "fake_clock_test"
   deps = [ ":fake_clock_svc_test" ]

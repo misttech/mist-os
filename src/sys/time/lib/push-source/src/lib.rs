@@ -5,7 +5,7 @@
 //! The `push_source` library defines an implementation of the `PushSource` API and traits to hook
 //! in an algorithm that produces time updates.
 
-use anyhow::Error;
+use anyhow::Result;
 use async_trait::async_trait;
 use fidl::prelude::*;
 use fidl_fuchsia_time_external::{
@@ -62,7 +62,7 @@ pub trait UpdateAlgorithm {
     /// Generate updates asynchronously and push them to |sink|. This method may run
     /// indefinitely. This method may generate duplicate updates.
     // TODO(satsukiu) - use a generator library instead once one is available
-    async fn generate_updates(&self, sink: Sender<Update>) -> Result<(), Error>;
+    async fn generate_updates(&self, sink: Sender<Update>) -> Result<()>;
 }
 
 /// An implementation of |fuchsia.time.external.PushSource| that routes time updates from an
@@ -78,12 +78,12 @@ pub struct PushSource<UA: UpdateAlgorithm> {
 impl<UA: UpdateAlgorithm> PushSource<UA> {
     /// Create a new |PushSource| that polls |update_algorithm| for time updates and starts in the
     /// |initial_status| status.
-    pub fn new(update_algorithm: UA, initial_status: Status) -> Result<Self, Error> {
+    pub fn new(update_algorithm: UA, initial_status: Status) -> Result<Self> {
         Ok(Self { internal: Mutex::new(PushSourceInternal::new(initial_status)), update_algorithm })
     }
 
     /// Polls updates received on |update_algorithm| and pushes them to bound clients.
-    pub async fn poll_updates(&self) -> Result<(), Error> {
+    pub async fn poll_updates(&self) -> Result<()> {
         // Updates should be processed immediately so add no extra buffer space.
         let (sender, mut receiver) = channel(0);
         let updater_fut = self.update_algorithm.generate_updates(sender);
@@ -100,7 +100,8 @@ impl<UA: UpdateAlgorithm> PushSource<UA> {
     pub async fn handle_requests_for_stream(
         &self,
         mut request_stream: PushSourceRequestStream,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
+        tracing::debug!("handle_requests_for_stream: ");
         let client_context = self.internal.lock().await.register_client();
         while let Some(request) = request_stream.try_next().await? {
             client_context.lock().await.handle_request(request, &self.update_algorithm).await?;
@@ -128,6 +129,7 @@ impl PushSourceInternal {
     /// Create a new client handler registered to receive asynchonous updates
     /// for the duration of its lifetime.
     pub fn register_client(&mut self) -> Arc<Mutex<PushSourceClientHandler>> {
+        tracing::debug!("PushSourceInternal: register_client");
         let client = Arc::new(Mutex::new(PushSourceClientHandler {
             sample_watcher: WatchHandler::create(self.latest_sample.clone()),
             status_watcher: WatchHandler::create(Some(self.latest_status)),
@@ -138,6 +140,7 @@ impl PushSourceInternal {
 
     /// Push a new update to all existing clients.
     pub async fn push_update(&mut self, update: Update) {
+        tracing::debug!("push_update: received update: {:?}", &update);
         match &update {
             Update::Sample(sample) => self.latest_sample = Some(Arc::clone(&sample)),
             Update::Status(status) => self.latest_status = *status,
@@ -151,6 +154,12 @@ impl PushSourceInternal {
             }
             None => false,
         });
+        // Note well that the number of clients here matches the number of
+        // clients you expect. If your setup makes it so that an update comes
+        // before any clients are connected, your clients will never see that
+        // update. And if your clients depend on receiving that update, then
+        // you may have a bug on your hands.
+        tracing::debug!("push_update: clients to update: {}", client_arcs.len());
         for client in client_arcs {
             client.lock().await.handle_update(update.clone());
         }
@@ -171,7 +180,7 @@ impl PushSourceClientHandler {
         &mut self,
         request: PushSourceRequest,
         update_algorithm: &impl UpdateAlgorithm,
-    ) -> Result<(), Error> {
+    ) -> Result<()> {
         match request {
             PushSourceRequest::WatchSample { responder } => {
                 self.sample_watcher.watch(WatchSampleResponder(responder)).map_err(|e| {
@@ -232,6 +241,13 @@ pub struct TestUpdateAlgorithm {
 
 impl TestUpdateAlgorithm {
     pub fn new() -> (Self, Sender<Update>) {
+        // It is important that the capacity of this channel is 0. This
+        // capacity will *block* the sender until there is someone to receive
+        // the message. This isn't normally an issue when the distribution
+        // of the channel objects is linear. However, the sequence of receivers
+        // bottoms out at a publish-subscribe hub, which may drop an event if it
+        // arrives before there are any subscribers. This will confuse the tests.
+        // The zero capacity channel prevents that sequence of events.
         let (sender, receiver) = channel(0);
         (
             TestUpdateAlgorithm {
@@ -249,7 +265,7 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
         self.device_property_updates.lock().await.push(properties);
     }
 
-    async fn generate_updates(&self, sink: Sender<Update>) -> Result<(), Error> {
+    async fn generate_updates(&self, sink: Sender<Update>) -> Result<()> {
         let receiver = self.receiver.lock().await.take().unwrap();
         receiver.map(Ok).forward(sink).await?;
         Ok(())
@@ -269,7 +285,7 @@ mod test {
         /// The PushSource under test.
         test_source: Arc<PushSource<TestUpdateAlgorithm>>,
         /// Tasks spawned for the test.
-        tasks: Vec<fasync::Task<Result<(), Error>>>,
+        tasks: Vec<fasync::Task<Result<()>>>,
         /// Sender that injects updates to test_source.
         update_sender: Sender<Update>,
     }

@@ -14,6 +14,7 @@ mod rtc;
 mod time_source;
 mod time_source_manager;
 
+use anyhow::{Context as _, Result};
 use fidl::AsHandleRef;
 use fidl_fuchsia_time as fft;
 use futures::{
@@ -33,7 +34,6 @@ use {
         time_source::{TimeSource, TimeSourceLauncher},
         time_source_manager::TimeSourceManager,
     },
-    anyhow::{Context as _, Error},
     chrono::prelude::*,
     fidl_fuchsia_time as ftime, fuchsia_async as fasync,
     fuchsia_component::server::ServiceFs,
@@ -147,10 +147,12 @@ struct MonitorTrack {
     clock: Arc<zx::Clock>,
 }
 
-#[fuchsia::main(logging_tags=["time"])]
-async fn main() -> Result<(), Error> {
+#[fuchsia::main(logging_tags=["time", "timekeeper"])]
+async fn main() -> Result<()> {
     let config: Arc<Config> =
         Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
+
+    debug!("config: {:?}", &config);
 
     info!("retrieving UTC clock handle");
     let time_maintainer =
@@ -267,15 +269,16 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
 
     let rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
     let backstop = clock.get_details().expect("failed to get UTC clock details").backstop;
+    let backstop_chrono = Utc.timestamp_nanos(backstop.into_nanos());
     if rtc_time < backstop {
-        warn!("initial RTC time before backstop: {}", rtc_chrono);
+        warn!("initial RTC time {} is before backstop: {}", rtc_chrono, backstop_chrono);
         diagnostics.record(Event::InitializeRtc {
             outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
             time: Some(rtc_time),
         });
         return;
     } else {
-        debug!("RTC time ahead of backstop: rtc_time={:?}; backstop={:?}", rtc_time, backstop);
+        debug!("RTC time {} is ahead of backstop {}, as expected", rtc_chrono, backstop_chrono);
     }
 
     diagnostics.record(Event::InitializeRtc {
