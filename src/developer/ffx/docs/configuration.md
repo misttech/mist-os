@@ -130,5 +130,6 @@ When updating, please add the value in alphabetical order.
 | `targets.manual`                        | Contains the list of manual        |
 :                                         : targets                            :
 | `ffx.subtool-search-paths`              | A list of paths to search for non- |
-|                                         | SDK subtool binaries.              |
-:                                         :                                    :
+:                                         : SDK subtool binaries.              :
+| `fidl.ir.path`                          | The path for looking up FIDL IR    |
+:                                         : encoding/decoding FIDL messages    :

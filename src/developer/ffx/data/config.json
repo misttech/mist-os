@@ -24,5 +24,10 @@
             "$FUCHSIA_DEVICE_ADDR",
             "$FUCHSIA_NODENAME"
         ]
+    },
+    "fidl": {
+        "ir": {
+            "path": "fidling/gen/ir_root"
+        }
     }
 }

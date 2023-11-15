@@ -280,6 +280,7 @@ function fx-change-build-dir {
   # Set relevant variables in the ffx build-level config file
   json-config-set "${FUCHSIA_BUILD_DIR}.json" "repository.default" "$(ffx-default-repository-name)"
   json-config-set "${FUCHSIA_BUILD_DIR}.json" "sdk.root" '$BUILD_DIR'
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "fidl.ir.path" '$BUILD_DIR/fidling/gen/ir_root'
 
   local -r pb_path="$(_query_product_bundle_path)"
   # Only set product bundle path if a product bundle is produced by the build.

@@ -52,6 +52,19 @@ extern zx_status_t ffx_channel_write(ffx_lib_context_t* ctx, zx_handle_t handle,
 extern zx_status_t ffx_channel_write_etc(ffx_lib_context_t* ctx, zx_handle_t handle,
                                          const char* out_buf, uint64_t out_len,
                                          zx_handle_disposition_t* hdls, uint64_t hdls_len);
+// Attempts to get a config value from the environment context.
+//
+// Will try to coerce said value into a string. `out_buf` should point to a caller-owned buffer,
+// which this function will write to. `out_buf_len` is a caller-owned pointer to the length of
+// `out_buf`. On a ZX_OK return, `out_buf_len` will have the length of the found config string value
+// written to it.
+//
+// If the config value cannot be found, ZX_ERR_NOT_FOUND will be returned. If the `out_buf_len` is
+// not sufficient to fit the found value, ZX_ERR_BUFFER_TOO_SMALL will be returned. For any other
+// internal errors ZX_ERR_INTERNAL will be returned and the error scratch buffer will be set.
+extern zx_status_t ffx_config_get_string(ffx_env_context_t* ctx, const char* config_key,
+                                         uint64_t config_key_len, char* out_buf,
+                                         uint64_t* out_buf_len);
 extern zx_status_t ffx_channel_read(ffx_lib_context_t* ctx, zx_handle_t handle, char* out_buf,
                                     uint64_t out_len, zx_handle_t* hdls, uint64_t hdls_len,
                                     uint64_t* actual_bytes_count, uint64_t* actual_handles_count);

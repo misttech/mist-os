@@ -5,6 +5,7 @@ import asyncio
 import os
 import os.path
 import sys
+import typing
 import unittest
 
 import fidl.fuchsia_developer_ffx as ffx_fidl
@@ -16,16 +17,42 @@ from fuchsia_controller_py import IsolateDir
 
 
 class EndToEnd(unittest.IsolatedAsyncioTestCase):
-    def _make_ctx(self):
+    def _get_default_config(self) -> typing.Dict[str, str]:
+        return {"sdk.root": "./sdk/exported/core"}
+
+    def _get_isolate_dir(self) -> IsolateDir:
         isolation_path = None
         tmp_path = os.getenv("TEST_UNDECLARED_OUTPUTS_DIR")
         if tmp_path:
             isolation_path = os.path.join(tmp_path, "isolate")
+        return IsolateDir(dir=isolation_path)
 
+    def _make_ctx(self):
         return Context(
-            config={"sdk.root": "./sdk/exported/core"},
-            isolate_dir=IsolateDir(dir=isolation_path),
+            config=self._get_default_config(),
+            isolate_dir=self._get_isolate_dir(),
         )
+
+    def test_config_get_nonexistent(self):
+        ctx = self._make_ctx()
+        self.assertEqual(ctx.config_get_string("foobarzzzzzzo==?"), None)
+
+    def test_config_get_exists(self):
+        config = self._get_default_config()
+        key = "foobar"
+        expect = "bazmumble"
+        config[key] = expect
+        ctx = Context(config=config, isolate_dir=self._get_isolate_dir())
+        self.assertEqual(ctx.config_get_string(key), expect)
+
+    def test_config_get_too_long(self):
+        config = self._get_default_config()
+        key = "foobarzington"
+        expect = "b" * 50000
+        config[key] = expect
+        ctx = Context(config=config, isolate_dir=self._get_isolate_dir())
+        with self.assertRaises(BufferError):
+            ctx.config_get_string(key)
 
     async def test_echo_daemon(self):
         ctx = self._make_ctx()
