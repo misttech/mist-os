@@ -213,7 +213,6 @@ hlcpp_visibility = [
   "//src/lib/metrics_buffer:*",
   "//src/lib/process:*",
   "//src/lib/test-suite:*",
-  "//src/lib/ui/base_view:*",
   "//src/lib/ui/flatland-frame-scheduling:*",
   "//src/lib/ui/input-synthesis:*",
   "//src/lib/ui/scenic/cpp:*",

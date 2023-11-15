@@ -142,9 +142,7 @@ executable("web-semantics-test-bin") {
     "//src/chromium/web_runner_tests:mock_server",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/ui/base_view",
     "//src/ui/a11y/lib/view",
-    "//src/ui/testing/views",
     "//third_party/googletest:gtest",
   ]
 }

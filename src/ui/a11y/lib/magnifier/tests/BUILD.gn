@@ -50,7 +50,6 @@ executable("magnification_pixeltest_bin") {
     "//src/ui/a11y/testing/fidl:test.accessibility_hlcpp",
     "//src/ui/testing/ui_test_manager",
     "//src/ui/testing/util",
-    "//src/ui/testing/views",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]

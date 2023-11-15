@@ -18,7 +18,6 @@ executable("display_rotation_pixel_test_bin") {
     "//src/lib/testing/loop_fixture",
     "//src/ui/testing/ui_test_manager",
     "//src/ui/testing/util",
-    "//src/ui/testing/views",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
   ]
