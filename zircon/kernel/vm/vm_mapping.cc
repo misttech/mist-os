@@ -438,7 +438,7 @@ void VmMapping::AspaceUnmapLockedObject(uint64_t offset, uint64_t len) const {
   // If we're currently faulting and are responsible for the vmo code to be calling
   // back to us, detect the recursion and abort here.
   // The specific path we're avoiding is if the VMO calls back into us during
-  // vmo->LookupPagesLocked() via AspaceUnmapLockedObject(). If we set this flag we're short
+  // a VmCowPages::LookupCursor call via AspaceUnmapLockedObject(). If we set this flag we're short
   // circuiting the unmap operation so that we don't do extra work.
   if (unlikely(currently_faulting_)) {
     LTRACEF("recursing to ourself, abort\n");
@@ -921,7 +921,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
 
   // set the currently faulting flag for any recursive calls the vmo may make back into us
   // The specific path we're avoiding is if the VMO calls back into us during
-  // vmo->LookupPagesLocked() via AspaceUnmapLockedObject(). Since we're responsible for
+  // a VmCowPages::LookupCursor call via AspaceUnmapLockedObject(). Since we're responsible for
   // that page, signal to ourself to skip the unmap operation.
   DEBUG_ASSERT(!currently_faulting_);
   currently_faulting_ = true;
@@ -955,7 +955,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // If this is a write fault and the VMO supports dirty tracking, only lookup 1 page. The pages
     // will also be marked dirty for a write, which we only want for the current page. We could
     // optimize this to lookup following pages here too and map them in, however we would have to
-    // not mark them dirty in LookupPagesLocked, and map them in without write permissions here, so
+    // not mark them dirty during the lookup, and map them in without write permissions here, so
     // that we can take a permission fault on a write to update their dirty tracking later. Instead,
     // we can keep things simple by just looking up 1 page.
     // TODO(rashaeqbal): Revisit this decision if there are performance issues.

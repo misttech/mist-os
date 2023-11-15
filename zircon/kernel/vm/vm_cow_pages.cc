@@ -2387,7 +2387,7 @@ zx_status_t VmCowPages::PrepareForWriteLocked(uint64_t offset, uint64_t len,
 
   // Found a contiguous run of pages that need to transition to Dirty. There might be more such
   // pages later in the range, but we will come into this call again for them via another
-  // LookupPagesLocked after the waiting caller is unblocked for this range.
+  // LookupCursor call after the waiting caller is unblocked for this range.
 
   VmoDebugInfo vmo_debug_info{};
   // We have a page source so this cannot be a hidden node, but the VmObjectPaged could have been
@@ -3400,7 +3400,7 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
             return ZX_ERR_STOP;
           },
           next_start_offset, end);
-      // Bubble up any errors from LookupPagesLocked.
+      // Bubble up any errors from LookupCursor.
       if (status != ZX_OK) {
         return status;
       }
@@ -3565,9 +3565,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
       // allocate a zero page to replace the empty slot. Otherwise, we'll have to look up the page
       // and zero it.
       //
-      // We could technically fall through to LookupPagesLocked even for an empty slot and let
-      // LookupPagesLocked allocate a new page and zero it, but we want to avoid having to
-      // redundantly zero a newly forked zero page after LookupPagesLocked.
+      // We could technically fall through to GetLookupCursorLocked even for an empty slot and let
+      // RequirePage allocate a new page and zero it, but we want to avoid having to redundantly
+      // zero a newly forked zero page.
       if (!slot && can_see_parent(offset) && !parent_has_content(offset)) {
         // We could only have ended up here if the parent was mutable, otherwise we should have been
         // able to treat an empty slot as zero (decommit a committed page) and return early above.

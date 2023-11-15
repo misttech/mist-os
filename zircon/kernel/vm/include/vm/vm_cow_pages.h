@@ -900,7 +900,7 @@ class VmCowPages final : public VmHierarchyBase,
                                           uint64_t* owner_offset_out, uint64_t* owner_length)
       TA_REQ(lock());
 
-  // LookupPagesLocked helper function that 'forks' the page at |offset| of the current vmo. If
+  // LookupCursor helper function that 'forks' the page at |offset| of the current vmo. If
   // this function successfully inserts a page into |offset| of the current vmo, it returns ZX_OK
   // and populates |out_page|. |page_request| must be provided and if ZX_ERR_SHOULD_WAIT is returned
   // then this indicates a transient allocation failure that should be resolved by waiting on the

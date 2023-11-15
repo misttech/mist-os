@@ -1132,10 +1132,10 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
       // call to VmCowPages::CommitRangeLocked(). This is required to make any COW copies of pages
       // that were just supplied.
       // - The first call to VmCowPages::CommitRangeLocked() returns early from
-      // LookupPagesLocked() with ZX_ERR_SHOULD_WAIT after queueing a page request for the absent
-      // page.
-      // - The second call to VmCowPages::CommitRangeLocked() calls LookupPagesLocked() which
-      // copies out the now present page (if required).
+      // LookupCursor::RequireOwnedPage with ZX_ERR_SHOULD_WAIT after queueing a page request
+      // for the absent page.
+      // - The second call to VmCowPages::CommitRangeLocked() calls LookupCursor::RequireOwnedPage
+      // which copies out the now present page (if required).
       if (commit_status == ZX_ERR_SHOULD_WAIT) {
         continue;
       }
