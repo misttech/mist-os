@@ -883,8 +883,9 @@ impl RealmBuilder {
     /// build the created realm under an instance of component manager, use
     /// `build_in_nested_component_manager()`.
     ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be used
-    /// in component manager's manifest and listed as a namespace capability in its config.
+    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
+    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
+    /// passed to `component_manager`'s `--config` arg.
     ///
     /// Note that any routes with a target of `parent` from the root realm will result in exposing
     /// the capability to component manager, which is rather useless by itself. Component manager
@@ -975,8 +976,9 @@ impl RealmBuilder {
     /// components in the realm). This component manager _must_ be referenced by a fragment-only
     /// URL.
     ///
-    /// Note that any routes with a source of `parent` in the root realm will need to also be used
-    /// in component manager's manifest and listed as a namespace capability in its config.
+    /// Note that any routes with a source of `parent` in the root realm will need to also be `use`d
+    /// in component manager's manifest and listed in `namespace_capabilities` in the config file
+    /// passed to `component_manager`'s `--config` arg.
     ///
     /// Note that any routes with a target of `parent` from the root realm will result in exposing
     /// the capability to component manager, which is rather useless by itself. Component manager
