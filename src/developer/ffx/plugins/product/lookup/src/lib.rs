@@ -19,14 +19,6 @@ pub async fn pb_lookup(
     cmd: LookupCommand,
     #[ffx(machine = ProductBundle)] mut writer: Writer,
 ) -> Result<()> {
-    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-    println!("@");
-    println!("@  The `lookup` subcommand is intended to be used by infra only");
-    println!("@");
-    println!("@  Please use `ffx --machine json-pretty product list` instead.");
-    println!("@");
-    println!("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@");
-
     let mut input = stdin();
     // Emit machine progress info to stderr so users can redirect it to /dev/null.
     let mut output = if writer.is_machine() {
