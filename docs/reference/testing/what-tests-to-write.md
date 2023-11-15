@@ -36,15 +36,15 @@ pipeline is this kind of test run)
 The below table provides an overview of the types of tests categorized
 by what needs that type of test.
 
-|                                                           |Source Code|Components|Drivers|Protocols|
-|-----------------------------------------------------------|-----------|----------|-------|---------|
-|[Unit](#unit-tests)                                        |All        |-         |-      |-        |
-|[Hermetic integration](#hermetic-integration-tests)        |-          |All       |Some   |-        |
-|[Non-hermetic integration](#non-hermetic-integration-tests)|-          |Few       |Few    |-        |
-|[Compatibility (CTF)](#compatibility-tests)                |-          |Some      |Some   |All (SDK)|
-|[Conformance](#conformance-tests)                          |-          |Some      |Some   |Some     |
-|[System Validation](#system-validation-tests)              |-          |Some      |Some   |Some     |
-|[Host-driven (Lacewing)](#lacewing-tests)                  |-          |Some      |Some   |Some     |
+|                                                            |Source Code|Components|Drivers|Protocols|
+|------------------------------------------------------------|-----------|----------|-------|---------|
+|[Unit](#unit-tests)                                         |All        |-         |-      |-        |
+|[Hermetic integration](#hermetic-integration-tests)         |-          |All       |Some   |-        |
+|[Non-hermetic integration](#non-hermetic-integration-tests) |-          |Few       |Few    |-        |
+|[Compatibility (CTF)](#compatibility-tests)                 |-          |Some      |Some   |All (SDK)|
+|[Conformance](#conformance-tests)                           |-          |Some      |Some   |Some     |
+|[On-device System Validation](#system-validation-tests)     |-          |Some      |Some   |Some     |
+|[Host-driven System Automation (Lacewing)](#lacewing-tests) |-          |Some      |Some   |Some     |
 <!-- TODO(b/308191530): Fill out these sections
 |[Microbenchmarks](#microbenchmarks)|All (performance critical)|-|-|-
 |[Mezzobenchmarks](#mezzobenchmarks)|-|Some|Some|-
@@ -221,7 +221,7 @@ that they are used as a stop-gap solution for a test that otherwise
 would be made hermetic given appropriate mocks or isolation features.
 **They _should not_ be used for tests that legitimately want to
 assert on the behavior of a given system globally** (see instead
-[System Validation](#system-validation-tests) and [Host-driven
+[On-device System Validation](#system-validation-tests) and [Host-driven
 System Interaction Tests](#lacewing-tests)).
 
 
@@ -383,7 +383,7 @@ More concretely, we can solve the above examples as follows:
 **Interfaces that are expected to be implemented multiple times should ship
 a conformance test for integrators to build on top of.**
 
-### System Validation Tests {#system-validation-tests}
+### On-device System Validation Tests {#system-validation-tests}
 
 * What needs it: Many platform components and drivers. For example,
 drivers should ensure they interact with actual hardware on an
@@ -411,7 +411,7 @@ tests are a special kind of non-hermetic integration test that
 ensures the real component behaves as expected, subject to some
 constraints.
 
-System validation tests are typically based on hermetic TRF tests
+On-device system validation tests are typically based on hermetic TRF tests
 consisting of a RealmFactory and Test Suite. Instead of using the
 RealmFactory (which instantiates isolated components under test),
 system validation tests use a stand-in component that provides
@@ -448,6 +448,14 @@ written OOT**.
 **Platform components and drivers should have system validation
 tests. The Fuchsia SDK should make a validation test suite available for
 each driver expected to be implemented in a separate repository.**
+
+Note: We differentiate between on-device and host-driven system
+validation tests, recognizing that some system validation tasks
+cannot happen within the context of a device (e.g. rebooting the
+device as part of testing requires some process external to the
+device to coordinate). Certain host-driven system interaction
+tests (implemented using [Lacewing](#lacewing-tests)) can
+provide the same coverage as on-device system validation tests.
 
 ### Host-driven System Interaction Tests (Lacewing) {#lacewing-tests}
 
