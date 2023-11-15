@@ -12,8 +12,10 @@ use crate::{
         VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::errno::{error, Errno},
-    types::{mode, OpenFlags},
+    types::{
+        errno::{error, Errno},
+        mode, OpenFlags,
+    },
 };
 
 use fuchsia_zircon as zx;
@@ -79,19 +81,22 @@ impl FsNodeOps for CpuClassDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         match name {
             name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
+                current_task,
                 TmpfsDirectory::new(),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"online" => Ok(node.fs().create_node(
+                current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"possible" => Ok(node.fs().create_node(
+                current_task,
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),

@@ -21,8 +21,11 @@ use crate::{
         XattrOp,
     },
     task::{CurrentTask, Kernel},
-    types::errno::{error, Errno},
-    types::{as_any::AsAny, ino_t, statfs, ArcKey, DeviceType, MountFlags},
+    types::{
+        as_any::AsAny,
+        errno::{error, Errno},
+        ino_t, statfs, ArcKey, DeviceType, MountFlags,
+    },
 };
 
 pub const DEFAULT_LRU_CAPACITY: usize = 32;
@@ -186,17 +189,19 @@ impl FileSystem {
     ///
     /// Currently, apply the required selinux context if the selinux workaround is enabled on this
     /// filesystem.
-    fn prepare_node_for_insertion(&self, node: &Arc<FsNode>) -> Weak<FsNode> {
+    fn prepare_node_for_insertion(
+        &self,
+        current_task: &CurrentTask,
+        node: &Arc<FsNode>,
+    ) -> Weak<FsNode> {
         if let Some(label) = self.selinux_context.get() {
-            if let Some(kernel) = self.kernel.upgrade() {
-                let _ = node.ops().set_xattr(
-                    node,
-                    kernel.kthreads.system_task(),
-                    b"security.selinux",
-                    label,
-                    XattrOp::Create,
-                );
-            }
+            let _ = node.ops().set_xattr(
+                node,
+                current_task,
+                b"security.selinux",
+                label,
+                XattrOp::Create,
+            );
         }
         Arc::downgrade(node)
     }
@@ -215,6 +220,7 @@ impl FileSystem {
     /// Returns Err only if create_fn returns Err.
     pub fn get_or_create_node<F>(
         &self,
+        current_task: &CurrentTask,
         node_id: Option<ino_t>,
         create_fn: F,
     ) -> Result<FsNodeHandle, Errno>
@@ -226,7 +232,7 @@ impl FileSystem {
         match nodes.entry(node_id) {
             Entry::Vacant(entry) => {
                 let node = create_fn(node_id)?;
-                entry.insert(self.prepare_node_for_insertion(&node));
+                entry.insert(self.prepare_node_for_insertion(current_task, &node));
                 Ok(node)
             }
             Entry::Occupied(mut entry) => {
@@ -234,7 +240,7 @@ impl FileSystem {
                     return Ok(node);
                 }
                 let node = create_fn(node_id)?;
-                entry.insert(self.prepare_node_for_insertion(&node));
+                entry.insert(self.prepare_node_for_insertion(current_task, &node));
                 Ok(node)
             }
         }
@@ -245,24 +251,28 @@ impl FileSystem {
     /// call |create_node|.
     pub fn create_node_with_id(
         self: &Arc<Self>,
+        current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
         id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
         let node = FsNode::new_uncached(ops, self, id, info);
-        self.nodes.lock().insert(node.node_id, self.prepare_node_for_insertion(&node));
+        self.nodes
+            .lock()
+            .insert(node.node_id, self.prepare_node_for_insertion(current_task, &node));
         node
     }
 
     pub fn create_node(
         self: &Arc<Self>,
+        current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
         let node_id = self.next_node_id();
-        self.create_node_with_id(ops, node_id, info(node_id))
+        self.create_node_with_id(current_task, ops, node_id, info(node_id))
     }
 
     /// Remove the given FsNode from the node cache.

@@ -3,15 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::proc::ProcSysNetDev,
     fs::{
-        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeOps,
-        FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, proc::ProcSysNetDev,
+        unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle,
+        FsNode, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
     task::CurrentTask,
-    types::errno::{errno, Errno},
-    types::{off_t, OpenFlags},
+    types::{
+        errno::{errno, Errno},
+        off_t, OpenFlags,
+    },
 };
 use starnix_lock::Mutex;
 use std::{collections::HashMap, sync::Arc};
@@ -32,12 +33,13 @@ pub struct NetstackDevices {
 impl NetstackDevices {
     pub fn add_dev(
         &self,
+        current_task: &CurrentTask,
         name: &str,
         proc_fs: Option<&FileSystemHandle>,
         sys_fs: Option<&FileSystemHandle>,
     ) {
         // procfs or sysfs may not be mounted.
-        let proc_sys_net = proc_fs.map(ProcSysNetDev::new);
+        let proc_sys_net = proc_fs.map(|fs| ProcSysNetDev::new(current_task, fs));
         let sys_class_net = sys_fs.map(|sys_fs| {
             // nodes in `/sys/class/net` are normally symlinks into
             // `/sys/devices`. However, currently known use-cases only enumerate
@@ -46,7 +48,7 @@ impl NetstackDevices {
             //
             // TODO(https://fxbug.dev/128794): Support `/sys/class/net`
             // properly.
-            StaticDirectoryBuilder::new(sys_fs).build()
+            StaticDirectoryBuilder::new(sys_fs).build(current_task)
         });
 
         let mut entries = self.entries.lock();

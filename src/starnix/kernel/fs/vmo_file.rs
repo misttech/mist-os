@@ -16,8 +16,10 @@ use crate::{
     logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
-    types::{mode, OpenFlags, SealFlags},
+    types::{
+        errno::{errno, error, Errno},
+        mode, OpenFlags, SealFlags,
+    },
     vmex_resource::VMEX_RESOURCE,
 };
 
@@ -350,6 +352,7 @@ pub fn new_memfd(
 ) -> Result<FileHandle, Errno> {
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(
+        current_task,
         VmoFileNode::new()?,
         FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
     );

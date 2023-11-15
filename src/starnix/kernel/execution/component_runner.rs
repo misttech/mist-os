@@ -25,10 +25,13 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
-    types::auth::Capabilities,
-    types::errno::{Errno, EEXIST, ENOTDIR},
-    types::signals::{SIGINT, SIGKILL},
-    types::{mode, release_on_error, DeviceType, MountFlags, OpenFlags, ReleasableByRef, WeakRef},
+    types::{
+        auth::Capabilities,
+        errno::{Errno, EEXIST, ENOTDIR},
+        mode, release_on_error,
+        signals::{SIGINT, SIGKILL},
+        DeviceType, MountFlags, OpenFlags, ReleasableByRef, WeakRef,
+    },
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error
@@ -147,7 +150,7 @@ pub async fn start_component(
         if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts")? {
             for mount in local_mounts.iter() {
                 let (mount_point, child_fs) =
-                    create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;
+                    create_filesystem_from_spec(&current_task, &pkg, mount)?;
                 let mount_point = current_task.lookup_path_from_root(mount_point)?;
                 mount_record.mount(mount_point, WhatToMount::Fs(child_fs), MountFlags::empty())?;
             }

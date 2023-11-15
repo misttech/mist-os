@@ -16,11 +16,13 @@ use crate::{
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
-    types::time::time_from_timespec,
     types::{
-        off_t, ownership::ReleasableByRef, statfs, uapi, Access, DeviceType, FileMode, OpenFlags,
-        FUSE_SUPER_MAGIC,
+        errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
+        off_t,
+        ownership::ReleasableByRef,
+        statfs,
+        time::time_from_timespec,
+        uapi, Access, DeviceType, FileMode, OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
 use bstr::B;
@@ -229,6 +231,7 @@ impl FuseNode {
     /// Build a FsNodeHandle from a FuseResponse that is expected to be a FuseResponse::Entry.
     fn fs_node_from_entry(
         &self,
+        current_task: &CurrentTask,
         node: &FsNode,
         name: &FsStr,
         response: FuseResponse,
@@ -241,7 +244,7 @@ impl FuseNode {
         if entry.nodeid == 0 {
             return error!(ENOENT);
         }
-        let node = node.fs().get_or_create_node(Some(entry.nodeid), |id| {
+        let node = node.fs().get_or_create_node(current_task, Some(entry.nodeid), |id| {
             let fuse_node = Arc::new(FuseNode {
                 connection: self.connection.clone(),
                 nodeid: entry.nodeid,
@@ -537,9 +540,12 @@ impl FileOps for FuseFileObject {
             if let Some(entry) = entry {
                 // nodeid == 0 means the server doesn't want to send entry info.
                 if entry.nodeid != 0 {
-                    if let Err(e) =
-                        node.fs_node_from_entry(file.node(), &name, FuseResponse::Entry(entry))
-                    {
+                    if let Err(e) = node.fs_node_from_entry(
+                        current_task,
+                        file.node(),
+                        &name,
+                        FuseResponse::Entry(entry),
+                    ) {
                         log_error!("Unable to prefill entry: {e:?}");
                     }
                 }
@@ -641,7 +647,7 @@ impl FsNodeOps for Arc<FuseNode> {
             self,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response)
     }
 
     fn mknod(
@@ -666,7 +672,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response)
     }
 
     fn mkdir(
@@ -688,7 +694,7 @@ impl FsNodeOps for Arc<FuseNode> {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response)
     }
 
     fn create_symlink(
@@ -704,7 +710,7 @@ impl FsNodeOps for Arc<FuseNode> {
             self,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(node, name, response)
+        self.fs_node_from_entry(current_task, node, name, response)
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {

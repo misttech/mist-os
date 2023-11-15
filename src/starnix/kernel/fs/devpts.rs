@@ -33,9 +33,11 @@ use crate::{
         TIOCSSERIAL, TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP, TTY_ALT_MAJOR,
     },
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::errno::{errno, error, Errno},
-    types::signals::SIGWINCH,
-    types::user_address::{UserAddress, UserRef},
+    types::{
+        errno::{errno, error, Errno},
+        signals::SIGWINCH,
+        user_address::{UserAddress, UserRef},
+    },
 };
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
@@ -182,7 +184,7 @@ impl FsNodeOps for DevPtsRootDir {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
@@ -190,7 +192,7 @@ impl FsNodeOps for DevPtsRootDir {
             let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::PTMX;
             info.blksize = BLOCK_SIZE;
-            let node = node.fs().create_node_with_id(SpecialNode, info.ino, info);
+            let node = node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
@@ -206,7 +208,8 @@ impl FsNodeOps for DevPtsRootDir {
                     info.blksize = BLOCK_SIZE;
                     // TODO(qsr): set gid to the tty group
                     info.gid = 0;
-                    let node = node.fs().create_node_with_id(SpecialNode, info.ino, info);
+                    let node =
+                        node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
                     return Ok(node);
                 }
             }
@@ -617,8 +620,10 @@ mod tests {
             MountInfo, NamespaceNode,
         },
         testing::*,
-        types::signals::{SIGCHLD, SIGTTOU},
-        types::FileMode,
+        types::{
+            signals::{SIGCHLD, SIGTTOU},
+            FileMode,
+        },
     };
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(

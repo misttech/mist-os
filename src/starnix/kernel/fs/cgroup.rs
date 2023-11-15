@@ -18,8 +18,10 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
     task::{CurrentTask, Task},
-    types::errno::{errno, error, Errno},
-    types::{pid_t, DeviceType, FileMode, OpenFlags, WeakRef},
+    types::{
+        errno::{errno, error, Errno},
+        pid_t, DeviceType, FileMode, OpenFlags, WeakRef,
+    },
 };
 
 type ControlGroupHandle = Arc<Mutex<ControlGroup>>;
@@ -62,7 +64,7 @@ impl FsNodeOps for CgroupDirectoryNode {
     fn mkdir(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -70,13 +72,17 @@ impl FsNodeOps for CgroupDirectoryNode {
         node.update_info(|info| {
             info.link_count += 1;
         });
-        Ok(node.fs().create_node(CgroupDirectoryNode::new(), FsNodeInfo::new_factory(mode, owner)))
+        Ok(node.fs().create_node(
+            current_task,
+            CgroupDirectoryNode::new(),
+            FsNodeInfo::new_factory(mode, owner),
+        ))
     }
 
     fn mknod(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
@@ -87,7 +93,7 @@ impl FsNodeOps for CgroupDirectoryNode {
             FileMode::IFREG => Box::new(ControlGroupNode::new(self.control_group.clone())),
             _ => return error!(EACCES),
         };
-        let node = node.fs().create_node(ops, |id| {
+        let node = node.fs().create_node(current_task, ops, |id| {
             let mut info = FsNodeInfo::new(id, mode, owner);
             info.rdev = dev;
             info

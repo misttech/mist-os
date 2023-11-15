@@ -4,7 +4,11 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{fs::FileHandle, task::CurrentTask, types::errno::Errno, types::OpenFlags};
+use crate::{
+    fs::FileHandle,
+    task::CurrentTask,
+    types::{errno::Errno, OpenFlags},
+};
 
 mod remote;
 mod remote_bundle;
@@ -21,7 +25,7 @@ pub fn create_file_from_handle(
     current_task: &CurrentTask,
     handle: zx::Handle,
 ) -> Result<FileHandle, Errno> {
-    new_remote_file(current_task.kernel(), handle, OpenFlags::RDWR)
+    new_remote_file(current_task, handle, OpenFlags::RDWR)
 }
 
 #[cfg(test)]

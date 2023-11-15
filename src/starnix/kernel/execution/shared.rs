@@ -2,20 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error};
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_process as fprocess;
-#[cfg(feature = "syscall_stats")]
-use fuchsia_inspect::NumericProperty;
-use fuchsia_runtime::{HandleInfo, HandleType};
-use fuchsia_zircon::{self as zx};
-use lock_sequence::{Locked, Unlocked};
-use std::{convert::TryFrom, sync::Arc};
-
 use crate::{
     fs::{
         fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-        FdNumber, FdTable, FileSystemHandle, FileSystemOptions,
+        FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions,
     },
     logging::log_trace,
     mm::MemoryManager,
@@ -29,9 +19,20 @@ use crate::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
         Waiter,
     },
-    types::errno::{errno, Errno},
-    types::MountFlags,
+    types::{
+        errno::{errno, Errno},
+        MountFlags,
+    },
 };
+use anyhow::{anyhow, Error};
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_process as fprocess;
+#[cfg(feature = "syscall_stats")]
+use fuchsia_inspect::NumericProperty;
+use fuchsia_runtime::{HandleInfo, HandleType};
+use fuchsia_zircon::{self as zx};
+use lock_sequence::{Locked, Unlocked};
+use std::{convert::TryFrom, sync::Arc};
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -204,10 +205,12 @@ pub fn create_remotefs_filesystem(
 }
 
 pub fn create_filesystem_from_spec<'a>(
-    kernel: &Arc<Kernel>,
+    creator: &impl FileSystemCreator,
     pkg: &fio::DirectorySynchronousProxy,
     spec: &'a str,
 ) -> Result<(&'a [u8], FileSystemHandle), Error> {
+    let kernel = creator.kernel();
+
     let mut iter = spec.splitn(4, ':');
     let mount_point =
         iter.next().ok_or_else(|| anyhow!("mount point is missing from {:?}", spec))?;
@@ -233,7 +236,7 @@ pub fn create_filesystem_from_spec<'a>(
     let fs = match fs_type {
         "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
         "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, options)?,
-        _ => kernel.create_filesystem(fs_type.as_bytes(), options)?,
+        _ => creator.create_filesystem(fs_type.as_bytes(), options)?,
     };
     Ok((mount_point.as_bytes(), fs))
 }

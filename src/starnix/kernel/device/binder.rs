@@ -2564,7 +2564,11 @@ impl std::fmt::Display for Handle {
 trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     // File related methods.
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno>;
-    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno>;
+    fn get_file_with_flags(
+        &self,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+    ) -> Result<(FileHandle, FdFlags), Errno>;
     fn add_file_with_flags(
         &self,
         current_task: &CurrentTask,
@@ -2717,7 +2721,11 @@ impl ResourceAccessor for RemoteResourceAccessor {
         .map(|_| ())
     }
 
-    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+    fn get_file_with_flags(
+        &self,
+        current_task: &CurrentTask,
+        fd: FdNumber,
+    ) -> Result<(FileHandle, FdFlags), Errno> {
         profile_duration!("RemoteGetFile");
         let response = self.run_file_request(fbinder::FileRequest {
             get_requests: Some(vec![fd.raw()]),
@@ -2729,11 +2737,11 @@ impl ResourceAccessor for RemoteResourceAccessor {
                 let file = files.pop().unwrap();
                 if let Some(handle) = file.file {
                     return Ok((
-                        new_remote_file(&self.kernel, handle, file.flags.into())?,
+                        new_remote_file(current_task, handle, file.flags.into())?,
                         FdFlags::empty(),
                     ));
                 } else {
-                    return Ok((new_null_file(&self.kernel, file.flags.into()), FdFlags::empty()));
+                    return Ok((new_null_file(current_task, file.flags.into()), FdFlags::empty()));
                 }
             }
         }
@@ -2778,7 +2786,11 @@ impl ResourceAccessor for CurrentTask {
         log_trace!("Closing fd {:?}", fd);
         self.files.close(fd)
     }
-    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+    fn get_file_with_flags(
+        &self,
+        _current_task: &CurrentTask,
+        fd: FdNumber,
+    ) -> Result<(FileHandle, FdFlags), Errno> {
         log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
@@ -2807,7 +2819,11 @@ impl ResourceAccessor for Task {
         log_trace!("Closing fd {:?}", fd);
         self.files.close(fd)
     }
-    fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
+    fn get_file_with_flags(
+        &self,
+        _current_task: &CurrentTask,
+        fd: FdNumber,
+    ) -> Result<(FileHandle, FdFlags), Errno> {
         log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
@@ -3713,7 +3729,8 @@ impl BinderDriver {
                         })
                     }
                     SerializedBinderObject::File { fd, flags, cookie } => {
-                        let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;
+                        let (file, fd_flags) =
+                            source_resource_accessor.get_file_with_flags(current_task, fd)?;
                         let new_fd = target_resource_accessor.add_file_with_flags(
                             current_task,
                             file,
@@ -3826,8 +3843,10 @@ impl BinderDriver {
 
                         // Dup each file descriptor and re-write the value of the new FD.
                         for fd in fd_array {
-                            let (file, flags) = source_resource_accessor
-                                .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
+                            let (file, flags) = source_resource_accessor.get_file_with_flags(
+                                current_task,
+                                FdNumber::from_raw(*fd as i32),
+                            )?;
                             let new_fd = target_resource_accessor.add_file_with_flags(
                                 current_task,
                                 file,
@@ -4252,12 +4271,12 @@ impl FsNodeOps for BinderFsDir {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if let Some(dev) = self.devices.get(name) {
             let mode = if name == b"remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
-            Ok(node.fs().create_node(SpecialNode, |ino| {
+            Ok(node.fs().create_node(current_task, SpecialNode, |ino| {
                 let mut info = FsNodeInfo::new(ino, mode, FsCred::root());
                 info.rdev = *dev;
                 info
@@ -4314,8 +4333,12 @@ pub mod tests {
         fn close_fd(&self, fd: FdNumber) -> Result<(), Errno> {
             self.deref().close_fd(fd)
         }
-        fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
-            self.deref().get_file_with_flags(fd)
+        fn get_file_with_flags(
+            &self,
+            current_task: &CurrentTask,
+            fd: FdNumber,
+        ) -> Result<(FileHandle, FdFlags), Errno> {
+            self.deref().get_file_with_flags(current_task, fd)
         }
         fn add_file_with_flags(
             &self,
@@ -7659,26 +7682,28 @@ pub mod tests {
         assert_eq!(vector, other_vector);
 
         let fd0 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::RDWR), FdFlags::empty())
+            .add_file_with_flags(&task, new_null_file(&task, OpenFlags::RDWR), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd0.raw(), 0);
         let fd1 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::WRONLY), FdFlags::empty())
+            .add_file_with_flags(&task, new_null_file(&task, OpenFlags::WRONLY), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd1.raw(), 1);
         let fd2 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::RDONLY), FdFlags::empty())
+            .add_file_with_flags(&task, new_null_file(&task, OpenFlags::RDONLY), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd2.raw(), 2);
 
         assert_eq!(remote_binder_task.close_fd(fd1), Ok(()));
         let (handle, flags) =
-            remote_binder_task.get_file_with_flags(fd0).expect("get_file_with_flags");
+            remote_binder_task.get_file_with_flags(&task, fd0).expect("get_file_with_flags");
         assert_eq!(flags, FdFlags::empty());
         assert_eq!(handle.flags(), OpenFlags::RDWR);
 
         assert_eq!(
-            remote_binder_task.get_file_with_flags(FdNumber::from_raw(3)).expect_err("bad fd"),
+            remote_binder_task
+                .get_file_with_flags(&task, FdNumber::from_raw(3))
+                .expect_err("bad fd"),
             errno!(EBADF)
         );
 

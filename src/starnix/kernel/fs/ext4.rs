@@ -2,26 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
-use ext4_read_only::readers::VmoReader;
-use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
+use ext4_read_only::{
+    parser::{Parser as ExtParser, XattrMap as ExtXattrMap},
+    readers::VmoReader,
+    structs::{EntryType, INode, ROOT_INODE_NUM},
+};
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
 
-use crate::auth::FsCred;
-use crate::fs::{
-    default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-    fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
-    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    SymlinkTarget, VmoFileObject, XattrOp,
+use crate::{
+    auth::FsCred,
+    fs::{
+        default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+        fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode,
+        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, SeekTarget, SymlinkTarget, VmoFileObject, XattrOp,
+    },
+    logging::log_warn,
+    mm::ProtectionFlags,
+    task::{CurrentTask, Kernel},
+    types::{
+        errno::{errno, error, Errno},
+        ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC,
+    },
 };
-use crate::logging::log_warn;
-use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel};
-use crate::types::errno::{errno, error, Errno};
-use crate::types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC};
 
 mod pager;
 
@@ -132,7 +138,7 @@ impl FsNodeOps for ExtDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let fs = node.fs();
@@ -145,7 +151,7 @@ impl FsNodeOps for ExtDirectory {
             .ok_or_else(|| errno!(ENOENT, String::from_utf8_lossy(name)))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(current_task, Some(inode_num as ino_t), |inode_num| {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
