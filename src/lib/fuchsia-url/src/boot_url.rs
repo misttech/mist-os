@@ -8,6 +8,8 @@ pub use crate::{
 };
 use crate::{validate_path, Scheme, UrlParts};
 
+pub const SCHEME: &str = "fuchsia-boot";
+
 /// Decoded representation of a fuchsia-boot URL.
 ///
 /// fuchsia-boot:///path/to#path/to/resource
@@ -77,7 +79,7 @@ impl BootUrl {
 
 impl std::fmt::Display for BootUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fuchsia-boot://{}", self.path)?;
+        write!(f, "{}://{}", SCHEME, self.path)?;
         if let Some(ref resource) = self.resource {
             write!(f, "#{}", percent_encoding::utf8_percent_encode(resource, crate::FRAGMENT))?;
         }

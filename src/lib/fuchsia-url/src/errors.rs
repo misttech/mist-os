@@ -63,6 +63,9 @@ pub enum ParseError {
     #[error("cannot contain hash")]
     CannotContainHash,
 
+    #[error("path must be root")]
+    PathMustBeRoot,
+
     #[error("resource path failed to percent decode")]
     ResourcePathPercentDecode(#[source] std::str::Utf8Error),
 

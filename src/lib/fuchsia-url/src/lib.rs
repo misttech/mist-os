@@ -7,6 +7,7 @@ pub use fuchsia_hash::{Hash, HASH_SIZE};
 mod absolute_component_url;
 mod absolute_package_url;
 pub mod boot_url;
+pub mod builtin_url;
 mod component_url;
 pub mod errors;
 mod host;
@@ -52,6 +53,7 @@ lazy_static! {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Scheme {
+    Builtin,
     FuchsiaPkg,
     FuchsiaBoot,
 }
@@ -72,8 +74,9 @@ impl UrlParts {
         let (scheme, url) = match url::Url::parse(input) {
             Ok(url) => (
                 Some(match url.scheme() {
-                    "fuchsia-pkg" => Scheme::FuchsiaPkg,
-                    "fuchsia-boot" => Scheme::FuchsiaBoot,
+                    builtin_url::SCHEME => Scheme::Builtin,
+                    repository_url::SCHEME => Scheme::FuchsiaPkg,
+                    boot_url::SCHEME => Scheme::FuchsiaBoot,
                     _ => return Err(ParseError::InvalidScheme),
                 }),
                 url,

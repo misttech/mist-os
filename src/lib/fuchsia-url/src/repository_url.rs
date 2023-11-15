@@ -4,6 +4,8 @@
 
 use crate::{errors::ParseError, Host, Scheme, UrlParts};
 
+pub const SCHEME: &str = "fuchsia-pkg";
+
 /// A URL locating a Fuchsia package repository.
 /// Has the form "fuchsia-pkg://<repository>", where "repository" is a valid hostname.
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url?hl=en#repository
@@ -74,7 +76,7 @@ impl std::convert::TryFrom<&str> for RepositoryUrl {
 
 impl std::fmt::Display for RepositoryUrl {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "fuchsia-pkg://{}", self.host.as_ref())
+        write!(f, "{}://{}", SCHEME, self.host.as_ref())
     }
 }
 
