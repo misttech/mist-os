@@ -26,6 +26,9 @@ use crate::{
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
+    types::errno::{errno, errno_from_code, error, Errno, EINTR},
+    types::user_address::{UserAddress, UserRef},
+    types::user_buffer::UserBuffer,
     types::{
         binder_buffer_object, binder_driver_command_protocol,
         binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
@@ -52,15 +55,12 @@ use crate::{
         binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
         binder_object_header, binder_transaction_data,
         binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-        binder_uintptr_t, binder_version, binder_write_read,
-        errno::{errno, errno_from_code, error, Errno, EINTR},
-        flat_binder_object, mode, pid_t, release_after, release_on_error, statfs,
-        struct_with_union_into_bytes, transaction_flags_TF_ONE_WAY, uapi,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        ArcKey, DeviceType, OpenFlags, OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef,
-        BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
-        BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+        binder_uintptr_t, binder_version, binder_write_read, flat_binder_object, mode, pid_t,
+        release_after, release_on_error, statfs, struct_with_union_into_bytes,
+        transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType, OpenFlags, OwnedRef, Releasable,
+        ReleaseGuard, TempRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
+        BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA,
+        BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
     },
 };
 use derivative::Derivative;
@@ -2565,12 +2565,7 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     // File related methods.
     fn close_fd(&self, fd: FdNumber) -> Result<(), Errno>;
     fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno>;
-    fn add_file_with_flags(
-        &self,
-        current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno>;
+    fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno>;
 
     // State related methods.
     fn kernel(&self) -> &Arc<Kernel>;
@@ -2740,15 +2735,10 @@ impl ResourceAccessor for RemoteResourceAccessor {
         error!(ENOENT)
     }
 
-    fn add_file_with_flags(
-        &self,
-        current_task: &CurrentTask,
-        file: FileHandle,
-        _flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+    fn add_file_with_flags(&self, file: FileHandle, _flags: FdFlags) -> Result<FdNumber, Errno> {
         profile_duration!("RemoteAddFile");
         let flags: fbinder::FileFlags = file.flags().into();
-        let handle = file.to_handle(current_task)?;
+        let handle = file.to_handle(self.kernel.kthreads.system_task())?;
         let response = self.run_file_request(fbinder::FileRequest {
             add_requests: Some(vec![fbinder::FileHandle { file: handle, flags }]),
             ..Default::default()
@@ -2782,12 +2772,7 @@ impl ResourceAccessor for CurrentTask {
         log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
-    fn add_file_with_flags(
-        &self,
-        _current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+    fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
         log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
@@ -2811,12 +2796,7 @@ impl ResourceAccessor for Task {
         log_trace!("Getting file {:?} with flags", fd);
         self.files.get_with_flags(fd)
     }
-    fn add_file_with_flags(
-        &self,
-        _current_task: &CurrentTask,
-        file: FileHandle,
-        flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+    fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
         log_trace!("Adding file {:?} with flags {:?}", file, flags);
         self.add_file(file, flags)
     }
@@ -3245,7 +3225,6 @@ impl BinderDriver {
 
                 // Copy the transaction data to the target process.
                 let (buffers, mut transaction_state) = self.copy_transaction_buffers(
-                    current_task,
                     binder_proc.get_resource_accessor(current_task),
                     binder_proc,
                     binder_thread,
@@ -3374,7 +3353,6 @@ impl BinderDriver {
 
         // Copy the transaction data to the target process.
         let (buffers, transaction_state) = self.copy_transaction_buffers(
-            current_task,
             binder_proc.get_resource_accessor(current_task),
             binder_proc,
             binder_thread,
@@ -3537,7 +3515,6 @@ impl BinderDriver {
     /// If `security_context` is present, it musts be null terminated.
     fn copy_transaction_buffers<'a>(
         &self,
-        current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
         source_thread: &Arc<BinderThread>,
@@ -3586,7 +3563,6 @@ impl BinderDriver {
         // Translate any handles/fds from the source process' handle table to the target process'
         // handle table.
         let transient_transaction_state = self.translate_objects(
-            current_task,
             source_resource_accessor,
             source_proc,
             source_thread,
@@ -3619,7 +3595,6 @@ impl BinderDriver {
     /// `BC_FREE_BUFFER` command.
     fn translate_objects<'a>(
         &self,
-        current_task: &CurrentTask,
         source_resource_accessor: &dyn ResourceAccessor,
         source_proc: &BinderProcess,
         source_thread: &Arc<BinderThread>,
@@ -3714,11 +3689,8 @@ impl BinderDriver {
                     }
                     SerializedBinderObject::File { fd, flags, cookie } => {
                         let (file, fd_flags) = source_resource_accessor.get_file_with_flags(fd)?;
-                        let new_fd = target_resource_accessor.add_file_with_flags(
-                            current_task,
-                            file,
-                            fd_flags,
-                        )?;
+                        let new_fd =
+                            target_resource_accessor.add_file_with_flags(file, fd_flags)?;
 
                         // Close this FD if the transaction fails.
                         transaction_state.push_transient_fd(new_fd);
@@ -3828,11 +3800,8 @@ impl BinderDriver {
                         for fd in fd_array {
                             let (file, flags) = source_resource_accessor
                                 .get_file_with_flags(FdNumber::from_raw(*fd as i32))?;
-                            let new_fd = target_resource_accessor.add_file_with_flags(
-                                current_task,
-                                file,
-                                flags,
-                            )?;
+                            let new_fd =
+                                target_resource_accessor.add_file_with_flags(file, flags)?;
 
                             // Close this FD if the transaction ends either by success or failure.
                             transaction_state.push_owned_fd(new_fd);
@@ -4317,13 +4286,8 @@ pub mod tests {
         fn get_file_with_flags(&self, fd: FdNumber) -> Result<(FileHandle, FdFlags), Errno> {
             self.deref().get_file_with_flags(fd)
         }
-        fn add_file_with_flags(
-            &self,
-            current_task: &CurrentTask,
-            file: FileHandle,
-            flags: FdFlags,
-        ) -> Result<FdNumber, Errno> {
-            self.deref().add_file_with_flags(current_task, file, flags)
+        fn add_file_with_flags(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
+            self.deref().add_file_with_flags(file, flags)
         }
         fn kernel(&self) -> &Arc<Kernel> {
             &self.deref().kernel()
@@ -5361,7 +5325,6 @@ pub mod tests {
             .driver
             .copy_transaction_buffers(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -5430,7 +5393,6 @@ pub mod tests {
         let transaction_state = test
             .driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -5522,7 +5484,6 @@ pub mod tests {
         test.driver
             .translate_objects(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -5597,7 +5558,6 @@ pub mod tests {
         let transaction_state = test
             .driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -5709,7 +5669,6 @@ pub mod tests {
         let transaction_state = test
             .driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -5854,7 +5813,6 @@ pub mod tests {
             .driver
             .copy_transaction_buffers(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -5960,7 +5918,6 @@ pub mod tests {
         test.driver
             .copy_transaction_buffers(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -6040,7 +5997,6 @@ pub mod tests {
         // Perform the translation and copying.
         test.driver
             .copy_transaction_buffers(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -6475,7 +6431,6 @@ pub mod tests {
             .driver
             .copy_transaction_buffers(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -6515,7 +6470,6 @@ pub mod tests {
             .driver
             .translate_objects(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -6549,7 +6503,6 @@ pub mod tests {
         let transaction_ref_error = test
             .driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -6594,7 +6547,6 @@ pub mod tests {
 
         test.driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -6975,7 +6927,6 @@ pub mod tests {
             .driver
             .translate_objects(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -7047,7 +6998,6 @@ pub mod tests {
             .driver
             .translate_objects(
                 &sender.task,
-                &sender.task,
                 &sender.proc,
                 &sender.thread,
                 &receiver.task,
@@ -7097,7 +7047,6 @@ pub mod tests {
         let transaction_state = test
             .driver
             .translate_objects(
-                &sender.task,
                 &sender.task,
                 &sender.proc,
                 &sender.thread,
@@ -7636,7 +7585,7 @@ pub mod tests {
             process_accessor_client_end.into_channel(),
         );
 
-        let (kernel, task) = create_kernel_and_task();
+        let (kernel, _task) = create_kernel_and_task();
         let process =
             fuchsia_runtime::process_self().duplicate(zx::Rights::SAME_RIGHTS).expect("process");
         let remote_binder_task =
@@ -7659,15 +7608,15 @@ pub mod tests {
         assert_eq!(vector, other_vector);
 
         let fd0 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::RDWR), FdFlags::empty())
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::RDWR), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd0.raw(), 0);
         let fd1 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::WRONLY), FdFlags::empty())
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::WRONLY), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd1.raw(), 1);
         let fd2 = remote_binder_task
-            .add_file_with_flags(&task, new_null_file(&kernel, OpenFlags::RDONLY), FdFlags::empty())
+            .add_file_with_flags(new_null_file(&kernel, OpenFlags::RDONLY), FdFlags::empty())
             .expect("add_file_with_flags");
         assert_eq!(fd2.raw(), 2);
 
