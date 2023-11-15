@@ -79,12 +79,6 @@ pub(crate) enum LibraryCommand {
         handles: ExtBuffer<fidl::Handle>,
         responder: Responder<zx_status::Status>,
     },
-    ConfigGetString {
-        env_ctx: Arc<EnvContext>,
-        config_key: String,
-        out_buf: ExtBuffer<u8>,
-        responder: Responder<Result<usize, zx_status::Status>>,
-    },
     ChannelWriteEtc {
         channel: fidl::Channel,
         buf: ExtBuffer<u8>,
@@ -333,23 +327,6 @@ impl LibraryCommand {
                     Err(e) => e,
                 };
                 responder.send(status).unwrap();
-            }
-            Self::ConfigGetString { env_ctx, responder, config_key, mut out_buf } => {
-                let result: String = match env_ctx.context.get(&config_key).await {
-                    Ok(r) => r,
-                    Err(e) => {
-                        env_ctx.write_err(e);
-                        responder.send(Err(zx_status::Status::NOT_FOUND)).unwrap();
-                        return;
-                    }
-                };
-                let result_bytes = result.as_bytes();
-                if out_buf.len() < result_bytes.len() {
-                    responder.send(Err(zx_status::Status::BUFFER_TOO_SMALL)).unwrap();
-                    return;
-                }
-                out_buf[..result_bytes.len()].copy_from_slice(result_bytes);
-                responder.send(Ok(result_bytes.len())).unwrap();
             }
             Self::EventCreate { responder } => {
                 responder.send(fidl::Event::create()).unwrap();
