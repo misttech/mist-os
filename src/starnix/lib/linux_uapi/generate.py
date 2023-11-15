@@ -107,6 +107,7 @@ AUTO_DERIVE_TRAITS = [
     (r"sock_fprog", ["FromBytes", "FromZeroes"]),
     (r"sysinfo", ["AsBytes"]),
     (r"xt_counters_info", ["FromBytes", "FromZeroes"]),
+    (r"input_id", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of

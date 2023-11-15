@@ -9708,7 +9708,7 @@ pub struct input_event {
     pub value: __s32,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes, PartialEq)]
 pub struct input_id {
     pub bustype: __u16,
     pub vendor: __u16,
