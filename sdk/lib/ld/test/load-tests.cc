@@ -136,10 +136,6 @@ TYPED_TEST(LdLoadTests, IndirectDeps) {
 }
 
 TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -152,10 +148,6 @@ TYPED_TEST(LdLoadTests, PassiveAbiBasic) {
 }
 
 TYPED_TEST(LdLoadTests, SymbolicNamespace) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -170,10 +162,6 @@ TYPED_TEST(LdLoadTests, SymbolicNamespace) {
 }
 
 TYPED_TEST(LdLoadTests, ManyDeps) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -195,10 +183,6 @@ TYPED_TEST(LdLoadTests, ManyDeps) {
 }
 
 TYPED_TEST(LdLoadTests, InitFini) {
-  if constexpr (!TestFixture::kHasPassiveAbi) {
-    GTEST_SKIP() << "test requires passive ABI support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -211,10 +195,6 @@ TYPED_TEST(LdLoadTests, InitFini) {
 }
 
 TYPED_TEST(LdLoadTests, TlsExecOnly) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -227,10 +207,6 @@ TYPED_TEST(LdLoadTests, TlsExecOnly) {
 }
 
 TYPED_TEST(LdLoadTests, TlsShlibOnly) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -245,10 +221,6 @@ TYPED_TEST(LdLoadTests, TlsShlibOnly) {
 }
 
 TYPED_TEST(LdLoadTests, TlsExecShlib) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -263,10 +235,6 @@ TYPED_TEST(LdLoadTests, TlsExecShlib) {
 }
 
 TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
@@ -281,10 +249,6 @@ TYPED_TEST(LdLoadTests, TlsInitialExecAccess) {
 }
 
 TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
-  if constexpr (!TestFixture::kHasTls) {
-    GTEST_SKIP() << "test requires TLS support";
-  }
-
   constexpr int64_t kReturnValue = 17;
   constexpr int64_t kSkipReturnValue = 77;
 
@@ -307,10 +271,6 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
-  if constexpr (!TestFixture::kIsStartupDynamicLinker) {
-    GTEST_SKIP() << "test is specific to the startup dynamic linker";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
@@ -325,10 +285,6 @@ startup dynamic linking failed with 1 errors and 0 warnings
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingDependency) {
-  if constexpr (!TestFixture::kIsStartupDynamicLinker) {
-    GTEST_SKIP() << "test is specific to the startup dynamic linker";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
@@ -343,10 +299,6 @@ startup dynamic linking failed with 1 errors and 0 warnings
 }
 
 TYPED_TEST(LdLoadFailureTests, Relro) {
-  if constexpr (!TestFixture::kHasRelro) {
-    GTEST_SKIP() << "test requires Relro support";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Load("relro"));

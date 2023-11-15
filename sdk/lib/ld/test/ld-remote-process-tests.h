@@ -26,10 +26,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   LdRemoteProcessTests();
   ~LdRemoteProcessTests();
 
-  static constexpr bool kHasPassiveAbi = false;
-  static constexpr bool kHasRelro = false;
-  static constexpr bool kHasTls = false;
-  static constexpr bool kIsStartupDynamicLinker = false;
+  void SetUp() override;
 
   void Init(std::initializer_list<std::string_view> args = {});
 

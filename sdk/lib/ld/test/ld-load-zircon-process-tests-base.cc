@@ -47,15 +47,18 @@ int64_t LdLoadZirconProcessTestsBase::Run(TestProcessArgs* bootstrap,
   zx::vmo stack_vmo;
   uintptr_t sp;
   auto allocate_stack = [&]() {
-    std::optional<size_t> bootstrap_stack_size = stack_size;
-    if (!bootstrap_stack_size) {
+    size_t bootstrap_stack_size;
+    if (!bootstrap) {
+      ASSERT_TRUE(stack_size);
+      bootstrap_stack_size = *stack_size;
+    } else {
       // TODO(mcgrathr): stack use too big for procargs piddly default
       // bootstrap_stack_size = bootstrap.GetStackSize();
       bootstrap_stack_size = 64 << 10;
     }
 
     const size_t page_size = zx_system_get_page_size();
-    const size_t stack_vmo_size = (*bootstrap_stack_size + page_size - 1) & -page_size;
+    const size_t stack_vmo_size = (bootstrap_stack_size + page_size - 1) & -page_size;
     const size_t stack_vmar_size = stack_vmo_size + page_size;
 
     ASSERT_EQ(zx::vmo::create(stack_vmo_size, 0, &stack_vmo), ZX_OK);

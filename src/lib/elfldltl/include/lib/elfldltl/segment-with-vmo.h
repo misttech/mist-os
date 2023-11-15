@@ -169,8 +169,8 @@ class SegmentWithVmo {
   // page has been cleared to all zero bytes.  The segment.filesz() has been
   // rounded up to whole pages so it can be mapped with no additional zeroing.
   template <class Diagnostics, class LoadInfo>
-  [[nodiscard]] static bool AlignSegments(Diagnostics& diag, LoadInfo& info, zx::unowned_vmo vmo,
-                                          size_t page_size) {
+  static bool AlignSegments(Diagnostics& diag, LoadInfo& info, zx::unowned_vmo vmo,
+                            size_t page_size) {
     using DataWithZeroFillSegment = typename LoadInfo::DataWithZeroFillSegment;
     return info.VisitSegments([vmo, page_size, &diag](auto& segment) {
       using Segment = std::decay_t<decltype(segment)>;

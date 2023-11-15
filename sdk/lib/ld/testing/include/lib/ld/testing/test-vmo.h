@@ -4,12 +4,9 @@
 #ifndef LIB_LD_TESTING_TEST_VMO_H_
 #define LIB_LD_TESTING_TEST_VMO_H_
 
-#include <lib/elfldltl/soname.h>
 #include <lib/zx/vmo.h>
 
 namespace ld::testing {
-
-elfldltl::Soname<> GetVdsoSoname();
 
 zx::unowned_vmo GetVdsoVmo();
 

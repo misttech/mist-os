@@ -43,24 +43,12 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   using MetadataMemory = elfldltl::LoadInfoMappedMemory<LoadInfo, elfldltl::MappedVmoFile>;
   using Loader = elfldltl::AlignedRemoteVmarLoader;
 
-  // Information from decoding the main executable, specifically.
-  struct ExecInfo {
-    size_type relative_entry = 0;         // The file-relative entry point address.
-    std::optional<size_type> stack_size;  // Requested initial stack size.
-  };
-
-  // The decode result of a single module, whether it's an executable or dependency.
   struct DecodeResult {
     std::vector<Soname> needed;  // Names of each DT_NEEDED entry for the module.
-    // This information is only relavent for the main executable, and is copied
-    // into the DecodeModulesResult that is returned to the caller.
-    ExecInfo exec_info;
-  };
 
-  // The result returned to the caller after all modules have been decoded.
-  struct DecodeModulesResult {
-    List modules;        // The list of all decoded modules.
-    ExecInfo main_exec;  // Decoded information for the main exectuable.
+    // These are only of interest for the main executable.
+    size_type relative_entry = 0;         // The file-relative entry point address.
+    std::optional<size_type> stack_size;  // Requested initial stack size.
   };
 
   RemoteLoadModule() = delete;
@@ -114,12 +102,6 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
       module().build_id = build_id->desc;
     }
 
-    // Fix up segments to be compatible with AlignedRemoteVmarLoader.
-    if (!elfldltl::SegmentWithVmo::AlignSegments(diag, load_info(), vmo_.borrow(),
-                                                 Loader::page_size())) {
-      return std::nullopt;
-    }
-
     auto memory = metadata_memory();
     SetModulePhdrs(module(), ehdr, load_info(), memory);
 
@@ -130,14 +112,32 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
 
     return DecodeResult{
         .needed = std::move(*needed),
-        .exec_info =
-            {
-                .relative_entry = ehdr.entry,
-                .stack_size = stack_size,
-            },
+        .relative_entry = ehdr.entry,
+        .stack_size = stack_size,
     };
   }
 
+  template <class Diagnostics, typename GetDepVmo>
+  static List LinkModules(Diagnostics& diag, std::unique_ptr<RemoteLoadModule> main_executable,
+                          std::vector<Soname> executable_needed, GetDepVmo&& get_dep_vmo) {
+    main_executable->module().symbols_visible = true;
+
+    List modules;
+    modules.push_back(std::move(main_executable));
+
+    if (!DecodeDeps(diag, modules, executable_needed, std::forward<GetDepVmo>(get_dep_vmo)))
+        [[unlikely]] {
+      diag.FormatError("remote dynamic linking failed with ", diag.errors(), " errors and ",
+                       diag.warnings(), " warnings");
+      return {};
+    }
+
+    // TODO(fxbug.dev/134320): Populate ABI.
+
+    return modules;
+  }
+
+ private:
   // Decode dynamic sections and store the metadata collected from observers.
   // A vector of each DT_NEEDED entry string name is returned.
   template <class Diagnostics>
@@ -181,102 +181,6 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     return needed_names;
   }
 
-  // Decode the main executable VMO and all its dependencies. The `get_dep_vmo`
-  // callback is used to retrieve the VMO for each DT_NEEDED entry; it takes a
-  // `string_view` and should return a `zx::vmo`.
-  template <class Diagnostics, typename GetDepVmo>
-  static std::optional<DecodeModulesResult> DecodeModules(Diagnostics& diag,
-                                                          zx::vmo main_executable_vmo,
-                                                          GetDepVmo&& get_dep_vmo) {
-    // Decode the main executable first and save its decoded information to
-    // include in the result returned to the caller.
-    auto exec = std::make_unique<RemoteLoadModule>(abi::Abi<>::kExecutableName);
-    auto exec_decode_result = exec->Decode(diag, std::move(main_executable_vmo));
-    if (!exec_decode_result) [[unlikely]] {
-      return std::nullopt;
-    }
-
-    // The main executable will always be the first entry of the modules list.
-    List modules;
-    modules.push_back(std::move(exec));
-
-    auto decode_deps_result =
-        DecodeDeps(diag, modules, exec_decode_result->needed, std::forward<GetDepVmo>(get_dep_vmo));
-    if (!decode_deps_result) [[unlikely]] {
-      return std::nullopt;
-    }
-
-    return DecodeModulesResult{
-        .modules = std::move(modules),
-        .main_exec = exec_decode_result->exec_info,
-    };
-  }
-
-  // Initialize the the loader and allocate the address region for the module,
-  // updating the module's runtime addr fields on success.
-  template <class Diagnostics>
-  bool Allocate(Diagnostics& diag, const zx::vmar& vmar) {
-    loader_ = Loader{vmar};
-    if (!loader_.Allocate(diag, load_info())) {
-      return false;
-    }
-    SetModuleVaddrBounds(module(), load_info(), loader_.load_bias());
-    return true;
-  }
-
-  template <class Diagnostics>
-  static bool AllocateModules(Diagnostics& diag, List& modules, zx::unowned_vmar vmar) {
-    auto allocate = [&diag, &vmar](auto& module) { return module.Allocate(diag, *vmar); };
-    return OnModules(modules, allocate);
-  }
-
-  template <class Diagnostics>
-  bool Relocate(Diagnostics& diag, const List& modules) {
-    auto mutable_memory = elfldltl::LoadInfoMutableMemory{
-        diag, load_info(), elfldltl::SegmentWithVmo::GetMutableMemory<LoadInfo>{vmo_.borrow()}};
-    if (!mutable_memory.Init()) {
-      return false;
-    }
-    if (!elfldltl::RelocateRelative(diag, mutable_memory, reloc_info(), load_bias())) {
-      return false;
-    }
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag);
-    return elfldltl::RelocateSymbolic(mutable_memory, diag, reloc_info(), symbol_info(),
-                                      load_bias(), resolver);
-  }
-
-  template <class Diagnostics>
-  static bool RelocateModules(Diagnostics& diag, List& modules) {
-    auto relocate = [&](auto& module) { return module.Relocate(diag, modules); };
-    return OnModules(modules, relocate);
-  }
-
-  // Load the module into its allocated vaddr region.
-  template <class Diagnostics>
-  bool Load(Diagnostics& diag) {
-    return loader_.Load(diag, load_info(), vmo_.borrow());
-  }
-
-  template <class Diagnostics>
-  static bool LoadModules(Diagnostics& diag, List& modules) {
-    auto load = [&diag](auto& module) { return module.Load(diag); };
-    return OnModules(modules, load);
-  }
-
-  // This must be the last method called with the loader. Direct the loader to
-  // preserve the load image before it is garbage collected.
-  void Commit() { std::move(loader_).Commit(); }
-
-  static void CommitModules(List& modules) {
-    std::for_each(modules.begin(), modules.end(), [](auto& module) { module.Commit(); });
-  }
-
- private:
-  template <typename T>
-  static bool OnModules(List& modules, T&& callback) {
-    return std::all_of(modules.begin(), modules.end(), std::forward<T>(callback));
-  }
-
   static void EnqueueDeps(List& modules, const std::vector<Soname>& needed) {
     for (auto soname : needed) {
       if (std::find(modules.begin(), modules.end(), soname) == modules.end()) {
@@ -285,8 +189,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     }
   }
 
-  // Decode every dependency module, enqueing new dependencies to the modules
-  // list to be decoded as well.
+  // `get_dep_vmo` takes a `string_view` and should return a `zx::vmo`.
   template <class Diagnostics, typename GetDepVmo>
   static bool DecodeDeps(Diagnostics& diag, List& modules, std::vector<Soname>& needed,
                          GetDepVmo&& get_dep_vmo) {
@@ -297,7 +200,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     for (auto it = modules.begin(); it != modules.end(); it++) {
       if (it->HasModule()) {
         // Only the main executable should already be decoded before this loop
-        // reaches it. Assert here and proceed to EnqueueDeps.
+        // reaches it.
         assert(it == modules.begin());
       } else {
         auto vmo = get_dep_vmo(it->name());
@@ -317,6 +220,8 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
       }
 
       it->EnqueueDeps(modules, needed);
+
+      // TODO(fxbug.dev/134320): Add to Passive ABI.
     }
     return true;
   }
@@ -337,7 +242,6 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     return true;
   }
 
-  Loader loader_;
   elfldltl::MappedVmoFile mapped_vmo_;
   zx::vmo vmo_;
 };
