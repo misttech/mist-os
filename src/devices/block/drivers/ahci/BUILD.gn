@@ -36,6 +36,11 @@ fuchsia_driver_component("ahci") {
   manifest = "meta/ahci.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ahci"
+  driver_components = [ ":ahci" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

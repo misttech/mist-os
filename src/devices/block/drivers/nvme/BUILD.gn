@@ -62,6 +62,11 @@ fuchsia_driver_component("nvme") {
   manifest = "meta/nvme.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "nvme"
+  driver_components = [ ":nvme" ]
+}
+
 test("nvme-queue-tests-bin") {
   sources = [
     "queue-test.cc",

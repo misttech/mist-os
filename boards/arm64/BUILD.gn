@@ -17,7 +17,10 @@ board_configuration("arm64") {
 
   provided_features = []
 
-  input_bundles = [ ":main_bundle" ]
+  input_bundles = [
+    ":main_bundle",
+    "//boards/emulation/virtio",
+  ]
 
   filesystems = {
     vbmeta = {
@@ -39,4 +42,46 @@ board_configuration("arm64") {
 
 board_input_bundle("main_bundle") {
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
+
+  drivers = [
+    {
+      package_target = "//src/devices/block/drivers/nvme:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/nvme.cm" ]
+    },
+    {
+      package_target = "//src/devices/bus/drivers/pci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/xhci.cm" ]
+    },
+  ]
+
+  # Additional drivers to support running as a virtualization guest.
+  drivers += [
+    {
+      package_target = "//src/devices/block/drivers/ahci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/ahci.cm" ]
+    },
+    {
+      package_target = "//src/devices/board/drivers/acpi-arm64:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/acpi-arm64.cm" ]
+    },
+    {
+      package_target = "//src/devices/board/drivers/qemu-arm64:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/qemu-arm64.cm" ]
+    },
+    {
+      package_target = "//src/devices/rtc/drivers/pl031-rtc:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/pl031-rtc.cm" ]
+    },
+  ]
 }

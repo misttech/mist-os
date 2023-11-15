@@ -11,7 +11,10 @@ board_configuration("qemu-arm64") {
 
   provided_features = [ "fuchsia::driver_framework_v2_support" ]
 
-  input_bundles = [ "//boards/arm64:main_bundle" ]
+  input_bundles = [
+    "//boards/arm64:main_bundle",
+    "//boards/emulation/virtio",
+  ]
 
   filesystems = {
     fvm = {

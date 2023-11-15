@@ -13,10 +13,6 @@ max_blob_contents_size =
     5216665600  # 4975 MiB. Leaves 50 MiB for the update package.
 
 _bootfs_deps = [
-  # Drivers
-  "//src/devices/bus/drivers/pci:bus-pci",
-  "//src/devices/usb/drivers/xhci",
-
   # Configs
   "//src/power/power-manager:base_config",
 ]

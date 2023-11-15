@@ -4,29 +4,11 @@
 
 import("common/arm64-common.gni")
 
-_imports = {  # Import into hidden scope, to avoid importing into args.gn.
-  import("//boards/emulation/virtio_drivers.gni")
-}
-
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/qemu-arm64"
 
 board_name = "qemu-arm64"
 add_qemu_to_build_archives = true
-
-_bootfs_deps = [ "//src/devices/block/drivers/nvme" ]
-
-# Additional drivers to support running as a virtualization guest.
-_bootfs_deps += _imports.virtio_drivers + [
-                  "//src/devices/block/drivers/ahci",
-                  "//src/devices/board/drivers/acpi-arm64",
-                  "//src/devices/board/drivers/qemu-arm64",
-                  "//src/devices/rtc/drivers/pl031-rtc",
-                ]
-
-board_bootfs_labels += _bootfs_deps
-board_recovery_bootfs_labels += _bootfs_deps
-board_zedboot_bootfs_labels += _bootfs_deps
 
 # Supports only virtual devices.
 board_is_emu = true
