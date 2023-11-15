@@ -6,6 +6,7 @@ group("tests") {
   testonly = true
 
   deps = [
+    "async-helpers/cpp:tests",
     "compat:tests",
     "component/cpp:tests",
     "devfs:tests",
