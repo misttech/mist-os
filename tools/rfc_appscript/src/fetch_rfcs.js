@@ -137,7 +137,9 @@ function syncRow(tableId, rowId) {
   };
 
   if (cl.work_in_progress) {
-    patchedValues[STATUS_COL] = WIP_STATUS;
+    if (!row.values[STATUS_COL]) {
+      patchedValues[STATUS_COL] = WIP_STATUS;
+    }
   } else {
     if (!row.values[STATUS_COL] || row.values[STATUS_COL] === WIP_STATUS) {
       patchedValues[STATUS_COL] = DEFAULT_STATUS;
