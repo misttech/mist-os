@@ -4,8 +4,7 @@
 
 use {
     anyhow::{anyhow, Context, Error},
-    fidl_fuchsia_io::DirectoryProxy,
-    fidl_fuchsia_io::OpenFlags,
+    fidl_fuchsia_io::{DirectoryProxy, NodeAttributes, OpenFlags},
     fuchsia_fs::directory::{open_directory, open_file, readdir, DirentKind},
     fuchsia_inspect, fuchsia_zircon as zx,
     futures::{future::BoxFuture, FutureExt, TryFutureExt},
@@ -39,7 +38,7 @@ pub async fn register_stats(root: &fuchsia_inspect::Node, data_dir: DirectoryPro
 
             // Tree size stats
             let tree_size_node = root.create_child("data");
-            let _total_size = record_tree_size(&tree_size_node, data_dir).await?;
+            record_tree_size(tree_size_node.clone_weak(), data_dir).await?;
             root.record(tree_size_node);
 
             Ok(inspector)
@@ -78,23 +77,26 @@ async fn record_filesystem_info(
 }
 
 /// Records metrics for the size of each file/directory in the data filesystem's directory hierarchy
-fn record_tree_size<'a>(
-    node: &'a fuchsia_inspect::Node,
+fn record_tree_size(
+    node: fuchsia_inspect::Node,
     dir_proxy: DirectoryProxy,
-) -> BoxFuture<'a, Result<u64, Error>> {
+) -> BoxFuture<'static, Result<TreeSize, Error>> {
     async move {
-        let mut total_size = 0;
+        let mut total: TreeSize = Default::default();
         for dir_entry in readdir(&dir_proxy).await?.iter() {
             match dir_entry.kind {
                 DirentKind::File => {
                     let child = node.create_child(&dir_entry.name);
                     let file_proxy =
                         open_file(&dir_proxy, &dir_entry.name, OpenFlags::RIGHT_READABLE).await?;
-                    let (status, attrs) = file_proxy.get_attr().await?;
-                    zx::Status::ok(status)?;
-                    child.record_uint("size", attrs.content_size);
-                    total_size += attrs.content_size as u64;
+                    let attrs = file_proxy
+                        .get_attr()
+                        .await
+                        .map(|(status, attrs)| zx::Status::ok(status).map(|_| attrs))??;
+                    let size: TreeSize = attrs.into();
+                    size.record(&child);
                     node.record(child);
+                    total += size;
                 }
                 DirentKind::Directory => {
                     let child = node.create_child(&dir_entry.name);
@@ -102,15 +104,46 @@ fn record_tree_size<'a>(
                         open_directory(&dir_proxy, &dir_entry.name, OpenFlags::RIGHT_READABLE)
                             .await
                             .context("open_directory failed")?;
-                    let size = record_tree_size(&child, directory_proxy).await?;
-                    total_size += size as u64;
+                    let size = record_tree_size(child.clone_weak(), directory_proxy).await?;
+                    total += size;
                     node.record(child);
                 }
                 _ => continue,
             }
         }
-        node.record_uint("size", total_size);
-        Ok(total_size)
+        total.record(&node);
+        Ok(total)
     }
     .boxed()
+}
+
+#[derive(Default)]
+struct TreeSize {
+    content_size: u64,
+    storage_size: u64,
+}
+
+impl TreeSize {
+    // NOTE: Use caution when changing the names of these Inspect properties, there may be out of
+    // tree users depending on these values.
+    const CONTENT_SIZE_PROP_NAME: &'static str = "size";
+    const STORAGE_SIZE_PROP_NAME: &'static str = "storage_size";
+
+    fn record(&self, node: &fuchsia_inspect::Node) {
+        node.record_uint(Self::CONTENT_SIZE_PROP_NAME, self.content_size);
+        node.record_uint(Self::STORAGE_SIZE_PROP_NAME, self.storage_size);
+    }
+}
+
+impl From<NodeAttributes> for TreeSize {
+    fn from(value: NodeAttributes) -> Self {
+        Self { content_size: value.content_size, storage_size: value.storage_size }
+    }
+}
+
+impl std::ops::AddAssign for TreeSize {
+    fn add_assign(&mut self, rhs: Self) {
+        self.content_size += rhs.content_size;
+        self.storage_size += rhs.storage_size;
+    }
 }
