@@ -320,8 +320,8 @@ pub enum TelemetryEvent {
     },
     /// Notify telemetry of the result of a create iface request.
     IfaceCreationResult(Result<(), ()>),
-    /// Notify the telemtry event loop that a PHY has failed to destroy an interface.
-    IfaceDestructionFailure,
+    /// Notify telemetry of the result of destroying an interface.
+    IfaceDestructionResult(Result<(), ()>),
     /// Notify telemetry of the result of a StartAp request.
     StartApResult(Result<(), ()>),
     /// Record scan fulfillment time
@@ -1391,8 +1391,8 @@ impl Telemetry {
             TelemetryEvent::IfaceCreationResult(result) => {
                 self.stats_logger.log_iface_creation_result(result).await;
             }
-            TelemetryEvent::IfaceDestructionFailure => {
-                self.stats_logger.log_iface_destruction_failure().await;
+            TelemetryEvent::IfaceDestructionResult(result) => {
+                self.stats_logger.log_iface_destruction_result(result).await;
             }
             TelemetryEvent::StartApResult(result) => {
                 self.stats_logger.log_ap_start_result(result).await;
@@ -3019,14 +3019,23 @@ impl StatsLogger {
         }
     }
 
-    async fn log_iface_destruction_failure(&mut self) {
-        log_cobalt_1dot1!(
-            self.cobalt_1dot1_proxy,
-            log_occurrence,
-            metrics::INTERFACE_DESTRUCTION_FAILURE_METRIC_ID,
-            1,
-            &[]
-        )
+    async fn log_iface_destruction_result(&mut self, result: Result<(), ()>) {
+        if result.is_err() {
+            log_cobalt_1dot1!(
+                self.cobalt_1dot1_proxy,
+                log_occurrence,
+                metrics::INTERFACE_DESTRUCTION_FAILURE_METRIC_ID,
+                1,
+                &[]
+            )
+        }
+
+        if let Some(reason) = self.recovery_record.destroy_iface_failure.take() {
+            match result {
+                Ok(()) => self.log_post_recovery_result(reason, RecoveryOutcome::Success).await,
+                Err(()) => self.log_post_recovery_result(reason, RecoveryOutcome::Failure).await,
+            }
+        }
     }
 
     async fn log_scan_issues(&mut self, issues: Vec<ScanIssue>) {
@@ -7455,7 +7464,7 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         // Send a notification that interface creation has failed.
-        test_helper.telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
+        test_helper.telemetry_sender.send(TelemetryEvent::IfaceDestructionResult(Err(())));
 
         // Run the telemetry loop until it stalls.
         assert_variant!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
@@ -8281,6 +8290,43 @@ mod tests {
     )]
     #[fuchsia::test(add_test_attr = false)]
     fn test_post_recovery_create_iface(
+        recovery_event: TelemetryEvent,
+        post_recovery_event: TelemetryEvent,
+        duplicate_check_event: TelemetryEvent,
+        expected_metric_id: u32,
+        dimensions: Vec<u32>,
+    ) {
+        test_generic_post_recovery_event(
+            recovery_event,
+            post_recovery_event,
+            duplicate_check_event,
+            expected_metric_id,
+            dimensions,
+        );
+    }
+
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::DestroyIfaceFailure(PhyRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::IfaceDestructionResult(Err(())),
+        TelemetryEvent::IfaceDestructionResult(Err(())),
+        metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Failure as u32] ;
+        "destroy iface does not work after recovery"
+    )]
+    #[test_case(
+        TelemetryEvent::RecoveryEvent {
+            reason: RecoveryReason::DestroyIfaceFailure(PhyRecoveryMechanism::PhyReset)
+        },
+        TelemetryEvent::IfaceDestructionResult(Ok(())),
+        TelemetryEvent::IfaceDestructionResult(Ok(())),
+        metrics::INTERFACE_DESTRUCTION_RECOVERY_OUTCOME_METRIC_ID,
+        vec![RecoveryOutcome::Success as u32] ;
+        "destroy iface works after recovery"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_post_recovery_destroy_iface(
         recovery_event: TelemetryEvent,
         post_recovery_event: TelemetryEvent,
         duplicate_check_event: TelemetryEvent,

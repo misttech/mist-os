@@ -774,23 +774,29 @@ async fn destroy_iface(
     telemetry_sender: &TelemetrySender,
 ) -> Result<(), PhyManagerError> {
     let request = fidl_service::DestroyIfaceRequest { iface_id };
-    match proxy.destroy_iface(&request).await {
+    let (destroy_iface_response, metric) = match proxy.destroy_iface(&request).await {
         Ok(status) => match status {
-            fuchsia_zircon::sys::ZX_OK => Ok(()),
+            fuchsia_zircon::sys::ZX_OK => (Ok(()), Some(Ok(()))),
             ref e => {
-                if *e != fuchsia_zircon::sys::ZX_ERR_NOT_FOUND {
-                    telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
-                }
+                let metric = match *e {
+                    fuchsia_zircon::sys::ZX_ERR_NOT_FOUND => None,
+                    _ => Some(Err(())),
+                };
                 warn!("failed to destroy iface {}: {}", iface_id, e);
-                Err(PhyManagerError::IfaceDestroyFailure)
+                (Err(PhyManagerError::IfaceDestroyFailure), metric)
             }
         },
         Err(e) => {
             warn!("failed to send destroy iface {}: {}", iface_id, e);
-            telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
-            Err(PhyManagerError::IfaceDestroyFailure)
+            (Err(PhyManagerError::IfaceDestroyFailure), Some(Err(())))
         }
+    };
+
+    if let Some(metric) = metric {
+        telemetry_sender.send(TelemetryEvent::IfaceDestructionResult(metric));
     }
+
+    destroy_iface_response
 }
 
 async fn query_security_support(
@@ -3681,7 +3687,10 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // Verify that there is nothing waiting on the telemetry receiver.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_))
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceDestructionResult(Ok(()))))
+        )
     }
 
     #[fuchsia::test]
@@ -3737,7 +3746,7 @@ mod tests {
         // Verify that a metric has been logged.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
+            Ok(Some(TelemetryEvent::IfaceDestructionResult(Err(()))))
         )
     }
 
@@ -3761,7 +3770,7 @@ mod tests {
         // Verify that a metric has been logged.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
+            Ok(Some(TelemetryEvent::IfaceDestructionResult(Err(()))))
         )
     }
 
