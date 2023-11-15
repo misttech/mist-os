@@ -10,7 +10,6 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
     types,
-    types::device_type::DeviceType,
     types::errno::Errno,
     types::{uapi, OpenFlags},
 };
@@ -20,7 +19,7 @@ use std::sync::Arc;
 
 pub fn create_uinput_device(
     _current_task: &CurrentTask,
-    _id: DeviceType,
+    _id: types::DeviceType,
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {

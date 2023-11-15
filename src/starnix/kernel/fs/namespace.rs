@@ -29,9 +29,9 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
     time::utc,
     types::{
-        device_type::DeviceType,
         errno::{errno, error, Errno},
-        Access, ArcKey, FileMode, MountFlags, OpenFlags, PtrKey, WeakKey, WeakRef, NAME_MAX,
+        Access, ArcKey, DeviceType, FileMode, MountFlags, OpenFlags, PtrKey, WeakKey, WeakRef,
+        NAME_MAX,
     },
 };
 use fidl_fuchsia_io as fio;

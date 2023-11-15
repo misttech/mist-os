@@ -14,11 +14,10 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     types::{
-        device_type::DeviceType,
         errno::{errno, errno_from_code, error, Errno, ErrnoCode, EAGAIN, EINTR},
         pid_t, uapi,
         user_address::{UserAddress, UserCString, UserRef},
-        OpenFlags, PATH_MAX,
+        DeviceType, OpenFlags, PATH_MAX,
     },
 };
 use anyhow::{Context, Error};

@@ -28,6 +28,10 @@ pub mod user_buffer;
 pub(crate) use union::struct_with_union_into_bytes;
 
 pub use arc_key::{ArcKey, PtrKey, WeakKey};
+pub use device_type::{
+    DeviceType, DYN_MAJOR, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, LOOP_MAJOR, TOUCH_INPUT_MINOR,
+    TTY_ALT_MAJOR,
+};
 pub(crate) use file_mode::mode;
 pub use file_mode::{Access, FileMode};
 pub use mount_flags::MountFlags;

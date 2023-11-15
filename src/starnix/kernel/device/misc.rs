@@ -9,7 +9,7 @@ use crate::{
     },
     fs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
     task::Kernel,
-    types::device_type::DeviceType,
+    types::DeviceType,
 };
 
 use std::sync::Arc;

@@ -11,9 +11,8 @@ use crate::{
     mm::ProtectionFlags,
     task::CurrentTask,
     types::{
-        device_type::DeviceType,
         errno::{errno, error, Errno},
-        ino_t, off_t, FileMode, OpenFlags, TempRef, WeakRef,
+        ino_t, off_t, DeviceType, FileMode, OpenFlags, TempRef, WeakRef,
     },
 };
 use async_trait::async_trait;

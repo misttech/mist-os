@@ -27,9 +27,9 @@ use crate::{
     types::time::{duration_from_poll_timeout, duration_from_timeval, timeval_from_duration},
     types::user_address::{UserAddress, UserCString, UserRef},
     types::{
-        device_type::DeviceType, FileMode, OpenFlags, __kernel_time_t, clone_args, gid_t,
-        itimerval, pid_t, pollfd, uapi, uid_t, ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR,
-        AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL, ITIMER_REAL,
+        DeviceType, FileMode, OpenFlags, __kernel_time_t, clone_args, gid_t, itimerval, pid_t,
+        pollfd, uapi, uid_t, ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW,
+        CLONE_VFORK, CLONE_VM, CSIGNAL, ITIMER_REAL,
     },
 };
 

@@ -1422,7 +1422,7 @@ mod tests {
             MountInfo,
         },
         testing::*,
-        types::{device_type::DeviceType, FileMode, OpenFlags},
+        types::{DeviceType, FileMode, OpenFlags},
     };
     use std::sync::{
         atomic::{AtomicBool, Ordering},

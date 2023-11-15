@@ -15,9 +15,8 @@ use crate::{
     logging::not_implemented,
     task::CurrentTask,
     types::{
-        device_type::DeviceType,
         errno::{error, Errno},
-        mode, OpenFlags,
+        mode, DeviceType, OpenFlags,
     },
 };
 

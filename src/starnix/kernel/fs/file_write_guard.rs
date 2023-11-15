@@ -179,7 +179,7 @@ mod tests {
     use crate::{
         fs::FsNode,
         testing::*,
-        types::{device_type::DeviceType, FileMode},
+        types::{DeviceType, FileMode},
     };
 
     fn create_fs_node() -> Arc<FsNode> {

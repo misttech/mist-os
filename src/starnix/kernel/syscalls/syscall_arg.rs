@@ -6,7 +6,7 @@ use crate::{
     fs::{FdNumber, WdNumber},
     types::signals::UncheckedSignal,
     types::user_address::{UserAddress, UserCString, UserRef},
-    types::{device_type::DeviceType, FileMode},
+    types::{DeviceType, FileMode},
 };
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

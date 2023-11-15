@@ -39,11 +39,10 @@ use crate::{
         bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
         bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_map_info, bpf_map_type,
         bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
-        device_type::DeviceType,
         errno::{errno, error, Errno},
         mode, statfs,
         user_address::{UserAddress, UserCString},
-        FileMode, OpenFlags, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
+        DeviceType, FileMode, OpenFlags, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
     },
 };
 

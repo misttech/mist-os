@@ -157,7 +157,7 @@ use crate::{
     types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
-    types::{device_type::DeviceType, OpenFlags},
+    types::{DeviceType, OpenFlags},
 };
 
 #[derive(Clone)]

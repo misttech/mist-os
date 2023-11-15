@@ -17,13 +17,12 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
     types::{
-        device_type::DeviceType,
         errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
         off_t,
         ownership::ReleasableByRef,
         statfs,
         time::time_from_timespec,
-        uapi, Access, FileMode, OpenFlags, FUSE_SUPER_MAGIC,
+        uapi, Access, DeviceType, FileMode, OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
 use bstr::B;

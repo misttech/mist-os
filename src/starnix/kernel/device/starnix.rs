@@ -7,7 +7,7 @@ use crate::{
     fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
     task::{CurrentTask, Kernel},
     types::errno::Errno,
-    types::{device_type::DeviceType, OpenFlags},
+    types::{DeviceType, OpenFlags},
 };
 
 use std::sync::Arc;

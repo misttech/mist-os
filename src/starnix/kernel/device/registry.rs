@@ -13,10 +13,7 @@ use crate::{
     logging::log_error,
     task::CurrentTask,
     types::errno::{errno, error, Errno},
-    types::{
-        device_type::{DeviceType, DYN_MAJOR},
-        OpenFlags,
-    },
+    types::{DeviceType, OpenFlags, DYN_MAJOR},
 };
 
 use starnix_lock::{Mutex, RwLock};
