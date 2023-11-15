@@ -102,16 +102,6 @@ source_set("sysconfig") {
 }
 
 # Board specific paver implementations.
-source_set("as370") {
-  sources = [ "as370.cc" ]
-  deps = [
-    ":paver-core",
-    ":skip-block",
-    "//src/lib/uuid",
-    "//src/storage/gpt",
-  ]
-}
-
 source_set("astro") {
   sources = [ "astro.cc" ]
   deps = [
@@ -165,24 +155,6 @@ source_set("luis") {
   ]
 }
 
-source_set("pinecrest-abr") {
-  sources = [ "pinecrest_abr_avbab_conversion.c" ]
-  deps = [ "//src/firmware/lib/abr" ]
-}
-
-source_set("pinecrest") {
-  sources = [ "pinecrest.cc" ]
-  deps = [
-    ":gpt",
-    ":paver-core",
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
-    "//src/devices/lib/amlogic",
-    "//src/lib/uuid",
-    "//src/storage/gpt",
-  ]
-  public_deps = [ ":pinecrest-abr" ]
-}
-
 source_set("vim3") {
   sources = [ "vim3.cc" ]
   deps = [
@@ -211,12 +183,10 @@ zx_library("paver") {
   sdk_headers = [ "lib/paver/provider.h" ]
   sources = [ "provider.cc" ]
   deps = [
-    ":as370",
     ":astro",
     ":luis",
     ":nelson",
     ":paver-core",
-    ":pinecrest",
     ":sherlock",
     ":vim3",
     ":x64",

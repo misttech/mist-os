@@ -11,8 +11,6 @@
 
 #include <fbl/auto_lock.h>
 
-#include "src/storage/lib/paver/pinecrest_abr_avbab_conversion.h"
-
 // CRC32 implementation required for libabr.
 extern "C" uint32_t AbrCrc32(const void* buf, size_t buf_size) {
   return crc32(0UL, reinterpret_cast<const uint8_t*>(buf), buf_size);

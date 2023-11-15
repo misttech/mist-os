@@ -44,8 +44,6 @@
 #include "src/storage/lib/paver/fvm.h"
 #include "src/storage/lib/paver/gpt.h"
 #include "src/storage/lib/paver/paver.h"
-#include "src/storage/lib/paver/pinecrest.h"
-#include "src/storage/lib/paver/pinecrest_abr_avbab_conversion.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 #include "src/storage/lib/paver/utils.h"
 #include "src/storage/lib/utils/topological_path.h"
@@ -2374,91 +2372,6 @@ TEST_F(PaverServiceLuisTest, OneShotRecovery) {
   AbrData disk_abr_data;
   memcpy(&disk_abr_data, block_read_vmo_mapper.start(), sizeof(disk_abr_data));
   ASSERT_TRUE(AbrIsOneShotRecoveryBoot(&disk_abr_data));
-}
-
-class PaverServicePinecrestTest : public PaverServiceGptDeviceTest {
- public:
-  static constexpr size_t kDurableBootStart = 0x10400;
-  static constexpr size_t kDurableBootSize = 0x10000;
-
-  PaverServicePinecrestTest() {
-    ASSERT_NO_FATAL_FAILURE(InitializeGptDevice("pinecrest", 0x748034, 512));
-  }
-
-  void InitializePinecrestGPTPartitions() {
-    constexpr uint8_t kAbrMetaType[GPT_GUID_LEN] = GUID_ABR_META_VALUE;
-    const std::vector<PartitionDescription> kStartingPartitions = {
-        {GUID_ABR_META_NAME, kAbrMetaType, kDurableBootStart, kDurableBootSize},
-    };
-    ASSERT_NO_FATAL_FAILURE(InitializeStartingGPTPartitions(kStartingPartitions));
-  }
-};
-
-TEST_F(PaverServicePinecrestTest, PinecrestAbrClientCreateFailsOnMissingFirmwareSlotArg) {
-  ASSERT_NO_FATAL_FAILURE(InitializePinecrestGPTPartitions());
-  // Required by FindBootManager().
-  fake_svc_.fake_boot_args().SetArgResponse("_a");
-  std::shared_ptr<paver::Context> context;
-  fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-  auto res =
-      paver::PinecrestAbrClientFactory().New(devmgr_.devfs_root().duplicate(), svc_root, context);
-  ASSERT_TRUE(res.is_error());
-}
-
-TEST_F(PaverServicePinecrestTest, PinecrestAbrClientEndToEnd) {
-  ASSERT_NO_FATAL_FAILURE(InitializePinecrestGPTPartitions());
-
-  zx::result endpoints = fidl::CreateEndpoints<fuchsia_paver::BootManager>();
-  ASSERT_OK(endpoints.status_value());
-  auto& [local, remote] = endpoints.value();
-
-  // Required by FindBootManager().
-  fake_svc_.fake_boot_args().SetArgResponse("_a");
-  fake_svc_.fake_boot_args().AddStringArgs("zvb.firmware_slot", "_a");
-
-  auto result = client_->FindBootManager(std::move(remote));
-  ASSERT_OK(result.status());
-  auto boot_manager = fidl::WireSyncClient(std::move(local));
-
-  {
-    auto result = boot_manager->SetConfigurationUnbootable(fuchsia_paver::wire::Configuration::kA);
-    ASSERT_OK(result.status());
-    ASSERT_OK(result.value().status);
-  }
-
-  {
-    auto result = boot_manager->SetConfigurationUnbootable(fuchsia_paver::wire::Configuration::kB);
-    ASSERT_OK(result.status());
-    ASSERT_OK(result.value().status);
-  }
-
-  // Create a block partition client to read the abr content from block directly.
-  zx::result block_client =
-      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
-  ASSERT_OK(block_client);
-
-  // Read the abr data directly from block and verify.
-  zx::vmo block_read_vmo;
-  fzl::VmoMapper block_read_vmo_mapper;
-  ASSERT_OK(block_read_vmo_mapper.CreateAndMap(kDurableBootSize * kBlockSize, ZX_VM_PERM_READ,
-                                               nullptr, &block_read_vmo));
-  ASSERT_OK(block_client->Read(block_read_vmo, kDurableBootSize, kDurableBootStart, 0));
-
-  AbrData disk_abr_data;
-  memcpy(&disk_abr_data, block_read_vmo_mapper.start(), sizeof(disk_abr_data));
-
-  // Check Crc32 is little endian
-  ASSERT_EQ(AbrCrc32(&disk_abr_data, sizeof(disk_abr_data) - sizeof(uint32_t)),
-            disk_abr_data.crc32);
-
-  // Check that ab slot unbootable flag is set
-  ASSERT_EQ(abr_get_reserve2_ab_slot_unbootable(&disk_abr_data), 1);
-
-  // Active configuration should be R
-  auto query_result = boot_manager->QueryActiveConfiguration();
-  ASSERT_OK(query_result.status());
-  // QueryActiveConfiguration returns failure on R slot.
-  ASSERT_TRUE(query_result->is_error());
 }
 
 }  // namespace
