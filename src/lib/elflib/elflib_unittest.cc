@@ -221,7 +221,7 @@ TEST(ElfLib, GetSymbolValue) {
   auto data = elf->GetSymbol("zx_frob_handle");
   ASSERT_TRUE(data);
   Elf64_Sym aligned_data;
-  memcpy(&aligned_data, data, sizeof(aligned_data));
+  memcpy(&aligned_data, reinterpret_cast<const std::byte*>(data), sizeof(aligned_data));
   EXPECT_EQ(kSymbolPoison, aligned_data.st_value);
 }
 
