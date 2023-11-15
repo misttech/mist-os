@@ -1,0 +1,3 @@
+fuchsia.power.squareload_cpu: MaxPower
+fuchsia.power.squareload_cpu: MeanPower
+fuchsia.power.squareload_cpu: MinPower
