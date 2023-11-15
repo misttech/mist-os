@@ -11,10 +11,8 @@ use crate::{
         VecDirectory, VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::{
-        errno::{error, Errno},
-        mode, OpenFlags,
-    },
+    types::errno::{error, Errno},
+    types::{mode, OpenFlags},
 };
 
 use std::sync::Weak;
@@ -60,12 +58,11 @@ impl FsNodeOps for ClassCollectionDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match self.kobject().get_child(name) {
             Some(child_kobject) => Ok(node.fs().create_node(
-                current_task,
                 child_kobject.ops(),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o777), FsCred::root()),
             )),

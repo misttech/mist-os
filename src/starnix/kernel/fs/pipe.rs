@@ -21,11 +21,9 @@ use crate::{
         F_SETPIPE_SZ, PIPEFS_MAGIC, SUCCESS,
     },
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        errno::{errno, error, Errno},
-        signals::SIGPIPE,
-        user_address::{UserAddress, UserRef},
-    },
+    types::errno::{errno, error, Errno},
+    types::signals::SIGPIPE,
+    types::user_address::{UserAddress, UserRef},
 };
 
 const ATOMIC_IO_BYTES: u16 = 4096;
@@ -261,7 +259,7 @@ impl Pipe {
 /// sys_pipe2().
 pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), Errno> {
     let fs = pipe_fs(current_task.kernel());
-    let node = fs.create_node(current_task, SpecialNode, |id| {
+    let node = fs.create_node(SpecialNode, |id| {
         let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
         info.blksize = ATOMIC_IO_BYTES.into();
         info

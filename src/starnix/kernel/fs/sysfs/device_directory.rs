@@ -14,10 +14,8 @@ use crate::{
     },
     logging::not_implemented,
     task::CurrentTask,
-    types::{
-        errno::{error, Errno},
-        mode, DeviceType, OpenFlags,
-    },
+    types::errno::{error, Errno},
+    types::{mode, DeviceType, OpenFlags},
 };
 
 use std::sync::{Arc, Weak};
@@ -76,12 +74,11 @@ impl FsNodeOps for DeviceDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         match name {
             b"dev" => Ok(node.fs().create_node(
-                current_task,
                 BytesFile::new_node(
                     format!("{}:{}\n", self.device_type()?.major(), self.device_type()?.minor())
                         .into_bytes(),
@@ -89,7 +86,6 @@ impl FsNodeOps for DeviceDirectory {
                 FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"uevent" => Ok(node.fs().create_node(
-                current_task,
                 UEventFsNode::new(self.kobject()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             )),
@@ -141,7 +137,6 @@ impl FsNodeOps for BlockDeviceDirectory {
     ) -> Result<Arc<FsNode>, Errno> {
         match name {
             b"queue" => Ok(node.fs().create_node(
-                current_task,
                 BlockDeviceQueueDirectory::new(self.kobject()),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),
@@ -177,12 +172,11 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<Arc<FsNode>, Errno> {
         match name {
             b"read_ahead_kb" => Ok(node.fs().create_node(
-                current_task,
                 ReadAheadKbNode,
                 FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
             )),

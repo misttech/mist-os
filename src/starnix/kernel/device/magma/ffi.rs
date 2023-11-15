@@ -56,12 +56,10 @@ use crate::{
     fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
-    types::{
-        errno::{errno, Errno},
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        FileMode, OpenFlags,
-    },
+    types::errno::{errno, Errno},
+    types::user_address::{UserAddress, UserRef},
+    types::user_buffer::UserBuffer,
+    types::{FileMode, OpenFlags},
 };
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned
@@ -612,7 +610,7 @@ pub fn query(
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) };
         let vmo_size = vmo.get_size().unwrap();
         let file = Anon::new_file_extended(
-            current_task,
+            current_task.kernel(),
             Box::new(VmoFileObject::new(Arc::new(vmo))),
             OpenFlags::RDWR,
             |id| {

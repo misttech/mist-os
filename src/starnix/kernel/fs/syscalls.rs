@@ -2,6 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use lock_sequence::{Locked, Unlocked};
+use starnix_lock::Mutex;
+use std::{
+    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
+};
+
 use crate::{
     arch::uapi::epoll_event,
     fs::{
@@ -9,30 +15,31 @@ use crate::{
         eventfd::{new_eventfd, EventFdType},
         fuchsia::{TimerFile, TimerFileClock},
         inotify::InotifyFileObject,
-        namespace::FileSystemCreator,
         new_memfd,
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
         splice, DirentSink64, EpollFileObject, FallocMode, FdEvents, FdFlags, FdNumber,
-        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, InotifyMask,
-        LookupContext, NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags,
-        SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType,
-        UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        FileAsyncOwner, FileHandle, FlockOperation, FsStr, InotifyMask, LookupContext,
+        NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
+        StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
+        ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
+    types::auth::{
+        CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
+    },
+    types::errno::{errno, error, Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
+    types::personality::PersonalityFlags,
+    types::signals::SigSet,
+    types::time::{
+        duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
+        timespec_from_duration,
+    },
+    types::user_address::{UserAddress, UserCString, UserRef},
     types::{
-        auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
-        errno::{errno, error, Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
-        personality::PersonalityFlags,
-        signals::SigSet,
-        time::{
-            duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
-            timespec_from_duration,
-        },
-        user_address::{UserAddress, UserCString, UserRef},
         Resource, SealFlags, __kernel_fd_set, f_owner_ex, itimerspec, off_t, pid_t, pollfd,
         pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, Access, DeviceType,
         FileMode, MountFlags, OpenFlags, AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR,
@@ -52,11 +59,6 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
-use starnix_lock::Mutex;
-use std::{
-    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
-};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -1570,13 +1572,7 @@ fn do_mount_create(
         String::from_utf8_lossy(data)
     );
 
-    let options = FileSystemOptions {
-        source: source.to_vec(),
-        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: data.to_vec(),
-    };
-
-    let fs = current_task.create_filesystem(fs_type, options)?;
+    let fs = current_task.create_filesystem(fs_type, source, flags, data)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 

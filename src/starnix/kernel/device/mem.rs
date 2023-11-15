@@ -16,11 +16,9 @@ use crate::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
     task::{CurrentTask, Kernel},
-    types::{
-        errno::{error, Errno},
-        user_address::UserAddress,
-        DeviceType, FileMode, OpenFlags,
-    },
+    types::errno::{error, Errno},
+    types::user_address::UserAddress,
+    types::{DeviceType, FileMode, OpenFlags},
 };
 
 use fuchsia_zircon::{self as zx, cprng_draw};
@@ -29,9 +27,9 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct DevNull;
 
-pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle {
+pub fn new_null_file(kernel: &Arc<Kernel>, flags: OpenFlags) -> FileHandle {
     Anon::new_file_extended(
-        current_task,
+        kernel,
         Box::new(DevNull),
         flags,
         FsNodeInfo::new_factory(FileMode::from_bits(0o666), FsCred::root()),

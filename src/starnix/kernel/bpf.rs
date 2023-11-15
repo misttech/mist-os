@@ -29,20 +29,19 @@ use crate::{
     logging::{log_trace, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{SyscallResult, SUCCESS},
-    task::{CurrentTask, Kernel},
+    task::CurrentTask,
+    task::Kernel,
+    types::errno::{errno, error, Errno},
+    types::user_address::{UserAddress, UserCString},
     types::{
-        as_any::AsAny,
-        bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
+        as_any::AsAny, bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
         bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5,
         bpf_attr__bindgen_ty_9, bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE,
         bpf_cmd_BPF_MAP_GET_NEXT_KEY, bpf_cmd_BPF_MAP_UPDATE_ELEM, bpf_cmd_BPF_OBJ_GET,
         bpf_cmd_BPF_OBJ_GET_INFO_BY_FD, bpf_cmd_BPF_OBJ_PIN, bpf_cmd_BPF_PROG_ATTACH,
         bpf_cmd_BPF_PROG_LOAD, bpf_cmd_BPF_PROG_QUERY, bpf_map_info, bpf_map_type,
         bpf_map_type_BPF_MAP_TYPE_DEVMAP, bpf_map_type_BPF_MAP_TYPE_DEVMAP_HASH, bpf_prog_info,
-        errno::{errno, error, Errno},
-        mode, statfs,
-        user_address::{UserAddress, UserCString},
-        DeviceType, FileMode, OpenFlags, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
+        mode, statfs, DeviceType, FileMode, OpenFlags, BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
     },
 };
 
@@ -469,7 +468,6 @@ impl BpfFsDir {
     ) -> Result<(), Errno> {
         node.entry.create_entry(current_task, &node.mount, name, |dir, _mount, _name| {
             Ok(dir.fs().create_node(
-                current_task,
                 BpfFsObject::new(object, &selinux_context),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o600), FsCred::root()),
             ))
@@ -493,14 +491,13 @@ impl FsNodeOps for BpfFsDir {
     fn mkdir(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let selinux_context = get_selinux_context(name);
         Ok(node.fs().create_node(
-            current_task,
             BpfFsDir::new(&selinux_context),
             FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
         ))

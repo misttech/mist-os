@@ -10,10 +10,8 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
     task::CurrentTask,
-    types::{
-        errno::{errno, Errno},
-        mode, off_t, DeviceType, FileMode, OpenFlags,
-    },
+    types::errno::{errno, Errno},
+    types::{mode, off_t, DeviceType, FileMode, OpenFlags},
 };
 use std::{collections::BTreeMap, sync::Arc};
 
@@ -47,26 +45,24 @@ impl<'a> StaticDirectoryBuilder<'a> {
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry(
         &mut self,
-        current_task: &CurrentTask,
         name: &'static FsStr,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
     ) {
         let ops = ops.into();
-        self.entry_dev(current_task, name, ops, mode, DeviceType::NONE);
+        self.entry_dev(name, ops, mode, DeviceType::NONE);
     }
 
     /// Adds an entry to the directory. Panics if an entry with the same name was already added.
     pub fn entry_dev(
         &mut self,
-        current_task: &CurrentTask,
         name: &'static FsStr,
         ops: impl Into<Box<dyn FsNodeOps>>,
         mode: FileMode,
         dev: DeviceType,
     ) {
         let ops = ops.into();
-        let node = self.fs.create_node(current_task, ops, |id| {
+        let node = self.fs.create_node(ops, |id| {
             let mut info = FsNodeInfo::new(id, mode, self.entry_creds.clone());
             info.rdev = dev;
             info
@@ -74,17 +70,11 @@ impl<'a> StaticDirectoryBuilder<'a> {
         self.node(name, node);
     }
 
-    pub fn subdir(
-        &mut self,
-        current_task: &CurrentTask,
-        name: &'static FsStr,
-        mode: u32,
-        build_subdir: impl Fn(&mut Self),
-    ) {
+    pub fn subdir(&mut self, name: &'static FsStr, mode: u32, build_subdir: impl Fn(&mut Self)) {
         let mut subdir = Self::new(self.fs);
         build_subdir(&mut subdir);
         subdir.set_mode(mode!(IFDIR, mode));
-        self.node(name, subdir.build(current_task));
+        self.node(name, subdir.build());
     }
 
     /// Adds an [`FsNode`] entry to the directory, which already has an inode number and file mode.
@@ -107,9 +97,8 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
-    pub fn build(self, current_task: &CurrentTask) -> Arc<FsNode> {
+    pub fn build(self) -> Arc<FsNode> {
         self.fs.create_node(
-            current_task,
             Arc::new(StaticDirectory { entries: self.entries }),
             FsNodeInfo::new_factory(self.mode, self.creds),
         )

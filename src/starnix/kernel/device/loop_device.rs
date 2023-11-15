@@ -14,9 +14,9 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
+    types::errno::{errno, error, Errno},
+    types::user_address::UserRef,
     types::{
-        errno::{errno, error, Errno},
-        user_address::UserRef,
         OpenFlags, __kernel_old_dev_t, loop_info, loop_info64, uapi, DeviceType, BLKFLSBUF,
         BLKGETSIZE, BLKGETSIZE64, LOOP_CHANGE_FD, LOOP_CLR_FD, LOOP_CONFIGURE, LOOP_CTL_ADD,
         LOOP_CTL_GET_FREE, LOOP_CTL_REMOVE, LOOP_GET_STATUS, LOOP_GET_STATUS64, LOOP_MAJOR,
@@ -658,7 +658,7 @@ mod tests {
     async fn basic_get_vmo() {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -667,8 +667,7 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file =
-            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
         let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
 
         let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
@@ -689,7 +688,7 @@ mod tests {
         let expected_contents = &expected_contents
             [expected_offset as usize..(expected_offset + expected_size_limit) as usize];
 
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -698,8 +697,7 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file =
-            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
         let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(

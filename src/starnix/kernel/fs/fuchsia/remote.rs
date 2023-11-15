@@ -33,8 +33,8 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
+    types::errno::{errno, error, from_status_like_fdio, Errno},
     types::{
-        errno::{errno, error, from_status_like_fdio, Errno},
         fsverity_descriptor, ino_t, off_t, statfs, DeviceType, FileMode, MountFlags, OpenFlags,
     },
     vmex_resource::VMEX_RESOURCE,
@@ -259,7 +259,7 @@ struct RemoteNode {
 /// was created using Starnix).  This is fine, since this should mostly be used when interfacing
 /// with objects created outside of Starnix.
 pub fn new_remote_file(
-    current_task: &CurrentTask,
+    kernel: &Arc<Kernel>,
     handle: zx::Handle,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
@@ -289,7 +289,7 @@ pub fn new_remote_file(
         zx::ObjectType::SOCKET => Box::new(RemotePipeObject::new(Arc::new(zxio))),
         _ => return error!(ENOSYS),
     };
-    let file_handle = Anon::new_file_extended(current_task, ops, flags, |id| {
+    let file_handle = Anon::new_file_extended(kernel, ops, flags, |id| {
         let mut info = FsNodeInfo::new(id, mode, FsCred::root());
         update_info_from_attrs(&mut info, &attrs);
         info
@@ -302,7 +302,7 @@ pub fn create_fuchsia_pipe(
     socket: zx::Socket,
     flags: OpenFlags,
 ) -> Result<FileHandle, Errno> {
-    new_remote_file(current_task, socket.into(), flags)
+    new_remote_file(current_task.kernel(), socket.into(), flags)
 }
 
 // Update info from attrs if they are set.
@@ -365,7 +365,7 @@ impl FsNodeOps for RemoteNode {
     fn mknod(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mut mode: FileMode,
         dev: DeviceType,
@@ -458,7 +458,6 @@ impl FsNodeOps for RemoteNode {
             node_id = fs.next_node_id();
         }
         let child = fs.create_node_with_id(
-            current_task,
             ops,
             node_id,
             FsNodeInfo { rdev: dev, ..FsNodeInfo::new(node_id, mode, owner) },
@@ -469,7 +468,7 @@ impl FsNodeOps for RemoteNode {
     fn mkdir(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -538,19 +537,14 @@ impl FsNodeOps for RemoteNode {
         if !fs_ops.use_remote_ids {
             node_id = fs.next_node_id();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo::new(node_id, mode, owner),
-        );
+        let child = fs.create_node_with_id(ops, node_id, FsNodeInfo::new(node_id, mode, owner));
         Ok(child)
     }
 
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = get_name_str(name)?;
@@ -629,7 +623,6 @@ impl FsNodeOps for RemoteNode {
         }
 
         fs.get_or_create_node(
-            current_task,
             if fs_ops.use_remote_ids {
                 if node_id == fio::INO_UNKNOWN {
                     return error!(ENOTSUP);
@@ -763,7 +756,7 @@ impl FsNodeOps for RemoteNode {
     fn create_symlink(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
         owner: FsCred,
@@ -787,7 +780,6 @@ impl FsNodeOps for RemoteNode {
             fs.next_node_id()
         };
         let symlink = fs.create_node_with_id(
-            current_task,
             RemoteSymlink { zxio },
             node_id,
             FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner),
@@ -1515,7 +1507,8 @@ mod test {
         },
         mm::PAGE_SIZE,
         testing::*,
-        types::{errno::EINVAL, mode},
+        types::errno::EINVAL,
+        types::mode,
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
@@ -1614,7 +1607,7 @@ mod test {
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_directory() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let pkg_channel: zx::Channel = directory::open_in_namespace(
             "/pkg",
             fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
@@ -1624,15 +1617,15 @@ mod test {
         .expect("into_channel")
         .into();
 
-        let fd = new_remote_file(&current_task, pkg_channel.into(), OpenFlags::RDWR)
-            .expect("new_remote_file");
+        let fd =
+            new_remote_file(&kernel, pkg_channel.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }
 
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_file() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let content_channel: zx::Channel =
             file::open_in_namespace("/pkg/meta/contents", fio::OpenFlags::RIGHT_READABLE)
                 .expect("failed to open /pkg/meta/contents")
@@ -1640,7 +1633,7 @@ mod test {
                 .expect("into_channel")
                 .into();
 
-        let fd = new_remote_file(&current_task, content_channel.into(), OpenFlags::RDONLY)
+        let fd = new_remote_file(&kernel, content_channel.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
         assert!(!fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
@@ -1648,10 +1641,9 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_new_remote_vmo() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
         let vmo = zx::Vmo::create(*PAGE_SIZE).expect("Vmo::create");
-        let fd =
-            new_remote_file(&current_task, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
+        let fd = new_remote_file(&kernel, vmo.into(), OpenFlags::RDWR).expect("new_remote_file");
         assert!(!fd.node().is_dir());
         assert!(fd.to_handle(&current_task).expect("to_handle").is_some());
     }

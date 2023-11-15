@@ -16,10 +16,8 @@ use crate::{
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::{
-        errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
-        ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags,
-    },
+    types::errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
+    types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags},
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
@@ -386,7 +384,7 @@ impl FsNodeOps for DirectoryObject {
     fn lookup(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
@@ -404,12 +402,8 @@ impl FsNodeOps for DirectoryObject {
         let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => {
-                Ok(fs.create_node_with_id(current_task, SymlinkObject, inode_num, info))
-            }
-            NodeInfo::Directory(_) => {
-                Ok(fs.create_node_with_id(current_task, DirectoryObject, inode_num, info))
-            }
+            NodeInfo::Symlink(_) => Ok(fs.create_node_with_id(SymlinkObject, inode_num, info)),
+            NodeInfo::Directory(_) => Ok(fs.create_node_with_id(DirectoryObject, inode_num, info)),
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
                 bundle
@@ -423,7 +417,6 @@ impl FsNodeOps for DirectoryObject {
                     .map_err(|_| errno!(EIO))?;
                 let file = fio::FileSynchronousProxy::new(file.into_channel());
                 Ok(fs.create_node_with_id(
-                    current_task,
                     File { inner: Mutex::new(Inner::NeedsVmo(file)) },
                     inode_num,
                     info,
@@ -503,7 +496,8 @@ mod test {
             LookupContext, Namespace, SymlinkMode, SymlinkTarget,
         },
         testing::create_kernel_and_task,
-        types::{errno::Errno, ino_t, off_t, FileMode, OpenFlags},
+        types::errno::Errno,
+        types::{ino_t, off_t, FileMode, OpenFlags},
     };
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
