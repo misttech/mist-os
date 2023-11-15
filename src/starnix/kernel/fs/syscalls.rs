@@ -31,6 +31,7 @@ use crate::{
     types::auth::{
         CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS,
     },
+    types::device_type::DeviceType,
     types::errno::{errno, error, Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
     types::personality::PersonalityFlags,
     types::signals::SigSet,
@@ -40,9 +41,9 @@ use crate::{
     },
     types::user_address::{UserAddress, UserCString, UserRef},
     types::{
-        Resource, SealFlags, __kernel_fd_set, f_owner_ex, itimerspec, off_t, pid_t, pollfd,
-        pselect6_sigmask, sigset_t, statfs, statx, timespec, uapi, uid_t, Access, DeviceType,
-        FileMode, MountFlags, OpenFlags, AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR,
+        FileMode, MountFlags, OpenFlags, Resource, SealFlags, __kernel_fd_set, f_owner_ex,
+        itimerspec, off_t, pid_t, pollfd, pselect6_sigmask, sigset_t, statfs, statx, timespec,
+        uapi, uid_t, Access, AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR,
         AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM,
         CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC,
         CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE, EPOLL_CLOEXEC,

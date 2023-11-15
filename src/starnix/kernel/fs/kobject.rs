@@ -18,7 +18,7 @@ use crate::{
     },
     task::CurrentTask,
     types::errno::{error, Errno},
-    types::{DeviceType, OpenFlags},
+    types::{device_type::DeviceType, OpenFlags},
 };
 
 /// ktype is the type of object that embeds a `kobject`.

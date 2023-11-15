@@ -7,7 +7,8 @@ use paste::paste;
 
 use crate::{
     arch::syscalls::sys_clone,
-    syscalls::{decls::Syscall, CurrentTask, SyscallResult},
+    syscalls::{decls::Syscall, SyscallResult},
+    task::CurrentTask,
     types::errno::Errno,
 };
 

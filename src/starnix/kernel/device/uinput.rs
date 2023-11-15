@@ -7,10 +7,12 @@ use crate::{
         default_ioctl, fileops_impl_dataless, fileops_impl_seekless, FileObject, FileOps, FsNode,
     },
     logging::log_warn,
-    syscalls::{uapi, OpenFlags, SyscallArg, SyscallResult, SUCCESS},
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
     types,
+    types::device_type::DeviceType,
     types::errno::Errno,
+    types::{uapi, OpenFlags},
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
@@ -18,7 +20,7 @@ use std::sync::Arc;
 
 pub fn create_uinput_device(
     _current_task: &CurrentTask,
-    _id: types::DeviceType,
+    _id: DeviceType,
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {

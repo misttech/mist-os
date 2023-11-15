@@ -21,8 +21,12 @@ use crate::{
         XattrOp,
     },
     task::{CurrentTask, Kernel},
-    types::errno::{error, Errno},
-    types::{as_any::AsAny, ino_t, statfs, ArcKey, DeviceType, MountFlags},
+    types::{
+        as_any::AsAny,
+        device_type::DeviceType,
+        errno::{error, Errno},
+        ino_t, statfs, ArcKey, MountFlags,
+    },
 };
 
 pub const DEFAULT_LRU_CAPACITY: usize = 32;

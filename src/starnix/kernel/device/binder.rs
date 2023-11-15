@@ -55,12 +55,12 @@ use crate::{
         binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
         binder_object_header, binder_transaction_data,
         binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-        binder_uintptr_t, binder_version, binder_write_read, flat_binder_object, mode, pid_t,
-        release_after, release_on_error, statfs, struct_with_union_into_bytes,
-        transaction_flags_TF_ONE_WAY, uapi, ArcKey, DeviceType, OpenFlags, OwnedRef, Releasable,
-        ReleaseGuard, TempRef, WeakRef, BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT,
-        BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA,
-        BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+        binder_uintptr_t, binder_version, binder_write_read, device_type::DeviceType,
+        flat_binder_object, mode, pid_t, release_after, release_on_error, statfs,
+        struct_with_union_into_bytes, transaction_flags_TF_ONE_WAY, uapi, ArcKey, OpenFlags,
+        OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef, BINDERFS_SUPER_MAGIC,
+        BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION, BINDER_TYPE_BINDER,
+        BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
     },
 };
 use derivative::Derivative;

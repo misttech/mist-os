@@ -21,9 +21,9 @@ use crate::{
     types::signals::SIGXFSZ,
     types::time::{timespec_from_time, NANOS_PER_SECOND},
     types::{
-        __kernel_ulong_t, as_any::AsAny, fsverity_descriptor, gid_t, ino_t, mode, statx,
-        statx_timestamp, timespec, uapi, uid_t, Access, DeviceType, FileMode, OpenFlags, Resource,
-        FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
+        __kernel_ulong_t, as_any::AsAny, device_type::DeviceType, fsverity_descriptor, gid_t,
+        ino_t, mode, statx, statx_timestamp, timespec, uapi, uid_t, Access, FileMode, OpenFlags,
+        Resource, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
         FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB,
         LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS,
         STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID,
@@ -782,7 +782,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
-            _dev: crate::types::DeviceType,
+            _dev: crate::types::device_type::DeviceType,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
             crate::types::errno::error!(EROFS)
@@ -885,7 +885,7 @@ macro_rules! fs_node_impl_not_dir {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: crate::types::FileMode,
-            _dev: crate::types::DeviceType,
+            _dev: crate::types::device_type::DeviceType,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
             crate::types::errno::error!(ENOTDIR)

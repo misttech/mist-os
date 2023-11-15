@@ -16,9 +16,12 @@ use crate::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
     task::{CurrentTask, Kernel},
-    types::errno::{error, Errno},
-    types::user_address::UserAddress,
-    types::{DeviceType, FileMode, OpenFlags},
+    types::{
+        device_type::DeviceType,
+        errno::{error, Errno},
+        user_address::UserAddress,
+        FileMode, OpenFlags,
+    },
 };
 
 use fuchsia_zircon::{self as zx, cprng_draw};

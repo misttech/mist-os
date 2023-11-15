@@ -19,8 +19,8 @@ use crate::{
     types::errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
     types::time::time_from_timespec,
     types::{
-        off_t, ownership::ReleasableByRef, statfs, uapi, Access, DeviceType, FileMode, OpenFlags,
-        FUSE_SUPER_MAGIC,
+        device_type::DeviceType, off_t, ownership::ReleasableByRef, statfs, uapi, Access, FileMode,
+        OpenFlags, FUSE_SUPER_MAGIC,
     },
 };
 use bstr::B;

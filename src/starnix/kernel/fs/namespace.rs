@@ -30,8 +30,8 @@ use crate::{
     time::utc,
     types::errno::{errno, error, Errno},
     types::{
-        Access, ArcKey, DeviceType, FileMode, MountFlags, OpenFlags, PtrKey, WeakKey, WeakRef,
-        NAME_MAX,
+        device_type::DeviceType, Access, ArcKey, FileMode, MountFlags, OpenFlags, PtrKey, WeakKey,
+        WeakRef, NAME_MAX,
     },
 };
 use fidl_fuchsia_io as fio;

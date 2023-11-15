@@ -35,7 +35,8 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     types::errno::{errno, error, from_status_like_fdio, Errno},
     types::{
-        fsverity_descriptor, ino_t, off_t, statfs, DeviceType, FileMode, MountFlags, OpenFlags,
+        device_type::DeviceType, fsverity_descriptor, ino_t, off_t, statfs, FileMode, MountFlags,
+        OpenFlags,
     },
     vmex_resource::VMEX_RESOURCE,
 };

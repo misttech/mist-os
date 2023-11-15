@@ -16,8 +16,11 @@ use crate::{
     logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
-    types::errno::{error, Errno},
-    types::{gid_t, mode, statfs, uid_t, DeviceType, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC},
+    types::{
+        device_type::DeviceType,
+        errno::{error, Errno},
+        gid_t, mode, statfs, uid_t, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC,
+    },
 };
 
 pub struct TmpFs(());

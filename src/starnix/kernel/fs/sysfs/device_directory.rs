@@ -14,8 +14,11 @@ use crate::{
     },
     logging::not_implemented,
     task::CurrentTask,
-    types::errno::{error, Errno},
-    types::{mode, DeviceType, OpenFlags},
+    types::{
+        device_type::DeviceType,
+        errno::{error, Errno},
+        mode, OpenFlags,
+    },
 };
 
 use std::sync::{Arc, Weak};

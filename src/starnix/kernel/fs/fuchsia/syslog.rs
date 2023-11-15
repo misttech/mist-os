@@ -8,8 +8,9 @@ use crate::{
         default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
     logging::log,
-    syscalls::{CurrentTask, OpenFlags, SyscallArg, SyscallResult},
-    types::errno::Errno,
+    syscalls::{SyscallArg, SyscallResult},
+    task::CurrentTask,
+    types::{errno::Errno, OpenFlags},
 };
 
 pub struct SyslogFile;

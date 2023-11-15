@@ -20,7 +20,7 @@ use crate::{
     types::errno::{errno, error, Errno},
     types::user_address::{UserAddress, UserRef},
     types::{
-        fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, DeviceType, OpenFlags,
+        device_type::DeviceType, fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo, OpenFlags,
         FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS,
         FB_VISUAL_TRUECOLOR,
     },
