@@ -7,6 +7,7 @@
 
 import argparse
 import errno
+import filecmp
 import json
 import os
 import shutil
@@ -353,6 +354,20 @@ def main():
         ldflag += args.ldflag
     cmd += ["-ldflags=%s" % " ".join(ldflag)]
 
+    # If an output file already exists, compile to a temporary file, and then
+    # only if the new file and the existing file are different, move the new
+    # file over the existing file.
+    if os.path.exists(args.output_path):
+        compilation_output_path = args.output_path + ".new"
+
+        # Since the go compiler is written in go, the action tracer can't see
+        # any writes that it does, so we need to first write to the temp file to
+        # make it visible to the action tracer
+        with open(compilation_output_path, "w") as touch:
+            touch.write("")
+    else:
+        compilation_output_path = args.output_path
+
     cmd += [
         # Omit version control information so that binaries are deterministic
         # based on their source code and don't change on each commit.
@@ -360,7 +375,7 @@ def main():
         "-pkgdir",
         os.path.join(project_path, "pkg"),
         "-o",
-        os.path.relpath(args.output_path, gopath_src),
+        os.path.relpath(compilation_output_path, gopath_src),
         package,
     ]
     proc = subprocess.run(
@@ -386,74 +401,95 @@ def main():
         # traceback that clutters up the relevant output from `go build`.
         return proc.returncode
 
-    # If the package contains no *_test.go files `go test -c` will exit with a
-    # retcode of zero, but not produce the expected output file. Instead it will
-    # print a warning like "no test files".
-    #
-    # Not producing the expected output file leads to confusing no-op failures
-    # and breakages in targets that depend on this one, so we should turn it
-    # into an immediate failure. We can't check if the file exists to determine
-    # whether the build succeeded because the file might have been created by a
-    # previous build, so instead we assume that Go will only print anything if
-    # it didn't produce the output file, or otherwise failed in some fatal way.
-    if proc.stdout.strip():
-        raise Exception("go build printed unexpected output")
+    try:
+        # Check to see if the compiled file is different from the existing file
+        if compilation_output_path != args.output_path:
+            if filecmp.cmp(
+                compilation_output_path, args.output_path, shallow=False
+            ):
+                # The newly compiled file matches, so exit early after cleaning up.
+                os.remove(compilation_output_path)
+                return 0
+            else:
+                # Move the newly compiled file over the existing and continue with
+                # any processing.
+                os.rename(compilation_output_path, args.output_path)
 
-    if args.stripped_output_path:
-        if args.current_os == "mac":
-            subprocess.run(
-                [
-                    "xcrun",
-                    "strip",
-                    "-x",
-                    args.output_path,
-                    "-o",
-                    args.stripped_output_path,
-                ],
-                env=env,
-            ).check_returncode()
-        else:
-            subprocess.run(
-                [
-                    args.objcopy,
-                    "--strip-sections",
-                    args.output_path,
-                    args.stripped_output_path,
-                ],
-                env=env,
-            ).check_returncode()
+        # If the package contains no *_test.go files `go test -c` will exit with a
+        # retcode of zero, but not produce the expected output file. Instead it will
+        # print a warning like "no test files".
+        #
+        # Not producing the expected output file leads to confusing no-op failures
+        # and breakages in targets that depend on this one, so we should turn it
+        # into an immediate failure. We can't check if the file exists to determine
+        # whether the build succeeded because the file might have been created by a
+        # previous build, so instead we assume that Go will only print anything if
+        # it didn't produce the output file, or otherwise failed in some fatal way.
+        if proc.stdout.strip():
+            raise Exception("go build printed unexpected output")
 
-    # TODO(fxbug.dev/27215): Also invoke the buildidtool in the case of linux
-    # once buildidtool knows how to deal in Go's native build ID format.
-    supports_build_id = args.current_os == "fuchsia"
-    if args.dump_syms and supports_build_id:
-        if args.current_os == "fuchsia":
-            with open(dist + ".sym", "w") as f:
+        if args.stripped_output_path:
+            if args.current_os == "mac":
                 subprocess.run(
-                    [args.dump_syms, "-r", "-o", "Fuchsia", args.output_path],
-                    stdout=f,
+                    [
+                        "xcrun",
+                        "strip",
+                        "-x",
+                        args.output_path,
+                        "-o",
+                        args.stripped_output_path,
+                    ],
+                    env=env,
+                ).check_returncode()
+            else:
+                subprocess.run(
+                    [
+                        args.objcopy,
+                        "--strip-sections",
+                        args.output_path,
+                        args.stripped_output_path,
+                    ],
+                    env=env,
                 ).check_returncode()
 
-    if args.buildidtool and supports_build_id:
-        if not args.build_id_dir:
-            raise ValueError("Using --buildidtool requires --build-id-dir")
-        subprocess.run(
-            [
-                args.buildidtool,
-                "-build-id-dir",
-                args.build_id_dir,
-                "-stamp",
-                dist + ".build-id.stamp",
-                "-entry",
-                ".debug=" + args.output_path,
-                "-entry",
-                "=" + dist,
-            ]
-        ).check_returncode()
+        # TODO(fxbug.dev/27215): Also invoke the buildidtool in the case of linux
+        # once buildidtool knows how to deal in Go's native build ID format.
+        supports_build_id = args.current_os == "fuchsia"
+        if args.dump_syms and supports_build_id:
+            if args.current_os == "fuchsia":
+                with open(dist + ".sym", "w") as f:
+                    subprocess.run(
+                        [
+                            args.dump_syms,
+                            "-r",
+                            "-o",
+                            "Fuchsia",
+                            args.output_path,
+                        ],
+                        stdout=f,
+                    ).check_returncode()
 
-    # Clean up the tree of go files assembled in gopath_src to indicate to the
-    # action tracer that they were intermediates and not final outputs.
-    rmtree(gopath_src)
+        if args.buildidtool and supports_build_id:
+            if not args.build_id_dir:
+                raise ValueError("Using --buildidtool requires --build-id-dir")
+            subprocess.run(
+                [
+                    args.buildidtool,
+                    "-build-id-dir",
+                    args.build_id_dir,
+                    "-stamp",
+                    dist + ".build-id.stamp",
+                    "-entry",
+                    ".debug=" + args.output_path,
+                    "-entry",
+                    "=" + dist,
+                ]
+            ).check_returncode()
+    finally:
+        # Clean up the tree of go files assembled in gopath_src to indicate to the
+        # action tracer that they were intermediates and not final outputs.
+        rmtree(gopath_src)
+
     return 0
 
 
