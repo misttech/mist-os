@@ -311,6 +311,38 @@ async fn inspect_counters(name: &str) {
                     CacheFull: 0u64,
                 },
             },
+            "UDP": {
+                "V4": {
+                    "Rx": {
+                        Received: 1u64,
+                        "Errors": {
+                            MappedAddr: 0u64,
+                            UnknownDstPort: 0u64,
+                            Malformed: 0u64,
+                        },
+                    },
+                    "Tx": {
+                        Sent: 1u64,
+                        Errors: 0u64,
+                    },
+                    IcmpErrors: 0u64,
+                },
+                "V6": {
+                    "Rx": {
+                        Received: 0u64,
+                        "Errors": {
+                            MappedAddr: 0u64,
+                            UnknownDstPort: 0u64,
+                            Malformed: 0u64,
+                        },
+                    },
+                    "Tx": {
+                        Sent: 0u64,
+                        Errors: 0u64,
+                    },
+                    IcmpErrors: 0u64,
+                },
+            },
         }
     })
 }

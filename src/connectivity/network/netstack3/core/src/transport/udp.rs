@@ -158,13 +158,32 @@ impl<I: IpExt, D: WeakId> Default for UdpState<I, D> {
     }
 }
 
-pub(crate) type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
+/// Counters for the UDP layer.
+pub type UdpCounters<I> = IpMarked<I, UdpCountersInner>;
 
 /// Counters for the UDP layer.
 #[derive(Default)]
-pub(crate) struct UdpCountersInner {
+pub struct UdpCountersInner {
     /// Count of ICMP error messages received.
-    pub(crate) rx_icmp_error: Counter,
+    pub rx_icmp_error: Counter,
+    /// Count of UDP datagrams received from the IP layer, including error
+    /// cases.
+    pub rx: Counter,
+    /// Count of incoming UDP datagrams dropped because it contained a mapped IP
+    /// address in the header.
+    pub rx_mapped_addr: Counter,
+    /// Count of incoming UDP datagrams dropped because of an unknown
+    /// destination port.
+    pub rx_unknown_dest_port: Counter,
+    /// Count of incoming UDP datagrams dropped because their UDP header was in
+    /// a malformed state.
+    pub rx_malformed: Counter,
+    /// Count of outgoing UDP datagrams sent from the socket layer, including
+    /// error cases.
+    pub tx: Counter,
+    /// Count of outgoing UDP datagrams which failed to be sent out of the
+    /// transport layer.
+    pub tx_error: Counter,
 }
 
 impl<C: crate::NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::UdpCounters<I>>
@@ -1218,6 +1237,9 @@ impl<
             Ok(packet) => packet,
             Err(e) => {
                 let _: ParseError = e;
+                sync_ctx.with_counters(|counters| {
+                    counters.rx_malformed.increment();
+                });
                 // TODO(joshlf): Do something with this error.
                 return;
             }
@@ -1229,6 +1251,9 @@ impl<
             let src_ip = match src_ip.try_into() {
                 Ok(addr) => addr,
                 Err(AddrIsMappedError {}) => {
+                    sync_ctx.with_counters(|counters| {
+                        counters.rx_mapped_addr.increment();
+                    });
                     trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
                     return;
                 }
@@ -1236,6 +1261,9 @@ impl<
             let dst_ip = match dst_ip.try_into() {
                 Ok(addr) => addr,
                 Err(AddrIsMappedError {}) => {
+                    sync_ctx.with_counters(|counters| {
+                        counters.rx_mapped_addr.increment();
+                    });
                     trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
                     return;
                 }
@@ -1293,7 +1321,9 @@ fn receive_ip_packet<
     B: BufferMut,
     C: BufferStateNonSyncContext<I, B, SC::DeviceId>
         + BufferStateNonSyncContext<I::OtherVersion, B, SC::DeviceId>,
-    SC: BufferStateContext<I, C, B> + BufferStateContext<I::OtherVersion, C, B>,
+    SC: BufferStateContext<I, C, B>
+        + BufferStateContext<I::OtherVersion, C, B>
+        + CounterContext<UdpCounters<I>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1303,6 +1333,9 @@ fn receive_ip_packet<
     mut buffer: B,
 ) -> Result<(), (B, TransportReceiveError)> {
     trace_duration!(ctx, "udp::receive_ip_packet");
+    sync_ctx.with_counters(|counters| {
+        counters.rx.increment();
+    });
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into();
 
@@ -1313,6 +1346,9 @@ fn receive_ip_packet<
     } else {
         // There isn't much we can do if the UDP packet is
         // malformed.
+        sync_ctx.with_counters(|counters| {
+            counters.rx_malformed.increment();
+        });
         return Ok(());
     };
 
@@ -1320,6 +1356,9 @@ fn receive_ip_packet<
         match src_ip.try_into() {
             Ok(addr) => Some(addr),
             Err(AddrIsMappedError {}) => {
+                sync_ctx.with_counters(|counters| {
+                    counters.rx_mapped_addr.increment();
+                });
                 trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
                 return Ok(());
             }
@@ -1330,6 +1369,9 @@ fn receive_ip_packet<
     let dst_ip = match dst_ip.try_into() {
         Ok(addr) => addr,
         Err(AddrIsMappedError {}) => {
+            sync_ctx.with_counters(|counters| {
+                counters.rx_mapped_addr.increment();
+            });
             trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
             return Ok(());
         }
@@ -1383,6 +1425,9 @@ fn receive_ip_packet<
 
     if !was_delivered && StateContext::<I, _>::should_send_port_unreachable(sync_ctx) {
         buffer.undo_parse(meta);
+        sync_ctx.with_counters(|counters| {
+            counters.rx_unknown_dest_port.increment();
+        });
         Err((buffer, TransportReceiveError::new_port_unreachable()))
     } else {
         Ok(())
@@ -1910,7 +1955,7 @@ impl<
         I: IpExt,
         B: BufferMut,
         C: BufferStateNonSyncContext<I, B, SC::DeviceId>,
-        SC: BufferStateContext<I, C, B>,
+        SC: BufferStateContext<I, C, B> + CounterContext<UdpCounters<I>>,
     > BufferSocketHandler<I, C, B> for SC
 {
     fn send(
@@ -1919,13 +1964,21 @@ impl<
         id: SocketId<I>,
         body: B,
     ) -> Result<(), Either<SendError, ExpectedConnError>> {
-        datagram::send_conn(self, ctx, id, body).map_err(|err| match err {
-            DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
-            DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
-            DatagramSendError::IpSock(err) => Either::Left(SendError::IpSock(err)),
-            DatagramSendError::SerializeError(never) => match never {},
-            DatagramSendError::DualStackNotImplemented => {
-                Either::Left(SendError::DualStackNotImplemented)
+        self.with_counters(|counters| {
+            counters.tx.increment();
+        });
+        datagram::send_conn(self, ctx, id, body).map_err(|err| {
+            self.with_counters(|counters| {
+                counters.tx_error.increment();
+            });
+            match err {
+                DatagramSendError::NotConnected => Either::Right(ExpectedConnError),
+                DatagramSendError::NotWriteable => Either::Left(SendError::NotWriteable),
+                DatagramSendError::IpSock(err) => Either::Left(SendError::IpSock(err)),
+                DatagramSendError::SerializeError(never) => match never {},
+                DatagramSendError::DualStackNotImplemented => {
+                    Either::Left(SendError::DualStackNotImplemented)
+                }
             }
         })
     }
@@ -1938,25 +1991,31 @@ impl<
         remote_port: NonZeroU16,
         body: B,
     ) -> Result<(), Either<LocalAddressError, SendToError>> {
-        datagram::send_to(self, ctx, id, remote_ip, remote_port, body).map_err(|e| match e {
-            Either::Left(e) => Either::Left(e),
-            Either::Right(e) => {
-                let err = match e {
-                    datagram::SendToError::SerializeError(never) => match never {},
-                    datagram::SendToError::NotWriteable => SendToError::NotWriteable,
-                    datagram::SendToError::Zone(e) => SendToError::Zone(e),
-                    datagram::SendToError::CreateAndSend(e) => match e {
-                        IpSockCreateAndSendError::Mtu => SendToError::Mtu,
-                        IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
-                    },
-                    datagram::SendToError::RemoteUnexpectedlyMapped => SendToError::CreateSock(
-                        IpSockCreationError::Route(ResolveRouteError::Unreachable),
-                    ),
-                    datagram::SendToError::DualStackNotImplemented => {
-                        SendToError::DualStackNotImplemented
-                    }
-                };
-                Either::Right(err)
+        self.with_counters(|counters| {
+            counters.tx.increment();
+        });
+        datagram::send_to(self, ctx, id, remote_ip, remote_port, body).map_err(|e| {
+            self.with_counters(|counters| counters.tx_error.increment());
+            match e {
+                Either::Left(e) => Either::Left(e),
+                Either::Right(e) => {
+                    let err = match e {
+                        datagram::SendToError::SerializeError(never) => match never {},
+                        datagram::SendToError::NotWriteable => SendToError::NotWriteable,
+                        datagram::SendToError::Zone(e) => SendToError::Zone(e),
+                        datagram::SendToError::CreateAndSend(e) => match e {
+                            IpSockCreateAndSendError::Mtu => SendToError::Mtu,
+                            IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
+                        },
+                        datagram::SendToError::RemoteUnexpectedlyMapped => SendToError::CreateSock(
+                            IpSockCreationError::Route(ResolveRouteError::Unreachable),
+                        ),
+                        datagram::SendToError::DualStackNotImplemented => {
+                            SendToError::DualStackNotImplemented
+                        }
+                    };
+                    Either::Right(err)
+                }
             }
         })
     }

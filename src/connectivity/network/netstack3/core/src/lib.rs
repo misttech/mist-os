@@ -262,6 +262,10 @@ pub struct StackCounters<'a> {
     pub ipv6: &'a Ipv6Counters,
     /// ARP layer counters.
     pub arp: &'a ArpCounters,
+    /// UDP layer counters for IPv4.
+    pub udpv4: &'a UdpCounters<Ipv4>,
+    /// UDP layer counters for IPv6.
+    pub udpv6: &'a UdpCounters<Ipv6>,
 }
 
 /// Visitor for stack counters.
@@ -278,6 +282,8 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
         ipv4: sync_ctx.state.ipv4().counters(),
         ipv6: sync_ctx.state.ipv6().counters(),
         arp: sync_ctx.state.arp_counters(),
+        udpv4: sync_ctx.state.udp_counters::<Ipv4>(),
+        udpv6: sync_ctx.state.udp_counters::<Ipv6>(),
     };
     visitor.visit_counters(counters);
 }

@@ -385,6 +385,44 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     node.record_uint("CacheFull", counters.ipv6_common.fragment_cache_full.get());
                 });
             });
+            inspector.root().record_child("UDP", |node| {
+                node.record_child("V4", |node| {
+                    node.record_child("Rx", |node| {
+                        node.record_uint("Received", counters.udpv4.rx.get());
+                        node.record_child("Errors", |node| {
+                            node.record_uint("MappedAddr", counters.udpv4.rx_mapped_addr.get());
+                            node.record_uint(
+                                "UnknownDstPort",
+                                counters.udpv4.rx_unknown_dest_port.get(),
+                            );
+                            node.record_uint("Malformed", counters.udpv4.rx_malformed.get());
+                        });
+                    });
+                    node.record_child("Tx", |node| {
+                        node.record_uint("Sent", counters.udpv4.tx.get());
+                        node.record_uint("Errors", counters.udpv4.tx_error.get());
+                    });
+                    node.record_uint("IcmpErrors", counters.udpv4.rx_icmp_error.get());
+                });
+                node.record_child("V6", |node| {
+                    node.record_child("Rx", |node| {
+                        node.record_uint("Received", counters.udpv6.rx.get());
+                        node.record_child("Errors", |node| {
+                            node.record_uint("MappedAddr", counters.udpv4.rx_mapped_addr.get());
+                            node.record_uint(
+                                "UnknownDstPort",
+                                counters.udpv6.rx_unknown_dest_port.get(),
+                            );
+                            node.record_uint("Malformed", counters.udpv6.rx_malformed.get());
+                        });
+                    });
+                    node.record_child("Tx", |node| {
+                        node.record_uint("Sent", counters.udpv6.tx.get());
+                        node.record_uint("Errors", counters.udpv6.tx_error.get());
+                    });
+                    node.record_uint("IcmpErrors", counters.udpv6.rx_icmp_error.get());
+                });
+            });
         }
     }
     let sync_ctx = ctx.sync_ctx();
