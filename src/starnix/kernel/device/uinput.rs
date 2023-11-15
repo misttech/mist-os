@@ -7,20 +7,14 @@ use crate::{
         default_ioctl, fileops_impl_dataless, fileops_impl_seekless, FileObject, FileOps, FsNode,
     },
     logging::log_warn,
-    mm::MemoryAccessorExt,
     syscalls::{uapi, OpenFlags, SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::user_address::{UserAddress, UserRef},
-    types::{
-        self,
-        errno::{self, Errno},
-    },
+    types,
+    types::errno::Errno,
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
 use std::sync::Arc;
-
-const UINPUT_VERSION: u32 = 5;
 
 pub fn create_uinput_device(
     _current_task: &CurrentTask,
@@ -58,24 +52,8 @@ impl UinputDevice {
             }
             _ => {
                 log_warn!("UI_SET_EVBIT with unsupported evbit {}", evbit);
-                errno::error!(EPERM)
+                Err(types::errno::errno!(EPERM))
             }
-        }
-    }
-
-    fn ui_get_version(
-        &self,
-        current_task: &CurrentTask,
-        arg: SyscallArg,
-    ) -> Result<SyscallResult, Errno> {
-        let user_arg = UserAddress::from(arg);
-        if user_arg.is_null() {
-            return errno::error!(EFAULT);
-        }
-        let response: u32 = UINPUT_VERSION;
-        match current_task.mm.write_object(UserRef::new(user_arg), &response) {
-            Ok(_) => Ok(SUCCESS),
-            Err(e) => Err(e),
         }
     }
 }
@@ -92,7 +70,6 @@ impl FileOps for Arc<UinputDevice> {
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
         match request {
-            uapi::UI_GET_VERSION => self.ui_get_version(current_task, arg),
             uapi::UI_SET_EVBIT => self.ui_set_evbit(arg),
             // `fuchsia.ui.test.input.Registry` does not use some uinput ioctl
             // request, just ignore the request and return SUCCESS, even args
@@ -114,9 +91,10 @@ mod test {
     use super::*;
     use crate::{
         fs::FileHandle,
-        mm::MemoryAccessor,
+        mm::{MemoryAccessor, MemoryAccessorExt},
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        types::user_address::UserAddress,
     };
     use test_case::test_case;
 
@@ -137,32 +115,9 @@ mod test {
         (kernel, current_task, file_object)
     }
 
-    #[::fuchsia::test]
-    async fn ui_get_version() {
-        let dev = UinputDevice::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(dev.clone());
-        let version_address =
-            map_memory(&current_task, UserAddress::default(), std::mem::size_of::<u32>() as u64);
-        let r =
-            dev.ioctl(&file_object, &current_task, uapi::UI_GET_VERSION, version_address.into());
-        assert_eq!(r, Ok(SUCCESS));
-        let version: u32 =
-            current_task.mm.read_object(version_address.into()).expect("read object");
-        assert_eq!(version, UINPUT_VERSION);
-
-        // call with invalid buffer.
-        let r = dev.ioctl(
-            &file_object,
-            &current_task,
-            uapi::UI_GET_VERSION,
-            SyscallArg::from(0 as u64),
-        );
-        assert_eq!(r, errno::error!(EFAULT));
-    }
-
     #[test_case(uapi::EV_KEY, vec![uapi::EV_KEY as usize] => Ok(SUCCESS))]
     #[test_case(uapi::EV_ABS, vec![uapi::EV_ABS as usize] => Ok(SUCCESS))]
-    #[test_case(uapi::EV_REL, vec![] => errno::error!(EPERM))]
+    #[test_case(uapi::EV_REL, vec![] => Err(types::errno::errno!(EPERM)))]
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = UinputDevice::new();
