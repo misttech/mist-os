@@ -21,14 +21,21 @@ devicetree_fragment("amlogic-a311d") {
   sources = [ "dts/amlogic-a311d.dtsi" ]
 }
 
+devicetree_fragment("meson-g12-common") {
+  sources = [ "dts/meson-g12-common.dtsi.S" ]
+}
+
 devicetree("vim3") {
   sources = [ "dts/khadas-vim3.dts.S" ]
   deps = [
     ":amlogic-a311d",
+    ":meson-g12-common",
     "//zircon/system/ulib/ddk-platform-defs",
   ]
-  visitors =
-      [ "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor" ]
+  visitors = [
+    "//sdk/lib/driver/devicetree/visitors/drivers/sysmem:sysmem-visitor",
+    "//sdk/lib/driver/devicetree/visitors/drivers/interrupt-controllers/arm-gicv2",
+  ]
   golden = "dts/khadas-vim3.golden.dts"
 }
 

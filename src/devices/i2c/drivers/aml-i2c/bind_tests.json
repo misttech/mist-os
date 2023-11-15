@@ -15,6 +15,19 @@
         ]
     },
     {
+        "node": "pdev",
+        "tests": [
+            {
+                "name": "Match Devicetree",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.DEVICETREE",
+                    "fuchsia.devicetree.FIRST_COMPATIBLE": "\"amlogic,meson-axg-i2c\""
+                }
+            }
+        ]
+    },
+    {
         "node": "gpio-init",
         "tests": [
             {

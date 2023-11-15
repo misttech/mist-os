@@ -39,8 +39,11 @@ TEST_F(Vim3DevicetreeTest, DevicetreeEnumeration) {
   std::vector<std::string> device_node_paths = {
       "sys/platform/pt",          // vim3-devicetree board driver
       "sys/platform/00:00:32",    // devicetree root
-      "sys/platform/00:00:32:1",  // amlogic-clk
-      "sys/platform/00:00:32:4",  // sysmem
+      "sys/platform/00:00:32:2",  // interrupt-controller
+      "sys/platform/00:00:32:4",  // i2c_AO
+      "sys/platform/00:00:32:6",  // i2c3
+      "sys/platform/00:00:32:7",  // amlogic-clk
+      "sys/platform/00:00:32:a",  // sysmem
   };
   ASSERT_TRUE(board_test_.StartRealm().is_ok());
   ASSERT_TRUE(board_test_.WaitOnDevices(device_node_paths).is_ok());

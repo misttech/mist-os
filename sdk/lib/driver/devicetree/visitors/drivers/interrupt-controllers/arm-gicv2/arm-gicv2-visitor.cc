@@ -11,6 +11,8 @@
 #include <cstdint>
 #include <string_view>
 
+#include "arm-gicv2.h"
+
 namespace arm_gic_dt {
 
 static constexpr auto kGicCompatibleDevices = cpp20::to_array<std::string_view>({
@@ -36,7 +38,7 @@ class InterruptPropertyV2 {
       : interrupt_cells_(cells, 1, 1, 1) {}
 
   // 1st cell contains the interrupt type; 0 for SPI interrupts, 1 for PPI interrupts.
-  bool is_spi() { return *interrupt_cells_[0][0] == 0; }
+  bool is_spi() { return *interrupt_cells_[0][0] == GIC_SPI; }
 
   // 2nd cell contains the interrupt number.
   // SPI interrupts are in the range [0-987].
@@ -64,17 +66,17 @@ class InterruptPropertyV2 {
   zx::result<uint32_t> mode() {
     uint64_t mode = *interrupt_cells_[0][2];
     switch (mode & kModeMask) {
-      case 1:
+      case GIC_IRQ_MODE_EDGE_RISING:
         return zx::ok(ZX_INTERRUPT_MODE_EDGE_HIGH);
-      case 2:
+      case GIC_IRQ_MODE_EDGE_FALLING:
         if (is_spi()) {
           FDF_LOG(ERROR, "Edge low mode not supported for SPI interrupt");
           return zx::error(ZX_ERR_INVALID_ARGS);
         }
         return zx::ok(ZX_INTERRUPT_MODE_EDGE_LOW);
-      case 4:
+      case GIC_IRQ_MODE_LEVEL_HIGH:
         return zx::ok(ZX_INTERRUPT_MODE_LEVEL_HIGH);
-      case 8:
+      case GIC_IRQ_MODE_LEVEL_LOW:
         if (is_spi()) {
           FDF_LOG(ERROR, "Level low mode not supported for SPI interrupt");
           return zx::error(ZX_ERR_INVALID_ARGS);
