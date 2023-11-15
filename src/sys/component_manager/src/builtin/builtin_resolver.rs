@@ -1,0 +1,90 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use crate::model::resolver;
+use async_trait::async_trait;
+use fuchsia_url::builtin_url::BuiltinUrl;
+use include_bytes_from_working_dir::include_bytes_from_working_dir_env;
+use routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError};
+use thiserror::Error;
+
+use crate::model::resolver::Resolver;
+
+pub static SCHEME: &str = "fuchsia-builtin";
+
+/// The builtin resolver resolves components defined inside component_manager.
+///
+/// It accepts a URL scheme of the form `fuchsia-builtin://#elf_runner.cm`.
+///
+/// Builtin component declarations are used to bootstrap the ELF runner.
+/// They are never packaged.
+///
+/// Only absolute URLs are supported.
+#[derive(Debug)]
+pub struct BuiltinResolver {}
+
+#[async_trait]
+impl Resolver for BuiltinResolver {
+    async fn resolve(
+        &self,
+        component_address: &ComponentAddress,
+    ) -> Result<ResolvedComponent, ResolverError> {
+        if component_address.is_relative_path() {
+            return Err(ResolverError::UnexpectedRelativePath(component_address.url().to_string()));
+        }
+        let url = BuiltinUrl::parse(component_address.url())
+            .map_err(|e| ResolverError::malformed_url(e))?;
+        let Some(resource) = url.resource() else {
+            return Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone())));
+        };
+        let cm = match resource {
+            "elf_runner.cm" => Ok(ELF_RUNNER_CM),
+            _ => Err(ResolverError::manifest_not_found(ManifestNotFoundError(url.clone()))),
+        }?;
+        let decl = resolver::read_and_validate_manifest_bytes(cm)?;
+
+        // Unpackaged components built into component_manager are assigned the latest abi revision.
+        let abi_revision = version_history::get_latest_abi_revision();
+
+        Ok(ResolvedComponent {
+            resolved_by: SCHEME.to_string(),
+            resolved_url: url.to_string(),
+            context_to_resolve_children: None,
+            decl,
+            package: None,
+            config_values: None,
+            abi_revision: Some(version_history::AbiRevision(abi_revision)),
+        })
+    }
+}
+
+/// A compiled `.cm` binary blob corresponding to the ELF runner component declaration.
+static ELF_RUNNER_CM: &'static [u8] = include_bytes_from_working_dir_env!("ELF_RUNNER_CM_PATH");
+
+#[derive(Error, Debug, Clone)]
+#[error("{0} does not reference a known manifest. Try fuchsia-builtin://#elf_runner.cm")]
+struct ManifestNotFoundError(pub BuiltinUrl);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::resolver;
+    use assert_matches::assert_matches;
+    use fidl_fuchsia_data as fdata;
+
+    #[fuchsia::test]
+    fn elf_runner_cm_smoke_test() {
+        let decl = resolver::read_and_validate_manifest_bytes(ELF_RUNNER_CM).unwrap();
+        let program = decl.program.unwrap();
+        assert_eq!(program.runner.unwrap().as_str(), "builtin");
+        let entries = program.info.entries.unwrap();
+        let program_type = entries.iter().find(|entry| entry.key == "type").unwrap();
+        let value = *program_type.value.clone().unwrap();
+        assert_matches!(
+            value,
+            fdata::DictionaryValue::Str(s)
+            if &s == "elf_runner"
+        );
+    }
+}

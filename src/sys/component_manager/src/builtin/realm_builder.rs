@@ -91,7 +91,7 @@ impl Resolver for RealmBuilderResolver {
         let resolved_by = "RealmBuilderResolver".to_string();
         let resolved_url = url.unwrap();
         let context_to_resolve_children = resolution_context.map(Into::into);
-        let decl = resolver::read_and_validate_manifest(&decl.unwrap()).await?;
+        let decl = resolver::read_and_validate_manifest(&decl.unwrap())?;
         let config_values = if let Some(data) = config_values {
             Some(resolver::read_and_validate_config_values(&data)?)
         } else {

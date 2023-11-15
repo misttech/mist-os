@@ -35,10 +35,10 @@ const SVC: &str = "svc";
 /// the builtin runner, the `type` field in the program block will identify which
 /// builtin component to run (e.g `type: "elf_runner"`).
 ///
-/// When bootstrapping the system, builtin components may be resolved by the
-/// builtin URL scheme, e.g. builtin://elf_runner.cm. However, it's entirely possible
-/// to resolve a builtin component via other schemes. A component is a builtin
-/// component if and only if it uses the builtin runner.
+/// When bootstrapping the system, builtin components may be resolved by the builtin URL
+/// scheme, e.g. fuchsia-builtin://#elf_runner.cm. However, it's entirely possible to resolve
+/// a builtin component via other schemes. A component is a builtin component if and only
+/// if it uses the builtin runner.
 pub struct BuiltinRunner {
     root_job: zx::Unowned<'static, zx::Job>,
     task_group: TaskGroup,
@@ -352,7 +352,7 @@ mod tests {
     fn make_start_info(program_type: &str) -> (ComponentStartInfo, DirectoryProxy) {
         let (outgoing_dir, outgoing_server_end) = fidl::endpoints::create_proxy().unwrap();
         let start_info = ComponentStartInfo {
-            resolved_url: Some("builtin://elf_runner.cm".to_string()),
+            resolved_url: Some("fuchsia-builtin://elf_runner.cm".to_string()),
             program: Some(Dictionary {
                 entries: Some(vec![DictionaryEntry {
                     key: "type".to_string(),

@@ -8,9 +8,7 @@ use fuchsia_component_test::{ChildOptions, RealmBuilder};
 
 /// An integration test that runs a simple ELF component that uses a runner from
 /// an ELF runner component instantiated as a child.
-#[fuchsia::test]
-async fn run_elf_component_with_elf_runner_component() {
-    let url = "#meta/simple_elf_program.cm";
+async fn run_test(url: &str) {
     let builder = RealmBuilder::new().await.unwrap();
     builder.add_child("simple_elf_program", url, ChildOptions::new().eager()).await.unwrap();
     let instance =
@@ -41,4 +39,16 @@ async fn run_elf_component_with_elf_runner_component() {
         .expect(event_stream)
         .await
         .unwrap();
+}
+
+#[fuchsia::test]
+async fn run_elf_component_with_elf_runner_component_from_package() {
+    let url = "#meta/simple_elf_program_packaged_elf_runner.cm";
+    run_test(url).await;
+}
+
+#[fuchsia::test]
+async fn run_elf_component_with_elf_runner_component_from_builtin_resolver() {
+    let url = "#meta/simple_elf_program_builtin_elf_runner.cm";
+    run_test(url).await;
 }

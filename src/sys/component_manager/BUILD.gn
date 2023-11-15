@@ -57,6 +57,7 @@ rustc_binary("bin") {
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/fuchsia-url",
+    "//src/lib/include_bytes_from_working_dir",
     "//src/lib/injectable-time",
     "//src/lib/versioning/version-history/rust:version-history",
     "//src/lib/zircon/rust:fuchsia-zircon",
@@ -136,6 +137,7 @@ rustc_binary("bin") {
     "src/bedrock/program/mod.rs",
     "src/bootfs.rs",
     "src/builtin/arguments.rs",
+    "src/builtin/builtin_resolver.rs",
     "src/builtin/builtin_runner.rs",
     "src/builtin/capability.rs",
     "src/builtin/cpu_resource.rs",
@@ -255,6 +257,20 @@ rustc_binary("bin") {
     "src/startup.rs",
   ]
 
+  # Add the compiled manifest of the ELF runner as a dependency, such that it may
+  # later be included into the binary via `include_bytes_from_working_dir_env`.
+  #
+  # Note: get_target_outputs would have been more robust, but that function does
+  # not support querying targets in other toolchains. component_manager may get
+  # built in e.g. asan toolchain.
+  elf_runner_cm_out_dir =
+      get_label_info(":elf_runner_cm($default_toolchain)", "target_out_dir")
+  elf_runner_cm = "$elf_runner_cm_out_dir/cml/elf_runner_cm/elf_runner.cm"
+  elf_runner_cm_path = rebase_path(elf_runner_cm, root_build_dir)
+  inputs = [ elf_runner_cm ]
+  deps += [ ":elf_runner_cm($default_toolchain)" ]
+  rustenv = [ "ELF_RUNNER_CM_PATH=$elf_runner_cm_path" ]
+
   # component_manager should not depend on json5
   assert_no_deps = [
     # regex crate is large
@@ -289,6 +305,14 @@ fuchsia_component("component-manager-realm-builder-debug-cmp") {
   ]
   component_name = "component_manager"
   manifest = "meta/component_manager_debug.cml"
+}
+
+# This is a low-level action that compiles `elf_runner.cml`
+# without also adding the compiled `.cm` as a `resource`, which would
+# otherwise get funneled into bootfs.
+cm("elf_runner_cm") {
+  output_name = "cml/elf_runner_cm/elf_runner.cm"
+  manifest = "meta/elf_runner.cml"
 }
 
 fuchsia_component("elf_runner") {

@@ -13,6 +13,7 @@ use {
         bootfs::BootfsSvc,
         builtin::{
             arguments::Arguments as BootArguments,
+            builtin_resolver::{BuiltinResolver, SCHEME as BUILTIN_SCHEME},
             cpu_resource::CpuResource,
             crash_introspect::CrashIntrospectSvc,
             debug_resource::DebugResource,
@@ -314,6 +315,8 @@ impl BuiltinEnvironmentBuilder {
                 return Err(format_err!("Root component url is required from RuntimeConfig."));
             }
         };
+
+        register_builtin_resolver(&mut self.resolvers);
 
         let boot_resolver = if self.add_environment_resolvers {
             register_boot_resolver(&mut self.resolvers, &runtime_config).await?
@@ -1252,6 +1255,10 @@ impl BuiltinEnvironment {
         drop(self._service_fs_task.take());
         Ok(())
     }
+}
+
+fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
+    resolvers.register(BUILTIN_SCHEME.to_string(), Box::new(BuiltinResolver {}));
 }
 
 // Creates a FuchsiaBootResolver if the /boot directory is installed in component_manager's

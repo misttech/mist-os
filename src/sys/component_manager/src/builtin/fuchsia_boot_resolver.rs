@@ -439,7 +439,7 @@ impl Resolver for FuchsiaBootResolver {
                 anyhow::format_err!("missing manifest from resolved component").into(),
             )
         })?;
-        let decl = resolver::read_and_validate_manifest(&decl).await?;
+        let decl = resolver::read_and_validate_manifest(&decl)?;
         let config_values = if let Some(cv) = config_values {
             Some(resolver::read_and_validate_config_values(&cv)?)
         } else {

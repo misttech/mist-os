@@ -131,7 +131,7 @@ impl Resolver for RemoteResolver {
             proxy.resolve(component_url).await.map_err(ResolverError::fidl_error)??
         };
         let decl_buffer: fmem::Data = component.decl.ok_or(ResolverError::RemoteInvalidData)?;
-        let decl = read_and_validate_manifest(&decl_buffer).await?;
+        let decl = read_and_validate_manifest(&decl_buffer)?;
         let config_values = if decl.config.is_some() {
             Some(read_and_validate_config_values(
                 &component.config_values.ok_or(ResolverError::RemoteInvalidData)?,
@@ -184,12 +184,18 @@ impl Resolver for InternalResolver {
     }
 }
 
-pub async fn read_and_validate_manifest(
+pub fn read_and_validate_manifest(
     data: &fmem::Data,
 ) -> Result<cm_rust::ComponentDecl, ResolverError> {
     let bytes = mem_util::bytes_from_data(data).map_err(ResolverError::manifest_invalid)?;
+    read_and_validate_manifest_bytes(&bytes)
+}
+
+pub fn read_and_validate_manifest_bytes(
+    bytes: &[u8],
+) -> Result<cm_rust::ComponentDecl, ResolverError> {
     let component_decl: fdecl::Component =
-        fidl::unpersist(&bytes).map_err(ResolverError::manifest_invalid)?;
+        fidl::unpersist(bytes).map_err(ResolverError::manifest_invalid)?;
     cm_fidl_validator::validate(&component_decl).map_err(ResolverError::manifest_invalid)?;
     Ok(component_decl.fidl_into_native())
 }
@@ -534,13 +540,12 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_read_and_validate_manifest() {
+    fn test_read_and_validate_manifest() {
         let manifest = fmem::Data::Bytes(
             fidl::persist(&COMPONENT_DECL.clone().native_into_fidl())
                 .expect("failed to encode manifest"),
         );
-        let actual =
-            read_and_validate_manifest(&manifest).await.expect("failed to decode manifest");
+        let actual = read_and_validate_manifest(&manifest).expect("failed to decode manifest");
         assert_eq!(actual, COMPONENT_DECL.clone());
     }
 

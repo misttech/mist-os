@@ -33,10 +33,16 @@ rustc_binary("simple_elf_program_bin") {
   sources = [ "simple_elf_program.rs" ]
 }
 
-fuchsia_component("simple_elf_program") {
+fuchsia_component("simple_elf_program_packaged_elf_runner") {
   testonly = true
   deps = [ ":simple_elf_program_bin" ]
-  manifest = "meta/simple_elf_program.cml"
+  manifest = "meta/simple_elf_program_packaged_elf_runner.cml"
+}
+
+fuchsia_component("simple_elf_program_builtin_elf_runner") {
+  testonly = true
+  deps = [ ":simple_elf_program_bin" ]
+  manifest = "meta/simple_elf_program_builtin_elf_runner.cml"
 }
 
 fuchsia_unittest_package("builtin-runner-test") {
@@ -44,7 +50,8 @@ fuchsia_unittest_package("builtin-runner-test") {
   deps = [
     ":builtin_runner_test_bin",
     ":component-manager-realm-builder-debug-with-builtin-runner-cmp",
-    ":simple_elf_program",
+    ":simple_elf_program_builtin_elf_runner",
+    ":simple_elf_program_packaged_elf_runner",
     "//src/sys/component_manager:elf_runner",
   ]
 }
