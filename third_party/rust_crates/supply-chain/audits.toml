@@ -161,6 +161,12 @@ who = "Joshua Liebow-Feeser <joshlf@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
 delta = "0.11.12 -> 0.12.3"
 
+[[audits.getrandom]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.2.2 -> 0.2.12"
+notes = "Audited at https://fxrev.dev/932979"
+
 [[audits.hkdf]]
 who = "Joshua Liebow-Feeser <joshlf@google.com>"
 criteria = ["safe-to-deploy", "ub-risk-2"]
@@ -176,6 +182,12 @@ who = "Erick Tryzelaar <etryzelaar@google.com>"
 criteria = ["ub-risk-2", "safe-to-run"]
 version = "0.4.4"
 notes = "Reviewed on https://fxrev.dev/611683"
+
+[[audits.libc]]
+who = "David Koloski <dkoloski@google.com>"
+criteria = ["safe-to-deploy", "ub-risk-2"]
+delta = "0.2.142 -> 0.2.149"
+notes = "Audited at https://fxrev.dev/932979"
 
 [[audits.loom]]
 who = "David Koloski <dkoloski@google.com>"
