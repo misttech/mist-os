@@ -14,19 +14,15 @@ use crate::{
     },
     logging::log_error,
     signals::send_standard_signal,
-    task::{CurrentTask, ExitStatus, Kernel, WaitQueue, Waiter},
+    task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
+    types::auth::{CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
+    types::errno::{errno, error, Errno, EACCES, ENOSYS},
+    types::signals::SIGXFSZ,
+    types::time::{timespec_from_time, NANOS_PER_SECOND},
     types::{
-        __kernel_ulong_t,
-        as_any::AsAny,
-        auth::{CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
-        errno::{errno, error, Errno, EACCES, ENOSYS},
-        fsverity_descriptor, gid_t, ino_t, mode,
-        ownership::ReleasableByRef,
-        signals::SIGXFSZ,
-        statx, statx_timestamp,
-        time::{timespec_from_time, NANOS_PER_SECOND},
-        timespec, uapi, uid_t, Access, DeviceType, FileMode, OpenFlags, Resource,
+        __kernel_ulong_t, as_any::AsAny, fsverity_descriptor, gid_t, ino_t, mode, statx,
+        statx_timestamp, timespec, uapi, uid_t, Access, DeviceType, FileMode, OpenFlags, Resource,
         FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
         FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB,
         LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS,
@@ -1910,17 +1906,8 @@ impl Drop for FsNode {
             fs.remove_node(self);
         }
         if let Some(kernel) = self.kernel.upgrade() {
-            match kernel.kthreads.workaround_for_b297439724_new_system_task() {
-                Ok(workaround_task) => {
-                    if let Err(err) = self.ops.forget(self, &workaround_task) {
-                        log_error!("Error on FsNodeOps::forget: {err:?}");
-                    }
-                    workaround_task.thread_group.exit(ExitStatus::Exit(0));
-                    workaround_task.release(());
-                }
-                Err(e) => {
-                    log_error!("Error creating workaround task: {e:?}");
-                }
+            if let Err(err) = self.ops.forget(self, kernel.kthreads.system_task()) {
+                log_error!("Error on FsNodeOps::forget: {err:?}");
             }
         }
     }
