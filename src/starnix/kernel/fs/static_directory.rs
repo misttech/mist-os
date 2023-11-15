@@ -11,8 +11,9 @@ use crate::{
     },
     task::CurrentTask,
     types::{
+        device_type::DeviceType,
         errno::{errno, Errno},
-        mode, off_t, DeviceType, FileMode, OpenFlags,
+        mode, off_t, FileMode, OpenFlags,
     },
 };
 use std::{collections::BTreeMap, sync::Arc};

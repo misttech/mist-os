@@ -21,9 +21,9 @@ use crate::{
     types::errno::{error, Errno},
     types::signals::{Signal, SIGINT, SIGQUIT, SIGSTOP},
     types::{
-        cc_t, pid_t, tcflag_t, uapi, DeviceType, ECHO, ECHOCTL, ECHONL, ICANON, ICRNL, IEXTEN,
-        IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL, VEOL2,
-        VERASE, VINTR, VQUIT, VSUSP, XTABS,
+        cc_t, device_type::DeviceType, pid_t, tcflag_t, uapi, ECHO, ECHOCTL, ECHONL, ICANON, ICRNL,
+        IEXTEN, IGNCR, INLCR, ISIG, IUTF8, OCRNL, ONLCR, ONLRET, ONOCR, OPOST, TABDLY, VEOF, VEOL,
+        VEOL2, VERASE, VINTR, VQUIT, VSUSP, XTABS,
     },
 };
 

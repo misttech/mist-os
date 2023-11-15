@@ -23,8 +23,9 @@ use crate::{
     task::{CurrentTask, Kernel},
     types::{
         as_any::AsAny,
+        device_type::DeviceType,
         errno::{error, Errno},
-        ino_t, statfs, ArcKey, DeviceType, MountFlags,
+        ino_t, statfs, ArcKey, MountFlags,
     },
 };
 

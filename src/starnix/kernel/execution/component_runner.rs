@@ -25,12 +25,13 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{ExitStatus, Task},
+    types::device_type::DeviceType,
     types::{
         auth::Capabilities,
         errno::{Errno, EEXIST, ENOTDIR},
         mode, release_on_error,
         signals::{SIGINT, SIGKILL},
-        DeviceType, MountFlags, OpenFlags, ReleasableByRef, WeakRef,
+        MountFlags, OpenFlags, ReleasableByRef, WeakRef,
     },
 };
 

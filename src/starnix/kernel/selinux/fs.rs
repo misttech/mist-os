@@ -14,8 +14,9 @@ use crate::{
     logging::not_implemented,
     task::{CurrentTask, Task},
     types::{
+        device_type::DeviceType,
         errno::{errno, error, Errno},
-        mode, statfs, DeviceType, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC,
+        mode, statfs, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC,
     },
 };
 use derivative::Derivative;

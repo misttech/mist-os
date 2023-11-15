@@ -17,8 +17,9 @@ use crate::{
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
     types::{
+        device_type::DeviceType,
         errno::{error, Errno},
-        gid_t, mode, statfs, uid_t, DeviceType, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC,
+        gid_t, mode, statfs, uid_t, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC,
     },
 };
 

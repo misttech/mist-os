@@ -10,7 +10,7 @@ use crate::{
     },
     task::Kernel,
     types::errno::Errno,
-    types::{mode, DeviceType},
+    types::{device_type::DeviceType, mode},
 };
 use std::sync::Arc;
 

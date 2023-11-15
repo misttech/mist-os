@@ -307,7 +307,7 @@ impl DirEntry {
                 mount,
                 name,
                 crate::types::mode!(IFDIR, 0o777),
-                crate::types::DeviceType::NONE,
+                crate::types::device_type::DeviceType::NONE,
                 FsCred::root(),
             )
         })

@@ -19,8 +19,9 @@ use crate::{
     },
     task::{CurrentTask, Task},
     types::{
+        device_type::DeviceType,
         errno::{errno, error, Errno},
-        pid_t, DeviceType, FileMode, OpenFlags, WeakRef,
+        pid_t, FileMode, OpenFlags, WeakRef,
     },
 };
 

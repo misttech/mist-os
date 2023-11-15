@@ -17,9 +17,10 @@ use crate::{
     },
     task::{CurrentTask, Kernel},
     types::{
+        device_type::DeviceType,
         errno::{error, Errno},
         user_address::UserAddress,
-        DeviceType, FileMode, OpenFlags,
+        FileMode, OpenFlags,
     },
 };
 
