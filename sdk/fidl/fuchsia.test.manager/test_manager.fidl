@@ -12,65 +12,6 @@ using fuchsia.test;
 using fuchsia.url;
 using zx;
 
-/// Holds the server end of an iterator over the isolated logs of a test.
-type LogsIterator = flexible resource union {
-    1: reserved;
-    /// Server end of the iterator, when this protocol is used by Fuchsia clients.
-    2: batch server_end:fuchsia.diagnostics.BatchIterator;
-    /// Server end of the iterator, when this protocol is used by host-side clients.
-    /// This uses the protocol specified in fuchsia.diagnostics.host.ArchiveReader.
-    3: stream zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
-};
-
-/// Error for `LaunchSuite` call.
-type LaunchError = flexible enum {
-    /// There were insufficient resources to perform the operation.
-    RESOURCE_UNAVAILABLE = 1;
-
-    /// Cannot resolve `test_url`.
-    INSTANCE_CANNOT_RESOLVE = 2;
-
-    /// Invalid argument(s) passed.
-    INVALID_ARGS = 3;
-
-    /// Failed to connect to the `fuchsia.test.TestSuite` that the test should
-    /// expose.
-    FAILED_TO_CONNECT_TO_TEST_SUITE = 4;
-
-    /// Failed to enumerate tests.
-    CASE_ENUMERATION = 5;
-
-    /// Some internal error occurred. Something wrong with test manager setup.
-    /// Check logs and report bug.
-    INTERNAL_ERROR = 6;
-
-    /// No test cases matched the specified test filters. This error is only
-    /// returned when a test filter is specified. In the case of a test suite
-    /// with no test cases, the suite will pass.
-    NO_MATCHING_CASES = 7;
-
-    /// Test manifest is invalid.
-    INVALID_MANIFEST = 8;
-};
-
-/// Human-readable name for a test case.
-alias CaseName = string:fuchsia.test.MAX_TEST_NAME;
-
-/// Information about the enumerated test case.
-type Case = table {
-    /// Name of the test case.
-    1: name CaseName;
-};
-
-/// Iterator for listing available test cases.
-closed protocol CaseIterator {
-    /// Returns the next batch of test cases.
-    /// Empty vector if no more test cases.
-    strict GetNext() -> (struct {
-        cases vector<Case>:MAX;
-    });
-};
-
 // Query server for tests which implement `fuchsia.test.Suite` protocol.
 @discoverable
 open protocol Query {
@@ -94,6 +35,24 @@ open protocol Query {
         iterator server_end:CaseIterator;
     }) -> () error LaunchError;
 };
+
+/// Iterator for listing available test cases.
+closed protocol CaseIterator {
+    /// Returns the next batch of test cases.
+    /// Empty vector if no more test cases.
+    strict GetNext() -> (struct {
+        cases vector<Case>:MAX;
+    });
+};
+
+/// Information about the enumerated test case.
+type Case = table {
+    /// Name of the test case.
+    1: name CaseName;
+};
+
+/// Human-readable name for a test case.
+alias CaseName = string:fuchsia.test.MAX_TEST_NAME;
 
 /// This is the entry point of running test suites. A test "run" consists of
 /// multiple test "suites" which consists of running multiple "test cases".
@@ -203,6 +162,16 @@ type RunOptions = table {
     /// Configures the minimum severity for the components under test.
     7: log_interest
             vector<fuchsia.diagnostics.LogInterestSelector>:fuchsia.diagnostics.MAX_LOG_SELECTORS;
+};
+
+/// Holds the server end of an iterator over the isolated logs of a test.
+type LogsIterator = flexible resource union {
+    1: reserved;
+    /// Server end of the iterator, when this protocol is used by Fuchsia clients.
+    2: batch server_end:fuchsia.diagnostics.BatchIterator;
+    /// Server end of the iterator, when this protocol is used by host-side clients.
+    /// This uses the protocol specified in fuchsia.diagnostics.host.ArchiveReader.
+    3: stream zx.Handle:<SOCKET, zx.Rights.WRITE | zx.Rights.WAIT>;
 };
 
 /// Option which specifies which kind of iterator the client supports
@@ -332,8 +301,7 @@ type SuiteEventPayload = flexible resource union {
     8: suite_stopped SuiteStopped;
 };
 
-/// Test case identifier. Unique in a suite run.
-alias TestCaseId = uint32;
+type SuiteStarted = struct {};
 
 type CaseFound = struct {
     /// Name of this test case.
@@ -346,6 +314,31 @@ type CaseFound = struct {
 type CaseStarted = struct {
     identifier TestCaseId;
 };
+
+type CaseArtifact = resource struct {
+    identifier TestCaseId;
+    artifact Artifact;
+};
+
+type CaseStopped = struct {
+    identifier TestCaseId;
+    status CaseStatus;
+};
+
+type CaseFinished = struct {
+    identifier TestCaseId;
+};
+
+type SuiteArtifact = resource struct {
+    artifact Artifact;
+};
+
+type SuiteStopped = struct {
+    status SuiteStatus;
+};
+
+/// Test case identifier. Unique in a suite run.
+alias TestCaseId = uint32;
 
 /// Represent status of a test case run execution.
 type CaseStatus = flexible enum {
@@ -388,21 +381,6 @@ type SuiteStatus = flexible enum {
 
     // Some internal error occurred, please file bug.
     INTERNAL_ERROR = 6;
-};
-
-type CaseStopped = struct {
-    identifier TestCaseId;
-    status CaseStatus;
-};
-
-type CaseFinished = struct {
-    identifier TestCaseId;
-};
-
-type SuiteStarted = struct {};
-
-type SuiteStopped = struct {
-    status SuiteStatus;
 };
 
 type Artifact = flexible resource union {
@@ -449,15 +427,6 @@ type DirectoryAndToken = resource struct {
     token zx.Handle:EVENTPAIR;
 };
 
-type CaseArtifact = resource struct {
-    identifier TestCaseId;
-    artifact Artifact;
-};
-
-type SuiteArtifact = resource struct {
-    artifact Artifact;
-};
-
 /// An iterator protocol over which a client may retrieve debug data information.
 closed protocol DebugDataIterator {
     /// Retrieve the next batch of debug data. This is a hanging get; if no data is
@@ -473,4 +442,35 @@ type DebugData = resource table {
     1: name string:512;
     /// Socket over which the file may be accessed.
     2: socket zx.Handle:SOCKET;
+};
+
+/// Error for `LaunchSuite` call.
+type LaunchError = flexible enum {
+    /// There were insufficient resources to perform the operation.
+    RESOURCE_UNAVAILABLE = 1;
+
+    /// Cannot resolve `test_url`.
+    INSTANCE_CANNOT_RESOLVE = 2;
+
+    /// Invalid argument(s) passed.
+    INVALID_ARGS = 3;
+
+    /// Failed to connect to the `fuchsia.test.TestSuite` that the test should
+    /// expose.
+    FAILED_TO_CONNECT_TO_TEST_SUITE = 4;
+
+    /// Failed to enumerate tests.
+    CASE_ENUMERATION = 5;
+
+    /// Some internal error occurred. Something wrong with test manager setup.
+    /// Check logs and report bug.
+    INTERNAL_ERROR = 6;
+
+    /// No test cases matched the specified test filters. This error is only
+    /// returned when a test filter is specified. In the case of a test suite
+    /// with no test cases, the suite will pass.
+    NO_MATCHING_CASES = 7;
+
+    /// Test manifest is invalid.
+    INVALID_MANIFEST = 8;
 };
