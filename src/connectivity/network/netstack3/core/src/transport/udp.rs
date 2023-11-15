@@ -7340,13 +7340,18 @@ mod tests {
                 }) if found_remote_ip.into_inner().addr() == remote_ip &&
                     found_remote_port == REMOTE_PORT
             );
-        } else {
-            // Verify the original state is preserved.
+            // Disconnect the socket, returning it to the original state.
             assert_eq!(
-                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
-                SocketInfo::Unbound
+                SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, socket),
+                Ok(())
             );
         }
+
+        // Verify the original state is preserved.
+        assert_eq!(
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+            SocketInfo::Unbound
+        );
     }
 
     #[test_case(V6_LOCAL_IP, V6_REMOTE_IP, Ok(());
@@ -7411,13 +7416,23 @@ mod tests {
                 }) if found_remote_ip.into_inner().addr() == remote_ip &&
                     found_remote_port == REMOTE_PORT
             );
-        } else {
-            // Verify the original state is preserved.
-            assert_matches!(
-                SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
-                SocketInfo::Listener(_)
+            // Disconnect the socket, returning it to the original state.
+            assert_eq!(
+                SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, socket),
+                Ok(())
             );
         }
+
+        // Verify the original state is preserved.
+        assert_matches!(
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+            SocketInfo::Listener(ListenerInfo {
+                local_ip: found_local_ip, local_port: found_local_port
+            }) if found_local_port == LOCAL_PORT &&
+                local_ip == found_local_ip.map(
+                        |a| a.into_inner().addr().get()
+                    ).unwrap_or(Ipv6::UNSPECIFIED_ADDRESS)
+        );
     }
 
     #[test_case(V6_REMOTE_IP, V6_REMOTE_IP, Ok(());
@@ -7482,6 +7497,16 @@ mod tests {
                 remote_port: found_remote_port,
             }) if found_remote_ip.into_inner().addr() == expected_remote_ip &&
                 found_remote_port == expected_remote_port
+        );
+
+        // Disconnect the socket and verify it returns to unbound state.
+        assert_eq!(
+            SocketHandler::disconnect_connected(&mut sync_ctx, &mut non_sync_ctx, socket),
+            Ok(())
+        );
+        assert_eq!(
+            SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
+            SocketInfo::Unbound
         );
     }
 
