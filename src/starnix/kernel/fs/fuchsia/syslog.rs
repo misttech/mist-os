@@ -8,7 +8,8 @@ use crate::{
         default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
     logging::log,
-    syscalls::{CurrentTask, OpenFlags, SyscallArg, SyscallResult},
+    syscalls::{OpenFlags, SyscallArg, SyscallResult},
+    task::CurrentTask,
     types::errno::Errno,
 };
 
