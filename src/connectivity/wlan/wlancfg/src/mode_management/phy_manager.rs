@@ -733,19 +733,38 @@ async fn create_iface(
     let request = fidl_service::CreateIfaceRequest { phy_id, role, sta_addr: sta_addr.to_array() };
     let create_iface_response = match proxy.create_iface(&request).await {
         Ok((status, iface_response)) => {
-            if fuchsia_zircon::ok(status).is_err() || iface_response.is_none() {
-                telemetry_sender.send(TelemetryEvent::IfaceCreationFailure);
-                return Err(PhyManagerError::IfaceCreateFailure);
+            // Ensure that the CreateIface call
+            // 1. Did not return a non-ok status
+            // 2. Resulted in an interface ID
+            if fuchsia_zircon::ok(status).is_err() {
+                warn!("create iface failed for PHY {}: {:?}", phy_id, status);
+                Err(PhyManagerError::IfaceCreateFailure)
+            } else {
+                match iface_response {
+                    Some(response) => Ok(response.iface_id),
+                    None => {
+                        warn!(
+                            "create iface succeeded but did not provide iface ID for PHY {}",
+                            phy_id
+                        );
+                        Err(PhyManagerError::IfaceCreateFailure)
+                    }
+                }
             }
-            iface_response.ok_or_else(|| PhyManagerError::IfaceCreateFailure)?
         }
         Err(e) => {
-            warn!("failed to create iface for PHY {}: {}", phy_id, e);
-            telemetry_sender.send(TelemetryEvent::IfaceCreationFailure);
-            return Err(PhyManagerError::IfaceCreateFailure);
+            warn!("create iface request failed for PHY {}: {}", phy_id, e);
+            Err(PhyManagerError::IfaceCreateFailure)
         }
     };
-    Ok(create_iface_response.iface_id)
+
+    if create_iface_response.is_ok() {
+        telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Ok(())));
+    } else {
+        telemetry_sender.send(TelemetryEvent::IfaceCreationResult(Err(())));
+    }
+
+    create_iface_response
 }
 
 /// Destroys the specified interface.
@@ -3573,7 +3592,10 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(0)));
 
         // Verify that there is nothing waiting on the telemetry receiver.
-        assert_variant!(test_values.telemetry_receiver.try_next(), Err(_))
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceCreationResult(Ok(()))))
+        )
     }
 
     #[fuchsia::test]
@@ -3606,7 +3628,7 @@ mod tests {
         // Verify that a metric has been logged.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceCreationFailure))
+            Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
         )
     }
 
@@ -3636,7 +3658,7 @@ mod tests {
         // Verify that a metric has been logged.
         assert_variant!(
             test_values.telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::IfaceCreationFailure))
+            Ok(Some(TelemetryEvent::IfaceCreationResult(Err(()))))
         )
     }
 
