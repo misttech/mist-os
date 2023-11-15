@@ -201,20 +201,20 @@ TEST(F2fsTest, GetFilesystemInfo) {
   ASSERT_EQ(info.block_size, kBlockSize);
   ASSERT_EQ(info.max_filename_size, kMaxNameLen);
   ASSERT_EQ(info.fs_type, fuchsia_fs::VfsType::kF2Fs);
-  ASSERT_EQ(info.total_bytes, sb_info.GetUserBlockCount() * kBlockSize);
-  ASSERT_EQ(info.used_bytes, sb_info.GetTotalValidBlockCount() * kBlockSize);
-  ASSERT_EQ(info.total_nodes, sb_info.GetTotalNodeCount());
-  ASSERT_EQ(info.used_nodes, sb_info.GetTotalValidInodeCount());
+  ASSERT_EQ(info.total_bytes, sb_info.GetTotalBlockCount() * kBlockSize);
+  ASSERT_EQ(info.used_bytes, sb_info.GetValidBlockCount() * kBlockSize);
+  ASSERT_EQ(info.total_nodes, sb_info.GetMaxNodeCount());
+  ASSERT_EQ(info.used_nodes, sb_info.GetValidInodeCount());
   ASSERT_EQ(info.name, "f2fs");
 
   // Check type conversion
-  block_t tmp_user_block_count = sb_info.GetUserBlockCount();
-  block_t tmp_valid_block_count = sb_info.GetUserBlockCount();
+  block_t tmp_user_block_count = sb_info.GetTotalBlockCount();
+  block_t tmp_valid_block_count = sb_info.GetTotalBlockCount();
 
   constexpr uint64_t LARGE_BLOCK_COUNT = 26214400;  // 100GB
 
-  sb_info.SetUserBlockCount(LARGE_BLOCK_COUNT);
-  sb_info.SetTotalValidBlockCount(LARGE_BLOCK_COUNT);
+  sb_info.SetTotalBlockCount(LARGE_BLOCK_COUNT);
+  sb_info.SetValidBlockCount(LARGE_BLOCK_COUNT);
 
   info_or = fs->GetFilesystemInfo();
   ASSERT_TRUE(info_or.is_ok());
@@ -223,8 +223,8 @@ TEST(F2fsTest, GetFilesystemInfo) {
   ASSERT_EQ(info.total_bytes, LARGE_BLOCK_COUNT * kBlockSize);
   ASSERT_EQ(info.used_bytes, LARGE_BLOCK_COUNT * kBlockSize);
 
-  sb_info.SetUserBlockCount(tmp_user_block_count);
-  sb_info.SetTotalValidBlockCount(tmp_valid_block_count);
+  sb_info.SetTotalBlockCount(tmp_user_block_count);
+  sb_info.SetValidBlockCount(tmp_valid_block_count);
   FileTester::Unmount(std::move(fs), &bc);
 }
 

@@ -6,13 +6,6 @@
 
 namespace f2fs {
 
-bool F2fs::SpaceForRollForward() const {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  std::lock_guard stat_lock(superblock_info.GetStatLock());
-  return superblock_info.GetLastValidBlockCount() + superblock_info.GetAllocValidBlockCount() <=
-         superblock_info.GetUserBlockCount();
-}
-
 F2fs::FsyncInodeEntry *F2fs::GetFsyncInode(FsyncInodeList &inode_list, nid_t ino) {
   auto inode_entry =
       inode_list.find_if([ino](const auto &entry) { return entry.GetVnode().Ino() == ino; });
@@ -50,8 +43,6 @@ zx_status_t F2fs::RecoverInode(VnodeF2fs &vnode, NodePage &node_page) {
 }
 
 zx_status_t F2fs::FindFsyncDnodes(FsyncInodeList &inode_list) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  uint64_t cp_ver = LeToCpu(superblock_info.GetCheckpoint().checkpoint_ver);
   fbl::RefPtr<VnodeF2fs> vnode_refptr;
   zx_status_t err = ZX_OK;
 
@@ -70,7 +61,7 @@ zx_status_t F2fs::FindFsyncDnodes(FsyncInodeList &inode_list) {
       return ret;
     }
 
-    if (cp_ver != page.GetPage<NodePage>().CpverOfNode()) {
+    if (superblock_info_->GetCheckpointVer() != page.GetPage<NodePage>().CpverOfNode()) {
       break;
     }
 
@@ -137,10 +128,9 @@ void F2fs::DestroyFsyncDnodes(FsyncInodeList &inode_list) {
 }
 
 void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
   uint32_t segno = segment_manager_->GetSegmentNumber(blkaddr);
-  uint16_t blkoff = static_cast<uint16_t>(segment_manager_->GetSegOffFromSeg0(blkaddr) &
-                                          (superblock_info.GetBlocksPerSeg() - 1));
+  size_t blkoff =
+      segment_manager_->GetSegOffFromSeg0(blkaddr) & (superblock_info_->GetBlocksPerSeg() - 1);
   Summary sum;
   nid_t ino;
   block_t bidx;
@@ -258,8 +248,6 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
 }
 
 void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  uint64_t cp_ver = LeToCpu(superblock_info.GetCheckpoint().checkpoint_ver);
   block_t blkaddr = segment_manager_->NextFreeBlkAddr(type);
 
   while (true) {
@@ -274,7 +262,7 @@ void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
       break;
     }
 
-    if (cp_ver != page.GetPage<NodePage>().CpverOfNode()) {
+    if (superblock_info_->GetCheckpointVer() != page.GetPage<NodePage>().CpverOfNode()) {
       break;
     }
 
@@ -294,11 +282,10 @@ void F2fs::RecoverData(FsyncInodeList &inode_list, CursegType type) {
 }
 
 void F2fs::RecoverFsyncData() {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
   FsyncInodeList inode_list;
 
   // Step #1: find fsynced inode numbers
-  superblock_info.SetOnRecovery();
+  SetOnRecovery();
   if (auto result = FindFsyncDnodes(inode_list); result == ZX_OK) {
     // Step #2: recover data
     if (!inode_list.is_empty()) {
@@ -311,7 +298,7 @@ void F2fs::RecoverFsyncData() {
   // TODO: Handle error cases
   GetMetaVnode().InvalidatePages(GetSegmentManager().GetMainAreaStartBlock());
   DestroyFsyncDnodes(inode_list);
-  superblock_info.ClearOnRecovery();
+  ClearOnRecovery();
 }
 
 }  // namespace f2fs

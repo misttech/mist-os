@@ -97,7 +97,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
   }
 
   void GetLastCheckpoint(uint32_t expect_cp_position, bool after_mkfs, LockedPage *cp_out) {
-    Superblock &raw_superblock = fs_->GetSuperblockInfo().GetSuperblock();
+    const Superblock &raw_superblock = fs_->GetSuperblockInfo().GetSuperblock();
     Checkpoint *cp_block1 = nullptr, *cp_block2 = nullptr;
     LockedPage cp_page1, cp_page2;
 
@@ -331,7 +331,7 @@ TEST_F(CheckpointTest, AddOrphanInode) {
       ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpOrphanPresentFlag));
 
       for (auto ino : exp_inos) {
-        fs_->GetSuperblockInfo().RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
+        fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
       }
 
       for (block_t i = 0; i < orphan_blkaddr; ++i) {
@@ -363,10 +363,10 @@ TEST_F(CheckpointTest, AddOrphanInode) {
                  std::default_random_engine(static_cast<uint32_t>(cp->checkpoint_ver)));
 
     for (auto ino : inos) {
-      fs_->GetSuperblockInfo().AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
+      fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
     }
 
-    ASSERT_EQ(fs_->GetSuperblockInfo().GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
+    ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
 
     // Add duplicate orphan inodes
     constexpr uint32_t kGapBetweenTargetInos = 10;
@@ -377,7 +377,7 @@ TEST_F(CheckpointTest, AddOrphanInode) {
     });
 
     for (auto ino : dup_inos) {
-      fs_->GetSuperblockInfo().AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
+      fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
     }
   };
 
@@ -427,7 +427,7 @@ TEST_F(CheckpointTest, RemoveOrphanInode) {
         for (block_t j = 0; j < LeToCpu(orphan_blk->entry_count); ++j) {
           nid_t ino = LeToCpu(orphan_blk->ino[j]);
           cp_inos.push_back(ino);
-          superblock_info.RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
+          fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
         }
       }
 
@@ -445,9 +445,9 @@ TEST_F(CheckpointTest, RemoveOrphanInode) {
 
     if (cp->checkpoint_ver <= kCheckpointLoopCnt) {
       for (auto ino : inos) {
-        superblock_info.AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
+        fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
       }
-      ASSERT_EQ(superblock_info.GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
+      ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
     }
 
     // 5. Remove orphan inodes
@@ -458,7 +458,7 @@ TEST_F(CheckpointTest, RemoveOrphanInode) {
     });
 
     for (auto ino : rm_inos) {
-      superblock_info.RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
+      fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
     }
   };
 
@@ -507,7 +507,7 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
 
       for (auto &vnode_refptr : vnodes) {
         ASSERT_EQ(vnode_refptr.get()->GetNlink(), (uint32_t)0);
-        superblock_info.RemoveVnodeFromVnodeSet(InoType::kOrphanIno, vnode_refptr->GetKey());
+        fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, vnode_refptr->GetKey());
         vnode_refptr.reset();
       }
       vnodes.clear();
@@ -541,11 +541,11 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
       fs_->InsertVnode(vnode);
 
       vnodes.push_back(std::move(vnode_refptr));
-      superblock_info.AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
+      fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
       vnode_refptr.reset();
     }
 
-    ASSERT_EQ(superblock_info.GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
+    ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), orphan_inos);
   };
 
   DoFirstCheckpoint(check_recover_orphan_inode);

@@ -312,15 +312,15 @@ TEST_F(VnodeTest, SyncFile) {
 
   // 4. Check SpaceForRollForward()
   pre_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
-  block_t temp_user_block_count = fs_->GetSuperblockInfo().GetUserBlockCount();
-  fs_->GetSuperblockInfo().SetUserBlockCount(0);
+  block_t temp_user_block_count = fs_->GetSuperblockInfo().GetTotalBlockCount();
+  fs_->GetSuperblockInfo().SetTotalBlockCount(0);
   file_vnode->SetDirty();
   ASSERT_EQ(file_vnode->SyncFile(0, safemath::checked_cast<loff_t>(file_vnode->GetSize()), 0),
             ZX_OK);
   ASSERT_FALSE(file_vnode->TestFlag(InodeInfoFlag::kNeedCp));
   curr_checkpoint_ver = fs_->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
-  fs_->GetSuperblockInfo().SetUserBlockCount(temp_user_block_count);
+  fs_->GetSuperblockInfo().SetTotalBlockCount(temp_user_block_count);
 
   ASSERT_EQ(file_vnode->Close(), ZX_OK);
   file_vnode = nullptr;

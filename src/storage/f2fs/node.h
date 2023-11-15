@@ -158,7 +158,6 @@ class NodeManager {
 
   bool IsCheckpointedNode(nid_t nid);
 
-  void DecValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isInode);
   bool FlushNatsInJournal();
   zx_status_t FlushNatEntries();
 
@@ -206,8 +205,6 @@ class NodeManager {
 
  private:
   friend class MapTester;
-  bool IncValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isInode);
-
   pgoff_t CurrentNatAddr(nid_t start);
   bool IsUpdatedNatPage(nid_t start);
   pgoff_t NextNatAddr(pgoff_t block_addr);

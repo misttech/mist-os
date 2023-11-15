@@ -471,7 +471,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
   int slots = (LeToCpu(dentry->name_len) + kNameLen - 1) / kNameLen;
 
   // Add to VnodeSet to ensure consistency of deleted entry.
-  superblock_info_.AddVnodeToVnodeSet(InoType::kModifiedDirIno, Ino());
+  fs()->AddVnodeToVnodeSet(InoType::kModifiedDirIno, Ino());
 
   if (TestFlag(InodeInfoFlag::kInlineDentry)) {
     DeleteInlineEntry(dentry, page, vnode);

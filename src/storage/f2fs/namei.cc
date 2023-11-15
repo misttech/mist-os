@@ -13,7 +13,7 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   fbl::RefPtr<VnodeF2fs> vnode;
 
   do {
-    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
     if (fs()->GetNodeManager().AllocNid(ino).is_error()) {
       return ZX_ERR_NO_SPACE;
     }
@@ -103,7 +103,7 @@ zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::V
     SetColdFile(*vnode);
 
   {
-    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
     if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
       vnode->ClearNlink();
       vnode->UnlockNewInode();
@@ -162,7 +162,7 @@ zx_status_t Dir::Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) {
     target->SetCTime(cur_time);
 
     {
-      fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+      fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
       target->SetFlag(InodeInfoFlag::kIncLink);
       if (zx_status_t err = AddLink(name, target.get()); err != ZX_OK) {
         target->ClearFlag(InodeInfoFlag::kIncLink);
@@ -212,7 +212,7 @@ zx_status_t Dir::DoUnlink(VnodeF2fs *vnode, std::string_view name) {
     }
 
     {
-      fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+      fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
       if (zx_status_t err = fs()->CheckOrphanSpace(); err != ZX_OK) {
         return err;
       }
@@ -271,7 +271,7 @@ zx_status_t Dir::Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnod
   vnode->SetName(name);
   vnode->SetFlag(InodeInfoFlag::kIncLink);
   {
-    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
     if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
       vnode->ClearFlag(InodeInfoFlag::kIncLink);
       vnode->ClearNlink();
@@ -407,7 +407,7 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
       }
     }
 
-    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
     fbl::RefPtr<Page> new_page;
     DirEntry *new_entry = nullptr;
     if (is_same_dir) {
@@ -505,9 +505,9 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
 
     // Add new parent directory to VnodeSet to ensure consistency of renamed vnode.
-    superblock_info_.AddVnodeToVnodeSet(InoType::kModifiedDirIno, new_dir->Ino());
+    fs()->AddVnodeToVnodeSet(InoType::kModifiedDirIno, new_dir->Ino());
     if (old_vnode->IsDir()) {
-      superblock_info_.AddVnodeToVnodeSet(InoType::kModifiedDirIno, old_vnode->Ino());
+      fs()->AddVnodeToVnodeSet(InoType::kModifiedDirIno, old_vnode->Ino());
     }
   }
 

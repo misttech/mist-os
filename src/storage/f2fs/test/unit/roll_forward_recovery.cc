@@ -408,8 +408,8 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   // 4. Not enough SpaceForRollForward
   ASSERT_EQ(root_dir->Create("fsync_file_space_for_roll_forward", S_IFREG, &file_fs_vnode), ZX_OK);
   fsync_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(file_fs_vnode));
-  block_t temp_user_block_count = fs->GetSuperblockInfo().GetUserBlockCount();
-  fs->GetSuperblockInfo().SetUserBlockCount(0);
+  block_t temp_user_block_count = fs->GetSuperblockInfo().GetTotalBlockCount();
+  fs->GetSuperblockInfo().SetTotalBlockCount(0);
 
   pre_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   ASSERT_EQ(fsync_vnode->SyncFile(0, safemath::checked_cast<loff_t>(fsync_vnode->GetSize()), 0),
@@ -417,7 +417,7 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   curr_checkpoint_ver = fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver;
   // Checkpoint should be performed instead of fsync
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
-  fs->GetSuperblockInfo().SetUserBlockCount(temp_user_block_count);
+  fs->GetSuperblockInfo().SetTotalBlockCount(temp_user_block_count);
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
   fsync_vnode = nullptr;

@@ -397,25 +397,25 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
   }
 
   // Check IncValidNodeCount() exception case
-  block_t tmp_total_valid_block_count = superblock_info.GetTotalValidBlockCount();
-  superblock_info.SetTotalValidBlockCount(superblock_info.GetUserBlockCount());
+  block_t tmp_total_valid_block_count = superblock_info.GetValidBlockCount();
+  superblock_info.SetValidBlockCount(superblock_info.GetTotalBlockCount());
   {
     LockedPage dnode_page;
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv1 + direct_blks,
                                                        &dnode_page),
               ZX_ERR_NO_SPACE);
   }
-  superblock_info.SetTotalValidBlockCount(tmp_total_valid_block_count);
+  superblock_info.SetValidBlockCount(tmp_total_valid_block_count);
 
-  block_t tmp_total_valid_node_count = superblock_info.GetTotalValidNodeCount();
-  superblock_info.SetTotalValidNodeCount(superblock_info.GetTotalNodeCount());
+  block_t tmp_total_valid_node_count = superblock_info.GetValidNodeCount();
+  superblock_info.SetValidNodeCount(superblock_info.GetMaxNodeCount());
   {
     LockedPage dnode_page;
     ASSERT_EQ(fs_->GetNodeManager().GetLockedDnodePage(*vnode, indirect_index_lv1 + direct_blks,
                                                        &dnode_page),
               ZX_ERR_NO_SPACE);
   }
-  superblock_info.SetTotalValidNodeCount(tmp_total_valid_node_count);
+  superblock_info.SetValidNodeCount(tmp_total_valid_node_count);
 
   // Check NewNodePage() exception case
   fbl::RefPtr<VnodeF2fs> test_vnode;
@@ -425,12 +425,12 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
   ASSERT_EQ(fs_->GetNodeManager().NewInodePage(*test_vnode).status_value(), ZX_ERR_ACCESS_DENIED);
   test_vnode->ClearFlag(InodeInfoFlag::kNoAlloc);
 
-  tmp_total_valid_block_count = superblock_info.GetTotalValidBlockCount();
-  superblock_info.SetTotalValidBlockCount(superblock_info.GetUserBlockCount());
+  tmp_total_valid_block_count = superblock_info.GetValidBlockCount();
+  superblock_info.SetValidBlockCount(superblock_info.GetTotalBlockCount());
   ASSERT_EQ(fs_->GetNodeManager().NewInodePage(*test_vnode).status_value(), ZX_ERR_NO_SPACE);
   ASSERT_EQ(test_vnode->Close(), ZX_OK);
   test_vnode.reset();
-  superblock_info.SetTotalValidBlockCount(tmp_total_valid_block_count);
+  superblock_info.SetValidBlockCount(tmp_total_valid_block_count);
 
   vnode->SetBlocks(0);
 
@@ -471,8 +471,8 @@ TEST_F(NodeManagerTest, TruncateDoubleIndirect) {
   const pgoff_t double_indirect_index = indirect_index + indirect_blks * 2;
   const uint32_t inode_cnt = 2;
 
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), inode_cnt);
 
   std::vector<nid_t> nids;
   NodeManager &node_manager = fs_->GetNodeManager();
@@ -492,13 +492,13 @@ TEST_F(NodeManagerTest, TruncateDoubleIndirect) {
 
   // alloc_dnode cnt should be one
   ASSERT_EQ(nids.size(), 1UL);
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   // Truncate double the indirect node
   ASSERT_EQ(fs_->GetNodeManager().TruncateInodeBlocks(*vnode, double_indirect_index), ZX_OK);
   node_cnt = inode_cnt;
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   MapTester::RemoveTruncatedNode(node_manager, nids);
   ASSERT_EQ(nids.size(), 0UL);
@@ -530,8 +530,8 @@ TEST_F(NodeManagerTest, TruncateIndirect) {
   const pgoff_t direct_index = kAddrsPerInode + 1;
   const pgoff_t indirect_index = direct_index + direct_blks * 2;
   const uint32_t inode_cnt = 2;
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), inode_cnt);
 
   std::vector<nid_t> nids;
   NodeManager &node_manager = fs_->GetNodeManager();
@@ -550,15 +550,15 @@ TEST_F(NodeManagerTest, TruncateIndirect) {
   uint32_t alloc_node_cnt = indirect_node_cnt + direct_node_cnt;
 
   ASSERT_EQ(nids.size(), direct_node_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   // Truncate indirect nodes
   ASSERT_EQ(fs_->GetNodeManager().TruncateInodeBlocks(*vnode, indirect_index), ZX_OK);
   --indirect_node_cnt;
   --direct_node_cnt;
   node_cnt = inode_cnt + direct_node_cnt + indirect_node_cnt;
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   MapTester::RemoveTruncatedNode(node_manager, nids);
 
@@ -568,12 +568,12 @@ TEST_F(NodeManagerTest, TruncateIndirect) {
   ASSERT_EQ(fs_->GetNodeManager().TruncateInodeBlocks(*vnode, direct_index), ZX_OK);
   direct_node_cnt -= 2;
   node_cnt = inode_cnt + direct_node_cnt + indirect_node_cnt;
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   MapTester::RemoveTruncatedNode(node_manager, nids);
   ASSERT_EQ(nids.size(), direct_node_cnt);
 
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
 
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt - alloc_node_cnt);
   fs_->WriteCheckpoint(false, false);
@@ -599,8 +599,8 @@ TEST_F(NodeManagerTest, TruncateExceptionCase) {
   // Fill direct node (level 1)
   const uint32_t inode_cnt = 2;
 
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), inode_cnt);
 
   const pgoff_t direct_index = 1;
   const pgoff_t direct_blks = kAddrsPerBlock;
@@ -629,8 +629,8 @@ TEST_F(NodeManagerTest, TruncateExceptionCase) {
   uint32_t node_cnt = inode_cnt + direct_node_cnt + indirect_node_cnt;
 
   ASSERT_EQ(nids.size(), direct_node_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   // 1. Truncate invalid node
   ASSERT_EQ(fs_->GetNodeManager().TruncateInodeBlocks(*vnode, indirect_index_invalid_lv4),
@@ -660,13 +660,13 @@ TEST_F(NodeManagerTest, TruncateExceptionCase) {
   FaultInjectToDnodeAndTruncate(node_manager, vnode, indirect_index_lv1, kNullAddr, ZX_OK);
   --indirect_node_cnt;
   node_cnt = inode_cnt + indirect_node_cnt;
-  ASSERT_EQ(superblock_info.GetTotalValidNodeCount(), node_cnt);
+  ASSERT_EQ(superblock_info.GetValidNodeCount(), node_cnt);
 
   // 6. Wrap up
   MapTester::RemoveTruncatedNode(node_manager, nids);
   ASSERT_EQ(nids.size(), 0UL);
 
-  ASSERT_EQ(superblock_info.GetTotalValidInodeCount(), inode_cnt);
+  ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
 
   fs_->WriteCheckpoint(false, false);
 

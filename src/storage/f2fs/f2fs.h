@@ -182,7 +182,7 @@ class F2fs final {
   zx_status_t GetValidCheckpoint();
   zx_status_t ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out);
   void BlockOperations();
-  void UnblockOperations() const;
+  void UnblockOperations();
   zx_status_t DoCheckpoint(bool is_umount);
   zx_status_t WriteCheckpoint(bool blocked, bool is_umount);
   uint32_t GetFreeSectionsForDirtyPages();
@@ -211,7 +211,6 @@ class F2fs final {
   };
   using FsyncInodeList = fbl::DoublyLinkedList<std::unique_ptr<FsyncInodeEntry>>;
 
-  bool SpaceForRollForward() const;
   FsyncInodeEntry *GetFsyncInode(FsyncInodeList &inode_list, nid_t ino);
   zx_status_t RecoverDentry(NodePage &ipage, VnodeF2fs &vnode);
   zx_status_t RecoverInode(VnodeF2fs &vnode, NodePage &node_page);
@@ -222,14 +221,6 @@ class F2fs final {
   void RecoverData(FsyncInodeList &inode_list, CursegType type);
   void RecoverFsyncData();
 
-  // block count
-  void DecValidBlockCount(VnodeF2fs *vnode, block_t count);
-  zx_status_t IncValidBlockCount(VnodeF2fs *vnode, block_t count);
-  block_t ValidUserBlocks();
-  uint32_t ValidNodeCount();
-  void IncValidInodeCount();
-  void DecValidInodeCount();
-  uint32_t ValidInodeCount();
   VnodeF2fs &GetNodeVnode() { return *node_vnode_; }
   VnodeF2fs &GetMetaVnode() { return *meta_vnode_; }
   zx::result<fbl::RefPtr<VnodeF2fs>> GetRootVnode() {
@@ -297,6 +288,34 @@ class F2fs final {
     }
   }
 
+  bool IsOnRecovery() const { return on_recovery_; }
+  void SetOnRecovery() { on_recovery_ = true; }
+  void ClearOnRecovery() { on_recovery_ = false; }
+
+  void AddVnodeToVnodeSet(InoType type, nid_t ino) {
+    vnode_set_[static_cast<uint8_t>(type)].AddVnode(ino);
+  }
+  void RemoveVnodeFromVnodeSet(InoType type, nid_t ino) {
+    vnode_set_[static_cast<uint8_t>(type)].RemoveVnode(ino);
+  }
+  bool FindVnodeFromVnodeSet(InoType type, nid_t ino) {
+    return vnode_set_[static_cast<uint8_t>(type)].FindVnode(ino);
+  }
+  uint64_t GetVnodeSetSize(InoType type) {
+    return vnode_set_[static_cast<uint8_t>(type)].GetSize();
+  }
+  void ForAllVnodesInVnodeSet(InoType type, fit::function<void(nid_t)> callback) {
+    vnode_set_[static_cast<uint8_t>(type)].ForAllVnodes(std::move(callback));
+  }
+
+  fs::SharedMutex &GetFsLock(LockType type) { return fs_lock_[static_cast<int>(type)]; }
+  void mutex_lock_op(LockType t) __TA_ACQUIRE(&fs_lock_[static_cast<int>(t)]) {
+    fs_lock_[static_cast<int>(t)].lock();
+  }
+  void mutex_unlock_op(LockType t) __TA_RELEASE(&fs_lock_[static_cast<int>(t)]) {
+    fs_lock_[static_cast<int>(t)].unlock();
+  }
+
  private:
   void StartMemoryPressureWatcher();
 
@@ -332,6 +351,11 @@ class F2fs final {
 
   VnodeCache vnode_cache_;
   DirEntryCache dir_entry_cache_;
+
+  bool on_recovery_ = false;  // recovery is doing or not
+  // for inode number management
+  VnodeSet vnode_set_[static_cast<uint8_t>(InoType::kNrInoType)];
+  fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations
 
   zx::event fs_id_;
   std::unique_ptr<InspectTree> inspect_tree_;

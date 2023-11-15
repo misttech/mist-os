@@ -790,37 +790,37 @@ zx_status_t FsckWorker::Verify() {
   }
 
   str = "\tvalid_block_count ";
-  if (superblock_info_->GetTotalValidBlockCount() == fsck_.result.valid_block_count) {
+  if (superblock_info_->GetValidBlockCount() == fsck_.result.valid_block_count) {
     FX_LOGS(INFO) << str << "[OK] : " << fsck_.result.valid_block_count;
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetTotalValidBlockCount()
+    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetValidBlockCount()
                   << "(ckpt) != " << fsck_.result.valid_block_count;
     status = ZX_ERR_INTERNAL;
   }
 
   str = "\tvalid_node_count[de] ";
-  if (superblock_info_->GetTotalValidNodeCount() == fsck_.result.valid_node_count) {
+  if (superblock_info_->GetValidNodeCount() == fsck_.result.valid_node_count) {
     FX_LOGS(INFO) << str << "[OK] : " << fsck_.result.valid_node_count;
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetTotalValidNodeCount()
+    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetValidNodeCount()
                   << "(expected) != " << fsck_.result.valid_node_count;
     status = ZX_ERR_INTERNAL;
   }
 
   str = "\tvalid_node_count[nat] ";
-  if (superblock_info_->GetTotalValidNodeCount() == fsck_.result.valid_nat_entry_count) {
+  if (superblock_info_->GetValidNodeCount() == fsck_.result.valid_nat_entry_count) {
     FX_LOGS(INFO) << str << "[OK] : " << fsck_.result.valid_nat_entry_count;
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetTotalValidNodeCount()
+    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetValidNodeCount()
                   << "(expected) != " << fsck_.result.valid_nat_entry_count;
     status = ZX_ERR_INTERNAL;
   }
 
   str = "\tvalid_inode_count ";
-  if (superblock_info_->GetTotalValidInodeCount() == fsck_.result.valid_inode_count) {
+  if (superblock_info_->GetValidInodeCount() == fsck_.result.valid_inode_count) {
     FX_LOGS(INFO) << str << "[OK] : " << fsck_.result.valid_inode_count;
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetTotalValidInodeCount()
+    FX_LOGS(INFO) << str << "[FAILED] : " << superblock_info_->GetValidInodeCount()
                   << "(ckpt) != " << fsck_.result.valid_inode_count;
     status = ZX_ERR_INTERNAL;
   }
@@ -1008,18 +1008,19 @@ zx_status_t FsckWorker::RepairSit() {
 
 zx_status_t FsckWorker::RepairCheckpoint() {
   bool need_update_checkpoint = false;
-  if (superblock_info_->GetTotalValidBlockCount() != fsck_.result.valid_block_count) {
-    superblock_info_->GetCheckpoint().valid_block_count = fsck_.result.valid_block_count;
+  auto &ckpt_block = superblock_info_->GetCheckpointBlock();
+  if (superblock_info_->GetValidBlockCount() != fsck_.result.valid_block_count) {
+    ckpt_block->valid_block_count = fsck_.result.valid_block_count;
     need_update_checkpoint = true;
   }
 
-  if (superblock_info_->GetTotalValidNodeCount() != fsck_.result.valid_node_count) {
-    superblock_info_->GetCheckpoint().valid_node_count = fsck_.result.valid_node_count;
+  if (superblock_info_->GetValidNodeCount() != fsck_.result.valid_node_count) {
+    ckpt_block->valid_node_count = fsck_.result.valid_node_count;
     need_update_checkpoint = true;
   }
 
-  if (superblock_info_->GetTotalValidInodeCount() != fsck_.result.valid_inode_count) {
-    superblock_info_->GetCheckpoint().valid_inode_count = fsck_.result.valid_inode_count;
+  if (superblock_info_->GetValidInodeCount() != fsck_.result.valid_inode_count) {
+    ckpt_block->valid_inode_count = fsck_.result.valid_inode_count;
     need_update_checkpoint = true;
   }
 
@@ -1037,18 +1038,18 @@ zx_status_t FsckWorker::RepairCheckpoint() {
       }
 
       if (segtype < static_cast<uint32_t>(CursegType::kCursegHotNode)) {
-        superblock_info_->GetCheckpoint().cur_data_blkoff[segtype] = offset;
+        ckpt_block->cur_data_blkoff[segtype] = offset;
       } else {
-        superblock_info_->GetCheckpoint()
-            .cur_node_blkoff[segtype - static_cast<uint32_t>(CursegType::kCursegHotNode)] = offset;
+        ckpt_block->cur_node_blkoff[segtype - static_cast<uint32_t>(CursegType::kCursegHotNode)] =
+            offset;
       }
-      superblock_info_->GetCheckpoint().alloc_type[segtype] = static_cast<uint8_t>(AllocMode::kSSR);
+      ckpt_block->alloc_type[segtype] = static_cast<uint8_t>(AllocMode::kSSR);
       need_update_checkpoint = true;
     }
   }
 
   if (need_update_checkpoint) {
-    BlockBuffer<Checkpoint> checkpoint(superblock_info_->GetCheckpointBlock());
+    BlockBuffer<Checkpoint> checkpoint(ckpt_block);
     uint32_t crc =
         F2fsCalCrc32(kF2fsSuperMagic, checkpoint.get(), LeToCpu(checkpoint->checksum_offset));
     *(reinterpret_cast<uint32_t *>(checkpoint.get<uint8_t>() +
@@ -1228,7 +1229,7 @@ void FsckWorker::PrintRawSuperblockInfo() {
 }
 
 void FsckWorker::PrintCheckpointInfo() {
-  Checkpoint &cp = superblock_info_->GetCheckpoint();
+  const Checkpoint &cp = superblock_info_->GetCheckpoint();
   uint32_t alloc_type;
 
   FX_LOGS(INFO) << "==== f2fs checkpoint pack ====";
@@ -1417,7 +1418,7 @@ zx_status_t FsckWorker::BuildNodeManager() {
 
 zx_status_t FsckWorker::BuildSitInfo() {
   const Superblock &raw_sb = superblock_info_->GetSuperblock();
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_->GetCheckpoint();
   std::unique_ptr<SitInfo> sit_i;
   uint32_t sit_segs;
   uint32_t bitmap_size;
@@ -1459,7 +1460,7 @@ void FsckWorker::ResetCurseg(CursegType type, int modified) {
 }
 
 zx_status_t FsckWorker::ReadCompactedSummaries() {
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_->GetCheckpoint();
   block_t start;
   BlockBuffer<> fs_block;
   uint32_t offset;
@@ -1522,7 +1523,7 @@ zx_status_t FsckWorker::RestoreNodeSummary(uint32_t segno, SummaryBlock &summary
 }
 
 zx_status_t FsckWorker::ReadNormalSummaries(CursegType type) {
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_->GetCheckpoint();
   unsigned short blk_off;
   uint32_t segno = 0;
   block_t block_address = 0;
@@ -1663,7 +1664,7 @@ SegmentEntry &FsckWorker::GetSegmentEntry(uint32_t segno) {
 }
 
 SegType FsckWorker::GetSumBlockInfo(uint32_t segno, BlockBuffer<SummaryBlock> &summary_block) {
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_->GetCheckpoint();
   CursegInfo *curseg;
   block_t ssa_blk;
 
@@ -1788,8 +1789,8 @@ void FsckWorker::BuildSitEntries() {
 }
 
 zx_status_t FsckWorker::BuildSegmentManager() {
-  Superblock &raw_super = superblock_info_->GetSuperblock();
-  Checkpoint &ckpt = superblock_info_->GetCheckpoint();
+  const Superblock &raw_super = superblock_info_->GetSuperblock();
+  const Checkpoint &ckpt = superblock_info_->GetCheckpoint();
 
   if (segment_manager_ = std::make_unique<SegmentManager>(*superblock_info_);
       segment_manager_ == nullptr) {

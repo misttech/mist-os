@@ -106,64 +106,17 @@ zx::result<fs::FilesystemInfo> F2fs::GetFilesystemInfo() {
   info.max_filename_size = kMaxNameLen;
   info.fs_type = fuchsia_fs::VfsType::kF2Fs;
   info.total_bytes =
-      safemath::CheckMul<uint64_t>(superblock_info_->GetUserBlockCount(), kBlockSize).ValueOrDie();
-  info.used_bytes = safemath::CheckMul<uint64_t>(ValidUserBlocks(), kBlockSize).ValueOrDie();
-  info.total_nodes = superblock_info_->GetTotalNodeCount();
-  info.used_nodes = superblock_info_->GetTotalValidInodeCount();
+      safemath::CheckMul<uint64_t>(superblock_info_->GetTotalBlockCount(), kBlockSize).ValueOrDie();
+  info.used_bytes =
+      safemath::CheckMul<uint64_t>(superblock_info_->GetValidBlockCount(), kBlockSize).ValueOrDie();
+  info.total_nodes = superblock_info_->GetMaxNodeCount();
+  info.used_nodes = superblock_info_->GetValidInodeCount();
   info.SetFsId(fs_id_);
   info.name = "f2fs";
 
   // TODO(unknown): Fill free_shared_pool_bytes using fvm info
 
   return zx::ok(info);
-}
-
-void F2fs::DecValidBlockCount(VnodeF2fs* vnode, block_t count) {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  ZX_ASSERT(superblock_info_->GetTotalValidBlockCount() >= count);
-  vnode->DecBlocks(count);
-  superblock_info_->SetTotalValidBlockCount(superblock_info_->GetTotalValidBlockCount() - count);
-}
-
-zx_status_t F2fs::IncValidBlockCount(VnodeF2fs* vnode, block_t count) {
-  block_t valid_block_count;
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  valid_block_count = superblock_info_->GetTotalValidBlockCount() + count;
-  if (valid_block_count > superblock_info_->GetUserBlockCount()) {
-    inspect_tree_->OnOutOfSpace();
-    return ZX_ERR_NO_SPACE;
-  }
-  vnode->IncBlocks(count);
-  superblock_info_->SetTotalValidBlockCount(valid_block_count);
-  superblock_info_->SetAllocValidBlockCount(superblock_info_->GetAllocValidBlockCount() + count);
-  return ZX_OK;
-}
-
-block_t F2fs::ValidUserBlocks() {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  return superblock_info_->GetTotalValidBlockCount();
-}
-
-uint32_t F2fs::ValidNodeCount() {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  return superblock_info_->GetTotalValidNodeCount();
-}
-
-void F2fs::IncValidInodeCount() {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  ZX_ASSERT(superblock_info_->GetTotalValidInodeCount() != superblock_info_->GetTotalNodeCount());
-  superblock_info_->SetTotalValidInodeCount(superblock_info_->GetTotalValidInodeCount() + 1);
-}
-
-void F2fs::DecValidInodeCount() {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  ZX_ASSERT(superblock_info_->GetTotalValidInodeCount());
-  superblock_info_->SetTotalValidInodeCount(superblock_info_->GetTotalValidInodeCount() - 1);
-}
-
-uint32_t F2fs::ValidInodeCount() {
-  std::lock_guard lock(superblock_info_->GetStatLock());
-  return superblock_info_->GetTotalValidInodeCount();
 }
 
 bool F2fs::IsValid() const {
@@ -345,15 +298,15 @@ void F2fs::SyncFs(bool bShutdown) {
   // block_t total_count, user_block_count, start_count, ovp_count;
 
   // total_count = LeToCpu(superblock_info->raw_super->block_count);
-  // user_block_count = superblock_info->GetUserBlockCount();
+  // user_block_count = superblock_info->GetTotalBlockCount();
   // start_count = LeToCpu(superblock_info->raw_super->segment0_blkaddr);
   // ovp_count = GetSmInfo(superblock_info).ovp_segments << superblock_info->GetLogBlocksPerSeg();
   // buf->f_type = kF2fsSuperMagic;
   // buf->f_bsize = superblock_info->GetBlocksize();
 
   // buf->f_blocks = total_count - start_count;
-  // buf->f_bfree = buf->f_blocks - ValidUserBlocks(superblock_info) - ovp_count;
-  // buf->f_bavail = user_block_count - ValidUserBlocks(superblock_info);
+  // buf->f_bfree = buf->f_blocks - .GetValidBlockCount(superblock_info) - ovp_count;
+  // buf->f_bavail = user_block_count - .GetValidBlockCount(superblock_info);
 
   // buf->f_files = ValidInodeCount(superblock_info);
   // buf->f_ffree = superblock_info->GetTotalNodeCount() - ValidNodeCount(superblock_info);
@@ -421,7 +374,7 @@ zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
 
   // allocate memory for f2fs-specific super block info
   superblock_info_ = std::make_unique<SuperblockInfo>(std::move(sb), mount_options_);
-  superblock_info_->ClearOnRecovery();
+  ClearOnRecovery();
 
   node_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetNodeIno(), 0);
   meta_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetMetaIno(), 0);

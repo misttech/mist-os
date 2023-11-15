@@ -16,10 +16,9 @@ void NodePage::CopyNodeFooterFrom(NodePage &src) {
   memcpy(&node().footer, &src.node().footer, sizeof(NodeFooter));
 }
 
-void NodePage::FillNodeFooterBlkaddr(block_t blkaddr) {
-  Checkpoint &ckpt = fs()->GetSuperblockInfo().GetCheckpoint();
+void NodePage::FillNodeFooterBlkaddr(block_t blkaddr, uint64_t ver) {
   NodeFooter &raw_footer = node().footer;
-  raw_footer.cp_ver = CpuToLe(ckpt.checkpoint_ver);
+  raw_footer.cp_ver = CpuToLe(ver);
   raw_footer.next_blkaddr = CpuToLe(blkaddr);
 }
 

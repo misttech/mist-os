@@ -23,7 +23,7 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
 
   void FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs);
   void CopyNodeFooterFrom(NodePage &src);
-  void FillNodeFooterBlkaddr(block_t blkaddr);
+  void FillNodeFooterBlkaddr(block_t blkaddr, uint64_t ver);
   nid_t InoOfNode() const;
   nid_t NidOfNode() const;
   uint32_t OfsOfNode() const;

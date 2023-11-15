@@ -355,10 +355,13 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
     std::lock_guard lock(mutex_);
     block_t num_blocks =
         CheckedDivRoundUp(static_cast<block_t>(len), static_cast<block_t>(Page::Size()));
-    if (zx_status_t ret = fs()->IncValidBlockCount(this, num_blocks); ret != ZX_OK) {
+    if (zx_status_t ret = superblock_info_.IncValidBlockCount(num_blocks); ret != ZX_OK) {
+      if (ret == ZX_ERR_NO_SPACE) {
+        fs()->GetInspectTree().OnOutOfSpace();
+      }
       return ret;
     }
-    fs()->DecValidBlockCount(this, num_blocks);
+    superblock_info_.DecValidBlockCount(num_blocks);
   }
 
   // Set the size to adjust the vmo and content sizes, and then we can access the range in the vmo.

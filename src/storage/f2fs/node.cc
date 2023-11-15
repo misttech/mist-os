@@ -28,35 +28,6 @@ void NodeManager::NodeInfoFromRawNat(NodeInfo &ni, RawNatEntry &raw_ne) {
   ni.version = raw_ne.version;
 }
 
-bool NodeManager::IncValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isInode) {
-  block_t valid_block_count;
-  uint32_t valid_node_count;
-
-  std::lock_guard stat_lock(superblock_info_.GetStatLock());
-
-  valid_block_count = superblock_info_.GetTotalValidBlockCount() + static_cast<block_t>(count);
-  superblock_info_.SetAllocValidBlockCount(superblock_info_.GetAllocValidBlockCount() +
-                                           static_cast<block_t>(count));
-  valid_node_count = superblock_info_.GetTotalValidNodeCount() + count;
-
-  if (valid_block_count > superblock_info_.GetUserBlockCount()) {
-    return false;
-  }
-
-  if (valid_node_count > superblock_info_.GetTotalNodeCount()) {
-    return false;
-  }
-
-  if (vnode && !isInode) {
-    vnode->IncBlocks(count);
-  }
-
-  superblock_info_.SetTotalValidNodeCount(valid_node_count);
-  superblock_info_.SetTotalValidBlockCount(valid_block_count);
-
-  return true;
-}
-
 zx::result<nid_t> NodeManager::GetNextFreeNid() {
   fs::SharedLock free_nid_lock(free_nid_tree_lock_);
   if (free_nid_tree_.empty()) {
@@ -120,19 +91,6 @@ void NodeManager::SetToNextNat(nid_t start_nid) {
 //  - Mark cold node blocks in their node footer
 //  - Mark cold data pages in page cache
 bool NodeManager::IsColdFile(VnodeF2fs &vnode) { return vnode.IsAdviseSet(FAdvise::kCold); }
-
-void NodeManager::DecValidNodeCount(VnodeF2fs *vnode, uint32_t count, bool isInode) {
-  std::lock_guard stat_lock(superblock_info_.GetStatLock());
-
-  ZX_ASSERT(!(superblock_info_.GetTotalValidBlockCount() < count));
-  ZX_ASSERT(!(superblock_info_.GetTotalValidNodeCount() < count));
-
-  if (!isInode) {
-    vnode->DecBlocks(count);
-  }
-  superblock_info_.SetTotalValidNodeCount(superblock_info_.GetTotalValidNodeCount() - count);
-  superblock_info_.SetTotalValidBlockCount(superblock_info_.GetTotalValidBlockCount() - count);
-}
 
 void NodeManager::GetCurrentNatPage(nid_t nid, LockedPage *out) {
   pgoff_t index = CurrentNatAddr(nid);
@@ -594,13 +552,15 @@ void NodeManager::TruncateNode(VnodeF2fs &vnode, nid_t nid, NodePage &node_page)
   }
 
   // Deallocate node address
-  DecValidNodeCount(&vnode, 1, nid == vnode.Ino());
+  superblock_info_.DecValidNodeCount(1);
+
   SetNodeAddr(ni, kNullAddr);
 
   if (nid == vnode.Ino()) {
-    superblock_info_.RemoveVnodeFromVnodeSet(InoType::kOrphanIno, nid);
-    fs_->DecValidInodeCount();
+    fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, nid);
+    superblock_info_.DecValidInodeCount();
   } else {
+    vnode.DecBlocks(1);
     vnode.SetDirty();
   }
 
@@ -882,7 +842,7 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   new_ni = old_ni;
   new_ni.ino = vnode.Ino();
 
-  if (!IncValidNodeCount(&vnode, 1, !ofs)) {
+  if (!superblock_info_.IncValidNodeCount(1)) {
     page->ClearUptodate();
     fs_->GetInspectTree().OnOutOfSpace();
     return ZX_ERR_NO_SPACE;
@@ -894,7 +854,9 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   page.SetDirty();
   page.GetPage<NodePage>().SetColdNode(vnode.IsDir());
   if (ofs == 0)
-    fs_->IncValidInodeCount();
+    superblock_info_.IncValidInodeCount();
+  else
+    vnode.IncBlocks(1);
 
   *out = std::move(page);
   return ZX_OK;
@@ -1246,9 +1208,9 @@ zx_status_t NodeManager::RecoverInodePage(NodePage &page) {
   new_node_info = old_node_info;
   new_node_info.ino = ino;
 
-  ZX_ASSERT(IncValidNodeCount(nullptr, 1, true));
+  ZX_ASSERT(superblock_info_.IncValidNodeCount(1));
   SetNodeAddr(new_node_info, kNewAddr);
-  fs_->IncValidInodeCount();
+  superblock_info_.IncValidInodeCount();
   ipage.SetDirty();
   return ZX_OK;
 }
@@ -1415,12 +1377,12 @@ zx_status_t NodeManager::FlushNatEntries() {
 }
 
 zx_status_t NodeManager::InitNodeManager() {
-  const Superblock &sb_raw = superblock_info_.GetSuperblock();
+  const Superblock &sb = superblock_info_.GetSuperblock();
 
   // segment_count_nat includes pair segment so divide to 2
-  uint32_t nat_segs = LeToCpu(sb_raw.segment_count_nat) >> 1;
-  uint32_t nat_blocks = nat_segs << LeToCpu(sb_raw.log_blocks_per_seg);
-  nat_blkaddr_ = LeToCpu(sb_raw.nat_blkaddr);
+  uint32_t nat_segs = LeToCpu(sb.segment_count_nat) >> 1;
+  uint32_t nat_blocks = nat_segs << LeToCpu(sb.log_blocks_per_seg);
+  nat_blkaddr_ = LeToCpu(sb.nat_blkaddr);
   max_nid_ = kNatEntryPerBlock * nat_blocks;
   {
     std::lock_guard lock(build_lock_);

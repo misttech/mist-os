@@ -96,16 +96,15 @@ TEST_F(SegmentManagerTest, DirtyToFree) {
 }
 
 TEST_F(SegmentManagerTest, BalanceFs) {
-  SuperblockInfo &superblock_info = fs_->GetSuperblockInfo();
   uint32_t nfree_segs = fs_->GetSegmentManager().FreeSegments();
 
-  superblock_info.ClearOnRecovery();
+  fs_->ClearOnRecovery();
   fs_->GetSegmentManager().BalanceFs();
 
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs);
   ASSERT_FALSE(fs_->GetSegmentManager().PrefreeSegments());
 
-  superblock_info.SetOnRecovery();
+  fs_->SetOnRecovery();
   fs_->GetSegmentManager().BalanceFs();
 
   ASSERT_EQ(fs_->GetSegmentManager().FreeSegments(), nfree_segs);

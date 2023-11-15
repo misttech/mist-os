@@ -146,7 +146,7 @@ class VnodeSet {
   VnodeSet(const VnodeSet &) = delete;
   VnodeSet &operator=(const VnodeSet &) = delete;
   VnodeSet(VnodeSet &&) = delete;
-  VnodeSet &operator=(const VnodeSet &&) = delete;
+  VnodeSet &operator=(VnodeSet &&) = delete;
 
   void AddVnode(nid_t ino) __TA_EXCLUDES(vnode_mutex_) {
     std::lock_guard lock(vnode_mutex_);
@@ -194,43 +194,32 @@ class SuperblockInfo {
     InitFromSuperblock();
   }
 
-  Superblock &GetSuperblock() { return *sb_; }
-  const Superblock &GetSuperblock() const { return *sb_; }
-
   bool IsDirty() const { return is_dirty_; }
   void SetDirty() { is_dirty_ = true; }
   void ClearDirty() { is_dirty_ = false; }
 
   void SetCpFlags(CpFlag flag) __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
-    SetCpFlagsUnsafe(flag);
-  }
-
-  void SetCpFlagsUnsafe(CpFlag flag) __TA_REQUIRES(mutex_) {
-    uint32_t flags = LeToCpu(GetCheckpoint().ckpt_flags);
+    uint32_t flags = LeToCpu(checkpoint_block_->ckpt_flags);
     flags |= static_cast<uint32_t>(flag);
-    GetCheckpoint().ckpt_flags = CpuToLe(flags);
+    checkpoint_block_->ckpt_flags = CpuToLe(flags);
   }
 
   void ClearCpFlags(CpFlag flag) __TA_EXCLUDES(mutex_) {
     std::lock_guard lock(mutex_);
-    ClearCpFlagsUnsafe(flag);
-  }
-
-  void ClearCpFlagsUnsafe(CpFlag flag) __TA_REQUIRES(mutex_) {
-    uint32_t flags = LeToCpu(GetCheckpoint().ckpt_flags);
+    uint32_t flags = LeToCpu(checkpoint_block_->ckpt_flags);
     flags &= (~static_cast<uint32_t>(flag));
-    GetCheckpoint().ckpt_flags = CpuToLe(flags);
+    checkpoint_block_->ckpt_flags = CpuToLe(flags);
   }
 
   bool TestCpFlags(CpFlag flag) __TA_EXCLUDES(mutex_) {
     fs::SharedLock lock(mutex_);
-    uint32_t flags = LeToCpu(GetCheckpoint().ckpt_flags);
+    uint32_t flags = LeToCpu(checkpoint_block_->ckpt_flags);
     return flags & static_cast<uint32_t>(flag);
   }
 
+  const Superblock &GetSuperblock() const { return *sb_; }
   const Checkpoint &GetCheckpoint() const { return *checkpoint_block_; }
-  Checkpoint &GetCheckpoint() { return *checkpoint_block_; }
   BlockBuffer<Checkpoint> &GetCheckpointBlock() { return checkpoint_block_; }
 
   zx_status_t SetCheckpoint(const BlockBuffer<Checkpoint> &block) {
@@ -254,98 +243,110 @@ class SuperblockInfo {
   RawBitmap &GetExtraSitBitmap() { return extra_sit_bitmap_; }
   void SetExtraSitBitmap(size_t num_bytes) { extra_sit_bitmap_.Reset(GetBitSize(num_bytes)); }
 
-  fs::SharedMutex &GetFsLock(LockType type) { return fs_lock_[static_cast<int>(type)]; }
-
-  void mutex_lock_op(LockType t) __TA_ACQUIRE(&fs_lock_[static_cast<int>(t)]) {
-    fs_lock_[static_cast<int>(t)].lock();
-  }
-
-  void mutex_unlock_op(LockType t) __TA_RELEASE(&fs_lock_[static_cast<int>(t)]) {
-    fs_lock_[static_cast<int>(t)].unlock();
-  }
-
-  bool IsOnRecovery() const { return on_recovery_; }
-
-  void SetOnRecovery() { on_recovery_ = true; }
-
-  void ClearOnRecovery() { on_recovery_ = false; }
-
-  void AddVnodeToVnodeSet(InoType type, nid_t ino) {
-    vnode_set_[static_cast<uint8_t>(type)].AddVnode(ino);
-  }
-  void RemoveVnodeFromVnodeSet(InoType type, nid_t ino) {
-    vnode_set_[static_cast<uint8_t>(type)].RemoveVnode(ino);
-  }
-  bool FindVnodeFromVnodeSet(InoType type, nid_t ino) {
-    return vnode_set_[static_cast<uint8_t>(type)].FindVnode(ino);
-  }
-  uint64_t GetVnodeSetSize(InoType type) {
-    return vnode_set_[static_cast<uint8_t>(type)].GetSize();
-  }
-  void ForAllVnodesInVnodeSet(InoType type, fit::function<void(nid_t)> callback) {
-    vnode_set_[static_cast<uint8_t>(type)].ForAllVnodes(std::move(callback));
-  }
-
+  // superblock fields
   block_t GetLogSectorsPerBlock() const { return log_sectors_per_block_; }
-  void SetLogSectorsPerBlock(block_t log_sectors_per_block) {
-    log_sectors_per_block_ = log_sectors_per_block;
-  }
   block_t GetLogBlocksize() const { return log_blocksize_; }
-  void SetLogBlocksize(block_t log_blocksize) { log_blocksize_ = log_blocksize; }
   block_t GetBlocksize() const { return blocksize_; }
-  void SetBlocksize(block_t blocksize) { blocksize_ = blocksize; }
-
   uint32_t GetRootIno() const { return root_ino_num_; }
-  void SetRootIno(uint32_t root_ino) { root_ino_num_ = root_ino; }
   uint32_t GetNodeIno() const { return node_ino_num_; }
-  void SetNodeIno(uint32_t node_ino) { node_ino_num_ = node_ino; }
   uint32_t GetMetaIno() const { return meta_ino_num_; }
-  void SetMetaIno(uint32_t meta_ino) { meta_ino_num_ = meta_ino; }
-
   block_t GetLogBlocksPerSeg() const { return log_blocks_per_seg_; }
-  void SetLogBlocksPerSeg(block_t log_blocks_per_seg) { log_blocks_per_seg_ = log_blocks_per_seg; }
   block_t GetBlocksPerSeg() const { return blocks_per_seg_; }
-  void SetBlocksPerSeg(block_t blocks_per_seg) { blocks_per_seg_ = blocks_per_seg; }
   block_t GetSegsPerSec() const { return segs_per_sec_; }
-  void SetSegsPerSec(block_t segs_per_sec) { segs_per_sec_ = segs_per_sec; }
   block_t GetSecsPerZone() const { return secs_per_zone_; }
-  void SetSecsPerZone(block_t secs_per_zone) { secs_per_zone_ = secs_per_zone; }
   block_t GetTotalSections() const { return total_sections_; }
 
-  void SetTotalSections(block_t total_sections) { total_sections_ = total_sections; }
-  nid_t GetTotalNodeCount() const { return total_node_count_; }
-  void SetTotalNodeCount(nid_t total_node_count) { total_node_count_ = total_node_count; }
-
-  nid_t GetTotalValidNodeCount() const { return total_valid_node_count_; }
-
-  void SetTotalValidNodeCount(nid_t total_valid_node_count) {
-    total_valid_node_count_ = total_valid_node_count;
+  // for test
+  void SetTotalBlockCount(block_t block_count) { total_block_count_ = block_count; }
+  void SetValidBlockCount(block_t block_count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    valid_block_count_ = block_count;
+  }
+  void SetValidNodeCount(nid_t block_count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    valid_node_count_ = block_count;
   }
 
-  nid_t GetTotalValidInodeCount() const { return total_valid_inode_count_; }
+  // for space status
+  block_t GetValidBlockCount() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return valid_block_count_;
+  }
+  nid_t GetMaxNodeCount() const { return max_node_count_; }
+  block_t GetTotalBlockCount() const { return total_block_count_; }
 
-  void SetTotalValidInodeCount(nid_t total_valid_inode_count) {
-    total_valid_inode_count_ = total_valid_inode_count;
+  void ResetAllocBlockCount() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    last_valid_block_count_ = valid_block_count_;
+    alloc_block_count_ = 0;
   }
 
-  block_t GetUserBlockCount() const { return user_block_count_; }
-  void SetUserBlockCount(block_t user_block_count) { user_block_count_ = user_block_count; }
-  block_t GetTotalValidBlockCount() const { return total_valid_block_count_; }
-  void SetTotalValidBlockCount(block_t total_valid_block_count) {
-    total_valid_block_count_ = total_valid_block_count;
+  bool SpaceForRollForward() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return last_valid_block_count_ + alloc_block_count_ <= total_block_count_;
   }
-  block_t GetAllocValidBlockCount() const { return alloc_valid_block_count_; }
-  void SetAllocValidBlockCount(block_t alloc_valid_block_count) {
-    alloc_valid_block_count_ = alloc_valid_block_count;
-  }
-  block_t GetLastValidBlockCount() const { return last_valid_block_count_; }
 
-  void SetLastValidBlockCount(block_t last_valid_block_count) {
-    last_valid_block_count_ = last_valid_block_count;
+  bool IncValidNodeCount(block_t count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    block_t valid_block_count = valid_block_count_ + count;
+    block_t valid_node_count = valid_node_count_ + count;
+
+    if (valid_block_count > total_block_count_ || valid_node_count > max_node_count_) {
+      return false;
+    }
+    alloc_block_count_ += count;
+    valid_node_count_ = valid_node_count;
+    valid_block_count_ = valid_block_count;
+
+    return true;
+  }
+
+  void DecValidNodeCount(uint32_t count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    ZX_ASSERT(valid_block_count_ >= count);
+    ZX_ASSERT(valid_node_count_ >= count);
+    valid_node_count_ -= count;
+    valid_block_count_ -= count;
+  }
+  nid_t GetValidNodeCount() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return valid_node_count_;
+  }
+  nid_t GetValidInodeCount() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return valid_inode_count_;
+  }
+  void DecValidInodeCount() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    ZX_ASSERT(valid_inode_count_);
+    --valid_inode_count_;
+  }
+  void IncValidInodeCount() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    ZX_ASSERT(valid_inode_count_ != max_node_count_);
+    ++valid_inode_count_;
+  }
+  void DecValidBlockCount(block_t count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    ZX_ASSERT(valid_block_count_ >= count);
+    valid_block_count_ -= count;
+  }
+  zx_status_t IncValidBlockCount(block_t count) __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    if (valid_block_count_ + count > total_block_count_) {
+      return ZX_ERR_NO_SPACE;
+    }
+    valid_block_count_ += count;
+    alloc_block_count_ += count;
+    return ZX_OK;
+  }
+
+  uint32_t Utilization() __TA_EXCLUDES(mutex_) {
+    fs::SharedLock lock(mutex_);
+    return 100 * valid_block_count_ / total_block_count_;
   }
 
   uint32_t GetNextGeneration() const { return s_next_generation_; }
-
   void IncNextGeneration() { ++s_next_generation_; }
 
   const std::vector<std::string> &GetExtensionList() const { return extension_list_; }
@@ -368,8 +369,6 @@ class SuperblockInfo {
   void IncBlockCount(int type) { ++block_count_[type]; }
   uint32_t GetLastVictim(int mode) const { return last_victim_[mode]; }
   void SetLastVictim(int mode, uint32_t last_victim) { last_victim_[mode] = last_victim; }
-
-  std::mutex &GetStatLock() { return stat_lock_; }
 
   void IncreasePageCount(CountType count_type) {
     // Use release-acquire ordering with nr_pages_.
@@ -395,13 +394,13 @@ class SuperblockInfo {
   uint32_t GetSitBitmapSize() const { return LeToCpu(checkpoint_block_->sit_ver_bitmap_bytesize); }
   uint32_t GetNatBitmapSize() const { return LeToCpu(checkpoint_block_->nat_ver_bitmap_bytesize); }
   uint8_t *GetNatBitmap() {
-    if (LeToCpu(sb_->cp_payload) > 0) {
+    if (cp_payload_ > 0) {
       return checkpoint_block_->sit_nat_version_bitmap;
     }
-    return checkpoint_block_->sit_nat_version_bitmap + checkpoint_block_->sit_ver_bitmap_bytesize;
+    return checkpoint_block_->sit_nat_version_bitmap + GetSitBitmapSize();
   }
   uint8_t *GetSitBitmap() {
-    if (LeToCpu(sb_->cp_payload) > 0) {
+    if (cp_payload_ > 0) {
       return static_cast<uint8_t *>(GetExtraSitBitmap().StorageUnsafe()->GetData());
     }
     return checkpoint_block_->sit_nat_version_bitmap;
@@ -422,21 +421,23 @@ class SuperblockInfo {
   block_t StartSumAddr() const { return LeToCpu(checkpoint_block_->cp_pack_start_sum); }
   block_t GetNumCpPayload() const { return cp_payload_; }
 
+  uint64_t GetCheckpointVer() const { return checkpoint_ver_; }
+  void UpdateCheckpointVer() { checkpoint_block_->checkpoint_ver = CpuToLe(++checkpoint_ver_); }
+
  private:
   void InitFromSuperblock() {
-    SetLogSectorsPerBlock(LeToCpu(sb_->log_sectors_per_block));
-    SetLogBlocksize(LeToCpu(sb_->log_blocksize));
-    SetBlocksize(1 << GetLogBlocksize());
-    SetLogBlocksPerSeg(LeToCpu(sb_->log_blocks_per_seg));
-    SetBlocksPerSeg(1 << GetLogBlocksPerSeg());
-    SetSegsPerSec(LeToCpu(sb_->segs_per_sec));
-    SetSecsPerZone(LeToCpu(sb_->secs_per_zone));
-    SetTotalSections(LeToCpu(sb_->section_count));
-    SetTotalNodeCount((LeToCpu(sb_->segment_count_nat) / 2) * GetBlocksPerSeg() *
-                      kNatEntryPerBlock);
-    SetRootIno(LeToCpu(sb_->root_ino));
-    SetNodeIno(LeToCpu(sb_->node_ino));
-    SetMetaIno(LeToCpu(sb_->meta_ino));
+    log_sectors_per_block_ = LeToCpu(sb_->log_sectors_per_block);
+    log_blocksize_ = LeToCpu(sb_->log_blocksize);
+    blocksize_ = 1 << GetLogBlocksize();
+    log_blocks_per_seg_ = LeToCpu(sb_->log_blocks_per_seg);
+    blocks_per_seg_ = 1 << GetLogBlocksPerSeg();
+    segs_per_sec_ = LeToCpu(sb_->segs_per_sec);
+    secs_per_zone_ = LeToCpu(sb_->secs_per_zone);
+    total_sections_ = LeToCpu(sb_->section_count);
+    max_node_count_ = LeToCpu(sb_->segment_count_nat) / 2 * GetBlocksPerSeg() * kNatEntryPerBlock;
+    root_ino_num_ = LeToCpu(sb_->root_ino);
+    node_ino_num_ = LeToCpu(sb_->node_ino);
+    meta_ino_num_ = LeToCpu(sb_->meta_ino);
     cp_payload_ = LeToCpu(sb_->cp_payload);
 
     ZX_ASSERT(sb_->extension_count < kMaxExtension);
@@ -447,13 +448,15 @@ class SuperblockInfo {
     ZX_ASSERT(sb_->extension_count == extension_list_.size());
   }
 
-  void InitFromCheckpoint() {
-    SetTotalValidNodeCount(LeToCpu(GetCheckpoint().valid_node_count));
-    SetTotalValidInodeCount(GetCheckpoint().valid_inode_count);
-    SetUserBlockCount(LeToCpu(static_cast<block_t>(GetCheckpoint().user_block_count)));
-    SetTotalValidBlockCount(LeToCpu(static_cast<block_t>(GetCheckpoint().valid_block_count)));
-    SetLastValidBlockCount(GetTotalValidBlockCount());
-    SetAllocValidBlockCount(0);
+  void InitFromCheckpoint() __TA_EXCLUDES(mutex_) {
+    std::lock_guard lock(mutex_);
+    valid_node_count_ = LeToCpu(checkpoint_block_->valid_node_count);
+    valid_inode_count_ = LeToCpu(checkpoint_block_->valid_inode_count);
+    total_block_count_ = static_cast<block_t>(checkpoint_block_->user_block_count);
+    last_valid_block_count_ = valid_block_count_ =
+        static_cast<block_t>(LeToCpu(checkpoint_block_->valid_block_count));
+    alloc_block_count_ = 0;
+    checkpoint_ver_ = LeToCpu(checkpoint_block_->checkpoint_ver);
   }
 
   zx_status_t CheckBlockSize(const Checkpoint &ckpt) const {
@@ -473,9 +476,9 @@ class SuperblockInfo {
         ((LeToCpu(sb_->segment_count_nat) / 2) << LeToCpu(sb_->log_blocks_per_seg)) / 8;
     block_t nat_blocks = (LeToCpu(sb_->segment_count_nat) >> 1) << LeToCpu(sb_->log_blocks_per_seg);
 
-    if (ckpt.sit_ver_bitmap_bytesize != sit_ver_bitmap_bytesize ||
-        ckpt.nat_ver_bitmap_bytesize != nat_ver_bitmap_bytesize ||
-        ckpt.next_free_nid >= kNatEntryPerBlock * nat_blocks) {
+    if (LeToCpu(ckpt.sit_ver_bitmap_bytesize) != sit_ver_bitmap_bytesize ||
+        LeToCpu(ckpt.nat_ver_bitmap_bytesize) != nat_ver_bitmap_bytesize ||
+        LeToCpu(ckpt.next_free_nid) >= kNatEntryPerBlock * nat_blocks) {
       return ZX_ERR_BAD_STATE;
     }
 
@@ -489,50 +492,40 @@ class SuperblockInfo {
 
   RawBitmap extra_sit_bitmap_;
 
-  fs::SharedMutex mutex_;                                             // for checkpoint data
-  fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations
-
-#if 0  // porting needed
-  // std::mutex writepages;                                             // mutex for writepages()
-#endif
-  bool on_recovery_ = false;  // recovery is doing or not
-
-  // for inode number management
-  VnodeSet vnode_set_[static_cast<uint8_t>(InoType::kNrInoType)];
-
   MountOptions mount_options_;
-  uint64_t n_dirty_dirs = 0;           // # of dir inodes
-  block_t log_sectors_per_block_ = 0;  // log2 sectors per block
-  block_t log_blocksize_ = 0;          // log2 block size
-  block_t blocksize_ = 0;              // block size
-  nid_t root_ino_num_ = 0;             // root inode numbe
-  nid_t node_ino_num_ = 0;             // node inode numbe
-  nid_t meta_ino_num_ = 0;             // meta inode numbe
-  block_t log_blocks_per_seg_ = 0;     // log2 blocks per segment
-  block_t blocks_per_seg_ = 0;         // blocks per segment
-  block_t segs_per_sec_ = 0;           // segments per section
-  block_t secs_per_zone_ = 0;          // sections per zone
-  block_t total_sections_ = 0;         // total section count
-  nid_t total_node_count_ = 0;         // total node block count
-  nid_t total_valid_node_count_ = 0;   // valid node block count
-  nid_t total_valid_inode_count_ = 0;  // valid inode count
+  uint64_t n_dirty_dirs = 0;                          // # of dir inodes
+  block_t log_sectors_per_block_ = 0;                 // log2 sectors per block
+  block_t log_blocksize_ = 0;                         // log2 block size
+  block_t blocksize_ = 0;                             // block size
+  nid_t root_ino_num_ = 0;                            // root inode number
+  nid_t node_ino_num_ = 0;                            // node inode number
+  nid_t meta_ino_num_ = 0;                            // meta inode number
+  block_t log_blocks_per_seg_ = 0;                    // log2 blocks per segment
+  block_t blocks_per_seg_ = 0;                        // blocks per segment
+  block_t segs_per_sec_ = 0;                          // segments per section
+  block_t secs_per_zone_ = 0;                         // sections per zone
+  block_t total_sections_ = 0;                        // total section count
+  nid_t max_node_count_ = 0;                          // maximum number of node blocks
+  nid_t valid_node_count_ __TA_GUARDED(mutex_) = 0;   // valid node block count
+  nid_t valid_inode_count_ __TA_GUARDED(mutex_) = 0;  // valid inode count
 
   block_t cp_payload_ = 0;
-  block_t user_block_count_ = 0;         // # of user blocks
-  block_t total_valid_block_count_ = 0;  // # of valid blocks
-  block_t alloc_valid_block_count_ = 0;  // # of allocated blocks
-  block_t last_valid_block_count_ = 0;   // for recovery
-  uint32_t s_next_generation_ = 0;       // for NFS support
+  block_t total_block_count_ = 0;                            // # of user blocks
+  block_t valid_block_count_ __TA_GUARDED(mutex_) = 0;       // # of valid blocks
+  block_t alloc_block_count_ __TA_GUARDED(mutex_) = 0;       // # of allocated blocks
+  block_t last_valid_block_count_ __TA_GUARDED(mutex_) = 0;  // for recovery
+  uint32_t s_next_generation_ = 0;                           // for NFS support
   std::atomic<int> nr_pages_[static_cast<int>(CountType::kNrCountType)] = {
       0};  // # of pages, see count_type
 
+  uint64_t checkpoint_ver_ = 0;
   uint64_t segment_count_[2] = {0};  // # of allocated segments
   uint64_t block_count_[2] = {0};    // # of allocated blocks
   uint32_t last_victim_[2] = {0};    // last victim segment #
 
   std::vector<std::string> extension_list_;
 
-  std::mutex stat_lock_;  // lock for stat operations
+  fs::SharedMutex mutex_;  // for checkpoint data
 };
 
 // InodeInfo->flags keeping only in memory

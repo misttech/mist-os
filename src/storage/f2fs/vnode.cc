@@ -273,7 +273,8 @@ zx_status_t VnodeF2fs::Allocate(F2fs *fs, ino_t ino, umode_t mode, fbl::RefPtr<V
 
 zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
   LockedPage node_page;
-  if (ino < fs->GetSuperblockInfo().GetRootIno() || !fs->GetNodeManager().CheckNidRange(ino) ||
+  SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
+  if (ino < superblock_info.GetRootIno() || !fs->GetNodeManager().CheckNidRange(ino) ||
       fs->GetNodeManager().GetNodePage(ino, &node_page) != ZX_OK) {
     return ZX_ERR_NOT_FOUND;
   }
@@ -299,7 +300,7 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
   vnode->SetXattrNid(LeToCpu(inode.i_xattr_nid));
   vnode->SetInodeFlags(LeToCpu(inode.i_flags));
   vnode->SetDirLevel(inode.i_dir_level);
-  vnode->UpdateVersion(LeToCpu(fs->GetSuperblockInfo().GetCheckpoint().checkpoint_ver) - 1);
+  vnode->UpdateVersion(superblock_info.GetCheckpointVer() - 1);
   vnode->SetAdvise(inode.i_advise);
   vnode->GetExtentInfo(inode.i_ext);
 
@@ -326,14 +327,14 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
 
   // If the roll-forward recovery creates it, it will initialize its cache from the latest inode
   // block later.
-  if (!fs->GetSuperblockInfo().IsOnRecovery() || !vnode->GetNlink()) {
+  if (!fs->IsOnRecovery() || !vnode->GetNlink()) {
     vnode->InitFileCache(LeToCpu(inode.i_size));
   }
 
   std::string_view name(reinterpret_cast<char *>(inode.i_name),
                         std::min(kMaxNameLen, inode.i_namelen));
   if (inode.i_namelen != name.length() ||
-      (ino != fs->GetSuperblockInfo().GetRootIno() && !fs::IsValidName(name))) {
+      (ino != superblock_info.GetRootIno() && !fs::IsValidName(name))) {
     // TODO: Need to repair the file or set NeedFsck flag when fsck supports repair feature.
     // For now, we set kBad and clear link, so that it can be deleted without purging.
     vnode->ClearNlink();
@@ -492,7 +493,7 @@ zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
 
   // VnodeCache should keep vnodes holding valid links except when purging orphans at mount time.
   if (ino != fs->GetSuperblockInfo().GetNodeIno() && ino != fs->GetSuperblockInfo().GetMetaIno() &&
-      (!fs->GetSuperblockInfo().IsOnRecovery() && !vnode->GetNlink())) {
+      (!fs->IsOnRecovery() && !vnode->GetNlink())) {
     vnode->SetFlag(InodeInfoFlag::kBad);
     return ZX_ERR_NOT_FOUND;
   }
@@ -582,7 +583,7 @@ zx_status_t VnodeF2fs::UpdateInodePage() {
     return ZX_OK;
   }
 
-  fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kNodeOp));
+  fs::SharedLock rlock(fs()->GetFsLock(LockType::kNodeOp));
   LockedPage node_page;
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &node_page); ret != ZX_OK) {
     return ret;
@@ -624,7 +625,8 @@ int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node
     SetDataBlkaddr(node_page, ofs_in_node, kNullAddr);
     UpdateExtentCache(kNullAddr, node_page.StartBidxOfNode(GetAddrsPerInode()) + ofs_in_node);
     fs()->GetSegmentManager().InvalidateBlocks(blkaddr);
-    fs()->DecValidBlockCount(this, 1);
+    superblock_info_.DecValidBlockCount(1);
+    DecBlocks(1);
     ++nr_free;
   }
   if (nr_free) {
@@ -650,7 +652,7 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   pgoff_t free_from =
       safemath::CheckRsh(fbl::round_up(from, blocksize), superblock_info_.GetLogBlocksize())
           .ValueOrDie();
-  fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+  fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
   // Invalidate data pages starting from |free_from|. It safely removes any pages updating their
   // block addrs before purging the addrs in nodes.
   InvalidatePages(free_from);
@@ -760,7 +762,7 @@ void VnodeF2fs::EvictVnode() {
   }
 
   {
-    fs::SharedLock rlock(superblock_info_.GetFsLock(LockType::kFileOp));
+    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
     fs()->GetNodeManager().RemoveInodePage(this);
   }
   fs()->EvictVnode(this);
@@ -835,7 +837,7 @@ bool VnodeF2fs::NeedToCheckpoint() {
   if (TestFlag(InodeInfoFlag::kNeedCp)) {
     return true;
   }
-  if (!fs()->SpaceForRollForward()) {
+  if (!superblock_info_.SpaceForRollForward()) {
     return true;
   }
   if (NeedToSyncDir()) {
@@ -844,7 +846,7 @@ bool VnodeF2fs::NeedToCheckpoint() {
   if (superblock_info_.TestOpt(MountOption::kDisableRollForward)) {
     return true;
   }
-  if (superblock_info_.FindVnodeFromVnodeSet(InoType::kModifiedDirIno, GetParentNid())) {
+  if (fs()->FindVnodeFromVnodeSet(InoType::kModifiedDirIno, GetParentNid())) {
     return true;
   }
   return false;

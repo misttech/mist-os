@@ -352,7 +352,7 @@ TEST_P(GcManagerTestWithLargeSec, SecureSpace) {
   MakeGcTriggerCondition();
   // Set the number of blocks to be gc'ed as 2 sections or available space of the volume.
   uint64_t blocks_to_secure =
-      std::min((safemath::CheckMul<uint64_t>(fs_->GetSuperblockInfo().GetUserBlockCount(),
+      std::min((safemath::CheckMul<uint64_t>(fs_->GetSuperblockInfo().GetTotalBlockCount(),
                                              100 - fs_->GetSegmentManager().Utilization()) /
                 100)
                    .ValueOrDie(),

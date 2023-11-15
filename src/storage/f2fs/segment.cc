@@ -181,10 +181,7 @@ int SegmentManager::GetSsrSegment(CursegType type) {
   return 1;
 }
 
-uint32_t SegmentManager::Utilization() {
-  return static_cast<uint32_t>(static_cast<int64_t>(fs_->ValidUserBlocks()) * 100 /
-                               static_cast<int64_t>(superblock_info_.GetUserBlockCount()));
-}
+uint32_t SegmentManager::Utilization() { return superblock_info_.Utilization(); }
 
 // Sometimes f2fs may be better to drop out-of-place update policy.
 // So, if fs utilization is over kMinIpuUtil, then f2fs tries to write
@@ -309,7 +306,7 @@ bool SegmentManager::SecUsageCheck(unsigned int secno) {
 }
 
 bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed) {
-  if (superblock_info_.IsOnRecovery())
+  if (fs_->IsOnRecovery())
     return false;
 
   return (FreeSections() + freed) <= (fs_->GetFreeSectionsForDirtyPages() + ReservedSections());
@@ -318,7 +315,7 @@ bool SegmentManager::HasNotEnoughFreeSecs(uint32_t freed) {
 // This function balances dirty node and dentry pages.
 // In addition, it controls garbage collection.
 void SegmentManager::BalanceFs() {
-  if (superblock_info_.IsOnRecovery()) {
+  if (fs_->IsOnRecovery()) {
     return;
   }
 
@@ -905,7 +902,8 @@ zx::result<block_t> SegmentManager::GetBlockAddrOnSegment(LockedPage &page, bloc
     }
 
     if (p_type == PageType::kNode) {
-      page.GetPage<NodePage>().FillNodeFooterBlkaddr(NextFreeBlkAddr(type));
+      page.GetPage<NodePage>().FillNodeFooterBlkaddr(NextFreeBlkAddr(type),
+                                                     superblock_info_.GetCheckpointVer());
     }
   }
 
@@ -1019,7 +1017,7 @@ void SegmentManager::RecoverDataPage(Summary &sum, block_t old_blkaddr, block_t 
 }
 
 zx_status_t SegmentManager::ReadCompactedSummaries() {
-  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   LockedPage page;
   block_t start;
   int offset;
@@ -1073,7 +1071,7 @@ zx_status_t SegmentManager::ReadCompactedSummaries() {
 }
 
 zx_status_t SegmentManager::ReadNormalSummaries(int type) {
-  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   SummaryBlock *sum;
   CursegInfo *curseg;
   uint16_t blk_off;
@@ -1167,15 +1165,15 @@ void SegmentManager::WriteCompactedSummaries(block_t blkaddr) {
   // Step 3: write summary entries
   for (int i = static_cast<int>(CursegType::kCursegHotData);
        i <= static_cast<int>(CursegType::kCursegColdData); ++i) {
-    uint16_t blkoff;
+    size_t blkoff;
     seg_i = CURSEG_I(static_cast<CursegType>(i));
     if (superblock_info_.GetCheckpoint().alloc_type[i] == static_cast<uint8_t>(AllocMode::kSSR)) {
-      blkoff = static_cast<uint16_t>(superblock_info_.GetBlocksPerSeg());
+      blkoff = superblock_info_.GetBlocksPerSeg();
     } else {
       blkoff = CursegBlkoff(i);
     }
 
-    for (int j = 0; j < blkoff; ++j) {
+    for (size_t j = 0; j < blkoff; ++j) {
       if (!page) {
         fs_->GrabMetaPage(blkaddr++, &page);
         written_size = 0;
@@ -1370,7 +1368,7 @@ zx_status_t SegmentManager::FlushSitEntries() {
 
 zx_status_t SegmentManager::BuildSitInfo() {
   const Superblock &raw_super = superblock_info_.GetSuperblock();
-  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_.GetCheckpoint();
   uint32_t sit_segs;
 
   // allocate memory for SIT information
@@ -1411,7 +1409,7 @@ zx_status_t SegmentManager::BuildSitInfo() {
 
   sit_i->sit_base_addr = LeToCpu(raw_super.sit_blkaddr);
   sit_i->sit_blocks = sit_segs << superblock_info_.GetLogBlocksPerSeg();
-  sit_i->written_valid_blocks = LeToCpu(static_cast<block_t>(ckpt.valid_block_count));
+  sit_i->written_valid_blocks = LeToCpu(safemath::checked_cast<block_t>(ckpt.valid_block_count));
   sit_i->bitmap_size = bitmap_size;
   sit_i->dirty_sentries = 0;
   sit_i->sents_per_block = kSitEntryPerBlock;
@@ -1554,7 +1552,7 @@ void SegmentManager::InitMinMaxMtime() {
 
 zx_status_t SegmentManager::BuildSegmentManager() {
   const Superblock &raw_super = superblock_info_.GetSuperblock();
-  Checkpoint &ckpt = superblock_info_.GetCheckpoint();
+  const Checkpoint &ckpt = superblock_info_.GetCheckpoint();
 
   seg0_blkaddr_ = LeToCpu(raw_super.segment0_blkaddr);
   main_blkaddr_ = LeToCpu(raw_super.main_blkaddr);

@@ -472,7 +472,7 @@ TEST(FormatFilesystemTest, MkfsSmallVolume) {
       async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
       FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
-      Superblock &sb = fs->GetSuperblockInfo().GetSuperblock();
+      const Superblock &sb = fs->GetSuperblockInfo().GetSuperblock();
       ASSERT_EQ(LeToCpu(sb.segment_count_main), static_cast<uint32_t>(volume_size / 2 - 8));
 
       FileTester::Unmount(std::move(fs), &bc);

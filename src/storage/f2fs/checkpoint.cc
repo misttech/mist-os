@@ -58,26 +58,22 @@ pgoff_t F2fs::FlushDirtyMetaPages(bool is_commit) {
 }
 
 zx_status_t F2fs::CheckOrphanSpace() {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  uint32_t max_orphans;
-  zx_status_t err = 0;
-
   /*
    * considering 512 blocks in a segment 5 blocks are needed for cp
    * and log segment summaries. Remaining blocks are used to keep
    * orphan entries with the limitation one reserved segment
    * for cp pack we can have max 1020*507 orphan entries
    */
-  max_orphans = (superblock_info.GetBlocksPerSeg() - 5) * kOrphansPerBlock;
-  if (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) >= max_orphans) {
-    err = ZX_ERR_NO_SPACE;
+  size_t max_orphans = (superblock_info_->GetBlocksPerSeg() - 5) * kOrphansPerBlock;
+  if (GetVnodeSetSize(InoType::kOrphanIno) >= max_orphans) {
     inspect_tree_->OnOutOfSpace();
+    return ZX_ERR_NO_SPACE;
   }
-  return err;
+  return ZX_OK;
 }
 
 void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
-  GetSuperblockInfo().AddVnodeToVnodeSet(InoType::kOrphanIno, vnode->GetKey());
+  AddVnodeToVnodeSet(InoType::kOrphanIno, vnode->GetKey());
   if (vnode->IsDir()) {
     vnode->Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
   }
@@ -93,15 +89,12 @@ void F2fs::PurgeOrphanInode(nid_t ino) {
 }
 
 zx_status_t F2fs::PurgeOrphanInodes() {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  block_t start_blk, orphan_blkaddr;
-
-  if (!(superblock_info.TestCpFlags(CpFlag::kCpOrphanPresentFlag))) {
+  if (!(superblock_info_->TestCpFlags(CpFlag::kCpOrphanPresentFlag))) {
     return ZX_OK;
   }
-  superblock_info.SetOnRecovery();
-  start_blk = superblock_info.StartCpAddr() + superblock_info.GetNumCpPayload() + 1;
-  orphan_blkaddr = superblock_info.StartSumAddr() - 1;
+  SetOnRecovery();
+  block_t start_blk = superblock_info_->StartCpAddr() + superblock_info_->GetNumCpPayload() + 1;
+  block_t orphan_blkaddr = superblock_info_->StartSumAddr() - 1;
 
   for (block_t i = 0; i < orphan_blkaddr; ++i) {
     LockedPage page;
@@ -122,13 +115,12 @@ zx_status_t F2fs::PurgeOrphanInodes() {
     }
   }
   // clear Orphan Flag
-  superblock_info.ClearCpFlags(CpFlag::kCpOrphanPresentFlag);
-  superblock_info.ClearOnRecovery();
+  superblock_info_->ClearCpFlags(CpFlag::kCpOrphanPresentFlag);
+  ClearOnRecovery();
   return ZX_OK;
 }
 
 void F2fs::WriteOrphanInodes(block_t start_blk) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
   OrphanBlock *orphan_blk = nullptr;
   LockedPage page;
   uint32_t nentries = 0;
@@ -136,10 +128,9 @@ void F2fs::WriteOrphanInodes(block_t start_blk) {
   uint16_t orphan_blocks;
 
   orphan_blocks = static_cast<uint16_t>(
-      (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) + (kOrphansPerBlock - 1)) /
-      kOrphansPerBlock);
+      (GetVnodeSetSize(InoType::kOrphanIno) + (kOrphansPerBlock - 1)) / kOrphansPerBlock);
 
-  superblock_info.ForAllVnodesInVnodeSet(InoType::kOrphanIno, [&](nid_t ino) {
+  ForAllVnodesInVnodeSet(InoType::kOrphanIno, [&](nid_t ino) {
     if (nentries == kOrphansPerBlock) {
       // an orphan block is full of 1020 entries,
       // then we need to flush current orphan blocks
@@ -269,7 +260,7 @@ zx_status_t F2fs::GetValidCheckpoint() {
     }
   }
 
-  size_t num_payload = superblock_info_->GetNumCpPayload();
+  block_t num_payload = superblock_info_->GetNumCpPayload();
   if (num_payload) {
     size_t blk_size = superblock_info_->GetBlocksize();
     superblock_info_->SetExtraSitBitmap(num_payload * blk_size);
@@ -316,7 +307,6 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation, bool wait_write
 
 // Freeze all the FS-operations for checkpoint.
 void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
   while (true) {
     // Write out all dirty dentry pages and remove orphans from dirty list.
     WritebackOperation op;
@@ -329,11 +319,11 @@ void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
     FlushDirtyDataPages(op, true);
 
     // Stop file operation
-    superblock_info.mutex_lock_op(LockType::kFileOp);
-    if (!superblock_info.GetPageCount(CountType::kDirtyDents)) {
+    mutex_lock_op(LockType::kFileOp);
+    if (!superblock_info_->GetPageCount(CountType::kDirtyDents)) {
       break;
     }
-    superblock_info.mutex_unlock_op(LockType::kFileOp);
+    mutex_unlock_op(LockType::kFileOp);
   }
 
   // POR: we should ensure that there is no dirty node pages
@@ -342,88 +332,82 @@ void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
     WritebackOperation op;
     GetNodeManager().FlushDirtyNodePages(op);
 
-    superblock_info.mutex_lock_op(LockType::kNodeOp);
-    if (!superblock_info.GetPageCount(CountType::kDirtyNodes)) {
+    mutex_lock_op(LockType::kNodeOp);
+    if (!superblock_info_->GetPageCount(CountType::kDirtyNodes)) {
       break;
     }
-    superblock_info.mutex_unlock_op(LockType::kNodeOp);
+    mutex_unlock_op(LockType::kNodeOp);
   }
 }
 
-void F2fs::UnblockOperations() const __TA_NO_THREAD_SAFETY_ANALYSIS {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  superblock_info.mutex_unlock_op(LockType::kNodeOp);
-  superblock_info.mutex_unlock_op(LockType::kFileOp);
+void F2fs::UnblockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
+  mutex_unlock_op(LockType::kNodeOp);
+  mutex_unlock_op(LockType::kFileOp);
 }
 
 zx_status_t F2fs::DoCheckpoint(bool is_umount) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  Checkpoint &ckpt = superblock_info.GetCheckpoint();
-  block_t start_blk;
-  uint32_t data_sum_blocks, orphan_blocks;
-  uint32_t crc32 = 0;
-
   // Flush all the NAT/SIT pages
+  SuperblockInfo &superblock_info = GetSuperblockInfo();
   while (superblock_info.GetPageCount(CountType::kDirtyMeta)) {
     FlushDirtyMetaPages(false);
   }
 
   ScheduleWriter();
 
+  auto &ckpt_block = superblock_info.GetCheckpointBlock();
   if (auto last_nid_or = GetNodeManager().GetNextFreeNid(); last_nid_or.is_ok()) {
-    ckpt.next_free_nid = CpuToLe(*last_nid_or);
+    ckpt_block->next_free_nid = CpuToLe(*last_nid_or);
   } else {
-    ckpt.next_free_nid = CpuToLe(GetNodeManager().GetNextScanNid());
+    ckpt_block->next_free_nid = CpuToLe(GetNodeManager().GetNextScanNid());
   }
 
   // modify checkpoint
   // version number is already updated
-  ckpt.elapsed_time = CpuToLe(static_cast<uint64_t>(GetSegmentManager().GetMtime()));
-  ckpt.valid_block_count = CpuToLe(ValidUserBlocks());
-  ckpt.free_segment_count = CpuToLe(GetSegmentManager().FreeSegments());
+  ckpt_block->elapsed_time = CpuToLe(GetSegmentManager().GetMtime());
+  ckpt_block->valid_block_count = CpuToLe(superblock_info.GetValidBlockCount());
+  ckpt_block->free_segment_count = CpuToLe(GetSegmentManager().FreeSegments());
   for (int i = 0; i < 3; ++i) {
-    ckpt.cur_node_segno[i] =
+    ckpt_block->cur_node_segno[i] =
         CpuToLe(GetSegmentManager().CursegSegno(i + static_cast<int>(CursegType::kCursegHotNode)));
-    ckpt.cur_node_blkoff[i] =
+    ckpt_block->cur_node_blkoff[i] =
         CpuToLe(GetSegmentManager().CursegBlkoff(i + static_cast<int>(CursegType::kCursegHotNode)));
-    ckpt.alloc_type[i + static_cast<int>(CursegType::kCursegHotNode)] =
+    ckpt_block->alloc_type[i + static_cast<int>(CursegType::kCursegHotNode)] =
         GetSegmentManager().CursegAllocType(i + static_cast<int>(CursegType::kCursegHotNode));
   }
   for (int i = 0; i < 3; ++i) {
-    ckpt.cur_data_segno[i] =
+    ckpt_block->cur_data_segno[i] =
         CpuToLe(GetSegmentManager().CursegSegno(i + static_cast<int>(CursegType::kCursegHotData)));
-    ckpt.cur_data_blkoff[i] =
+    ckpt_block->cur_data_blkoff[i] =
         CpuToLe(GetSegmentManager().CursegBlkoff(i + static_cast<int>(CursegType::kCursegHotData)));
-    ckpt.alloc_type[i + static_cast<int>(CursegType::kCursegHotData)] =
+    ckpt_block->alloc_type[i + static_cast<int>(CursegType::kCursegHotData)] =
         GetSegmentManager().CursegAllocType(i + static_cast<int>(CursegType::kCursegHotData));
   }
 
-  ckpt.valid_node_count = CpuToLe(ValidNodeCount());
-  ckpt.valid_inode_count = CpuToLe(ValidInodeCount());
+  ckpt_block->valid_node_count = CpuToLe(superblock_info.GetValidNodeCount());
+  ckpt_block->valid_inode_count = CpuToLe(superblock_info.GetValidInodeCount());
 
   // 2 cp  + n data seg summary + orphan inode blocks
-  data_sum_blocks = GetSegmentManager().NpagesForSummaryFlush();
+  uint32_t data_sum_blocks = GetSegmentManager().NpagesForSummaryFlush();
   if (data_sum_blocks < 3) {
     superblock_info.SetCpFlags(CpFlag::kCpCompactSumFlag);
   } else {
     superblock_info.ClearCpFlags(CpFlag::kCpCompactSumFlag);
   }
 
-  orphan_blocks = static_cast<uint32_t>(
-      (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) + kOrphansPerBlock - 1) /
-      kOrphansPerBlock);
-  ckpt.cp_pack_start_sum = 1 + orphan_blocks + superblock_info.GetNumCpPayload();
-  ckpt.cp_pack_total_block_count =
-      2 + data_sum_blocks + orphan_blocks + superblock_info.GetNumCpPayload();
-
+  block_t num_cp_payload = superblock_info.GetNumCpPayload();
+  uint32_t orphan_blocks = static_cast<uint32_t>(
+      (GetVnodeSetSize(InoType::kOrphanIno) + kOrphansPerBlock - 1) / kOrphansPerBlock);
+  uint32_t cp_pack_total_block_count = 2 + data_sum_blocks + orphan_blocks + num_cp_payload;
   if (is_umount) {
     superblock_info.SetCpFlags(CpFlag::kCpUmountFlag);
-    ckpt.cp_pack_total_block_count += kNrCursegNodeType;
+    cp_pack_total_block_count += kNrCursegNodeType;
   } else {
     superblock_info.ClearCpFlags(CpFlag::kCpUmountFlag);
   }
+  ckpt_block->cp_pack_start_sum = CpuToLe(1 + orphan_blocks + num_cp_payload);
+  ckpt_block->cp_pack_total_block_count = CpuToLe(cp_pack_total_block_count);
 
-  if (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) > 0) {
+  if (GetVnodeSetSize(InoType::kOrphanIno) > 0) {
     superblock_info.SetCpFlags(CpFlag::kCpOrphanPresentFlag);
   } else {
     superblock_info.ClearCpFlags(CpFlag::kCpOrphanPresentFlag);
@@ -433,22 +417,22 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   GetSegmentManager().GetSitBitmap(superblock_info.GetSitBitmap());
   GetNodeManager().GetNatBitmap(superblock_info.GetNatBitmap());
 
-  crc32 = CpuToLe(F2fsCrc32(&ckpt, LeToCpu(ckpt.checksum_offset)));
-  std::memcpy(reinterpret_cast<uint8_t *>(&ckpt) + LeToCpu(ckpt.checksum_offset), &crc32,
+  uint32_t crc32 = CpuToLe(F2fsCrc32(&ckpt_block, LeToCpu(ckpt_block->checksum_offset)));
+  std::memcpy(ckpt_block.get<uint8_t>() + LeToCpu(ckpt_block->checksum_offset), &crc32,
               sizeof(uint32_t));
 
-  start_blk = superblock_info.StartCpAddr();
+  block_t start_blk = superblock_info.StartCpAddr();
 
   // Prepare Pages for this checkpoint pack
   {
     LockedPage cp_page;
     GrabMetaPage(start_blk++, &cp_page);
-    cp_page->Write(&ckpt, 0, (1 << superblock_info.GetLogBlocksize()));
+    cp_page->Write(&ckpt_block, 0, superblock_info.GetBlocksize());
     cp_page.SetDirty();
   }
 
   size_t offset = 0;
-  for (size_t i = 0; i < superblock_info.GetNumCpPayload(); ++i) {
+  for (size_t i = 0; i < num_cp_payload; ++i) {
     LockedPage cp_page;
     GrabMetaPage(start_blk++, &cp_page);
     memcpy(cp_page->GetAddress(), &superblock_info.GetSitBitmap()[offset], cp_page->Size());
@@ -456,7 +440,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     offset += cp_page->Size();
   }
 
-  if (superblock_info.GetVnodeSetSize(InoType::kOrphanIno) > 0) {
+  if (GetVnodeSetSize(InoType::kOrphanIno) > 0) {
     WriteOrphanInodes(start_blk);
     start_blk += orphan_blocks;
   }
@@ -475,13 +459,12 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   {
     LockedPage cp_page;
     GrabMetaPage(start_blk, &cp_page);
-    cp_page->Write(&ckpt, 0, (1 << superblock_info.GetLogBlocksize()));
+    cp_page->Write(&ckpt_block, 0, superblock_info.GetBlocksize());
     cp_page.SetDirty();
   }
 
   // Update the valid block count.
-  superblock_info.SetLastValidBlockCount(superblock_info.GetTotalValidBlockCount());
-  superblock_info.SetAllocValidBlockCount(0);
+  superblock_info.ResetAllocBlockCount();
 
   // Commit.
   if (!superblock_info.TestCpFlags(CpFlag::kCpErrorFlag)) {
@@ -529,11 +512,7 @@ void F2fs::SetTearDown() { teardown_flag_.test_and_set(std::memory_order_relaxed
 
 // We guarantee that this checkpoint procedure should not fail.
 zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
-  SuperblockInfo &superblock_info = GetSuperblockInfo();
-  Checkpoint &ckpt = superblock_info.GetCheckpoint();
-  uint64_t ckpt_ver;
-
-  if (superblock_info.TestCpFlags(CpFlag::kCpErrorFlag)) {
+  if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -550,8 +529,7 @@ zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
   // update checkpoint pack index
   // Increase the version number so that
   // SIT entries and seg summaries are written at correct place
-  ckpt_ver = LeToCpu(ckpt.checkpoint_ver);
-  ckpt.checkpoint_ver = CpuToLe(static_cast<uint64_t>(++ckpt_ver));
+  superblock_info_->UpdateCheckpointVer();
 
   // write cached NAT/SIT entries to NAT/SIT area
   if (zx_status_t ret = GetNodeManager().FlushNatEntries(); ret != ZX_OK) {
@@ -566,7 +544,7 @@ zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
     return ret;
   }
 
-  if (is_umount && !(superblock_info.TestCpFlags(CpFlag::kCpErrorFlag))) {
+  if (is_umount && !(superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag))) {
     ZX_ASSERT(superblock_info_->GetPageCount(CountType::kDirtyDents) == 0);
     ZX_ASSERT(superblock_info_->GetPageCount(CountType::kDirtyData) == 0);
     ZX_ASSERT(superblock_info_->GetPageCount(CountType::kWriteback) == 0);
