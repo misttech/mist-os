@@ -349,65 +349,6 @@ TEST_F(ConvertTest, ToFidlJoinBssRequest) {
   EXPECT_EQ(ZX_ERR_INVALID_ARGS, ConvertJoinBssRequest(in, &out, fidl_arena));
 }
 
-TEST_F(ConvertTest, ToFidlBcn) {
-  drivers::log::Instance::Init(0);
-  // Populate wlan_softmac_enable_beaconing_request_t
-  uint8_t* tx_packet_template_buffer = (uint8_t*)calloc(kFakePacketSize, sizeof(uint8_t));
-  for (size_t i = 0; i < kFakePacketSize; i++) {
-    tx_packet_template_buffer[i] = kRandomPopulaterUint8;
-  }
-  wlan_softmac_enable_beaconing_request_t in = {
-      .packet_template =
-          {
-              .mac_frame_buffer = tx_packet_template_buffer,
-              .mac_frame_size = kFakePacketSize,
-              .info =
-                  {
-                      .tx_flags = kRandomPopulaterUint8,
-                      .valid_fields = kRandomPopulaterUint32,
-                      .tx_vector_idx = kRandomPopulaterUint16,
-                      .phy = kFakeBanjoPhyType,  // Valid PhyType in first try.
-                      .channel_bandwidth = kFakeBanjoChannelBandwidth,
-                      .mcs = kRandomPopulaterUint8,
-                  },
-          },
-      .tim_ele_offset = kRandomPopulaterUint64,
-      .beacon_interval = kRandomPopulaterUint16,
-  };
-
-  // Conduct conversion
-  fidl::Arena arena;
-  wlan_softmac::WlanSoftmacEnableBeaconingRequest out;
-  ConvertEnableBeaconing(in, &out, arena);
-
-  // Verify outputs
-  EXPECT_EQ(kFakePacketSize, out.packet_template().mac_frame.count());
-  for (size_t i = 0; i < kFakePacketSize; i++) {
-    EXPECT_EQ(kRandomPopulaterUint8, out.packet_template().mac_frame.data()[i]);
-  }
-
-  EXPECT_EQ(kRandomPopulaterUint8, out.packet_template().info.tx_flags);
-  EXPECT_EQ(kRandomPopulaterUint32, out.packet_template().info.valid_fields);
-
-  EXPECT_EQ(kRandomPopulaterUint16, out.packet_template().info.tx_vector_idx);
-
-  EXPECT_EQ(kFakeFidlPhyType, out.packet_template().info.phy);
-
-  EXPECT_EQ(kFakeFidlChannelBandwidth, out.packet_template().info.channel_bandwidth);
-  EXPECT_EQ(kRandomPopulaterUint8, out.packet_template().info.mcs);
-  EXPECT_EQ(kRandomPopulaterUint64, out.tim_ele_offset());
-  EXPECT_EQ(kRandomPopulaterUint16, out.beacon_interval());
-
-  // Assign out-of-range values to these fields, and they will be adjust to the default values.
-  in.packet_template.info.phy = kRandomPopulaterUint32;
-  in.packet_template.info.channel_bandwidth = kRandomPopulaterUint32;
-  ConvertEnableBeaconing(in, &out, arena);
-  EXPECT_EQ(wlan_common::WlanPhyType::kDsss, out.packet_template().info.phy);
-  EXPECT_EQ(wlan_common::ChannelBandwidth::kCbw20, out.packet_template().info.channel_bandwidth);
-
-  free(tx_packet_template_buffer);
-}
-
 TEST_F(ConvertTest, ToFidlKeyConfig) {
   log::Instance::Init(0);
   // Create tmp non-const key from const key.

@@ -30,7 +30,8 @@ use {
     anyhow::{bail, Error},
     banjo_fuchsia_wlan_common as banjo_common, banjo_fuchsia_wlan_softmac as banjo_wlan_softmac,
     device::DeviceOps,
-    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_softmac as fidl_softmac,
+    fuchsia_zircon as zx,
     futures::{
         channel::{mpsc, oneshot},
         select, StreamExt,
@@ -83,6 +84,29 @@ impl WlanSoftmacBandCapabilityExt for fidl_softmac::WlanSoftmacBandCapability {
                 Some(&operating_channels[..cmp::min(usize::from(*n), operating_channels.len())])
             }
             _ => None,
+        }
+    }
+}
+
+trait WlanTxPacketExt {
+    fn template(mac_frame: Vec<u8>) -> Self;
+}
+
+impl WlanTxPacketExt for fidl_softmac::WlanTxPacket {
+    fn template(mac_frame: Vec<u8>) -> Self {
+        fidl_softmac::WlanTxPacket {
+            mac_frame,
+            // TODO(fxbug.dev/105579): At time of writing, this field is ignored by the `iwlwifi`
+            //                         vendor driver (the only one other than the tap driver used
+            //                         for testing). The data used here is meaningless.
+            info: fidl_softmac::WlanTxInfo {
+                tx_flags: 0,
+                valid_fields: 0,
+                tx_vector_idx: 0,
+                phy: fidl_common::WlanPhyType::Dsss,
+                channel_bandwidth: fidl_common::ChannelBandwidth::Cbw20,
+                mcs: 0,
+            },
         }
     }
 }

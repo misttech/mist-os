@@ -119,9 +119,7 @@ pub trait DeviceOps {
     fn join_bss(&mut self, cfg: banjo_common::JoinBssRequest) -> Result<(), zx::Status>;
     fn enable_beaconing(
         &mut self,
-        buf: OutBuf,
-        tim_ele_offset: usize,
-        beacon_interval: TimeUnit,
+        request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
     ) -> Result<(), zx::Status>;
     fn disable_beaconing(&mut self) -> Result<(), zx::Status>;
     fn notify_association_complete(
@@ -335,16 +333,15 @@ impl DeviceOps for Device {
 
     fn enable_beaconing(
         &mut self,
-        buf: OutBuf,
-        tim_ele_offset: usize,
-        beacon_interval: TimeUnit,
+        request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
     ) -> Result<(), zx::Status> {
-        zx::ok((self.raw_device.enable_beaconing)(
-            self.raw_device.device,
-            buf,
-            tim_ele_offset,
-            beacon_interval.0,
-        ))
+        self.wlan_softmac_bridge_proxy
+            .enable_beaconing(&request, zx::Time::INFINITE)
+            .map_err(|error| {
+                error!("FIDL error during EnableBeaconing: {:?}", error);
+                zx::Status::INTERNAL
+            })?
+            .map_err(zx::Status::from_raw)
     }
 
     fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
@@ -527,13 +524,6 @@ pub struct DeviceInterface {
     /// Configure the device's BSS.
     /// |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
     join_bss: extern "C" fn(device: *mut c_void, cfg: &mut banjo_common::JoinBssRequest) -> i32,
-    /// Enable hardware offload of beaconing on the device.
-    enable_beaconing: extern "C" fn(
-        device: *mut c_void,
-        buf: OutBuf,
-        tim_ele_offset: usize,
-        beacon_interval: u16,
-    ) -> i32,
 }
 
 pub mod test_utils {
@@ -911,14 +901,18 @@ pub mod test_utils {
 
         fn enable_beaconing(
             &mut self,
-            buf: OutBuf,
-            tim_ele_offset: usize,
-            beacon_interval: TimeUnit,
+            request: fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest,
         ) -> Result<(), zx::Status> {
-            self.state.lock().unwrap().beacon_config =
-                Some((buf.as_slice().to_vec(), tim_ele_offset, beacon_interval));
-            buf.free();
-            Ok(())
+            match (request.packet_template, request.tim_ele_offset, request.beacon_interval) {
+                (Some(packet_template), Some(tim_ele_offset), Some(beacon_interval)) => Ok({
+                    self.state.lock().unwrap().beacon_config = Some((
+                        packet_template.mac_frame.clone(),
+                        usize::try_from(tim_ele_offset).map_err(|_| zx::Status::INTERNAL)?,
+                        TimeUnit(beacon_interval),
+                    ));
+                }),
+                _ => Err(zx::Status::INVALID_ARGS),
+            }
         }
 
         fn disable_beaconing(&mut self) -> Result<(), zx::Status> {
@@ -1078,9 +1072,13 @@ pub mod test_utils {
 #[cfg(test)]
 mod tests {
     use {
-        super::*, crate::ddk_converter, fidl_fuchsia_wlan_common as fidl_common,
-        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fuchsia_async as fasync, ieee80211::Ssid,
-        std::convert::TryFrom, wlan_common::assert_variant,
+        super::*,
+        crate::{ddk_converter, WlanTxPacketExt as _},
+        fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+        fuchsia_async as fasync,
+        ieee80211::Ssid,
+        std::convert::TryFrom,
+        wlan_common::assert_variant,
     };
 
     fn make_deauth_confirm_msg() -> fidl_mlme::DeauthenticateConfirm {
@@ -1473,9 +1471,15 @@ mod tests {
             .get_buffer(4)
             .expect("error getting buffer");
         in_buf.as_mut_slice().copy_from_slice(&[1, 2, 3, 4][..]);
+        let mac_frame = in_buf.as_slice().to_vec();
 
         fake_device
-            .enable_beaconing(OutBuf::from(in_buf, 4), 1, TimeUnit(2))
+            .enable_beaconing(fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest {
+                packet_template: Some(fidl_softmac::WlanTxPacket::template(mac_frame)),
+                tim_ele_offset: Some(1),
+                beacon_interval: Some(2),
+                ..Default::default()
+            })
             .expect("error enabling beaconing");
         assert_variant!(
         fake_device_state.lock().unwrap().beacon_config.as_ref(),

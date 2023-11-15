@@ -104,11 +104,6 @@ typedef struct {
    * |cfg| is mutable because the underlying API does not take a const join_bss_request_t.
    */
   int32_t (*join_bss)(void *device, join_bss_request_t *cfg);
-  /**
-   * Enable hardware offload of beaconing on the device.
-   */
-  int32_t (*enable_beaconing)(void *device, wlansoftmac_out_buf_t buf, uintptr_t tim_ele_offset,
-                              uint16_t beacon_interval);
 } rust_device_interface_t;
 
 /**

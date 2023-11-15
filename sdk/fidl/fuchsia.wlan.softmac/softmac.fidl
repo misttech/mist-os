@@ -477,6 +477,41 @@ closed protocol WlanSoftmacBridge {
         1: channel fuchsia.wlan.common.WlanChannel;
     }) -> () error zx.Status;
 
+    /// Enables hardware Beaconing.
+    ///
+    /// This method cannot be called while beaconing is enabled and so
+    /// `DisableBeaconing` must be called prior to this method if beaconing is
+    /// enabled.
+    ///
+    /// All request fields are required.
+    ///
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_NOT_SUPPORTED`: The device does not support hardware beacons.
+    /// - `ZX_ERR_INVALID_ARGS`: The device cannot transmit the requested
+    ///                          beacon.
+    /// - `ZX_ERR_BAD_STATE`: The device is already beaconing.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.EnableBeaconing")
+    strict EnableBeaconing(table {
+        /// Beacon template. Since this is a template, some packet content can
+        /// only contain minimal valid information, because the content is later
+        /// modified by hardware, firmware, or software.
+        1: packet_template WlanTxPacket;
+
+        /// TIM offset to the start of the `packet_template` field in bytes.
+        /// This must index the first byte of the TIM IE, which is the tag ID.
+        2: tim_ele_offset uint64;
+
+        /// Beacon interval period in TU.
+        3: beacon_interval uint16;
+    }) -> () error zx.Status;
+
+    /// Disables hardware beaconing.
+    @available(added=HEAD)
+    @selector("fuchsia.wlan.softmac/WlanSoftmac.DisableBeaconing")
+    strict DisableBeaconing() -> () error zx.Status;
+
     /// Notifies the device of a successful association and configures
     /// additional parameters necessary to participate in that association.
     ///
@@ -490,11 +525,6 @@ closed protocol WlanSoftmacBridge {
     strict NotifyAssociationComplete(struct {
         assoc_cfg WlanAssociationConfig;
     }) -> () error zx.Status;
-
-    /// Disables hardware beaconing.
-    @available(added=HEAD)
-    @selector("fuchsia.wlan.softmac/WlanSoftmac.DisableBeaconing")
-    strict DisableBeaconing() -> () error zx.Status;
 
     /// Notifies MAC and PHY that the peer has been de-associated.
     @selector("fuchsia.wlan.softmac/WlanSoftmac.ClearAssociation")
@@ -690,25 +720,32 @@ closed protocol WlanSoftmac {
         join_request fuchsia.wlan.common.JoinBssRequest;
     }) -> () error zx.Status;
 
-    /// Enables hardware Beaconing. This API cannot be invoked while beaconing is active.
-    /// DisableBeaconing() must be called before this API can be re-invoked. \
-    /// All fields in the message are required. \
-    /// Common errors include: \
-    ///   ZX_ERR_NOT_SUPPORTED: The device does not support hardware beacons. \
-    ///   ZX_ERR_INVALID_ARGS: The device cannot transmit the requested beacon. \
-    ///   ZX_ERR_BAD_STATE: The device is already beaconing.
-    @available(added=15)
+    /// Enables hardware Beaconing.
+    ///
+    /// This method cannot be called while beaconing is enabled and so
+    /// `DisableBeaconing` must be called prior to this method if beaconing is
+    /// enabled.
+    ///
+    /// All request fields are required.
+    ///
+    /// Common errors include:
+    ///
+    /// - `ZX_ERR_NOT_SUPPORTED`: The device does not support hardware beacons.
+    /// - `ZX_ERR_INVALID_ARGS`: The device cannot transmit the requested
+    ///                          beacon.
+    /// - `ZX_ERR_BAD_STATE`: The device is already beaconing.
+    @available(added=15, removed=HEAD)
     strict EnableBeaconing(table {
-        /// Points to the beacon template. Since this is just the template, some packet content can
-        /// contain only minimum valid info. They will be changed later by hardware/firmware or
-        /// software.
+        /// Beacon template. Since this is a template, some packet content can
+        /// only contain minimal valid information, because the content is later
+        /// modified by hardware, firmware, or software.
         1: packet_template WlanTxPacket;
 
-        /// TIM offset (in bytes) to the start of |bcn_tmpl|. This points to the first byte of
-        /// TIM IE, which is the tag ID.
+        /// TIM offset to the start of the `packet_template` field in bytes.
+        /// This must index the first byte of the TIM IE, which is the tag ID.
         2: tim_ele_offset uint64;
 
-        /// in TU
+        /// Beacon interval period in TU.
         3: beacon_interval uint16;
     }) -> () error zx.Status;
 

@@ -38,9 +38,6 @@ zx_status_t ConvertChannel(const wlan_channel_t& in, fuchsia_wlan_common::wire::
 zx_status_t ConvertJoinBssRequest(const join_bss_request_t& in,
                                   fuchsia_wlan_common::wire::JoinBssRequest* out,
                                   fidl::AnyArena& arena);
-void ConvertEnableBeaconing(const wlan_softmac_enable_beaconing_request_t& in,
-                            fuchsia_wlan_softmac::wire::WlanSoftmacEnableBeaconingRequest* out,
-                            fidl::AnyArena& arena);
 zx_status_t ConvertKeyConfig(const wlan_key_configuration_t& in,
                              fuchsia_wlan_softmac::wire::WlanKeyConfiguration* out,
                              fidl::AnyArena& arena);

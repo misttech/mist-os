@@ -13,10 +13,11 @@ use {
         device::DeviceOps,
         error::Error,
         key::KeyConfig,
+        WlanTxPacketExt as _,
     },
     anyhow::format_err,
     fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_softmac as fidl_softmac, fuchsia_zircon as zx,
     ieee80211::{MacAddr, MacAddrBytes, Ssid},
     std::{
         collections::{HashMap, VecDeque},
@@ -101,13 +102,20 @@ impl InfraBss {
 
         // TODO(fxbug.dev/37891): Support DTIM.
 
-        let (in_buf, bytes_written, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
+        let (in_buf, _, beacon_offload_params) = bss.make_beacon_frame(ctx)?;
+        let mac_frame = in_buf.as_slice().to_vec();
+        let tim_ele_offset = u64::try_from(beacon_offload_params.tim_ele_offset).map_err(|_| {
+            Error::Internal(format_err!(
+                "failed to convert TIM offset for beacon frame packet template"
+            ))
+        })?;
         ctx.device
-            .enable_beaconing(
-                OutBuf::from(in_buf, bytes_written),
-                beacon_offload_params.tim_ele_offset,
-                beacon_interval,
-            )
+            .enable_beaconing(fidl_softmac::WlanSoftmacBridgeEnableBeaconingRequest {
+                packet_template: Some(fidl_softmac::WlanTxPacket::template(mac_frame)),
+                tim_ele_offset: Some(tim_ele_offset),
+                beacon_interval: Some(beacon_interval.0),
+                ..Default::default()
+            })
             .map_err(|s| Error::Status(format!("failed to enable beaconing"), s))?;
 
         Ok(bss)

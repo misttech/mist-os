@@ -171,23 +171,21 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
     DispatchAndComplete(__func__, dispatcher, completer);
   }
 
-  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) override {
-    auto arena = fdf::Arena::Create(0, 0);
-    if (arena.is_error()) {
-      lerror("Arena creation failed: %s", arena.status_string());
-      return completer.ReplyError(ZX_ERR_INTERNAL);
-    }
+  void EnableBeaconing(EnableBeaconingRequestView request,
+                       EnableBeaconingCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::EnableBeaconing> dispatcher =
+        [request](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->EnableBeaconing(*request);
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
+  }
 
-    auto result = client_.sync().buffer(*std::move(arena))->DisableBeaconing();
-    if (!result.ok()) {
-      lerror("DisableBeaconing failed (FIDL error %s)", result.status_string());
-      return completer.ReplyError(result.status());
-    }
-    if (result->is_error()) {
-      lerror("DisableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
-      return completer.ReplyError(result->error_value());
-    }
-    return completer.ReplySuccess();
+  void DisableBeaconing(DisableBeaconingCompleter::Sync& completer) override {
+    Dispatcher<fuchsia_wlan_softmac::WlanSoftmac::DisableBeaconing> dispatcher =
+        [](const auto& arena, const auto& client) {
+          return client.sync().buffer(arena)->DisableBeaconing();
+        };
+    DispatchAndComplete(__func__, dispatcher, completer);
   }
 
   static void BindSelfManagedServer(
@@ -309,20 +307,6 @@ zx_status_t WlanSoftmacHandle::Init(
       },
       .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
         return DEVICE(device)->JoinBss(cfg);
-      },
-      .enable_beaconing = [](void* device, wlansoftmac_out_buf_t buf, size_t tim_ele_offset,
-                             uint16_t beacon_interval) -> zx_status_t {
-        auto used_buffer = UsedBuffer::FromOutBuf(buf);
-        wlan_softmac_enable_beaconing_request_t request = {
-            .packet_template =
-                {
-                    .mac_frame_buffer = used_buffer.data(),
-                    .mac_frame_size = used_buffer.size(),
-                },
-            .tim_ele_offset = tim_ele_offset,
-            .beacon_interval = beacon_interval,
-        };
-        return DEVICE(device)->EnableBeaconing(&request);
       },
   };
 
@@ -771,34 +755,6 @@ zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
     return result->error_value();
   }
 
-  return ZX_OK;
-}
-
-// Max size of WlanSoftmacEnableBeaconingRequest.
-static constexpr size_t kWlanSoftmacEnableBeaconingRequestBufferSize =
-    fidl::MaxSizeInChannel<fuchsia_wlan_softmac::wire::WlanSoftmacEnableBeaconingRequest,
-                           fidl::MessageDirection::kSending>();
-
-zx_status_t Device::EnableBeaconing(wlan_softmac_enable_beaconing_request_t* request) {
-  auto arena = fdf::Arena::Create(0, 0);
-  if (arena.is_error()) {
-    lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-
-  fidl::Arena<kWlanSoftmacEnableBeaconingRequestBufferSize> fidl_arena;
-  fuchsia_wlan_softmac::wire::WlanSoftmacEnableBeaconingRequest fidl_request;
-  ConvertEnableBeaconing(*request, &fidl_request, fidl_arena);
-
-  auto result = client_.sync().buffer(*std::move(arena))->EnableBeaconing(fidl_request);
-  if (!result.ok()) {
-    lerror("EnableBeaconing failed (FIDL error %s)", result.status_string());
-    return result.status();
-  }
-  if (result->is_error()) {
-    lerror("EnableBeaconing failed (status %s)", zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
   return ZX_OK;
 }
 
