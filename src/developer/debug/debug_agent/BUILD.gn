@@ -161,6 +161,10 @@ static_library("lib") {
     sources += [
       "linux_utils.cc",
       "linux_utils.h",
+      "posix/dir_reader_linux.h",
+      "posix/eintr_wrapper.h",
+      "posix/file_descriptor_shuffle.cc",
+      "posix/file_descriptor_shuffle.h",
     ]
   }
 
@@ -331,7 +335,10 @@ test("unit_tests") {
       "//src/developer/debug/shared:tests",
     ]
   } else if (is_linux) {
-    sources += [ "linux_utils_unittest.cc" ]
+    sources += [
+      "linux_utils_unittest.cc",
+      "posix/file_descriptor_shuffle_unittest.cc",
+    ]
   }
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
