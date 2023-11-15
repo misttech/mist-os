@@ -235,7 +235,9 @@ void NdmData::ParseNdmData(const void* page, fbl::Vector<int32_t>* bad_blocks,
 
   for (int i = 0;; i++) {
     int32_t bad_block;
-    memcpy(&bad_block, reinterpret_cast<const int32_t*>(bad_data) + i + 1, sizeof(bad_block));
+    memcpy(&bad_block,
+           reinterpret_cast<const std::byte*>(reinterpret_cast<const int32_t*>(bad_data) + i + 1),
+           sizeof(bad_block));
     if (bad_block == h.num_blocks) {
       break;
     }
@@ -253,7 +255,7 @@ void NdmData::ParseNdmData(const void* page, fbl::Vector<int32_t>* bad_blocks,
 
   for (int i = 0;; i++, running_ptr++) {
     RunningBadBlock running;
-    memcpy(&running, running_ptr, sizeof(running));
+    memcpy(&running, reinterpret_cast<const std::byte*>(running_ptr), sizeof(running));
     if (running.bad_block == -1) {
       break;
     }
@@ -268,7 +270,7 @@ void NdmData::ParseNdmData(const void* page, fbl::Vector<int32_t>* bad_blocks,
   }
 
   BadBlockData bad_block_data;
-  memcpy(&bad_block_data, bad_data, sizeof(bad_block_data));
+  memcpy(&bad_block_data, reinterpret_cast<const std::byte*>(bad_data), sizeof(bad_block_data));
   DumpPartitions(h, data, bad_block_data.num_partitions);
   Log("Total bad blocks %lu\n\n", bad_blocks->size());
 }
