@@ -7,10 +7,9 @@ use {
         logging::not_implemented,
         mm::MemoryAccessorExt,
         syscalls::{
-            fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg,
+            fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg, CurrentTask,
             FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
         },
-        task::CurrentTask,
         types::errno::{errno, error, Errno},
         types::user_address::UserAddress,
     },
