@@ -19,16 +19,16 @@ use crate::{
         FdEvents, FdNumber, FileHandle, FileObject, FsNode, FsStr, LookupContext,
     },
     mm::MemoryAccessorExt,
-    syscalls::{
-        gid_t, socklen_t, uapi, ucred, uid_t, OpenFlags, SyscallArg, SyscallResult, FIONREAD,
-        SOL_SOCKET, SO_ACCEPTCONN, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK,
-        SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
-        SUCCESS,
-    },
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
     types::errno::{errno, error, Errno, EACCES, EINTR, EPERM},
     types::user_address::{UserAddress, UserRef},
     types::user_buffer::UserBuffer,
+    types::{
+        gid_t, socklen_t, uapi, ucred, uid_t, OpenFlags, FIONREAD, SOL_SOCKET, SO_ACCEPTCONN,
+        SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER, SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED,
+        SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT, SO_SNDBUF,
+    },
 };
 
 use starnix_lock::Mutex;

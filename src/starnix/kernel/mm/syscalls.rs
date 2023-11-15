@@ -17,17 +17,17 @@ use crate::{
         DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
         MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
-    syscalls::{robust_list_head, timespec, uapi},
     task::{CurrentTask, Task},
     types::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     types::errno::{errno, error, Errno},
     types::time::{duration_from_timespec, time_from_timespec},
     types::user_address::{UserAddress, UserRef},
     types::{
-        pid_t, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_PRIVATE_FLAG,
-        FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET, MAP_ANONYMOUS,
-        MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE,
-        MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
+        pid_t, robust_list_head, timespec, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
+        FUTEX_CMD_MASK, FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET,
+        FUTEX_WAKE, FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED,
+        MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED,
+        MAP_STACK, PROT_EXEC,
     },
 };
 

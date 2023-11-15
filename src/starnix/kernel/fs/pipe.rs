@@ -16,16 +16,12 @@ use crate::{
     },
     mm::{MemoryAccessorExt, PAGE_SIZE},
     signals::send_standard_signal,
-    syscalls::{
-        mode, statfs, uapi, OpenFlags, SyscallArg, SyscallResult, FIONREAD, F_GETPIPE_SZ,
-        F_SETPIPE_SZ, PIPEFS_MAGIC, SUCCESS,
-    },
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        errno::{errno, error, Errno},
-        signals::SIGPIPE,
-        user_address::{UserAddress, UserRef},
-    },
+    types::errno::{errno, error, Errno},
+    types::signals::SIGPIPE,
+    types::user_address::{UserAddress, UserRef},
+    types::{mode, statfs, uapi, OpenFlags, FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC},
 };
 
 const ATOMIC_IO_BYTES: u16 = 4096;
