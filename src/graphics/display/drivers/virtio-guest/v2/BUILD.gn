@@ -84,7 +84,7 @@ test("virtio-gpu-test") {
   sources = [
     # TODO(b/282968393): tests pending conversion to dfv2
     #"gpu_test.cc",
-    #"virtio-abi-test.cc",
+    "virtio-abi-test.cc",
   ]
   deps = [
     ":common_srcs",
