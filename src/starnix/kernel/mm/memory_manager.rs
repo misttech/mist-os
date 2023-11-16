@@ -1270,11 +1270,11 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
@@ -1289,8 +1289,28 @@ impl MemoryManagerState {
         if !bytes.is_empty() && bytes_read == 0 {
             error!(EFAULT)
         } else {
-            Ok(bytes_read)
+            // SAFETY: The created slice is properly aligned/sized since it
+            // is a subset of the `bytes` slice. Note that `MaybeUninit<T>` has
+            // the same layout as `T`. Also note that `bytes_read` bytes have
+            // been properly initialized.
+            let bytes = unsafe {
+                std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, bytes_read)
+            };
+            Ok(bytes)
         }
+    }
+
+    /// Like `read_memory_partial` but only returns the bytes up to and including
+    /// a null (zero) byte.
+    fn read_memory_partial_until_null_byte<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        let read_bytes = self.read_memory_partial(addr, bytes)?;
+        let max_len = memchr::memchr(b'\0', read_bytes)
+            .map_or_else(|| read_bytes.len(), |null_index| null_index + 1);
+        Ok(&mut read_bytes[..max_len])
     }
 
     /// Writes the provided bytes.
@@ -1678,8 +1698,10 @@ pub trait MemoryAccessorExt: MemoryAccessor {
             let read =
                 self.read_memory_partial_to_slice_until_null_byte(addr, &mut buf[index..])?;
 
-            if let Some(nul_index) = memchr::memchr(b'\0', &buf[index..index + read]) {
-                buf.resize(index + nul_index, 0u8);
+            // Check if the last byte read is the null byte.
+            let maybe_null_index = index + read - 1;
+            if buf[maybe_null_index] == 0 {
+                buf.resize(maybe_null_index, 0u8);
                 if buf.len() > max_size {
                     return error!(ENAMETOOLONG);
                 }
@@ -1738,9 +1760,14 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         buffer: &'a mut [u8],
     ) -> Result<&'a [u8], Errno> {
         let actual = self.read_memory_partial_to_slice_until_null_byte(string.addr(), buffer)?;
-        let buffer = &mut buffer[..actual];
-        let null_index = memchr::memchr(b'\0', buffer).ok_or_else(|| errno!(ENAMETOOLONG))?;
-        Ok(&buffer[..null_index])
+
+        // Make sure the last element holds the null byte.
+        let maybe_null_index = actual - 1;
+        if buffer[maybe_null_index] == 0 {
+            Ok(&buffer[..maybe_null_index])
+        } else {
+            error!(ENAMETOOLONG)
+        }
     }
 
     fn write_object<T: AsBytes>(&self, user: UserRef<T>, object: &T) -> Result<usize, Errno> {
@@ -1791,7 +1818,10 @@ impl MemoryAccessor for MemoryManager {
                 Ok(read_bytes.len())
             }
         } else {
-            self.vmo_read_memory_partial(addr, bytes)
+            self.state
+                .read()
+                .read_memory_partial_until_null_byte(addr, bytes)
+                .map(|bytes| bytes.len())
         }
     }
 
@@ -1817,7 +1847,7 @@ impl MemoryAccessor for MemoryManager {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.state.read().read_memory_partial(addr, bytes)
+        self.state.read().read_memory_partial(addr, bytes).map(|bytes| bytes.len())
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
