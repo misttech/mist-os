@@ -73,5 +73,5 @@ fuchsia_unittest_package("extended_pstate-unittests") {
 fuchsia_component_perf_test("extended_pstate_bench") {
   package = ":extended_pstate"
   component_name = "extended_pstate_bench"
-  expected_metric_names_filename = "fuchsia.extended_pstate.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.extended_pstate.txt"
 }

@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/python/python_action.gni")
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/host_test_data.gni")
 
@@ -15,9 +16,9 @@ import("//build/testing/host_test_data.gni")
 #     The entrypoint that contains the __main__ to execute the test.
 #     Type: path
 #
-#   expected_metric_names_filename (required)
-#     The file containing the expected metrics.
-#     Type: list(string)
+#   expected_metric_names_filepath (required)
+#     The absolute path to the file containing the expected metrics.
+#     Type: string
 #
 #   libraries (optional)
 #     Additional libraries that the test depends on if any.
@@ -40,20 +41,25 @@ import("//build/testing/host_test_data.gni")
 #     values are "sl4f", "fc", or "fuchsia-controller".
 #     Type: string
 #     Default: "fuchsia-controller"
+#
+#   timeout_secs (optional)
+#     The infra timeout in seconds for the test.
+#     Type: int
+#     Default: 5 minutes (defined in recipes)
 template("python_perf_test") {
   if (is_host) {
     assert(defined(invoker.main_source), "main_source is required")
-    assert(defined(invoker.expected_metric_names_filename),
-           "expected_metric_names_filename is required")
+    assert(defined(invoker.expected_metric_names_filepath),
+           "expected_metric_names_filepath is required")
 
     _test_target_name = "${target_name}_test"
     _runtime_deps_target = "${_test_target_name}_runtime_deps"
     _runtime_deps_dir = "${target_out_dir}/${_test_target_name}/runtime_deps"
     host_test_data(_runtime_deps_target) {
       sources = [
+        "${invoker.expected_metric_names_filepath}",
         "${root_out_dir}/catapult_converter",
         "${root_out_dir}/trace2json",
-        "//src/tests/end_to_end/perf/expected_metric_names/${invoker.expected_metric_names_filename}",
       ]
       outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
       deps = [
@@ -61,6 +67,22 @@ template("python_perf_test") {
         "//src/testing/catapult_converter:converter_bin",
       ]
     }
+
+    python_action("${_test_target_name}_verify") {
+      binary_label = "//build/testing/perf:verify_expected_metric_path"
+
+      output_file = "$target_gen_dir/$target_name.verified"
+
+      inputs = [ invoker.expected_metric_names_filepath ]
+      outputs = [ output_file ]
+      args = [
+        "--expected-metric-names-filepath",
+        rebase_path(invoker.expected_metric_names_filepath, root_build_dir),
+        "--output-file",
+        rebase_path(output_file, root_build_dir),
+      ]
+    }
+
     python_mobly_test("${_test_target_name}") {
       test_name = "${target_name}"
       forward_variables_from(invoker,
@@ -68,6 +90,7 @@ template("python_perf_test") {
                                "main_source",
                                "params_source",
                                "params_source_deps",
+                               "timeout_secs",
                              ])
       if (defined(invoker.libraries)) {
         libraries = invoker.libraries
@@ -97,7 +120,10 @@ template("python_perf_test") {
 
   group("${target_name}") {
     testonly = true
-    deps = [ ":${target_name}_test($host_toolchain)" ]
+    deps = [
+      ":${target_name}_test($host_toolchain)",
+      ":${target_name}_test_verify($host_toolchain)",
+    ]
     if (defined(invoker.target_deps)) {
       foreach(target_dep, invoker.target_deps) {
         deps += [ "${target_dep}($target_toolchain)" ]
@@ -125,9 +151,9 @@ template("python_perf_test") {
 #     The name of the test component inside the given package.
 #     Type: string
 #
-#   expected_metric_names_filename (required)
-#     The names of the files containing expected metric names to validate against.
-#     Type: list(string)
+#   expected_metric_names_filepath (required)
+#     The absolute path to the file containing the expected metrics.
+#     Type: string
 #
 #   system_test (optional)
 #     Whether or not the component must be run in the system tests collection.
@@ -136,8 +162,8 @@ template("python_perf_test") {
 #
 template("fuchsia_component_perf_test") {
   assert(defined(invoker.component_name), "component_name is required")
-  assert(defined(invoker.expected_metric_names_filename),
-         "expected_metric_names_filename is required")
+  assert(defined(invoker.expected_metric_names_filepath),
+         "expected_metric_names_filepath is required")
   assert(defined(invoker.package), "package is required")
 
   if (defined(invoker.package_name)) {
@@ -156,7 +182,7 @@ template("fuchsia_component_perf_test") {
     contents = {
       ffx_test_url =
           "fuchsia-pkg://fuchsia.com/${_package}#meta/${_component}.cm"
-      expected_metric_names_filename = invoker.expected_metric_names_filename
+      expected_metric_names_filepath = invoker.expected_metric_names_filepath
       ffx_test_options = []
 
       if (_is_system_test) {
@@ -178,7 +204,7 @@ template("fuchsia_component_perf_test") {
     forward_variables_from(invoker,
                            [
                              "environments",
-                             "expected_metric_names_filename",
+                             "expected_metric_names_filepath",
                            ])
     main_source =
         "//src/performance/lib/perf_test/fuchsia_component_perf_test.py"

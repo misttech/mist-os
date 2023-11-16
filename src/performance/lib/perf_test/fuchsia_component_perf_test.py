@@ -7,6 +7,8 @@ component that publishes a fuchsiaperf.json file.
 """
 
 import logging
+import os
+from os import path
 import pathlib
 
 from fuchsia_base_test import fuchsia_base_test
@@ -23,7 +25,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
     Mobly test class allowing to run a test component and publish its fucshiaperf data.
 
     Required Mobly Test Params:
-        expected_metric_names_filename (str): Name of the file with the metric allowlist.
+        expected_metric_names_filepath (str): Name of the file with the metric allowlist.
         ffx_test_url (str): Test URL to execute via `ffx test run`.
 
     Optional Mobly Test Params:
@@ -40,8 +42,8 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
         self.ffx_test_options: list[str] = self.user_params["ffx_test_options"]
         self.ffx_test_url: str = self.user_params["ffx_test_url"]
-        self.expected_metric_names_filename = self.user_params[
-            "expected_metric_names_filename"
+        self.expected_metric_names_filepath = self.user_params[
+            "expected_metric_names_filepath"
         ]
 
         cmd = [
@@ -59,7 +61,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         asserts.assert_equal(len(result_files), 1)
         publish.publish_fuchsiaperf(
             result_files,
-            self.expected_metric_names_filename,
+            os.path.basename(self.expected_metric_names_filepath),
         )
 
 

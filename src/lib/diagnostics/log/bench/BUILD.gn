@@ -73,13 +73,13 @@ fuchsia_package("diagnostics-log-rust-benchmarks") {
 fuchsia_component_perf_test("diagnostics-log-rust-core-benchmark") {
   package = ":diagnostics-log-rust-benchmarks"
   component_name = "core"
-  expected_metric_names_filename = "fuchsia.diagnostics_log_rust.core.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics_log_rust.core.txt"
 }
 
 fuchsia_component_perf_test("diagnostics-log-rust-encoding-benchmark") {
   package = ":diagnostics-log-rust-benchmarks"
   component_name = "encoding"
-  expected_metric_names_filename = "fuchsia.diagnostics_log_rust.encoding.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics_log_rust.encoding.txt"
 }
 
 group("bench") {

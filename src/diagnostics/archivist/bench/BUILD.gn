@@ -67,13 +67,13 @@ fuchsia_package("archivist-benchmarks") {
 fuchsia_component_perf_test("archivist-formatter-benchmark") {
   package = ":archivist-benchmarks"
   component_name = _formatter_benchmark_component
-  expected_metric_names_filename = "fuchsia.archivist.formatter.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.archivist.formatter.txt"
 }
 
 fuchsia_component_perf_test("archivist-logging-benchmark") {
   package = ":archivist-benchmarks"
   component_name = _logging_benchmark_component
-  expected_metric_names_filename = "fuchsia.archivist.logging.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.archivist.logging.txt"
 }
 
 group("bench") {

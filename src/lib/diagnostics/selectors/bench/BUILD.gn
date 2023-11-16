@@ -26,7 +26,7 @@ fuchsia_package_with_single_component("selectors-benchmarks") {
 fuchsia_component_perf_test("selectors-benchmark") {
   package = ":selectors-benchmarks"
   component_name = "selectors-benchmarks"
-  expected_metric_names_filename = "fuchsia.diagnostics.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.diagnostics.txt"
 }
 
 group("bench") {

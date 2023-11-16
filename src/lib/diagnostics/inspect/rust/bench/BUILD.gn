@@ -128,19 +128,19 @@ fuchsia_unittest_package("rust-inspect-benchmarks-test") {
 fuchsia_component_perf_test("rust-inspect-reader-benchmark") {
   package = ":rust-inspect-benchmarks"
   component_name = _reader_benchmark_component
-  expected_metric_names_filename = "fuchsia.rust_inspect.reader_benchmarks.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.reader_benchmarks.txt"
 }
 
 fuchsia_component_perf_test("rust-inspect-writer-benchmark") {
   package = ":rust-inspect-benchmarks"
   component_name = _writer_benchmark_component
-  expected_metric_names_filename = "fuchsia.rust_inspect.benchmarks.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.benchmarks.txt"
 }
 
 fuchsia_component_perf_test("rust-inspect-snapshot-filter-benchmark") {
   package = ":rust-inspect-benchmarks"
   component_name = _snapshot_filter_benchmark_component
-  expected_metric_names_filename = "fuchsia.rust_inspect.selectors.txt"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.rust_inspect.selectors.txt"
 }
 
 group("bench") {
