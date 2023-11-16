@@ -1,8 +1,8 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#ifndef SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
-#define SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
+#ifndef SRC_GRAPHICS_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
+#define SRC_GRAPHICS_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
 #include <lib/magma/platform/platform_bus_mapper.h>
 #include <lib/magma/util/utils.h>
 #include <lib/magma_service/test_util/platform_device_helper.h>
@@ -100,4 +100,4 @@ class TestPlatformBusMapperCases {
   }
 };
 
-#endif  // SRC_GRAPHICS_LIB_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_
+#endif  // SRC_GRAPHICS_MAGMA_TESTS_UNIT_TESTS_TEST_PLATFORM_BUS_MAPPER_CASES_H_

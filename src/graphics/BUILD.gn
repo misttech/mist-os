@@ -18,7 +18,7 @@ group("tests") {
     "display:tests",
     "drivers:tests",
     "lib/compute:tests",
-    "lib/magma/tests",
+    "magma/tests",
     "tests:tests",
   ]
 }

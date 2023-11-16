@@ -536,8 +536,8 @@ romfs_image("extras") {
   testonly = true
 
   deps = [
-    "//src/graphics/lib/magma/tests/integration:virtmagma_conformance_tests(${linux_exe_toolchain})",
-    "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_vulkan_unit_tests(${linux_exe_toolchain})",
+    "//src/graphics/magma/tests/integration:virtmagma_conformance_tests(${linux_exe_toolchain})",
+    "//src/graphics/magma/tests_linux/unit_tests:virtmagma_vulkan_unit_tests(${linux_exe_toolchain})",
   ]
 
   inputs = [

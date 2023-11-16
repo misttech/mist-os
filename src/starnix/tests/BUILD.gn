@@ -65,25 +65,25 @@ if (host_os == "linux" && host_cpu == "x64") {
 
 starnix_linux_test_component("virtmagma_conformance_tests") {
   test_label =
-      "//src/graphics/lib/magma/tests/integration:virtmagma_conformance_tests"
+      "//src/graphics/magma/tests/integration:virtmagma_conformance_tests"
   test_type = "starnix"
 }
 
 starnix_linux_test_component("virtmagma_sync_file_tests") {
   test_label =
-      "//src/graphics/lib/magma/tests/integration:virtmagma_sync_file_tests"
+      "//src/graphics/magma/tests/integration:virtmagma_sync_file_tests"
   test_type = "starnix"
 }
 
 starnix_linux_test_component("virtmagma_image_tests") {
   test_label =
-      "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_image_tests"
+      "//src/graphics/magma/tests_linux/unit_tests:virtmagma_image_tests"
   test_type = "starnix"
 }
 
 starnix_linux_test_component("virtmagma_unit_tests") {
   test_label =
-      "//src/graphics/lib/magma/tests_linux/unit_tests:virtmagma_unit_tests"
+      "//src/graphics/magma/tests_linux/unit_tests:virtmagma_unit_tests"
   test_type = "starnix"
 }
 

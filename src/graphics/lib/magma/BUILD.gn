@@ -7,11 +7,6 @@ config("magma_src_include_config") {
   include_dirs = [ "src" ]
 }
 
-# This config allows inclusion of headers via relative paths from tests
-config("magma_tests_include_config") {
-  include_dirs = [ "tests" ]
-}
-
 # Included in //bundles/tools, this target should contain only tools.
 group("magma-tools") {
   testonly = true

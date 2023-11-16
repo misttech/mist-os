@@ -26,3 +26,8 @@ config("src_config") {
   visibility = [ "./*" ]
   include_dirs = [ "." ]
 }
+
+# This config allows inclusion of headers via relative paths from tests
+config("magma_tests_include_config") {
+  include_dirs = [ "tests" ]
+}

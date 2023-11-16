@@ -53,7 +53,7 @@ fuchsia_unittest_package("msd-arm-mali-integration-tests") {
     "..:msd_arm_test",
     "..:msd_arm_test_dfv2",
     "integration",
-    "//src/graphics/lib/magma/tests/unit_tests:test_firmware",
+    "//src/graphics/magma/tests/unit_tests:test_firmware",
   ]
   manifest = "meta/msd_arm_mali_integration_tests.cml"
   test_specs = {

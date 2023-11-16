@@ -1,0 +1,152 @@
+# Copyright 2019 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/testing/environments.gni")
+import("//src/graphics/lib/magma/gnbuild/magma.gni")
+
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":magma-conformance-tests",
+    ":magma-conformance-tests-arm",
+    ":magma-conformance-tests-hermetic",
+    ":magma-conformance-tests-vsi",
+    ":magma_nonhardware_tests",
+    "codegen",
+    "icd_strip",
+    "//src/graphics/lib/magma/src/libmagma:verify_magma",
+    "//src/graphics/lib/magma/src/tools:tests",
+    "//src/graphics/magma/lib/magma_service/sys_driver/tests",
+  ]
+
+  # Add driver dependencies:
+  public_deps += [
+    "//src/graphics/bin/vulkan_loader",
+    "//src/graphics/drivers/msd-arm-mali/tests",
+    "//src/graphics/drivers/msd-intel-gen/tests",
+    "//src/graphics/drivers/msd-vsi-vip/tests/integration",
+    "//src/graphics/drivers/msd-vsi-vip/tests/unit_tests:msd-vsi-vip-nonhardware-tests",
+  ]
+  if (target_cpu == "x64") {
+    public_deps += [
+      "//src/graphics/drivers/intel-gen/icd:mesa_integration_tests",
+      "//src/graphics/drivers/intel-gen/icd:mesa_unit_tests",
+    ]
+
+    # Ensure that Mesa/Anvil builds for Linux
+    public_deps += [ "//third_party/mesa/src/intel/vulkan:vulkan_intel(//build/toolchain:linux_x64-shared)" ]
+  }
+
+  # Ensure the test MSDs are built even when not deployed
+  public_deps += [
+    "//src/graphics/drivers/msd-arm-mali:msd_arm_test",
+    "//src/graphics/drivers/msd-intel-gen:msd_intel_test",
+    "//src/graphics/drivers/msd-vsi-vip:msd_vsi_test",
+  ]
+}
+
+# This group must only be referenced from a *_system_image_deps arg, since it contains drivers that
+# go into the system image.
+group("test-drivers") {
+  testonly = true
+  deps = [
+    "//src/graphics/drivers/msd-intel-gen:test-driver",
+    "//src/graphics/drivers/msd-vsi-vip:test-driver",
+  ]
+}
+
+# Tests that require a working libvulkan to run.
+group("vulkan-tests") {
+  testonly = true
+  public_deps = [ "//src/graphics/tests:vulkan-tests" ]
+}
+
+# Packages needed for L0 from //doc/the-book/magma/contributing.md
+group("l0") {
+  testonly = true
+  deps = [
+    ":tests",
+    ":vulkan-tests",
+  ]
+}
+
+# Packages needed for L1
+group("l1") {
+  testonly = true
+  deps = [
+    ":l0",
+    "//src/graphics/examples:vkcube-on-fb",
+    "//src/graphics/examples:vkcube-on-scenic",
+    "//src/graphics/lib/magma/src/tools",
+    "//src/lib/vulkan/tests:image-pipe-swapchain-tests",
+    "//src/ui:ui_package",
+  ]
+}
+
+fuchsia_unittest_package("magma_nonhardware_tests") {
+  manifest = "meta/magma_nonhardware_tests.cml"
+  deps = [ "unit_tests" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+# Runs on any GPU if the only device present; if multiple
+# GPUs are present the vendor must be specified.
+fuchsia_unittest_package("magma-conformance-tests") {
+  manifest = "meta/magma-conformance-tests.cml"
+  deps = [ "integration" ]
+  test_specs = {
+    environments = magma_intel_gpu_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+fuchsia_unittest_package("magma-conformance-tests-hermetic") {
+  manifest = "meta/magma-conformance-tests-hermetic.cml"
+  deps = [ "integration" ]
+  test_specs = {
+    environments = magma_intel_gpu_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+# Runs only on ARM devices
+fuchsia_unittest_package("magma-conformance-tests-arm") {
+  manifest = "meta/magma-conformance-tests-arm.cml"
+  deps = [ "integration" ]
+  test_specs = {
+    environments = magma_arm_gpu_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+# Runs only on VSI devices
+fuchsia_unittest_package("magma-conformance-tests-vsi") {
+  manifest = "meta/magma-conformance-tests-vsi.cml"
+  deps = [ "integration" ]
+  test_specs = {
+    environments = [
+      sherlock_env,
+      vim3_env,
+    ]
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
