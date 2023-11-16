@@ -27,6 +27,7 @@ _base = {
   input_bundles = [
     ":main_bundle",
     ":vulkan_arm_mali",
+    ":rtc_driver",
   ]
 
   filesystems = {
@@ -326,4 +327,8 @@ board_input_bundle("devicetree_board_driver") {
 board_input_bundle("vulkan_arm_mali") {
   base_packages =
       [ "//src/graphics/drivers/arm-mali/icd:libvulkan_arm_g52_r0p0" ]
+}
+
+board_input_bundle("rtc_driver") {
+  drivers = []
 }
