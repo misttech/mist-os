@@ -502,15 +502,12 @@ fn process_eapol_conf(
     match rsna.supplicant.on_eapol_conf(&mut update_sink, eapol_conf.result_code) {
         Err(e) => {
             error!("error handling EAPOL confirm: {}", e);
-            return RsnaStatus::Unchanged;
+            RsnaStatus::Unchanged
         }
-        Ok(_) => {
-            if update_sink.is_empty() {
-                return RsnaStatus::Unchanged;
-            }
+        Ok(()) => {
+            process_rsna_updates(context, Bssid::from(eapol_conf.dst_addr), update_sink, None)
         }
     }
-    process_eapol_updates(context, Bssid::from(eapol_conf.dst_addr), update_sink, None)
 }
 
 fn process_rsna_retransmission_timeout(
@@ -522,15 +519,10 @@ fn process_rsna_retransmission_timeout(
     match rsna.supplicant.on_rsna_retransmission_timeout(&mut update_sink) {
         Err(e) => {
             error!("{:?}", e);
-            return RsnaStatus::Failed(EstablishRsnaFailureReason::InternalError);
+            RsnaStatus::Failed(EstablishRsnaFailureReason::InternalError)
         }
-        Ok(_) => {
-            if update_sink.is_empty() {
-                return RsnaStatus::Unchanged;
-            }
-        }
+        Ok(()) => process_rsna_updates(context, timeout.bssid, update_sink, None),
     }
-    process_eapol_updates(context, timeout.bssid, update_sink, None)
 }
 
 fn process_eapol_ind(
@@ -562,26 +554,28 @@ fn process_eapol_ind(
             });
             return RsnaStatus::Unchanged;
         }
-        Ok(_) => {
-            inspect_log!(context.inspect.rsn_events.lock(), {
-                rx_eapol_frame: InspectBytes(&eapol_pdu),
-                status: "processed"
-            });
-            if update_sink.is_empty() {
-                return RsnaStatus::Unchanged;
-            }
-        }
+        Ok(()) => {}
     }
-    let ap_responsive = Some(context.timer.schedule(event::RsnaResponseTimeout {}));
-    process_eapol_updates(context, Bssid::from(ind.src_addr), update_sink, ap_responsive)
+
+    inspect_log!(context.inspect.rsn_events.lock(), {
+        rx_eapol_frame: InspectBytes(&eapol_pdu),
+        status: "processed"
+    });
+    let ap_responsive =
+        (update_sink.len() > 0).then(|| context.timer.schedule(event::RsnaResponseTimeout {}));
+    process_rsna_updates(context, Bssid::from(ind.src_addr), update_sink, ap_responsive)
 }
 
-fn process_eapol_updates(
+fn process_rsna_updates(
     context: &mut Context,
     bssid: Bssid,
     updates: rsna::UpdateSink,
     ap_responsive: Option<EventId>,
 ) -> RsnaStatus {
+    if updates.is_empty() {
+        return RsnaStatus::Unchanged;
+    }
+
     let sta_addr = MacAddr::from(context.device_info.sta_addr);
     let mut new_retransmission_timeout = None;
     let mut handshake_complete = false;

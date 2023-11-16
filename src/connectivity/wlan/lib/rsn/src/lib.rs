@@ -117,8 +117,6 @@ impl Supplicant {
         Ok(Supplicant { auth_method, esssa, auth_cfg })
     }
 
-    /// Starts the Supplicant. A Supplicant must be started after its creation and everytime it was
-    /// reset.
     pub fn start(&mut self) -> Result<(), Error> {
         // The Supplicant always waits for Authenticator to initiate and does not yet support EAPOL
         // request frames. Thus, all updates can be ignored.
@@ -126,19 +124,12 @@ impl Supplicant {
         self.esssa.initiate(&mut dead_update_sink)
     }
 
-    /// Resets all established Security Associations and invalidates all derived keys in this ESSSA.
-    /// The Supplicant must be reset or destroyed when the underlying 802.11 association terminates.
-    /// The replay counter is also reset.
     pub fn reset(&mut self) {
         // The replay counter must be reset so subsequent associations are not ignored.
         self.esssa.reset_replay_counter();
         self.esssa.reset_security_associations();
     }
 
-    /// Entry point for all incoming EAPOL frames. Incoming frames can be corrupted, invalid or of
-    /// unsupported types; the Supplicant will filter and drop all unexpected frames.
-    /// Outbound EAPOL frames, status and key updates will be pushed into the `update_sink`.
-    /// The method will return an `Error` if the frame was invalid.
     pub fn on_eapol_frame<B: ByteSlice>(
         &mut self,
         update_sink: &mut UpdateSink,

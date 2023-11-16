@@ -410,6 +410,7 @@ impl RsnaLinkState {
         )?;
 
         let mut update_sink = vec![];
+        // TODO(b/311379419): The AP doesn't currently track whether a client is responsive.
         authenticator.on_eapol_frame(&mut update_sink, eapol::Frame::Key(key_frame))?;
         self.process_authenticator_updates(r_sta, ctx, &update_sink);
         Ok(())

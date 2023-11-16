@@ -499,18 +499,17 @@ impl EssSa {
         update_sink: &mut UpdateSink,
         frame: eapol::Frame<B>,
     ) -> Result<(), Error> {
-        let mut new_updates = UpdateSink::default();
         // Only processes EAPOL Key frames. Drop all other frames silently.
-        let updates = match frame {
+        let on_eapol_key_frame_updates = match frame {
             eapol::Frame::Key(key_frame) => {
-                let mut updates = UpdateSink::default();
-                self.on_eapol_key_frame(&mut updates, key_frame)?;
-                // We've received a new key frame, so don't retransmit our last one.
+                let mut on_eapol_key_frame_updates = UpdateSink::default();
+                self.on_eapol_key_frame(&mut on_eapol_key_frame_updates, key_frame)?;
+                // Frame received. Don't retransmit the last one.
                 self.last_key_frame_buf.take();
 
                 // Authenticator updates its key replay counter with every outbound EAPOL frame.
                 if let Role::Authenticator = self.role {
-                    for update in &updates {
+                    for update in &on_eapol_key_frame_updates {
                         if let SecAssocUpdate::TxEapolKeyFrame { frame, .. } = update {
                             let key_replay_counter =
                                 frame.keyframe().key_frame_fields.key_replay_counter.to_native();
@@ -525,15 +524,18 @@ impl EssSa {
                     }
                 }
 
-                updates
+                on_eapol_key_frame_updates
             }
             _ => UpdateSink::default(),
         };
 
+        // Check if ESSSA established before processing key updates.
         let was_esssa_established = self.is_established();
-        for update in updates {
+
+        // Process and filter Key updates internally to correctly track security associations.
+        let mut new_updates = UpdateSink::default();
+        for update in on_eapol_key_frame_updates {
             match update {
-                // Process Key updates ourselves to correctly track security associations.
                 SecAssocUpdate::Key(key) => {
                     if let Err(e) = self.on_key_confirmed(&mut new_updates, key) {
                         error!("error while processing key: {}", e);
@@ -544,14 +546,13 @@ impl EssSa {
             }
         }
 
-        // Report once ESSSA is established.
+        // Report if this EAPOL frame established the ESSSA.
         if !was_esssa_established && self.is_established() {
             info!("established ESSSA");
             new_updates.push(SecAssocUpdate::Status(SecAssocStatus::EssSaEstablished));
         }
 
         self.push_updates(update_sink, new_updates);
-
         Ok(())
     }
 

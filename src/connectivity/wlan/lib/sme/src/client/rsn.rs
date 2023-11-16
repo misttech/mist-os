@@ -22,8 +22,17 @@ impl PartialEq for Rsna {
 }
 
 pub trait Supplicant: std::fmt::Debug + std::marker::Send {
+    /// Starts the Supplicant. A Supplicant must be started after its creation and everytime it
+    /// was reset.
     fn start(&mut self) -> Result<(), Error>;
+    /// Resets all established Security Associations and invalidates all derived keys in this
+    /// ESSSA. The Supplicant must be reset or destroyed when the underlying 802.11 association
+    /// terminates. The replay counter is also reset.
     fn reset(&mut self);
+    /// Entry point for all incoming EAPOL frames. Incoming frames can be corrupted, invalid or
+    /// of unsupported types; the Supplicant will filter and drop all unexpected frames.
+    /// Outbound EAPOL frames, status and key updates will be pushed into the `update_sink`.
+    /// The method will return an `Error` if the frame was invalid.
     fn on_eapol_frame(
         &mut self,
         update_sink: &mut UpdateSink,
