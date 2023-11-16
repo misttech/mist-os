@@ -76,10 +76,7 @@ fit::result<fit::failed, BufferCollectionInfo> BufferCollectionInfo::New(
       constraints.usage.cpu = fuchsia::sysmem::cpuUsageRead;
     }
   } else if (buffer_usage.none) {
-    // This should actually be the following, once we've fixed tests:
-    // constraints.usage.none = fuchsia::sysmem::noneUsage;
-    constraints.usage.vulkan =
-        fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
+    constraints.usage.none = fuchsia::sysmem::noneUsage;
   } else if (buffer_usage.vulkan) {
     constraints.usage.vulkan =
         fuchsia::sysmem::vulkanUsageSampled | fuchsia::sysmem::vulkanUsageTransferSrc;
