@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::ops::Range;
+use std::{mem::MaybeUninit, ops::Range};
 
 use fdio;
 use fidl_fuchsia_io as fio;
@@ -15,6 +15,19 @@ use zx::{AsHandleRef, HandleBased, Task};
 extern "C" {
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
+}
+
+/// Converts a slice to an equivalent MaybeUninit slice.
+pub fn slice_to_maybe_unit<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
+    let ptr = slice.as_mut_ptr();
+    let ptr = ptr as *mut MaybeUninit<T>;
+    // SAFETY: This is effectively reinterpreting the `slice` reference as a
+    // slice of uninitialized T's. `MaybeUninit<T>` has the same layout[1] as
+    // `T` and we know the original slice is initialized and its okay to from
+    // initialized to maybe initialized.
+    //
+    // [1]: https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#layout-1
+    unsafe { std::slice::from_raw_parts_mut(ptr, slice.len()) }
 }
 
 type HermeticCopyFn =
@@ -237,7 +250,7 @@ impl Usercopy {
     // Copies data from the restricted address |source_addr| to |dest|
     // Returns Ok(()) if all bytes were copied without an error.
     // Returns Err(num_bytes) with the number of bytes copied if a fault was encountered.
-    pub fn copyin(&self, source_addr: usize, dest: &mut [u8]) -> Result<(), usize> {
+    pub fn copyin(&self, source_addr: usize, dest: &mut [MaybeUninit<u8>]) -> Result<(), usize> {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
@@ -258,7 +271,11 @@ impl Usercopy {
         }
     }
 
-    pub fn copyin_until_null_byte(&self, source_addr: usize, dest: &mut [u8]) -> Result<(), usize> {
+    pub fn copyin_until_null_byte(
+        &self,
+        source_addr: usize,
+        dest: &mut [MaybeUninit<u8>],
+    ) -> Result<(), usize> {
         // Assumption: The address 0 is invalid and cannot be mapped.  The error encoding scheme has
         // a collision on the value 0 - it could mean that there was a fault at the address 0 or
         // that there was no fault. We want to treat an attempt to copy from 0 as a fault always.
@@ -402,7 +419,7 @@ mod test {
     fn copyin_no_fault(buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let mut dest = vec![0u8; buf_len];
+        let mut dest = Vec::with_capacity(buf_len);
 
         let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -416,9 +433,11 @@ mod test {
 
         let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
-        let result = usercopy.copyin(mapped_addr, &mut dest);
-
+        let result = usercopy.copyin(mapped_addr, dest.spare_capacity_mut());
         assert_eq!(result, Ok(()));
+
+        // SAFETY: OK because the copyin was successful.
+        unsafe { dest.set_len(buf_len) }
 
         assert_eq!(&dest, &vec!['a' as u8; buf_len]);
     }
@@ -465,7 +484,7 @@ mod test {
         let usercopy =
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
-        let result = usercopy.copyin(source_addr, &mut dest);
+        let result = usercopy.copyin(source_addr, slice_to_maybe_unit(&mut dest));
 
         assert_eq!(result, Err(offset));
 
@@ -473,11 +492,19 @@ mod test {
         assert_eq!(&dest[offset..], &vec![0 as u8; buf_len - offset]);
     }
 
+    #[test_case(0)]
+    #[test_case(1)]
+    #[test_case(7)]
+    #[test_case(8)]
+    #[test_case(9)]
+    #[test_case(128)]
+    #[test_case(zx::system_get_page_size() as usize - 1)]
+    #[test_case(zx::system_get_page_size() as usize)]
     #[::fuchsia::test]
-    fn copyin_until_null_byte_no_fault() {
+    fn copyin_until_null_byte_no_fault(buf_len: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let mut dest = vec![0u8; 128];
+        let mut dest = Vec::with_capacity(buf_len);
 
         let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -487,15 +514,17 @@ mod test {
             .map(0, &source_vmo, 0, page_size, zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE)
             .unwrap();
 
-        unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, 128) }.fill('a' as u8);
+        unsafe { std::slice::from_raw_parts_mut(mapped_addr as *mut u8, buf_len) }.fill('a' as u8);
 
         let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
-        let result = usercopy.copyin_until_null_byte(mapped_addr, &mut dest);
-
+        let result = usercopy.copyin_until_null_byte(mapped_addr, dest.spare_capacity_mut());
         assert_eq!(result, Ok(()));
 
-        assert_eq!(dest, &['a' as u8; 128]);
+        // SAFETY: OK because the copyin_until_null_byte was successful.
+        unsafe { dest.set_len(dest.capacity()) }
+
+        assert_eq!(dest, vec!['a' as u8; buf_len]);
     }
 
     #[test_case(1, 2)]
@@ -540,7 +569,7 @@ mod test {
         let usercopy =
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
-        let result = usercopy.copyin_until_null_byte(source_addr, &mut dest);
+        let result = usercopy.copyin_until_null_byte(source_addr, slice_to_maybe_unit(&mut dest));
 
         assert_eq!(result, Err(offset));
 
@@ -557,8 +586,7 @@ mod test {
     fn copyin_until_null_byte_no_fault_with_zero(zero_idx: usize) {
         let page_size = zx::system_get_page_size() as usize;
 
-        let mut dest = vec![0u8; 128];
-        dest.fill('b' as u8);
+        let mut dest = vec!['b' as u8; 128];
 
         let source_vmo = zx::Vmo::create(page_size as u64).unwrap();
 
@@ -577,7 +605,7 @@ mod test {
 
         let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
-        let result = usercopy.copyin_until_null_byte(mapped_addr, &mut dest);
+        let result = usercopy.copyin_until_null_byte(mapped_addr, slice_to_maybe_unit(&mut dest));
 
         assert_eq!(result, if (zero_idx + 1) == dest.len() { Ok(()) } else { Err(zero_idx + 1) });
 
@@ -601,9 +629,10 @@ mod test {
 
         let mut dest = vec![0u8];
 
-        let result = usercopy.copyin_until_null_byte(addr, &mut dest);
+        let result = usercopy.copyin_until_null_byte(addr, slice_to_maybe_unit(&mut dest));
 
         assert_eq!(result, Err(0));
+        assert_eq!(dest, [0]);
     }
 
     #[test_case(0..1, 0)]
@@ -621,9 +650,10 @@ mod test {
 
         let mut dest = vec![0u8];
 
-        let result = usercopy.copyin(addr, &mut dest);
+        let result = usercopy.copyin(addr, slice_to_maybe_unit(&mut dest));
 
         assert_eq!(result, Err(0));
+        assert_eq!(dest, [0]);
     }
 
     #[test_case(0..1, 0)]
@@ -644,5 +674,6 @@ mod test {
         let result = usercopy.copyout(&source, addr);
 
         assert_eq!(result, Err(0));
+        assert_eq!(source, [0]);
     }
 }

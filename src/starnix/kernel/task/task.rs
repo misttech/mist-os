@@ -16,6 +16,7 @@ use std::{
     convert::TryFrom,
     ffi::CString,
     fmt,
+    mem::MaybeUninit,
     sync::{
         atomic::{AtomicU8, Ordering},
         Arc,
@@ -121,36 +122,40 @@ impl std::ops::Deref for CurrentTask {
 }
 
 impl MemoryAccessor for CurrentTask {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.mm.read_memory_to_slice(addr, bytes)
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+        self.mm.read_memory(addr, bytes)
     }
 
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.mm.vmo_read_memory_to_slice(addr, bytes)
-    }
-
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn vmo_read_memory(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial_to_slice_until_null_byte(addr, bytes)
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno> {
+        self.mm.vmo_read_memory(addr, bytes)
     }
 
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial_until_null_byte(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial_to_slice(addr, bytes)
+        self.mm.read_memory_partial_until_null_byte(addr, bytes)
     }
 
-    fn vmo_read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+        self.mm.read_memory_partial(addr, bytes)
+    }
+
+    fn vmo_read_memory_partial(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<usize, Errno> {
+        self.mm.vmo_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
@@ -2468,36 +2473,40 @@ impl CurrentTask {
 }
 
 impl MemoryAccessor for Task {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.mm.read_memory_to_slice(addr, bytes)
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+        self.mm.read_memory(addr, bytes)
     }
 
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.mm.vmo_read_memory_to_slice(addr, bytes)
-    }
-
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn vmo_read_memory(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial_to_slice_until_null_byte(addr, bytes)
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno> {
+        self.mm.vmo_read_memory(addr, bytes)
     }
 
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial_until_null_byte(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial_to_slice(addr, bytes)
+        self.mm.read_memory_partial_until_null_byte(addr, bytes)
     }
 
-    fn vmo_read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+        self.mm.read_memory_partial(addr, bytes)
+    }
+
+    fn vmo_read_memory_partial(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<usize, Errno> {
+        self.mm.vmo_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {

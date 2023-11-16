@@ -555,6 +555,7 @@ mod tests {
     use super::*;
     use crate::testing::*;
     use assert_matches::assert_matches;
+    use std::mem::MaybeUninit;
 
     const TEST_STACK_ADDR: UserAddress = UserAddress::const_from(0x3000_0000);
 
@@ -567,38 +568,42 @@ mod tests {
     }
 
     impl MemoryAccessor for StackVmo {
-        fn read_memory_to_slice(&self, _addr: UserAddress, _bytes: &mut [u8]) -> Result<(), Errno> {
-            todo!()
-        }
-
-        fn read_memory_partial_to_slice_until_null_byte(
+        fn read_memory(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [u8],
-        ) -> Result<usize, Errno> {
-            todo!()
-        }
-
-        fn vmo_read_memory_to_slice(
-            &self,
-            _addr: UserAddress,
-            _bytes: &mut [u8],
+            _bytes: &mut [MaybeUninit<u8>],
         ) -> Result<(), Errno> {
             todo!()
         }
 
-        fn read_memory_partial_to_slice(
+        fn read_memory_partial_until_null_byte(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [u8],
+            _bytes: &mut [MaybeUninit<u8>],
         ) -> Result<usize, Errno> {
             todo!()
         }
 
-        fn vmo_read_memory_partial_to_slice(
+        fn vmo_read_memory(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [u8],
+            _bytes: &mut [MaybeUninit<u8>],
+        ) -> Result<(), Errno> {
+            todo!()
+        }
+
+        fn read_memory_partial(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [MaybeUninit<u8>],
+        ) -> Result<usize, Errno> {
+            todo!()
+        }
+
+        fn vmo_read_memory_partial(
+            &self,
+            _addr: UserAddress,
+            _bytes: &mut [MaybeUninit<u8>],
         ) -> Result<usize, Errno> {
             todo!()
         }

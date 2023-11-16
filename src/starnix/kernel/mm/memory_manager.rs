@@ -33,7 +33,10 @@ use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
 use starnix_lock::{Mutex, RwLock};
 use static_assertions::const_assert_eq;
-use std::{collections::HashMap, convert::TryInto, ffi::CStr, ops::Range, sync::Arc};
+use std::{
+    collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
+};
+use usercopy::slice_to_maybe_unit;
 use zerocopy::{AsBytes, FromBytes};
 
 fn usercopy(mm: &MemoryManager) -> &Option<usercopy::Usercopy> {
@@ -266,12 +269,17 @@ impl Mapping {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         profile_duration!("MappingReadMemory");
         if !self.can_read() {
             return error!(EFAULT);
         }
-        self.vmo.read(bytes, self.address_to_offset(addr)).map_err(|e| {
+
+        self.vmo.read_uninit(bytes, self.address_to_offset(addr)).map_err(|e| {
             log_warn!("Got an error when reading from vmo: {:?}", e);
             errno!(EFAULT)
         })
@@ -1238,7 +1246,7 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
@@ -1262,10 +1270,10 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
@@ -1375,22 +1383,26 @@ pub trait MemoryAccessor {
     ///
     /// Consider using `MemoryAccessorExt::read_memory_to_*` methods if you do not require control
     /// over the allocation.
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno>;
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno>;
 
-    /// Like `read_memory_to_slice` but always reads the memory through a VMO.
+    /// Like `read_memory` but always reads the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno>;
+    fn vmo_read_memory(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno>;
 
     /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
     /// bytes have been read or no more bytes can be read from the target.
     ///
     /// This is used, for example, to read null-terminated strings where the exact length is not
     /// known, only the maximum length is.
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn read_memory_partial_until_null_byte(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno>;
 
     /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
@@ -1401,19 +1413,19 @@ pub trait MemoryAccessor {
     ///
     /// Consider using `MemoryAccessorExt::read_memory_partial_to_*` methods if you do not require
     /// control over the allocation.
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno>;
 
-    /// Like `read_memory_partial_to_slice` but always reads the memory through a VMO.
+    /// Like `read_memory_partial` but always reads the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial_to_slice(
+    fn vmo_read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno>;
 
     /// Writes the provided bytes to `addr`.
@@ -1467,6 +1479,63 @@ fn slice_as_mut_bytes<T: FromBytes + Sized>(slice: &mut [T]) -> &mut [u8] {
 }
 
 pub trait MemoryAccessorExt: MemoryAccessor {
+    /// Reads exactly `bytes.len()` bytes of memory from `addr` into `bytes`.
+    ///
+    /// In case of success, the number of bytes read will always be `bytes.len()`.
+    ///
+    /// Consider using `MemoryAccessorExt::read_memory_to_*` methods if you do not require control
+    /// over the allocation.
+    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.read_memory(addr, slice_to_maybe_unit(bytes))
+    }
+
+    /// Like `read_memory_to_slice` but always reads the memory through a VMO.
+    ///
+    /// Useful when the address may not be mapped in the current address space.
+    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        self.vmo_read_memory(addr, slice_to_maybe_unit(bytes))
+    }
+
+    /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
+    /// bytes have been read or no more bytes can be read from the target.
+    ///
+    /// This is used, for example, to read null-terminated strings where the exact length is not
+    /// known, only the maximum length is.
+    fn read_memory_partial_to_slice_until_null_byte(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.read_memory_partial_until_null_byte(addr, slice_to_maybe_unit(bytes))
+    }
+
+    /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
+    /// or no more bytes can be read from the target.
+    ///
+    /// This is used, for example, to read null-terminated strings where the exact length is not
+    /// known, only the maximum length is.
+    ///
+    /// Consider using `MemoryAccessorExt::read_memory_partial_to_*` methods if you do not require
+    /// control over the allocation.
+    fn read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.read_memory_partial(addr, slice_to_maybe_unit(bytes))
+    }
+
+    /// Like `read_memory_partial_to_slice` but always reads the memory through a VMO.
+    ///
+    /// Useful when the address may not be mapped in the current address space.
+    fn vmo_read_memory_partial_to_slice(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [u8],
+    ) -> Result<usize, Errno> {
+        self.vmo_read_memory_partial(addr, slice_to_maybe_unit(bytes))
+    }
+
     /// Read exactly `len` bytes of memory, returning them as a a Vec.
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
         let mut buffer = vec![0u8; len];
@@ -1688,7 +1757,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 }
 
 impl MemoryAccessor for MemoryManager {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             match usercopy.copyin(addr.ptr(), bytes) {
                 Ok(()) => Ok(()),
@@ -1701,18 +1770,22 @@ impl MemoryAccessor for MemoryManager {
                 }
             }
         } else {
-            self.vmo_read_memory_to_slice(addr, bytes)
+            self.vmo_read_memory(addr, bytes)
         }
     }
 
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.state.read().read_memory_to_slice(addr, bytes)
-    }
-
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn vmo_read_memory(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno> {
+        self.state.read().read_memory(addr, bytes)
+    }
+
+    fn read_memory_partial_until_null_byte(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             match usercopy.copyin_until_null_byte(addr.ptr(), bytes) {
@@ -1726,14 +1799,14 @@ impl MemoryAccessor for MemoryManager {
                 }
             }
         } else {
-            self.vmo_read_memory_partial_to_slice(addr, bytes)
+            self.vmo_read_memory_partial(addr, bytes)
         }
     }
 
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             match usercopy.copyin(addr.ptr(), bytes) {
@@ -1747,16 +1820,16 @@ impl MemoryAccessor for MemoryManager {
                 }
             }
         } else {
-            self.vmo_read_memory_partial_to_slice(addr, bytes)
+            self.vmo_read_memory_partial(addr, bytes)
         }
     }
 
-    fn vmo_read_memory_partial_to_slice(
+    fn vmo_read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.state.read().read_memory_partial_to_slice(addr, bytes)
+        self.state.read().read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {

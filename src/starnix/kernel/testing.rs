@@ -5,7 +5,7 @@
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
-use std::{ffi::CString, sync::Arc};
+use std::{ffi::CString, mem::MaybeUninit, sync::Arc};
 use zerocopy::AsBytes;
 
 use crate::{
@@ -404,32 +404,36 @@ impl std::convert::AsRef<CurrentTask> for AutoReleasableTask {
 }
 
 impl MemoryAccessor for AutoReleasableTask {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        (**self).read_memory_to_slice(addr, bytes)
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+        (**self).read_memory(addr, bytes)
     }
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        (**self).vmo_read_memory_to_slice(addr, bytes)
-    }
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn vmo_read_memory(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        (**self).read_memory_partial_to_slice_until_null_byte(addr, bytes)
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno> {
+        (**self).vmo_read_memory(addr, bytes)
     }
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial_until_null_byte(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        (**self).read_memory_partial_to_slice(addr, bytes)
+        (**self).read_memory_partial_until_null_byte(addr, bytes)
     }
-    fn vmo_read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        (**self).vmo_read_memory_partial_to_slice(addr, bytes)
+        (**self).read_memory_partial(addr, bytes)
+    }
+    fn vmo_read_memory_partial(
+        &self,
+        addr: UserAddress,
+        bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<usize, Errno> {
+        (**self).vmo_read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         (**self).write_memory(addr, bytes)

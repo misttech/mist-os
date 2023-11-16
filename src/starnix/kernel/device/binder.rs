@@ -79,6 +79,7 @@ use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
+    mem::MaybeUninit,
     ops::Deref,
     sync::{
         atomic::{AtomicU64, Ordering},
@@ -2630,19 +2631,24 @@ impl std::fmt::Debug for RemoteResourceAccessor {
 const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteResourceAccessor {
-    fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.vmo_read_memory_to_slice(addr, bytes)
+    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+        self.vmo_read_memory(addr, bytes)
     }
 
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+    fn vmo_read_memory(
+        &self,
+        addr: UserAddress,
+        mut unread_bytes: &mut [MaybeUninit<u8>],
+    ) -> Result<(), Errno> {
         profile_duration!("RemoteReadMemory");
-        let mut index = 0;
-        while index < bytes.len() {
-            let len = std::cmp::min(bytes.len() - index, MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
-            let bytes_count = self
+        let mut addr = addr.ptr();
+        while !unread_bytes.is_empty() {
+            let len = std::cmp::min(unread_bytes.len(), MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
+            let (read_bytes, _unread_bytes) = self
                 .process
-                .read_memory(addr.ptr() + index, &mut bytes[index..(index + len)])
+                .read_memory_uninit(addr, &mut unread_bytes[..len])
                 .map_err(|_| errno!(EINVAL))?;
+            let bytes_count = read_bytes.len();
             // bytes_count can be less than len when:
             // - there is a fault
             // - the reading is done across 2 mappings
@@ -2652,31 +2658,37 @@ impl MemoryAccessor for RemoteResourceAccessor {
             if bytes_count == 0 {
                 return error!(EFAULT);
             }
-            index += bytes_count;
+            addr += bytes_count;
+            // Note that we can't use `_unread_bytes` because it does not extend
+            // to the end of `unread_bytes`. We pass `unread_bytes[..len]` to
+            // `read_memory_uninit` so the returned unread bytes would be
+            // `unread_bytes[bytes_count..len]` vs. `unread_bytes[bytes_count..]`
+            // which is what we want.
+            unread_bytes = &mut unread_bytes[bytes_count..];
         }
         Ok(())
     }
 
-    fn read_memory_partial_to_slice_until_null_byte(
+    fn read_memory_partial_until_null_byte(
         &self,
         _addr: UserAddress,
-        _bytes: &mut [u8],
+        _bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
 
-    fn read_memory_partial_to_slice(
+    fn read_memory_partial(
         &self,
         addr: UserAddress,
-        bytes: &mut [u8],
+        bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.vmo_read_memory_partial_to_slice(addr, bytes)
+        self.vmo_read_memory_partial(addr, bytes)
     }
 
-    fn vmo_read_memory_partial_to_slice(
+    fn vmo_read_memory_partial(
         &self,
         _addr: UserAddress,
-        _bytes: &mut [u8],
+        _bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         error!(ENOTSUP)
     }
