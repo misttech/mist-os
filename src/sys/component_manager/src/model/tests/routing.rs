@@ -28,7 +28,9 @@ use {
         },
     },
     ::routing::{
-        capability_source::{AggregateCapability, ComponentCapability},
+        capability_source::{
+            AggregateCapability, AggregateInstance, AggregateMember, ComponentCapability,
+        },
         error::ComponentInstanceError,
         resolving::ResolverError,
     },
@@ -2566,9 +2568,16 @@ async fn verify_service_route(
     let source = RouteRequest::UseService(use_decl).route(&target_component).await.unwrap();
     match source {
         RouteSource {
-            source: CapabilitySource::AnonymizedAggregate { collections, capability, component, .. },
+            source: CapabilitySource::AnonymizedAggregate { members, capability, component, .. },
             relative_path: _,
         } => {
+            let collections: Vec<_> = members
+                .into_iter()
+                .map(|m| match m {
+                    AggregateMember::Collection(c) => c.to_string(),
+                    _ => panic!("not expected"),
+                })
+                .collect();
             let unique_colls: HashSet<_> =
                 child_monikers.iter().map(|c| c.collection().unwrap().to_string()).collect();
             let mut unique_colls: Vec<_> = unique_colls.into_iter().collect();
@@ -3220,15 +3229,23 @@ async fn list_service_instances_from_collections() {
     };
 
     // Check that only the instances that expose the service are listed.
-    let instances: HashSet<ChildName> =
-        aggregate_capability_provider.list_instances().await.unwrap().into_iter().collect();
+    let instances: HashSet<ChildName> = aggregate_capability_provider
+        .list_instances()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|m| match m {
+            AggregateInstance::Child(c) => c.clone(),
+            _ => panic!("not expected"),
+        })
+        .collect();
     assert_eq!(instances.len(), 2);
     assert!(instances.contains(&"coll1:service_child_a".try_into().unwrap()));
     assert!(instances.contains(&"coll2:service_child_b".try_into().unwrap()));
 
     // Try routing to one of the instances.
     let source = aggregate_capability_provider
-        .route_instance(&"coll1:service_child_a".try_into().unwrap())
+        .route_instance(&AggregateInstance::Child("coll1:service_child_a".try_into().unwrap()))
         .await
         .expect("failed to route to child");
     match source {
@@ -3717,7 +3734,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
 }
 
 #[fuchsia::test]
-async fn use_anonymized_aggregate_service_from_sibling() {
+async fn use_anonymized_aggregate_service_from_sibling_and_parent() {
     let expose_service_decl = ComponentDeclBuilder::new()
         .expose(ExposeDecl::Service(ExposeServiceDecl {
             source: ExposeSource::Self_,
@@ -3737,34 +3754,64 @@ async fn use_anonymized_aggregate_service_from_sibling() {
             "a",
             ComponentDeclBuilder::new()
                 .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("b".to_string()),
+                    source: OfferSource::Self_,
                     source_name: "my.service.Service".parse().unwrap(),
                     source_dictionary: None,
-                    target: OfferTarget::static_child("d".to_string()),
+                    target: OfferTarget::static_child("b".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                }))
+                .service(ServiceDecl {
+                    name: "my.service.Service".parse().unwrap(),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
+                })
+                .add_child(ChildDeclBuilder::new_lazy_child("b"))
+                .build(),
+        ),
+        (
+            "b",
+            ComponentDeclBuilder::new()
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::static_child("c".to_string()),
+                    source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
+                    target: OfferTarget::static_child("e".to_string()),
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                     source_instance_filter: None,
                     renamed_instances: None,
                 }))
                 .offer(OfferDecl::Service(OfferServiceDecl {
-                    source: OfferSource::static_child("c".to_string()),
+                    source: OfferSource::static_child("d".to_string()),
                     source_name: "my.service.Service".parse().unwrap(),
                     source_dictionary: None,
-                    target: OfferTarget::static_child("d".to_string()),
+                    target: OfferTarget::static_child("e".to_string()),
                     target_name: "my.service.Service".parse().unwrap(),
                     availability: Availability::Required,
                     source_instance_filter: None,
                     renamed_instances: None,
                 }))
-                .add_child(ChildDeclBuilder::new_lazy_child("b"))
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::Parent,
+                    source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
+                    target: OfferTarget::static_child("e".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                }))
                 .add_child(ChildDeclBuilder::new_lazy_child("c"))
                 .add_child(ChildDeclBuilder::new_lazy_child("d"))
+                .add_child(ChildDeclBuilder::new_lazy_child("e"))
                 .build(),
         ),
-        ("b", expose_service_decl.clone()),
-        ("c", expose_service_decl),
+        ("c", expose_service_decl.clone()),
+        ("d", expose_service_decl),
         (
-            "d",
+            "e",
             ComponentDeclBuilder::new()
                 .use_(UseDecl::Service(UseServiceDecl {
                     dependency_type: DependencyType::Strong,
@@ -3784,12 +3831,17 @@ async fn use_anonymized_aggregate_service_from_sibling() {
     };
     let test = RoutingTestBuilder::new("a", components)
         .add_outgoing_path(
-            "b",
+            "a",
             "/svc/my.service.Service/default".parse().unwrap(),
             instance_dir.clone(),
         )
         .add_outgoing_path(
             "c",
+            "/svc/my.service.Service/default".parse().unwrap(),
+            instance_dir.clone(),
+        )
+        .add_outgoing_path(
+            "d",
             "/svc/my.service.Service/variantinstance".parse().unwrap(),
             instance_dir,
         )
@@ -3797,15 +3849,15 @@ async fn use_anonymized_aggregate_service_from_sibling() {
         .await;
     let _server_handle = fasync::Task::spawn(async move {
         while let Some(echo::EchoRequest::EchoString { value, responder }) = receiver.next().await {
-            responder.send(value.as_ref().map(|v| v.as_str())).expect("failed to send reply");
+            responder.send(value.as_ref().map(|v| v.as_str())).unwrap();
         }
     });
 
     test.check_use(
-        vec!["d"].try_into().unwrap(),
+        "b/e".parse().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".parse().unwrap(),
-            instance: ServiceInstance::Aggregated(2),
+            instance: ServiceInstance::Aggregated(3),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },

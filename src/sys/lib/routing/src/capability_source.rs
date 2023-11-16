@@ -38,6 +38,29 @@ pub enum Error {
     InvalidBuiltinCapability {},
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone)]
+pub enum AggregateMember {
+    Child(ChildName),
+    Collection(Name),
+    Parent,
+}
+
+impl fmt::Display for AggregateMember {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Child(n) => {
+                write!(f, "child `{n}`")
+            }
+            Self::Collection(n) => {
+                write!(f, "collection `{n}`")
+            }
+            Self::Parent => {
+                write!(f, "parent")
+            }
+        }
+    }
+}
+
 /// Describes the source of a capability, as determined by `find_capability_source`
 #[derive(Debug, Derivative)]
 #[derivative(Clone(bound = ""))]
@@ -79,8 +102,7 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         capability: AggregateCapability,
         component: WeakComponentInstanceInterface<C>,
         aggregate_capability_provider: Box<dyn AnonymizedAggregateCapabilityProvider<C>>,
-        collections: Vec<Name>,
-        children: Vec<ChildName>,
+        members: Vec<AggregateMember>,
     },
     /// This capability is an aggregate of capabilities over a set of children with filters
     /// The instances in the aggregate service are the union of these filters.
@@ -169,17 +191,37 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                 Self::Namespace { capability, .. } => capability.to_string(),
                 Self::FilteredAggregate { capability, .. } => capability.to_string(),
                 Self::Capability { source_capability, .. } => format!("{}", source_capability),
-                Self::AnonymizedAggregate { capability, collections, component, .. } => {
+                Self::AnonymizedAggregate { capability, members, component, .. } => {
                     format!(
-                        "{} from collections '{}' of component '{}'",
+                        "{} from component '{}' aggregated from {}",
                         capability,
-                        collections.iter().map(|c| c.as_str()).collect::<Vec<_>>().join(","),
-                        &component.moniker
+                        &component.moniker,
+                        members.iter().map(|s| format!("{s}")).collect::<Vec<_>>().join(","),
                     )
                 }
                 Self::Environment { capability, .. } => capability.to_string(),
             }
         )
+    }
+}
+
+/// An individual instance in an aggregate.
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub enum AggregateInstance {
+    Child(ChildName),
+    Parent,
+}
+
+impl fmt::Display for AggregateInstance {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Child(n) => {
+                write!(f, "child `{n}`")
+            }
+            Self::Parent => {
+                write!(f, "parent")
+            }
+        }
     }
 }
 
@@ -195,12 +237,12 @@ pub trait AnonymizedAggregateCapabilityProvider<C: ComponentInstanceInterface>:
     ///
     /// The instance is an opaque identifier that is only meaningful for a subsequent
     /// call to `route_instance`.
-    async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError>;
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError>;
 
     /// Route the given `instance` of the capability to its source.
     async fn route_instance(
         &self,
-        instance: &ChildName,
+        instance: &AggregateInstance,
     ) -> Result<CapabilitySource<C>, RoutingError>;
 
     /// Trait-object compatible clone.

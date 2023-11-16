@@ -2267,11 +2267,13 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     }
 
     ///   a
-    /// / | \
-    /// b c d
+    ///   |
+    ///   b
+    ///  /|
+    /// c d
     ///
-    /// a: offers "foo" from both b and c to d
-    /// b: exposes "foo" to parent from self
+    /// a: offers "foo" from self to `b`
+    /// b: offers "foo" from parent and c to d, forming an aggregate
     /// c: exposes "foo" to parent from self
     /// d: uses "foo" from parent
     /// routing an aggregate service without specifying a source_instance_filter should fail.
@@ -2285,15 +2287,21 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 "a",
                 ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
-                        source: OfferSource::static_child("b".parse().unwrap()),
+                        source: OfferSource::Self_,
                         source_name: "foo".parse().unwrap(),
                         source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
-                        target: OfferTarget::static_child("d".to_string()),
+                        target: OfferTarget::static_child("b".to_string()),
                         source_instance_filter: None,
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
+                    .add_lazy_child("b")
+                    .build(),
+            ),
+            (
+                "b",
+                ComponentDeclBuilder::new()
                     .offer(OfferDecl::Service(OfferServiceDecl {
                         source: OfferSource::static_child("c".parse().unwrap()),
                         source_name: "foo".parse().unwrap(),
@@ -2304,23 +2312,18 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
-                    .add_lazy_child("b")
-                    .add_lazy_child("c")
-                    .add_lazy_child("d")
-                    .build(),
-            ),
-            (
-                "b",
-                ComponentDeclBuilder::new()
-                    .expose(ExposeDecl::Service(ExposeServiceDecl {
-                        source: ExposeSource::Self_,
+                    .offer(OfferDecl::Service(OfferServiceDecl {
+                        source: OfferSource::Parent,
                         source_name: "foo".parse().unwrap(),
                         source_dictionary: None,
                         target_name: "foo".parse().unwrap(),
-                        target: ExposeTarget::Parent,
-                        availability: cm_rust::Availability::Required,
+                        target: OfferTarget::static_child("d".to_string()),
+                        source_instance_filter: None,
+                        renamed_instances: None,
+                        availability: Availability::Required,
                     }))
-                    .service(expected_service_decl.clone())
+                    .add_lazy_child("c")
+                    .add_lazy_child("d")
                     .build(),
             ),
             (
@@ -2353,8 +2356,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         ];
         let test = T::new("a", components).build().await;
 
-        let d_component =
-            test.look_up_instance(&vec!["d"].try_into().unwrap()).await.expect("b instance");
+        let d_component = test.look_up_instance(&"b/d".parse().unwrap()).await.expect("b instance");
         let source = route_capability(
             RouteRequest::UseService(UseServiceDecl {
                 source: UseSource::Parent,

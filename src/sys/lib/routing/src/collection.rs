@@ -5,17 +5,19 @@
 use {
     crate::{
         capability_source::{
-            AnonymizedAggregateCapabilityProvider, CapabilitySource, ComponentCapability,
-            FilteredAggregateCapabilityProvider, FilteredAggregateCapabilityRouteData,
+            AggregateInstance, AggregateMember, AnonymizedAggregateCapabilityProvider,
+            CapabilitySource, ComponentCapability, FilteredAggregateCapabilityProvider,
+            FilteredAggregateCapabilityRouteData,
         },
         component_instance::{
-            ComponentInstanceInterface, ResolvedInstanceInterface, WeakComponentInstanceInterface,
+            ComponentInstanceInterface, ExtendedInstanceInterface, ResolvedInstanceInterface,
+            WeakComponentInstanceInterface,
         },
         error::RoutingError,
         mapper::NoopRouteMapper,
         router::{
-            self, CapabilityVisitor, ErrorNotFoundInChild, ExposeVisitor, OfferVisitor,
-            RouteBundle, Sources,
+            self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
+            OfferVisitor, RouteBundle, Sources,
         },
     },
     async_trait::async_trait,
@@ -40,11 +42,8 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
     /// Component that defines the aggregate.
     pub containing_component: WeakComponentInstanceInterface<C>,
 
-    /// Names of the collections within `containing_component` that are in the aggregate.
-    pub collections: Vec<Name>,
-
-    /// Names of the static children within `containing_component` that are in the aggregate.
-    pub children: Vec<ChildName>,
+    /// The members relative to `containing_component` that make up the aggregate.
+    pub members: Vec<AggregateMember>,
 
     /// Name of the capability as exposed by children in the collection.
     pub capability_name: Name,
@@ -59,30 +58,45 @@ pub(super) struct AnonymizedAggregateServiceProvider<C: ComponentInstanceInterfa
 impl<C, V> AnonymizedAggregateCapabilityProvider<C> for AnonymizedAggregateServiceProvider<C, V>
 where
     C: ComponentInstanceInterface + 'static,
+    V: OfferVisitor,
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
 {
-    /// Returns a list of instances of capabilities in this provider.
-    ///
-    /// Instances correspond to the names of children in the collection that expose the capability
-    /// with the name `capability_name`.
+    /// Returns a list of instances contributing capabilities to this provider.
     ///
     /// In the case of service capabilities, they are *not* instances inside that service, but
-    /// rather service capabilities with the same name that are exposed by different children.
-    async fn list_instances(&self) -> Result<Vec<ChildName>, RoutingError> {
+    /// rather service capabilities with the same name that are exposed by different components.
+    async fn list_instances(&self) -> Result<Vec<AggregateInstance>, RoutingError> {
         let mut instances = Vec::new();
         let component = self.containing_component.upgrade()?;
         let mut child_components = vec![];
+        let mut parent = None;
         {
             let resolved_state = component.lock_resolved_state().await?;
-            for child_name in &self.children {
-                if let Some(child) = resolved_state.get_child(child_name) {
-                    child_components.push((child_name.clone(), child.clone()));
+            for s in &self.members {
+                match s {
+                    AggregateMember::Child(child_name) => {
+                        if let Some(child) = resolved_state.get_child(&child_name) {
+                            child_components.push((child_name.clone(), child.clone()));
+                        }
+                    }
+                    AggregateMember::Collection(collection) => {
+                        child_components.extend(resolved_state.children_in_collection(&collection));
+                    }
+                    AggregateMember::Parent => {
+                        if let Ok(p) = component.try_get_parent() {
+                            match p {
+                                ExtendedInstanceInterface::AboveRoot(_) => {
+                                    // Services from above parent are not supported.
+                                }
+                                ExtendedInstanceInterface::Component(p) => {
+                                    parent = Some(p);
+                                }
+                            }
+                        }
+                    }
                 }
-            }
-            for collection in &self.collections {
-                child_components.extend(resolved_state.children_in_collection(collection));
             }
         }
         for (child_name, child_component) in child_components {
@@ -94,7 +108,25 @@ where
                         &self.capability_name,
                         &child_exposes,
                     ) {
-                        instances.push(child_name.clone());
+                        instances.push(AggregateInstance::Child(child_name.clone()));
+                    }
+                }
+                // Ignore errors. One misbehaving component should not affect the entire collection.
+                Err(_) => {}
+            }
+        }
+        if let Some(parent) = parent {
+            let parent_offers = parent.lock_resolved_state().await.map(|c| c.offers());
+            match parent_offers {
+                Ok(parent_offers) => {
+                    let child_moniker = component.child_moniker().expect("ChildName should exist");
+                    if let Some(_) = router::find_matching_offers(
+                        self.capability_type,
+                        &self.capability_name,
+                        &child_moniker,
+                        &parent_offers,
+                    ) {
+                        instances.push(AggregateInstance::Parent);
                     }
                 }
                 // Ignore errors. One misbehaving component should not affect the entire collection.
@@ -109,6 +141,29 @@ where
     /// `instance` is the name of the child that exposes the capability, as returned by
     /// `list_instances`.
     async fn route_instance(
+        &self,
+        instance: &AggregateInstance,
+    ) -> Result<CapabilitySource<C>, RoutingError> {
+        match instance {
+            AggregateInstance::Child(name) => self.route_child_instance(&name).await,
+            AggregateInstance::Parent => self.route_parent_instance().await,
+        }
+    }
+
+    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
+        Box::new(self.clone())
+    }
+}
+
+impl<C, V> AnonymizedAggregateServiceProvider<C, V>
+where
+    C: ComponentInstanceInterface + 'static,
+    V: OfferVisitor,
+    V: ExposeVisitor,
+    V: CapabilityVisitor,
+    V: Clone + Send + Sync + 'static,
+{
+    async fn route_child_instance(
         &self,
         instance: &ChildName,
     ) -> Result<CapabilitySource<C>, RoutingError> {
@@ -145,8 +200,42 @@ where
         .await
     }
 
-    fn clone_boxed(&self) -> Box<dyn AnonymizedAggregateCapabilityProvider<C>> {
-        Box::new(self.clone())
+    async fn route_parent_instance(&self) -> Result<CapabilitySource<C>, RoutingError> {
+        let containing_component = self.containing_component.upgrade()?;
+        let parent = match containing_component.try_get_parent().map_err(|_| {
+            RoutingError::OfferFromParentNotFound {
+                moniker: containing_component.moniker().clone(),
+                capability_id: self.capability_name.clone().into(),
+            }
+        })? {
+            ExtendedInstanceInterface::AboveRoot(_) => {
+                return Err(RoutingError::unsupported_route_source("service above parent"));
+            }
+            ExtendedInstanceInterface::Component(p) => p,
+        };
+
+        let child_moniker = containing_component.child_moniker().expect("ChildName should exist");
+        let parent_offers = parent.lock_resolved_state().await?.offers();
+        let parent_offers = router::find_matching_offers(
+            self.capability_type,
+            &self.capability_name,
+            &child_moniker,
+            &parent_offers,
+        )
+        .ok_or_else(|| {
+            OfferDecl::error_not_found_from_parent(
+                containing_component.moniker().clone(),
+                self.capability_name.clone(),
+            )
+        })?;
+        router::route_from_offer(
+            parent_offers,
+            parent,
+            self.sources.clone(),
+            &mut self.visitor.clone(),
+            &mut NoopRouteMapper,
+        )
+        .await
     }
 }
 

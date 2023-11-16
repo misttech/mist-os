@@ -1,4 +1,4 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
+// Copyright 2020 The Fuchsia Authors. Al rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -18,7 +18,8 @@
 use {
     crate::{
         capability_source::{
-            AggregateCapability, CapabilitySource, ComponentCapability, InternalCapability,
+            AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
+            InternalCapability,
         },
         collection::{
             AnonymizedAggregateServiceProvider, OfferAggregateServiceProvider,
@@ -183,22 +184,24 @@ where
             Ok(capability_source)
         }
         OfferResult::OfferFromAnonymizedAggregate(offers, aggregation_component) => {
-            let mut collections = vec![];
-            let mut children = vec![];
+            let mut members = vec![];
             for o in offers.iter() {
                 match o.source() {
                     OfferSource::Collection(n) => {
-                        collections.push(n.clone());
+                        members.push(AggregateMember::Collection(n.clone()));
                     }
                     OfferSource::Child(c) => {
                         assert!(
                             c.collection.is_none(),
                             "Anonymized offer source contained a dynamic child"
                         );
-                        children.push(
+                        members.push(AggregateMember::Child(
                             ChildName::try_new(c.name.clone(), None)
                                 .expect("child source should be convertible to ChildName"),
-                        );
+                        ));
+                    }
+                    OfferSource::Parent => {
+                        members.push(AggregateMember::Parent);
                     }
                     _ => unreachable!("impossible source"),
                 }
@@ -209,16 +212,14 @@ where
                 capability: AggregateCapability::Service(first_offer.source_name().clone()),
                 component: aggregation_component.as_weak(),
                 aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
-                    collections: collections.clone(),
-                    children: children.clone(),
+                    members: members.clone(),
                     containing_component: aggregation_component.as_weak(),
                     capability_name: first_offer.source_name().clone(),
                     capability_type,
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                 }),
-                collections,
-                children,
+                members,
             })
         }
         OfferResult::OfferFromFilteredAggregate(offers, aggregation_component) => {
@@ -293,6 +294,7 @@ pub async fn route_from_expose<C, V>(
 ) -> Result<CapabilitySource<C>, RoutingError>
 where
     C: ComponentInstanceInterface + 'static,
+    V: OfferVisitor,
     V: ExposeVisitor,
     V: CapabilityVisitor,
     V: Clone + Send + Sync + 'static,
@@ -300,18 +302,17 @@ where
     match Expose::route(expose, expose_target, &sources, visitor, mapper).await? {
         ExposeResult::Source(source) => Ok(source),
         ExposeResult::ExposeFromAnonymizedAggregate(expose, aggregation_component) => {
-            let mut collections = vec![];
-            let mut children = vec![];
+            let mut members = vec![];
             for e in expose.iter() {
                 match e.source() {
                     ExposeSource::Collection(n) => {
-                        collections.push(n.clone());
+                        members.push(AggregateMember::Collection(n.clone()));
                     }
                     ExposeSource::Child(n) => {
-                        children.push(
+                        members.push(AggregateMember::Child(
                             ChildName::try_new(n.clone(), None)
                                 .expect("child source should be convertible to ChildName"),
-                        );
+                        ));
                     }
                     _ => unreachable!("this was checked before"),
                 }
@@ -322,16 +323,14 @@ where
                 capability: AggregateCapability::Service(first_expose.source_name().clone()),
                 component: aggregation_component.as_weak(),
                 aggregate_capability_provider: Box::new(AnonymizedAggregateServiceProvider {
-                    collections: collections.clone(),
-                    children: children.clone(),
+                    members: members.clone(),
                     containing_component: aggregation_component.as_weak(),
                     capability_name: first_expose.source_name().clone(),
                     capability_type,
                     sources: sources.clone(),
                     visitor: visitor.clone(),
                 }),
-                collections,
-                children,
+                members,
             })
         }
     }

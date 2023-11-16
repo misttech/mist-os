@@ -272,18 +272,11 @@ impl RouteValidator {
         let source = request.route(target).await?;
         let source = &source.source;
         let service_dir = match source {
-            CapabilitySource::AnonymizedAggregate {
-                capability,
-                component,
-                collections,
-                children,
-                ..
-            } => {
+            CapabilitySource::AnonymizedAggregate { capability, component, members, .. } => {
                 let component = component.upgrade()?;
                 let route = AnonymizedServiceRoute {
                     source_moniker: component.moniker.clone(),
-                    collections: collections.clone(),
-                    children: children.clone(),
+                    members: members.clone(),
                     service_name: capability.source_name().clone(),
                 };
                 let state = component.lock_state().await;
@@ -1270,7 +1263,7 @@ mod tests {
                     ..
                 } if instance_name.len() == 32 &&
                     instance_name.chars().all(|c| c.is_ascii_hexdigit()) &&
-                    child_name == format!("coll:child_{}", child_id) &&
+                    child_name == format!("child `coll:child_{}`", child_id) &&
                     child_instance_name == format!("instance_{}", instance_id)
             );
         }

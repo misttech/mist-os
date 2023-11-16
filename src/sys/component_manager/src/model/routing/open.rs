@@ -238,15 +238,13 @@ impl<'a> OpenRequest<'a> {
                 capability,
                 component,
                 aggregate_capability_provider,
-                collections,
-                children,
+                members,
             } => {
                 let source_component_instance = component.upgrade()?;
 
                 let route = AnonymizedServiceRoute {
                     source_moniker: source_component_instance.moniker.clone(),
-                    collections: collections.clone(),
-                    children: children.clone(),
+                    members: members.clone(),
                     service_name: capability.source_name().clone(),
                 };
 

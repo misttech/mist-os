@@ -51,8 +51,8 @@ type ServiceInstance = table {
     /// The name of the service instance in this service directory.
     1: instance_name string:MAX;
 
-    /// The name of the child component that serves the service instance,
-    /// including the collection name.
+    /// The name of the component that serves the service instance,
+    /// including the collection name if the component is a child.
     2: child_name string:MAX;
 
     /// The name of the service instance as exposed by the child.
