@@ -20,7 +20,6 @@ use {
     fuchsia_zircon::{self as zx, AsHandleRef},
     futures::try_join,
     fxfs::{
-        async_enter,
         errors::FxfsError,
         object_handle::{ObjectHandle, ReadObjectHandle},
         object_store::{DataObjectHandle, ObjectDescriptor},
@@ -175,24 +174,8 @@ impl PagerBacked for FxBlob {
         &self.vmo
     }
 
-    fn page_in(self: Arc<Self>, mut range: Range<u64>) {
-        async_enter!("page_in");
-
-        // Apply some read-ahead.
-        let read_alignment = self.read_alignment();
-        let aligned_size = round_up(self.uncompressed_size, read_alignment).unwrap();
-        if aligned_size < range.end {
-            range.end = aligned_size;
-        } else {
-            range = round_down(range.start, READ_AHEAD_SIZE)
-                ..round_up(range.end, READ_AHEAD_SIZE).unwrap();
-            if range.end > aligned_size {
-                range.end = aligned_size;
-            }
-        }
-        range.start = round_down(range.start, read_alignment);
-
-        // Delegate the rest to to generic page handling code.
+    fn page_in(self: Arc<Self>, range: Range<u64>) {
+        // Delegate to the generic page handling code.
         default_page_in(self, range)
     }
 

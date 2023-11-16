@@ -16,6 +16,7 @@ use {
     },
     futures::Future,
     fxfs::{
+        async_enter,
         log::*,
         round::{round_down, round_up},
     },
@@ -87,7 +88,7 @@ impl PagerPacketReceiver {
             // the page request to avoid leaving the client hanging.
             file.pager().report_failure(file.vmo(), contents.range(), zx::Status::BAD_STATE);
             return;
-         };
+        };
         match command {
             ZX_PAGER_VMO_READ => file.page_in(contents.range()),
             ZX_PAGER_VMO_DIRTY => file.mark_dirty(contents.range()),
@@ -411,32 +412,40 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     const ZERO_VMO_SIZE: u64 = 1_048_576;
     static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
+    assert!(range.end < i64::MAX as u64);
+
+    const READ_AHEAD_SIZE: u64 = 131_072;
     let read_alignment = this.read_alignment();
-    let byte_size = round_up(this.byte_size(), read_alignment).unwrap();
+    let readahead_alignment = if read_alignment > READ_AHEAD_SIZE {
+        read_alignment
+    } else {
+        round_down(READ_AHEAD_SIZE, read_alignment)
+    };
+    let aligned_size = round_up(this.byte_size(), read_alignment).unwrap();
+    range = round_down(range.start, readahead_alignment)
+        ..round_up(range.end, readahead_alignment).unwrap();
+    if range.end > aligned_size {
+        range.end = aligned_size;
+    }
 
     // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
-    let mut offset = std::cmp::max(range.start, byte_size);
+    let mut offset = std::cmp::max(range.start, aligned_size);
     while offset < range.end {
         let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
         this.pager().supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
         offset = end;
     }
 
-    range.start = round_down(range.start, read_alignment);
-
-    // Calls to aligned_read must be aligned at all times, but the start must also not exceed the
-    // last block of the file.
-    let read_range_end = round_up(range.end, read_alignment).unwrap();
-
     // Read in chunks of 128 KiB.
     let read_size = round_up(128 * 1024, read_alignment).unwrap();
 
     while range.start < range.end {
-        let read_range = range.start..std::cmp::min(read_range_end, range.start + read_size);
+        let read_range = range.start..std::cmp::min(range.end, range.start + read_size);
         range.start += read_size;
 
         let this = this.clone();
         this.clone().pager().spawn(async move {
+            async_enter!("page_in");
             // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
             // solution for buffer allocation failing.
             let _guard = this.pager().acquire_read_permit().await;
@@ -446,7 +455,7 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
                 Err(error) => {
                     error!(
                         range = ?read_range,
-                        ?byte_size,
+                        ?aligned_size,
                         ?error,
                         "Failed to load range"
                     );
