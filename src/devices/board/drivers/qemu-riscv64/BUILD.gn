@@ -58,3 +58,8 @@ fuchsia_driver_component("qemu-riscv64") {
   info = "qemu-riscv64-info.json"
   manifest = "meta/qemu-riscv64.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "qemu-riscv64"
+  driver_components = [ ":qemu-riscv64" ]
+}

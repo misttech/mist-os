@@ -4,10 +4,6 @@
 
 import("//boards/common/riscv64-common.gni")
 
-_imports = {  # Import into hidden scope, to avoid importing into args.gn.
-  import("//boards/emulation/virtio_drivers.gni")
-}
-
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/riscv64"
 
@@ -20,13 +16,9 @@ board_is_phys = false
 
 platform_enable_user_pci = true
 board_bootfs_labels += [
-  "//src/devices/bus/drivers/pci:bus-pci",
-  "//src/devices/board/drivers/qemu-riscv64",
-
   # Configs
   "//src/power/power-manager:base_config",
 ]
-board_bootfs_labels += _imports.virtio_drivers
 
 partitions_config_label = "//boards/partitions:riscv64"
 
