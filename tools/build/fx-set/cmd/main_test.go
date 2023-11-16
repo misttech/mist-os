@@ -317,11 +317,12 @@ func (r fakeSubprocessRunner) Run(context.Context, []string, subprocess.RunOptio
 func TestConstructStaticSpec(t *testing.T) {
 	rbeSupported := rbeIsSupported()
 	testCases := []struct {
-		name      string
-		args      *setArgs
-		runner    fakeSubprocessRunner
-		expected  *fintpb.Static
-		expectErr bool
+		name         string
+		args         *setArgs
+		runner       fakeSubprocessRunner
+		expected     *fintpb.Static
+		expectErr    bool
+		cannotUseRbe bool
 	}{
 		{
 			name: "basic",
@@ -391,11 +392,19 @@ func TestConstructStaticSpec(t *testing.T) {
 			},
 		},
 		{
-			name: "cxx-rbe default",
+			name: "cxx-rbe default with access",
 			args: &setArgs{},
 			expected: &fintpb.Static{
 				CxxRbeEnable: rbeSupported,
 			},
+		},
+		{
+			name: "cxx-rbe default without access",
+			args: &setArgs{},
+			expected: &fintpb.Static{
+				CxxRbeEnable: false,
+			},
+			cannotUseRbe: true,
 		},
 		{
 			name: "cxx-rbe enabled",
@@ -404,6 +413,16 @@ func TestConstructStaticSpec(t *testing.T) {
 				CxxRbeEnable: true,
 			},
 			expectErr: !rbeSupported,
+		},
+		{
+			// allow the setting, but gives a notice about access
+			name: "cxx-rbe enabled without access",
+			args: &setArgs{enableCxxRbe: true},
+			expected: &fintpb.Static{
+				CxxRbeEnable: true,
+			},
+			expectErr:    !rbeSupported,
+			cannotUseRbe: true,
 		},
 		{
 			name: "cxx-rbe disabled",
@@ -502,7 +521,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			createFile(t, checkoutDir, expected.Product)
 
 			fx := fxRunner{sr: tc.runner, checkoutDir: checkoutDir}
-			got, err := constructStaticSpec(ctx, fx, checkoutDir, tc.args)
+			got, err := constructStaticSpec(ctx, fx, checkoutDir, tc.args, !tc.cannotUseRbe)
 			if err != nil {
 				if tc.expectErr {
 					return

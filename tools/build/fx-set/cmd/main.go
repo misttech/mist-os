@@ -111,7 +111,12 @@ func mainImpl(ctx context.Context) error {
 
 	var staticSpec *fintpb.Static
 	if args.fintParamsPath == "" {
-		staticSpec, err = constructStaticSpec(ctx, fx, args.checkoutDir, args)
+		canUseRbe, err := canAccessRbe(args.checkoutDir)
+		if err != nil {
+			fmt.Printf("Unable to determine RBE access, assuming False.")
+			canUseRbe = false
+		}
+		staticSpec, err = constructStaticSpec(ctx, fx, args.checkoutDir, args, canUseRbe)
 		if err != nil {
 			return err
 		}
@@ -339,7 +344,7 @@ func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
 
-func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, args *setArgs) (*fintpb.Static, error) {
+func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, args *setArgs, canUseRbe bool) (*fintpb.Static, error) {
 	productPath, err := findGNIFile(checkoutDir, "products", args.product)
 	if err != nil {
 		productPath, err = findGNIFile(checkoutDir, filepath.Join("products", "tests"), args.product)
@@ -365,8 +370,13 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	// Check for RBE eligibility.
 	rbeSupported := rbeIsSupported()
 	requestedAnyRbe := args.enableCxxRbe || args.enableRustRbe || args.enableLinkRbe
-	if requestedAnyRbe && !rbeSupported {
-		return nil, fmt.Errorf("Sorry, RBE is only supported on linux-x64 at this time.")
+	if requestedAnyRbe {
+		if !rbeSupported {
+			return nil, fmt.Errorf("Sorry, RBE is only supported on linux-x64 at this time.")
+		}
+		if !canUseRbe {
+			fmt.Printf("Note: RBE is not publicly accessible at this time.")
+		}
 	}
 
 	var (
@@ -396,7 +406,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		// User explicitly tries to enable Goma (deprecated).
 		// Allow this for a limited time before removing this option.
 		fmt.Printf("Goma is deprecated and shutting down. This will be disabled in the near future. See go/fuchsia-goma-shutdown-psa.")
-		if rbeSupported {
+		if rbeSupported && canUseRbe {
 			fmt.Printf("On this platform, you can build C++ on RBE using '--cxx-rbe'.")
 		}
 		gomaAuth, err := isGomaAuthenticated(ctx, fx)
@@ -416,7 +426,7 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	if args.enableCxxRbe {
 		useCxxRbeFinal = true
 	} else if !args.disableCxxRbe {
-		if rbeSupported && !args.useGoma && !args.useCcache {
+		if rbeSupported && canUseRbe && !args.useGoma && !args.useCcache {
 			useCxxRbeFinal = true
 		}
 	}
@@ -512,6 +522,28 @@ func allEnvVars() map[string]string {
 		env[key] = val
 	}
 	return env
+}
+
+func canAccessRbe(checkoutDir string) (bool, error) {
+	// Note: This is not perfect because it does not actually check against ACL
+	// but it avoids the problem of external developers accidentally
+	// configuring use of RBE.
+	cmd := exec.Command("git", "remote", "-v")
+	cmd.Dir = checkoutDir + "/integration"
+	out, err := cmd.Output()
+	if err != nil {
+		return false, err
+	}
+	lines := strings.Split(string(out), "\n")
+	if len(lines) < 1 {
+		return false, fmt.Errorf("Failed to read 'git remote -v'")
+	}
+	fields := strings.Fields(lines[0])
+	// Expect a line like:
+	//   "origin	sso://.../integration (fetch)"
+	// or
+	//   "origin	https://.../integration (fetch)"
+	return strings.HasPrefix(fields[1], "sso://"), nil
 }
 
 func isGomaAuthenticated(ctx context.Context, fx fxRunner) (bool, error) {
