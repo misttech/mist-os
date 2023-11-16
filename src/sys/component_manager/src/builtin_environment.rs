@@ -71,7 +71,7 @@ use {
             storage::admin_protocol::StorageAdminDerivedCapability,
         },
         root_stop_notifier::RootStopNotifier,
-        sandbox_util::{LaunchTaskOnReceive, Sandbox},
+        sandbox_util::{DictExt, LaunchTaskOnReceive},
     },
     ::routing::{
         capability_source::{CapabilitySource, InternalCapability},
@@ -104,7 +104,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
-    sandbox::Receiver,
+    sandbox::{Capability, Dict, Receiver},
     std::sync::Arc,
     tracing::info,
 };
@@ -391,21 +391,22 @@ impl BuiltinEnvironmentBuilder {
     }
 }
 
-struct BuiltinSandboxBuilder {
-    sandbox: Sandbox,
+/// Constructs a [Dict] that contains built-in capabilities.
+struct BuiltinDictBuilder {
+    dict: Dict,
     builtin_task_launchers: Vec<LaunchTaskOnReceive>,
     top_instance: Arc<ComponentManagerInstance>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
 }
 
-impl BuiltinSandboxBuilder {
+impl BuiltinDictBuilder {
     fn new(
         top_instance: Arc<ComponentManagerInstance>,
         runtime_config: &Arc<RuntimeConfig>,
     ) -> Self {
         Self {
-            sandbox: Sandbox::new(),
+            dict: Dict::new(),
             builtin_task_launchers: Vec::new(),
             top_instance,
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
@@ -413,10 +414,10 @@ impl BuiltinSandboxBuilder {
         }
     }
 
-    /// Adds a new builtin protocol to the sandbox that will be given to the root component. If the
+    /// Adds a new builtin protocol to the dict that will be given to the root component. If the
     /// protocol is not listed in `self.builtin_capabilities`, then it will silently be omitted
-    /// from the sandbox.
-    fn add_builtin_protocol_if_enabled<P>(
+    /// from the dict.
+    fn add_protocol_if_enabled<P>(
         &mut self,
         task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
             + Sync
@@ -432,14 +433,14 @@ impl BuiltinSandboxBuilder {
         // unknown.
         if self.builtin_capabilities.iter().find(|decl| decl.name() == &name).is_none() {
             // This builtin protocol is not enabled based on the runtime config, so don't add the
-            // capability to the sandbox.
+            // capability to the dict.
             return;
         }
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
-        let mut cap_sandbox = self.sandbox.get_or_insert_protocol(name.clone());
-        cap_sandbox.insert_sender(sender);
-        cap_sandbox.insert_availability(cm_rust::Availability::Required);
+        let mut cap_dict = self.dict.get_or_insert_protocol_mut(&name);
+        cap_dict.insert_sender(sender);
+        cap_dict.insert_availability(cm_rust::Availability::Required);
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
             top_instance: Arc::downgrade(&self.top_instance),
@@ -453,14 +454,14 @@ impl BuiltinSandboxBuilder {
         ));
     }
 
-    fn build(self) -> (Sandbox, fasync::Task<()>) {
+    fn build(self) -> (Dict, fasync::Task<()>) {
         let builtin_receivers_future: FuturesUnordered<_> =
             self.builtin_task_launchers.into_iter().map(LaunchTaskOnReceive::run).collect();
         let builtin_receivers_task = fasync::Task::spawn(async move {
             // The result here is irrelevant because the stream is infallible
             let _ = builtin_receivers_future.map(Result::Ok).forward(drain()).await;
         });
-        (self.sandbox, builtin_receivers_task)
+        (self.dict, builtin_receivers_task)
     }
 }
 
@@ -490,8 +491,7 @@ pub struct BuiltinEnvironment {
     pub num_threads: usize,
     pub inspector: Inspector,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
-    pub sandbox: Sandbox,
-
+    pub dict: Dict,
     _builtin_receivers_task_group: TaskGroup,
     _service_fs_task: Option<fasync::Task<()>>,
 }
@@ -521,25 +521,26 @@ impl BuiltinEnvironment {
             None
         };
 
-        let mut sandbox_builder =
-            BuiltinSandboxBuilder::new(model.top_instance().clone(), &runtime_config);
+        let mut builtin_dict_builder =
+            BuiltinDictBuilder::new(model.top_instance().clone(), &runtime_config);
 
         // Set up ProcessLauncher if available.
         if runtime_config.use_builtin_process_launcher {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fprocess::LauncherMarker>(|stream| {
+            builtin_dict_builder.add_protocol_if_enabled::<fprocess::LauncherMarker>(|stream| {
                 async move {
-                    ProcessLauncher::serve(stream).await.map_err(|e| format_err!("{:?}", e))
-                }.boxed()
+                        ProcessLauncher::serve(stream).await.map_err(|e| format_err!("{:?}", e))
+                    }
+                    .boxed()
             });
         }
 
         // Set up RootJob service.
-        sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
+        builtin_dict_builder.add_protocol_if_enabled::<fkernel::RootJobMarker>(|stream| {
             RootJob::serve(stream, zx::Rights::SAME_RIGHTS).boxed()
         });
 
         // Set up RootJobForInspect service.
-        sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::RootJobForInspectMarker>(
+        builtin_dict_builder.add_protocol_if_enabled::<fkernel::RootJobForInspectMarker>(
             |stream| {
                 let stream = stream.cast_stream::<fkernel::RootJobRequestStream>();
                 let rights = zx::Rights::INSPECT
@@ -586,32 +587,32 @@ impl BuiltinEnvironment {
             .map(zx::Channel::from)
             .map(SvcStashCapability::new);
         if let Some(svc_stash_provider) = svc_stash_provider {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::SvcStashProviderMarker>(
                 move |stream| svc_stash_provider.clone().serve(stream).boxed(),
             );
         }
 
         // Set up BootArguments service.
         let boot_args = BootArguments::new(&mut zbi_parser).await?;
-        sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ArgumentsMarker>(move |stream| {
+        builtin_dict_builder.add_protocol_if_enabled::<fboot::ArgumentsMarker>(move |stream| {
             boot_args.clone().serve(stream).boxed()
         });
 
         if let Some(mut zbi_parser) = zbi_parser {
             let factory_items = FactoryItems::new(&mut zbi_parser)?;
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::FactoryItemsMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::FactoryItemsMarker>(
                 move |stream| factory_items.clone().serve(stream).boxed(),
             );
 
             let items = Items::new(zbi_parser)?;
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ItemsMarker>(move |stream| {
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::ItemsMarker>(move |stream| {
                 items.clone().serve(stream).boxed()
             });
         }
 
         // Set up CrashRecords service.
         let crash_records_svc = CrashIntrospectSvc::new(crash_records);
-        sandbox_builder.add_builtin_protocol_if_enabled::<fsys::CrashIntrospectMarker>(
+        builtin_dict_builder.add_protocol_if_enabled::<fsys::CrashIntrospectMarker>(
             move |stream| crash_records_svc.clone().serve(stream).boxed(),
         );
 
@@ -632,9 +633,9 @@ impl BuiltinEnvironment {
             })
             .flatten();
         if let Some(kernel_stats) = info_resource_handle.map(KernelStats::new) {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::StatsMarker>(
-                move |stream| kernel_stats.clone().serve(stream).boxed(),
-            );
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::StatsMarker>(move |stream| {
+                kernel_stats.clone().serve(stream).boxed()
+            });
         }
 
         // Set up ReadOnlyLog service.
@@ -646,7 +647,7 @@ impl BuiltinEnvironment {
             )
         });
         if let Some(read_only_log) = read_only_log {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::ReadOnlyLogMarker>(
                 move |stream| read_only_log.clone().serve(stream).boxed(),
             );
         }
@@ -656,7 +657,7 @@ impl BuiltinEnvironment {
             WriteOnlyLog::new(zx::DebugLog::create(handle, zx::DebugLogOpts::empty()).unwrap())
         });
         if let Some(write_only_log) = write_only_log {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::WriteOnlyLogMarker>(
                 move |stream| write_only_log.clone().serve(stream).boxed(),
             );
         }
@@ -664,7 +665,7 @@ impl BuiltinEnvironment {
         // Register the UTC time maintainer.
         if let Some(clock) = utc_clock {
             let utc_time_maintainer = Arc::new(UtcTimeMaintainer::new(clock));
-            sandbox_builder.add_builtin_protocol_if_enabled::<ftime::MaintenanceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<ftime::MaintenanceMarker>(
                 move |stream| utc_time_maintainer.clone().serve(stream).boxed(),
             );
         }
@@ -672,7 +673,7 @@ impl BuiltinEnvironment {
         // Set up the MmioResource service.
         let mmio_resource = mmio_resource_handle.map(MmioResource::new);
         if let Some(mmio_resource) = mmio_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::MmioResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::MmioResourceMarker>(
                 move |stream| mmio_resource.clone().serve(stream).boxed(),
             );
         }
@@ -680,7 +681,7 @@ impl BuiltinEnvironment {
         #[cfg(target_arch = "x86_64")]
         if let Some(handle) = take_startup_handle(HandleType::IoportResource.into()) {
             let ioport_resource = IoportResource::new(handle.into());
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::IoportResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IoportResourceMarker>(
                 move |stream| ioport_resource.clone().serve(stream).boxed(),
             );
         }
@@ -688,7 +689,7 @@ impl BuiltinEnvironment {
         // Set up the IrqResource service.
         let irq_resource = irq_resource_handle.map(IrqResource::new);
         if let Some(irq_resource) = irq_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::IrqResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IrqResourceMarker>(
                 move |stream| irq_resource.clone().serve(stream).boxed(),
             );
         }
@@ -696,7 +697,7 @@ impl BuiltinEnvironment {
         // Set up RootResource service.
         let root_resource = root_resource_handle.map(RootResource::new);
         if let Some(root_resource) = root_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fboot::RootResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fboot::RootResourceMarker>(
                 move |stream| root_resource.clone().serve(stream).boxed(),
             );
         }
@@ -705,7 +706,7 @@ impl BuiltinEnvironment {
         #[cfg(target_arch = "aarch64")]
         if let Some(handle) = take_startup_handle(HandleType::SmcResource.into()) {
             let smc_resource = SmcResource::new(handle.into());
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::SmcResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::SmcResourceMarker>(
                 move |stream| smc_resource.clone().serve(stream).boxed(),
             );
         }
@@ -727,7 +728,7 @@ impl BuiltinEnvironment {
             .map(CpuResource::new)
             .and_then(Result::ok);
         if let Some(cpu_resource) = cpu_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::CpuResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::CpuResourceMarker>(
                 move |stream| cpu_resource.clone().serve(stream).boxed(),
             );
         }
@@ -749,7 +750,7 @@ impl BuiltinEnvironment {
             .map(EnergyInfoResource::new)
             .and_then(Result::ok);
         if let Some(energy_info_resource) = energy_info_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::EnergyInfoResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::EnergyInfoResourceMarker>(
                 move |stream| energy_info_resource.clone().serve(stream).boxed(),
             );
         }
@@ -771,7 +772,7 @@ impl BuiltinEnvironment {
             .map(DebugResource::new)
             .and_then(Result::ok);
         if let Some(debug_resource) = debug_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::DebugResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::DebugResourceMarker>(
                 move |stream| debug_resource.clone().serve(stream).boxed(),
             );
         }
@@ -793,7 +794,7 @@ impl BuiltinEnvironment {
             .map(HypervisorResource::new)
             .and_then(Result::ok);
         if let Some(hypervisor_resource) = hypervisor_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::HypervisorResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::HypervisorResourceMarker>(
                 move |stream| hypervisor_resource.clone().serve(stream).boxed(),
             );
         }
@@ -815,7 +816,7 @@ impl BuiltinEnvironment {
             .map(InfoResource::new)
             .and_then(Result::ok);
         if let Some(info_resource) = info_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::InfoResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::InfoResourceMarker>(
                 move |stream| info_resource.clone().serve(stream).boxed(),
             );
         }
@@ -837,7 +838,7 @@ impl BuiltinEnvironment {
             .map(MexecResource::new)
             .and_then(Result::ok);
         if let Some(mexec_resource) = mexec_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::MexecResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::MexecResourceMarker>(
                 move |stream| mexec_resource.clone().serve(stream).boxed(),
             );
         }
@@ -859,7 +860,7 @@ impl BuiltinEnvironment {
             .map(PowerResource::new)
             .and_then(Result::ok);
         if let Some(power_resource) = power_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::PowerResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::PowerResourceMarker>(
                 move |stream| power_resource.clone().serve(stream).boxed(),
             );
         }
@@ -881,14 +882,14 @@ impl BuiltinEnvironment {
             .map(VmexResource::new)
             .and_then(Result::ok);
         if let Some(vmex_resource) = vmex_resource {
-            sandbox_builder.add_builtin_protocol_if_enabled::<fkernel::VmexResourceMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::VmexResourceMarker>(
                 move |stream| vmex_resource.clone().serve(stream).boxed(),
             );
         }
 
         // Set up System Controller service.
         let weak_model = Arc::downgrade(&model);
-        sandbox_builder.add_builtin_protocol_if_enabled::<fsys::SystemControllerMarker>(
+        builtin_dict_builder.add_protocol_if_enabled::<fsys::SystemControllerMarker>(
             move |stream| {
                 SystemController::new(weak_model.clone(), SHUTDOWN_TIMEOUT).serve(stream).boxed()
             },
@@ -993,7 +994,7 @@ impl BuiltinEnvironment {
 
         if let Some(elf_runner) = elf_runner {
             let elf_runner_memory_attribution = ElfRunnerMemoryAttribution::new(elf_runner);
-            sandbox_builder.add_builtin_protocol_if_enabled::<freport::SnapshotProviderMarker>(
+            builtin_dict_builder.add_protocol_if_enabled::<freport::SnapshotProviderMarker>(
                 move |stream| {
                     elf_runner_memory_attribution.serve(stream);
                     std::future::ready::<Result<(), anyhow::Error>>(Ok(())).boxed()
@@ -1001,7 +1002,7 @@ impl BuiltinEnvironment {
             );
         }
 
-        let (sandbox, builtin_receivers_task) = sandbox_builder.build();
+        let (dict, builtin_receivers_task) = builtin_dict_builder.build();
         let builtin_receivers_task_group = TaskGroup::new();
         builtin_receivers_task_group.spawn(builtin_receivers_task);
 
@@ -1022,7 +1023,7 @@ impl BuiltinEnvironment {
             num_threads,
             inspector,
             realm_builder_resolver,
-            sandbox,
+            dict,
             _builtin_receivers_task_group: builtin_receivers_task_group,
             _service_fs_task: None,
         })
@@ -1197,9 +1198,9 @@ impl BuiltinEnvironment {
     }
 
     #[cfg(test)]
-    /// Adds a protocol to the root sandbox, replacing prior entries. This must be called before
+    /// Adds a protocol to the root dict, replacing prior entries. This must be called before
     /// the model is started.
-    pub async fn add_protocol_to_root_sandbox<P>(
+    pub async fn add_protocol_to_root_dict<P>(
         &mut self,
         name: Name,
         task_to_launch: impl Fn(P::RequestStream) -> BoxFuture<'static, Result<(), anyhow::Error>>
@@ -1212,9 +1213,9 @@ impl BuiltinEnvironment {
         let receiver = Receiver::new();
         let sender = receiver.new_sender();
 
-        let mut cap_sandbox = self.sandbox.get_or_insert_protocol(name.clone());
-        cap_sandbox.insert_sender(sender);
-        cap_sandbox.insert_availability(cm_rust::Availability::Required);
+        let mut cap_dict = self.dict.get_or_insert_protocol_mut(&name);
+        cap_dict.insert_sender(sender);
+        cap_dict.insert_availability(cm_rust::Availability::Required);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
@@ -1234,10 +1235,10 @@ impl BuiltinEnvironment {
 
     #[cfg(test)]
     /// Causes the root component to be discovered, which provides the root component with the
-    /// sandbox from the builtin environment. This is called in some tests because the tests create
+    /// dict from the builtin environment. This is called in some tests because the tests create
     /// a new model but do not call `Model::start`.
     pub async fn discover_root_component(&self) {
-        self.model.discover_root_component(self.sandbox.clone()).await;
+        self.model.discover_root_component(self.dict.try_clone().unwrap()).await;
     }
 
     pub async fn wait_for_root_stop(&self) {
@@ -1246,7 +1247,7 @@ impl BuiltinEnvironment {
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
         self.bind_service_fs_to_out().await?;
-        self.model.start(self.sandbox.clone()).await;
+        self.model.start(self.dict.try_clone().unwrap()).await;
         component::health().set_ok();
         self.wait_for_root_stop().await;
 

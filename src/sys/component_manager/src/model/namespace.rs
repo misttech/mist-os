@@ -10,7 +10,7 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
-        sandbox_util::Message,
+        sandbox_util::{DictExt, Message},
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
@@ -36,7 +36,7 @@ use {
 /// Creates a component's namespace.
 ///
 /// TODO(b/298106231): eventually this should only build a delivery map as
-/// the program sandbox will be fetched from the resolved component state.
+/// the program dict will be fetched from the resolved component state.
 pub async fn create_namespace(
     package: Option<&Package>,
     component: &Arc<ComponentInstance>,
@@ -285,17 +285,17 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
             if let UseDecl::Protocol(use_protocol_decl) = &use_ {
                 let name = &use_protocol_decl.source_name;
                 if let Ok(mut state) = target.lock_resolved_state().await {
-                    // The capability sandbox can be missing if we used a capability from our
-                    // parent but the parent did not offer this capability.
-                    if let Some(mut cap_sandbox) = state.program_sandbox.get_protocol_mut(name) {
-                        // The capability sandbox can be present but missing a sender if we're both
+                    // The CapabilityDict can be missing if we used the protocol from our
+                    // parent but the parent did not offer this protocol.
+                    if let Some(mut cap_dict) = state.program_dict.get_protocol_mut(name) {
+                        // The CapabilityDict can be present but missing a Sender if we're both
                         // using from parent _and_ declaring a capability, but our parent didn't
-                        // offer the capability to us. In this case this capability sandbox will
-                        // only contain the receiver we declared.
-                        if cap_sandbox.get_sender().is_some() {
+                        // offer the protocol to us. In this case this CapabilityDict will
+                        // only contain the Receiver we declared.
+                        if cap_dict.get_sender().is_some() {
                             let handle = server_end.into_handle();
                             let msg = Message { handle, flags, target: weak_component.clone() };
-                            cap_sandbox.send(msg).unwrap();
+                            cap_dict.send(msg).unwrap();
                             return;
                         }
                     }

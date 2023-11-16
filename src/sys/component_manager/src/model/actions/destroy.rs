@@ -3,22 +3,20 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        model::{
-            actions::{
-                Action, ActionKey, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
-                ShutdownAction, StartAction,
-            },
-            component::{ComponentInstance, InstanceState, StartReason},
-            error::DestroyActionError,
+    crate::model::{
+        actions::{
+            Action, ActionKey, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
+            ShutdownAction, StartAction,
         },
-        sandbox_util::Sandbox,
+        component::{ComponentInstance, InstanceState, StartReason},
+        error::DestroyActionError,
     },
     async_trait::async_trait,
     futures::{
         future::{join_all, BoxFuture},
         Future,
     },
+    sandbox::Dict,
     std::sync::Arc,
 };
 
@@ -53,7 +51,7 @@ async fn do_destroy(component: &Arc<ComponentInstance>) -> Result<(), DestroyAct
     // Require the component to be discovered before deleting it so a Destroyed event is
     // always preceded by a Discovered.
     // TODO: wait for a discover, don't register a new one
-    ActionSet::register(component.clone(), DiscoverAction::new(Sandbox::new())).await?;
+    ActionSet::register(component.clone(), DiscoverAction::new(Dict::new())).await?;
 
     // For destruction to behave correctly, the component has to be shut down first.
     // NOTE: This will recursively shut down the whole subtree. If this component has children,
@@ -378,7 +376,7 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();
-        fasync::Task::spawn(async move { model.start(Sandbox::new()).await }).detach();
+        fasync::Task::spawn(async move { model.start(Dict::new()).await }).detach();
         event_stream
     }
 
@@ -391,7 +389,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(Sandbox::new()).await;
+        test.model.start(Dict::new()).await;
 
         let component_root = test.model.root().clone();
         let component_a = match *component_root.lock_state().await {
@@ -499,7 +497,7 @@ pub mod tests {
             ("a", component_decl_with_test_runner()),
         ];
         let test = ActionsTest::new("root", components, None).await;
-        test.model.start(Sandbox::new()).await;
+        test.model.start(Dict::new()).await;
 
         let component_root = test.model.root().clone();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;

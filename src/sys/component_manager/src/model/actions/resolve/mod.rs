@@ -18,7 +18,8 @@ use {
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::io::clone_dir,
-    sandbox_construction::build_component_sandboxes,
+    sandbox::Capability,
+    sandbox_construction::build_component_sandbox,
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -97,7 +98,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
-                let sandbox_from_parent = match state.deref_mut() {
+                let dict_from_parent = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
                     }
@@ -110,17 +111,17 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                         });
                     }
                     InstanceState::Unresolved(unresolved_state) => {
-                        unresolved_state.sandbox_from_parent.clone()
+                        unresolved_state.dict_from_parent.try_clone().unwrap()
                     }
                 };
-                let component_sandboxes =
-                    build_component_sandboxes(&component_info.decl, sandbox_from_parent).await;
+                let component_sandbox =
+                    build_component_sandbox(&component_info.decl, dict_from_parent).await;
                 state.set(InstanceState::Resolved(
                     ResolvedInstanceState::new(
                         component,
                         component_info.clone(),
                         component_address,
-                        component_sandboxes,
+                        component_sandbox,
                     )
                     .await?,
                 ));

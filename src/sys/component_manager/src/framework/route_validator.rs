@@ -426,21 +426,19 @@ async fn validate_exposes(
 mod tests {
     use {
         super::*,
-        crate::{
-            model::{
-                component::StartReason,
-                testing::{
-                    out_dir::OutDir,
-                    test_helpers::{TestEnvironmentBuilder, TestModelResult},
-                },
+        crate::model::{
+            component::StartReason,
+            testing::{
+                out_dir::OutDir,
+                test_helpers::{TestEnvironmentBuilder, TestModelResult},
             },
-            sandbox_util::Sandbox,
         },
         assert_matches::assert_matches,
         cm_rust::*,
         cm_rust_testing::ComponentDeclBuilder,
         fidl::endpoints,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        sandbox::Dict,
     };
 
     #[derive(Ord, PartialOrd, Eq, PartialEq)]
@@ -521,7 +519,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // `my_child` should not be resolved right now
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
@@ -657,7 +655,7 @@ mod tests {
             validator_server.serve(Moniker::root(), validator_request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // `my_child` should not be resolved right now
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;
@@ -796,7 +794,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // Validate the root
         let targets = &[
@@ -931,7 +929,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // Validate the root, passing an empty vector. This should match both capabilities
         let mut results = validator.route(".", &[]).await.unwrap().unwrap();
@@ -1060,7 +1058,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // Validate the root
         let targets =
@@ -1192,7 +1190,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // Create two children in the collection, each exposing `my_service` with two instances.
         let collection_ref = fdecl::CollectionRef { name: "coll".parse().unwrap() };
@@ -1348,7 +1346,7 @@ mod tests {
             validator_server.serve(Moniker::root(), request_stream).await
         });
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
 
         // `my_child` should not be resolved right now
         let instance = model.find_resolved(&vec!["my_child"].try_into().unwrap()).await;

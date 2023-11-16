@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        model::{
-            actions::{ActionKey, DiscoverAction},
-            component::{ComponentInstance, ComponentManagerInstance, InstanceState, StartReason},
-            context::ModelContext,
-            environment::Environment,
-            error::ModelError,
-        },
-        sandbox_util::Sandbox,
+    crate::model::{
+        actions::{ActionKey, DiscoverAction},
+        component::{ComponentInstance, ComponentManagerInstance, InstanceState, StartReason},
+        context::ModelContext,
+        environment::Environment,
+        error::ModelError,
     },
     cm_config::RuntimeConfig,
     moniker::{Moniker, MonikerBase},
+    sandbox::Dict,
     std::sync::Arc,
     tracing::warn,
 };
@@ -150,19 +148,19 @@ impl Model {
         }
     }
 
-    /// Discovers the root component, providing it with `sandbox_for_root`.
-    pub async fn discover_root_component(self: &Arc<Model>, sandbox_for_root: Sandbox) {
+    /// Discovers the root component, providing it with `dict_for_root`.
+    pub async fn discover_root_component(self: &Arc<Model>, dict_for_root: Dict) {
         let mut actions = self.root.lock_actions().await;
         // This returns a Future that does not need to be polled.
-        let _ = actions.register_no_wait(&self.root, DiscoverAction::new(sandbox_for_root));
+        let _ = actions.register_no_wait(&self.root, DiscoverAction::new(dict_for_root));
     }
 
     /// Starts root, starting the component tree. If `discover_root_component` has already been
-    /// called, then `sandbox_for_root` is unused.
-    pub async fn start(self: &Arc<Model>, sandbox_for_root: Sandbox) {
+    /// called, then `dict_for_root` is unused.
+    pub async fn start(self: &Arc<Model>, dict_for_root: Dict) {
         // Normally the Discovered event is dispatched when an instance is added as a child, but
         // since the root isn't anyone's child we need to dispatch it here.
-        self.discover_root_component(sandbox_for_root).await;
+        self.discover_root_component(dict_for_root).await;
 
         // In debug mode, we don't start the component root. It must be started manually from
         // the lifecycle controller.
@@ -201,21 +199,19 @@ impl Model {
 #[cfg(test)]
 pub mod tests {
     use {
-        crate::{
-            model::{
-                actions::test_utils::is_discovered,
-                actions::{ActionSet, ShutdownAction, UnresolveAction},
-                testing::test_helpers::{
-                    component_decl_with_test_runner, ActionsTest, TestEnvironmentBuilder,
-                    TestModelResult,
-                },
+        crate::model::{
+            actions::test_utils::is_discovered,
+            actions::{ActionSet, ShutdownAction, UnresolveAction},
+            testing::test_helpers::{
+                component_decl_with_test_runner, ActionsTest, TestEnvironmentBuilder,
+                TestModelResult,
             },
-            sandbox_util::Sandbox,
         },
         assert_matches::assert_matches,
         cm_rust_testing::ComponentDeclBuilder,
         fidl_fuchsia_component_decl as fdecl,
         moniker::{Moniker, MonikerBase},
+        sandbox::Dict,
     };
 
     #[fuchsia::test]
@@ -241,7 +237,7 @@ pub mod tests {
         let _ =
             model.root().lock_actions().await.register_inner(&model.root, ShutdownAction::new());
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
     }
 
     #[should_panic]
@@ -264,7 +260,7 @@ pub mod tests {
         let TestModelResult { model, .. } =
             TestEnvironmentBuilder::new().set_components(components).build().await;
 
-        model.start(Sandbox::new()).await;
+        model.start(Dict::new()).await;
     }
 
     #[fuchsia::test]

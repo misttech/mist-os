@@ -174,15 +174,12 @@ impl Resolver for Environment {
 mod tests {
     use {
         super::*,
-        crate::{
-            model::{
-                component::StartReason,
-                context::ModelContext,
-                error::ModelError,
-                model::{Model, ModelParams},
-                testing::mocks::MockResolver,
-            },
-            sandbox_util::Sandbox,
+        crate::model::{
+            component::StartReason,
+            context::ModelContext,
+            error::ModelError,
+            model::{Model, ModelParams},
+            testing::mocks::MockResolver,
         },
         ::routing::environment::DebugRegistration,
         assert_matches::assert_matches,
@@ -195,6 +192,7 @@ mod tests {
         fidl_fuchsia_component as fcomponent,
         maplit::hashmap,
         moniker::{Moniker, MonikerBase},
+        sandbox::Dict,
         std::{collections::HashMap, sync::Weak},
     };
 
@@ -317,7 +315,7 @@ mod tests {
         })
         .await
         .unwrap();
-        model.discover_root_component(Sandbox::new()).await;
+        model.discover_root_component(Dict::new()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -414,7 +412,7 @@ mod tests {
             top_instance,
         })
         .await?;
-        model.discover_root_component(Sandbox::new()).await;
+        model.discover_root_component(Dict::new()).await;
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
         assert_eq!(component.component_url, "test:///b");
@@ -515,7 +513,7 @@ mod tests {
             top_instance,
         })
         .await?;
-        model.discover_root_component(Sandbox::new()).await;
+        model.discover_root_component(Dict::new()).await;
         // Add instance to collection.
         {
             let parent =
@@ -619,7 +617,7 @@ mod tests {
         })
         .await
         .unwrap();
-        model.discover_root_component(Sandbox::new()).await;
+        model.discover_root_component(Dict::new()).await;
 
         let component =
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await?;
@@ -691,7 +689,7 @@ mod tests {
             top_instance,
         })
         .await?;
-        model.discover_root_component(Sandbox::new()).await;
+        model.discover_root_component(Dict::new()).await;
         assert_matches!(
             model.start_instance(&vec!["a", "b"].try_into().unwrap(), &StartReason::Eager).await,
             Err(ModelError::ResolveActionError { .. })

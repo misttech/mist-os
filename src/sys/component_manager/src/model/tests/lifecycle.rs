@@ -17,7 +17,6 @@ use {
                 test_helpers::*, test_hook::TestHook,
             },
         },
-        sandbox_util::Sandbox,
     },
     ::routing::policy::PolicyError,
     assert_matches::assert_matches,
@@ -35,6 +34,7 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
     futures::{channel::mpsc, future::pending, join, lock::Mutex, prelude::*},
     moniker::{ChildName, Moniker, MonikerBase},
+    sandbox::Dict,
     std::sync::{Arc, Weak},
     std::{collections::HashSet, convert::TryFrom},
 };
@@ -126,7 +126,7 @@ async fn bind_concurrent() {
     .await;
 
     // Start the root component.
-    model.start(Sandbox::new()).await;
+    model.start(Dict::new()).await;
 
     // Attempt to start the "system" component
     let system_component = model.find(&vec!["system"].try_into().unwrap()).await.unwrap();
@@ -452,7 +452,7 @@ async fn bind_action_sequence() {
 
     // Child of root should start out discovered but not resolved yet.
     let m = Moniker::parse_str("/system").unwrap();
-    model.start(Sandbox::new()).await;
+    model.start(Dict::new()).await;
     event_stream.wait_until(EventType::Resolved, vec![].try_into().unwrap()).await.unwrap();
     event_stream.wait_until(EventType::Discovered, m.clone()).await.unwrap();
     event_stream.wait_until(EventType::Started, vec![].try_into().unwrap()).await.unwrap();

@@ -3,29 +3,27 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        model::{
-            actions::{Action, ActionKey},
-            component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
-            error::DiscoverActionError,
-            hooks::{Event, EventPayload},
-        },
-        sandbox_util::Sandbox,
+    crate::model::{
+        actions::{Action, ActionKey},
+        component::{ComponentInstance, InstanceState, UnresolvedInstanceState},
+        error::DiscoverActionError,
+        hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
+    sandbox::Dict,
     std::sync::Arc,
 };
 
 /// Dispatches a `Discovered` event for a component instance. This action should be registered
 /// when a component instance is created.
 pub struct DiscoverAction {
-    /// A sandbox holding the capabilities made available to this component by its parent.
-    sandbox: Sandbox,
+    /// A Dict holding the capabilities made available to this component by its parent.
+    dict: Dict,
 }
 
 impl DiscoverAction {
-    pub fn new(sandbox: Sandbox) -> Self {
-        Self { sandbox }
+    pub fn new(dict: Dict) -> Self {
+        Self { dict }
     }
 }
 
@@ -33,7 +31,7 @@ impl DiscoverAction {
 impl Action for DiscoverAction {
     type Output = Result<(), DiscoverActionError>;
     async fn handle(self, component: &Arc<ComponentInstance>) -> Self::Output {
-        do_discover(component, self.sandbox).await
+        do_discover(component, self.dict).await
     }
     fn key(&self) -> ActionKey {
         ActionKey::Discover
@@ -42,7 +40,7 @@ impl Action for DiscoverAction {
 
 async fn do_discover(
     component: &Arc<ComponentInstance>,
-    sandbox: Sandbox,
+    dict: Dict,
 ) -> Result<(), DiscoverActionError> {
     let is_discovered = {
         let state = component.lock_state().await;
@@ -79,7 +77,7 @@ async fn do_discover(
                 );
             }
             InstanceState::New => {
-                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(sandbox)));
+                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(dict)));
             }
         }
     }

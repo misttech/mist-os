@@ -8,7 +8,7 @@ use {
     crate::model::{
         actions::{Action, ActionKey},
         component::{
-            ComponentInstance, ExecutionState, InstanceState, Package, Runtime, SandboxDispatcher,
+            ComponentInstance, DictDispatcher, ExecutionState, InstanceState, Package, Runtime,
             StartReason, WeakComponentInstance,
         },
         error::{StartActionError, StructuredConfigError},
@@ -32,6 +32,7 @@ use {
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
+    sandbox::Capability,
     std::sync::Arc,
     tracing::warn,
 };
@@ -352,8 +353,8 @@ async fn make_execution_runtime(
         .await
         .expect("component must be resolved in order to start");
 
-    let sandbox_dispatcher = SandboxDispatcher::new(
-        resolved_state.program_sandbox.clone(),
+    let dict_dispatcher = DictDispatcher::new(
+        resolved_state.program_dict.try_clone().unwrap(),
         decl.capabilities.clone(),
         outgoing_dir.clone(),
         WeakComponentInstance::new(&component),
@@ -365,7 +366,7 @@ async fn make_execution_runtime(
         start_reason,
         execution_controller_task,
         logger,
-        sandbox_dispatcher,
+        dict_dispatcher,
     );
     let (break_on_start_left, break_on_start_right) = zx::EventPair::create();
 
@@ -417,25 +418,22 @@ async fn create_scoped_logger(
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            model::{
-                actions::{
-                    resolve::sandbox_construction::ComponentSandboxes, start::should_return_early,
-                    ActionSet, ShutdownAction, StartAction, StopAction,
-                },
-                component::{
-                    Component, ComponentInstance, ExecutionState, InstanceState,
-                    ResolvedInstanceState, Runtime, SandboxDispatcher, StartReason,
-                    UnresolvedInstanceState, WeakComponentInstance,
-                },
-                error::{ModelError, StartActionError},
-                hooks::{Event, EventType, Hook, HooksRegistration},
-                testing::{
-                    test_helpers::{self, ActionsTest},
-                    test_hook::Lifecycle,
-                },
+        crate::model::{
+            actions::{
+                resolve::sandbox_construction::ComponentSandbox, start::should_return_early,
+                ActionSet, ShutdownAction, StartAction, StopAction,
             },
-            sandbox_util::Sandbox,
+            component::{
+                Component, ComponentInstance, DictDispatcher, ExecutionState, InstanceState,
+                ResolvedInstanceState, Runtime, StartReason, UnresolvedInstanceState,
+                WeakComponentInstance,
+            },
+            error::{ModelError, StartActionError},
+            hooks::{Event, EventType, Hook, HooksRegistration},
+            testing::{
+                test_helpers::{self, ActionsTest},
+                test_hook::Lifecycle,
+            },
         },
         assert_matches::assert_matches,
         async_trait::async_trait,
@@ -445,6 +443,7 @@ mod tests {
         fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
         moniker::Moniker,
         routing::resolving::ComponentAddress,
+        sandbox::Dict,
         std::sync::{Arc, Weak},
     };
 
@@ -626,7 +625,7 @@ mod tests {
         // Checks based on InstanceState:
         assert!(should_return_early(&InstanceState::New, &es, &m).is_none());
         assert!(should_return_early(
-            &InstanceState::Unresolved(UnresolvedInstanceState::new(Sandbox::new())),
+            &InstanceState::Unresolved(UnresolvedInstanceState::new(Dict::new())),
             &es,
             &m
         )
@@ -637,9 +636,9 @@ mod tests {
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
         let decl = ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build();
-        let mut sandbox_finalization_output = ComponentSandboxes::default();
+        let mut component_sandbox = ComponentSandbox::default();
         let name = Name::new(TEST_CHILD_NAME).unwrap();
-        sandbox_finalization_output.child_sandboxes.insert(name, Sandbox::new());
+        component_sandbox.child_dicts.insert(name, Dict::new());
         let resolved_component = Component {
             resolved_url: "".to_string(),
             context_to_resolve_children: None,
@@ -652,7 +651,7 @@ mod tests {
             &child,
             resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
-            sandbox_finalization_output,
+            component_sandbox,
         )
         .await
         .unwrap();
@@ -667,12 +666,7 @@ mod tests {
                 StartReason::Debug,
                 None,
                 None,
-                SandboxDispatcher::new(
-                    Sandbox::new(),
-                    vec![],
-                    None,
-                    WeakComponentInstance::invalid(),
-                ),
+                DictDispatcher::new(Dict::new(), vec![], None, WeakComponentInstance::invalid()),
             ));
             assert!(!es.is_shut_down());
             assert_matches!(

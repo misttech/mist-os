@@ -312,7 +312,7 @@ impl RoutingTest {
             env_builder.build().await.expect("builtin environment setup failed");
 
         builtin_environment
-            .add_protocol_to_root_sandbox::<fidl_fidl_examples_routing_echo::EchoMarker>(
+            .add_protocol_to_root_dict::<fidl_fidl_examples_routing_echo::EchoMarker>(
                 ECHO_CAPABILITY.clone(),
                 |s| EchoProtocol::serve(s).boxed(),
             )

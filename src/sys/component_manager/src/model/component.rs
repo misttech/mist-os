@@ -9,7 +9,7 @@ use {
     crate::model::{
         actions::{
             resolve::sandbox_construction::{
-                extend_dict_with_offers, CapabilitySourceFactory, ComponentSandboxes,
+                extend_dict_with_offers, CapabilitySourceFactory, ComponentSandbox,
             },
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
             ShutdownAction, StartAction, StopAction, UnresolveAction,
@@ -30,7 +30,7 @@ use {
             service::{AnonymizedAggregateServiceDir, AnonymizedServiceRoute},
         },
     },
-    crate::sandbox_util::{LaunchTaskOnReceive, Message, Sandbox, SandboxWaiter},
+    crate::sandbox_util::{DictExt, DictWaiter, LaunchTaskOnReceive, Message},
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
         capability_source::{BuiltinCapabilities, ComponentCapability, NamespaceCapabilities},
@@ -75,7 +75,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::Receiver,
+    sandbox::{Capability, Dict, Receiver},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -567,11 +567,11 @@ impl ComponentInstance {
             return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
 
-        let collection_sandbox = state
-            .collection_sandboxes
+        let collection_dict = state
+            .collection_dicts
             .get(&Name::new(&collection_name).unwrap())
-            .expect("sandbox missing for declared collection");
-        let child_sandbox = collection_sandbox.clone();
+            .expect("dict missing for declared collection");
+        let child_dict = collection_dict.try_clone().unwrap();
 
         let (child, discover_fut) = state
             .add_child(
@@ -580,7 +580,7 @@ impl ComponentInstance {
                 Some(&collection_decl),
                 child_args.dynamic_offers,
                 child_args.controller,
-                child_sandbox,
+                child_dict,
             )
             .await?;
 
@@ -735,10 +735,10 @@ impl ComponentInstance {
             self.hooks.dispatch(&event).await;
 
             // If we're still in a resolved state then initiate watching the receivers in our
-            // sandbox so a new start action can be kicked off on the next capability access.
+            // dict so a new start action can be kicked off on the next capability access.
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.wait_on_program_sandbox(&self);
+                resolved_state.wait_on_program_dict(&self);
             }
         }
         if let ExtendedInstance::Component(parent) =
@@ -947,7 +947,7 @@ impl ComponentInstance {
         {
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.stop_waiting_on_program_sandbox();
+                resolved_state.stop_waiting_on_program_dict();
             }
         }
 
@@ -1238,13 +1238,13 @@ impl fmt::Debug for InstanceState {
 }
 
 pub struct UnresolvedInstanceState {
-    /// The sandbox containing all capabilities that the parent wished to provide to us.
-    pub sandbox_from_parent: Sandbox,
+    /// The dict containing all capabilities that the parent wished to provide to us.
+    pub dict_from_parent: Dict,
 }
 
 impl UnresolvedInstanceState {
-    pub fn new(sandbox_from_parent: Sandbox) -> Self {
-        Self { sandbox_from_parent }
+    pub fn new(dict_from_parent: Dict) -> Self {
+        Self { dict_from_parent }
     }
 }
 
@@ -1319,20 +1319,20 @@ pub struct ResolvedInstanceState {
     /// Anonymized service directories aggregated from collections and children.
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
-    /// The sandbox containing all capabilities that the parent wished to provide to us.
-    pub sandbox_from_parent: Sandbox,
+    /// The dict containing all capabilities that the parent wished to provide to us.
+    pub dict_from_parent: Dict,
 
-    /// The sandbox containing all capabilities that we use or declare.
-    pub program_sandbox: Sandbox,
+    /// The dict containing all capabilities that we use or declare.
+    pub program_dict: Dict,
 
-    /// Sandboxes containing the capabilities we want to provide to each collection. Each new
-    /// dynamic child gets a clone of one of these sandboxes (which is potentially extended by
+    /// Dicts containing the capabilities we want to provide to each collection. Each new
+    /// dynamic child gets a clone of one of these dicts (which is potentially extended by
     /// dynamic offers).
-    collection_sandboxes: HashMap<Name, Sandbox>,
+    collection_dicts: HashMap<Name, Dict>,
 
-    /// This waiter holds the component sandbox, and invokes a start command if the receiver
-    /// becomes available. The stop command sets this to a new SandboxWaiter.
-    pub sandbox_waiter: Option<SandboxWaiter>,
+    /// This waiter holds the component dict, and invokes a start command if the receiver
+    /// becomes available. The stop command sets this to a new DictWaiter.
+    pub dict_waiter: Option<DictWaiter>,
 }
 
 impl ResolvedInstanceState {
@@ -1340,7 +1340,7 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         resolved_component: Component,
         address: ComponentAddress,
-        component_sandboxes: ComponentSandboxes,
+        component_sandbox: ComponentSandbox,
     ) -> Result<Self, ResolveActionError> {
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
@@ -1366,22 +1366,23 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
-            sandbox_from_parent: component_sandboxes.sandbox_from_parent,
-            program_sandbox: component_sandboxes.program_sandbox,
-            collection_sandboxes: component_sandboxes.collection_sandboxes,
-            sandbox_waiter: None,
+            dict_from_parent: component_sandbox.dict_from_parent,
+            program_dict: component_sandbox.program_dict.try_clone().unwrap(),
+            collection_dicts: component_sandbox.collection_dicts,
+            dict_waiter: None,
         };
-        state.add_static_children(component, component_sandboxes.child_sandboxes).await?;
-        state.wait_on_program_sandbox(component);
-        state.dispatch_receivers_to_providers(component, component_sandboxes.sources_and_receivers);
+        state.add_static_children(component, component_sandbox.child_dicts).await?;
+        state.wait_on_program_dict(component);
+        state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
-    // Waits for any receiver in our program sandbox to become readable.
-    pub fn wait_on_program_sandbox(&mut self, component: &Arc<ComponentInstance>) {
+    // Waits for any receiver in our program dict to become readable.
+    pub fn wait_on_program_dict(&mut self, component: &Arc<ComponentInstance>) {
         let weak_component = WeakComponentInstance::new(component);
-        self.sandbox_waiter =
-            Some(SandboxWaiter::new(self.program_sandbox.clone(), move |name, target_moniker| {
+        self.dict_waiter = Some(DictWaiter::new(
+            self.program_dict.try_clone().unwrap(),
+            move |name, target_moniker| {
                 let name = name.clone();
                 async move {
                     if let Ok(component) = weak_component.upgrade() {
@@ -1406,7 +1407,8 @@ impl ResolvedInstanceState {
                     }
                 }
                 .boxed()
-            }));
+            },
+        ));
     }
 
     fn dispatch_receivers_to_providers(
@@ -1467,9 +1469,9 @@ impl ResolvedInstanceState {
         }
     }
 
-    // Causes this component to stop watching the receivers in our program sandbox.
-    pub fn stop_waiting_on_program_sandbox(&mut self) {
-        self.sandbox_waiter = None;
+    // Causes this component to stop watching the receivers in our program dict.
+    pub fn stop_waiting_on_program_dict(&mut self) {
+        self.dict_waiter = None;
     }
 
     /// Returns a reference to the component's validated declaration.
@@ -1634,20 +1636,20 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
-        sandbox: Sandbox,
+        dict: Dict,
     ) -> Result<
         (Arc<ComponentInstance>, BoxFuture<'static, Result<(), DiscoverActionError>>),
         AddChildError,
     > {
-        let (child, sandbox) = self
-            .add_child_internal(component, child, collection, dynamic_offers, controller, sandbox)
+        let (child, dict) = self
+            .add_child_internal(component, child, collection, dynamic_offers, controller, dict)
             .await?;
         // Register a Discover action.
         let discover_fut = child
             .clone()
             .lock_actions()
             .await
-            .register_no_wait(&child, DiscoverAction::new(sandbox))
+            .register_no_wait(&child, DiscoverAction::new(dict))
             .boxed();
         Ok((child, discover_fut))
     }
@@ -1663,7 +1665,7 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
     ) -> Result<(), AddChildError> {
-        self.add_child_internal(component, child, collection, None, None, Sandbox::new())
+        self.add_child_internal(component, child, collection, None, None, Dict::new())
             .await
             .map(|_| ())
     }
@@ -1675,8 +1677,8 @@ impl ResolvedInstanceState {
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
-        mut child_sandbox: Sandbox,
-    ) -> Result<(Arc<ComponentInstance>, Sandbox), AddChildError> {
+        mut child_dict: Dict,
+    ) -> Result<(Arc<ComponentInstance>, Dict), AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
@@ -1688,10 +1690,10 @@ impl ResolvedInstanceState {
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
         let sources_and_receivers = extend_dict_with_offers(
-            &self.sandbox_from_parent,
-            &self.program_sandbox,
+            &self.dict_from_parent,
+            &self.program_dict,
             &dynamic_offers,
-            &mut child_sandbox,
+            &mut child_dict,
         );
         self.dispatch_receivers_to_providers(component, sources_and_receivers);
 
@@ -1732,7 +1734,7 @@ impl ResolvedInstanceState {
         }
         self.children.insert(child_moniker, child.clone());
         self.dynamic_offers.extend(dynamic_offers.into_iter());
-        Ok((child, child_sandbox))
+        Ok((child, child_dict))
     }
 
     fn validate_and_convert_dynamic_offers(
@@ -1797,15 +1799,15 @@ impl ResolvedInstanceState {
     async fn add_static_children(
         &mut self,
         component: &Arc<ComponentInstance>,
-        mut child_sandboxes: HashMap<Name, Sandbox>,
+        mut child_dicts: HashMap<Name, Dict>,
     ) -> Result<(), ResolveActionError> {
         // We can't hold an immutable reference to `self` while passing a mutable reference later
         // on. To get around this, clone the children.
         let children = self.resolved_component.decl.children.clone();
         for child in &children {
             let child_name = Name::new(&child.name).unwrap();
-            let child_sandbox = child_sandboxes.remove(&child_name).expect("missing child sandbox");
-            self.add_child(component, child, None, None, None, child_sandbox).await.map_err(
+            let child_dict = child_dicts.remove(&child_name).expect("missing child dict");
+            self.add_child(component, child, None, None, None, child_dict).await.map_err(
                 |err| ResolveActionError::AddStaticChildError {
                     child_name: child.name.to_string(),
                     err,
@@ -1902,9 +1904,9 @@ pub struct Runtime {
     /// Only set if the component uses the `fuchsia.logger.LogSink` protocol.
     logger: Option<Arc<ScopedLogger>>,
 
-    /// Reads messages from the program sandbox and dispatches those messages into the component's
+    /// Reads messages from the program dict and dispatches those messages into the component's
     /// outgoing directory.
-    _sandbox_dispatcher: SandboxDispatcher,
+    _dict_dispatcher: DictDispatcher,
 }
 
 impl Runtime {
@@ -1914,7 +1916,7 @@ impl Runtime {
         start_reason: StartReason,
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
-        sandbox_dispatcher: SandboxDispatcher,
+        dict_dispatcher: DictDispatcher,
     ) -> Self {
         let timestamp = zx::Time::get_monotonic();
         Runtime {
@@ -1927,7 +1929,7 @@ impl Runtime {
             start_reason,
             execution_controller_task,
             logger: logger.map(Arc::new),
-            _sandbox_dispatcher: sandbox_dispatcher,
+            _dict_dispatcher: dict_dispatcher,
         }
     }
 
@@ -2002,14 +2004,14 @@ impl Runtime {
     }
 }
 
-/// Reads messages from a sandbox, writing open requests into the given directory.
-pub struct SandboxDispatcher {
+/// Reads messages from Receivers in a Dict, writing open requests into the given directory.
+pub struct DictDispatcher {
     _task: fasync::Task<()>,
 }
 
-impl SandboxDispatcher {
+impl DictDispatcher {
     pub fn new(
-        sandbox: Sandbox,
+        dict: Dict,
         capability_decls: Vec<cm_rust::CapabilityDecl>,
         directory: Option<fio::DirectoryProxy>,
         component: WeakComponentInstance,
@@ -2019,11 +2021,11 @@ impl SandboxDispatcher {
                 // Components that do not have a runner do not have an outgoing directory, so
                 // there's nothing for us to do here.
                 let Some(directory) = directory else { return };
-                while let Some((name, message)) = sandbox.read().await {
+                while let Some((name, message)) = dict.read_receivers().await {
                     let capability_decl = capability_decls
                         .iter()
                         .find(|decl| decl.name() == &name)
-                        .expect("capability received for name not in sandbox");
+                        .expect("capability received for name not in dict");
                     // Check if this route is allowed by the security policy.
                     if let Err(_e) = Self::can_route_capability(
                         &component,
@@ -2928,7 +2930,7 @@ pub mod tests {
             &comp,
             resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
-            ComponentSandboxes::default(),
+            ComponentSandbox::default(),
         )
         .await
         .unwrap();
@@ -2936,7 +2938,7 @@ pub mod tests {
     }
 
     async fn new_unresolved() -> InstanceState {
-        InstanceState::Unresolved(UnresolvedInstanceState::new(Sandbox::new()))
+        InstanceState::Unresolved(UnresolvedInstanceState::new(Dict::new()))
     }
 
     #[fuchsia::test]

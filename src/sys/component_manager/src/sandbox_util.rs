@@ -5,6 +5,7 @@
 use {
     crate::model::component::{ComponentInstance, WeakComponentInstance},
     ::routing::{capability_source::CapabilitySource, policy::GlobalPolicyChecker},
+    async_trait::async_trait,
     cm_types::Name,
     cm_util::WeakTaskGroup,
     fidl::{
@@ -82,44 +83,36 @@ impl TryFrom<AnyCapability> for Message {
     }
 }
 
-// TODO: use the `Name` type in `Dict`, so that sandboxes aren't holding duplicate strings.
+// TODO: use the `Name` type in `Dict`, so that Dicts aren't holding duplicate strings.
 
-#[derive(Debug, Default)]
-pub struct Sandbox {
-    inner: Dict,
+#[async_trait]
+pub trait DictExt {
+    fn get_protocol<'a>(&'a self, name: &Name) -> Option<CapabilityDict<'a>>;
+    fn get_protocol_mut<'a>(&'a mut self, name: &Name) -> Option<CapabilityDictMut<'a>>;
+    fn get_or_insert_protocol_mut<'a>(&'a mut self, name: &Name) -> CapabilityDictMut<'a>;
+    async fn peek_receivers(&self) -> Option<(Name, Moniker)>;
+    async fn read_receivers(&self) -> Option<(Name, Message)>;
 }
 
-impl Clone for Sandbox {
-    fn clone(&self) -> Self {
-        Self { inner: self.inner.try_clone().expect("non-cloneable capability in a sandbox") }
-    }
-}
-
-impl Sandbox {
-    pub fn new() -> Self {
-        Self { inner: Dict::new() }
-    }
-
-    pub fn get_protocol<'a>(&'a self, name: &Name) -> Option<CapabilityDict<'a>> {
-        self.inner
-            .entries
+#[async_trait]
+impl DictExt for Dict {
+    fn get_protocol<'a>(&'a self, name: &Name) -> Option<CapabilityDict<'a>> {
+        self.entries
             .get(&name.as_str().to_string())
-            .and_then(|dict| dict.try_into().ok())
+            .and_then(|value| value.try_into().ok())
             .map(|inner| CapabilityDict { inner })
     }
 
-    pub fn get_protocol_mut<'a>(&'a mut self, name: &Name) -> Option<CapabilityDictMut<'a>> {
-        self.inner
-            .entries
+    fn get_protocol_mut<'a>(&'a mut self, name: &Name) -> Option<CapabilityDictMut<'a>> {
+        self.entries
             .get_mut(&name.as_str().to_string())
-            .and_then(|dict| dict.try_into().ok())
+            .and_then(|value| value.try_into().ok())
             .map(|inner| CapabilityDictMut { inner })
     }
 
-    pub fn get_or_insert_protocol<'a>(&'a mut self, name: Name) -> CapabilityDictMut<'a> {
+    fn get_or_insert_protocol_mut<'a>(&'a mut self, name: &Name) -> CapabilityDictMut<'a> {
         CapabilityDictMut {
             inner: self
-                .inner
                 .entries
                 .entry(name.as_str().to_string())
                 .or_insert(Box::new(Dict::new()))
@@ -128,21 +121,22 @@ impl Sandbox {
         }
     }
 
-    /// Waits for any receivers to become readable. Once that happens, returns the name of the
-    /// sandbox that receiver was in and the moniker that sent the message. Returns `None` if there
-    /// are no receivers in this sandbox.
+    /// Waits for any Receivers to become readable.
     ///
-    /// Does not remove messages from receivers.
-    pub async fn peek(&self) -> Option<(Name, Moniker)> {
+    /// Once that happens, returns the name of the Dict that Receiver was in and the moniker that
+    /// sent the message. Returns `None` if there are no Receivers in this Dict.
+    ///
+    /// Does not remove messages from Receivers.
+    async fn peek_receivers(&self) -> Option<(Name, Moniker)> {
         let mut futures_unordered = FuturesUnordered::new();
-        for cap_name in self.inner.entries.keys() {
+        for cap_name in self.entries.keys() {
             let cap_dict = self.get_protocol(&cap_name.parse().unwrap()).unwrap();
             if cap_dict.get_receiver().is_some() {
                 futures_unordered.push(async move {
                     // It would be great if we could return the value from the `peek` call here,
                     // but the lifetimes don't work out. Let's block on the peek call, and then
-                    // return the `cap_dict` so we can access the `peek` value again outside of the
-                    // `FuturesUnordered`.
+                    // return the `cap_dict` so we can access the `peek` value again outside
+                    // of the `FuturesUnordered`.
                     let _ = cap_dict.get_receiver().unwrap().peek().await;
                     (cap_name, cap_dict)
                 });
@@ -157,12 +151,13 @@ impl Sandbox {
         return Some((name.parse().unwrap(), message.target.moniker.clone()));
     }
 
-    /// Reads messages from receivers in this sandbox. Once a message is received, returns the name
-    /// of the sandbox that the receiver was in and the message that was received. Returns `None`
-    /// if there are no receivers in this sandbox.
-    pub async fn read(&self) -> Option<(Name, Message)> {
+    /// Reads messages from Receivers in this Dict.
+    ///
+    /// Once a message is received, returns the name of the Dict that the Receiver was in and the
+    /// message that was received. Returns `None` if there are no Receivers in this Dict.
+    async fn read_receivers(&self) -> Option<(Name, Message)> {
         let mut futures_unordered = FuturesUnordered::new();
-        for cap_name in self.inner.entries.keys() {
+        for cap_name in self.entries.keys() {
             let cap_dict = self.get_protocol(&cap_name.parse().unwrap()).unwrap();
             if let Some(receiver) = cap_dict.get_receiver() {
                 let receiver = receiver.clone();
@@ -175,12 +170,6 @@ impl Sandbox {
         let (name, message) =
             futures_unordered.next().await.expect("FuturesUnordered is not empty");
         return Some((name.parse().unwrap(), message));
-    }
-}
-
-impl From<Dict> for Sandbox {
-    fn from(inner: Dict) -> Self {
-        Self { inner }
     }
 }
 
@@ -261,22 +250,22 @@ impl<'a> CapabilityDictMut<'a> {
     }
 }
 
-/// Waits for any receiver in a sandbox to become readable, and calls a closure when that happens.
-pub struct SandboxWaiter {
+/// Waits for any Receiver in a Dict to become readable, and calls a closure when that happens.
+pub struct DictWaiter {
     _task: fasync::Task<()>,
 }
 
-impl SandboxWaiter {
+impl DictWaiter {
     pub fn new(
-        sandbox: Sandbox,
-        call_when_sandbox_is_readable: impl FnOnce(&Name, Moniker) -> BoxFuture<'static, ()>
+        dict: Dict,
+        call_when_dict_is_readable: impl FnOnce(&Name, Moniker) -> BoxFuture<'static, ()>
             + Send
             + 'static,
     ) -> Self {
         Self {
             _task: fasync::Task::spawn(async move {
-                if let Some((name, moniker)) = sandbox.peek().await {
-                    call_when_sandbox_is_readable(&name, moniker).await
+                if let Some((name, moniker)) = dict.peek_receivers().await {
+                    call_when_dict_is_readable(&name, moniker).await
                 }
             }),
         }

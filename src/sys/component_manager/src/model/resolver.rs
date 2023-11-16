@@ -214,15 +214,12 @@ pub fn read_and_validate_config_values(
 mod tests {
     use {
         super::*,
-        crate::{
-            model::{
-                actions::DiscoverAction,
-                component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
-                context::ModelContext,
-                environment::Environment,
-                hooks::Hooks,
-            },
-            sandbox_util::Sandbox,
+        crate::model::{
+            actions::DiscoverAction,
+            component::{ComponentInstance, ComponentManagerInstance, WeakExtendedInstance},
+            context::ModelContext,
+            environment::Environment,
+            hooks::Hooks,
         },
         anyhow::{format_err, Error},
         assert_matches::assert_matches,
@@ -235,6 +232,7 @@ mod tests {
         moniker::MonikerBase,
         routing::environment::{DebugRegistry, RunnerRegistry},
         routing::resolving::{ComponentAddress, ComponentResolutionContext},
+        sandbox::Dict,
         serde_json::json,
         std::sync::{Arc, Mutex, Weak},
     };
@@ -368,7 +366,7 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(Sandbox::new()));
+            .register_no_wait(&component, DiscoverAction::new(Dict::new()));
         component
     }
 
@@ -400,7 +398,7 @@ mod tests {
         let _ = component
             .lock_actions()
             .await
-            .register_no_wait(&component, DiscoverAction::new(Sandbox::new()));
+            .register_no_wait(&component, DiscoverAction::new(Dict::new()));
         component
     }
 

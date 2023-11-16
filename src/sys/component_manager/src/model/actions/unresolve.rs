@@ -10,6 +10,7 @@ use {
         hooks::{Event, EventPayload},
     },
     async_trait::async_trait,
+    sandbox::Capability,
     std::{ops::DerefMut, sync::Arc},
 };
 
@@ -72,8 +73,8 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
         let mut state = component.lock_state().await;
         match state.deref_mut() {
             InstanceState::Resolved(resolved_state) => {
-                let sandbox = resolved_state.sandbox_from_parent.clone();
-                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(sandbox)));
+                let dict = resolved_state.dict_from_parent.try_clone().unwrap();
+                state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(dict)));
                 true
             }
             InstanceState::Destroyed => {
@@ -111,6 +112,7 @@ pub mod tests {
         cm_types::Name,
         fidl_fuchsia_component_decl as fdecl, fuchsia_async as fasync,
         moniker::{Moniker, MonikerBase},
+        sandbox::Capability,
         std::sync::Arc,
     };
 
@@ -230,8 +232,8 @@ pub mod tests {
             .await
             .expect("subscribe to event stream");
         let model = test.model.clone();
-        let sandbox = test.builtin_environment.lock().await.sandbox.clone();
-        fasync::Task::spawn(async move { model.start(sandbox).await }).detach();
+        let dict = test.builtin_environment.lock().await.dict.try_clone().unwrap();
+        fasync::Task::spawn(async move { model.start(dict).await }).detach();
         event_stream
     }
 
