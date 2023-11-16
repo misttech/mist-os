@@ -6306,6 +6306,56 @@ TEST(Sysmem, PixelFormatModifier_DoNotCare) {
   }
 }
 
+TEST(Sysmem, SetDebugClientInfo_NoIdIsFine) {
+  auto token = create_initial_token_v2();
+  fuchsia_sysmem2::NodeSetDebugClientInfoRequest token_set_debug_info_request;
+  token_set_debug_info_request.name() = "foo";
+  ZX_DEBUG_ASSERT(!token_set_debug_info_request.id().has_value());
+  auto token_set_debug_info_result =
+      token->SetDebugClientInfo(std::move(token_set_debug_info_request));
+  ASSERT_TRUE(token_set_debug_info_result.is_ok());
+  auto token_sync_result = token->Sync();
+  ASSERT_TRUE(token_sync_result.is_ok());
+
+  auto allocator_result = connect_to_sysmem_service_v2();
+  ASSERT_TRUE(allocator_result.is_ok());
+  auto allocator = std::move(allocator_result.value());
+  fuchsia_sysmem2::AllocatorSetDebugClientInfoRequest allocator_set_debug_info_request;
+  allocator_set_debug_info_request.name() = "foo";
+  ZX_DEBUG_ASSERT(!allocator_set_debug_info_request.id().has_value());
+  auto allocator_set_debug_info_result =
+      allocator->SetDebugClientInfo(std::move(allocator_set_debug_info_request));
+  ASSERT_TRUE(allocator_set_debug_info_result.is_ok());
+  auto allocator_server_koid = get_related_koid(token.client_end().channel().get());
+  ASSERT_NE(ZX_KOID_INVALID, allocator_server_koid);
+  fuchsia_sysmem2::AllocatorValidateBufferCollectionTokenRequest validate_request;
+  validate_request.token_server_koid() = allocator_server_koid;
+  auto allocator_validate_result =
+      allocator->ValidateBufferCollectionToken(std::move(validate_request));
+  ASSERT_TRUE(allocator_validate_result.is_ok());
+  ASSERT_TRUE(allocator_validate_result->is_known());
+
+  auto group = create_group_under_token_v2(token);
+  fuchsia_sysmem2::NodeSetDebugClientInfoRequest group_set_debug_info_request;
+  group_set_debug_info_request.name() = "foo";
+  ZX_DEBUG_ASSERT(!group_set_debug_info_request.id().has_value());
+  auto group_set_debug_info_result =
+      group->SetDebugClientInfo(std::move(group_set_debug_info_request));
+  ASSERT_TRUE(group_set_debug_info_result.is_ok());
+  auto group_sync_result = group->Sync();
+  ASSERT_TRUE(group_sync_result.is_ok());
+
+  auto collection = convert_token_to_collection_v2(std::move(token));
+  fuchsia_sysmem2::NodeSetDebugClientInfoRequest collection_set_debug_info_request;
+  collection_set_debug_info_request.name() = "foo";
+  ZX_DEBUG_ASSERT(!collection_set_debug_info_request.id().has_value());
+  auto collection_set_debug_info_result =
+      group->SetDebugClientInfo(std::move(collection_set_debug_info_request));
+  ASSERT_TRUE(collection_set_debug_info_result.is_ok());
+  auto collection_sync_result = group->Sync();
+  ASSERT_TRUE(collection_sync_result.is_ok());
+}
+
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
 // and run this manually.
 #if 0

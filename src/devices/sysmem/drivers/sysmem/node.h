@@ -234,14 +234,15 @@ class Node : public fbl::RefCounted<Node> {
       FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires name set");
       return;
     }
-    if (!request.id().has_value()) {
-      FailSync(FROM_HERE, completer, ZX_ERR_BAD_STATE, "SetDebugClientInfo() requires id set");
-      return;
+
+    uint64_t id = 0;
+    if (request.id().has_value()) {
+      id = *request.id();
     }
 
     ClientDebugInfo debug_info;
     debug_info.name = std::string(request.name()->begin(), request.name()->end());
-    debug_info.id = *request.id();
+    debug_info.id = id;
 
     SetDebugClientInfoInternal(std::move(debug_info));
   }

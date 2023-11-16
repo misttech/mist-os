@@ -264,15 +264,14 @@ void Allocator::V2::SetDebugClientInfo(SetDebugClientInfoRequest& request,
     completer.Close(ZX_ERR_INVALID_ARGS);
     return;
   }
-  if (!request.id().has_value()) {
-    allocator_->LogError(FROM_HERE, "SetDebugClientInfo requires id set");
-    completer.Close(ZX_ERR_INVALID_ARGS);
-    return;
+  uint64_t id = 0;
+  if (request.id().has_value()) {
+    id = *request.id();
   }
   allocator_->client_debug_info_.emplace();
   allocator_->client_debug_info_->name =
       std::string(request.name()->begin(), request.name()->end());
-  allocator_->client_debug_info_->id = request.id().value();
+  allocator_->client_debug_info_->id = id;
 }
 
 void Allocator::V2::GetVmoInfo(GetVmoInfoRequest& request, GetVmoInfoCompleter::Sync& completer) {
