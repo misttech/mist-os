@@ -107,8 +107,6 @@ type Vectors = struct {
   EXPECT_EQ(10, type0_vector->max_count);
   EXPECT_EQ(1, type0_vector->element_size_v2);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type0_vector->nullability);
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCanMemcpy,
-            type0_vector->element_memcpy_compatibility);
 
   auto type1 = gen.coded_types().at(1).get();
   EXPECT_STREQ("Vector20nonnullable39Vector10nonnullable18example_SomeStruct",
@@ -120,80 +118,6 @@ type Vectors = struct {
   EXPECT_EQ(20, type1_vector->max_count);
   EXPECT_EQ(16, type1_vector->element_size_v2);
   EXPECT_EQ(fidl::types::Nullability::kNonnullable, type1_vector->nullability);
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy,
-            type1_vector->element_memcpy_compatibility);
-}
-
-TEST(CodedTypesGeneratorTests, GoodVectorEncodeMightMutate) {
-  TestLibrary library(R"FIDL(
-library example;
-
-using zx;
-
-type Bits = bits : uint32 {
-  A = 1;
-};
-
-type Enum = enum : uint32 {
-  A = 1;
-};
-
-protocol P {};
-
-type EmptyStruct = struct {};
-
-type NeverMutateStruct = struct {
-  v1 uint32;
-  v2 Bits;
-  v3 Enum;
-};
-
-type PaddingStruct = struct {
-  v1 uint32;
-  v2 uint64;
-};
-
-type Table = resource table {};
-type Union = resource union {
-    1: a uint32;
-};
-
-type Value = resource struct {
-  // The number in the name corresponds to the field index in the assertions below.
-  never0 vector<EmptyStruct>;
-  never1 vector<NeverMutateStruct>;
-  maybe2 vector<box<NeverMutateStruct>>;
-  maybe3 vector<PaddingStruct>;
-  maybe4 vector<vector<uint32>>;
-  maybe5 vector<string>;
-  maybe6 vector<zx.Handle>;
-  maybe7 vector<server_end:P>;
-  maybe8 vector<client_end:P>;
-  maybe9 vector<Table>;
-  maybe10 vector<Union>;
-};
-)FIDL");
-  library.UseLibraryZx();
-  ASSERT_COMPILED(library);
-  auto str = library.LookupStruct("Value");
-  ASSERT_NOT_NULL(str);
-  auto elem_might_mutate = [&str](size_t index) {
-    const fidl::flat::VectorType* vec =
-        static_cast<const fidl::flat::VectorType*>(str->members.at(index).type_ctor->type);
-    return fidl::ComputeMemcpyCompatibility(vec->element_type);
-  };
-  // Note: these EXPECT_EQ are not in a loop so that they give more useful errors.
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCanMemcpy, elem_might_mutate(0));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCanMemcpy, elem_might_mutate(1));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(2));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(3));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(4));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(5));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(6));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(7));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(8));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(9));
-  EXPECT_EQ(fidl::coded::MemcpyCompatibility::kCannotMemcpy, elem_might_mutate(10));
 }
 
 TEST(CodedTypesGeneratorTests, GoodCodedTypesOfProtocols) {

@@ -9,7 +9,6 @@
 #include <zircon/assert.h>
 
 #include <limits>
-#include <memory>
 #include <string>
 #include <variant>
 #include <vector>
@@ -325,29 +324,21 @@ struct StringType : public Type {
   const types::Nullability nullability;
 };
 
-enum struct MemcpyCompatibility {
-  kCannotMemcpy,
-  kCanMemcpy,
-};
-
 struct VectorType : public Type {
   VectorType(std::string name, const Type* element_type, uint32_t max_count,
-             uint32_t element_size_v2, types::Nullability nullability,
-             MemcpyCompatibility element_memcpy_compatibility)
+             uint32_t element_size_v2, types::Nullability nullability)
       // Note: vectors have is_noop = false, but there is the potential to optimize this in the
       // future.
       : Type(Kind::kVector, std::move(name), 16u, true, false),
         element_type(element_type),
         max_count(max_count),
         element_size_v2(element_size_v2),
-        nullability(nullability),
-        element_memcpy_compatibility(element_memcpy_compatibility) {}
+        nullability(nullability) {}
 
   const Type* const element_type;
   const uint32_t max_count;
   const uint32_t element_size_v2;
   const types::Nullability nullability;
-  const MemcpyCompatibility element_memcpy_compatibility;
 };
 
 struct ZxExperimentalPointerType : public Type {

@@ -158,7 +158,6 @@ class FidlDecoder final : public BaseVisitor<WireFormatVersion, Byte> {
 
   Status VisitPointer(Position ptr_position, PointeeType pointee_type,
                       ObjectPointerPointer object_ptr_ptr, uint32_t inline_size,
-                      FidlMemcpyCompatibility pointee_memcpy_compatibility,
                       Position* out_position) {
     if (unlikely(pointee_type != PointeeType::kEnvelope &&
                  reinterpret_cast<uintptr_t>(*object_ptr_ptr) != FIDL_ALLOC_PRESENT)) {

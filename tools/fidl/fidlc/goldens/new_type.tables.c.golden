@@ -14,7 +14,7 @@ __LOCAL extern const struct FidlCodedBits test_newtype_BitsTable;
 
 static const struct FidlCodedStructPointer Pointer19test_newtype_StructTable = {.tag=kFidlTypeStructPointer, .struct_type=&test_newtype_StructTable};
 
-static const struct FidlCodedVector Vector4294967295nonnullable18test_newtype_UnionTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_newtype_UnionTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+static const struct FidlCodedVector Vector4294967295nonnullable18test_newtype_UnionTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_newtype_UnionTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable};
 
 static const struct FidlCodedHandle Request23test_newtype_CalculatornullableTable = {.tag=kFidlTypeHandle, .handle_subtype=ZX_OBJ_TYPE_CHANNEL, .handle_rights=ZX_DEFAULT_CHANNEL_RIGHTS, .nullable=kFidlNullability_Nullable};
 

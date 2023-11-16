@@ -21,11 +21,11 @@ __LOCAL extern const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMetho
 __LOCAL extern const struct FidlCodedUnion test_anonymous_SomeProtocol_SomeMethod_ResultNullableRefTable;
 
 
-static const struct FidlCodedVector Vector10nonnullable24test_anonymous_TableDataTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_anonymous_TableDataTable), .max_count=10u, .element_size_v2=1u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CanMemcpy};
+static const struct FidlCodedVector Vector10nonnullable24test_anonymous_TableDataTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_anonymous_TableDataTable), .max_count=10u, .element_size_v2=1u, .nullable=kFidlNullability_Nonnullable};
 
 static const struct FidlCodedString String100nonnullableTable = {.tag=kFidlTypeString, .max_size=100u, .nullable=kFidlNullability_Nonnullable};
 
-static const struct FidlCodedVector Vector5nonnullable36test_anonymous_ExpressionNullableRefTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_anonymous_ExpressionNullableRefTable), .max_count=5u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+static const struct FidlCodedVector Vector5nonnullable36test_anonymous_ExpressionNullableRefTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&test_anonymous_ExpressionNullableRefTable), .max_count=5u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable};
 
 
 static const struct FidlUnionField Fields26test_anonymous_UnionMember[] = {

@@ -420,8 +420,7 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkStructPointer(
   Position obj_position;
   auto status =
       visitor_->VisitPointer(position, VisitorImpl::PointeeType::kOther, PtrTo<Ptr<void>>(position),
-                             coded_struct_pointer->struct_type->size_v2,
-                             kFidlMemcpyCompatibility_CannotMemcpy, &obj_position);
+                             coded_struct_pointer->struct_type->size_v2, &obj_position);
   FIDL_STATUS_GUARD(status);
   return WalkStruct(coded_struct_pointer->struct_type, obj_position, inner_depth);
 }
@@ -511,8 +510,7 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkEnvelope(Position envelope_po
     uint32_t num_bytes = payload_type != nullptr ? type_size : v2_envelope->num_bytes;
     Position obj_position;
     auto status = visitor_->VisitPointer(envelope_position, VisitorImpl::PointeeType::kEnvelope,
-                                         PtrTo<void*>(envelope_position), num_bytes,
-                                         kFidlMemcpyCompatibility_CannotMemcpy, &obj_position);
+                                         PtrTo<void*>(envelope_position), num_bytes, &obj_position);
     FIDL_STATUS_GUARD(status);
 
     if (likely(payload_type != nullptr)) {
@@ -556,9 +554,8 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkTable(
   OutOfLineDepth envelope_vector_depth = INCREASE_DEPTH(depth);
   FIDL_DEPTH_GUARD(envelope_vector_depth);
   Position envelope_vector_position;
-  auto status = visitor_->VisitPointer(
-      position, VisitorImpl::PointeeType::kOther, &envelope_vector_ptr->data, size,
-      kFidlMemcpyCompatibility_CannotMemcpy, &envelope_vector_position);
+  auto status = visitor_->VisitPointer(position, VisitorImpl::PointeeType::kOther,
+                                       &envelope_vector_ptr->data, size, &envelope_vector_position);
   FIDL_STATUS_GUARD(status);
 
   const FidlTableField* next_field = coded_table->fields;
@@ -667,7 +664,7 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkString(
   status = visitor_->VisitPointer(
       position, VisitorImpl::PointeeType::kString,
       &reinterpret_cast<Ptr<void>&>(const_cast<Ptr<char>&>(string_ptr->data)),
-      static_cast<uint32_t>(size), kFidlMemcpyCompatibility_CanMemcpy, &array_position);
+      static_cast<uint32_t>(size), &array_position);
   FIDL_STATUS_GUARD(status);
   return Result::kContinue;
 }
@@ -725,9 +722,8 @@ Result Walker<VisitorImpl, WireFormatVersion>::WalkVector(
   OutOfLineDepth array_depth = INCREASE_DEPTH(depth);
   FIDL_DEPTH_GUARD(array_depth);
   Position array_position;
-  status =
-      visitor_->VisitPointer(position, VisitorImpl::PointeeType::kVector, &vector_ptr->data, size,
-                             coded_vector->element_memcpy_compatibility, &array_position);
+  status = visitor_->VisitPointer(position, VisitorImpl::PointeeType::kVector, &vector_ptr->data,
+                                  size, &array_position);
   FIDL_STATUS_GUARD(status);
 
   uint32_t stride = coded_vector->element_size_v2;

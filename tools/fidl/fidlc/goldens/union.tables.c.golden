@@ -61,13 +61,13 @@ __LOCAL extern const struct FidlCodedUnion test_union_UnionContainingEmptyStruct
 
 static const struct FidlCodedString String4294967295nonnullableTable = {.tag=kFidlTypeString, .max_size=4294967295u, .nullable=kFidlNullability_Nonnullable};
 
-static const struct FidlCodedVector Vector4294967295nonnullable27String4294967295nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String4294967295nonnullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+static const struct FidlCodedVector Vector4294967295nonnullable27String4294967295nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String4294967295nonnullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable};
 
-static const struct FidlCodedVector Vector10nonnullable5uint8Table = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&fidl_internal_kUint8Table), .max_count=10u, .element_size_v2=1u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CanMemcpy};
+static const struct FidlCodedVector Vector10nonnullable5uint8Table = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&fidl_internal_kUint8Table), .max_count=10u, .element_size_v2=1u, .nullable=kFidlNullability_Nonnullable};
 
 static const struct FidlCodedString String16nonnullableTable = {.tag=kFidlTypeString, .max_size=16u, .nullable=kFidlNullability_Nonnullable};
 
-static const struct FidlCodedVector Vector4294967295nonnullable19String16nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String16nonnullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable, .element_memcpy_compatibility=kFidlMemcpyCompatibility_CannotMemcpy};
+static const struct FidlCodedVector Vector4294967295nonnullable19String16nonnullableTable = {.tag=kFidlTypeVector, .element=(fidl_type_t*)(&String16nonnullableTable), .max_count=4294967295u, .element_size_v2=16u, .nullable=kFidlNullability_Nonnullable};
 
 
 static const struct FidlUnionField Fields30test_union_UnionWithAttributes[] = {

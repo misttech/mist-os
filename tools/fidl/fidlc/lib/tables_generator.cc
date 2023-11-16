@@ -174,16 +174,6 @@ void Emit(std::ostream* file, types::Resourceness resourceness) {
   }
 }
 
-void Emit(std::ostream* file, coded::MemcpyCompatibility element_memcpy_compatibility) {
-  switch (element_memcpy_compatibility) {
-    case coded::MemcpyCompatibility::kCannotMemcpy:
-      Emit(file, "kFidlMemcpyCompatibility_CannotMemcpy");
-      break;
-    case coded::MemcpyCompatibility::kCanMemcpy:
-      Emit(file, "kFidlMemcpyCompatibility_CanMemcpy");
-      break;
-  }
-}
 }  // namespace
 
 template <typename Collection>
@@ -407,8 +397,6 @@ void TablesGenerator::Generate(const coded::VectorType& vector_type) {
   Emit(&tables_file_, vector_type.element_size_v2);
   Emit(&tables_file_, ", .nullable=");
   Emit(&tables_file_, vector_type.nullability);
-  Emit(&tables_file_, ", .element_memcpy_compatibility=");
-  Emit(&tables_file_, vector_type.element_memcpy_compatibility);
   Emit(&tables_file_, "};\n\n");
 }
 

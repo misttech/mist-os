@@ -90,11 +90,6 @@ typedef bool FidlIsResource;
 static const FidlIsResource kFidlIsResource_Resource = true;
 static const FidlIsResource kFidlIsResource_NotResource = false;
 
-// Indicates if encoding an object of a given type might involve mutations.
-typedef bool FidlMemcpyCompatibility;
-static const FidlMemcpyCompatibility kFidlMemcpyCompatibility_CannotMemcpy = false;
-static const FidlMemcpyCompatibility kFidlMemcpyCompatibility_CanMemcpy = true;
-
 // Indicates if a struct is empty.
 typedef bool FidlEmpty;
 static const FidlEmpty kFidlEmpty_IsNotEmpty = false;
@@ -479,7 +474,6 @@ struct FidlCodedString FIDL_INTERNAL_INHERIT_TYPE_T {
 struct FidlCodedVector FIDL_INTERNAL_INHERIT_TYPE_T {
   const FidlTypeTag tag;
   const FidlNullability nullable;
-  const FidlMemcpyCompatibility element_memcpy_compatibility;
   const uint32_t max_count;
   const uint32_t element_size_v2;
   const fidl_type_t* const element;

@@ -13,15 +13,6 @@
 
 namespace fidl {
 
-coded::MemcpyCompatibility ComputeMemcpyCompatibility(const flat::Type* type) {
-  auto typeshape = type->typeshape(fidl::WireFormat::kV2);
-  if (typeshape.max_out_of_line == 0 && typeshape.max_handles == 0 &&
-      !typeshape.has_flexible_envelope && !typeshape.has_padding) {
-    return coded::MemcpyCompatibility::kCanMemcpy;
-  }
-  return coded::MemcpyCompatibility::kCannotMemcpy;
-}
-
 CodedTypesGenerator::FlattenedStructMember::FlattenedStructMember(const flat::StructMember& member)
     : FlattenedStructMember(member.type_ctor->type, member.name, member.typeshape(WireFormat::kV2),
                             member.fieldshape(WireFormat::kV2)) {
@@ -145,9 +136,9 @@ const coded::Type* CodedTypesGenerator::CompileType(const flat::Type* type,
       uint32_t element_size_v2 = coded_element_type->size_v2;
       std::string_view element_name = coded_element_type->coded_name;
       auto name = NameCodedVector(element_name, max_count, vector_type->nullability);
-      auto coded_vector_type = std::make_unique<coded::VectorType>(
-          std::move(name), coded_element_type, max_count, element_size_v2, vector_type->nullability,
-          ComputeMemcpyCompatibility(vector_type->element_type));
+      auto coded_vector_type =
+          std::make_unique<coded::VectorType>(std::move(name), coded_element_type, max_count,
+                                              element_size_v2, vector_type->nullability);
       vector_type_map_[vector_type] = coded_vector_type.get();
       coded_types_.push_back(std::move(coded_vector_type));
       return coded_types_.back().get();
