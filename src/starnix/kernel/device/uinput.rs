@@ -36,6 +36,8 @@ pub fn create_uinput_device(
 struct UinputDeviceMutableState {
     #[allow(dead_code)]
     enabled_evbits: BitVec,
+    #[allow(dead_code)]
+    input_id: Option<uapi::input_id>,
 }
 
 struct UinputDevice {
@@ -47,6 +49,7 @@ impl UinputDevice {
         Arc::new(Self {
             inner: Mutex::new(UinputDeviceMutableState {
                 enabled_evbits: BitVec::from_elem(uapi::EV_CNT as usize, false),
+                input_id: None,
             }),
         })
     }
@@ -84,6 +87,25 @@ impl UinputDevice {
         }
     }
 
+    /// UI_DEV_SETUP set the name of device and input_id (bustype, vendor id,
+    /// product id, version) to the uinput device.
+    fn ui_dev_setup(
+        &self,
+        current_task: &CurrentTask,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        let user_arg = UserAddress::from(arg);
+        if user_arg.is_null() {
+            return errno::error!(EFAULT);
+        }
+        let uinput_setup = current_task
+            .mm
+            .read_object::<uapi::uinput_setup>(UserRef::new(user_arg))
+            .expect("read object");
+        self.inner.lock().input_id = Some(uinput_setup.id);
+        Ok(SUCCESS)
+    }
+
     fn ui_dev_create(&self) -> Result<SyscallResult, Errno> {
         // TODO(b/308156116): impl ui_dev_create.
         log_info!("ui_dev_create()");
@@ -116,8 +138,8 @@ impl FileOps for Arc<UinputDevice> {
             uapi::UI_SET_KEYBIT
             | uapi::UI_SET_ABSBIT
             | uapi::UI_SET_PHYS
-            | uapi::UI_SET_PROPBIT
-            | uapi::UI_DEV_SETUP => Ok(SUCCESS),
+            | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
+            uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg),
             uapi::UI_DEV_CREATE => self.ui_dev_create(),
             uapi::UI_DEV_DESTROY => self.ui_dev_destroy(),
             // default_ioctl() handles file system related requests and reject
@@ -337,17 +359,31 @@ mod test {
             UserAddress::default(),
             std::mem::size_of::<uapi::uinput_setup>() as u64,
         );
-        let setup = uapi::uinput_setup {
-            id: uapi::input_id { vendor: 0x18d1, product: 0xabcd, ..uapi::input_id::default() },
-            ..uapi::uinput_setup::default()
-        };
+        let want_input_id =
+            uapi::input_id { vendor: 0x18d1, product: 0xabcd, ..uapi::input_id::default() };
+        let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
         current_task.mm.write_object(address.into(), &setup).expect("write_memory");
         let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
         assert_eq!(r, Ok(SUCCESS));
+        assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);
 
-        // also test call multi times with invalid argument.
+        // call multi time updates input_id.
+        let address = map_memory(
+            &current_task,
+            UserAddress::default(),
+            std::mem::size_of::<uapi::uinput_setup>() as u64,
+        );
+        let want_input_id =
+            uapi::input_id { vendor: 0x18d1, product: 0x1234, ..uapi::input_id::default() };
+        let setup = uapi::uinput_setup { id: want_input_id, ..uapi::uinput_setup::default() };
+        current_task.mm.write_object(address.into(), &setup).expect("write_memory");
+        let r = dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, address.into());
+        assert_eq!(r, Ok(SUCCESS));
+        assert_eq!(dev.inner.lock().input_id.unwrap(), want_input_id);
+
+        // call with invalid argument.
         let r =
             dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, SyscallArg::from(0 as u64));
-        assert_eq!(r, Ok(SUCCESS));
+        assert_eq!(r, errno::error!(EFAULT));
     }
 }

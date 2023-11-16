@@ -95,8 +95,14 @@ TEST_F(UinputTest, UiDevSetup) {
   usetup.id.product = 0x0002;
   strcpy(usetup.name, "Example device");
 
-  int res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, KEY_SPACE);
+  int res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, &usetup);
   EXPECT_EQ(res, 0);
+}
+
+TEST_F(UinputTest, UiDevSetupNull) {
+  int res = ioctl(uinput_fd_.get(), UI_DEV_SETUP, NULL);
+  EXPECT_EQ(res, -1);
+  EXPECT_EQ(errno, EFAULT);
 }
 
 TEST_F(UinputTest, UiDevCreate) {
