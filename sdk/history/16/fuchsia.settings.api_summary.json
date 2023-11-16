@@ -407,15 +407,6 @@
         "response": "fuchsia.settings/DisplayWatchResponse"
     },
     {
-        "kind": "protocol/member",
-        "name": "fuchsia.settings/Display.WatchLightSensor",
-        "strictness": "strict",
-        "ordinal": "8730445416654743573",
-        "direction": "two_way",
-        "request": "fuchsia.settings/DisplayWatchLightSensorRequest",
-        "response": "fuchsia.settings/DisplayWatchLightSensorResponse"
-    },
-    {
         "kind": "protocol",
         "name": "fuchsia.settings/Display",
         "openness": "closed",
@@ -470,26 +461,6 @@
     {
         "kind": "table",
         "name": "fuchsia.settings/DisplaySettings"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.settings/DisplayWatchLightSensorRequest.delta",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.settings/DisplayWatchLightSensorRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.settings/DisplayWatchLightSensorResponse.light_sensor_data",
-        "ordinal": "1",
-        "type": "fuchsia.settings/LightSensorData"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.settings/DisplayWatchLightSensorResponse"
     },
     {
         "kind": "struct/member",
@@ -1051,22 +1022,6 @@
     {
         "kind": "table",
         "name": "fuchsia.settings/LightGroup"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.settings/LightSensorData.color",
-        "ordinal": "2",
-        "type": "fuchsia.ui.types/ColorRgb"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.settings/LightSensorData.illuminance_lux",
-        "ordinal": "1",
-        "type": "float32"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.settings/LightSensorData"
     },
     {
         "kind": "struct/member",
