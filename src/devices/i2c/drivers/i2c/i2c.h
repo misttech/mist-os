@@ -8,9 +8,12 @@
 #include <fidl/fuchsia.hardware.i2c.businfo/cpp/wire.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 
+#include <memory>
 #include <vector>
 
 #include <ddktl/device.h>
+
+#include "i2cimpl-adapter.h"
 
 namespace i2c {
 
@@ -22,8 +25,9 @@ class I2cDevice : public I2cDeviceType {
   using TransferRequestView = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferRequestView;
   using TransferCompleter = fidl::WireServer<fuchsia_hardware_i2c::Device>::TransferCompleter;
 
-  I2cDevice(zx_device_t* parent, uint64_t max_transfer_size, const ddk::I2cImplProtocolClient& i2c)
-      : I2cDeviceType(parent), i2c_(i2c), max_transfer_(max_transfer_size) {
+  I2cDevice(zx_device_t* parent, uint64_t max_transfer_size,
+            std::unique_ptr<TransportAdapter>&& i2c)
+      : I2cDeviceType(parent), i2c_(std::move(i2c)), max_transfer_(max_transfer_size) {
     impl_ops_.resize(kInitialOpCount);
     read_vectors_.resize(kInitialOpCount);
     read_buffer_.resize(kInitialReadBufferSize);
@@ -45,7 +49,7 @@ class I2cDevice : public I2cDeviceType {
   zx_status_t GrowContainersIfNeeded(
       const fidl::VectorView<fuchsia_hardware_i2c::wire::Transaction>& transactions);
 
-  const ddk::I2cImplProtocolClient i2c_;
+  std::unique_ptr<TransportAdapter> i2c_;
   const uint64_t max_transfer_;
 
   // Ops and read data/vectors to be used in Transact(). Set to the initial capacities specified

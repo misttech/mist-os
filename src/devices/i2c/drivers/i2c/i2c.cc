@@ -4,6 +4,7 @@
 
 #include "i2c.h"
 
+#include <fidl/fuchsia.hardware.i2cimpl/cpp/driver/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
@@ -16,14 +17,23 @@
 #include <fbl/alloc_checker.h>
 
 #include "i2c-child.h"
+#include "i2cimpl-adapter.h"
 
 namespace i2c {
 
 zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
-  ddk::I2cImplProtocolClient i2c(parent);
-  if (!i2c.is_valid()) {
-    zxlogf(ERROR, "Failed to get i2cimpl client");
-    return ZX_ERR_NO_RESOURCES;
+  std::unique_ptr<TransportAdapter> i2c = std::make_unique<BanjoTransportAdapter>(parent);
+  if (!i2c->is_valid()) {
+    zxlogf(DEBUG, "Could not connect I2cImpl Banjo protocol, trying FIDL");
+
+    auto client_end = DdkConnectRuntimeProtocol<fuchsia_hardware_i2cimpl::Service::Device>(parent);
+    if (client_end.is_error()) {
+      zxlogf(ERROR, "DdkConnectFidlProtocol() error: %s",
+             zx_status_get_string(client_end.error_value()));
+      return client_end.error_value();
+    }
+
+    i2c.reset(new FidlTransportAdapter{std::move(*client_end)});
   }
 
   auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_i2c_businfo::wire::I2CBusMetadata>(
@@ -39,13 +49,13 @@ zx_status_t I2cDevice::Create(void* ctx, zx_device_t* parent) {
   }
 
   uint64_t max_transfer_size = 0;
-  if (zx_status_t status = i2c.GetMaxTransferSize(&max_transfer_size); status != ZX_OK) {
+  if (zx_status_t status = i2c->GetMaxTransferSize(&max_transfer_size); status != ZX_OK) {
     zxlogf(ERROR, "Failed to get max transfer size: %s", zx_status_get_string(status));
     return status;
   }
 
   fbl::AllocChecker ac;
-  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, max_transfer_size, i2c));
+  std::unique_ptr<I2cDevice> device(new (&ac) I2cDevice(parent, max_transfer_size, std::move(i2c)));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -104,7 +114,7 @@ void I2cDevice::Transact(const uint16_t address, TransferRequestView request,
   }
   impl_ops_[transactions.count() - 1].stop = true;
 
-  zx_status_t status = i2c_.Transact(impl_ops_.data(), transactions.count());
+  zx_status_t status = i2c_->Transact(impl_ops_, transactions.count());
   if (status == ZX_OK) {
     completer.ReplySuccess(
         fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(read_vectors_.data(), read_ops));

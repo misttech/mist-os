@@ -44,7 +44,8 @@ class I2cChild : public I2cChildType {
   void GetName(GetNameCompleter::Sync& completer) override;
 
  private:
-  friend class I2cChildTest;
+  friend class I2cChildBanjoTest;
+  friend class I2cChildFidlTest;
 
   void Bind(fidl::ServerEnd<fidl_i2c::Device> request) {
     bindings_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request),
