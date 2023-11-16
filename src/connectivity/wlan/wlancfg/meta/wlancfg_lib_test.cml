@@ -26,6 +26,10 @@
             storage: "tmp",
             path: "/tmp",
         },
+        {
+            storage: "data",
+            path: "/data",
+        },
     ],
     offer: [
         {

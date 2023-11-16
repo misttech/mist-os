@@ -28,7 +28,7 @@ use {
         path::Path,
     },
     tracing::{error, info},
-    wlan_stash::policy::{PolicyStash as Stash, POLICY_STASH_ID},
+    wlan_stash::policy::{PolicyStorage as Stash, POLICY_STASH_ID},
 };
 
 const MAX_CONFIGS_PER_SSID: usize = 1;
@@ -139,6 +139,7 @@ impl SavedNetworksManager {
     pub async fn new(telemetry_sender: TelemetrySender) -> Self {
         let path = LEGACY_KNOWN_NETWORKS_PATH;
         let stash = Stash::new_with_id(POLICY_STASH_ID)
+            .await
             .map_err(|e| {
                 error!(
                     "An error occurred initializing persistent storage. WLAN will continue without
@@ -221,7 +222,7 @@ impl SavedNetworksManager {
         let path = Alphanumeric.sample_string(&mut thread_rng(), 20);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let stash = Some(Stash::new_with_id(&stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(&stash_id).await.expect("failed to create stash"));
         Self::new_with_stash_or_paths(stash, Path::new(&path), telemetry_sender).await
     }
 
@@ -791,7 +792,7 @@ mod tests {
 
         // Saved networks should persist when we create a saved networks manager with the same ID.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
 
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
@@ -910,7 +911,7 @@ mod tests {
 
         // Check that removal persists.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
             &path,
@@ -1115,7 +1116,7 @@ mod tests {
 
         // Success connects should be saved as persistent data.
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
             &path,
@@ -1674,7 +1675,7 @@ mod tests {
 
         // Load store from stash to verify it is also gone from persistent storage
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
             &path,
@@ -1701,7 +1702,7 @@ mod tests {
 
         let stash_id = "read_network_from_legacy_storage";
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(stash_id).await.expect("failed to create stash"));
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
             &path,
@@ -1893,7 +1894,8 @@ mod tests {
         path: impl AsRef<Path>,
     ) -> SavedNetworksManager {
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let stash = Some(Stash::new_with_id(stash_id.as_ref()).expect("failed to create stash"));
+        let stash =
+            Some(Stash::new_with_id(stash_id.as_ref()).await.expect("failed to create stash"));
         let saved_networks = SavedNetworksManager::new_with_stash_or_paths(
             stash,
             &path,
@@ -1925,7 +1927,7 @@ mod tests {
         let path = temp_dir.path().join("networks.json");
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let stash = Some(Stash::new_with_id(&stash_id).expect("failed to create stash"));
+        let stash = Some(Stash::new_with_id(&stash_id).await.expect("failed to create stash"));
 
         let saved_networks =
             SavedNetworksManager::new_with_stash_or_paths(stash, &path, telemetry_sender).await;

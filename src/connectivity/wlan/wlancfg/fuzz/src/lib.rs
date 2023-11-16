@@ -65,7 +65,8 @@ async fn create_saved_networks(stash_id: impl AsRef<str>) -> SavedNetworksManage
     let path = temp_dir.path().join("networks.json");
     let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
     let telemetry_sender = TelemetrySender::new(telemetry_sender);
-    let stash = wlan_stash::policy::PolicyStash::new_with_id(stash_id.as_ref())
+    let stash = wlan_stash::policy::PolicyStorage::new_with_id(stash_id.as_ref())
+        .await
         .expect("failed to initialize WLAN policy stash");
 
     let saved_networks =

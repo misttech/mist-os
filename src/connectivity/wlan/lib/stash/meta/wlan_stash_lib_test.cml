@@ -31,6 +31,10 @@
             protocol: "fuchsia.stash.Store",
             from: "#stash",
         },
+        {
+            storage: "data",
+            path: "/data",
+        },
     ],
     offer: [
         {
