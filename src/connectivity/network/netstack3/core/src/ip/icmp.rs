@@ -175,71 +175,75 @@ pub(crate) struct IcmpState<I: IpExt + datagram::DualStackIpExt, Instant, D: Wea
     pub(crate) rx_counters: IcmpRxCounters<I>,
 }
 
-pub(crate) type IcmpTxCounters<I> = IpMarked<I, IcmpTxCountersInner>;
+/// ICMP tx path counters.
+pub type IcmpTxCounters<I> = IpMarked<I, IcmpTxCountersInner>;
 
 /// ICMP tx path counters.
 #[derive(Default)]
-pub(crate) struct IcmpTxCountersInner {
+pub struct IcmpTxCountersInner {
     /// Count of reply messages sent.
-    pub(crate) reply: Counter,
+    pub reply: Counter,
     /// Count of protocol unreachable messages sent.
-    pub(crate) protocol_unreachable: Counter,
+    pub protocol_unreachable: Counter,
     /// Count of port unreachable messages sent.
-    pub(crate) port_unreachable: Counter,
+    pub port_unreachable: Counter,
     /// Count of net unreachable messages sent.
-    pub(crate) net_unreachable: Counter,
+    pub net_unreachable: Counter,
     /// Count of ttl expired messages sent.
-    pub(crate) ttl_expired: Counter,
+    pub ttl_expired: Counter,
     /// Count of packet too big messages sent.
-    pub(crate) packet_too_big: Counter,
+    pub packet_too_big: Counter,
     /// Count of parameter problem messages sent.
-    pub(crate) parameter_problem: Counter,
+    pub parameter_problem: Counter,
     /// Count of destination unreachable messages sent.
-    pub(crate) dest_unreachable: Counter,
+    pub dest_unreachable: Counter,
     /// Count of error messages sent.
-    pub(crate) error: Counter,
+    pub error: Counter,
 }
 
-pub(crate) type IcmpRxCounters<I> = IpMarked<I, IcmpRxCountersInner>;
+/// ICMP rx path counters.
+pub type IcmpRxCounters<I> = IpMarked<I, IcmpRxCountersInner>;
 
 /// ICMP rx path counters.
 #[derive(Default)]
-pub(crate) struct IcmpRxCountersInner {
-    #[cfg(test)]
+pub struct IcmpRxCountersInner {
     /// Count of error messages received.
-    pub(crate) error: Counter,
+    pub error: Counter,
     /// Count of error messages received at the transport layer.
     pub(crate) error_at_transport_layer: Counter,
     /// Count of error messages delivered to a socket.
     pub(crate) error_at_socket: Counter,
     /// Count of echo request messages received.
-    pub(crate) echo_request: Counter,
+    pub echo_request: Counter,
     /// Count of echo reply messages received.
-    pub(crate) echo_reply: Counter,
+    pub echo_reply: Counter,
     /// Count of timestamp request messages received.
-    pub(crate) timestamp_request: Counter,
+    pub timestamp_request: Counter,
     /// Count of destination unreachable messages received.
-    pub(crate) dest_unreachable: Counter,
+    pub dest_unreachable: Counter,
     /// Count of time exceeded messages received.
-    pub(crate) time_exceeded: Counter,
+    pub time_exceeded: Counter,
     /// Count of parameter problem messages received.
-    pub(crate) parameter_problem: Counter,
+    pub parameter_problem: Counter,
     /// Count of packet too big messages received.
-    pub(crate) packet_too_big: Counter,
+    pub packet_too_big: Counter,
 }
 
 /// Counters for NDP messages.
 #[derive(Default)]
-pub(crate) struct NdpCounters {
+pub struct NdpCounters {
     /// Count of neighbor solicitation messages received.
-    pub(crate) rx_neighbor_solicitation: Counter,
+    pub rx_neighbor_solicitation: Counter,
     /// Count of neighbor advertisement messages received.
-    pub(crate) rx_neighbor_advertisement: Counter,
+    pub rx_neighbor_advertisement: Counter,
     /// Count of router advertisement messages received.
-    pub(crate) rx_router_advertisement: Counter,
-    #[cfg(test)]
+    pub rx_router_advertisement: Counter,
     /// Count of router solicitation messages received.
-    pub(crate) rx_router_solicitation: Counter,
+    pub rx_router_solicitation: Counter,
+    /// Count of neighbor advertisement messages sent.
+    pub tx_neighbor_advertisement: Counter,
+    /// Count of neighbor solicitation messages sent.
+    pub tx_neighbor_solicitation: Counter,
 }
 
 impl<C: NonSyncContext, I: Ip> UnlockedAccess<crate::lock_ordering::IcmpTxCounters<I>>
@@ -1798,7 +1802,10 @@ pub(crate) fn send_ndp_packet<
 
 fn send_neighbor_advertisement<
     C,
-    SC: Ipv6DeviceHandler<C> + IpDeviceHandler<Ipv6, C> + BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
+    SC: Ipv6DeviceHandler<C>
+        + IpDeviceHandler<Ipv6, C>
+        + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
+        + CounterContext<NdpCounters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1807,6 +1814,9 @@ fn send_neighbor_advertisement<
     device_addr: UnicastAddr<Ipv6Addr>,
     dst_ip: SpecifiedAddr<Ipv6Addr>,
 ) {
+    sync_ctx.with_counters(|counters| {
+        counters.tx_neighbor_advertisement.increment();
+    });
     debug!("send_neighbor_advertisement from {:?} to {:?}", device_addr, dst_ip);
     // We currently only allow the destination address to be:
     // 1) a unicast address.

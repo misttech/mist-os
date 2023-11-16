@@ -275,6 +275,130 @@ pub(crate) fn counters(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                     node.record_uint("Responses", counters.arp.tx_responses.get());
                 });
             });
+            inspector.root().record_child("ICMP", |node| {
+                node.record_child("V4", |node| {
+                    node.record_child("Rx", |node| {
+                        node.record_uint("EchoRequest", counters.icmpv4_rx.echo_request.get());
+                        node.record_uint("EchoReply", counters.icmpv4_rx.echo_reply.get());
+                        node.record_uint(
+                            "TimestampRequest",
+                            counters.icmpv4_rx.timestamp_request.get(),
+                        );
+                        node.record_uint(
+                            "DestUnreachable",
+                            counters.icmpv4_rx.dest_unreachable.get(),
+                        );
+                        node.record_uint("TimeExceeded", counters.icmpv4_rx.time_exceeded.get());
+                        node.record_uint(
+                            "ParameterProblem",
+                            counters.icmpv4_rx.parameter_problem.get(),
+                        );
+                        node.record_uint("PacketTooBig", counters.icmpv4_rx.packet_too_big.get());
+                        node.record_uint("Error", counters.icmpv4_rx.error.get());
+                    });
+                    node.record_child("Tx", |node| {
+                        node.record_uint("Reply", counters.icmpv4_tx.reply.get());
+                        node.record_uint(
+                            "ProtocolUnreachable",
+                            counters.icmpv4_tx.protocol_unreachable.get(),
+                        );
+                        node.record_uint(
+                            "PortUnreachable",
+                            counters.icmpv4_tx.port_unreachable.get(),
+                        );
+                        node.record_uint(
+                            "NetUnreachable",
+                            counters.icmpv4_tx.net_unreachable.get(),
+                        );
+                        node.record_uint("TtlExpired", counters.icmpv4_tx.ttl_expired.get());
+                        node.record_uint("PacketTooBig", counters.icmpv4_tx.packet_too_big.get());
+                        node.record_uint(
+                            "ParameterProblem",
+                            counters.icmpv4_tx.parameter_problem.get(),
+                        );
+                        node.record_uint(
+                            "DestUnreachable",
+                            counters.icmpv4_tx.dest_unreachable.get(),
+                        );
+                        node.record_uint("Error", counters.icmpv4_tx.error.get());
+                    });
+                });
+                node.record_child("V6", |node| {
+                    node.record_child("Rx", |node| {
+                        node.record_uint("EchoRequest", counters.icmpv6_rx.echo_request.get());
+                        node.record_uint("EchoReply", counters.icmpv6_rx.echo_reply.get());
+                        node.record_uint(
+                            "TimestampRequest",
+                            counters.icmpv6_rx.timestamp_request.get(),
+                        );
+                        node.record_uint(
+                            "DestUnreachable",
+                            counters.icmpv6_rx.dest_unreachable.get(),
+                        );
+                        node.record_uint("TimeExceeded", counters.icmpv6_rx.time_exceeded.get());
+                        node.record_uint(
+                            "ParameterProblem",
+                            counters.icmpv6_rx.parameter_problem.get(),
+                        );
+                        node.record_uint("PacketTooBig", counters.icmpv6_rx.packet_too_big.get());
+                        node.record_uint("Error", counters.icmpv6_rx.error.get());
+                        node.record_child("NDP", |node| {
+                            node.record_uint(
+                                "NeighborSolicitation",
+                                counters.ndp.rx_neighbor_solicitation.get(),
+                            );
+                            node.record_uint(
+                                "NeighborAdvertisement",
+                                counters.ndp.rx_neighbor_advertisement.get(),
+                            );
+                            node.record_uint(
+                                "RouterSolicitation",
+                                counters.ndp.rx_router_solicitation.get(),
+                            );
+                            node.record_uint(
+                                "RouterAdvertisement",
+                                counters.ndp.rx_router_advertisement.get(),
+                            );
+                        });
+                    });
+                    node.record_child("Tx", |node| {
+                        node.record_uint("Reply", counters.icmpv6_tx.reply.get());
+                        node.record_uint(
+                            "ProtocolUnreachable",
+                            counters.icmpv6_tx.protocol_unreachable.get(),
+                        );
+                        node.record_uint(
+                            "PortUnreachable",
+                            counters.icmpv6_tx.port_unreachable.get(),
+                        );
+                        node.record_uint(
+                            "NetUnreachable",
+                            counters.icmpv6_tx.net_unreachable.get(),
+                        );
+                        node.record_uint("TtlExpired", counters.icmpv6_tx.ttl_expired.get());
+                        node.record_uint("PacketTooBig", counters.icmpv6_tx.packet_too_big.get());
+                        node.record_uint(
+                            "ParameterProblem",
+                            counters.icmpv6_tx.parameter_problem.get(),
+                        );
+                        node.record_uint(
+                            "DestUnreachable",
+                            counters.icmpv6_tx.dest_unreachable.get(),
+                        );
+                        node.record_uint("Error", counters.icmpv6_tx.error.get());
+                        node.record_child("NDP", |node| {
+                            node.record_uint(
+                                "NeighborAdvertisement",
+                                counters.ndp.tx_neighbor_advertisement.get(),
+                            );
+                            node.record_uint(
+                                "NeighborSolicitation",
+                                counters.ndp.tx_neighbor_solicitation.get(),
+                            );
+                        });
+                    });
+                });
+            });
             inspector.root().record_child("IPv4", |node| {
                 node.record_uint("PacketTx", counters.ipv4_common.send_ip_packet.get());
                 node.record_child("PacketRx", |node| {

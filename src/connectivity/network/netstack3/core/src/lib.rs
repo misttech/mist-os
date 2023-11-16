@@ -266,6 +266,16 @@ pub struct StackCounters<'a> {
     pub udpv4: &'a UdpCounters<Ipv4>,
     /// UDP layer counters for IPv6.
     pub udpv6: &'a UdpCounters<Ipv6>,
+    /// ICMP layer counters for IPv4 Rx-path.
+    pub icmpv4_rx: &'a IcmpRxCounters<Ipv4>,
+    /// ICMP layer counters for IPv4 Tx-path.
+    pub icmpv4_tx: &'a IcmpTxCounters<Ipv4>,
+    /// ICMP layer counters for IPv6 Rx-path.
+    pub icmpv6_rx: &'a IcmpRxCounters<Ipv6>,
+    /// ICMP layer counters for IPv4 Tx-path.
+    pub icmpv6_tx: &'a IcmpTxCounters<Ipv6>,
+    /// NDP counters.
+    pub ndp: &'a NdpCounters,
 }
 
 /// Visitor for stack counters.
@@ -284,6 +294,11 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
         arp: sync_ctx.state.arp_counters(),
         udpv4: sync_ctx.state.udp_counters::<Ipv4>(),
         udpv6: sync_ctx.state.udp_counters::<Ipv6>(),
+        icmpv4_rx: sync_ctx.state.icmp_rx_counters::<Ipv4>(),
+        icmpv4_tx: sync_ctx.state.icmp_tx_counters::<Ipv4>(),
+        icmpv6_rx: sync_ctx.state.icmp_rx_counters::<Ipv6>(),
+        icmpv6_tx: sync_ctx.state.icmp_tx_counters::<Ipv6>(),
+        ndp: sync_ctx.state.ndp_counters(),
     };
     visitor.visit_counters(counters);
 }

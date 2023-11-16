@@ -68,6 +68,7 @@ use crate::{
             LinkResolutionNotifier, LinkResolutionResult, NudConfigContext, NudContext, NudHandler,
             NudState, NudTimerId,
         },
+        icmp::NdpCounters,
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
@@ -276,6 +277,9 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
 
         let mac = get_mac(self, device_id);
 
+        self.with_counters(|counters: &NdpCounters| {
+            counters.tx_neighbor_solicitation.increment();
+        });
         tracing::debug!("sending NDP solicitation for {lookup_addr} to {dst_ip}");
         // TODO(https://fxbug.dev/85055): Either panic or guarantee that this error
         // can't happen statically.
