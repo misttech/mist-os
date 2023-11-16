@@ -17,6 +17,16 @@ pub struct Target {
     pub description: TargetDescription,
 }
 
+impl Target {
+    pub fn from_description(label: impl ToString, description: TargetDescription) -> Self {
+        Self {
+            label: label.to_string(),
+            target_type: description.target_type.clone(),
+            description: description,
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum GraphInitError {
     #[error("Unable to find label '{0}' in target index while walking node index.  This shouldn't be possible.")]

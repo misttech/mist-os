@@ -38,6 +38,7 @@ rustc_binary("gn_desc") {
   sources = [
     "src/args.rs",
     "src/commands.rs",
+    "src/commands/all_deps.rs",
     "src/commands/list.rs",
     "src/commands/selectors.rs",
     "src/commands/summarize.rs",

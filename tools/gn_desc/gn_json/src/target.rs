@@ -89,8 +89,28 @@ pub struct TargetDescriptionBuilder {
 }
 
 impl TargetDescriptionBuilder {
+    pub fn group() -> Self {
+        Self { inner: TargetDescription { target_type: "group".to_string(), ..Default::default() } }
+    }
+
+    pub fn action(script: impl ToString) -> Self {
+        Self {
+            inner: TargetDescription {
+                target_type: "action".to_string(),
+                script: Some(script.to_string()),
+                ..Default::default()
+            },
+        }
+    }
+
     pub fn build(self) -> TargetDescription {
         self.inner
+    }
+
+    pub fn dep(self, dep: impl ToString) -> Self {
+        let Self { mut inner } = self;
+        inner.deps.push(dep.to_string());
+        Self { inner }
     }
 
     pub fn deps(self, deps: Vec<impl ToString>) -> Self {
