@@ -1526,7 +1526,10 @@ func (c *compiler) compileTable(table fidlgen.Table) Table {
 		ECI:   table.Name,
 		Name:  c.compileDeclIdentifier(table.Name),
 	}
-	for _, member := range table.SortedMembersNoReserved() {
+	for _, member := range table.Members {
+		if member.Reserved {
+			continue
+		}
 		r.Members = append(r.Members, TableMember{
 			TableMember: member,
 			Type:        c.compileType(*member.Type),

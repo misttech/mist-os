@@ -146,7 +146,10 @@ func (c *compiler) compileTable(val fidlgen.Table) *Table {
 		WireTableExternalBuilder: WireTableExternalBuilder.template(name.Wire),
 	}
 
-	for i, v := range val.SortedMembersNoReserved() {
+	for i, v := range val.Members {
+		if v.Reserved {
+			continue
+		}
 		m := c.compileTableMember(v, i)
 		if m.Ordinal > r.BiggestOrdinal {
 			r.BiggestOrdinal = m.Ordinal

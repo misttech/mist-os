@@ -12,7 +12,6 @@ import (
 	"math"
 	"os"
 	"reflect"
-	"sort"
 	"strconv"
 	"strings"
 )
@@ -1219,36 +1218,6 @@ type TableMember struct {
 	MaybeDefaultValue *Constant               `json:"maybe_default_value,omitempty"`
 	MaybeAlias        *PartialTypeConstructor `json:"experimental_maybe_from_alias,omitempty"`
 	MaxOutOfLine      int                     `json:"max_out_of_line"`
-}
-
-// byTableOrdinal is a wrapper type for sorting a []TableMember.
-type byTableOrdinal []TableMember
-
-func (s byTableOrdinal) Len() int {
-	return len(s)
-}
-
-func (s byTableOrdinal) Less(i, j int) bool {
-	return s[i].Ordinal < s[j].Ordinal
-}
-
-func (s byTableOrdinal) Swap(i, j int) {
-	s[i], s[j] = s[j], s[i]
-}
-
-// SortedMembersNoReserved returns the table's members sorted by ordinal,
-// excluding reserved members.
-//
-// TODO(fxbug.dev/115754): Remove.
-func (t *Table) SortedMembersNoReserved() []TableMember {
-	var members []TableMember
-	for _, member := range t.Members {
-		if !member.Reserved {
-			members = append(members, member)
-		}
-	}
-	sort.Sort(byTableOrdinal(members))
-	return members
 }
 
 // Struct represents a declaration of a FIDL struct.

@@ -1006,7 +1006,10 @@ func (c *compiler) compileTable(val fidlgen.Table) Table {
 	c.usedLibraryDeps[BindingsPackage] = BindingsAlias
 
 	var members []TableMember
-	for _, member := range val.SortedMembersNoReserved() {
+	for _, member := range val.Members {
+		if member.Reserved {
+			continue
+		}
 		ty, rbtag := c.compileType(*member.Type)
 		tags := Tags{
 			FidlOrdinalTag: member.Ordinal,
