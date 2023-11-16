@@ -1,0 +1,48 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.bluetooth.map;
+
+using fuchsia.bluetooth as bt;
+
+/// Clients can use Message Client Equipment (MCE) related features through this protocol.
+@discoverable
+open protocol MessagingClient {
+    /// Make connections to peers that support MAP.
+    /// An `Accessor` will be returned for each peer as they are
+    /// connected, and only one exists at a time for each peer.
+    /// Hangs until a new peer becomes available once all connected
+    /// peers have been delivered to this protocol.
+    flexible WatchAccessor() -> (resource table {
+        1: peer_id bt.PeerId;
+        2: accessor client_end:Accessor;
+    });
+};
+
+open protocol MessageController {
+    /// Retrieve all available message details.
+    /// + request `handle` Unique identifier for a Messsage.
+    /// + request `include_attachment` Whether or not attachment should be included as
+    ///                                part of Message content if it's available.
+    /// - response NOT_FOUND error is returned if the message with the given handle does not exist.
+    flexible GetDetails(struct {
+        handle uint64;
+        include_attachment bool;
+    }) -> (Message) error Error;
+};
+
+/// Protocol used for accessing messages and notifications for a connected Bluetooth peer.
+open protocol Accessor {
+    compose MessageController;
+
+    /// Hanging-get request to get new messages. If new messages have been reported from the peer,
+    /// returns the information available. See MAP v1.4.2 section 3.1.7 for details.
+    strict FetchNewMessage() -> (resource table {
+        /// Note that only some fields will be provided. To retrieve all
+        /// available information for a specific message use `GetDetails`.
+        1: messages vector<Message>:MAX;
+    });
+};
+
+// TODO(fxbug.dev/132355): add `RepositoryBrowser` protocol, which
+// would be used for browsing through a specific message repository.
