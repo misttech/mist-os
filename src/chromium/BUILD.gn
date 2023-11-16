@@ -17,11 +17,6 @@ group("chromium") {
   visibility += [ "//src:*" ]
 }
 
-generate_chrome_browser_targets("chromium") {
-}
-
-# The other targets are more complex to configure for historical reasons.
-
 archive_path_suffix = ""
 
 # TODO(crbug.com/1385930): Change this to "chromium.org".
