@@ -236,7 +236,7 @@ impl Supplicant for MockSupplicant {
     }
 
     fn reset(&mut self) {
-        let _ = self.on_eapol_frame.lock().unwrap().as_mut().map(|updates| updates.clear());
+        // Do nothing here because all updates are mocked.
     }
 
     fn on_eapol_frame(
