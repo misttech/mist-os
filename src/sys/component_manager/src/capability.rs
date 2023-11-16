@@ -41,11 +41,11 @@ pub trait CapabilityProvider: Send + Sync {
     ) -> Result<(), CapabilityProviderError>;
 }
 
-/// A trait for framework capabilities. This trait provides an implementation of
+/// A trait for builtin and framework capabilities. This trait provides an implementation of
 /// [CapabilityProvider::open] that wraps the `open` in a vfs service, ensuring that the capability is
 /// fully fuchsia.io-compliant.
 #[async_trait]
-pub trait FrameworkCapabilityProvider: Send + Sync {
+pub trait InternalCapabilityProvider: Send + Sync {
     type Marker: ProtocolMarker;
 
     /// Binds a server end of a zx::Channel to the provided capability, which is assumed to be a
@@ -54,7 +54,7 @@ pub trait FrameworkCapabilityProvider: Send + Sync {
 }
 
 #[async_trait]
-impl<T: FrameworkCapabilityProvider + 'static> CapabilityProvider for T {
+impl<T: InternalCapabilityProvider + 'static> CapabilityProvider for T {
     async fn open(
         self: Box<Self>,
         task_group: TaskGroup,
@@ -67,7 +67,7 @@ impl<T: FrameworkCapabilityProvider + 'static> CapabilityProvider for T {
             move |_scope: ExecutionScope, server_end: fuchsia_async::Channel| {
                 let mut this = this.lock().unwrap();
                 let this = this.take().expect("vfs open shouldn't be called more than once");
-                let server_end: ServerEnd<<Self as FrameworkCapabilityProvider>::Marker> =
+                let server_end: ServerEnd<<Self as InternalCapabilityProvider>::Marker> =
                     server_end.into_zx_channel().into();
                 task_group.spawn(this.open_protocol(server_end));
             },
@@ -81,6 +81,17 @@ impl<T: FrameworkCapabilityProvider + 'static> CapabilityProvider for T {
         service.open(ExecutionScope::new(), flags, relative_path, server_end.into());
         Ok(())
     }
+}
+
+/// Builtin capabilities implement this trait to register themselves with component manager's
+/// builtin environment.
+pub trait BuiltinCapability: Send + Sync {
+    /// Returns true if `capability` matches this framework capability.
+    fn matches(&self, capability: &InternalCapability) -> bool;
+
+    /// Returns a [CapabilityProvider] that serves this builtin capability and was
+    /// requested by `target`.
+    fn new_provider(&self, target: WeakComponentInstance) -> Box<dyn CapabilityProvider>;
 }
 
 /// Framework capabilities implement this trait to register themselves with component manager's

@@ -14,15 +14,13 @@
 /// dynamic component instances) should be defined here.
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::CapabilitySource,
         model::{
             actions::{ActionSet, DestroyAction, DestroyChildAction, ShutdownAction},
             component::StartReason,
             error::{
-                CapabilityProviderError, ModelError, ResolveActionError,
-                RouteAndOpenCapabilityError, StartActionError,
+                ModelError, ResolveActionError, RouteAndOpenCapabilityError, StartActionError,
             },
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
             routing::{Route, RouteRequest, RouteSource, RoutingError},
             testing::{routing_test_helpers::*, test_helpers::*},
         },
@@ -35,11 +33,8 @@ use {
         resolving::ResolverError,
     },
     assert_matches::assert_matches,
-    async_trait::async_trait,
     cm_rust::*,
     cm_rust_testing::*,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl_fidl_examples_routing_echo::{self as echo},
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
     fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_component_runner as fcrunner,
@@ -54,11 +49,10 @@ use {
     std::{
         collections::HashSet,
         convert::{TryFrom, TryInto},
-        path::PathBuf,
-        sync::{Arc, Weak},
+        sync::Arc,
     },
     tracing::warn,
-    vfs::pseudo_directory,
+    vfs::{pseudo_directory, service},
 };
 
 instantiate_common_routing_tests! { RoutingTestBuilder }
@@ -1771,41 +1765,7 @@ async fn use_runner_from_environment_failed() {
         ("b", ComponentDeclBuilder::new_empty_component().add_program("runner").build()),
     ];
 
-    struct RunnerHost {}
-    #[async_trait]
-    impl Hook for RunnerHost {
-        async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-            if let EventPayload::CapabilityRouted {
-                source:
-                    CapabilitySource::Component {
-                        capability: ComponentCapability::Runner(decl), ..
-                    },
-                capability_provider,
-            } = &event.payload
-            {
-                let mut capability_provider = capability_provider.lock().await;
-                if decl.name.as_str() == "runner" {
-                    *capability_provider = Some(Box::new(RunnerCapabilityProvider {}));
-                }
-            }
-            Ok(())
-        }
-    }
-
-    struct RunnerCapabilityProvider {}
-    #[async_trait]
-    impl CapabilityProvider for RunnerCapabilityProvider {
-        async fn open(
-            self: Box<Self>,
-            _task_group: TaskGroup,
-            _flags: fio::OpenFlags,
-            _relative_path: PathBuf,
-            server_end: &mut zx::Channel,
-        ) -> Result<(), CapabilityProviderError> {
-            channel::take_channel(server_end);
-            Ok(())
-        }
-    }
+    let runner_service = service::endpoint(|_scope, _channel| {});
 
     // Set a capability provider for the runner that closes the server end.
     // `ComponentRunner.Start` to fail.
@@ -1813,19 +1773,10 @@ async fn use_runner_from_environment_failed() {
         .set_builtin_capabilities(vec![CapabilityDecl::EventStream(EventStreamDecl {
             name: "stopped".parse().unwrap(),
         })])
+        .add_outgoing_path("a", "/svc/runner".parse().unwrap(), runner_service)
         .build()
         .await;
 
-    let runner_host = Arc::new(RunnerHost {});
-    test.model
-        .root()
-        .hooks
-        .install(vec![HooksRegistration::new(
-            "RunnerHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(&runner_host) as Weak<dyn Hook>,
-        )])
-        .await;
     let namespace_root = test.bind_and_get_namespace(Moniker::root()).await;
     let event_stream =
         capability_util::connect_to_svc_in_namespace::<fcomponent::EventStreamMarker>(

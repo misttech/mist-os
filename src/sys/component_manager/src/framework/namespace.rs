@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::component::WeakComponentInstance,
     },
     ::routing::capability_source::InternalCapability,
@@ -40,7 +40,7 @@ impl NamespaceCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for NamespaceCapabilityProvider {
+impl InternalCapabilityProvider for NamespaceCapabilityProvider {
     type Marker = fcomponent::NamespaceMarker;
 
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {

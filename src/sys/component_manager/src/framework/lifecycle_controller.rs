@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+    crate::capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
     crate::model::{
         actions::{ActionSet, StopAction},
         component::{StartReason, WeakComponentInstance},
@@ -268,7 +268,7 @@ impl LifecycleControllerCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for LifecycleControllerCapabilityProvider {
+impl InternalCapabilityProvider for LifecycleControllerCapabilityProvider {
     type Marker = fsys::LifecycleControllerMarker;
 
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {

@@ -323,10 +323,6 @@ async fn create_event_result(
         EventPayload::CapabilityRequested { name, capability, .. } => {
             Ok(create_capability_requested_payload(name.to_string(), capability.clone()).await)
         }
-        EventPayload::CapabilityRouted { .. } => {
-            // Capability routed events cannot be exposed externally. This should be unreachable.
-            unreachable!("Capability routed can't be externally exposed");
-        }
         EventPayload::Stopped { status } => {
             Ok(fcomponent::EventPayload::Stopped(fcomponent::StoppedPayload {
                 status: Some(status.into_raw()),

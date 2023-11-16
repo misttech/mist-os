@@ -5,7 +5,7 @@
 use {
     crate::{
         capability::{
-            CapabilityProvider, CapabilitySource, FrameworkCapability, FrameworkCapabilityProvider,
+            CapabilityProvider, CapabilitySource, FrameworkCapability, InternalCapabilityProvider,
         },
         model::{
             component::{
@@ -365,7 +365,7 @@ impl RouteValidatorCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for RouteValidatorCapabilityProvider {
+impl InternalCapabilityProvider for RouteValidatorCapabilityProvider {
     type Marker = fsys::RouteValidatorMarker;
 
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {

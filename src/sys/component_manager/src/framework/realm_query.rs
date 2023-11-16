@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, InstanceState, WeakComponentInstance},
             model::Model,
@@ -204,7 +204,7 @@ impl RealmQueryCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for RealmQueryCapabilityProvider {
+impl InternalCapabilityProvider for RealmQueryCapabilityProvider {
     type Marker = fsys::RealmQueryMarker;
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
         self.query.serve(self.scope_moniker, server_end.into_stream().unwrap()).await;

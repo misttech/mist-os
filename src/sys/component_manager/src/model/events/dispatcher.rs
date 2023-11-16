@@ -191,8 +191,6 @@ impl EventDispatcherScope {
                 ExtendedMoniker::ComponentManager => true,
                 ExtendedMoniker::ComponentInstance(target) => *source_moniker == *target,
             },
-            // CapabilityRouted events are never dispatched
-            EventPayload::CapabilityRouted { .. } => false,
             _ => {
                 let contained_in_realm = event.target_moniker.has_prefix(&self.moniker);
                 let is_component_instance = matches!(
@@ -226,16 +224,11 @@ impl EventDispatcherScope {
 mod tests {
     use {
         super::*,
-        crate::capability::CapabilitySource,
-        ::routing::capability_source::InternalCapability,
         assert_matches::assert_matches,
         fuchsia_zircon as zx,
         futures::StreamExt,
         moniker::{Moniker, MonikerBase},
-        std::{
-            convert::TryInto,
-            sync::{Arc, Weak},
-        },
+        std::{convert::TryInto, sync::Arc},
     };
 
     struct EventDispatcherFactory {
@@ -278,24 +271,6 @@ mod tests {
                 capability: capability_server_end,
                 flags: fio::OpenFlags::empty(),
                 relative_path: "".into(),
-            },
-        );
-        dispatcher.dispatch(&event).await
-    }
-
-    async fn dispatch_capability_routed_event(dispatcher: &EventDispatcher) -> Result<(), Error> {
-        let empty_capability_provider = Arc::new(Mutex::new(None));
-        let event = ComponentEvent::new_for_test(
-            Moniker::root(),
-            "fuchsia-pkg://root/a/b/c",
-            EventPayload::CapabilityRouted {
-                source: CapabilitySource::Builtin {
-                    capability: InternalCapability::Protocol(
-                        "fuchsia.sys2.MyAwesomeProtocol".parse().unwrap(),
-                    ),
-                    top_instance: Weak::new(),
-                },
-                capability_provider: empty_capability_provider,
             },
         );
         dispatcher.dispatch(&event).await
@@ -350,22 +325,5 @@ mod tests {
         );
         let dispatcher = factory.create_dispatcher(subscriber);
         assert!(dispatch_capability_requested_event(&dispatcher, &source_moniker).await.is_err());
-    }
-
-    // This test verifies that the CapabilityRouted event can never be sent.
-    #[fuchsia::test]
-    async fn cannot_send_capability_routed() {
-        let factory = EventDispatcherFactory::new();
-
-        // Verify that we cannot dispatch the CapabilityRouted event for above-root subscribers.
-        let dispatcher = factory.create_dispatcher(ExtendedMoniker::ComponentManager);
-        // This indicates that the event was not dispatched.
-        assert!(dispatch_capability_routed_event(&dispatcher).await.is_err());
-
-        // Verify that we cannot dispatch the CapabilityRouted event for in-tree subscribers.
-        let subscriber = ExtendedMoniker::ComponentInstance(vec!["root:0"].try_into().unwrap());
-        let dispatcher = factory.create_dispatcher(subscriber);
-        // This indicates that the event was not dispatched.
-        assert!(dispatch_capability_routed_event(&dispatcher).await.is_err());
     }
 }

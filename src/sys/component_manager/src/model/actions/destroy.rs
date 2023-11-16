@@ -361,14 +361,8 @@ pub mod tests {
                 availability: Availability::Required,
             })
             .collect();
-        let mut event_source = test
-            .builtin_environment
-            .lock()
-            .await
-            .event_source_factory
-            .create_for_above_root()
-            .await
-            .unwrap();
+        let mut event_source =
+            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
         let event_stream = event_source
             .subscribe(
                 events.into_iter().map(|event| EventSubscription { event_name: event }).collect(),

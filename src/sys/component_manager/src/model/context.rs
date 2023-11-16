@@ -5,7 +5,8 @@
 use {
     crate::{
         capability::{
-            CapabilityProvider, CapabilitySource, DerivedCapability, FrameworkCapability,
+            BuiltinCapability, CapabilityProvider, CapabilitySource, DerivedCapability,
+            FrameworkCapability,
         },
         model::component::WeakComponentInstance,
         model::error::ModelError,
@@ -23,6 +24,7 @@ pub struct ModelContext {
     component_id_index: component_id_index::Index,
     policy_checker: GlobalPolicyChecker,
     runtime_config: Arc<RuntimeConfig>,
+    builtin_capabilities: Mutex<Option<Vec<Box<dyn BuiltinCapability>>>>,
     framework_capabilities: Mutex<Option<Vec<Box<dyn FrameworkCapability>>>>,
     derived_capabilities: Mutex<Option<Vec<Box<dyn DerivedCapability>>>>,
 }
@@ -37,6 +39,7 @@ impl ModelContext {
             },
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             runtime_config,
+            builtin_capabilities: Mutex::new(None),
             framework_capabilities: Mutex::new(None),
             derived_capabilities: Mutex::new(None),
         })
@@ -65,16 +68,35 @@ impl ModelContext {
         &self.runtime_config.abi_revision_policy
     }
 
-    pub async fn init_framework_capabilities(&self, v: Vec<Box<dyn FrameworkCapability>>) {
-        let mut framework_capabilities = self.framework_capabilities.lock().await;
-        assert!(framework_capabilities.is_none(), "already initialized");
-        *framework_capabilities = Some(v);
+    pub async fn init_internal_capabilities(
+        &self,
+        b: Vec<Box<dyn BuiltinCapability>>,
+        f: Vec<Box<dyn FrameworkCapability>>,
+        d: Vec<Box<dyn DerivedCapability>>,
+    ) {
+        {
+            let mut builtin_capabilities = self.builtin_capabilities.lock().await;
+            assert!(builtin_capabilities.is_none(), "already initialized");
+            *builtin_capabilities = Some(b);
+        }
+        {
+            let mut framework_capabilities = self.framework_capabilities.lock().await;
+            assert!(framework_capabilities.is_none(), "already initialized");
+            *framework_capabilities = Some(f);
+        }
+        {
+            let mut derived_capabilities = self.derived_capabilities.lock().await;
+            assert!(derived_capabilities.is_none(), "already initialized");
+            *derived_capabilities = Some(d);
+        }
     }
 
-    pub async fn init_derived_capabilities(&self, v: Vec<Box<dyn DerivedCapability>>) {
-        let mut derived_capabilities = self.derived_capabilities.lock().await;
-        assert!(derived_capabilities.is_none(), "already initialized");
-        *derived_capabilities = Some(v);
+    #[cfg(test)]
+    pub async fn add_framework_capability(&self, c: Box<dyn FrameworkCapability>) {
+        // Internal capabilities added for a test should preempt existing ones that match the
+        // same metadata.
+        let mut framework_capabilities = self.framework_capabilities.lock().await;
+        framework_capabilities.as_mut().unwrap().insert(0, c);
     }
 
     pub async fn find_internal_provider(
@@ -83,6 +105,15 @@ impl ModelContext {
         target: WeakComponentInstance,
     ) -> Option<Box<dyn CapabilityProvider>> {
         match source {
+            CapabilitySource::Builtin { capability, top_instance: _ } => {
+                let builtin_capabilities = self.builtin_capabilities.lock().await;
+                for c in builtin_capabilities.as_ref().expect("not initialized") {
+                    if c.matches(capability) {
+                        return Some(c.new_provider(target));
+                    }
+                }
+                None
+            }
             CapabilitySource::Framework { capability, component } => {
                 let framework_capabilities = self.framework_capabilities.lock().await;
                 for c in framework_capabilities.as_ref().expect("not initialized") {

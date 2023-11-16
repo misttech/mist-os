@@ -205,14 +205,8 @@ pub mod tests {
         event_types: Vec<EventType>,
     ) -> EventStream {
         let events: Vec<_> = event_types.into_iter().map(|e| e.into()).collect();
-        let mut event_source = test
-            .builtin_environment
-            .lock()
-            .await
-            .event_source_factory
-            .create_for_above_root()
-            .await
-            .unwrap();
+        let mut event_source =
+            test.builtin_environment.lock().await.event_source_factory.create_for_above_root();
         let event_stream = event_source
             .subscribe(
                 events

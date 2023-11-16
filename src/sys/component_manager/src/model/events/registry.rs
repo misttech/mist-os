@@ -144,17 +144,12 @@ impl EventRegistry {
     }
 
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        let mut event_types = EventType::values();
-
-        // Do not subscribe to CapabilityRouted. That is a component-framework-internal event.
-        event_types.retain(|t| t != &EventType::CapabilityRouted);
-
         vec![
             // This hook must be registered with all events.
             // However, a task will only receive events to which it subscribed.
             HooksRegistration::new(
                 "EventRegistry",
-                event_types,
+                EventType::values(),
                 Arc::downgrade(self) as Weak<dyn Hook>,
             ),
         ]

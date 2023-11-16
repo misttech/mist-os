@@ -529,8 +529,6 @@ impl ComponentProviderError {
 
 #[derive(Debug, Clone, Error)]
 pub enum CapabilityProviderError {
-    #[error("failed to create stream from channel")]
-    StreamCreationError,
     #[error("bad path")]
     BadPath,
     #[error("component instance")]
@@ -563,7 +561,6 @@ pub enum CapabilityProviderError {
 impl CapabilityProviderError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
-            Self::StreamCreationError => zx::Status::INTERNAL,
             Self::BadPath => zx::Status::INVALID_ARGS,
             Self::ComponentInstanceError { err } => err.as_zx_status(),
             Self::CmNamespaceError { .. } => zx::Status::INTERNAL,

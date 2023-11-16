@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::component::WeakComponentInstance,
     },
     ::routing::capability_source::InternalCapability,
@@ -35,7 +35,7 @@ impl FactoryCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for FactoryCapabilityProvider {
+impl InternalCapabilityProvider for FactoryCapabilityProvider {
     type Marker = fsandbox::FactoryMarker;
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
         // We only need to look up the component matching this scope.

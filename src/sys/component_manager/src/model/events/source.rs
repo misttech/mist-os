@@ -15,7 +15,6 @@ use {
                 stream::EventStream,
                 stream_provider::EventStreamProvider,
             },
-            model::Model,
         },
     },
     async_trait::async_trait,
@@ -25,11 +24,7 @@ use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_zircon as zx,
     futures::{SinkExt, StreamExt},
     moniker::ExtendedMoniker,
-    routing::component_instance::ComponentInstanceInterface,
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::{path::PathBuf, sync::Weak},
 };
 
 // Event source (supporting event streams)
@@ -47,24 +42,12 @@ pub struct EventSource {
 }
 
 impl EventSource {
-    pub async fn new(
-        subscriber: ExtendedMoniker,
-        model: Weak<Model>,
+    pub fn new(
+        subscriber: WeakExtendedInstance,
         registry: Weak<EventRegistry>,
         stream_provider: Weak<EventStreamProvider>,
-    ) -> Result<Self, ModelError> {
-        let subscriber = {
-            let model = model.upgrade().ok_or(EventsError::ModelNotAvailable)?;
-            match &subscriber {
-                ExtendedMoniker::ComponentInstance(m) => WeakExtendedInstance::Component(
-                    model.find_and_maybe_resolve(&m).await?.as_weak(),
-                ),
-                ExtendedMoniker::ComponentManager => {
-                    WeakExtendedInstance::AboveRoot(Arc::downgrade(model.top_instance()))
-                }
-            }
-        };
-        Ok(Self { subscriber, registry, stream_provider })
+    ) -> Self {
+        Self { subscriber, registry, stream_provider }
     }
 
     /// Subscribes to events provided in the `events` vector.

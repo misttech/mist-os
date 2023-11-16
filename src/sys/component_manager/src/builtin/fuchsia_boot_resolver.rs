@@ -4,30 +4,26 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{BuiltinCapability, CapabilityProvider, InternalCapabilityProvider},
         model::{
-            error::{CapabilityProviderError, ModelError},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            component::WeakComponentInstance,
             resolver::{self, Resolver},
         },
     },
     anyhow::{format_err, Error},
     async_trait::async_trait,
-    cm_util::channel,
-    cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, Proxy, ServerEnd},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_resolution as fresolution,
     fidl_fuchsia_io as fio,
     fuchsia_pkg::PackagePath,
     fuchsia_url::{boot_url::BootUrl, PackageName, PackageVariant},
-    fuchsia_zircon as zx,
     futures::TryStreamExt,
     routing::capability_source::InternalCapability,
     routing::resolving::{ComponentAddress, ResolvedComponent, ResolverError},
     std::convert::TryInto,
-    std::path::{Path, PathBuf},
+    std::path::Path,
     std::str::FromStr,
-    std::sync::{Arc, Weak},
+    std::sync::Arc,
     system_image::{Bootfs, PathHashMapping},
     version_history::AbiRevision,
 };
@@ -63,7 +59,7 @@ impl FuchsiaBootResolver {
     /// Create a new FuchsiaBootResolver. This first checks whether the path passed in is present in
     /// the namespace, and returns Ok(None) if not present. For unit and integration tests, this
     /// path may point to /pkg.
-    pub async fn new(path: &'static str) -> Result<Option<FuchsiaBootResolver>, Error> {
+    async fn new(path: &'static str) -> Result<Option<Arc<Self>>, Error> {
         let bootfs_dir = Path::new(path);
 
         // TODO(97517): Remove this check if there is never a case for starting component manager
@@ -82,10 +78,10 @@ impl FuchsiaBootResolver {
 
     /// Create a new FuchsiaBootResolver that resolves URLs within the given directory. Used for
     /// injection in unit tests.
-    async fn new_from_directory(proxy: fio::DirectoryProxy) -> Result<FuchsiaBootResolver, Error> {
+    async fn new_from_directory(proxy: fio::DirectoryProxy) -> Result<Arc<Self>, Error> {
         let boot_package_resolver = BootPackageResolver::try_instantiate(&proxy).await?;
 
-        Ok(FuchsiaBootResolver { boot_proxy: proxy, boot_package_resolver })
+        Ok(Arc::new(Self { boot_proxy: proxy, boot_package_resolver }))
     }
 
     async fn resolve_unpackaged_component(
@@ -215,39 +211,6 @@ impl FuchsiaBootResolver {
         }
     }
 
-    pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
-        vec![HooksRegistration::new(
-            "boot_resolver",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(self) as Weak<dyn Hook>,
-        )]
-    }
-
-    async fn on_capability_routed_async<'a>(
-        self: Arc<Self>,
-        source: &'a CapabilitySource,
-        capability_provider: Option<Box<dyn CapabilityProvider>>,
-    ) -> Result<Option<Box<dyn CapabilityProvider>>, ModelError> {
-        if self.matches_routed_capability(source) {
-            Ok(Some(Box::new(ComponentResolverCapabilityProvider::new(self.clone()))
-                as Box<dyn CapabilityProvider>))
-        } else {
-            Ok(capability_provider)
-        }
-    }
-
-    fn matches_routed_capability(&self, source: &CapabilitySource) -> bool {
-        match source {
-            CapabilitySource::Builtin {
-                capability: InternalCapability::Resolver(name), ..
-            } => *name == "boot_resolver",
-            CapabilitySource::Builtin {
-                capability: InternalCapability::Protocol(name), ..
-            } => *name == "fuchsia.component.resolution.Resolver",
-            _ => false,
-        }
-    }
-
     async fn serve(
         self: Arc<Self>,
         mut stream: fresolution::ResolverRequestStream,
@@ -272,17 +235,33 @@ impl FuchsiaBootResolver {
     }
 }
 
-#[async_trait]
-impl Hook for FuchsiaBootResolver {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted { source, capability_provider } = &event.payload {
-            let mut capability_provider = capability_provider.lock().await;
-            *capability_provider =
-                self.on_capability_routed_async(&source, capability_provider.take()).await?;
-        };
-        Ok(())
+pub struct FuchsiaBootResolverBuiltinCapability {
+    host: Arc<FuchsiaBootResolver>,
+}
+
+impl FuchsiaBootResolverBuiltinCapability {
+    pub async fn new(path: &'static str) -> Result<Option<Self>, Error> {
+        Ok(FuchsiaBootResolver::new(path).await?.map(|host| Self { host }))
+    }
+
+    pub fn host(&self) -> &Arc<FuchsiaBootResolver> {
+        &self.host
     }
 }
+
+impl BuiltinCapability for FuchsiaBootResolverBuiltinCapability {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        matches!(capability, InternalCapability::Resolver(n) if n.as_str() == "boot_resolver")
+            || matches!(capability,
+                InternalCapability::Protocol(n) if n.as_str() == "fuchsia.component.resolution.Resolver"
+            )
+    }
+
+    fn new_provider(&self, _target: WeakComponentInstance) -> Box<dyn CapabilityProvider> {
+        Box::new(ComponentResolverCapabilityProvider::new(self.host.clone()))
+    }
+}
+
 struct ComponentResolverCapabilityProvider {
     component_resolver: Arc<FuchsiaBootResolver>,
 }
@@ -294,25 +273,13 @@ impl ComponentResolverCapabilityProvider {
 }
 
 #[async_trait]
-impl CapabilityProvider for ComponentResolverCapabilityProvider {
-    async fn open(
-        self: Box<Self>,
-        task_group: TaskGroup,
-        _flags: fio::OpenFlags,
-        _relative_path: PathBuf,
-        server_end: &mut zx::Channel,
-    ) -> Result<(), CapabilityProviderError> {
-        let server_end = channel::take_channel(server_end);
-        let server_end = ServerEnd::<fresolution::ResolverMarker>::new(server_end);
-        let stream: fresolution::ResolverRequestStream =
-            server_end.into_stream().map_err(|_| CapabilityProviderError::StreamCreationError)?;
-        task_group.spawn(async move {
-            let result = self.component_resolver.serve(stream).await;
-            if let Err(error) = result {
-                tracing::warn!(%error, "FuchsiaBootResolver::serve failed: {:?}", error);
-            }
-        });
-        Ok(())
+impl InternalCapabilityProvider for ComponentResolverCapabilityProvider {
+    type Marker = fresolution::ResolverMarker;
+
+    async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
+        if let Err(error) = self.component_resolver.serve(server_end.into_stream().unwrap()).await {
+            tracing::warn!(%error, "FuchsiaBootResolver::serve failed");
+        }
     }
 }
 
@@ -467,11 +434,13 @@ mod tests {
         ::routing::resolving::ResolvedPackage,
         assert_matches::assert_matches,
         cm_rust::{FidlIntoNative, NativeIntoFidl},
+        cm_util::TaskGroup,
         fidl::endpoints::{create_endpoints, create_proxy, ServerEnd},
         fidl::persist,
         fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
         fuchsia_async::Task,
         fuchsia_fs::directory::open_in_namespace,
+        std::path::PathBuf,
         std::sync::{Arc, Weak},
         vfs::{
             self, directory::entry::DirectoryEntry, execution_scope::ExecutionScope,
@@ -587,7 +556,7 @@ mod tests {
             .unwrap(),
         );
         let (_task, bootfs) = serve_vfs_dir(root);
-        let resolver = Arc::new(FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap());
+        let resolver = FuchsiaBootResolver::new_from_directory(bootfs).await.unwrap();
         let resolver_provider =
             Box::new(ComponentResolverCapabilityProvider::new(resolver.clone()));
         let (client_channel, server_channel) = create_endpoints::<fresolution::ResolverMarker>();

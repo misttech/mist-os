@@ -20,7 +20,7 @@ use {
             elf_runner_memory_attribution::ElfRunnerMemoryAttribution,
             energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
-            fuchsia_boot_resolver::{FuchsiaBootResolver, SCHEME as BOOT_SCHEME},
+            fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
             hypervisor_resource::HypervisorResource,
             info_resource::InfoResource,
             irq_resource::IrqResource,
@@ -42,7 +42,7 @@ use {
             time::{create_utc_clock, UtcTimeMaintainer},
             vmex_resource::VmexResource,
         },
-        capability::{DerivedCapability, FrameworkCapability},
+        capability::{BuiltinCapability, DerivedCapability, FrameworkCapability},
         diagnostics::{startup::ComponentEarlyStartupTimeStats, task_metrics::ComponentTreeStats},
         directory_ready_notifier::DirectoryReadyNotifier,
         framework::{
@@ -62,8 +62,10 @@ use {
             environment::Environment,
             event_logger::EventLogger,
             events::{
-                registry::EventRegistry, serve::serve_event_stream_as_stream,
-                source_factory::EventSourceFactory, stream_provider::EventStreamProvider,
+                registry::EventRegistry,
+                serve::serve_event_stream_as_stream,
+                source_factory::{EventSourceFactory, EventSourceFactoryCapability},
+                stream_provider::EventStreamProvider,
             },
             hooks::EventType,
             model::{Model, ModelParams},
@@ -371,7 +373,7 @@ impl BuiltinEnvironmentBuilder {
             .runners
             .into_iter()
             .map(|(name, runner)| {
-                Arc::new(BuiltinRunner::new(name, runner, runtime_config.security_policy.clone()))
+                BuiltinRunner::new(name, runner, runtime_config.security_policy.clone())
             })
             .collect();
 
@@ -478,7 +480,6 @@ pub struct BuiltinEnvironment {
 
     pub realm_query: Option<Arc<RealmQuery>>,
     pub lifecycle_controller: Option<Arc<LifecycleController>>,
-    pub builtin_runners: Vec<Arc<BuiltinRunner>>,
     pub event_registry: Arc<EventRegistry>,
     pub event_source_factory: Arc<EventSourceFactory>,
     pub stop_notifier: Arc<RootStopNotifier>,
@@ -501,8 +502,8 @@ impl BuiltinEnvironment {
         model: Arc<Model>,
         runtime_config: Arc<RuntimeConfig>,
         system_resource_handle: Option<Resource>,
-        builtin_runners: Vec<Arc<BuiltinRunner>>,
-        boot_resolver: Option<Arc<FuchsiaBootResolver>>,
+        builtin_runners: Vec<BuiltinRunner>,
+        boot_resolver: Option<FuchsiaBootResolverBuiltinCapability>,
         realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
         utc_clock: Option<Arc<Clock>>,
         inspector: Inspector,
@@ -895,24 +896,57 @@ impl BuiltinEnvironment {
             },
         );
 
+        // Set up the directory ready notifier.
+        let directory_ready_notifier =
+            Arc::new(DirectoryReadyNotifier::new(Arc::downgrade(&model)));
+        model.root().hooks.install(directory_ready_notifier.hooks()).await;
+
+        // Set up the event registry.
+        let event_registry = {
+            let mut event_registry = EventRegistry::new(Arc::downgrade(&model));
+            event_registry.register_synthesis_provider(
+                EventType::DirectoryReady,
+                directory_ready_notifier.clone(),
+            );
+            event_registry.register_synthesis_provider(
+                EventType::CapabilityRequested,
+                Arc::new(InspectSinkProvider::new()),
+            );
+            Arc::new(event_registry)
+        };
+        model.root().hooks.install(event_registry.hooks()).await;
+
+        let event_stream_provider =
+            Arc::new(EventStreamProvider::new(Arc::downgrade(&event_registry)));
+        model.root().hooks.install(event_stream_provider.hooks()).await;
+
+        let event_source_factory = EventSourceFactory::new(
+            Arc::downgrade(model.top_instance()),
+            Arc::downgrade(&event_registry),
+            Arc::downgrade(&event_stream_provider),
+        );
+
+        let mut builtin_capabilities: Vec<Box<dyn BuiltinCapability>> =
+            vec![Box::new(EventSourceFactoryCapability::new(event_source_factory.clone()))];
         let mut framework_capabilities: Vec<Box<dyn FrameworkCapability>> = vec![
             Box::new(RealmFrameworkCapability::new(Arc::downgrade(&model), runtime_config.clone())),
             Box::new(BinderFrameworkCapability::new()),
             Box::new(FactoryFrameworkCapability::new()),
             Box::new(NamespaceFrameworkCapability::new()),
             Box::new(PkgDirectoryFrameworkCapability::new()),
+            Box::new(EventSourceFactoryCapability::new(event_source_factory.clone())),
         ];
         let derived_capabilities: Vec<Box<dyn DerivedCapability>> =
             vec![Box::new(StorageAdminDerivedCapability::new(Arc::downgrade(&model)))];
 
         // Set up the builtin runners.
-        for runner in &builtin_runners {
-            model.root().hooks.install(runner.hooks()).await;
+        for runner in builtin_runners {
+            builtin_capabilities.push(Box::new(runner));
         }
 
         // Set up the boot resolver so it is routable from "above root".
         if let Some(boot_resolver) = boot_resolver {
-            model.root().hooks.install(boot_resolver.hooks()).await;
+            builtin_capabilities.push(Box::new(boot_resolver));
         }
 
         // Set up the root realm stop notifier.
@@ -941,8 +975,14 @@ impl BuiltinEnvironment {
                 .push(Box::new(RouteValidatorFrameworkCapability::new(Arc::downgrade(&model))));
         }
 
-        model.context().init_framework_capabilities(framework_capabilities).await;
-        model.context().init_derived_capabilities(derived_capabilities).await;
+        model
+            .context()
+            .init_internal_capabilities(
+                builtin_capabilities,
+                framework_capabilities,
+                derived_capabilities,
+            )
+            .await;
 
         // Set up the Component Tree Diagnostics runtime statistics.
         let component_tree_stats =
@@ -959,38 +999,6 @@ impl BuiltinEnvironment {
         // Serve stats about inspect in a lazy node.
         let node = inspect::stats::Node::new(&inspector, inspector.root());
         inspector.root().record(node.take());
-
-        // Set up the directory ready notifier.
-        let directory_ready_notifier =
-            Arc::new(DirectoryReadyNotifier::new(Arc::downgrade(&model)));
-        model.root().hooks.install(directory_ready_notifier.hooks()).await;
-
-        // Set up the event registry.
-        let event_registry = {
-            let mut event_registry = EventRegistry::new(Arc::downgrade(&model));
-            event_registry.register_synthesis_provider(
-                EventType::DirectoryReady,
-                directory_ready_notifier.clone(),
-            );
-            event_registry.register_synthesis_provider(
-                EventType::CapabilityRequested,
-                Arc::new(InspectSinkProvider::new()),
-            );
-            Arc::new(event_registry)
-        };
-        model.root().hooks.install(event_registry.hooks()).await;
-
-        let event_stream_provider =
-            Arc::new(EventStreamProvider::new(Arc::downgrade(&event_registry)));
-
-        // Set up the event source factory.
-        let event_source_factory = Arc::new(EventSourceFactory::new(
-            Arc::downgrade(&model),
-            Arc::downgrade(&event_registry),
-            Arc::downgrade(&event_stream_provider),
-        ));
-        model.root().hooks.install(event_source_factory.hooks()).await;
-        model.root().hooks.install(event_stream_provider.hooks()).await;
 
         if let Some(elf_runner) = elf_runner {
             let elf_runner_memory_attribution = ElfRunnerMemoryAttribution::new(elf_runner);
@@ -1010,7 +1018,6 @@ impl BuiltinEnvironment {
             model,
             realm_query,
             lifecycle_controller,
-            builtin_runners,
             event_registry,
             event_source_factory,
             stop_notifier,
@@ -1067,7 +1074,7 @@ impl BuiltinEnvironment {
         // If component manager is in debug mode, create an event source scoped at the
         // root and offer it via ServiceFs to the outside world.
         if self.debug {
-            let event_source = self.event_source_factory.create_for_above_root().await?;
+            let event_source = self.event_source_factory.create_for_above_root();
 
             service_fs.dir("svc").add_fidl_service(move |stream| {
                 let mut event_source = event_source.clone();
@@ -1268,22 +1275,22 @@ fn register_builtin_resolver(resolvers: &mut ResolverRegistry) {
 async fn register_boot_resolver(
     resolvers: &mut ResolverRegistry,
     runtime_config: &RuntimeConfig,
-) -> Result<Option<Arc<FuchsiaBootResolver>>, Error> {
+) -> Result<Option<FuchsiaBootResolverBuiltinCapability>, Error> {
     let path = match &runtime_config.builtin_boot_resolver {
         BuiltinBootResolver::Boot => "/boot",
         BuiltinBootResolver::None => return Ok(None),
     };
-    let boot_resolver =
-        FuchsiaBootResolver::new(path).await.context("Failed to create boot resolver")?;
+    let boot_resolver = FuchsiaBootResolverBuiltinCapability::new(path)
+        .await
+        .context("Failed to create boot resolver")?;
     match boot_resolver {
         None => {
             info!(%path, "fuchsia-boot resolver unavailable, not in namespace");
             Ok(None)
         }
         Some(boot_resolver) => {
-            let resolver = Arc::new(boot_resolver);
-            resolvers.register(BOOT_SCHEME.to_string(), box_arc_resolver(&resolver));
-            Ok(Some(resolver))
+            resolvers.register(BOOT_SCHEME.to_string(), box_arc_resolver(boot_resolver.host()));
+            Ok(Some(boot_resolver))
         }
     }
 }

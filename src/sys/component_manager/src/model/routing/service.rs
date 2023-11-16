@@ -272,7 +272,7 @@ impl AnonymizedAggregateServiceDir {
     pub fn hooks(self: &Arc<Self>) -> Vec<HooksRegistration> {
         vec![HooksRegistration::new(
             "AnonymizedAggregateServiceDir",
-            vec![EventType::CapabilityRouted, EventType::Started, EventType::Stopped],
+            vec![EventType::Started, EventType::Stopped],
             Arc::downgrade(self) as Weak<dyn Hook>,
         )]
     }

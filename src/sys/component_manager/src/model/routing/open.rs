@@ -8,7 +8,6 @@ use {
         model::{
             component::{ComponentInstance, ExtendedInstance, StartReason, WeakComponentInstance},
             error::{ModelError, OpenError},
-            hooks::{Event, EventPayload},
             routing::{
                 providers::{
                     DefaultComponentCapabilityProvider, DirectoryEntryCapabilityProvider,
@@ -28,7 +27,6 @@ use {
     cm_util::channel,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    futures::lock::Mutex,
     moniker::MonikerBase,
     std::{path::PathBuf, sync::Arc},
 };
@@ -108,28 +106,11 @@ impl<'a> OpenRequest<'a> {
         {
             provider
         } else {
-            // Dispatch a CapabilityRouted event to get a capability provider
-
-            if let Some(provider) =
-                target.context.find_internal_provider(&source, target.as_weak()).await
-            {
-                provider
-            } else {
-                let mutexed_provider = Arc::new(Mutex::new(None));
-                let event = Event::new(
-                    &target,
-                    EventPayload::CapabilityRouted {
-                        source: source.clone(),
-                        capability_provider: mutexed_provider.clone(),
-                    },
-                );
-
-                // Get a capability provider from the tree
-                target.hooks.dispatch(&event).await;
-
-                let provider = mutexed_provider.lock().await.take();
-                provider.ok_or(OpenError::CapabilityProviderNotFound)?
-            }
+            target
+                .context
+                .find_internal_provider(&source, target.as_weak())
+                .await
+                .ok_or(OpenError::CapabilityProviderNotFound)?
         };
 
         let OpenOptions { flags, relative_path, mut server_chan } = open_options;

@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{ComponentInstance, WeakComponentInstance},
             error::OpenExposedDirError,
@@ -47,7 +47,7 @@ impl RealmCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for RealmCapabilityProvider {
+impl InternalCapabilityProvider for RealmCapabilityProvider {
     type Marker = fcomponent::RealmMarker;
 
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {

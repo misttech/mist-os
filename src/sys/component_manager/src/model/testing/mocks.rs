@@ -382,10 +382,6 @@ impl MockRunner {
         controller.abort();
     }
 
-    pub fn last_checker(&self) -> Option<ScopedPolicyChecker> {
-        self.inner.lock().unwrap().last_checker.take()
-    }
-
     async fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,

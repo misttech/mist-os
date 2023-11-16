@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, FrameworkCapability, FrameworkCapabilityProvider},
+        capability::{CapabilityProvider, FrameworkCapability, InternalCapabilityProvider},
         model::{
             component::{StartReason, WeakComponentInstance},
             error::ModelError,
@@ -67,7 +67,7 @@ impl BinderCapabilityProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for BinderCapabilityProvider {
+impl InternalCapabilityProvider for BinderCapabilityProvider {
     type Marker = fcomponent::BinderMarker;
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
         let server_end = server_end.into_channel().into();

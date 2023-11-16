@@ -4,10 +4,9 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource},
+        capability::{CapabilityProvider, FrameworkCapability},
         model::{
-            error::{CapabilityProviderError, ModelError},
-            hooks::{Event, EventPayload, EventType, Hook, HooksRegistration},
+            component::WeakComponentInstance, error::CapabilityProviderError,
             testing::routing_test_helpers::*,
         },
     },
@@ -20,10 +19,7 @@ use {
     cm_util::TaskGroup,
     fidl::endpoints::ServerEnd,
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
-    std::{
-        path::PathBuf,
-        sync::{Arc, Weak},
-    },
+    std::path::PathBuf,
 };
 
 #[fuchsia::test]
@@ -66,7 +62,7 @@ async fn offer_from_component_manager_namespace_directory_incompatible_rights() 
 struct MockFrameworkDirectoryProvider {
     test_dir_proxy: fio::DirectoryProxy,
 }
-struct MockFrameworkDirectoryHost {
+struct MockFrameworkDirectory {
     test_dir_proxy: fio::DirectoryProxy,
 }
 
@@ -89,28 +85,19 @@ impl CapabilityProvider for MockFrameworkDirectoryProvider {
     }
 }
 
-#[async_trait]
-impl Hook for MockFrameworkDirectoryHost {
-    async fn on(self: Arc<Self>, event: &Event) -> Result<(), ModelError> {
-        if let EventPayload::CapabilityRouted {
-            source:
-                CapabilitySource::Framework {
-                    capability: InternalCapability::Directory(source_name),
-                    ..
-                },
-            capability_provider,
-        } = &event.payload
-        {
-            let mut capability_provider = capability_provider.lock().await;
-            if source_name.as_str() == "foo_data" {
-                let test_dir_proxy =
-                    fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
-                        .expect("failed to clone test dir");
-                *capability_provider =
-                    Some(Box::new(MockFrameworkDirectoryProvider { test_dir_proxy }));
-            }
-        }
-        Ok(())
+impl FrameworkCapability for MockFrameworkDirectory {
+    fn matches(&self, capability: &InternalCapability) -> bool {
+        matches!(capability, InternalCapability::Directory(n) if n.as_str() == "foo_data")
+    }
+
+    fn new_provider(
+        &self,
+        _scope: WeakComponentInstance,
+        _target: WeakComponentInstance,
+    ) -> Box<dyn CapabilityProvider> {
+        let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&self.test_dir_proxy, None)
+            .expect("failed to clone test dir");
+        Box::new(MockFrameworkDirectoryProvider { test_dir_proxy })
     }
 }
 
@@ -153,16 +140,8 @@ async fn framework_directory_rights() {
     let test = RoutingTest::new("a", components).await;
     let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&test.test_dir_proxy, None)
         .expect("failed to clone test dir");
-    let directory_host = Arc::new(MockFrameworkDirectoryHost { test_dir_proxy });
-    test.model
-        .root()
-        .hooks
-        .install(vec![HooksRegistration::new(
-            "MockFrameworkDirectoryHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(&directory_host) as Weak<dyn Hook>,
-        )])
-        .await;
+    let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
+    test.model.context().add_framework_capability(directory_host).await;
     test.check_use(vec!["b"].try_into().unwrap(), CheckUse::default_directory(ExpectedResult::Ok))
         .await;
 }
@@ -206,16 +185,8 @@ async fn framework_directory_incompatible_rights() {
     let test = RoutingTest::new("a", components).await;
     let test_dir_proxy = fuchsia_fs::directory::clone_no_describe(&test.test_dir_proxy, None)
         .expect("failed to clone test dir");
-    let directory_host = Arc::new(MockFrameworkDirectoryHost { test_dir_proxy });
-    test.model
-        .root()
-        .hooks
-        .install(vec![HooksRegistration::new(
-            "MockFrameworkDirectoryHost",
-            vec![EventType::CapabilityRouted],
-            Arc::downgrade(&directory_host) as Weak<dyn Hook>,
-        )])
-        .await;
+    let directory_host = Box::new(MockFrameworkDirectory { test_dir_proxy });
+    test.model.context().add_framework_capability(directory_host).await;
     test.check_use(
         vec!["b"].try_into().unwrap(),
         CheckUse::default_directory(ExpectedResult::Err(zx::Status::ACCESS_DENIED)),

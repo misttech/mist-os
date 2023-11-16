@@ -12,7 +12,9 @@
 
 use {
     crate::{
-        capability::{CapabilityProvider, CapabilitySource, DerivedCapability, FrameworkCapabilityProvider},
+        capability::{
+            CapabilityProvider, CapabilitySource, DerivedCapability, InternalCapabilityProvider,
+        },
         model::{
             component::{ComponentInstance, WeakComponentInstance},
             error::ModelError,
@@ -159,7 +161,7 @@ impl StorageAdminProtocolProvider {
 }
 
 #[async_trait]
-impl FrameworkCapabilityProvider for StorageAdminProtocolProvider {
+impl InternalCapabilityProvider for StorageAdminProtocolProvider {
     type Marker = fsys::StorageAdminMarker;
     async fn open_protocol(self: Box<Self>, server_end: ServerEnd<Self::Marker>) {
         if let Err(error) = self

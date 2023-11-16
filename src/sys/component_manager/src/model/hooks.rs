@@ -3,12 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    crate::{
-        capability::{CapabilityProvider, CapabilitySource},
-        model::{
-            component::{ComponentInstance, Runtime, WeakComponentInstance},
-            error::ModelError,
-        },
+    crate::model::{
+        component::{ComponentInstance, Runtime, WeakComponentInstance},
+        error::ModelError,
     },
     anyhow::format_err,
     async_trait::async_trait,
@@ -129,8 +126,6 @@ macro_rules! external_events {
                     $(
                         EventType::$name => Ok(fcomponent::EventType::$name),
                     )*
-                    EventType::CapabilityRouted =>
-                        Err(format_err!("can't serve capability routed")),
                 }
             }
         }
@@ -139,13 +134,9 @@ macro_rules! external_events {
 
 // Keep the event types listed below in alphabetical order!
 events!([
-    /// After a CapabilityProvider has been selected through the CapabilityRouted event,
-    /// the CapabilityRequested event is dispatched with the ServerEnd of the channel
-    /// for the capability.
+    /// After a CapabilityProvider has been selected, the CapabilityRequested event is dispatched
+    /// with the ServerEnd of the channel for the capability.
     (CapabilityRequested, capability_requested),
-    /// A capability is being requested by a component and requires routing.
-    /// The event propagation system is used to supply the capability being requested.
-    (CapabilityRouted, capability_routed),
     /// A directory exposed to the framework by a component is available.
     (DirectoryReady, directory_ready),
     /// A component instance was discovered.
@@ -222,13 +213,6 @@ pub enum EventPayload {
         relative_path: PathBuf,
         capability: Arc<Mutex<Option<zx::Channel>>>,
     },
-    CapabilityRouted {
-        source: CapabilitySource,
-        // Events are passed to hooks as immutable borrows. In order to mutate,
-        // a field within an Event, interior mutability is employed here with
-        // a Mutex.
-        capability_provider: Arc<Mutex<Option<Box<dyn CapabilityProvider>>>>,
-    },
     DirectoryReady {
         name: String,
         node: fio::NodeProxy,
@@ -289,9 +273,6 @@ impl fmt::Debug for EventPayload {
             }
             EventPayload::CapabilityRequested { name, .. } => {
                 formatter.field("name", &name).finish()
-            }
-            EventPayload::CapabilityRouted { source: capability, .. } => {
-                formatter.field("capability", &capability).finish()
             }
             EventPayload::Started { component_decl, .. } => {
                 formatter.field("component_decl", &component_decl).finish()
@@ -431,9 +412,6 @@ impl fmt::Display for Event {
             EventPayload::DirectoryReady { name, .. } => format!("serving {}", name),
             EventPayload::CapabilityRequested { source_moniker, name, .. } => {
                 format!("requested '{}' from '{}'", name.to_string(), source_moniker)
-            }
-            EventPayload::CapabilityRouted { source, .. } => {
-                format!("routed {}", source.to_string())
             }
             EventPayload::Stopped { status } => {
                 format!("with status: {}", status.to_string())

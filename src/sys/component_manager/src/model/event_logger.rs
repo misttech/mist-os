@@ -25,7 +25,6 @@ impl EventLogger {
             vec![
                 EventType::DirectoryReady,
                 EventType::CapabilityRequested,
-                EventType::CapabilityRouted,
                 EventType::Destroyed,
                 EventType::Started,
                 EventType::Stopped,
