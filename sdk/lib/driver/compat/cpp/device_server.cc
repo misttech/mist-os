@@ -386,7 +386,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
       return;
     }
 
-    if (!metadata_result.value().is_error()) {
+    if (metadata_result.value().is_error()) {
       FDF_LOG(WARNING, "Failed to get metadata from default parent. %s",
               zx_status_get_string(metadata_result.value().error_value()));
       ServeAndSetInitializeResult(fdf::Dispatcher::GetCurrent()->async_dispatcher(), outgoing);
@@ -403,7 +403,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
         continue;
       }
 
-      if (!metadata_result.value().is_error()) {
+      if (metadata_result.value().is_error()) {
         FDF_LOG(WARNING, "Failed to get metadata from parent %s. %s", parent_name.c_str(),
                 zx_status_get_string(metadata_result.value().error_value()));
         continue;
