@@ -1154,9 +1154,13 @@ struct Thread {
   //     any common CPUs).
   //
   // If the two masks conflict, the hard affinity wins.
-  void SetCpuAffinity(cpu_mask_t affinity) TA_EXCL(thread_lock);
+  //
+  // Setting the affinity mask returns the previous value to make pinning and
+  // restoring operations simpler and more efficient.
+  //
+  cpu_mask_t SetCpuAffinity(cpu_mask_t affinity) TA_EXCL(thread_lock);
   cpu_mask_t GetCpuAffinity() const TA_EXCL(thread_lock);
-  void SetSoftCpuAffinity(cpu_mask_t affinity) TA_EXCL(thread_lock);
+  cpu_mask_t SetSoftCpuAffinity(cpu_mask_t affinity) TA_EXCL(thread_lock);
   cpu_mask_t GetSoftCpuAffinity() const TA_EXCL(thread_lock);
 
   enum class MigrateStage {

@@ -753,7 +753,7 @@ cpu_mask_t Thread::GetCpuAffinity() const {
   return scheduler_state_.hard_affinity();
 }
 
-void Thread::SetCpuAffinity(cpu_mask_t affinity) {
+cpu_mask_t Thread::SetCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
   DEBUG_ASSERT_MSG(
       (affinity & mp_get_active_mask()) != 0,
@@ -762,22 +762,30 @@ void Thread::SetCpuAffinity(cpu_mask_t affinity) {
 
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
-  // set the affinity mask
+  const cpu_mask_t previous_affinity = scheduler_state_.hard_affinity();
   scheduler_state_.hard_affinity_ = affinity;
 
-  // let the scheduler deal with it
-  Scheduler::Migrate(this);
+  // Migrate to a different CPU if the current is no longer in the affinity mask.
+  if ((affinity & cpu_num_to_mask(arch_curr_cpu_num())) == 0) {
+    Scheduler::Migrate(this);
+  }
+
+  return previous_affinity;
 }
 
-void Thread::SetSoftCpuAffinity(cpu_mask_t affinity) {
+cpu_mask_t Thread::SetSoftCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
   Guard<MonitoredSpinLock, IrqSave> guard{ThreadLock::Get(), SOURCE_TAG};
 
-  // set the affinity mask
+  const cpu_mask_t previous_affinity = scheduler_state_.soft_affinity();
   scheduler_state_.soft_affinity_ = affinity;
 
-  // let the scheduler deal with it
-  Scheduler::Migrate(this);
+  // Migrate to a different CPU if the current is no longer in the affinity mask.
+  if ((affinity & cpu_num_to_mask(arch_curr_cpu_num())) == 0) {
+    Scheduler::Migrate(this);
+  }
+
+  return previous_affinity;
 }
 
 cpu_mask_t Thread::GetSoftCpuAffinity() const {
