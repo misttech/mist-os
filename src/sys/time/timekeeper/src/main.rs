@@ -147,12 +147,17 @@ struct MonitorTrack {
     clock: Arc<zx::Clock>,
 }
 
+fn koid_of(c: &zx::Clock) -> u64 {
+    c.as_handle_ref().get_koid().expect("infallible").raw_koid()
+}
+
 #[fuchsia::main(logging_tags=["time", "timekeeper"])]
 async fn main() -> Result<()> {
     let config: Arc<Config> =
         Arc::new(timekeeper_config::Config::take_from_startup_handle().into());
 
-    debug!("config: {:?}", &config);
+    // If we don't get this, timekeeper probably didn't even start.
+    debug!("starting timekeeper: config: {:?}", &config);
 
     info!("retrieving UTC clock handle");
     let time_maintainer =
@@ -163,6 +168,7 @@ async fn main() -> Result<()> {
             .await
             .context("failed to get UTC clock from maintainer")?,
     );
+    debug!("utc_clock handle with koid: {}", koid_of(&utc_clock));
 
     let time_source_urls = TimeSourceUrls {
         primary: TimeSourceDetails {

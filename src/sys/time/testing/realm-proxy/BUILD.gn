@@ -29,6 +29,7 @@ rustc_binary("bin") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.metrics.test:fuchsia.metrics.test_rust",
+    "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
@@ -58,8 +59,10 @@ fuchsia_package("pkg") {
     ":default",
     "//src/cobalt/bin/testing/mock_cobalt:component_v2",
     "//src/lib/fake-clock/svc",
+    "//src/sys/time/timekeeper_integration:config-values-faketime",
     "//src/sys/time/timekeeper_integration:config-values-integration",
     "//src/sys/time/timekeeper_integration:timekeeper_for_integration",
+    "//src/sys/time/timekeeper_integration:timekeeper_with_fake_time",
     "//src/sys/time/timekeeper_integration/dev_time_source:dev_time_source",
   ]
 }

@@ -21,6 +21,9 @@ fidl::UnownedClientEnd<fake_clock::FakeClock> GetService() {
   static std::once_flag svc_connect_once;
   static fidl::ClientEnd<fake_clock::FakeClock> fake_clock;
 
+  // Writing log messages almost anywhere here will crash the program. So,
+  // we must do without logging. Also, any errors here will result in bizarre
+  // low level stack traces, since the C runtime library calls into this code.
   std::call_once(svc_connect_once, []() {
     if (!fake_clock.is_valid()) {
       zx::result result = component::Connect<fake_clock::FakeClock>();

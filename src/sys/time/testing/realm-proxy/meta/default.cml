@@ -12,7 +12,13 @@
         binary: "bin/timekeeper-test-realm-factory",
     },
     capabilities: [
-        { protocol: "test.time.realm.RealmFactory" },
+        {
+            protocol: [
+                "fuchsia.testing.FakeClock",
+                "fuchsia.testing.FakeClockControl",
+                "test.time.realm.RealmFactory",
+            ],
+        },
     ],
     offer: [
         {
@@ -46,7 +52,15 @@
     ],
     expose: [
         {
-            protocol: "test.time.realm.RealmFactory",
+            protocol: [
+                // The below two protocols are forwarded programmatically to
+                // the #realm_builder collection. This is because there is no
+                // way to route directly to a collection (as opposed to a
+                // statically defined child component).
+                "fuchsia.testing.FakeClock",
+                "fuchsia.testing.FakeClockControl",
+                "test.time.realm.RealmFactory",
+            ],
             from: "self",
         },
     ],

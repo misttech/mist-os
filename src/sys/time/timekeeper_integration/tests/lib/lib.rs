@@ -101,6 +101,7 @@ impl NestedTimekeeper {
             builder.add_child("mock_cobalt", COBALT_URL, ChildOptions::new()).await.unwrap();
 
         let timekeeper_url = if use_fake_clock { TIMEKEEPER_FAKE_TIME_URL } else { TIMEKEEPER_URL };
+        tracing::trace!("using timekeeper_url: {}", timekeeper_url);
         let timekeeper = builder
             .add_child("timekeeper_test", timekeeper_url, ChildOptions::new().eager())
             .await
@@ -794,6 +795,25 @@ macro_rules! poll_until_async {
             &$crate::SourceLocation::new(file!(), line!(), column!()),
         )
     };
+}
+
+/// A reimplementation of the above, which deals better with borrows.
+#[macro_export]
+macro_rules! poll_until_async_2 {
+    ($condition:expr) => {{
+        let loc = $crate::SourceLocation::new(file!(), line!(), column!());
+        tracing::info!("=> poll_until_async() for {}", &loc);
+        let mut result = true;
+        loop {
+            result = $condition.await;
+            if result {
+                break;
+            }
+            fasync::Timer::new(fasync::Time::after($crate::RETRY_WAIT_DURATION)).await;
+        }
+        tracing::info!("=> poll_until_async_2() done for {}", &loc);
+        result
+    }};
 }
 
 /// Repeatedly evaluates `condition` until it returns `true`. Returns `()`.

@@ -15,7 +15,7 @@ use futures::{
     stream::{StreamExt, TryStreamExt},
     FutureExt,
 };
-use tracing::{debug, error, warn};
+use tracing::{debug, error, trace, warn};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
 use std::convert::TryFrom;
@@ -351,7 +351,7 @@ impl<T: FakeClockObserver> FakeClock<T> {
             }
         }
         .nanos();
-        debug!("incrementing mock clock {:?} => {:?}", increment, dur);
+        trace!("incrementing mock clock {:?} => {:?}", increment, dur);
         self.time += dur;
         let () = self.check_events();
         if self.check_stop_points() {
@@ -374,9 +374,12 @@ fn start_free_running<T: FakeClockObserver>(
 ) {
     let mock_clock_clone = Arc::clone(&mock_clock);
 
+    debug!(
+        "start free running mock clock: real_increment={:?} increment={:?}",
+        real_increment, increment
+    );
     mock_clock.lock().unwrap().free_running = Some(fasync::Task::local(async move {
         let mut itv = fasync::Interval::new(real_increment);
-        debug!("free running mock clock {:?} {:?}", real_increment, increment);
         loop {
             itv.next().await;
             mock_clock_clone.lock().unwrap().increment(&increment);
@@ -510,7 +513,7 @@ async fn handle_events<T: FakeClockObserver>(
     .await
 }
 
-#[fuchsia::main(logging_minimum_severity = "trace")]
+#[fuchsia::main]
 async fn main() -> Result<(), Error> {
     debug!("Starting mock clock service");
 
