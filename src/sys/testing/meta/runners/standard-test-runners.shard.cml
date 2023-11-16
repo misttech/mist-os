@@ -32,6 +32,10 @@
             url: "fuchsia-pkg://fuchsia.com/gunit-runner#meta/gunit-runner.cm",
         },
         {
+            name: "rust_test_create_raw_processes_runner",
+            url: "fuchsia-pkg://fuchsia.com/rust-test-create-raw-processes-runner#meta/rust-test-create-raw-processes-runner.cm",
+        },
+        {
             name: "rust_test_next_vdso_runner",
             url: "fuchsia-pkg://fuchsia.com/rust-test-next-vdso-runner#meta/rust-test-next-vdso-runner.cm",
         },
@@ -59,6 +63,7 @@
                 "#go_test_runner",
                 "#gtest_runner",
                 "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
             ],
@@ -74,6 +79,7 @@
                 "#go_test_runner",
                 "#gtest_runner",
                 "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
             ],
@@ -85,6 +91,7 @@
             to: [
                 "#gtest_runner",
                 "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
             ],

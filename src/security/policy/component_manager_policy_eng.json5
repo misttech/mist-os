@@ -33,6 +33,8 @@
             ],
             create_raw_processes: [
                 "/core/test_manager/elf_test_create_raw_processes_runner",
+                "/core/test_manager/rust_test_create_raw_processes_runner",
+                "/core/testing/rust_test_create_raw_processes_runner",
             ],
         },
         capability_policy: [

@@ -58,6 +58,10 @@
             url: "netemul-test-runner#meta/netemul-test-runner.cm",
         },
         {
+            name: "rust_test_create_raw_processes_runner",
+            url: "rust-test-create-raw-processes-runner#meta/rust-test-create-raw-processes-runner.cm",
+        },
+        {
             name: "rust_test_next_vdso_runner",
             url: "rust-test-next-vdso-runner#meta/rust-test-next-vdso-runner.cm",
         },
@@ -299,28 +303,6 @@
             to: "#system-tests",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: [
-                "#debug_data",
-                "#early_boot_instrumentation",
-                "#elf_test_ambient_exec_runner",
-                "#elf_test_runner",
-                "#fuzz_test_runner",
-                "#go_test_runner",
-                "#gtest_runner",
-                "#gunit_runner",
-                "#inspect_test_runner",
-                "#lib_loader_cache",
-                "#netemul_test_runner",
-                "#runner_memfs",
-                "#rust_test_runner",
-                "#starnix_unit_test_runner",
-                "#stress_test_runner",
-                "#test_tmpfs",
-            ],
-        },
-        {
             protocol: "fuchsia.process.Launcher",
             from: "parent",
             to: [
@@ -333,6 +315,7 @@
                 "#gtest_runner",
                 "#gunit_runner",
                 "#netemul_test_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",
@@ -350,6 +333,7 @@
                 "#go_test_runner",
                 "#gtest_runner",
                 "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",
@@ -388,6 +372,7 @@
             to: [
                 "#gtest_runner",
                 "#gunit_runner",
+                "#rust_test_create_raw_processes_runner",
                 "#rust_test_next_vdso_runner",
                 "#rust_test_runner",
                 "#starnix_unit_test_runner",

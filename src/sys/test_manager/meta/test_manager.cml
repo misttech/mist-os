@@ -50,6 +50,10 @@
                     from: "#rust_test_runner",
                 },
                 {
+                    runner: "rust_test_create_raw_processes_runner",
+                    from: "#rust_test_create_raw_processes_runner",
+                },
+                {
                     runner: "rust_test_next_vdso_runner",
                     from: "#rust_test_next_vdso_runner",
                 },

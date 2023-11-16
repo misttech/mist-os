@@ -63,6 +63,24 @@ fuchsia_package("rust-test-runner") {
   deps = [ ":rust_test_runner" ]
 }
 
+fuchsia_component("rust_test_create_raw_processes_runner") {
+  testonly = true
+  manifest = "meta/rust-test-create-raw-processes-runner.cml"
+  component_name = "rust-test-create-raw-processes-runner"
+  deps = [ ":bin" ]
+}
+
+fuchsia_package("rust-test-create-raw-processes-runner") {
+  testonly = true
+  visibility = [
+    ":*",
+    "//bundles/assembly/*",
+    "//sdk/ctf/*",
+    "//src/sys/test_manager:*",
+  ]
+  deps = [ ":rust_test_create_raw_processes_runner" ]
+}
+
 fuchsia_component("rust_test_next_vdso_runner") {
   testonly = true
   manifest = "meta/rust-test-next-vdso-runner.cml"
