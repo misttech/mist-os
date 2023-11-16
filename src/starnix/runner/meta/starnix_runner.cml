@@ -64,7 +64,6 @@
         },
         {
             protocol: [
-                "fuchsia.net.name.DnsServerWatcher",
                 "fuchsia.net.stack.Stack",
                 "fuchsia.power.battery.BatteryManager",
                 "fuchsia.ui.composition.Allocator",
