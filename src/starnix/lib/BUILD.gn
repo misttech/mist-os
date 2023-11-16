@@ -32,3 +32,8 @@ group("tests") {
     # "kill_job_on_panic:tests",
   ]
 }
+
+group("benchmarks") {
+  testonly = true
+  deps = [ "extended_pstate:benchmarks" ]
+}

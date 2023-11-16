@@ -20,7 +20,6 @@ test_list = [
   # keep-sorted start
   "audio_mixer_profiler_test",
   "driver_runtime_microbenchmarks_test",
-  "extended_pstate_benchmarks_test",
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
@@ -216,7 +215,6 @@ if (is_host) {
     # keep-sorted start
     "fuchsia.audio.txt",
     "fuchsia.driver_runtime_microbenchmarks.txt",
-    "fuchsia.extended_pstate.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_llcpp.txt",
@@ -319,6 +317,7 @@ group("package_deps") {
     "//src/diagnostics:benchmarks",
     "//src/lib/diagnostics:benchmarks",
     "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",
+    "//src/starnix:benchmarks",
     "//src/tests/benchmarks:kernel-boot-benchmarks",
     "//src/tests/benchmarks/fidl:benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
@@ -339,9 +338,6 @@ group("package_deps") {
 
     # This is used by storage_benchmarks_test.
     "//src/storage/benchmarks/fuchsia:benchmarks",
-
-    # These are used by extended_pstate_test
-    "//src/starnix/lib/extended_pstate",
 
     # Used by the tracing_microbenchmarks test
     "//src/lib/trace/rust/bench",
