@@ -2,11 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{
-    HandleBased, {self as zx},
-};
-use std::sync::Arc;
-
 use crate::{
     fs::{
         anon_fs,
@@ -26,6 +21,10 @@ use crate::{
     },
     vmex_resource::VMEX_RESOURCE,
 };
+use fuchsia_zircon::{
+    HandleBased, {self as zx},
+};
+use std::sync::Arc;
 
 pub struct VmoFileNode {
     /// The memory that backs this file.
@@ -356,6 +355,7 @@ pub fn new_memfd(
 ) -> Result<FileHandle, Errno> {
     let fs = anon_fs(current_task.kernel());
     let node = fs.create_node(
+        current_task,
         VmoFileNode::new()?,
         FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
     );

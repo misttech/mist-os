@@ -24,7 +24,6 @@ use crate::{
         user_address::UserAddress,
     },
 };
-
 use fuchsia_zircon::{
     cprng_draw, {self as zx},
 };
@@ -33,9 +32,9 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct DevNull;
 
-pub fn new_null_file(kernel: &Arc<Kernel>, flags: OpenFlags) -> FileHandle {
+pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle {
     Anon::new_file_extended(
-        kernel,
+        current_task,
         Box::new(DevNull),
         flags,
         FsNodeInfo::new_factory(FileMode::from_bits(0o666), FsCred::root()),

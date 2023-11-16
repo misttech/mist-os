@@ -12,11 +12,6 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use lock_sequence::{Locked, Unlocked};
-use starnix_lock::{declare_lock_levels, OrderedMutex};
-use std::{collections::BTreeMap, ops::Bound, sync::Arc};
-use zerocopy::{AsBytes, FromBytes};
-
 use crate::{
     auth::FsCred,
     fs::{
@@ -48,6 +43,10 @@ use crate::{
         BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
     },
 };
+use lock_sequence::{Locked, Unlocked};
+use starnix_lock::{declare_lock_levels, OrderedMutex};
+use std::{collections::BTreeMap, ops::Bound, sync::Arc};
+use zerocopy::{AsBytes, FromBytes};
 
 declare_lock_levels![BpfMapEntries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>>];
 use self::lock_levels::BpfMapEntries;
@@ -472,6 +471,7 @@ impl BpfFsDir {
     ) -> Result<(), Errno> {
         node.entry.create_entry(current_task, &node.mount, name, |dir, _mount, _name| {
             Ok(dir.fs().create_node(
+                current_task,
                 BpfFsObject::new(object, &selinux_context),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o600), FsCred::root()),
             ))
@@ -495,13 +495,14 @@ impl FsNodeOps for BpfFsDir {
     fn mkdir(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let selinux_context = get_selinux_context(name);
         Ok(node.fs().create_node(
+            current_task,
             BpfFsDir::new(&selinux_context),
             FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
         ))

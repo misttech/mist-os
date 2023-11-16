@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::{Mutex, MutexGuard};
-use std::{convert::TryInto, sync::Arc};
-
 use crate::{
     fs::{
         buffers::{
@@ -28,6 +25,8 @@ use crate::{
         FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
     },
 };
+use starnix_lock::{Mutex, MutexGuard};
+use std::{convert::TryInto, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;
 const PIPE_MAX_SIZE: usize = 1048576; // From pipe.go in gVisor.
@@ -262,7 +261,7 @@ impl Pipe {
 /// sys_pipe2().
 pub fn new_pipe(current_task: &CurrentTask) -> Result<(FileHandle, FileHandle), Errno> {
     let fs = pipe_fs(current_task.kernel());
-    let node = fs.create_node(SpecialNode, |id| {
+    let node = fs.create_node(current_task, SpecialNode, |id| {
         let mut info = FsNodeInfo::new(id, mode!(IFIFO, 0o600), current_task.as_fscred());
         info.blksize = ATOMIC_IO_BYTES.into();
         info

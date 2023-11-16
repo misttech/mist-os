@@ -638,49 +638,17 @@ impl fmt::Debug for Mount {
     }
 }
 
-impl Kernel {
-    pub fn create_filesystem(
-        self: &Arc<Self>,
+pub trait FileSystemCreator {
+    fn kernel(&self) -> &Arc<Kernel>;
+
+    fn create_filesystem(
+        &self,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
-        Ok(match fs_type {
-            b"binder" => BinderFs::new_fs(self, options)?,
-            b"bpf" => BpfFs::new_fs(self, options)?,
-            b"devpts" => dev_pts_fs(self, options).clone(),
-            b"devtmpfs" => dev_tmp_fs(self).clone(),
-            b"proc" => proc_fs(self, options).clone(),
-            b"remotefs" => crate::execution::create_remotefs_filesystem(
-                self,
-                self.container_data_dir
-                    .as_ref()
-                    .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-                options,
-            )?,
-            b"selinuxfs" => {
-                if self.security_server.is_some() {
-                    selinux_fs(self, options).clone()
-                } else {
-                    return error!(ENODEV, String::from_utf8_lossy(fs_type));
-                }
-            }
-            b"sysfs" => sys_fs(self, options).clone(),
-            b"tmpfs" => {
-                let fs = TmpFs::new_fs_with_options(self, options)?;
-                if self.has_fake_selinux() {
-                    let label = b"u:object_r:tmpfs:s0";
-                    fs.selinux_context.set(label.to_vec()).unwrap();
-                }
-                fs
-            }
-            b"tracefs" => trace_fs(self, options).clone(),
-            _ => {
-                return error!(ENODEV, String::from_utf8_lossy(fs_type));
-            }
-        })
-    }
+    ) -> Result<FileSystemHandle, Errno>;
+}
 
+impl Kernel {
     pub fn get_next_mount_id(&self) -> u64 {
         self.next_mount_id.fetch_add(1, Ordering::Relaxed)
     }
@@ -694,26 +662,71 @@ impl Kernel {
     }
 }
 
-impl CurrentTask {
-    pub fn create_filesystem(
+impl FileSystemCreator for Arc<Kernel> {
+    fn kernel(&self) -> &Arc<Kernel> {
+        self
+    }
+
+    fn create_filesystem(
         &self,
         fs_type: &FsStr,
-        source: &FsStr,
-        flags: MountFlags,
-        data: &FsStr,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno> {
+        Ok(match fs_type {
+            b"binder" => BinderFs::new_fs(self, options)?,
+            b"bpf" => BpfFs::new_fs(self, options)?,
+            b"devpts" => dev_pts_fs(self, options).clone(),
+            b"devtmpfs" => dev_tmp_fs(self).clone(),
+            b"remotefs" => crate::execution::create_remotefs_filesystem(
+                self,
+                self.container_data_dir
+                    .as_ref()
+                    .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                options,
+            )?,
+            b"tmpfs" => {
+                let fs = TmpFs::new_fs_with_options(self, options)?;
+                if self.has_fake_selinux() {
+                    let label = b"u:object_r:tmpfs:s0";
+                    fs.selinux_context.set(label.to_vec()).unwrap();
+                }
+                fs
+            }
+            _ => {
+                return error!(ENODEV, String::from_utf8_lossy(fs_type));
+            }
+        })
+    }
+}
+
+impl FileSystemCreator for CurrentTask {
+    fn kernel(&self) -> &Arc<Kernel> {
+        (self as &Task).kernel()
+    }
+
+    fn create_filesystem(
+        &self,
+        fs_type: &FsStr,
+        options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = self.kernel();
-        let options = FileSystemOptions {
-            source: source.to_vec(),
-            flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-            params: data.to_vec(),
-        };
 
         match fs_type {
             b"fuse" => new_fuse_fs(self, options),
             b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
             b"overlay" => OverlayFs::new_fs(self, options),
-            _ => self.kernel().create_filesystem(fs_type, options),
+            b"proc" => Ok(proc_fs(self, options).clone()),
+            b"tracefs" => Ok(trace_fs(self, options).clone()),
+            b"selinuxfs" => {
+                if self.kernel().security_server.is_some() {
+                    Ok(selinux_fs(self, options).clone())
+                } else {
+                    error!(ENODEV, String::from_utf8_lossy(fs_type))
+                }
+            }
+            b"sysfs" => Ok(sys_fs(self, options).clone()),
+            _ => kernel.create_filesystem(fs_type, options),
         }
     }
 }

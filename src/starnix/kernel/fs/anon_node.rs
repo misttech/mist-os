@@ -35,13 +35,13 @@ impl FsNodeOps for Anon {
 
 impl Anon {
     pub fn new_file_extended(
-        kernel: &Arc<Kernel>,
+        current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         info: impl FnOnce(ino_t) -> FsNodeInfo,
     ) -> FileHandle {
-        let fs = anon_fs(kernel);
-        FileObject::new_anonymous(ops, fs.create_node(Anon, info), flags)
+        let fs = anon_fs(current_task.kernel());
+        FileObject::new_anonymous(ops, fs.create_node(current_task, Anon, info), flags)
     }
 
     pub fn new_file(
@@ -50,7 +50,7 @@ impl Anon {
         flags: OpenFlags,
     ) -> FileHandle {
         Self::new_file_extended(
-            current_task.kernel(),
+            current_task,
             ops,
             flags,
             FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),

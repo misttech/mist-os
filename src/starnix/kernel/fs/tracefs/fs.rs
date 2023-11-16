@@ -9,14 +9,13 @@ use crate::{
         CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNodeInfo, FsStr, StaticDirectoryBuilder,
     },
-    task::{CurrentTask, Kernel},
+    task::CurrentTask,
     types::{errno::Errno, file_mode::mode, statfs, TRACEFS_MAGIC},
 };
-
 use std::sync::Arc;
 
-pub fn trace_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
-    kernel.trace_fs.get_or_init(|| TraceFs::new_fs(&kernel, options))
+pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
+    current_task.kernel().trace_fs.get_or_init(|| TraceFs::new_fs(current_task, options))
 }
 
 pub struct TraceFs;
@@ -32,13 +31,15 @@ impl FileSystemOps for Arc<TraceFs> {
 }
 
 impl TraceFs {
-    pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
+    pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
+        let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(TraceFs), options);
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(
             b"trace",
             fs.create_node(
+                current_task,
                 ConstFile::new_node(vec![]),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
             ),
@@ -46,23 +47,30 @@ impl TraceFs {
         // The remaining contents of the fs are a minimal set of files that we want to exist so
         // that Perfetto's ftrace controller will not error out. None of them provide any real
         // functionality.
-        dir.subdir(b"per_cpu", 0o755, |dir| {
+        dir.subdir(current_task, b"per_cpu", 0o755, |dir| {
             for cpu in 0..fuchsia_zircon::system_get_num_cpus() {
                 let dir_name = format!("cpu{}", cpu);
-                dir.subdir(Box::leak(dir_name.into_boxed_str()).as_bytes(), 0o755, |dir| {
-                    dir.node(
-                        b"trace_pipe_raw",
-                        fs.create_node(
-                            ConstFile::new_node(vec![]),
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
-                        ),
-                    );
-                });
+                dir.subdir(
+                    current_task,
+                    Box::leak(dir_name.into_boxed_str()).as_bytes(),
+                    0o755,
+                    |dir| {
+                        dir.node(
+                            b"trace_pipe_raw",
+                            fs.create_node(
+                                current_task,
+                                ConstFile::new_node(vec![]),
+                                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                            ),
+                        );
+                    },
+                );
             }
         });
         dir.node(
             b"tracing_on",
             fs.create_node(
+                current_task,
                 ConstFile::new_node(b"0".to_vec()),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
             ),
@@ -70,6 +78,7 @@ impl TraceFs {
         dir.node(
             b"trace_marker",
             fs.create_node(
+                current_task,
                 TraceMarkerFile::new_node(),
                 FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
             ),

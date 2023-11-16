@@ -1,6 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
 use crate::{
     auth::FsCred,
     fs::{
@@ -17,7 +18,6 @@ use crate::{
         open_flags::OpenFlags,
     },
 };
-
 use std::sync::Weak;
 
 pub struct SysFsDirectory {
@@ -61,11 +61,12 @@ impl FsNodeOps for SysFsDirectory {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match self.kobject().get_child(name) {
             Some(child_kobject) => Ok(node.fs().create_node(
+                current_task,
                 child_kobject.ops(),
                 FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),

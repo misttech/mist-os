@@ -28,7 +28,7 @@ use crate::{
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
-use ext4_metadata::{Node, NodeInfo};
+use ext4_metadata::{Metadata, Node, NodeInfo};
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon::{
     HandleBased, {self as zx},
@@ -39,8 +39,6 @@ use std::{
     sync::{Arc, Mutex},
 };
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
-
-use ext4_metadata::Metadata;
 
 const REMOTE_BUNDLE_NODE_LRU_CAPACITY: usize = 1024;
 
@@ -393,7 +391,7 @@ impl FsNodeOps for DirectoryObject {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
@@ -411,8 +409,12 @@ impl FsNodeOps for DirectoryObject {
         let info = to_fs_node_info(inode_num, metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => Ok(fs.create_node_with_id(SymlinkObject, inode_num, info)),
-            NodeInfo::Directory(_) => Ok(fs.create_node_with_id(DirectoryObject, inode_num, info)),
+            NodeInfo::Symlink(_) => {
+                Ok(fs.create_node_with_id(current_task, SymlinkObject, inode_num, info))
+            }
+            NodeInfo::Directory(_) => {
+                Ok(fs.create_node_with_id(current_task, DirectoryObject, inode_num, info))
+            }
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
                 bundle
@@ -426,6 +428,7 @@ impl FsNodeOps for DirectoryObject {
                     .map_err(|_| errno!(EIO))?;
                 let file = fio::FileSynchronousProxy::new(file.into_channel());
                 Ok(fs.create_node_with_id(
+                    current_task,
                     File { inner: Mutex::new(Inner::NeedsVmo(file)) },
                     inode_num,
                     info,

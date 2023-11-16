@@ -2,7 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{device::run_component_features, task::CurrentTask};
+use crate::{
+    auth::Credentials,
+    device::run_component_features,
+    execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
+    fs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
+    logging::{log_error, log_info},
+    signals,
+    task::{CurrentTask, ExitStatus, Task},
+    types::{
+        auth::Capabilities,
+        device_type::DeviceType,
+        errno::{Errno, EEXIST, ENOTDIR},
+        file_mode::mode,
+        mount_flags::MountFlags,
+        open_flags::OpenFlags,
+        ownership::{release_on_error, ReleasableByRef, WeakRef},
+        signals::{SIGINT, SIGKILL},
+    },
+};
 use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
@@ -17,25 +35,6 @@ use fuchsia_zircon as zx;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path};
-
-use crate::{
-    auth::Credentials,
-    execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
-    fs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
-    logging::{log_error, log_info},
-    signals,
-    task::{ExitStatus, Task},
-    types::{
-        auth::Capabilities,
-        device_type::DeviceType,
-        errno::{Errno, EEXIST, ENOTDIR},
-        file_mode::mode,
-        mount_flags::MountFlags,
-        open_flags::OpenFlags,
-        ownership::{release_on_error, ReleasableByRef, WeakRef},
-        signals::{SIGINT, SIGKILL},
-    },
-};
 
 /// Component controller epitaph value used as the base value to pass non-zero error
 /// codes to the calling component.
@@ -157,7 +156,7 @@ pub async fn start_component(
         if let Some(local_mounts) = get_program_strvec(&start_info, "component_mounts")? {
             for mount in local_mounts.iter() {
                 let (mount_point, child_fs) =
-                    create_filesystem_from_spec(current_task.kernel(), &pkg, mount)?;
+                    create_filesystem_from_spec(&current_task, &pkg, mount)?;
                 let mount_point = current_task.lookup_path_from_root(mount_point)?;
                 mount_record.mount(mount_point, WhatToMount::Fs(child_fs), MountFlags::empty())?;
             }

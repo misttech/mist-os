@@ -2,27 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bstr::BString;
-use fidl::{
-    endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy},
-    AsHandleRef,
-};
-use fidl_fuchsia_io as fio;
-use fuchsia_async as fasync;
-use fuchsia_zircon as zx;
-use futures::FutureExt;
-use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
-use once_cell::sync::OnceCell;
-use selinux::security_server::SecurityServer;
-use starnix_lock::{declare_lock_levels, OrderedRwLock, RwLock};
-use std::{
-    collections::BTreeMap,
-    sync::{
-        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
-        Arc, Weak,
-    },
-};
-
 use crate::{
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
@@ -52,6 +31,26 @@ use crate::{
         open_flags::OpenFlags,
     },
     vdso::vdso_loader::Vdso,
+};
+use bstr::BString;
+use fidl::{
+    endpoints::{create_endpoints, ClientEnd, ProtocolMarker, Proxy},
+    AsHandleRef,
+};
+use fidl_fuchsia_io as fio;
+use fuchsia_async as fasync;
+use fuchsia_zircon as zx;
+use futures::FutureExt;
+use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
+use once_cell::sync::OnceCell;
+use selinux::security_server::SecurityServer;
+use starnix_lock::{declare_lock_levels, OrderedRwLock, RwLock};
+use std::{
+    collections::BTreeMap,
+    sync::{
+        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+        Arc, Weak,
+    },
 };
 
 declare_lock_levels![KernelIpTables: OrderedRwLock<IpTables>];
@@ -213,27 +212,40 @@ struct InterfacesHandlerImpl(Weak<Kernel>);
 
 impl InterfacesHandlerImpl {
     fn with_netstack_devices<
-        F: FnOnce(&Arc<NetstackDevices>, Option<&FileSystemHandle>, Option<&FileSystemHandle>),
+        F: FnOnce(
+                &CurrentTask,
+                &Arc<NetstackDevices>,
+                Option<&FileSystemHandle>,
+                Option<&FileSystemHandle>,
+            ) + Sync
+            + Send
+            + 'static,
     >(
         &mut self,
         f: F,
     ) {
-        let Self(rc) = self;
-        let Some(rc) = rc.upgrade() else {
-            // The kernel may be getting torn-down.
-            return;
-        };
-        f(&rc.netstack_devices, rc.proc_fs.get(), rc.sys_fs.get())
+        if let Some(kernel) = self.0.upgrade() {
+            kernel.kthreads.spawner().spawn(move |current_task| {
+                let kernel = current_task.kernel();
+                f(current_task, &kernel.netstack_devices, kernel.proc_fs.get(), kernel.sys_fs.get())
+            });
+        }
     }
 }
 
 impl InterfacesHandler for InterfacesHandlerImpl {
     fn handle_new_link(&mut self, name: &str) {
-        self.with_netstack_devices(|devs, proc_fs, sys_fs| devs.add_dev(name, proc_fs, sys_fs))
+        let name = name.to_owned();
+        self.with_netstack_devices(move |current_task, devs, proc_fs, sys_fs| {
+            devs.add_dev(current_task, &name, proc_fs, sys_fs)
+        })
     }
 
     fn handle_deleted_link(&mut self, name: &str) {
-        self.with_netstack_devices(|devs, _proc_fs, _sys_fs| devs.remove_dev(name))
+        let name = name.to_owned();
+        self.with_netstack_devices(move |_current_task, devs, _proc_fs, _sys_fs| {
+            devs.remove_dev(&name)
+        })
     }
 }
 

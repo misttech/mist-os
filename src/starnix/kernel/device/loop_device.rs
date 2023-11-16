@@ -662,7 +662,7 @@ mod tests {
     async fn basic_get_vmo() {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
-        let (kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -671,7 +671,8 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let backing_file =
+            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
         let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
 
         let vmo = loop_file.get_vmo(&current_task, None, ProtectionFlags::READ).unwrap();
@@ -692,7 +693,7 @@ mod tests {
         let expected_contents = &expected_contents
             [expected_offset as usize..(expected_offset + expected_size_limit) as usize];
 
-        let (kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -701,7 +702,8 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file = new_remote_file(&kernel, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+        let backing_file =
+            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
         let loop_file = bind_simple_loop_device(&current_task, backing_file, OpenFlags::RDONLY);
 
         let info_addr = map_object_anywhere(

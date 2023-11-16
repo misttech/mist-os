@@ -486,7 +486,7 @@ fn mount_filesystems(
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
         let (mount_point, child_fs) =
-            create_filesystem_from_spec(system_task.kernel(), pkg_dir_proxy, mount_spec)
+            create_filesystem_from_spec(system_task, pkg_dir_proxy, mount_spec)
                 .with_source_context(|| {
                     format!("creating filesystem from spec: {}", &mount_spec)
                 })?;

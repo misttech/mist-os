@@ -612,7 +612,7 @@ pub fn query(
         let vmo = unsafe { zx::Vmo::from(zx::Handle::from_raw(result_buffer_out)) };
         let vmo_size = vmo.get_size().unwrap();
         let file = Anon::new_file_extended(
-            current_task.kernel(),
+            current_task,
             Box::new(VmoFileObject::new(Arc::new(vmo))),
             OpenFlags::RDWR,
             |id| {

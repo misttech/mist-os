@@ -5,16 +5,14 @@
 use super::proc_directory::ProcDirectory;
 use crate::{
     fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
-    task::{CurrentTask, Kernel},
-    types::errno::Errno,
-    types::{statfs, PROC_SUPER_MAGIC},
+    task::CurrentTask,
+    types::{errno::Errno, statfs, PROC_SUPER_MAGIC},
 };
-
 use std::sync::Arc;
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.
-pub fn proc_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> &FileSystemHandle {
-    kernel.proc_fs.get_or_init(|| ProcFs::new_fs(&kernel, options))
+pub fn proc_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
+    current_task.kernel().proc_fs.get_or_init(|| ProcFs::new_fs(current_task, options))
 }
 
 /// `ProcFs` is a filesystem that exposes runtime information about a `Kernel` instance.
@@ -30,9 +28,10 @@ impl FileSystemOps for Arc<ProcFs> {
 
 impl ProcFs {
     /// Creates a new instance of `ProcFs` for the given `kernel`.
-    pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
+    pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
+        let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(ProcFs), options);
-        fs.set_root(ProcDirectory::new(&fs, kernel));
+        fs.set_root(ProcDirectory::new(current_task, &fs));
         fs
     }
 }

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::sync::{Arc, Weak};
-
 use crate::{
     auth::FsCred,
     device::{
@@ -44,6 +42,7 @@ use crate::{
         TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
     },
 };
+use std::sync::{Arc, Weak};
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
 const DEVPTS_FIRST_MAJOR: u32 = 136;
@@ -189,7 +188,7 @@ impl FsNodeOps for DevPtsRootDir {
     fn lookup(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
@@ -197,7 +196,7 @@ impl FsNodeOps for DevPtsRootDir {
             let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::PTMX;
             info.blksize = BLOCK_SIZE;
-            let node = node.fs().create_node_with_id(SpecialNode, info.ino, info);
+            let node = node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
@@ -213,7 +212,8 @@ impl FsNodeOps for DevPtsRootDir {
                     info.blksize = BLOCK_SIZE;
                     // TODO(qsr): set gid to the tty group
                     info.gid = 0;
-                    let node = node.fs().create_node_with_id(SpecialNode, info.ino, info);
+                    let node =
+                        node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
                     return Ok(node);
                 }
             }

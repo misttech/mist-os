@@ -53,7 +53,7 @@ impl ImageFile {
         let vmo_size = vmo.get_size().unwrap();
 
         let file = Anon::new_file_extended(
-            current_task.kernel(),
+            current_task,
             Box::new(ImageFile { info, vmo: Arc::new(vmo) }),
             OpenFlags::RDWR,
             |id| {

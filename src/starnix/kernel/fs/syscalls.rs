@@ -2,12 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use lock_sequence::{Locked, Unlocked};
-use starnix_lock::Mutex;
-use std::{
-    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
-};
-
 use crate::{
     arch::uapi::epoll_event,
     fs::{
@@ -15,14 +9,15 @@ use crate::{
         eventfd::{new_eventfd, EventFdType},
         fuchsia::{TimerFile, TimerFileClock},
         inotify::InotifyFileObject,
+        namespace::FileSystemCreator,
         new_memfd,
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
         splice, DirentSink64, EpollFileObject, FallocMode, FdEvents, FdFlags, FdNumber,
-        FileAsyncOwner, FileHandle, FlockOperation, FsStr, InotifyMask, LookupContext,
-        NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
-        StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
-        ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, InotifyMask,
+        LookupContext, NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags,
+        SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType,
+        UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
@@ -67,6 +62,11 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
+use starnix_lock::Mutex;
+use std::{
+    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
+};
 
 // Constants from bionic/libc/include/sys/stat.h
 const UTIME_NOW: i64 = 0x3fffffff;
@@ -1580,7 +1580,13 @@ fn do_mount_create(
         String::from_utf8_lossy(data)
     );
 
-    let fs = current_task.create_filesystem(fs_type, source, flags, data)?;
+    let options = FileSystemOptions {
+        source: source.to_vec(),
+        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
+        params: data.to_vec(),
+    };
+
+    let fs = current_task.create_filesystem(fs_type, options)?;
     target.mount(WhatToMount::Fs(fs), flags)
 }
 

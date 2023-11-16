@@ -351,7 +351,7 @@ mod tests {
     }
 
     fn create_test_file<T: SequenceFileSource>(source: T) -> (AutoReleasableTask, FileHandle) {
-        let (_kern, current_task) = create_kernel_and_task();
+        let (_kernel, current_task) = create_kernel_and_task();
         let file =
             Anon::new_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
         (current_task, file)

@@ -34,12 +34,13 @@ pub struct NetstackDevices {
 impl NetstackDevices {
     pub fn add_dev(
         &self,
+        current_task: &CurrentTask,
         name: &str,
         proc_fs: Option<&FileSystemHandle>,
         sys_fs: Option<&FileSystemHandle>,
     ) {
         // procfs or sysfs may not be mounted.
-        let proc_sys_net = proc_fs.map(ProcSysNetDev::new);
+        let proc_sys_net = proc_fs.map(|fs| ProcSysNetDev::new(current_task, fs));
         let sys_class_net = sys_fs.map(|sys_fs| {
             // nodes in `/sys/class/net` are normally symlinks into
             // `/sys/devices`. However, currently known use-cases only enumerate
@@ -48,7 +49,7 @@ impl NetstackDevices {
             //
             // TODO(https://fxbug.dev/128794): Support `/sys/class/net`
             // properly.
-            StaticDirectoryBuilder::new(sys_fs).build()
+            StaticDirectoryBuilder::new(sys_fs).build(current_task)
         });
 
         let mut entries = self.entries.lock();

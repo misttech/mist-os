@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::{Mutex, MutexGuard};
-use std::sync::Arc;
-
 use crate::{
     auth::FsCred,
     fs::{
@@ -26,6 +23,8 @@ use crate::{
         statfs, uid_t, TMPFS_MAGIC,
     },
 };
+use starnix_lock::{Mutex, MutexGuard};
+use std::sync::Arc;
 
 pub struct TmpFs(());
 
@@ -188,6 +187,7 @@ impl TmpfsDirectory {
 }
 
 fn create_child_node(
+    current_task: &CurrentTask,
     parent: &FsNode,
     mode: FileMode,
     dev: DeviceType,
@@ -200,7 +200,7 @@ fn create_child_node(
         }
         _ => return error!(EACCES),
     };
-    let child = parent.fs().create_node(ops, move |id| {
+    let child = parent.fs().create_node(current_task, ops, move |id| {
         let mut info = FsNodeInfo::new(id, mode, owner);
         info.rdev = dev;
         // blksize is PAGE_SIZE for in memory node.
@@ -229,7 +229,7 @@ impl FsNodeOps for TmpfsDirectory {
     fn mkdir(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
@@ -238,19 +238,23 @@ impl FsNodeOps for TmpfsDirectory {
             info.link_count += 1;
         });
         *self.child_count.lock() += 1;
-        Ok(node.fs().create_node(TmpfsDirectory::new(), FsNodeInfo::new_factory(mode, owner)))
+        Ok(node.fs().create_node(
+            current_task,
+            TmpfsDirectory::new(),
+            FsNodeInfo::new_factory(mode, owner),
+        ))
     }
 
     fn mknod(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let child = create_child_node(node, mode, dev, owner)?;
+        let child = create_child_node(current_task, node, mode, dev, owner)?;
         *self.child_count.lock() += 1;
         Ok(child)
     }
@@ -258,13 +262,14 @@ impl FsNodeOps for TmpfsDirectory {
     fn create_symlink(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         _name: &FsStr,
         target: &FsStr,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         *self.child_count.lock() += 1;
         Ok(node.fs().create_node(
+            current_task,
             SymlinkNode::new(target),
             FsNodeInfo::new_factory(mode!(IFLNK, 0o777), owner),
         ))
@@ -273,12 +278,12 @@ impl FsNodeOps for TmpfsDirectory {
     fn create_tmpfile(
         &self,
         node: &FsNode,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         assert!(mode.is_reg());
-        create_child_node(node, mode, DeviceType::NONE, owner)
+        create_child_node(current_task, node, mode, DeviceType::NONE, owner)
     }
 
     fn link(

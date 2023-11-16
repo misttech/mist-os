@@ -7,21 +7,6 @@ use super::{
     SocketFile, SocketMessageFlags, SocketProtocol, SocketType, UnixSocket, VsockSocket,
     ZxioBackedSocket,
 };
-
-use std::{collections::VecDeque, ffi::CStr, mem::size_of};
-
-use fuchsia_zircon as zx;
-use net_types::ip::IpAddress;
-
-use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
-use netlink_packet_route::{
-    rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
-    AddressMessage, LinkMessage, RtnlMessage,
-};
-use starnix_lock::Mutex;
-use static_assertions::const_assert;
-use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
-
 use crate::{
     fs::{
         buffers::{
@@ -55,8 +40,17 @@ use crate::{
         SO_TYPE,
     },
 };
-
-use std::sync::Arc;
+use fuchsia_zircon as zx;
+use net_types::ip::IpAddress;
+use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
+use netlink_packet_route::{
+    rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
+    AddressMessage, LinkMessage, RtnlMessage,
+};
+use starnix_lock::Mutex;
+use static_assertions::const_assert;
+use std::{collections::VecDeque, ffi::CStr, mem::size_of, sync::Arc};
+use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
 
 pub const DEFAULT_LISTEN_BACKLOG: usize = 1024;
 
@@ -317,7 +311,11 @@ impl Socket {
     ) -> FileHandle {
         let fs = socket_fs(current_task.kernel());
         let mode = mode!(IFSOCK, 0o777);
-        let node = fs.create_node(Anon, FsNodeInfo::new_factory(mode, current_task.as_fscred()));
+        let node = fs.create_node(
+            current_task,
+            Anon,
+            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+        );
         node.set_socket(socket.clone());
         FileObject::new_anonymous(SocketFile::new(socket), node, open_flags)
     }
