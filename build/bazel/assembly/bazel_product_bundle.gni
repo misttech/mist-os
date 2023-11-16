@@ -412,6 +412,7 @@ template("bazel_product_bundle") {
 
       command = "build"
       bazel_targets = [ invoker.bazel_license_review_target ]
+      bazel_inputs = _aib_bazel_inputs + invoker.bazel_inputs_from_gn
       copy_outputs = [
         {
           bazel = "{{BAZEL_TARGET_OUT_DIR}}/license_review.zip"
