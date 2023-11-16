@@ -7,6 +7,7 @@
 #include <inttypes.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <zircon/compiler.h>
@@ -27,7 +28,6 @@
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 
 namespace blobfs {

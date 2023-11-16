@@ -74,6 +74,7 @@ static_library("blobfs") {
     "iterator/node_populator.cc",
     "iterator/vector_extent_iterator.cc",
     "iterator/vector_extent_iterator.h",
+    "trace.h",
   ]
   public_deps = [
     # format.h includes digest.h.

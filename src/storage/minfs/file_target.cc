@@ -6,7 +6,6 @@
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/minfs/file.h"
 #include "src/storage/minfs/minfs_private.h"
 #include "zircon/assert.h"

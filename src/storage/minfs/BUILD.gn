@@ -51,6 +51,7 @@ static_library("minfs") {
     "runner.cc",
     "runner.h",
     "superblock.h",
+    "trace.h",
     "transaction_limits.cc",
     "unowned_vmo_buffer.h",
     "vnode.cc",

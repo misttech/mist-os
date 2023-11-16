@@ -5,16 +5,13 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_DEBUG_H_
 #define SRC_STORAGE_LIB_VFS_CPP_DEBUG_H_
 
-#include <bitset>
 #include <cstdint>
 #include <cstdlib>
 #include <memory>
 #include <string_view>
-#include <utility>
 
 #include <fbl/string_buffer.h>
 
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__
@@ -25,9 +22,15 @@
 // Debug-only header defining utility functions for logging flags and strings.
 // May be used on both Fuchsia and host-only builds.
 
-namespace fs {
+namespace fs::debug_internal {
 
-namespace debug_internal {
+constexpr bool kTraceDebugEnabled = {
+#ifdef FS_TRACE_DEBUG_ENABLED
+    true
+#else
+    false
+#endif
+};
 
 template <size_t N>
 void PrintIntoStringBuffer(fbl::StringBuffer<N>* sb, VnodeConnectionOptions options) {
@@ -201,13 +204,11 @@ void ConnectionTraceDebug(Args... args) {
   Log(*str);
 }
 
-}  // namespace debug_internal
-
-}  // namespace fs
+}  // namespace fs::debug_internal
 
 #define FS_PRETTY_TRACE_DEBUG(args...)                \
   do {                                                \
-    if (fs::trace_debug_enabled())                    \
+    if (fs::debug_internal::kTraceDebugEnabled)       \
       fs::debug_internal::ConnectionTraceDebug(args); \
   } while (0)
 

@@ -17,7 +17,6 @@
 #include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
 
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 
 #ifdef __Fuchsia__
@@ -31,7 +30,6 @@
 #include "src/storage/minfs/directory.h"
 #include "src/storage/minfs/file.h"
 #include "src/storage/minfs/minfs_private.h"
-#include "src/storage/minfs/unowned_vmo_buffer.h"
 #include "src/storage/minfs/vnode.h"
 
 namespace minfs {

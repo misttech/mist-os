@@ -9,7 +9,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/minfs/service/admin.h"
 #include "src/storage/minfs/service/lifecycle.h"
 #include "src/storage/minfs/service/startup.h"

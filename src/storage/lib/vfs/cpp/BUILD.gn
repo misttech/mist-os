@@ -58,7 +58,6 @@ static_library("cpp") {
       "service.h",
       "synchronous_vfs.h",
       "ticker.h",
-      "trace.h",
       "tracked_remote_dir.h",
       "vmo_file.h",
       "watcher.h",
@@ -104,23 +103,15 @@ static_library("cpp") {
       # <fs/tracked_remote_dir.h> has #include <lib/async/cpp/wait.h>.
       "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
-
-      # <fs/trace.h> has #include <lib/trace/event.h>.
-      "//zircon/system/ulib/trace",
     ]
     deps += [
-      "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_cpp",
-      "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
       "//sdk/lib/fdio",
       "//sdk/lib/fidl",
       "//sdk/lib/fit",
-      "//zircon/system/ulib/async",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/fzl",
       "//zircon/system/ulib/sync",
-      "//zircon/system/ulib/trace",
-      "//zircon/system/ulib/zx",
     ]
   }
 }

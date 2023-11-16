@@ -21,15 +21,12 @@
 #include <fbl/algorithm.h>
 
 #include "lib/zx/result.h"
-#include "src/storage/lib/vfs/cpp/debug.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "zircon/assert.h"
 #include "zircon/errors.h"
 
 #ifdef __Fuchsia__
 #include <zircon/syscalls.h>
-
-#include <utility>
 
 #include <fbl/auto_lock.h>
 #endif

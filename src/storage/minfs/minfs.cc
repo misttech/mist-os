@@ -28,7 +28,6 @@
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/initializer.h"
-#include "src/storage/lib/vfs/cpp/trace.h"
 #include "src/storage/minfs/allocator/allocator_reservation.h"
 #include "src/storage/minfs/fsck.h"
 #include "src/storage/minfs/minfs_private.h"

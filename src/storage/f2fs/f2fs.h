@@ -49,7 +49,6 @@
 #include "src/storage/lib/vfs/cpp/watcher.h"
 #include "src/storage/lib/vfs/cpp/shared_mutex.h"
 #include "src/storage/lib/vfs/cpp/service.h"
-#include "src/storage/lib/vfs/cpp/trace.h"
 
 #include "lib/inspect/cpp/inspect.h"
 #include "lib/inspect/service/cpp/service.h"
