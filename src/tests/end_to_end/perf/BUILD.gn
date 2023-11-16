@@ -23,7 +23,6 @@ test_list = [
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
-  "kernel_boot_stats_test",
   "microbenchmarks_test",
   "netstack3_benchmarks_test",
   "netstack_benchmarks_test",
@@ -74,8 +73,7 @@ foreach(target_name, test_list) {
     ]
 
     # TODO(fxbug.dev/51799): Enable for all tests.
-    if (target_name == "kernel_boot_stats_test" ||
-        target_name == "audio_mixer_profiler_test") {
+    if (target_name == "audio_mixer_profiler_test") {
       environments += [
         astro_env,
         sherlock_env,
@@ -228,7 +226,6 @@ if (is_host) {
     "fuchsia.fidlc_microbenchmarks.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
-    "fuchsia.kernel.boot.txt",
     "fuchsia.microbenchmarks.starnix.txt",
     "fuchsia.microbenchmarks.tracing.txt",
     "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
@@ -318,8 +315,7 @@ group("package_deps") {
     "//src/lib/diagnostics:benchmarks",
     "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",
     "//src/starnix:benchmarks",
-    "//src/tests/benchmarks:kernel-boot-benchmarks",
-    "//src/tests/benchmarks/fidl:benchmarks",
+    "//src/tests/benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
 
     # Many tests use sl4f to communicate with the target.
@@ -373,9 +369,8 @@ group("tests_to_run_on_internal_builders") {
 
   deps = [
     ":audio_mixer_profiler_test($host_toolchain)",
-    ":kernel_boot_stats_test($host_toolchain)",
     ":storage_benchmarks_test($host_toolchain)",
     "//src/storage/benchmarks/fuchsia:benchmarks",
-    "//src/tests/benchmarks:kernel-boot-benchmarks",
+    "//src/tests/benchmarks:kernel_boot_benchmarks",
   ]
 }
