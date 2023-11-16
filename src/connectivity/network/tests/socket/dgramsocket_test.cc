@@ -2965,7 +2965,7 @@ TEST_P(NetDatagramSocketsCmsgIpTtlTest, RecvCmsgUnalignedControlBuffer) {
 
         // Copy the content to a properly aligned variable.
         char aligned_cmsg[CMSG_SPACE(sizeof(kDefaultTTL))];
-        memcpy(&aligned_cmsg, unaligned_cmsg, sizeof(aligned_cmsg));
+        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
         cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
         EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(kDefaultTTL)));
         EXPECT_EQ(cmsg->cmsg_level, SOL_IP);
