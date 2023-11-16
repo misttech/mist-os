@@ -1473,9 +1473,10 @@ mod tests {
         });
 
         // (mlme->sme) Send a ConnectConf as a response
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let connect_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(connect_conf, &mut h.context);
-
         assert!(suppl_mock.is_supplicant_started());
 
         // (mlme->sme) Send an EapolInd, mock supplicant with key frame
@@ -1566,9 +1567,10 @@ mod tests {
         });
 
         // (mlme->sme) Send a ConnectConf as a response
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let connect_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(connect_conf, &mut h.context);
-
         assert!(suppl_mock.is_supplicant_started());
 
         // (mlme->sme) Send an EapolInd, mock supplicant with key frame
@@ -1765,9 +1767,10 @@ mod tests {
         assert_variant!(h.mlme_stream.try_next(), Ok(Some(MlmeRequest::Connect(_req))));
 
         // (mlme->sme) Send a ConnectConf as a response
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let connect_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(connect_conf, &mut h.context);
-
         assert!(suppl_mock.is_supplicant_started());
 
         // (mlme->sme) Send an EapolInd, mock supplicant with key frame
@@ -2164,9 +2167,12 @@ mod tests {
             protection_ie: None,
             reassociation_loop_count: 0,
         }));
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let assoc_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let rsna_response_deadline = event::RSNA_RESPONSE_TIMEOUT_MILLIS.millis().after_now();
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
+        assert!(suppl_mock.is_supplicant_started());
 
         // Advance to the response timeout and setup a failure reason
         let mut timed_event_stream = timer::make_async_timed_event_stream(h.time_stream);
@@ -2238,8 +2244,11 @@ mod tests {
             protection_ie: None,
             reassociation_loop_count: 0,
         }));
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let assoc_conf = create_connect_conf(bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
+        assert!(suppl_mock.is_supplicant_started());
 
         let mut timed_event_stream = timer::make_async_timed_event_stream(h.time_stream);
 
@@ -2298,12 +2307,12 @@ mod tests {
                 rsn_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        "rx_eapol_frame": AnyBytesProperty,
-                        "status": "processed",
+                        "rsna_status": "PmkSaEstablished"
                     },
                     "1": {
                         "@time": AnyNumericProperty,
-                        "tx_eapol_frame": AnyBytesProperty,
+                        "rx_eapol_frame": AnyBytesProperty,
+                        "status": "processed",
                     },
                     "2": {
                         "@time": AnyNumericProperty,
@@ -2322,6 +2331,10 @@ mod tests {
                         "tx_eapol_frame": AnyBytesProperty,
                     },
                     "6": {
+                        "@time": AnyNumericProperty,
+                        "tx_eapol_frame": AnyBytesProperty,
+                    },
+                    "7": {
                         "@time": AnyNumericProperty,
                         "tx_eapol_frame": AnyBytesProperty,
                     },
@@ -2346,8 +2359,11 @@ mod tests {
             protection_ie: None,
             reassociation_loop_count: 0,
         }));
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let assoc_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
+        assert!(suppl_mock.is_supplicant_started());
 
         let mut timed_event_stream = timer::make_async_timed_event_stream(h.time_stream);
 
@@ -2443,12 +2459,12 @@ mod tests {
                 rsn_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        "rx_eapol_frame": AnyBytesProperty,
-                        "status": "processed",
+                        "rsna_status": "PmkSaEstablished"
                     },
                     "1": {
                         "@time": AnyNumericProperty,
-                        "tx_eapol_frame": AnyBytesProperty,
+                        "rx_eapol_frame": AnyBytesProperty,
+                        "status": "processed",
                     },
                     "2": {
                         "@time": AnyNumericProperty,
@@ -2467,6 +2483,10 @@ mod tests {
                         "tx_eapol_frame": AnyBytesProperty,
                     },
                     "6": {
+                        "@time": AnyNumericProperty,
+                        "tx_eapol_frame": AnyBytesProperty,
+                    },
+                    "7": {
                         "@time": AnyNumericProperty,
                         "tx_eapol_frame": AnyBytesProperty,
                     }
@@ -2491,8 +2511,11 @@ mod tests {
             protection_ie: None,
             reassociation_loop_count: 0,
         }));
+        suppl_mock
+            .set_start_updates(vec![SecAssocUpdate::Status(SecAssocStatus::PmkSaEstablished)]);
         let assoc_conf = create_connect_conf(bss.bssid, fidl_ieee80211::StatusCode::Success);
         let state = state.on_mlme_event(assoc_conf, &mut h.context);
+        assert!(suppl_mock.is_supplicant_started());
         let rsna_completion_deadline = event::RSNA_COMPLETION_TIMEOUT_MILLIS.millis().after_now();
         let mut initial_rsna_response_deadline_in_effect =
             Some(event::RSNA_RESPONSE_TIMEOUT_MILLIS.millis().after_now());
@@ -2643,28 +2666,32 @@ mod tests {
                 rsn_events: {
                     "0": {
                         "@time": AnyNumericProperty,
-                        "rx_eapol_frame": AnyBytesProperty,
-                        "status": "processed",
+                        "rsna_status": "PmkSaEstablished"
                     },
                     "1": {
                         "@time": AnyNumericProperty,
-                        "tx_eapol_frame": AnyBytesProperty,
+                        "rx_eapol_frame": AnyBytesProperty,
+                        "status": "processed",
                     },
                     "2": {
                         "@time": AnyNumericProperty,
-                        "rx_eapol_frame": AnyBytesProperty,
-                        "status": "processed",
+                        "tx_eapol_frame": AnyBytesProperty,
                     },
                     "3": {
                         "@time": AnyNumericProperty,
-                        "tx_eapol_frame": AnyBytesProperty,
+                        "rx_eapol_frame": AnyBytesProperty,
+                        "status": "processed",
                     },
                     "4": {
+                        "@time": AnyNumericProperty,
+                        "tx_eapol_frame": AnyBytesProperty,
+                    },
+                    "5": {
                         "@time": AnyNumericProperty,
                         "rx_eapol_frame": AnyBytesProperty,
                         "status": "processed",
                     },
-                    "5": {
+                    "6": {
                         "@time": AnyNumericProperty,
                         "tx_eapol_frame": AnyBytesProperty,
                     },

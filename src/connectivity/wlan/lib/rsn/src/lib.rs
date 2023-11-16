@@ -117,11 +117,8 @@ impl Supplicant {
         Ok(Supplicant { auth_method, esssa, auth_cfg })
     }
 
-    pub fn start(&mut self) -> Result<(), Error> {
-        // The Supplicant always waits for Authenticator to initiate and does not yet support EAPOL
-        // request frames. Thus, all updates can be ignored.
-        let mut dead_update_sink = vec![];
-        self.esssa.initiate(&mut dead_update_sink)
+    pub fn start(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
+        self.esssa.initiate(update_sink)
     }
 
     pub fn reset(&mut self) {

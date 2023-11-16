@@ -161,33 +161,50 @@ impl LinkState {
         context: &mut Context,
     ) -> Result<Self, EstablishRsnaFailureReason> {
         match protection {
-            Protection::Rsna(mut rsna) | Protection::LegacyWpa(mut rsna) => {
-                match rsna.supplicant.start() {
-                    Ok(_) => Ok(State::new(Init)
-                        .transition_to(EstablishingRsna {
-                            rsna,
-                            rsna_completion_timeout: Some(
-                                context.timer.schedule(event::RsnaCompletionTimeout),
-                            ),
-                            rsna_response_timeout: Some(
-                                context.timer.schedule(event::RsnaResponseTimeout),
-                            ),
-                            rsna_retransmission_timeout: None,
-                            handshake_complete: false,
-                            pending_key_ids: Default::default(),
-                        })
-                        .into()),
-                    Err(e) => {
-                        error!("could not start Supplicant: {}", e);
-                        Err(EstablishRsnaFailureReason::StartSupplicantFailed)
-                    }
-                }
-            }
             Protection::Open | Protection::Wep(_) => {
                 let now = now();
                 Ok(State::new(Init)
                     .transition_to(LinkUp { protection: Protection::Open, since: now })
                     .into())
+            }
+            Protection::Rsna(mut rsna) | Protection::LegacyWpa(mut rsna) => {
+                let mut update_sink = rsna::UpdateSink::default();
+                rsna.supplicant.start(&mut update_sink).map_err(|e| {
+                    error!("could not start Supplicant: {}", e);
+                    EstablishRsnaFailureReason::StartSupplicantFailed
+                })?;
+                let state = State::new(Init).transition_to(EstablishingRsna {
+                    rsna,
+                    rsna_completion_timeout: Some(
+                        context.timer.schedule(event::RsnaCompletionTimeout),
+                    ),
+                    rsna_response_timeout: Some(context.timer.schedule(event::RsnaResponseTimeout)),
+                    rsna_retransmission_timeout: None,
+                    handshake_complete: false,
+                    pending_key_ids: Default::default(),
+                });
+                let (transition, state) = state.release_data();
+                match process_rsna_updates(context, None, update_sink, None) {
+                    RsnaStatus::Unchanged { .. } => Ok(transition.to(state).into()),
+                    // RSNA progress during start() should only be trivial.
+                    RsnaStatus::Progressed {
+                        ap_responsive: None,
+                        new_retransmission_timeout: None,
+                        handshake_complete: false,
+                        sent_keys,
+                    } if sent_keys.is_empty() => {
+                        // Normally, we call both on_rsna_progressed() and
+                        // try_establish(). Here, we omit try_establish() since it is not
+                        // possible to establish an RSNA without any EAPOL frames exchanged.
+                        let state = state.on_rsna_progressed(None, None, false, sent_keys);
+                        Ok(transition.to(state).into())
+                    }
+                    RsnaStatus::Failed(reason) => Err(reason),
+                    rsna_status => {
+                        error!("Unexpected RsnaStatus upon Supplicant::start(): {:?}", rsna_status);
+                        Err(EstablishRsnaFailureReason::StartSupplicantFailed)
+                    }
+                }
             }
         }
     }
@@ -505,7 +522,7 @@ fn process_eapol_conf(
             RsnaStatus::Unchanged
         }
         Ok(()) => {
-            process_rsna_updates(context, Bssid::from(eapol_conf.dst_addr), update_sink, None)
+            process_rsna_updates(context, Some(Bssid::from(eapol_conf.dst_addr)), update_sink, None)
         }
     }
 }
@@ -521,7 +538,7 @@ fn process_rsna_retransmission_timeout(
             error!("{:?}", e);
             RsnaStatus::Failed(EstablishRsnaFailureReason::InternalError)
         }
-        Ok(()) => process_rsna_updates(context, timeout.bssid, update_sink, None),
+        Ok(()) => process_rsna_updates(context, Some(timeout.bssid), update_sink, None),
     }
 }
 
@@ -563,12 +580,12 @@ fn process_eapol_ind(
     });
     let ap_responsive =
         (update_sink.len() > 0).then(|| context.timer.schedule(event::RsnaResponseTimeout {}));
-    process_rsna_updates(context, Bssid::from(ind.src_addr), update_sink, ap_responsive)
+    process_rsna_updates(context, Some(Bssid::from(ind.src_addr)), update_sink, ap_responsive)
 }
 
 fn process_rsna_updates(
     context: &mut Context,
-    bssid: Bssid,
+    bssid: Option<Bssid>,
     updates: rsna::UpdateSink,
     ap_responsive: Option<EventId>,
 ) -> RsnaStatus {
@@ -585,17 +602,30 @@ fn process_rsna_updates(
             // ESS Security Association requests to send an EAPOL frame.
             // Forward EAPOL frame to MLME.
             SecAssocUpdate::TxEapolKeyFrame { frame, expect_response } => {
-                new_retransmission_timeout =
-                    send_eapol_frame(context, bssid, sta_addr, frame, expect_response);
+                new_retransmission_timeout = match bssid {
+                    None => {
+                        error!("No BSSID set to handle SecAssocUpdate::TxEapolKeyFrame");
+                        return RsnaStatus::Failed(EstablishRsnaFailureReason::InternalError);
+                    }
+                    Some(bssid) => {
+                        send_eapol_frame(context, bssid, sta_addr, frame, expect_response)
+                    }
+                }
             }
             // ESS Security Association derived a new key.
             // Configure key in MLME.
-            SecAssocUpdate::Key(key) => {
-                inspect_log_key(context, &key);
-                if let Some(key_id) = send_keys(&context.mlme_sink, bssid, key) {
-                    sent_keys.push(key_id);
+            SecAssocUpdate::Key(key) => match bssid {
+                None => {
+                    error!("No BSSID set to handle SecAssocUpdate::Key");
+                    return RsnaStatus::Failed(EstablishRsnaFailureReason::InternalError);
                 }
-            }
+                Some(bssid) => {
+                    inspect_log_key(context, &key);
+                    if let Some(key_id) = send_keys(&context.mlme_sink, bssid, key) {
+                        sent_keys.push(key_id);
+                    }
+                }
+            },
             // Received a status update.
             SecAssocUpdate::Status(status) => {
                 inspect_log!(

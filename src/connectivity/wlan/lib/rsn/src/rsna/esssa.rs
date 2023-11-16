@@ -213,13 +213,15 @@ impl EssSa {
         Ok(rsna)
     }
 
+    /// This function will not succeed unless called on a new Esssa or one that was reset.
     pub fn initiate(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
-        // This function will not succeed unless called on a new Esssa or one that was reset.
+        // TODO (fxbug.dev/69388): Ptksa starts in Initialized when the EssSa
+        // computes the PMKSA from a PSK. When an EssSa is not initialized with a PSK,
+        // Ptksa start in Uninitialized since the PMKSA cannot be computed. For example,
+        // when using SAE for authentication, Ptksa starts in Uninitialized.
         match (self.ptksa.as_ref(), self.gtksa.as_ref(), self.igtksa.as_ref()) {
             (Ptksa::Uninitialized { .. }, Gtksa::Uninitialized { .. }, Igtksa::Uninitialized) => (),
-            // TODO (fxbug.dev/69388): The Ptksa can be in the Initialized state
-            // if the auth method was SAE and the Pmksa key was
-            // confirmed prior to initiate()'ing this Esssa.
+
             (Ptksa::Initialized { .. }, Gtksa::Uninitialized { .. }, Igtksa::Uninitialized) => (),
             _ => return Err(Error::UnexpectedEsssaInitiation),
         };
@@ -232,10 +234,7 @@ impl EssSa {
             _ => None,
         };
         if let Some(pmk) = pmk {
-            let mut new_updates = UpdateSink::default();
-            let result = self.on_key_confirmed(&mut new_updates, Key::Pmk(pmk.clone()));
-            self.push_updates(update_sink, new_updates);
-            result
+            self.on_pmk_available(update_sink, pmk)
         } else {
             Ok(())
         }
@@ -661,10 +660,11 @@ mod tests {
     fn test_supplicant_with_wpa3_authenticator() {
         let mut supplicant = test_util::get_wpa3_supplicant();
         let mut authenticator = test_util::get_wpa3_authenticator();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut s_updates = vec![];
+        supplicant.start(&mut s_updates).expect("Failed starting Supplicant");
+        assert!(s_updates.is_empty(), "{:?}", s_updates);
 
         // Send Supplicant SAE commit
-        let mut s_updates = vec![];
         let result = supplicant.on_sae_handshake_ind(&mut s_updates);
         assert!(result.is_ok(), "Supplicant failed to ind SAE handshake");
         let s_sae_frame_vec = test_util::expect_sae_frame_vec(&s_updates[..]);
@@ -716,14 +716,20 @@ mod tests {
     fn test_supplicant_with_wpa2_authenticator() {
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut authenticator = test_util::get_wpa2_authenticator();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
         test_eapol_exchange(&mut supplicant, &mut authenticator, None, false);
     }
 
     #[test]
     fn test_replay_first_message() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send first message of handshake.
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
@@ -750,7 +756,11 @@ mod tests {
     #[test]
     fn test_first_message_does_not_change_replay_counter() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
+
         assert_eq!(0, supplicant.esssa.key_replay_counter);
 
         // Send first message of handshake.
@@ -781,7 +791,10 @@ mod tests {
     #[test]
     fn test_zero_key_replay_counter_msg1() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
@@ -793,7 +806,10 @@ mod tests {
     #[test]
     fn test_nonzero_key_replay_counter_msg1() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(1);
@@ -805,7 +821,10 @@ mod tests {
     #[test]
     fn test_zero_key_replay_counter_lower_msg3_counter() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
         assert_eq!(0, supplicant.esssa.key_replay_counter);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
@@ -836,7 +855,10 @@ mod tests {
     #[test]
     fn test_key_replay_counter_updated_after_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(1);
@@ -863,7 +885,10 @@ mod tests {
 
         // After reset, first message should not be dropped.
         supplicant.reset();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
         assert_eq!(0, supplicant.esssa.key_replay_counter);
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
@@ -875,7 +900,10 @@ mod tests {
     #[test]
     fn test_key_replay_counter_not_updated_for_invalid_mic_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(1);
@@ -909,7 +937,10 @@ mod tests {
     #[test]
     fn test_zero_key_replay_counter_valid_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
@@ -929,7 +960,11 @@ mod tests {
     #[test]
     fn test_zero_key_replay_counter_replayed_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
         assert_eq!(0, supplicant.esssa.key_replay_counter);
 
         let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
@@ -940,31 +975,31 @@ mod tests {
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
 
-        let (result, sink) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(2);
         });
         assert!(result.is_ok());
         assert_eq!(2, supplicant.esssa.key_replay_counter);
-        test_util::expect_reported_ptk(&sink[..]);
+        test_util::expect_reported_ptk(&updates[..]);
 
         // The just sent third message increased the key replay counter.
         // All successive EAPOL frames are required to have a larger key replay counter.
 
         // Send an invalid message.
-        let (result, sink) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(2);
         });
         assert!(result.is_ok());
         assert_eq!(2, supplicant.esssa.key_replay_counter);
-        assert!(sink.is_empty());
+        assert!(updates.is_empty());
 
         // Send a valid message.
-        let (result, sink) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(3);
         });
         assert!(result.is_ok());
         assert_eq!(3, supplicant.esssa.key_replay_counter);
-        assert!(!sink.is_empty());
+        assert!(!updates.is_empty());
     }
 
     // Replays the first message of the 4-Way Handshake with an altered ANonce to verify that
@@ -974,7 +1009,10 @@ mod tests {
     #[test]
     fn test_replayed_msg1_ptk_installation_different_anonces() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send 1st message of 4-Way Handshake for the first time and derive PTK.
         let (_, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
@@ -1022,7 +1060,10 @@ mod tests {
     #[test]
     fn test_replayed_msg1_ptk_installation_same_anonces() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send 1st message of 4-Way Handshake for the first time and derive PTK.
         let (_, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
@@ -1063,7 +1104,10 @@ mod tests {
     fn test_supplicant_wpa2_ccmp128_psk() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send first message
         let (result, updates) = send_fourway_msg1(&mut supplicant, |_| {});
@@ -1173,7 +1217,10 @@ mod tests {
     fn test_supplicant_no_gtk_reinstallation_from_4way() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Complete 4-Way Handshake.
         let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
@@ -1220,7 +1267,10 @@ mod tests {
     fn test_supplicant_no_gtk_reinstallation() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Complete 4-Way Handshake.
         let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
@@ -1254,7 +1304,10 @@ mod tests {
     fn test_rsna_retransmission_timeout() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
         let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
@@ -1288,7 +1341,10 @@ mod tests {
     fn test_rsna_retransmission_timeout_retries_reset() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         for _ in 0..3 {
             // Send the first frame.
@@ -1324,7 +1380,10 @@ mod tests {
     fn test_overall_timeout_before_msg1() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         assert_variant!(supplicant.incomplete_reason(), Error::EapolHandshakeNotStarted);
     }
@@ -1333,7 +1392,10 @@ mod tests {
     fn test_overall_timeout_after_msg2() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
         let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
@@ -1351,7 +1413,10 @@ mod tests {
     fn test_overall_timeout_before_conf() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = UpdateSink::default();
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});
@@ -1368,7 +1433,10 @@ mod tests {
     fn test_rsna_retransmission_timeout_retry_without_conf() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = vec![];
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
         let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
@@ -1399,7 +1467,10 @@ mod tests {
     fn test_msg2_out_of_order_conf() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = UpdateSink::default();
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});
@@ -1437,7 +1508,10 @@ mod tests {
     fn test_msg2_no_conf() {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
-        supplicant.start().expect("Failed starting Supplicant");
+        let mut updates = UpdateSink::default();
+        supplicant.start(&mut updates).expect("Failed starting Supplicant");
+        assert_eq!(updates.len(), 1, "{:?}", updates);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});

@@ -132,6 +132,7 @@ pub fn expect_stream_empty<T>(stream: &mut mpsc::UnboundedReceiver<T>, error_msg
 fn mock_supplicant(auth_cfg: auth::Config) -> (MockSupplicant, MockSupplicantController) {
     let started = Arc::new(AtomicBool::new(false));
     let start_failure = Arc::new(Mutex::new(None));
+    let start_sink = Arc::new(Mutex::new(Ok(UpdateSink::default())));
     let on_eapol_frame_sink = Arc::new(Mutex::new(Ok(UpdateSink::default())));
     let on_rsna_retransmission_timeout = Arc::new(Mutex::new(Ok(UpdateSink::default())));
     let on_rsna_response_timeout = Arc::new(Mutex::new(None));
@@ -143,6 +144,7 @@ fn mock_supplicant(auth_cfg: auth::Config) -> (MockSupplicant, MockSupplicantCon
     let supplicant = MockSupplicant {
         started: started.clone(),
         start_failure: start_failure.clone(),
+        start: start_sink.clone(),
         on_eapol_frame: on_eapol_frame_sink.clone(),
         on_rsna_retransmission_timeout: on_rsna_retransmission_timeout.clone(),
         on_rsna_response_timeout: on_rsna_response_timeout.clone(),
@@ -156,6 +158,7 @@ fn mock_supplicant(auth_cfg: auth::Config) -> (MockSupplicant, MockSupplicantCon
     let mock = MockSupplicantController {
         started,
         start_failure,
+        mock_start: start_sink,
         mock_on_eapol_frame: on_eapol_frame_sink,
         mock_on_rsna_retransmission_timeout: on_rsna_retransmission_timeout,
         mock_on_rsna_response_timeout: on_rsna_response_timeout,
@@ -195,6 +198,7 @@ type Cb = dyn Fn() + Send + 'static;
 pub struct MockSupplicant {
     started: Arc<AtomicBool>,
     start_failure: Arc<Mutex<Option<anyhow::Error>>>,
+    start: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
     on_eapol_frame: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
     on_eapol_frame_cb: Arc<Mutex<Option<Box<Cb>>>>,
     on_rsna_retransmission_timeout: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
@@ -221,12 +225,12 @@ fn populate_update_sink(
 }
 
 impl Supplicant for MockSupplicant {
-    fn start(&mut self) -> Result<(), Error> {
+    fn start(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
         match &*self.start_failure.lock().unwrap() {
-            Some(error) => return Err(format_rsn_err!("{:?}", error)),
+            Some(error) => Err(format_rsn_err!("{:?}", error)),
             None => {
                 self.started.store(true, Ordering::SeqCst);
-                Ok(())
+                populate_update_sink(update_sink, &self.start)
             }
         }
     }
@@ -313,6 +317,7 @@ impl std::fmt::Debug for MockSupplicant {
 pub struct MockSupplicantController {
     started: Arc<AtomicBool>,
     start_failure: Arc<Mutex<Option<anyhow::Error>>>,
+    mock_start: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
     mock_on_eapol_frame: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
     mock_on_rsna_retransmission_timeout: Arc<Mutex<Result<UpdateSink, anyhow::Error>>>,
     mock_on_rsna_response_timeout: Arc<Mutex<Option<EstablishRsnaFailureReason>>>,
@@ -326,6 +331,10 @@ pub struct MockSupplicantController {
 impl MockSupplicantController {
     pub fn set_start_failure(&self, error: anyhow::Error) {
         *self.start_failure.lock().unwrap() = Some(error);
+    }
+
+    pub fn set_start_updates(&self, updates: UpdateSink) {
+        *self.mock_start.lock().unwrap() = Ok(updates);
     }
 
     pub fn is_supplicant_started(&self) -> bool {

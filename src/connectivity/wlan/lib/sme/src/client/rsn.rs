@@ -24,7 +24,7 @@ impl PartialEq for Rsna {
 pub trait Supplicant: std::fmt::Debug + std::marker::Send {
     /// Starts the Supplicant. A Supplicant must be started after its creation and everytime it
     /// was reset.
-    fn start(&mut self) -> Result<(), Error>;
+    fn start(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error>;
     /// Resets all established Security Associations and invalidates all derived keys in this
     /// ESSSA. The Supplicant must be reset or destroyed when the underlying 802.11 association
     /// terminates. The replay counter is also reset.
@@ -65,8 +65,8 @@ pub trait Supplicant: std::fmt::Debug + std::marker::Send {
 }
 
 impl Supplicant for wlan_rsn::Supplicant {
-    fn start(&mut self) -> Result<(), Error> {
-        wlan_rsn::Supplicant::start(self)
+    fn start(&mut self, update_sink: &mut UpdateSink) -> Result<(), Error> {
+        wlan_rsn::Supplicant::start(self, update_sink)
     }
 
     fn reset(&mut self) {
