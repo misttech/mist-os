@@ -374,6 +374,10 @@ template("product_assembly_configuration") {
       fields = [ "product_index" ]
     },
     {
+      node_path = "platform.connectivity.network"
+      fields = [ "netcfg_config_path" ]
+    },
+    {
       node_path = "product.build_info"
       fields = [
         "version",
