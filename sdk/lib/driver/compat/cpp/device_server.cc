@@ -12,11 +12,10 @@ namespace compat {
 namespace {
 
 void CollectMetadataFrom(fidl::VectorView<fuchsia_driver_compat::wire::Metadata> metadata,
-                         const std::unordered_set<MetadataKey>& forward_metadata,
-                         DeviceServer* server) {
+                         const ForwardMetadata& forward_metadata, DeviceServer* server) {
   for (auto& metadata : metadata) {
-    auto find_result = forward_metadata.find(metadata.type);
-    if (find_result != forward_metadata.end()) {
+    auto should_forward = forward_metadata.should_forward(metadata.type);
+    if (should_forward) {
       size_t size;
       zx_status_t status =
           metadata.data.get_property(ZX_PROP_VMO_CONTENT_SIZE, &size, sizeof(size));
@@ -40,6 +39,39 @@ void CollectMetadataFrom(fidl::VectorView<fuchsia_driver_compat::wire::Metadata>
 }  // namespace
 
 namespace fcd = fuchsia_component_decl;
+
+bool ForwardMetadata::empty() const {
+  const bool* all = std::get_if<AllMetadata>(&forward_type_);
+  if (all != nullptr) {
+    return !(*all);
+  }
+
+  const SpecificMetadata* specific_metadata = std::get_if<SpecificMetadata>(&forward_type_);
+  if (specific_metadata != nullptr) {
+    return specific_metadata->empty();
+  }
+
+  return true;
+}
+
+bool ForwardMetadata::should_forward(MetadataKey key) const {
+  const bool* all = std::get_if<AllMetadata>(&forward_type_);
+  if (all != nullptr) {
+    return *all;
+  }
+
+  const SpecificMetadata* specific_metadata = std::get_if<SpecificMetadata>(&forward_type_);
+  if (specific_metadata != nullptr) {
+    return specific_metadata->find(key) != specific_metadata->end();
+  }
+
+  return false;
+}
+
+std::optional<zx::result<>> DeviceServer::InitResult() const {
+  const Initialized* initialized = std::get_if<Initialized>(&state_);
+  return (initialized != nullptr) ? std::make_optional(initialized->result) : std::nullopt;
+}
 
 void DeviceServer::Init(std::string name, std::string topological_path,
                         std::optional<ServiceOffersV1> service_offers,
@@ -299,7 +331,7 @@ void DeviceServer::SyncInit(const std::shared_ptr<fdf::Namespace>& incoming,
                             const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                             const std::optional<std::string>& node_name,
                             const std::optional<std::string>& child_additional_path,
-                            const std::unordered_set<MetadataKey>& forward_metadata) {
+                            const ForwardMetadata& forward_metadata) {
   auto node_name_val = node_name.value_or("NA");
   auto additional_path = child_additional_path.value_or("");
 

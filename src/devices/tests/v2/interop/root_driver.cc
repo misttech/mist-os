@@ -88,7 +88,7 @@ class RootDriver : public fdf::DriverBase {
                               node_name(),
                               "v1",
                               std::nullopt,
-                              std::unordered_set<uint32_t>{},
+                              compat::ForwardMetadata{false},
                               get_banjo_config()};
 };
 

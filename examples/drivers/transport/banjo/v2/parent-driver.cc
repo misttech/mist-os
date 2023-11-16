@@ -97,7 +97,7 @@ class ParentBanjoTransportDriver : public fdf::DriverBase,
                               node_name(),
                               name(),
                               std::nullopt,
-                              std::unordered_set<uint32_t>{},
+                              compat::ForwardMetadata{false},
                               get_banjo_config()};
 };
 
