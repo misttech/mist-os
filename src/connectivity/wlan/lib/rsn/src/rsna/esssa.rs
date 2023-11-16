@@ -856,11 +856,12 @@ mod tests {
     fn test_key_replay_counter_updated_after_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut updates = vec![];
+        let mut result;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
-        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+        (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(1);
         });
         assert!(result.is_ok());
@@ -868,7 +869,7 @@ mod tests {
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
 
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(5);
         });
         assert!(result.is_ok());
@@ -876,16 +877,16 @@ mod tests {
         test_util::expect_reported_ptk(&updates[..]);
 
         // First message should be dropped if replay counter too low.
-        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+        (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
         });
         assert!(result.is_ok());
         assert_eq!(5, supplicant.esssa.key_replay_counter);
-        assert!(updates.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         // After reset, first message should not be dropped.
         supplicant.reset();
-        let mut updates = vec![];
+        updates = vec![];
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
@@ -901,11 +902,12 @@ mod tests {
     fn test_key_replay_counter_not_updated_for_invalid_mic_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut updates = vec![];
+        let mut result: Result<(), Error>;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
-        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+        (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(1);
         });
         assert!(result.is_ok());
@@ -926,9 +928,8 @@ mod tests {
                 mic[0] = mic[0].wrapping_add(1);
             },
         );
-        let mut update_sink = UpdateSink::default();
-        let result =
-            supplicant.on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg3.keyframe()));
+        updates = UpdateSink::default();
+        result = supplicant.on_eapol_frame(&mut updates, eapol::Frame::Key(msg3.keyframe()));
         assert!(result.is_ok());
         // The key replay counter should not be updated
         assert_eq!(0, supplicant.esssa.key_replay_counter);
@@ -938,11 +939,12 @@ mod tests {
     fn test_zero_key_replay_counter_valid_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut updates = vec![];
+        let mut result;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
-        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+        (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
         });
         assert!(result.is_ok());
@@ -950,7 +952,7 @@ mod tests {
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
 
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(1);
         });
         assert!(result.is_ok());
@@ -960,14 +962,14 @@ mod tests {
     #[test]
     fn test_zero_key_replay_counter_replayed_msg3() {
         let mut supplicant = test_util::get_wpa2_supplicant();
-
         let mut updates = vec![];
+        let mut result;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
         assert_eq!(0, supplicant.esssa.key_replay_counter);
 
-        let (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
+        (result, updates) = send_fourway_msg1(&mut supplicant, |msg1| {
             msg1.key_frame_fields.key_replay_counter.set_from_native(0);
         });
         assert!(result.is_ok());
@@ -975,7 +977,7 @@ mod tests {
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
 
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(2);
         });
         assert!(result.is_ok());
@@ -986,15 +988,15 @@ mod tests {
         // All successive EAPOL frames are required to have a larger key replay counter.
 
         // Send an invalid message.
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(2);
         });
         assert!(result.is_ok());
         assert_eq!(2, supplicant.esssa.key_replay_counter);
-        assert!(updates.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         // Send a valid message.
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(3);
         });
         assert!(result.is_ok());
@@ -1310,31 +1312,33 @@ mod tests {
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
-        let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
+        updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
         let msg2 = test_util::expect_eapol_resp(&updates[..]);
-        let mut update_sink = vec![];
+
+        // Acknowledge the second frame sent.
+        updates = vec![];
         supplicant
-            .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+            .on_eapol_conf(&mut updates, EapolResultCode::Success)
             .expect("Failed to send eapol conf");
-        assert!(update_sink.is_empty());
+        assert!(updates.is_empty());
 
         // Timeout several times.
         for _ in 1..MAX_KEY_FRAME_RETRIES {
-            let mut update_sink = vec![];
+            updates = vec![];
             supplicant
-                .on_rsna_retransmission_timeout(&mut update_sink)
+                .on_rsna_retransmission_timeout(&mut updates)
                 .expect("Failed to send key frame timeout");
-            let msg2_retry = test_util::expect_eapol_resp(&update_sink[..]);
+            let msg2_retry = test_util::expect_eapol_resp(&updates[..]);
             supplicant
-                .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+                .on_eapol_conf(&mut updates, EapolResultCode::Success)
                 .expect("Failed to send eapol conf");
             assert_eq!(msg2, msg2_retry);
         }
 
         // Go idle on the last retry.
-        let mut update_sink = vec![];
-        assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut update_sink), Ok(()));
-        assert!(update_sink.is_empty());
+        updates = vec![];
+        assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
+        assert!(updates.is_empty(), "{:?}", updates);
     }
 
     #[test]
@@ -1348,31 +1352,31 @@ mod tests {
 
         for _ in 0..3 {
             // Send the first frame.
-            let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
+            updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
             let msg2 = test_util::expect_eapol_resp(&updates[..]);
-            let mut update_sink = vec![];
+            updates = vec![];
             supplicant
-                .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+                .on_eapol_conf(&mut updates, EapolResultCode::Success)
                 .expect("Failed to send eapol conf");
-            assert!(update_sink.is_empty());
+            assert!(updates.is_empty(), "{:?}", updates);
 
             // Timeout several times.
             for _ in 1..MAX_KEY_FRAME_RETRIES {
-                let mut update_sink = vec![];
+                updates = vec![];
                 supplicant
-                    .on_rsna_retransmission_timeout(&mut update_sink)
+                    .on_rsna_retransmission_timeout(&mut updates)
                     .expect("Failed to send key frame timeout");
-                let msg2_retry = test_util::expect_eapol_resp(&update_sink[..]);
+                let msg2_retry = test_util::expect_eapol_resp(&updates[..]);
                 supplicant
-                    .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+                    .on_eapol_conf(&mut updates, EapolResultCode::Success)
                     .expect("Failed to send eapol conf");
                 assert_eq!(msg2, msg2_retry);
             }
 
             // Go idle on the last retry.
-            let mut update_sink = vec![];
-            assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut update_sink), Ok(()));
-            assert!(update_sink.is_empty());
+            updates = vec![];
+            assert_variant!(supplicant.on_rsna_retransmission_timeout(&mut updates), Ok(()));
+            assert!(updates.is_empty(), "{:?}", updates);
         }
     }
 
@@ -1398,13 +1402,15 @@ mod tests {
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
-        let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
+        (_, updates) = send_fourway_msg1(&mut supplicant, |_| {});
         let _msg2 = test_util::expect_eapol_resp(&updates[..]);
-        let mut update_sink = vec![];
+
+        // Acknowledge second frame sent
+        updates = vec![];
         supplicant
-            .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+            .on_eapol_conf(&mut updates, EapolResultCode::Success)
             .expect("Failed to send eapol conf");
-        assert!(update_sink.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         assert_variant!(supplicant.incomplete_reason(), Error::LikelyWrongCredential);
     }
@@ -1420,11 +1426,10 @@ mod tests {
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});
-        let mut update_sink = UpdateSink::default();
         supplicant
-            .on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()))
+            .on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()))
             .expect("Failed to send eapol frame");
-        let _msg2 = test_util::expect_eapol_resp(&update_sink[..]);
+        let _msg2 = test_util::expect_eapol_resp(&updates[..]);
 
         assert_variant!(supplicant.incomplete_reason(), Error::NoKeyFrameTransmissionConfirm(0));
     }
@@ -1439,26 +1444,28 @@ mod tests {
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame.
-        let updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
+        updates = send_fourway_msg1(&mut supplicant, |_| {}).1;
         let msg2 = test_util::expect_eapol_resp(&updates[..]);
-        let mut update_sink = vec![];
+
+        // Acknowledge second frame sent.
+        updates = vec![];
         supplicant
-            .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+            .on_eapol_conf(&mut updates, EapolResultCode::Success)
             .expect("Failed to send eapol conf");
-        assert!(update_sink.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         // Respond to one timeout, but don't confirm the retry.
-        let mut update_sink = vec![];
+        updates = vec![];
         supplicant
-            .on_rsna_retransmission_timeout(&mut update_sink)
+            .on_rsna_retransmission_timeout(&mut updates)
             .expect("Failed to send key frame timeout");
-        let msg2_retry = test_util::expect_eapol_resp(&update_sink[..]);
+        let msg2_retry = test_util::expect_eapol_resp(&updates[..]);
         assert_eq!(msg2, msg2_retry);
 
         // Failure on the next timeout.
-        let mut update_sink = vec![];
+        updates = vec![];
         assert_variant!(
-            supplicant.on_rsna_retransmission_timeout(&mut update_sink),
+            supplicant.on_rsna_retransmission_timeout(&mut updates),
             Err(Error::NoKeyFrameTransmissionConfirm(0))
         );
     }
@@ -1468,40 +1475,40 @@ mod tests {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut updates = UpdateSink::default();
+        let result: Result<(), Error>;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});
-        let mut update_sink = UpdateSink::default();
         supplicant
-            .on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()))
+            .on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()))
             .expect("Failed to send eapol frame");
-        let msg2 = test_util::expect_eapol_resp(&update_sink[..]);
+        let msg2 = test_util::expect_eapol_resp(&updates[..]);
 
         // No key frame confirm means that we will buffer updates until the confirm is received.
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |_| {});
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |_| {});
         result.expect("Failed to send msg3");
-        assert!(updates.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         // When confirm is received we receive updates through msg4
-        let mut update_sink = UpdateSink::default();
+        updates = UpdateSink::default();
         supplicant
-            .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+            .on_eapol_conf(&mut updates, EapolResultCode::Success)
             .expect("Failed to send eapol conf");
-        assert_eq!(update_sink.len(), 3);
-        test_util::expect_eapol_resp(&update_sink[..]);
-        test_util::expect_reported_ptk(&update_sink[..]);
-        test_util::expect_reported_gtk(&update_sink[..]);
+        assert_eq!(updates.len(), 3);
+        test_util::expect_eapol_resp(&updates[..]);
+        test_util::expect_reported_ptk(&updates[..]);
+        test_util::expect_reported_gtk(&updates[..]);
 
         // On another confirm, we receive the remaining updates.
         supplicant
-            .on_eapol_conf(&mut update_sink, EapolResultCode::Success)
+            .on_eapol_conf(&mut updates, EapolResultCode::Success)
             .expect("Failed to send eapol conf");
-        test_util::expect_reported_status(&update_sink[..], SecAssocStatus::EssSaEstablished);
+        test_util::expect_reported_status(&updates[..], SecAssocStatus::EssSaEstablished);
     }
 
     #[test]
@@ -1509,24 +1516,24 @@ mod tests {
         // Create ESS Security Association
         let mut supplicant = test_util::get_wpa2_supplicant();
         let mut updates = UpdateSink::default();
+        let result: Result<(), Error>;
         supplicant.start(&mut updates).expect("Failed starting Supplicant");
         assert_eq!(updates.len(), 1, "{:?}", updates);
         test_util::expect_reported_status(&updates[..], SecAssocStatus::PmkSaEstablished);
 
         // Send the first frame but don't send a conf in response.
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], |_| {});
-        let mut update_sink = UpdateSink::default();
         supplicant
-            .on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()))
+            .on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()))
             .expect("Failed to send eapol frame");
-        let msg2 = test_util::expect_eapol_resp(&update_sink[..]);
+        let msg2 = test_util::expect_eapol_resp(&updates[..]);
 
         // No key frame confirm means that we will buffer updates until the confirm is received.
         let snonce = msg2.keyframe().key_frame_fields.key_nonce;
         let ptk = test_util::get_ptk(&ANONCE[..], &snonce[..]);
-        let (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |_| {});
+        (result, updates) = send_fourway_msg3(&mut supplicant, &ptk, |_| {});
         result.expect("Failed to send msg3");
-        assert!(updates.is_empty());
+        assert!(updates.is_empty(), "{:?}", updates);
 
         // We never receive a confirm, and report this on timeout.
         // There are 4 pending updates that we drop after this timeout:
@@ -1534,9 +1541,9 @@ mod tests {
         //   * PTK
         //   * GTK
         //   * ESSSA Established
-        let mut update_sink = vec![];
+        updates = vec![];
         assert_variant!(
-            supplicant.on_rsna_retransmission_timeout(&mut update_sink),
+            supplicant.on_rsna_retransmission_timeout(&mut updates),
             Err(Error::NoKeyFrameTransmissionConfirm(4))
         );
     }
@@ -1555,7 +1562,8 @@ mod tests {
     ) {
         // Initiate Authenticator.
         let mut a_updates = vec![];
-        let result = authenticator.initiate(&mut a_updates);
+        let mut result: Result<(), Error>;
+        result = authenticator.initiate(&mut a_updates);
         assert!(result.is_ok(), "Authenticator failed initiating: {}", result.unwrap_err());
 
         if wpa3 {
@@ -1584,7 +1592,7 @@ mod tests {
 
         // Send msg #1 to Supplicant and wait for response.
         let mut s_updates = vec![];
-        let result = supplicant.on_eapol_frame(&mut s_updates, eapol::Frame::Key(msg1.keyframe()));
+        result = supplicant.on_eapol_frame(&mut s_updates, eapol::Frame::Key(msg1.keyframe()));
         assert!(result.is_ok(), "Supplicant failed processing msg #1: {}", result.unwrap_err());
         let msg2 = test_util::expect_eapol_resp(&s_updates[..]);
         supplicant
@@ -1594,8 +1602,7 @@ mod tests {
 
         // Send msg #2 to Authenticator and wait for response.
         let mut a_updates = vec![];
-        let result =
-            authenticator.on_eapol_frame(&mut a_updates, eapol::Frame::Key(msg2.keyframe()));
+        result = authenticator.on_eapol_frame(&mut a_updates, eapol::Frame::Key(msg2.keyframe()));
         assert!(result.is_ok(), "Authenticator failed processing msg #2: {}", result.unwrap_err());
         let msg3 = test_util::expect_eapol_resp(&a_updates[..]);
         authenticator
@@ -1605,7 +1612,7 @@ mod tests {
 
         // Send msg #3 to Supplicant and wait for response.
         let mut s_updates = vec![];
-        let result = supplicant.on_eapol_frame(&mut s_updates, eapol::Frame::Key(msg3.keyframe()));
+        result = supplicant.on_eapol_frame(&mut s_updates, eapol::Frame::Key(msg3.keyframe()));
         assert!(result.is_ok(), "Supplicant failed processing msg #3: {}", result.unwrap_err());
 
         let msg4 = test_util::expect_eapol_resp(&s_updates[..]);
@@ -1627,8 +1634,7 @@ mod tests {
 
         // Send msg #4 to Authenticator.
         let mut a_updates = vec![];
-        let result =
-            authenticator.on_eapol_frame(&mut a_updates, eapol::Frame::Key(msg4.keyframe()));
+        result = authenticator.on_eapol_frame(&mut a_updates, eapol::Frame::Key(msg4.keyframe()));
         assert!(result.is_ok(), "Authenticator failed processing msg #4: {}", result.unwrap_err());
         let a_ptk = test_util::expect_reported_ptk(&a_updates[..]);
         let a_gtk = test_util::expect_reported_gtk(&a_updates[..]);
@@ -1649,18 +1655,15 @@ mod tests {
         assert_eq!(a_igtk, s_igtk);
     }
 
-    fn send_eapol_conf(
-        supplicant: &mut Supplicant,
-        update_sink: &mut UpdateSink,
-    ) -> Result<(), Error> {
+    fn send_eapol_conf(supplicant: &mut Supplicant, updates: &mut UpdateSink) -> Result<(), Error> {
         let mut sent_frame = false;
-        for update in &update_sink[..] {
+        for update in &updates[..] {
             if let SecAssocUpdate::TxEapolKeyFrame { .. } = update {
                 sent_frame = true;
             }
         }
         if sent_frame {
-            supplicant.on_eapol_conf(update_sink, EapolResultCode::Success)
+            supplicant.on_eapol_conf(updates, EapolResultCode::Success)
         } else {
             Ok(())
         }
@@ -1674,10 +1677,10 @@ mod tests {
         F: Fn(&mut eapol::KeyFrameTx),
     {
         let msg = test_util::get_wpa2_4whs_msg1(&ANONCE[..], msg_modifier);
-        let mut update_sink = UpdateSink::default();
-        let result = supplicant.on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()));
-        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut update_sink));
-        (result, update_sink)
+        let mut updates = UpdateSink::default();
+        let result = supplicant.on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()));
+        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut updates));
+        (result, updates)
     }
 
     fn send_fourway_msg3<F>(
@@ -1689,10 +1692,10 @@ mod tests {
         F: Fn(&mut eapol::KeyFrameTx),
     {
         let msg = test_util::get_wpa2_4whs_msg3(ptk, &ANONCE[..], &GTK, msg_modifier);
-        let mut update_sink = UpdateSink::default();
-        let result = supplicant.on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()));
-        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut update_sink));
-        (result, update_sink)
+        let mut updates = UpdateSink::default();
+        let result = supplicant.on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()));
+        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut updates));
+        (result, updates)
     }
 
     fn send_group_key_msg1(
@@ -1703,9 +1706,9 @@ mod tests {
         key_replay_counter: u64,
     ) -> (Result<(), Error>, UpdateSink) {
         let msg = test_util::get_group_key_hs_msg1(ptk, &gtk[..], key_id, key_replay_counter);
-        let mut update_sink = UpdateSink::default();
-        let result = supplicant.on_eapol_frame(&mut update_sink, eapol::Frame::Key(msg.keyframe()));
-        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut update_sink));
-        (result, update_sink)
+        let mut updates = UpdateSink::default();
+        let result = supplicant.on_eapol_frame(&mut updates, eapol::Frame::Key(msg.keyframe()));
+        let result = result.and_then(|_| send_eapol_conf(supplicant, &mut updates));
+        (result, updates)
     }
 }
