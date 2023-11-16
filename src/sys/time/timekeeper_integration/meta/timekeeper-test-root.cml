@@ -13,7 +13,7 @@
         },
         {
             name: "test_suite",
-            url: "timekeeper-integration2#meta/timekeeper_integration_test2.cm",
+            url: "timekeeper-integration#meta/timekeeper_integration_test.cm",
         },
     ],
     offer: [

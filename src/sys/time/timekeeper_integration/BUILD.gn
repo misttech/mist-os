@@ -101,13 +101,13 @@ fidl("test.time") {
   public_deps = [ "//sdk/fidl/fuchsia.time.external" ]
 }
 
-rustc_test("integration_test_bin2") {
-  name = "timekeeper_integration_test2"
+rustc_test("integration_test_bin") {
+  name = "timekeeper_integration_test"
   edition = "2021"
 
-  sources = [ "tests/timekeeper/integration2.rs" ]
+  sources = [ "tests/timekeeper/integration.rs" ]
 
-  source_root = "tests/timekeeper/integration2.rs"
+  source_root = "tests/timekeeper/integration.rs"
 
   deps = [
     ":timekeeper_integration_lib",
@@ -132,19 +132,19 @@ rustc_test("integration_test_bin2") {
 }
 
 # Component
-fuchsia_component("timekeeper_integration_test2") {
+fuchsia_component("timekeeper_integration_test") {
   testonly = true
-  component_name = "timekeeper_integration_test2"
+  component_name = "timekeeper_integration_test"
 
-  manifest = "meta/timekeeper_integration_test2.cml"
-  deps = [ ":integration_test_bin2" ]
+  manifest = "meta/timekeeper_integration_test.cml"
+  deps = [ ":integration_test_bin" ]
 }
 
 # Package - test suite
-fuchsia_package("timekeeper-integration2") {
+fuchsia_package("timekeeper-integration") {
   testonly = true
   deps = [
-    ":timekeeper_integration_test2",
+    ":timekeeper_integration_test",
     "//src/lib/fake-clock/svc",
   ]
 }
@@ -159,7 +159,7 @@ fuchsia_component("timekeeper-integration-test-root-component") {
 fuchsia_test_package("timekeeper-integration-test-root") {
   test_components = [ ":timekeeper-integration-test-root-component" ]
   subpackages = [
-    ":timekeeper-integration2",
+    ":timekeeper-integration",
 
     # The Timekeeper test realm factory (TTRF) package.
     "//src/sys/time/testing/realm-proxy:pkg",
@@ -175,13 +175,13 @@ fuchsia_test_package("timekeeper-integration-test-root") {
 }
 
 # Faketime tests
-rustc_test("faketime_integration_test_bin2") {
-  name = "faketime_integration_test2"
+rustc_test("faketime_integration_test_bin") {
+  name = "faketime_integration_test"
   edition = "2021"
 
-  sources = [ "tests/faketime/integration2.rs" ]
+  sources = [ "tests/faketime/integration.rs" ]
 
-  source_root = "tests/faketime/integration2.rs"
+  source_root = "tests/faketime/integration.rs"
 
   deps = [
     ":timekeeper_integration_lib",
@@ -205,19 +205,19 @@ rustc_test("faketime_integration_test_bin2") {
 }
 
 # Component
-fuchsia_component("faketime_integration_test2") {
+fuchsia_component("faketime_integration_test") {
   testonly = true
-  component_name = "faketime_integration_test2"
+  component_name = "faketime_integration_test"
 
-  manifest = "meta/faketime_integration_test2.cml"
-  deps = [ ":faketime_integration_test_bin2" ]
+  manifest = "meta/faketime_integration_test.cml"
+  deps = [ ":faketime_integration_test_bin" ]
 }
 
 # Package - test suite
-fuchsia_package("faketime-integration2") {
+fuchsia_package("faketime-integration") {
   testonly = true
   deps = [
-    ":faketime_integration_test2",
+    ":faketime_integration_test",
     "//src/lib/fake-clock/svc",
   ]
 }
@@ -233,7 +233,7 @@ fuchsia_component("faketime-integration-test-root-component") {
 fuchsia_test_package("faketime-integration-test-root") {
   test_components = [ ":faketime-integration-test-root-component" ]
   subpackages = [
-    ":faketime-integration2",
+    ":faketime-integration",
 
     # The Timekeeper test realm factory (TTRF) package.
     "//src/sys/time/testing/realm-proxy:pkg",

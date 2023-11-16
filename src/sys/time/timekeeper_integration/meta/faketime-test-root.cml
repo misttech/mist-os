@@ -13,7 +13,7 @@
         },
         {
             name: "test_suite",
-            url: "faketime-integration2#meta/faketime_integration_test2.cm",
+            url: "faketime-integration#meta/faketime_integration_test.cm",
         },
     ],
     offer: [
