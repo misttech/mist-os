@@ -7,14 +7,18 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps,
     },
-    task::CurrentTask,
+    task::{CurrentTask, Kernel},
     types::{
         as_any::AsAny,
         errno::{errno, error, Errno},
         open_flags::OpenFlags,
     },
 };
-use std::{borrow::Cow, sync::Arc};
+
+use std::{
+    borrow::Cow,
+    sync::{Arc, Weak},
+};
 
 pub struct SimpleFileNode<F, O>
 where
@@ -141,4 +145,27 @@ impl BytesFileOps for Vec<u8> {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         Ok(self.into())
     }
+}
+
+impl<T> BytesFileOps for T
+where
+    T: Fn() -> Result<String, Errno> + Send + Sync + 'static,
+{
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        let data = self()?;
+        Ok(data.into_bytes().into())
+    }
+}
+
+pub fn create_bytes_file_with_handler<F>(kernel: Weak<Kernel>, kernel_handler: F) -> impl FsNodeOps
+where
+    F: Fn(Arc<Kernel>) -> String + Send + Sync + 'static,
+{
+    BytesFile::new_node(move || {
+        if let Some(kernel) = kernel.upgrade() {
+            Ok(kernel_handler(kernel) + "\n")
+        } else {
+            error!(ENOENT)
+        }
+    })
 }

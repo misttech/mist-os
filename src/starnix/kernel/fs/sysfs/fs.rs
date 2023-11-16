@@ -7,7 +7,7 @@ use crate::{
     fs::{
         cgroup::CgroupDirectoryNode,
         kobject::{KObjectHandle, KType},
-        sysfs::{sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
+        sysfs::{sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
         CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },
@@ -47,9 +47,6 @@ impl SysFs {
                 dir.subdir(current_task, b"connections", 0o755, |_| ())
             });
         });
-        dir.subdir(current_task, b"kernel", 0o755, |dir| {
-            dir.subdir(current_task, b"tracing", 0o755, |_| ());
-        });
 
         dir.entry(
             current_task,
@@ -77,7 +74,8 @@ impl SysFs {
             |_| NetstackDevicesDirectory::new_sys_class_net(),
         );
 
-        sysfs_power_directory(current_task, &mut dir, &fs);
+        sysfs_kernel_directory(current_task, &mut dir);
+        sysfs_power_directory(current_task, &mut dir);
 
         // TODO(fxbug.dev/121327): Temporary fix of flakeness in tcp_socket_test.
         // Remove after registry.rs refactor is in place.

@@ -3,53 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
-    fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
+    fs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
     power::{PowerStateFile, PowerSyncOnSuspendFile, PowerWakeupCountFile},
-    task::{CurrentTask, Kernel},
-    types::{
-        errno::{error, Errno},
-        file_mode::mode,
-    },
-};
-use std::{
-    borrow::Cow,
-    sync::{Arc, Weak},
+    task::CurrentTask,
+    types::file_mode::mode,
 };
 
-impl<T> BytesFileOps for T
-where
-    T: Fn() -> Result<String, Errno> + Send + Sync + 'static,
-{
-    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        self().map(|s| s.into_bytes().into())
-    }
-}
+use std::sync::Arc;
 
-fn create_readonly_node<F>(
-    current_task: &CurrentTask,
-    fs: &Arc<FileSystem>,
-    kernel: Weak<Kernel>,
-    read_handler: F,
-) -> Arc<FsNode>
-where
-    F: Fn(Arc<Kernel>) -> String + Send + Sync + 'static,
-{
-    fs.create_node(
-        current_task,
-        BytesFile::new_node(move || match kernel.upgrade() {
-            Some(kernel) => Ok(read_handler(kernel) + "\n"),
-            None => error!(ENOENT),
-        }),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
-    )
-}
-
-pub fn sysfs_power_directory(
-    current_task: &CurrentTask,
-    dir: &mut StaticDirectoryBuilder<'_>,
-    fs: &Arc<FileSystem>,
-) {
+pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
     let kernel = current_task.kernel();
     dir.subdir(current_task, b"power", 0o755, |dir| {
         dir.entry(
@@ -66,27 +28,35 @@ pub fn sysfs_power_directory(
             mode!(IFREG, 0o644),
         );
         dir.subdir(current_task, b"suspend_stats", 0o755, |dir| {
-            dir.node(
+            let read_only_file_mode = mode!(IFREG, 0o444);
+            dir.entry(
+                current_task,
                 b"success",
-                create_readonly_node(current_task, fs, Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().success_count.to_string()
                 }),
+                read_only_file_mode,
             );
-            dir.node(
+            dir.entry(
+                current_task,
                 b"fail",
-                create_readonly_node(current_task, fs, Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().fail_count.to_string()
                 }),
+                read_only_file_mode,
             );
-            dir.node(
+            dir.entry(
+                current_task,
                 b"last_failed_dev",
-                create_readonly_node(current_task, fs, Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.power_manager.suspend_stats().last_failed_device.unwrap_or_default()
                 }),
+                read_only_file_mode,
             );
-            dir.node(
+            dir.entry(
+                current_task,
                 b"last_failed_errno",
-                create_readonly_node(current_task, fs, Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel
                         .power_manager
                         .suspend_stats()
@@ -94,6 +64,7 @@ pub fn sysfs_power_directory(
                         .map(|e| format!("-{}", e.code.error_code().to_string()))
                         .unwrap_or_default()
                 }),
+                read_only_file_mode,
             );
         });
     });

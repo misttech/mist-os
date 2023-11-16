@@ -26,9 +26,9 @@ class SysfsPowerTest : public ::testing::Test {
 };
 
 TEST_F(SysfsPowerTest, PowerDirectoryContainsExpectedContents) {
-  std::vector<std::string> suspend_stats_files;
-  EXPECT_TRUE(files::ReadDirContents("/sys/power", &suspend_stats_files));
-  EXPECT_THAT(suspend_stats_files, IsSupersetOf({"suspend_stats"}));
+  std::vector<std::string> files;
+  EXPECT_TRUE(files::ReadDirContents("/sys/power", &files));
+  EXPECT_THAT(files, IsSupersetOf({"suspend_stats", "wakeup_count", "state", "sync_on_suspend"}));
 }
 
 TEST_F(SysfsPowerTest, SuspendStatsDirectoryContainsExpectedContents) {
