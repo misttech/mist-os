@@ -42,7 +42,7 @@ zx_status_t DecodeCid(const std::array<uint8_t, SDMMC_CID_SIZE>& raw_cid) {
   zxlogf(INFO, "       revision=%u.%u", (raw_cid[MMC_CID_REVISION] >> 4) & 0xf,
          raw_cid[MMC_CID_REVISION] & 0xf);
   uint32_t serial;
-  memcpy(&serial, reinterpret_cast<const uint32_t*>(&raw_cid[MMC_CID_SERIAL]), sizeof(uint32_t));
+  memcpy(&serial, reinterpret_cast<const std::byte*>(&raw_cid[MMC_CID_SERIAL]), sizeof(uint32_t));
   zxlogf(INFO, "       serial=%u", serial);
   return ZX_OK;
 }
