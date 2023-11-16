@@ -41,6 +41,10 @@ board_configuration("arm64") {
 }
 
 board_input_bundle("main_bundle") {
+  configuration = {
+    power_manager =
+        "//src/power/power-manager/node_config/base_node_config.json5"
+  }
   base_packages = [ "//src/graphics/bin/vulkan_loader" ]
 
   drivers = [

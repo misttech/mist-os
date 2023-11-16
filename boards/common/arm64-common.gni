@@ -11,12 +11,3 @@ target_cpu = "arm64"
 blobfs_capacity = 10485760000  # 10000 MiB
 max_blob_contents_size =
     5216665600  # 4975 MiB. Leaves 50 MiB for the update package.
-
-_bootfs_deps = [
-  # Configs
-  "//src/power/power-manager:base_config",
-]
-
-board_bootfs_labels += _bootfs_deps
-board_zedboot_bootfs_labels += _bootfs_deps
-board_recovery_bootfs_labels += _bootfs_deps
