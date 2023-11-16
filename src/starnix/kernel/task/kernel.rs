@@ -393,8 +393,8 @@ impl Kernel {
     pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
         self.generic_netlink.get_or_init(|| {
             let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
-            self.kthreads.spawn(move |_| {
-                fasync::LocalExecutor::new().run_singlethreaded(generic_netlink_fut);
+            self.kthreads.ehandle.spawn_detached(async move {
+                generic_netlink_fut.await;
                 log_error!("Generic Netlink future unexpectedly exited");
             });
             generic_netlink
