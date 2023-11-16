@@ -4,18 +4,9 @@
 # found in the LICENSE file.
 
 #### CATEGORY=Run, inspect and debug
-### Display logs from a target device.
+### listen for logs from the on-device log_listener
 
-## usage: fx log FFX_LOG_FLAGS
-##
-##    FFX_LOG_FLAGS           flags to pass to ffx log, see `fx ffx log --help`.
-##
-## LEGACY MODE: listen for logs from the on-device log_listener
-##
-## usage: fx log --legacy [-h | --help] [--raw] LOG_LISTENER_FLAGS
-##
-##    --legacy                runs in legacy mode, i.e. listen for logs from
-##                            the on-device log_listener
+## usage: fx log [-h | --help] [--raw] [-r | --remote-symbols] LOG_LISTENER_FLAGS
 ##
 ##    --raw                   do not attempt to symbolize the log
 ##
@@ -40,59 +31,49 @@ set -o pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 
-if [[ "$1" == '--legacy' ]]; then
-  shift
-
-  fx-warn 'DEPRECATION WARNING'
-  fx-warn 'You are using `fx log` in legacy mode, this mode will be removed soon.'
-  fx-warn 'If you have any concerns, please report to https://fxbug.dev/131196.\n'
-
-  function listen {
-    while true; do
-      fx-command-run wait || return
-      fx-command-run shell log_listener "$@"
-      local error_code=$?
-      if [[ "${error_code}" -eq 0 ]]; then
-        # this is necessary, so that "--dump_logs yes" works as expected.
-        break
-      fi
-      echo "$(date '+%Y-%m-%d %H:%M:%S %Z'): Connection lost (status ${error_code}), reconnecting..."
-    done
-  }
-
-  declare is_raw=0
-  declare symbolizer=( "fx-command-run" "ffx" "debug" "symbolize" )
-
-  while [[ $# -ne 0 ]]; do
-    case "$1" in
-    -h|--help)
-      fx-command-help
-      echo
-      echo "[Attempting to shell into a connected device to provide help for the on-device log_listener]"
-      fx-command-exec shell log_listener -h
-      exit 0
-      ;;
-    --raw)
-      is_raw=1
-      ;;
-    --remote-symbols|-r)
-      fx-error "--remote-symbols|-r is deprecated. Remote symbolization will be tried automatically."
-      exit 1
-      ;;
-    --no-prettify)
-      symbolizer+=("--no-prettify")
-      ;;
-    *)
+function listen {
+  while true; do
+    fx-command-run wait || return
+    fx-command-run shell log_listener "$@"
+    local error_code=$?
+    if [[ "${error_code}" -eq 0 ]]; then
+      # this is necessary, so that "--dump_logs yes" works as expected.
       break
-    esac
-    shift
+    fi
+    echo "$(date '+%Y-%m-%d %H:%M:%S %Z'): Connection lost (status ${error_code}), reconnecting..."
   done
+}
 
-  if (( is_raw )); then
-    listen "$@"
-  else
-    listen "$@" | "${symbolizer[@]}"
-  fi
+declare is_raw=0
+declare symbolizer=( "fx-command-run" "ffx" "debug" "symbolize" )
+
+while [[ $# -ne 0 ]]; do
+  case "$1" in
+  -h|--help)
+    fx-command-help
+    echo
+    echo "[Attempting to shell into a connected device to provide help for the on-device log_listener]"
+    fx-command-exec shell log_listener -h
+    exit 0
+    ;;
+  --raw)
+    is_raw=1
+    ;;
+  --remote-symbols|-r)
+    fx-error "--remote-symbols|-r is deprecated. Remote symbolization will be tried automatically."
+    exit 1
+    ;;
+  --no-prettify)
+    symbolizer+=("--no-prettify")
+    ;;
+  *)
+    break
+  esac
+  shift
+done
+
+if (( is_raw )); then
+  listen "$@"
 else
-  fx-command-run ffx log "$@"
+  listen "$@" | "${symbolizer[@]}"
 fi
