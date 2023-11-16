@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
-        default_ioctl, fileops_impl_dataless, fileops_impl_seekless, FileObject, FileOps, FsNode,
-    },
-    logging::log_warn,
+    fs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
+    logging::{log_info, log_warn},
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
@@ -85,11 +83,22 @@ impl UinputDevice {
             Err(e) => Err(e),
         }
     }
+
+    fn ui_dev_create(&self) -> Result<SyscallResult, Errno> {
+        // TODO(b/308156116): impl ui_dev_create.
+        log_info!("ui_dev_create()");
+        Ok(SUCCESS)
+    }
+
+    fn ui_dev_destroy(&self) -> Result<SyscallResult, Errno> {
+        // TODO(b/302174354): impl ui_dev_destroy.
+        log_info!("ui_dev_destroy()");
+        Ok(SUCCESS)
+    }
 }
 
 impl FileOps for Arc<UinputDevice> {
     fileops_impl_seekless!();
-    fileops_impl_dataless!();
 
     fn ioctl(
         &self,
@@ -109,10 +118,38 @@ impl FileOps for Arc<UinputDevice> {
             | uapi::UI_SET_PHYS
             | uapi::UI_SET_PROPBIT
             | uapi::UI_DEV_SETUP => Ok(SUCCESS),
+            uapi::UI_DEV_CREATE => self.ui_dev_create(),
+            uapi::UI_DEV_DESTROY => self.ui_dev_destroy(),
             // default_ioctl() handles file system related requests and reject
             // others.
-            _ => default_ioctl(file, current_task, request, arg),
+            _ => {
+                log_warn!("receive unknown ioctl request: {:?}", request);
+                default_ioctl(file, current_task, request, arg)
+            }
         }
+    }
+
+    fn write(
+        &self,
+        _file: &crate::fs::FileObject,
+        _current_task: &crate::task::CurrentTask,
+        _offset: usize,
+        _data: &mut dyn crate::fs::buffers::InputBuffer,
+    ) -> Result<usize, Errno> {
+        // TODO(b/308160735): impl write() for uinput FD.
+        log_info!("write()");
+        Ok(0)
+    }
+
+    fn read(
+        &self,
+        _file: &crate::fs::FileObject,
+        _current_task: &crate::task::CurrentTask,
+        _offset: usize,
+        _data: &mut dyn crate::fs::buffers::OutputBuffer,
+    ) -> Result<usize, Errno> {
+        log_warn!("uinput FD does not support read().");
+        errno::error!(EINVAL)
     }
 }
 

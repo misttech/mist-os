@@ -101,12 +101,12 @@ TEST_F(UinputTest, UiDevSetup) {
 
 TEST_F(UinputTest, UiDevCreate) {
   int res = ioctl(uinput_fd_.get(), UI_DEV_CREATE);
-  EXPECT_EQ(res, -1);
+  EXPECT_EQ(res, 0);
 }
 
 TEST_F(UinputTest, UiDevDestroy) {
   int res = ioctl(uinput_fd_.get(), UI_DEV_DESTROY);
-  EXPECT_EQ(res, -1);
+  EXPECT_EQ(res, 0);
 }
 
 }  // namespace
