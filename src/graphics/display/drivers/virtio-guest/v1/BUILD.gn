@@ -20,7 +20,7 @@ driver_bind_rules("virtio_gpu_bind_v1") {
 group("tests") {
   testonly = true
   deps = [
-    ":virtio-gpu-test-package",
+    ":virtio-gpu-test-package-v1",
     ":virtio_gpu_bind_v1_test",
   ]
 }
@@ -104,7 +104,7 @@ test("virtio-gpu-test") {
   ]
 }
 
-fuchsia_unittest_package("virtio-gpu-test-package") {
-  package_name = "virtio-gpu-test"
+fuchsia_unittest_package("virtio-gpu-test-package-v1") {
+  package_name = "virtio-gpu-test-v1"
   deps = [ ":virtio-gpu-test" ]
 }

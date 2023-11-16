@@ -8,11 +8,10 @@ declare_args() {
 
 group("tests") {
   testonly = true
-  if (use_virtio_gpu_v2) {
-    deps = [ "v2:tests" ]
-  } else {
-    deps = [ "v1:tests" ]
-  }
+  deps = [
+    "v1:tests",
+    "v2:tests",
+  ]
 }
 
 group("virtio_gpu") {

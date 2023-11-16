@@ -254,7 +254,7 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
     if (!set_debug_status.ok()) {
       FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
               set_debug_status.status_string());
-      completer(set_debug_status.error().status());
+      completer(zx::make_result(set_debug_status.error().status()));
       return;
     }
 
