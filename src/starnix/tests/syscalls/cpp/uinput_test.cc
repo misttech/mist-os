@@ -37,6 +37,18 @@ class UinputTest : public ::testing::Test {
   test_helper::ScopedFD uinput_fd_;
 };
 
+TEST_F(UinputTest, UiGetVersion) {
+  // Pass null to UI_GET_VERSION expect EFAULT.
+  int res = ioctl(uinput_fd_.get(), UI_GET_VERSION, NULL);
+  EXPECT_EQ(res, -1);
+  EXPECT_EQ(errno, EFAULT);
+
+  int version;
+  res = ioctl(uinput_fd_.get(), UI_GET_VERSION, &version);
+  EXPECT_EQ(res, 0);
+  EXPECT_EQ(version, 5);
+}
+
 TEST_F(UinputTest, UiSetEvbit) {
   int res = ioctl(uinput_fd_.get(), UI_SET_EVBIT, EV_KEY);
   EXPECT_EQ(res, 0);
