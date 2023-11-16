@@ -11,8 +11,7 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },
     task::{CurrentTask, Kernel, NetstackDevicesDirectory},
-    types::errno::Errno,
-    types::{mode, statfs, SYSFS_MAGIC},
+    types::{errno::Errno, file_mode::mode, statfs, SYSFS_MAGIC},
 };
 
 use std::sync::Arc;

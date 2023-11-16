@@ -9,8 +9,10 @@ use crate::{
         SeekTarget, SimpleFileNode,
     },
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
-    types::off_t,
+    types::{
+        errno::{errno, error, Errno},
+        off_t,
+    },
 };
 use starnix_lock::Mutex;
 use std::collections::VecDeque;
@@ -324,15 +326,12 @@ impl FileOps for ConstFile {
 #[cfg(test)]
 mod tests {
     use crate::{
-        testing::{create_kernel_and_task, AutoReleasableTask},
-        {
-            fs::{
-                Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
-                SequenceFileSource, VecOutputBuffer,
-            },
-            types::errno::Errno,
-            types::OpenFlags,
+        fs::{
+            Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, SeekTarget,
+            SequenceFileSource, VecOutputBuffer,
         },
+        testing::{create_kernel_and_task, AutoReleasableTask},
+        types::{errno::Errno, open_flags::OpenFlags},
     };
     use starnix_lock::Mutex;
     use std::sync::Arc;

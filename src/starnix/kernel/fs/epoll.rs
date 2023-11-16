@@ -13,9 +13,11 @@ use crate::{
         CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
         WaitQueue, Waiter,
     },
-    types::errno::{errno, error, Errno, EBADF, EINTR, ETIMEDOUT},
-    types::OpenFlags,
-    types::{EPOLLET, EPOLLONESHOT},
+    types::{
+        errno::{errno, error, Errno, EBADF, EINTR, ETIMEDOUT},
+        open_flags::OpenFlags,
+        EPOLLET, EPOLLONESHOT,
+    },
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
@@ -497,7 +499,9 @@ mod tests {
         task::Waiter,
         testing::{create_kernel_and_task, create_task},
     };
-    use fuchsia_zircon::{self as zx, HandleBased};
+    use fuchsia_zircon::{
+        HandleBased, {self as zx},
+    };
     use std::sync::atomic::{AtomicU64, Ordering};
     use syncio::Zxio;
 

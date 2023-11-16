@@ -2,9 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::sync::Arc;
-
-use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+use crate::{
+    device::{
+        magma::{
+            file::{
+                BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
+                MagmaDevice, MagmaSemaphore,
+            },
+            magma::create_drm_image,
+        },
+        wayland::image_file::{ImageFile, ImageInfo},
+    },
+    fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
+    mm::{MemoryAccessor, MemoryAccessorExt},
+    task::CurrentTask,
+    types::{
+        errno::{errno, Errno},
+        file_mode::FileMode,
+        open_flags::OpenFlags,
+        user_address::{UserAddress, UserRef},
+        user_buffer::UserBuffer,
+    },
+};
+use fuchsia_zircon::{
+    AsHandleRef, HandleBased, {self as zx},
+};
 use magma::{
     magma_buffer_export, magma_buffer_get_handle, magma_buffer_id_t, magma_buffer_t,
     magma_command_descriptor, magma_connection_execute_command,
@@ -39,28 +61,8 @@ use magma::{
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
 };
-use std::mem::ManuallyDrop;
+use std::{mem::ManuallyDrop, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
-
-use crate::{
-    device::{
-        magma::{
-            file::{
-                BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
-                MagmaDevice, MagmaSemaphore,
-            },
-            magma::create_drm_image,
-        },
-        wayland::image_file::{ImageFile, ImageInfo},
-    },
-    fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
-    mm::{MemoryAccessor, MemoryAccessorExt},
-    task::CurrentTask,
-    types::errno::{errno, Errno},
-    types::user_address::{UserAddress, UserRef},
-    types::user_buffer::UserBuffer,
-    types::{FileMode, OpenFlags},
-};
 
 /// Reads a sequence of objects starting at `addr`, ensuring at least one element is in the returned
 /// Vec.

@@ -6,8 +6,10 @@ use std::sync::Arc;
 
 use crate::{
     fs::fs_node::FsNodeHandle,
-    types::errno::{errno, error, Errno},
-    types::SealFlags,
+    types::{
+        errno::{errno, error, Errno},
+        seal_flags::SealFlags,
+    },
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -179,7 +181,7 @@ mod tests {
     use crate::{
         fs::FsNode,
         testing::*,
-        types::{device_type::DeviceType, FileMode},
+        types::{device_type::DeviceType, file_mode::FileMode},
     };
 
     fn create_fs_node() -> Arc<FsNode> {

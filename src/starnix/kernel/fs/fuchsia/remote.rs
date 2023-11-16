@@ -33,10 +33,15 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::errno::{errno, error, from_status_like_fdio, Errno},
     types::{
-        device_type::DeviceType, fsverity_descriptor, ino_t, off_t, statfs, FileMode, MountFlags,
-        OpenFlags,
+        device_type::DeviceType,
+        errno::{errno, error, from_status_like_fdio, Errno},
+        file_mode::FileMode,
+        fsverity_descriptor, ino_t,
+        mount_flags::MountFlags,
+        off_t,
+        open_flags::OpenFlags,
+        statfs,
     },
     vmex_resource::VMEX_RESOURCE,
 };
@@ -1508,8 +1513,7 @@ mod test {
         },
         mm::PAGE_SIZE,
         testing::*,
-        types::errno::EINVAL,
-        types::mode,
+        types::{errno::EINVAL, file_mode::mode},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;

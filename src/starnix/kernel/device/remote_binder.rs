@@ -16,9 +16,10 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, errno_from_code, error, Errno, ErrnoCode, EAGAIN, EINTR},
+        open_flags::OpenFlags,
         pid_t, uapi,
         user_address::{UserAddress, UserCString, UserRef},
-        OpenFlags, PATH_MAX,
+        PATH_MAX,
     },
 };
 use anyhow::{Context, Error};
@@ -1058,7 +1059,7 @@ mod tests {
         mm::MemoryAccessor,
         task::Task,
         testing::*,
-        types::{mode, MountFlags},
+        types::{file_mode::mode, mount_flags::MountFlags},
     };
     use fidl::{
         endpoints::{create_endpoints, create_proxy, Proxy},

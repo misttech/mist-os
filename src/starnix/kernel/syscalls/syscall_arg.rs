@@ -4,9 +4,12 @@
 
 use crate::{
     fs::{FdNumber, WdNumber},
-    types::signals::UncheckedSignal,
-    types::user_address::{UserAddress, UserCString, UserRef},
-    types::{device_type::DeviceType, FileMode},
+    types::{
+        device_type::DeviceType,
+        file_mode::FileMode,
+        signals::UncheckedSignal,
+        user_address::{UserAddress, UserCString, UserRef},
+    },
 };
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

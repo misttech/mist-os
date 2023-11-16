@@ -2,15 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::Mutex;
-use std::{
-    borrow::Cow,
-    collections::{HashMap, VecDeque},
-    mem::size_of,
-    sync::atomic::{AtomicI32, Ordering},
-};
-use zerocopy::AsBytes;
-
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -21,11 +12,25 @@ use crate::{
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::auth::CAP_SYS_ADMIN,
-    types::errno::{errno, error, Errno},
-    types::user_address::{UserAddress, UserRef},
-    types::{inotify_event, FileMode, OpenFlags, WeakKey, FIONREAD},
+    types::{
+        arc_key::WeakKey,
+        auth::CAP_SYS_ADMIN,
+        errno::{errno, error, Errno},
+        file_mode::FileMode,
+        inotify_event,
+        open_flags::OpenFlags,
+        user_address::{UserAddress, UserRef},
+        FIONREAD,
+    },
 };
+use starnix_lock::Mutex;
+use std::{
+    borrow::Cow,
+    collections::{HashMap, VecDeque},
+    mem::size_of,
+    sync::atomic::{AtomicI32, Ordering},
+};
+use zerocopy::AsBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
 
@@ -567,7 +572,7 @@ mod tests {
     use crate::{
         fs::{buffers::VecOutputBuffer, InotifyMask, OutputBuffer, WdNumber},
         testing::create_kernel_and_task,
-        types::{FileMode, WeakKey},
+        types::{arc_key::WeakKey, file_mode::FileMode},
     };
 
     #[::fuchsia::test]

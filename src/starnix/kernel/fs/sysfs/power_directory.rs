@@ -2,21 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::power::PowerSyncOnSuspendFile;
-
-use {
-    crate::{
-        auth::FsCred,
-        fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
-        power::{PowerStateFile, PowerWakeupCountFile},
-        task::{CurrentTask, Kernel},
-        types::errno::{error, Errno},
-        types::mode,
+use crate::{
+    auth::FsCred,
+    fs::{BytesFile, BytesFileOps, FileSystem, FsNode, FsNodeInfo, StaticDirectoryBuilder},
+    power::{PowerStateFile, PowerSyncOnSuspendFile, PowerWakeupCountFile},
+    task::{CurrentTask, Kernel},
+    types::{
+        errno::{error, Errno},
+        file_mode::mode,
     },
-    std::{
-        borrow::Cow,
-        sync::{Arc, Weak},
-    },
+};
+use std::{
+    borrow::Cow,
+    sync::{Arc, Weak},
 };
 
 impl<T> BytesFileOps for T

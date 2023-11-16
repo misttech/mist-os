@@ -19,7 +19,11 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{error, Errno},
-        gid_t, mode, statfs, uid_t, FileMode, OpenFlags, SealFlags, TMPFS_MAGIC,
+        file_mode::{mode, FileMode},
+        gid_t,
+        open_flags::OpenFlags,
+        seal_flags::SealFlags,
+        statfs, uid_t, TMPFS_MAGIC,
     },
 };
 
@@ -344,8 +348,7 @@ mod test {
             FdNumber, UnlinkKind,
         },
         testing::*,
-        types::errno::errno,
-        types::MountFlags,
+        types::{errno::errno, mount_flags::MountFlags},
     };
     use zerocopy::AsBytes;
 

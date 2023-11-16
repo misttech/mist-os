@@ -6,23 +6,23 @@ use crate::{
     fs::parse_unsigned_file,
     mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
-    signals::syscalls::WaitingOptions,
     signals::{
-        send_signal, send_signal_first, send_standard_signal, SignalDetail, SignalInfo,
-        SignalInfoHeader, SI_HEADER_SIZE,
+        send_signal, send_signal_first, send_standard_signal, syscalls::WaitingOptions,
+        SignalDetail, SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
-    types::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
-    types::errno::{errno, error, Errno},
-    types::signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP},
-    types::user_address::{UserAddress, UserRef},
     types::{
-        pid_t, OwnedRefByRef, WeakRef, PTRACE_CONT, PTRACE_DETACH, PTRACE_GETSIGINFO,
-        PTRACE_GETSIGMASK, PTRACE_INTERRUPT, PTRACE_KILL, PTRACE_PEEKDATA, PTRACE_PEEKTEXT,
-        PTRACE_POKEDATA, PTRACE_POKETEXT, PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
+        auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
+        errno::{errno, error, Errno},
+        ownership::{OwnedRefByRef, WeakRef},
+        pid_t,
+        signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP},
+        user_address::{UserAddress, UserRef},
+        PTRACE_CONT, PTRACE_DETACH, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_INTERRUPT,
+        PTRACE_KILL, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA, PTRACE_POKETEXT,
+        PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
     },
 };
-
 use std::sync::{atomic::Ordering, Arc};
 use zerocopy::FromBytes;
 

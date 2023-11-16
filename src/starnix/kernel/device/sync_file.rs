@@ -2,19 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::buffers::{InputBuffer, OutputBuffer};
-use crate::fs::{fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps};
-use crate::logging::{impossible_error, log_warn};
-use crate::mm::MemoryAccessorExt;
-use crate::syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use crate::task::{
-    CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
-    WaitCanceler, WaitCancelerOneVmo, Waiter,
-};
-use crate::types::errno::{error, Errno};
-use crate::types::user_address::{UserAddress, UserRef};
-use crate::types::{
-    c_char, sync_fence_info, sync_file_info, sync_merge_data, OpenFlags, SYNC_IOC_MAGIC,
+use crate::{
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
+    },
+    logging::{impossible_error, log_warn},
+    mm::MemoryAccessorExt,
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
+    task::{
+        CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
+        WaitCanceler, WaitCancelerOneVmo, Waiter,
+    },
+    types::{
+        c_char,
+        errno::{error, Errno},
+        open_flags::OpenFlags,
+        sync_fence_info, sync_file_info, sync_merge_data,
+        user_address::{UserAddress, UserRef},
+        SYNC_IOC_MAGIC,
+    },
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;

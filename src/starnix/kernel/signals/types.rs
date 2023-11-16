@@ -2,23 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
+    types::{
+        __sifields__bindgen_ty_2, __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int,
+        c_uint,
+        errno::{error, Errno},
+        pid_t, sigaction_t, sigaltstack_t, sigevent, siginfo_t,
+        signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
+        sigval_t, uapi, uid_t,
+        union::struct_with_union_into_bytes,
+        user_address::UserAddress,
+        SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD, SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL,
+        SI_MAX_SIZE,
+    },
+};
 use starnix_lock::RwLock;
 use starnix_sync::InterruptibleEvent;
 use std::{collections::VecDeque, convert::TryFrom, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
-
-use crate::{
-    task::{IntervalTimerHandle, ThreadGroupReadGuard, WaitQueue, WaiterRef},
-    types::errno::{error, Errno},
-    types::signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
-    types::user_address::UserAddress,
-    types::{
-        __sifields__bindgen_ty_2, __sifields__bindgen_ty_4, __sifields__bindgen_ty_7, c_int,
-        c_uint, pid_t, sigaction_t, sigaltstack_t, sigevent, siginfo_t, sigval_t,
-        struct_with_union_into_bytes, uapi, uid_t, SIGEV_NONE, SIGEV_SIGNAL, SIGEV_THREAD,
-        SIGEV_THREAD_ID, SIG_DFL, SIG_IGN, SI_KERNEL, SI_MAX_SIZE,
-    },
-};
 
 /// `SignalActions` contains a `sigaction_t` for each valid signal.
 #[derive(Debug)]
@@ -491,8 +493,10 @@ impl From<SignalEventValue> for sigval_t {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::types::signals::{SIGCHLD, SIGPWR};
-    use crate::types::CLD_EXITED;
+    use crate::types::{
+        signals::{SIGCHLD, SIGPWR},
+        CLD_EXITED,
+    };
     use std::convert::TryFrom;
 
     #[::fuchsia::test]

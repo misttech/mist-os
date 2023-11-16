@@ -2,18 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use itertools::Itertools;
-use starnix_lock::{Mutex, MutexGuard, RwLock};
-use std::{
-    collections::BTreeMap,
-    fmt,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
-};
-
 use crate::{
     auth::Credentials,
     device::terminal::{ControllingSession, Terminal},
@@ -32,16 +20,32 @@ use crate::{
         TaskPersistentInfoState, TimerId, TimerTable, WaitQueue,
     },
     time::utc,
-    types::auth::{CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
-    types::errno::{errno, error, Errno},
-    types::personality::PersonalityFlags,
-    types::signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU},
-    types::time::{duration_from_timeval, timeval_from_duration},
-    types::user_address::UserAddress,
     types::{
-        itimerval, pid_t, rlimit, uid_t, OwnedRef, Releasable, Resource, ResourceLimits,
-        TaskTimeStats, TempRef, WeakRef, CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL,
-        SIG_IGN,
+        auth::{CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
+        errno::{errno, error, Errno},
+        itimerval,
+        ownership::{OwnedRef, Releasable, TempRef, WeakRef},
+        personality::PersonalityFlags,
+        pid_t,
+        resource_limits::{Resource, ResourceLimits},
+        rlimit,
+        signals::{Signal, UncheckedSignal, SIGCHLD, SIGCONT, SIGHUP, SIGKILL, SIGTTOU},
+        stats::TaskTimeStats,
+        time::{duration_from_timeval, timeval_from_duration},
+        uid_t,
+        user_address::UserAddress,
+        CLOCK_REALTIME, ITIMER_PROF, ITIMER_REAL, ITIMER_VIRTUAL, SIG_IGN,
+    },
+};
+use fuchsia_zircon as zx;
+use itertools::Itertools;
+use starnix_lock::{Mutex, MutexGuard, RwLock};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Weak,
     },
 };
 

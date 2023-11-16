@@ -9,7 +9,7 @@ use crate::{
     types::{
         auth::CAP_SYS_CHROOT,
         errno::{errno, error, Errno},
-        Access, FileMode,
+        file_mode::{Access, FileMode},
     },
 };
 use starnix_lock::RwLock;
@@ -171,7 +171,7 @@ mod test {
     use crate::{
         fs::{tmpfs::TmpFs, FsContext},
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
-        types::{FileMode, OpenFlags},
+        types::{file_mode::FileMode, open_flags::OpenFlags},
     };
 
     #[::fuchsia::test]

@@ -3,15 +3,17 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::proc::ProcSysNetDev,
     fs::{
-        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
-        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeOps,
-        FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, proc::ProcSysNetDev,
+        unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle,
+        FsNode, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
     task::CurrentTask,
-    types::errno::{errno, Errno},
-    types::{off_t, OpenFlags},
+    types::{
+        errno::{errno, Errno},
+        off_t,
+        open_flags::OpenFlags,
+    },
 };
 use starnix_lock::Mutex;
 use std::{collections::HashMap, sync::Arc};

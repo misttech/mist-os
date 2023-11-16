@@ -17,8 +17,11 @@ use crate::{
         FileObject, FileOps, FsNode, FsNodeOps, FsStr, FsString,
     },
     task::CurrentTask,
-    types::errno::{error, Errno},
-    types::{device_type::DeviceType, OpenFlags},
+    types::{
+        device_type::DeviceType,
+        errno::{error, Errno},
+        open_flags::OpenFlags,
+    },
 };
 
 /// ktype is the type of object that embeds a `kobject`.

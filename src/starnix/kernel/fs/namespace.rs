@@ -28,10 +28,15 @@ use crate::{
     selinux::fs::selinux_fs,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
     time::utc,
-    types::errno::{errno, error, Errno},
     types::{
-        device_type::DeviceType, Access, ArcKey, FileMode, MountFlags, OpenFlags, PtrKey, WeakKey,
-        WeakRef, NAME_MAX,
+        arc_key::{ArcKey, PtrKey, WeakKey},
+        device_type::DeviceType,
+        errno::{errno, error, Errno},
+        file_mode::{Access, FileMode},
+        mount_flags::MountFlags,
+        open_flags::OpenFlags,
+        ownership::WeakRef,
+        NAME_MAX,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -1470,8 +1475,7 @@ mod test {
     use crate::{
         fs::{tmpfs::TmpFs, LookupContext, Namespace, UnlinkKind, WhatToMount},
         testing::create_kernel_and_task,
-        types::errno::errno,
-        types::MountFlags,
+        types::{errno::errno, mount_flags::MountFlags},
     };
     use std::sync::Arc;
 

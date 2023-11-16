@@ -2,18 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_lock::RwLock;
-use std::{
-    collections::BTreeMap,
-    sync::{Arc, Weak},
-};
-
 use crate::{
     mutable_state::{state_accessor, state_implementation},
     signals::send_standard_signal,
     task::{Session, ThreadGroup},
-    types::signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
-    types::{pid_t, TempRef},
+    types::{
+        ownership::TempRef,
+        pid_t,
+        signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
+    },
+};
+use starnix_lock::RwLock;
+use std::{
+    collections::BTreeMap,
+    sync::{Arc, Weak},
 };
 
 #[derive(Debug)]

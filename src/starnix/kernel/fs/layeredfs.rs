@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::{collections::BTreeMap, sync::Arc};
-
 use crate::{
     fs::{
         fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
@@ -11,9 +9,14 @@ use crate::{
         FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
     },
     task::{CurrentTask, Kernel},
-    types::errno::{errno, Errno},
-    types::{ino_t, off_t, statfs, OpenFlags},
+    types::{
+        errno::{errno, Errno},
+        ino_t, off_t,
+        open_flags::OpenFlags,
+        statfs,
+    },
 };
+use std::{collections::BTreeMap, sync::Arc};
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level
 /// directory that points to other filesystems.

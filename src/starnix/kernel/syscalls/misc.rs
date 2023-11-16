@@ -10,21 +10,20 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use lock_sequence::{Locked, Unlocked};
 
 use crate::{
-    logging::not_implemented,
-    logging::{log_error, log_info},
+    logging::{log_error, log_info, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
-    types::errno::{errno, error, from_status_like_fdio, Errno},
-    types::personality::PersonalityFlags,
-    types::user_address::{UserAddress, UserCString, UserRef},
     types::{
-        uapi, utsname_t, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF,
-        LINUX_REBOOT_CMD_CAD_ON, LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC,
-        LINUX_REBOOT_CMD_RESTART, LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND,
-        LINUX_REBOOT_MAGIC1, LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B,
-        LINUX_REBOOT_MAGIC2C,
+        auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
+        errno::{errno, error, from_status_like_fdio, Errno},
+        personality::PersonalityFlags,
+        uapi,
+        user_address::{UserAddress, UserCString, UserRef},
+        utsname_t, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
+        LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
+        LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
+        LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
     },
 };
 

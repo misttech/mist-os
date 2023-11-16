@@ -19,9 +19,14 @@ use crate::{
     },
     logging::{log_error, not_implemented},
     task::{CurrentTask, EventHandler, Kernel, TaskStateCode, WaitCanceler, Waiter},
-    types::errno::{errno, error, Errno},
-    types::time::duration_to_scheduler_clock,
-    types::{mode, off_t, pid_t, OpenFlags},
+    types::{
+        errno::{errno, error, Errno},
+        file_mode::mode,
+        off_t,
+        open_flags::OpenFlags,
+        pid_t,
+        time::duration_to_scheduler_clock,
+    },
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;

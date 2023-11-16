@@ -6,7 +6,8 @@ use crate::task::PidTable;
 use bitflags::bitflags;
 use extended_pstate::ExtendedPstateState;
 use fuchsia_zircon::{
-    self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
+    sys::zx_thread_state_general_regs_t,
+    AsHandleRef, Signals, Task as _, {self as zx},
 };
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
@@ -50,12 +51,16 @@ use crate::{
         },
         device_type::DeviceType,
         errno::{errno, error, from_status_like_fdio, Errno},
-        pid_t, release_on_error, robust_list_head,
+        file_mode::{Access, FileMode},
+        open_flags::OpenFlags,
+        ownership::{release_on_error, OwnedRefByRef, ReleasableByRef, TempRef, WeakRef},
+        pid_t, robust_list_head,
         signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
-        sock_filter, sock_fprog, ucred,
+        sock_filter, sock_fprog,
+        stats::TaskTimeStats,
+        ucred,
         user_address::{UserAddress, UserRef},
-        Access, FileMode, OpenFlags, OwnedRefByRef, ReleasableByRef, TaskTimeStats, TempRef,
-        WeakRef, BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
+        BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
         CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
         CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
         CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY, FUTEX_OWNER_DIED,
@@ -2555,7 +2560,7 @@ mod test {
     use super::*;
     use crate::{
         testing::*,
-        types::{rlimit, signals::SIGCHLD, Resource},
+        types::{resource_limits::Resource, rlimit, signals::SIGCHLD},
     };
 
     #[::fuchsia::test]

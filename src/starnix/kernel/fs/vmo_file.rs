@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_zircon::{
+    HandleBased, {self as zx},
+};
 use std::sync::Arc;
 
 use crate::{
@@ -16,8 +18,12 @@ use crate::{
     logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
-    types::{mode, OpenFlags, SealFlags},
+    types::{
+        errno::{errno, error, Errno},
+        file_mode::mode,
+        open_flags::OpenFlags,
+        seal_flags::SealFlags,
+    },
     vmex_resource::VMEX_RESOURCE,
 };
 

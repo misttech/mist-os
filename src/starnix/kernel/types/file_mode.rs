@@ -6,7 +6,7 @@ use std::ops;
 
 use crate::types::errno::{errno, error, Errno};
 
-use crate::types::{uapi, OpenFlags};
+use crate::types::{open_flags::OpenFlags, uapi};
 
 #[derive(Copy, Clone, Debug, Default, Eq, PartialEq)]
 pub struct FileMode(u32);
@@ -143,7 +143,9 @@ impl ops::Not for FileMode {
 
 macro_rules! mode {
     ($type:ident, $mode:expr) => {
-        crate::types::FileMode::from_bits($mode | crate::types::FileMode::$type.bits())
+        crate::types::file_mode::FileMode::from_bits(
+            $mode | crate::types::file_mode::FileMode::$type.bits(),
+        )
     };
 }
 

@@ -3,14 +3,15 @@
 // found in the LICENSE file.
 
 use super::tracing_directory::TraceMarkerFile;
-use crate::auth::FsCred;
-use crate::fs::{
-    CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNodeInfo, FsStr, StaticDirectoryBuilder,
+use crate::{
+    auth::FsCred,
+    fs::{
+        CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsNodeInfo, FsStr, StaticDirectoryBuilder,
+    },
+    task::{CurrentTask, Kernel},
+    types::{errno::Errno, file_mode::mode, statfs, TRACEFS_MAGIC},
 };
-use crate::task::{CurrentTask, Kernel};
-use crate::types::errno::Errno;
-use crate::types::{mode, statfs, TRACEFS_MAGIC};
 
 use std::sync::Arc;
 

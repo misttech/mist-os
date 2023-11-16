@@ -15,8 +15,8 @@ use net_types::ip::IpAddress;
 
 use netlink_packet_core::{ErrorMessage, NetlinkHeader, NetlinkMessage, NetlinkPayload};
 use netlink_packet_route::{
-    rtnl::address::nlas::Nla as AddressNla, rtnl::link::nlas::Nla as LinkNla, AddressMessage,
-    LinkMessage, RtnlMessage,
+    rtnl::{address::nlas::Nla as AddressNla, link::nlas::Nla as LinkNla},
+    AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_lock::Mutex;
 use static_assertions::const_assert;
@@ -36,17 +36,23 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    types::as_any::AsAny,
-    types::auth::CAP_NET_RAW,
-    types::errno::{errno, error, Errno, ErrnoCode},
-    types::time::{duration_from_timeval, timeval_from_duration},
-    types::user_address::{UserAddress, UserRef},
-    types::user_buffer::UserBuffer,
     types::{
-        c_char, ifreq, in_addr, mode, sockaddr, sockaddr_in, struct_with_union_into_bytes, ucred,
-        OpenFlags, AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU,
-        SIOCSIFADDR, SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO,
-        SO_SNDTIMEO, SO_TYPE,
+        as_any::AsAny,
+        auth::CAP_NET_RAW,
+        c_char,
+        errno::{errno, error, Errno, ErrnoCode},
+        file_mode::mode,
+        ifreq, in_addr,
+        open_flags::OpenFlags,
+        sockaddr, sockaddr_in,
+        time::{duration_from_timeval, timeval_from_duration},
+        ucred,
+        union::struct_with_union_into_bytes,
+        user_address::{UserAddress, UserRef},
+        user_buffer::UserBuffer,
+        AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
+        SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO,
+        SO_TYPE,
     },
 };
 

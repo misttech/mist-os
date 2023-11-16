@@ -7,7 +7,7 @@ use crate::{
     task::{CurrentTask, Task},
     types::{
         errno::{errno, Errno},
-        OwnedRefByRef, ReleasableByRef, WeakRef,
+        ownership::{OwnedRefByRef, ReleasableByRef, WeakRef},
     },
 };
 use fuchsia_async as fasync;

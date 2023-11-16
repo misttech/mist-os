@@ -9,9 +9,12 @@ use crate::{
     fs::FsStr,
     mm::{vmo::round_up_to_increment, MemoryAccessor},
     task::CurrentTask,
-    types::errno::{errno, error, Errno, ENOSPC},
-    types::user_address::UserAddress,
-    types::{ino_t, off_t, FileMode},
+    types::{
+        errno::{errno, error, Errno, ENOSPC},
+        file_mode::FileMode,
+        ino_t, off_t,
+        user_address::UserAddress,
+    },
 };
 
 #[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]

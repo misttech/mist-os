@@ -2,14 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::{
+    task::{ProcessGroup, Task, ThreadGroup, ZombieProcess},
+    types::{
+        ownership::{TempRef, WeakRef},
+        pid_t,
+    },
+};
 use std::{
     collections::HashMap,
     sync::{Arc, Weak},
-};
-
-use crate::{
-    task::{ProcessGroup, Task, ThreadGroup, ZombieProcess},
-    types::{pid_t, TempRef, WeakRef},
 };
 
 #[derive(Default)]

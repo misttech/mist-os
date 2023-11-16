@@ -10,9 +10,7 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
     types,
-    types::device_type::DeviceType,
-    types::errno::Errno,
-    types::{uapi, OpenFlags},
+    types::{device_type::DeviceType, errno::Errno, open_flags::OpenFlags, uapi},
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;

@@ -16,11 +16,16 @@ use crate::{
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
-    types::time::time_from_timespec,
     types::{
-        device_type::DeviceType, off_t, ownership::ReleasableByRef, statfs, uapi, Access, FileMode,
-        OpenFlags, FUSE_SUPER_MAGIC,
+        device_type::DeviceType,
+        errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
+        file_mode::{Access, FileMode},
+        off_t,
+        open_flags::OpenFlags,
+        ownership::ReleasableByRef,
+        statfs,
+        time::time_from_timespec,
+        uapi, FUSE_SUPER_MAGIC,
     },
 };
 use bstr::B;

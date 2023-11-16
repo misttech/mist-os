@@ -49,7 +49,7 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, from_status_like_fdio, Errno},
-        OpenFlags,
+        open_flags::OpenFlags,
     },
     vdso::vdso_loader::Vdso,
 };

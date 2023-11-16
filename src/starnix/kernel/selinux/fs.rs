@@ -16,7 +16,10 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, error, Errno},
-        mode, statfs, OpenFlags, TempRef, WeakRef, SELINUX_MAGIC,
+        file_mode::mode,
+        open_flags::OpenFlags,
+        ownership::{TempRef, WeakRef},
+        statfs, SELINUX_MAGIC,
     },
 };
 use derivative::Derivative;

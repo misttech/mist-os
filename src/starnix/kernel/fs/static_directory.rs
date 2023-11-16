@@ -13,7 +13,9 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, Errno},
-        mode, off_t, FileMode, OpenFlags,
+        file_mode::{mode, FileMode},
+        off_t,
+        open_flags::OpenFlags,
     },
 };
 use std::{collections::BTreeMap, sync::Arc};

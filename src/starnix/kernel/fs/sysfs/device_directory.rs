@@ -17,7 +17,8 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{error, Errno},
-        mode, OpenFlags,
+        file_mode::mode,
+        open_flags::OpenFlags,
     },
 };
 

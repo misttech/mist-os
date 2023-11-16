@@ -16,18 +16,24 @@ use crate::{
     signals::send_standard_signal,
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
-    types::auth::{CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
-    types::errno::{errno, error, Errno, EACCES, ENOSYS},
-    types::signals::SIGXFSZ,
-    types::time::{timespec_from_time, NANOS_PER_SECOND},
     types::{
-        __kernel_ulong_t, as_any::AsAny, device_type::DeviceType, fsverity_descriptor, gid_t,
-        ino_t, mode, statx, statx_timestamp, timespec, uapi, uid_t, Access, FileMode, OpenFlags,
-        Resource, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE, FALLOC_FL_KEEP_SIZE,
-        FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE, LOCK_EX, LOCK_NB,
-        LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS, STATX_BLOCKS,
-        STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE, STATX_UID,
-        STATX__RESERVED, XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
+        __kernel_ulong_t,
+        as_any::AsAny,
+        auth::{CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
+        device_type::DeviceType,
+        errno::{errno, error, Errno, EACCES, ENOSYS},
+        file_mode::{mode, Access, FileMode},
+        fsverity_descriptor, gid_t, ino_t,
+        open_flags::OpenFlags,
+        resource_limits::Resource,
+        signals::SIGXFSZ,
+        statx, statx_timestamp,
+        time::{timespec_from_time, NANOS_PER_SECOND},
+        timespec, uapi, uid_t, FALLOC_FL_COLLAPSE_RANGE, FALLOC_FL_INSERT_RANGE,
+        FALLOC_FL_KEEP_SIZE, FALLOC_FL_PUNCH_HOLE, FALLOC_FL_UNSHARE_RANGE, FALLOC_FL_ZERO_RANGE,
+        LOCK_EX, LOCK_NB, LOCK_SH, LOCK_UN, STATX_ATIME, STATX_ATTR_VERITY, STATX_BASIC_STATS,
+        STATX_BLOCKS, STATX_CTIME, STATX_GID, STATX_INO, STATX_MTIME, STATX_NLINK, STATX_SIZE,
+        STATX_UID, STATX__RESERVED, XATTR_TRUSTED_PREFIX, XATTR_USER_PREFIX,
     },
 };
 use bitflags::bitflags;
@@ -756,7 +762,7 @@ macro_rules! fs_node_impl_symlink {
             &self,
             _node: &crate::fs::FsNode,
             _current_task: &CurrentTask,
-            _flags: crate::types::OpenFlags,
+            _flags: crate::types::open_flags::OpenFlags,
         ) -> Result<Box<dyn crate::fs::FileOps>, crate::types::errno::Errno> {
             unreachable!("Symlink nodes cannot be opened.");
         }
@@ -770,7 +776,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _node: &crate::fs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
-            _mode: crate::types::FileMode,
+            _mode: crate::types::file_mode::FileMode,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
             crate::types::errno::error!(EROFS)
@@ -781,7 +787,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _node: &crate::fs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
-            _mode: crate::types::FileMode,
+            _mode: crate::types::file_mode::FileMode,
             _dev: crate::types::device_type::DeviceType,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
@@ -884,7 +890,7 @@ macro_rules! fs_node_impl_not_dir {
             _node: &crate::fs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
-            _mode: crate::types::FileMode,
+            _mode: crate::types::file_mode::FileMode,
             _dev: crate::types::device_type::DeviceType,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
@@ -896,7 +902,7 @@ macro_rules! fs_node_impl_not_dir {
             _node: &crate::fs::FsNode,
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
-            _mode: crate::types::FileMode,
+            _mode: crate::types::file_mode::FileMode,
             _owner: crate::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, crate::types::errno::Errno> {
             crate::types::errno::error!(ENOTDIR)

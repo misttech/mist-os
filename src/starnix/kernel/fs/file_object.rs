@@ -6,7 +6,9 @@ use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         file_server::serve_file,
-        fsverity::{self, FsVerityState},
+        fsverity::{
+            FsVerityState, {self},
+        },
         DirentSink, FallocMode, FdEvents, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
         FileWriteGuardRef, FsNodeHandle, InotifyMask, NamespaceNode, RecordLockCommand,
     },
@@ -17,13 +19,19 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
-    types::errno::{errno, error, Errno, EAGAIN, ETIMEDOUT},
-    types::user_address::UserAddress,
     types::{
-        as_any::AsAny, fsxattr, off_t, pid_t, uapi, OpenFlags, Resource, SealFlags, FIONBIO,
-        FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
-        FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL,
-        SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
+        as_any::AsAny,
+        errno::{errno, error, Errno, EAGAIN, ETIMEDOUT},
+        fsxattr, off_t,
+        open_flags::OpenFlags,
+        pid_t,
+        resource_limits::Resource,
+        seal_flags::SealFlags,
+        uapi,
+        user_address::UserAddress,
+        FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR,
+        FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS,
+        FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
     },
 };
 use fidl::HandleBased;
@@ -1422,7 +1430,7 @@ mod tests {
             MountInfo,
         },
         testing::*,
-        types::{device_type::DeviceType, FileMode, OpenFlags},
+        types::{device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags},
     };
     use std::sync::{
         atomic::{AtomicBool, Ordering},

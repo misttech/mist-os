@@ -21,7 +21,10 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, error, Errno},
-        pid_t, FileMode, OpenFlags, WeakRef,
+        file_mode::FileMode,
+        open_flags::OpenFlags,
+        ownership::WeakRef,
+        pid_t,
     },
 };
 

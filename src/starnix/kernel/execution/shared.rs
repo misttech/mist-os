@@ -29,8 +29,10 @@ use crate::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
         Waiter,
     },
-    types::errno::{errno, Errno},
-    types::MountFlags,
+    types::{
+        errno::{errno, Errno},
+        mount_flags::MountFlags,
+    },
 };
 
 /// Contains context to track the most recently failing system call.

@@ -16,14 +16,23 @@ use crate::{
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
-    types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags},
+    types::{
+        errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
+        file_mode::FileMode,
+        ino_t,
+        mount_flags::MountFlags,
+        off_t,
+        open_flags::OpenFlags,
+        statfs,
+    },
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Node, NodeInfo};
 use fidl_fuchsia_io as fio;
-use fuchsia_zircon::{self as zx, HandleBased};
+use fuchsia_zircon::{
+    HandleBased, {self as zx},
+};
 use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use std::{
     io::Read,
@@ -496,8 +505,7 @@ mod test {
             LookupContext, Namespace, SymlinkMode, SymlinkTarget,
         },
         testing::create_kernel_and_task,
-        types::errno::Errno,
-        types::{ino_t, off_t, FileMode, OpenFlags},
+        types::{errno::Errno, file_mode::FileMode, ino_t, off_t, open_flags::OpenFlags},
     };
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;

@@ -2,13 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl_fuchsia_ui_composition as fuicomp;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::{AsHandleRef, HandleBased};
-use magma::magma_image_info_t;
-
-use std::sync::Arc;
-
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -16,9 +9,13 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::errno::Errno,
-    types::{FileMode, OpenFlags},
+    types::{errno::Errno, file_mode::FileMode, open_flags::OpenFlags},
 };
+use fidl_fuchsia_ui_composition as fuicomp;
+use fuchsia_zircon as zx;
+use fuchsia_zircon::{AsHandleRef, HandleBased};
+use magma::magma_image_info_t;
+use std::sync::Arc;
 
 pub struct ImageInfo {
     /// The magma image info associated with the `vmo`.

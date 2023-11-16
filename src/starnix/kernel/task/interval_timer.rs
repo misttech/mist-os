@@ -10,10 +10,8 @@ use crate::{
         ThreadGroup,
     },
     time::utc,
-    types::time::timespec_from_duration,
-    types::{itimerspec, TempRef, SI_TIMER},
+    types::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER},
 };
-
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::stream::AbortHandle;

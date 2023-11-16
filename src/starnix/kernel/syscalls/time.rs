@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, Task};
+use fuchsia_zircon::{
+    Task, {self as zx},
+};
 use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
@@ -12,14 +14,15 @@ use crate::{
     signals::{RunState, SignalEvent},
     task::{ClockId, CurrentTask, TimerId},
     time::utc::utc_now,
-    types::errno::{errno, error, from_status_like_fdio, Errno, EINTR},
-    types::time::{
-        duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
-        timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
-    },
-    types::user_address::UserRef,
     types::{
-        itimerspec, itimerval, pid_t, sigevent, timespec, timeval, timezone, tms, uapi,
+        errno::{errno, error, from_status_like_fdio, Errno, EINTR},
+        itimerspec, itimerval, pid_t, sigevent,
+        time::{
+            duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
+            timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
+        },
+        timespec, timeval, timezone, tms, uapi,
+        user_address::UserRef,
         CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
         CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
         CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
@@ -479,8 +482,7 @@ mod test {
         mm::PAGE_SIZE,
         testing::*,
         time::utc::UtcClockOverrideGuard,
-        types::user_address::UserAddress,
-        types::{signals, TempRef},
+        types::{ownership::TempRef, signals, user_address::UserAddress},
     };
     use fuchsia_zircon::HandleBased;
     use test_util::{assert_geq, assert_leq};

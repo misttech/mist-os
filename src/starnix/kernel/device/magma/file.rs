@@ -142,8 +142,10 @@ use super::{
     magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
 };
 use crate::{
-    device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-    device::wayland::image_file::{ImageFile, ImageInfo},
+    device::{
+        sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
+        wayland::image_file::{ImageFile, ImageInfo},
+    },
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
@@ -154,10 +156,13 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
-    types::user_address::{UserAddress, UserRef},
-    types::user_buffer::UserBuffer,
-    types::{device_type::DeviceType, OpenFlags},
+    types::{
+        device_type::DeviceType,
+        errno::{errno, error, Errno},
+        open_flags::OpenFlags,
+        user_address::{UserAddress, UserRef},
+        user_buffer::UserBuffer,
+    },
 };
 
 #[derive(Clone)]

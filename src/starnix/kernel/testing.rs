@@ -24,11 +24,12 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, Kernel, Task},
-    types::errno::Errno,
-    types::user_address::UserAddress,
     types::{
-        OpenFlags, OwnedRefByRef, ReleasableByRef, MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ,
-        PROT_WRITE,
+        errno::Errno,
+        open_flags::OpenFlags,
+        ownership::{OwnedRefByRef, ReleasableByRef},
+        user_address::UserAddress,
+        MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
     },
 };
 

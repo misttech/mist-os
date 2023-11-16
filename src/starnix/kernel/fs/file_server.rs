@@ -13,7 +13,10 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{errno, error, Errno},
-        ino_t, off_t, FileMode, OpenFlags, TempRef, WeakRef,
+        file_mode::FileMode,
+        ino_t, off_t,
+        open_flags::OpenFlags,
+        ownership::{TempRef, WeakRef},
     },
 };
 use async_trait::async_trait;

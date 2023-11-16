@@ -19,8 +19,10 @@ use crate::{
     fs::{FdEvents, FdNumber},
     signals::RunState,
     task::CurrentTask,
-    types::debug_assert_no_local_temp_ref,
-    types::errno::{error, Errno, EINTR},
+    types::{
+        errno::{error, Errno, EINTR},
+        ownership::debug_assert_no_local_temp_ref,
+    },
 };
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
@@ -1021,7 +1023,7 @@ mod tests {
             FdEvents,
         },
         testing::*,
-        types::OpenFlags,
+        types::open_flags::OpenFlags,
     };
     use std::sync::atomic::AtomicU64;
 

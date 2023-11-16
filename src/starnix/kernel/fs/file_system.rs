@@ -22,10 +22,13 @@ use crate::{
     },
     task::{CurrentTask, Kernel},
     types::{
+        arc_key::ArcKey,
         as_any::AsAny,
         device_type::DeviceType,
         errno::{error, Errno},
-        ino_t, statfs, ArcKey, MountFlags,
+        ino_t,
+        mount_flags::MountFlags,
+        statfs,
     },
 };
 

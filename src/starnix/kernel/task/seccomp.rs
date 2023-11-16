@@ -2,19 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bstr::ByteSlice;
-use starnix_lock::Mutex;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
-use std::sync::Arc;
-use ubpf::{
-    converter::{bpf_addressing_mode, bpf_class},
-    program::EbpfProgram,
-};
-
 use crate::{
-    fs::buffers::{InputBuffer, OutputBuffer},
-    fs::{fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps},
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
+    },
     logging::log_warn,
     mm::MemoryAccessorExt,
     signals::{send_signal, send_standard_signal, SignalDetail, SignalInfo},
@@ -23,25 +15,52 @@ use crate::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
     },
-    types::errno::{errno, errno_from_code, error, Errno},
-    types::signals::{SIGKILL, SIGSYS},
-    types::user_address::{UserAddress, UserRef},
     types::{
-        __NR_exit, __NR_read, __NR_write, seccomp_data, seccomp_notif, seccomp_notif_resp,
-        sock_filter, OpenFlags, BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD,
-        SECCOMP_IOCTL_NOTIF_ID_VALID, SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND,
-        SECCOMP_RET_ACTION_FULL, SECCOMP_RET_ALLOW, SECCOMP_RET_DATA,
-        SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+        __NR_exit, __NR_read, __NR_write,
+        errno::{errno, errno_from_code, error, Errno},
+        open_flags::OpenFlags,
+        seccomp_data, seccomp_notif, seccomp_notif_resp,
+        signals::{SIGKILL, SIGSYS},
+        sock_filter,
+        user_address::{UserAddress, UserRef},
+        BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
+        SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL,
+        SECCOMP_RET_ALLOW, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
     },
+};
+use bstr::ByteSlice;
+use starnix_lock::Mutex;
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicU64, AtomicU8, Ordering},
+        Arc,
+    },
+};
+use ubpf::{
+    converter::{bpf_addressing_mode, bpf_class},
+    program::EbpfProgram,
 };
 
 #[cfg(target_arch = "aarch64")]
-use crate::types::{__NR_clock_getres, __NR_clock_gettime, __NR_gettimeofday, AUDIT_ARCH_AARCH64};
+use crate::types::__NR_clock_getres;
+#[cfg(target_arch = "aarch64")]
+use crate::types::__NR_clock_gettime;
+#[cfg(target_arch = "aarch64")]
+use crate::types::__NR_gettimeofday;
+#[cfg(target_arch = "aarch64")]
+use crate::types::AUDIT_ARCH_AARCH64;
 
 #[cfg(target_arch = "x86_64")]
-use crate::types::{
-    __NR_clock_gettime, __NR_getcpu, __NR_gettimeofday, __NR_time, AUDIT_ARCH_X86_64,
-};
+use crate::types::__NR_clock_gettime;
+#[cfg(target_arch = "x86_64")]
+use crate::types::__NR_getcpu;
+#[cfg(target_arch = "x86_64")]
+use crate::types::__NR_gettimeofday;
+#[cfg(target_arch = "x86_64")]
+use crate::types::__NR_time;
+#[cfg(target_arch = "x86_64")]
+use crate::types::AUDIT_ARCH_X86_64;
 
 #[cfg(target_arch = "riscv64")]
 use crate::types::AUDIT_ARCH_RISCV64;
@@ -1005,8 +1024,7 @@ impl FileOps for SeccompNotifierFileObject {
 
 #[cfg(test)]
 mod test {
-    use crate::task::SeccompAction;
-    use crate::testing::create_kernel_and_task;
+    use crate::{task::SeccompAction, testing::create_kernel_and_task};
 
     #[::fuchsia::test]
     async fn test_actions_logged_accepts_legal_string() {

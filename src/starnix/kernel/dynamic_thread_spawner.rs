@@ -8,8 +8,7 @@ use crate::{
     task::{CurrentTask, Kernel, Task},
     types::{
         errno::{errno, Errno},
-        ownership::ReleasableByRef,
-        release_after,
+        ownership::{release_after, ReleasableByRef},
     },
 };
 use futures::{channel::oneshot, TryFutureExt};

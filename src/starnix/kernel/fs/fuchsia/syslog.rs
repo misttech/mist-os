@@ -10,7 +10,7 @@ use crate::{
     logging::log,
     syscalls::{SyscallArg, SyscallResult},
     task::CurrentTask,
-    types::{errno::Errno, OpenFlags},
+    types::{errno::Errno, open_flags::OpenFlags},
 };
 
 pub struct SyslogFile;

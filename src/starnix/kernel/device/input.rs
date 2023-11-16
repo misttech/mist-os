@@ -14,14 +14,15 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::time::timeval_from_time,
-    types::user_address::{UserAddress, UserRef},
     types::{
         device_type::{DeviceType, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, TOUCH_INPUT_MINOR},
         errno::{error, Errno},
-        timeval, uapi, OpenFlags, ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH,
-        BUS_VIRTUAL, FF_CNT, INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT,
-        MSC_CNT, REL_CNT, SW_CNT,
+        open_flags::OpenFlags,
+        time::timeval_from_time,
+        timeval, uapi,
+        user_address::{UserAddress, UserRef},
+        ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, BUS_VIRTUAL, FF_CNT,
+        INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
     },
 };
 
@@ -30,16 +31,21 @@ use fidl::handle::fuchsia_handles::Signals;
 use fidl_fuchsia_ui_input::MediaButtonsEvent;
 use fidl_fuchsia_ui_input3 as fuiinput;
 use fidl_fuchsia_ui_pointer::{
-    self as fuipointer, EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent,
-    TouchResponse as FidlTouchResponse, TouchResponseType,
+    EventPhase as FidlEventPhase, TouchEvent as FidlTouchEvent, TouchResponse as FidlTouchResponse,
+    TouchResponseType, {self as fuipointer},
 };
 use fidl_fuchsia_ui_policy as fuipolicy;
 use fidl_fuchsia_ui_views as fuiviews;
 use fuchsia_async as fasync;
-use fuchsia_inspect::{self, health::Reporter, NumericProperty};
+use fuchsia_inspect::{
+    health::Reporter,
+    NumericProperty, {self},
+};
 use fuchsia_zircon as zx;
 use futures::{
-    future::{self, Either},
+    future::{
+        Either, {self},
+    },
     StreamExt as _,
 };
 use starnix_lock::Mutex;

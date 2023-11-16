@@ -2,10 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
-use std::{convert::TryInto, mem::size_of};
-
 use crate::{
     fs::{
         buffers::{AncillaryData, ControlMsg, UserBuffersInputBuffer, UserBuffersOutputBuffer},
@@ -19,16 +15,24 @@ use crate::{
     logging::{log_trace, not_implemented},
     mm::{vmo::round_up_to_increment, MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, IpTables, Task, WaitCallback, Waiter},
-    types::errno::{errno, error, Errno, EEXIST, EINPROGRESS},
-    types::time::duration_from_timespec,
-    types::user_address::{UserAddress, UserRef},
-    types::user_buffer::UserBuffer,
     types::{
-        cmsghdr, mmsghdr, msghdr, socklen_t, timespec, FileMode, OpenFlags, MSG_CTRUNC,
-        MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
-        SOCK_NONBLOCK, UIO_MAXIOV,
+        cmsghdr,
+        errno::{errno, error, Errno, EEXIST, EINPROGRESS},
+        file_mode::FileMode,
+        mmsghdr, msghdr,
+        open_flags::OpenFlags,
+        socklen_t,
+        time::duration_from_timespec,
+        timespec,
+        user_address::{UserAddress, UserRef},
+        user_buffer::UserBuffer,
+        MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR,
+        SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
     },
 };
+use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
+use std::{convert::TryInto, mem::size_of};
 
 pub fn sys_socket(
     _locked: &mut Locked<'_, Unlocked>,

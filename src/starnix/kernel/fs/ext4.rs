@@ -2,26 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
-use ext4_read_only::readers::VmoReader;
-use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
+use crate::{
+    auth::FsCred,
+    fs::{
+        default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
+        fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode,
+        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        FsString, SeekTarget, SymlinkTarget, VmoFileObject, XattrOp,
+    },
+    logging::log_warn,
+    mm::ProtectionFlags,
+    task::{CurrentTask, Kernel},
+    types::{
+        errno::{errno, error, Errno},
+        file_mode::FileMode,
+        ino_t,
+        mount_flags::MountFlags,
+        off_t,
+        open_flags::OpenFlags,
+        statfs, EXT4_SUPER_MAGIC,
+    },
+};
+use ext4_read_only::{
+    parser::{Parser as ExtParser, XattrMap as ExtXattrMap},
+    readers::VmoReader,
+    structs::{EntryType, INode, ROOT_INODE_NUM},
+};
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use std::sync::Arc;
-
-use crate::auth::FsCred;
-use crate::fs::{
-    default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-    fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode, DirectoryEntryType,
-    DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SeekTarget,
-    SymlinkTarget, VmoFileObject, XattrOp,
-};
-use crate::logging::log_warn;
-use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel};
-use crate::types::errno::{errno, error, Errno};
-use crate::types::{ino_t, off_t, statfs, FileMode, MountFlags, OpenFlags, EXT4_SUPER_MAGIC};
 
 mod pager;
 

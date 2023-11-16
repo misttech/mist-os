@@ -2,17 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
-use fidl::endpoints::ServerEnd;
-use fidl_fuchsia_component_runner as frunner;
-use fidl_fuchsia_element as felement;
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_starnix_container as fstarcontainer;
-use fuchsia_async::{self as fasync, DurationExt};
-use fuchsia_zircon as zx;
-use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
-use std::{ffi::CString, sync::Arc};
-
 use crate::{
     execution::execute_task,
     fs::{
@@ -25,8 +14,25 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel, Task},
-    types::{errno::Errno, release_on_error, uapi, OpenFlags, ReleasableByRef},
+    types::{
+        errno::Errno,
+        open_flags::OpenFlags,
+        ownership::{release_on_error, ReleasableByRef},
+        uapi,
+    },
 };
+use anyhow::Error;
+use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_component_runner as frunner;
+use fidl_fuchsia_element as felement;
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_starnix_container as fstarcontainer;
+use fuchsia_async::{
+    DurationExt, {self as fasync},
+};
+use fuchsia_zircon as zx;
+use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use std::{ffi::CString, sync::Arc};
 
 use super::start_component;
 

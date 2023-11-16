@@ -15,13 +15,18 @@ use crate::{
         CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, TaskFlags, ThreadGroup,
         ThreadGroupWriteGuard,
     },
-    types::errno::{from_status_like_fdio, Errno},
-    types::signals::SIGKILL,
-    types::{pid_t, ReleasableByRef},
+    types::{
+        errno::{from_status_like_fdio, Errno},
+        ownership::ReleasableByRef,
+        pid_t,
+        signals::SIGKILL,
+    },
 };
 use anyhow::{format_err, Error};
 use fuchsia_inspect_contrib::ProfileDuration;
-use fuchsia_zircon::{self as zx, AsHandleRef};
+use fuchsia_zircon::{
+    AsHandleRef, {self as zx},
+};
 use lock_sequence::{Locked, Unlocked};
 use std::{os::unix::thread::JoinHandleExt, sync::Arc};
 

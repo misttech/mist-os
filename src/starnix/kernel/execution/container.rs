@@ -18,8 +18,12 @@ use crate::{
     time::utc::update_utc_clock,
     types::{
         errno::{errno, SourceContext, ENOENT},
-        pid_t, release_on_error, rlimit, MountFlags, OpenFlags, OwnedRefByRef, ReleasableByRef,
-        Resource,
+        mount_flags::MountFlags,
+        open_flags::OpenFlags,
+        ownership::{release_on_error, OwnedRefByRef, ReleasableByRef},
+        pid_t,
+        resource_limits::Resource,
+        rlimit,
     },
 };
 use anyhow::{anyhow, bail, Error};
@@ -519,7 +523,7 @@ mod test {
     use crate::{
         fs::FdNumber,
         testing::create_kernel_and_task,
-        types::{signals::SIGCHLD, FileMode, OpenFlags, CLONE_FS},
+        types::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS},
     };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};

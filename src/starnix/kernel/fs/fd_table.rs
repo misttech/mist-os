@@ -2,16 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use bitflags::bitflags;
-use starnix_lock::Mutex;
-use std::ops::DerefMut;
-
 use crate::{
     fs::{FdNumber, FileHandle, RecordLockOwner},
     task::{CurrentTask, Task},
-    types::errno::{errno, error, Errno},
-    types::{OpenFlags, OwnedRef, Releasable, ReleasableByRef, Resource, FD_CLOEXEC},
+    types::{
+        errno::{errno, error, Errno},
+        open_flags::OpenFlags,
+        ownership::{OwnedRef, Releasable, ReleasableByRef},
+        resource_limits::Resource,
+        FD_CLOEXEC,
+    },
 };
+use bitflags::bitflags;
+use starnix_lock::Mutex;
+use std::ops::DerefMut;
 
 bitflags! {
     pub struct FdFlags: u32 {

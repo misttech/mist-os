@@ -4,9 +4,10 @@
 
 use crate::{
     fs::{FdFlags, FdNumber, WdNumber},
-    types::signals::Signal,
-    types::user_address::UserAddress,
-    types::{FileMode, OpenFlags, SealFlags},
+    types::{
+        file_mode::FileMode, open_flags::OpenFlags, seal_flags::SealFlags, signals::Signal,
+        user_address::UserAddress,
+    },
 };
 
 #[derive(Eq, PartialEq, Debug)]

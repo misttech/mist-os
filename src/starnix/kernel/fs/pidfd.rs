@@ -5,8 +5,7 @@
 use crate::{
     fs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps},
     task::CurrentTask,
-    types::errno::Errno,
-    types::{pid_t, OpenFlags},
+    types::{errno::Errno, open_flags::OpenFlags, pid_t},
 };
 
 struct PidFdFileObject {

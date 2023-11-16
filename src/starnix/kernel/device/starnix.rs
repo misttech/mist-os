@@ -6,8 +6,7 @@ use crate::{
     device::{magma::MagmaFile, DeviceMode},
     fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
     task::{CurrentTask, Kernel},
-    types::errno::Errno,
-    types::{device_type::DeviceType, OpenFlags},
+    types::{device_type::DeviceType, errno::Errno, open_flags::OpenFlags},
 };
 
 use std::sync::Arc;

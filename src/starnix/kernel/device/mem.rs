@@ -19,12 +19,15 @@ use crate::{
     types::{
         device_type::DeviceType,
         errno::{error, Errno},
+        file_mode::FileMode,
+        open_flags::OpenFlags,
         user_address::UserAddress,
-        FileMode, OpenFlags,
     },
 };
 
-use fuchsia_zircon::{self as zx, cprng_draw};
+use fuchsia_zircon::{
+    cprng_draw, {self as zx},
+};
 use std::sync::Arc;
 
 #[derive(Default)]

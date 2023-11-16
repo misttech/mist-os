@@ -8,8 +8,13 @@ use crate::{
         FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     },
     task::{CurrentTask, Kernel},
-    types::errno::{error, Errno},
-    types::{ino_t, statfs, FileMode, OpenFlags, ANON_INODE_FS_MAGIC},
+    types::{
+        errno::{error, Errno},
+        file_mode::FileMode,
+        ino_t,
+        open_flags::OpenFlags,
+        statfs, ANON_INODE_FS_MAGIC,
+    },
 };
 use std::sync::Arc;
 
