@@ -8,15 +8,9 @@
 #include <string_view>
 
 #include "src/lib/analytics/cpp/core_dev_tools/environment_status.h"
-#include "src/lib/analytics/cpp/google_analytics/client.h"
 #include "src/lib/analytics/cpp/google_analytics_4/client.h"
 
 namespace analytics::core_dev_tools::internal {
-
-// DEPRECATED: will be removed when UA support is stopped
-void PrepareGoogleAnalyticsClient(google_analytics::Client& client, std::string_view tool_name,
-                                  std::string_view tracking_id,
-                                  std::optional<BotInfo> bot = std::nullopt);
 
 void PrepareGa4Client(google_analytics_4::Client& client, std::string tool_version,
                       std::string_view measurement_id, std::string_view measurement_key,

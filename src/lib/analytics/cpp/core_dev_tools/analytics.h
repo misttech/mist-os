@@ -16,7 +16,6 @@
 #include "src/lib/analytics/cpp/core_dev_tools/command_line_options.h"
 #include "src/lib/analytics/cpp/core_dev_tools/environment_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/ga4_common_events.h"
-#include "src/lib/analytics/cpp/core_dev_tools/general_parameters.h"
 #include "src/lib/analytics/cpp/core_dev_tools/google_analytics_4_client.h"
 #include "src/lib/analytics/cpp/core_dev_tools/persistent_status.h"
 #include "src/lib/analytics/cpp/core_dev_tools/system_info.h"
@@ -46,7 +45,6 @@ namespace analytics::core_dev_tools {
 //       static constexpr int64_t kQuitTimeoutMs = 500; // wait for at most 500ms before quitting
 //       static constexpr char kMeasurementId[] = "G-XXXXXXXXXX";
 //       static constexpr char kMeasurementKey[] = "YYYYYYYYYYYYYY";
-//       static constexpr char kTrackingId[] = "UA-XXXXX-Y";
 //       static constexpr char kEnableArgs[] = "--analytics=enable";
 //       static constexpr char kDisableArgs[] = "--analytics=disable";
 //       static constexpr char kStatusArgs[] = "--show-analytics";
