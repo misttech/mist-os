@@ -48,6 +48,10 @@ typedef struct {
   uint32_t hhi_clock_cntl_offset;
   // THe index into gpu_clk_freq that will be used upon booting.
   uint32_t initial_clock_index;
+  // True if the driver needs to use GP0.
+  bool enable_gp0;
+  // Initial clock index to use if initializing GP0 fails.
+  uint32_t non_gp0_index;
   // Map from the clock index to the mux source to use.
   uint32_t gpu_clk_freq[kMaxGpuClkFreq];
   // Map from the mux source to the frequency in Hz.
@@ -117,6 +121,7 @@ class AmlGpu final : public DdkDeviceType,
   // Signaled when the loop is shutdown.
   libsync::Completion loop_shutdown_completion_;
   fdf::UnsynchronizedDispatcher loop_dispatcher_;
+  bool gp0_init_succeeded_ = false;
 
   inspect::UintProperty current_clk_source_property_;
   inspect::UintProperty current_clk_mux_source_property_;

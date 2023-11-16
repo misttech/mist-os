@@ -27,6 +27,8 @@ static aml_gpu_block_t s912_gpu_blocks = {
     .reset2_mask_offset = 4 * S912_RESET2_MASK,
     .hhi_clock_cntl_offset = 0x6C,
     .initial_clock_index = 2,
+    .enable_gp0 = false,
+    .non_gp0_index = 2,
     .gpu_clk_freq =
         {
             S912_FCLK_DIV7,

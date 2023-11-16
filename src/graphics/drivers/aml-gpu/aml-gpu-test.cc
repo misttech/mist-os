@@ -77,6 +77,7 @@ class TestAmlGpu {
     reset_mock.ExpectWrite<uint32_t>(aml_gpu.gpu_block_->reset2_level_offset,
                                      aml_registers::MALI_RESET2_MASK,
                                      aml_registers::MALI_RESET2_MASK);
+    aml_gpu.gp0_init_succeeded_ = true;
     aml_gpu.InitClock();
     uint32_t value = aml_gpu.hiu_buffer_->Read32(0x6c << 2);
     // Glitch-free mux should stay unchanged.

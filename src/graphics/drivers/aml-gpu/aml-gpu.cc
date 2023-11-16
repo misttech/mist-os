@@ -141,6 +141,8 @@ zx_status_t AmlGpu::Gp0Init() {
     zxlogf(ERROR, "aml_gp0_init: pll_ena failed: %d", status);
     return status;
   }
+  gp0_init_succeeded_ = true;
+  root_.RecordBool("gp0_init_succeeded", true);
   return ZX_OK;
 }
 
@@ -177,7 +179,12 @@ void AmlGpu::InitClock() {
     }
   }
 
-  SetInitialClkFreqSource(gpu_block_->initial_clock_index);
+  uint32_t initial_clock_index = gpu_block_->initial_clock_index;
+  if (gpu_block_->enable_gp0 && !gp0_init_succeeded_) {
+    initial_clock_index = gpu_block_->non_gp0_index;
+  }
+
+  SetInitialClkFreqSource(static_cast<int32_t>(initial_clock_index));
 
   {
     auto result = reset_register_->WriteRegister32(gpu_block_->reset0_level_offset,
@@ -406,11 +413,10 @@ zx_status_t AmlGpu::Bind() {
     builder.use_protected_mode_callbacks(true);
   }
 
-  if (info.pid == PDEV_PID_AMLOGIC_S905D2 || info.pid == PDEV_PID_AMLOGIC_S905D3) {
+  if (gpu_block_->enable_gp0) {
     status = Gp0Init();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "aml_gp0_init failed: %d\n", status);
-      return status;
+      zxlogf(ERROR, "aml_gp0_init failed: %d. Falling back to lower clock.\n", status);
     }
   }
 
