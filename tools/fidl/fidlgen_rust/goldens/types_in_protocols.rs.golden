@@ -9173,52 +9173,47 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0x0000ff0000000000u64;
-            if (maskedval != 0) {
+            let mask = 0xff0000000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 0
-                        + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 32
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 32 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(80) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0x0000ff0000000000u64;
-            if (maskedval != 0) {
+            let mask = 0xff0000000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 80
-                        + ((0x0000ff0000000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 80 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(112) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 112
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 112 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(176) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 176
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 176 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(fidl::encoding::Array<u8, 5>, &mut self.array_uint8, decoder, offset + 0, _depth)?;
@@ -9354,12 +9349,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(40) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffff0000000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffff0000000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 40
-                        + ((0xffffff0000000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 40 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(fidl::encoding::Array<Bits, 5>, &mut self.array_bits, decoder, offset + 0, _depth)?;
@@ -9490,12 +9484,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(24) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffffffffff00u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffffffffff00u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 24
-                        + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 24 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(
@@ -9667,32 +9660,29 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0x000000000000ff00u64;
-            if (maskedval != 0) {
+            let mask = 0xff00u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 0
-                        + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0x000000000000ff00u64;
-            if (maskedval != 0) {
+            let mask = 0xff00u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 16
-                        + ((0x000000000000ff00u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 16 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(32) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 32
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 32 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(u8, &mut self.uint8, decoder, offset + 0, _depth)?;
@@ -9830,12 +9820,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffffffffff00u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffffffffff00u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 8
-                        + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 8 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(Bits, &mut self.bits, decoder, offset + 0, _depth)?;
@@ -10253,22 +10242,20 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(16) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffffffffff00u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffffffffff00u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 16
-                        + ((0xffffffffffffff00u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 16 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(176) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffff0000000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffff0000000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 176
-                        + ((0xffffff0000000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 176 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(fidl::encoding::HandleType<fidl::Handle, { fidl::ObjectType::NONE.into_raw() }, 2147483648>, &mut self.handle, decoder, offset + 0, _depth)?;

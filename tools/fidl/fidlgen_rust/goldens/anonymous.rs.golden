@@ -1131,12 +1131,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(0) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 0
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(Op, &mut self.op, decoder, offset + 0, _depth)?;

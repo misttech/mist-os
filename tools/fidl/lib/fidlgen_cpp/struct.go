@@ -5,7 +5,6 @@
 package fidlgen_cpp
 
 import (
-	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -19,7 +18,7 @@ type Struct struct {
 	AnonymousChildren   []ScopedLayout
 	CodingTableType     name
 	Members             []StructMember
-	PaddingV2           []StructPadding
+	PaddingV2           []fidlgen.PaddingMarker
 	BackingBufferTypeV2 string
 	IsInResult          bool
 	ParametersTupleDecl name
@@ -156,45 +155,6 @@ func (c *compiler) compileStructMember(val fidlgen.StructMember) StructMember {
 	}
 }
 
-type StructPadding struct {
-	Offset   int
-	MaskType string
-	Mask     string
-}
-
-func toStructPadding(in fidlgen.PaddingMarker) StructPadding {
-	switch len(in.Mask) {
-	case 2:
-		return StructPadding{
-			Offset:   in.Offset,
-			MaskType: "uint16_t",
-			Mask:     fmt.Sprintf("0x%04x", binary.LittleEndian.Uint16(in.Mask)),
-		}
-	case 4:
-		return StructPadding{
-			Offset:   in.Offset,
-			MaskType: "uint32_t",
-			Mask:     fmt.Sprintf("0x%08x", binary.LittleEndian.Uint32(in.Mask)),
-		}
-	case 8:
-		return StructPadding{
-			Offset:   in.Offset,
-			MaskType: "uint64_t",
-			Mask:     fmt.Sprintf("0x%016xull", binary.LittleEndian.Uint64(in.Mask)),
-		}
-	default:
-		panic("unexpected mask size")
-	}
-}
-
-func toStructPaddings(in []fidlgen.PaddingMarker) []StructPadding {
-	var out []StructPadding
-	for _, m := range in {
-		out = append(out, toStructPadding(m))
-	}
-	return out
-}
-
 func (c *compiler) compileStruct(val fidlgen.Struct) *Struct {
 	name := c.compileNameVariants(val.Name)
 	codingTableType := name.Wire.ns.member(c.compileCodingTableType(val.Name))
@@ -210,7 +170,7 @@ func (c *compiler) compileStruct(val fidlgen.Struct) *Struct {
 			TypeShape{val.TypeShapeV2}.MaxTotalSize(), TypeShape{val.TypeShapeV2}.MaxHandles, boundednessBounded).
 			BackingBufferType(),
 		IsInResult: false,
-		PaddingV2:  toStructPaddings(val.BuildPaddingMarkers(fidlgen.WireFormatVersionV2)),
+		PaddingV2:  val.BuildPaddingMarkers(fidlgen.PaddingConfig{}),
 	}
 
 	for _, v := range val.Members {

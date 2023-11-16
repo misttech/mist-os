@@ -113,11 +113,14 @@ mod internal {
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 let padding_ptr = buf_ptr.offset(2) as *mut u16;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let padding_mask = 0xff00u16;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(6) as *mut u16;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let padding_mask = 0xff00u16;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(10) as *mut u16;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let padding_mask = 0xff00u16;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
             }
             Ok(())
         }
@@ -159,26 +162,29 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(2) };
             let padval = unsafe { (ptr as *const u16).read_unaligned() };
-            let maskedval = padval & 0xff00u16;
-            if (maskedval != 0) {
+            let mask = 0xff00u16;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + 2 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 2 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(6) };
             let padval = unsafe { (ptr as *const u16).read_unaligned() };
-            let maskedval = padval & 0xff00u16;
-            if (maskedval != 0) {
+            let mask = 0xff00u16;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + 6 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 6 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(10) };
             let padval = unsafe { (ptr as *const u16).read_unaligned() };
-            let maskedval = padval & 0xff00u16;
-            if (maskedval != 0) {
+            let mask = 0xff00u16;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + 10 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 10 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             // Copy from the buffer into the object.
@@ -227,7 +233,8 @@ mod internal {
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 let padding_ptr = buf_ptr.offset(2) as *mut u16;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff00u16);
+                let padding_mask = 0xff00u16;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
             }
             Ok(())
         }
@@ -274,10 +281,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(2) };
             let padval = unsafe { (ptr as *const u16).read_unaligned() };
-            let maskedval = padval & 0xff00u16;
-            if (maskedval != 0) {
+            let mask = 0xff00u16;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + 2 + ((0xff00u16 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 2 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             // Copy from the buffer into the object.
@@ -326,7 +334,8 @@ mod internal {
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 let padding_ptr = buf_ptr.offset(0) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
+                let padding_mask = 0xffffff00u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
             }
             Ok(())
         }
@@ -373,12 +382,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(0) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xffffff00u32;
-            if (maskedval != 0) {
+            let mask = 0xffffff00u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 0
-                        + ((0xffffff00u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             // Copy from the buffer into the object.
@@ -492,12 +500,11 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset(8) };
             let padval = unsafe { (ptr as *const u64).read_unaligned() };
-            let maskedval = padval & 0xffffffff00000000u64;
-            if (maskedval != 0) {
+            let mask = 0xffffffff00000000u64;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 8
-                        + ((0xffffffff00000000u64 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 8 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             fidl::decode!(
@@ -551,15 +558,20 @@ mod internal {
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 let padding_ptr = buf_ptr.offset(0) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let padding_mask = 0xff000000u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(4) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xffffff00u32);
+                let padding_mask = 0xffffff00u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(12) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let padding_mask = 0xff000000u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(16) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let padding_mask = 0xff000000u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 let padding_ptr = buf_ptr.offset(20) as *mut u32;
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !0xff000000u32);
+                let padding_mask = 0xff000000u32;
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
             }
             Ok(())
         }
@@ -610,52 +622,47 @@ mod internal {
             // Verify that padding bytes are zero.
             let ptr = unsafe { buf_ptr.offset(0) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xff000000u32;
-            if (maskedval != 0) {
+            let mask = 0xff000000u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 0
-                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 0 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(4) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xffffff00u32;
-            if (maskedval != 0) {
+            let mask = 0xffffff00u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 4
-                        + ((0xffffff00u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 4 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(12) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xff000000u32;
-            if (maskedval != 0) {
+            let mask = 0xff000000u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 12
-                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 12 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(16) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xff000000u32;
-            if (maskedval != 0) {
+            let mask = 0xff000000u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 16
-                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 16 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             let ptr = unsafe { buf_ptr.offset(20) };
             let padval = unsafe { (ptr as *const u32).read_unaligned() };
-            let maskedval = padval & 0xff000000u32;
-            if (maskedval != 0) {
+            let mask = 0xff000000u32;
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset
-                        + 20
-                        + ((0xff000000u32 as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + 20 + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             // Copy from the buffer into the object.

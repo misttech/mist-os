@@ -100,7 +100,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
       memcpy(position.As<void>(), value, sizeof({{ . }}));
     } else {
       {{- range .PaddingV2 }}
-      internal::WireZeroPadding<{{ .MaskType }}>(encoder, position + {{ .Offset }});
+      internal::WireZeroPadding<uint{{ .MaskBitWidth }}_t>(encoder, position + {{ .Offset }});
       {{- end }}
       {{- range .Members }}
       internal::WireCodingTraits<{{ .Type }}, {{ .WireConstraint }}, IsRecursive>::Encode(encoder, &value->{{ . }}, position + {{ .OffsetV2 }}, recursion_depth);
@@ -116,7 +116,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
       {{- end }}
     }
     {{- range .PaddingV2 }}
-    internal::WireCheckPadding<{{ .MaskType }}>(decoder, position + {{ .Offset }}, {{ .Mask }});
+    internal::WireCheckPadding<uint{{ .MaskBitWidth }}_t>(decoder, position + {{ .Offset }}, {{ .Mask | printf "%#x" }});
     {{- end }}
     {{- if .IsEmpty }}
     if (*position.As<uint8_t>() != 0) {

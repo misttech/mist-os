@@ -108,9 +108,9 @@ class {{ .Name }} {
   static constexpr auto kPadding = std::make_tuple(
     {{- range $i, $p := .PaddingV2 }}
       {{- if $i }}, {{ end -}}
-      ::fidl::internal::NaturalStructPadding<{{ $p.MaskType }}>{
+      ::fidl::internal::NaturalStructPadding<uint{{ $p.MaskBitWidth }}_t>{
         .offset = {{ $p.Offset }},
-        .mask = {{ $p.Mask }},
+        .mask = {{ $p.Mask | printf "%#x" }},
       }
     {{- end -}}
   );

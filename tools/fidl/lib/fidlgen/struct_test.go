@@ -136,8 +136,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 0,
-					Mask:   []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff},
+					Offset:       0,
+					MaskBitWidth: 64,
+					Mask:         0xff_ff_00_00_00_00_00_00,
 				},
 			},
 		},
@@ -165,8 +166,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 0,
-					Mask:   []byte{0x00, 0x00, 0x00, 0xff},
+					Offset:       0,
+					MaskBitWidth: 32,
+					Mask:         0xff_00_00_00,
 				},
 			},
 		},
@@ -188,8 +190,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 0,
-					Mask:   []byte{0x00, 0xff},
+					Offset:       0,
+					MaskBitWidth: 16,
+					Mask:         0xff_00,
 				},
 			},
 		},
@@ -223,8 +226,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 0,
-					Mask:   []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff, 0xff},
+					Offset:       0,
+					MaskBitWidth: 64,
+					Mask:         0xff_ff_00_00_00_00_00_00,
 				},
 			},
 		},
@@ -252,8 +256,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 0,
-					Mask:   []byte{0x00, 0xff, 0x00, 0x00},
+					Offset:       0,
+					MaskBitWidth: 32,
+					Mask:         0x00_00_ff_00,
 				},
 			},
 		},
@@ -281,8 +286,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 8,
-					Mask:   []byte{0x00, 0x00, 0x00, 0x00, 0xff, 0xff, 0xff, 0xff},
+					Offset:       8,
+					MaskBitWidth: 64,
+					Mask:         0xff_ff_ff_ff_00_00_00_00,
 				},
 			},
 		},
@@ -310,8 +316,9 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 8,
-					Mask:   []byte{0x00, 0x00, 0xff, 0xff},
+					Offset:       8,
+					MaskBitWidth: 32,
+					Mask:         0xff_ff_00_00,
 				},
 			},
 		},
@@ -339,14 +346,15 @@ func TestBuildPaddingMarkersWithoutFlattening(t *testing.T) {
 			},
 			out: []PaddingMarker{
 				{
-					Offset: 8,
-					Mask:   []byte{0x00, 0xff},
+					Offset:       8,
+					MaskBitWidth: 16,
+					Mask:         0xff_00,
 				},
 			},
 		},
 	}
 	for _, testCase := range testCases {
-		out := testCase.in.BuildPaddingMarkers(WireFormatVersionV2)
+		out := testCase.in.BuildPaddingMarkers(PaddingConfig{})
 		if diff := cmp.Diff(testCase.out, out); diff != "" {
 			t.Errorf("%s:\nexpected != actual (-want +got)\n%s", testCase.name, diff)
 		}
@@ -387,20 +395,25 @@ func TestBuildPaddingMarkersFlatteningStruct(t *testing.T) {
 			},
 		},
 	}
-	out := input.BuildFlattenedPaddingMarkers(WireFormatVersionV2, func(identifier EncodedCompoundIdentifier) *Struct {
-		if identifier == innerStructIdentifier {
-			return &innerStruct
-		}
-		return nil
+	out := input.BuildPaddingMarkers(PaddingConfig{
+		FlattenStructs: true,
+		ResolveStruct: func(identifier EncodedCompoundIdentifier) *Struct {
+			if identifier == innerStructIdentifier {
+				return &innerStruct
+			}
+			return nil
+		},
 	})
 	expected := []PaddingMarker{
 		{
-			Offset: 0,
-			Mask:   []byte{0x00, 0xff, 0xff, 0xff},
+			Offset:       0,
+			MaskBitWidth: 32,
+			Mask:         0xff_ff_ff_00,
 		},
 		{
-			Offset: 4,
-			Mask:   []byte{0xff, 0xff, 0xff, 0xff},
+			Offset:       4,
+			MaskBitWidth: 32,
+			Mask:         0xff_ff_ff_ff,
 		},
 	}
 	if diff := cmp.Diff(expected, out); diff != "" {
@@ -408,7 +421,7 @@ func TestBuildPaddingMarkersFlatteningStruct(t *testing.T) {
 	}
 }
 
-func TestBuildPaddingMarkersFlatteningArray(t *testing.T) {
+func TestBuildPaddingMarkersFlatteningArrayOfStruct(t *testing.T) {
 	var innerStructIdentifier EncodedCompoundIdentifier = "abcd"
 	innerStruct := Struct{
 		TypeShapeV2: TypeShape{
@@ -447,24 +460,31 @@ func TestBuildPaddingMarkersFlatteningArray(t *testing.T) {
 			},
 		},
 	}
-	out := input.BuildFlattenedPaddingMarkers(WireFormatVersionV2, func(identifier EncodedCompoundIdentifier) *Struct {
-		if identifier == innerStructIdentifier {
-			return &innerStruct
-		}
-		return nil
+	out := input.BuildPaddingMarkers(PaddingConfig{
+		FlattenStructs: true,
+		FlattenArrays:  true,
+		ResolveStruct: func(identifier EncodedCompoundIdentifier) *Struct {
+			if identifier == innerStructIdentifier {
+				return &innerStruct
+			}
+			return nil
+		},
 	})
 	expected := []PaddingMarker{
 		{
-			Offset: 0,
-			Mask:   []uint8{0x00, 0x0ff, 0xff, 0xff},
+			Offset:       0,
+			MaskBitWidth: 32,
+			Mask:         0xff_ff_ff_00,
 		},
 		{
-			Offset: 4,
-			Mask:   []uint8{0x00, 0xff, 0xff, 0xff},
+			Offset:       4,
+			MaskBitWidth: 32,
+			Mask:         0xff_ff_ff_00,
 		},
 		{
-			Offset: 8,
-			Mask:   []byte{0x00, 0xff, 0xff, 0xff},
+			Offset:       8,
+			MaskBitWidth: 32,
+			Mask:         0xff_ff_ff_00,
 		},
 	}
 	if diff := cmp.Diff(expected, out); diff != "" {

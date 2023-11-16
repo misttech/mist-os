@@ -5,7 +5,6 @@
 package codegen
 
 import (
-	"encoding/binary"
 	"fmt"
 	"math"
 	"sort"
@@ -103,8 +102,8 @@ type Struct struct {
 	Derives                   derives
 	Name                      string
 	Members                   []StructMember
-	PaddingMarkersV2          []rustPaddingMarker
-	FlattenedPaddingMarkersV2 []rustPaddingMarker
+	PaddingMarkersV2          []fidlgen.PaddingMarker
+	FlattenedPaddingMarkersV2 []fidlgen.PaddingMarker
 	SizeV2                    int
 	AlignmentV2               int
 	HasPadding                bool
@@ -1473,57 +1472,21 @@ func (c *compiler) resolveStruct(identifier fidlgen.EncodedCompoundIdentifier) *
 	return nil
 }
 
-type rustPaddingMarker struct {
-	Type   string
-	Offset int
-	// Mask is a string so it can be in hex.
-	Mask string
-}
-
-func toRustPaddingMarker(in fidlgen.PaddingMarker) rustPaddingMarker {
-	switch len(in.Mask) {
-	case 2:
-		return rustPaddingMarker{
-			Type:   "u16",
-			Offset: in.Offset,
-			Mask:   fmt.Sprintf("0x%04xu16", binary.LittleEndian.Uint16(in.Mask)),
-		}
-	case 4:
-		return rustPaddingMarker{
-			Type:   "u32",
-			Offset: in.Offset,
-			Mask:   fmt.Sprintf("0x%08xu32", binary.LittleEndian.Uint32(in.Mask)),
-		}
-	case 8:
-		return rustPaddingMarker{
-			Type:   "u64",
-			Offset: in.Offset,
-			Mask:   fmt.Sprintf("0x%016xu64", binary.LittleEndian.Uint64(in.Mask)),
-		}
-	default:
-		panic("unexpected mask size")
-	}
-}
-
-func toRustPaddingMarkers(in []fidlgen.PaddingMarker) []rustPaddingMarker {
-	var out []rustPaddingMarker
-	for _, m := range in {
-		out = append(out, toRustPaddingMarker(m))
-	}
-	return out
-}
-
 func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
 	name := c.compileDeclIdentifier(val.Name)
 	r := Struct{
-		Struct:                    val,
-		ECI:                       val.Name,
-		Name:                      name,
-		Members:                   []StructMember{},
-		SizeV2:                    val.TypeShapeV2.InlineSize,
-		AlignmentV2:               val.TypeShapeV2.Alignment,
-		PaddingMarkersV2:          toRustPaddingMarkers(val.BuildPaddingMarkers(fidlgen.WireFormatVersionV2)),
-		FlattenedPaddingMarkersV2: toRustPaddingMarkers(val.BuildFlattenedPaddingMarkers(fidlgen.WireFormatVersionV2, c.resolveStruct)),
+		Struct:           val,
+		ECI:              val.Name,
+		Name:             name,
+		Members:          []StructMember{},
+		SizeV2:           val.TypeShapeV2.InlineSize,
+		AlignmentV2:      val.TypeShapeV2.Alignment,
+		PaddingMarkersV2: val.BuildPaddingMarkers(fidlgen.PaddingConfig{}),
+		FlattenedPaddingMarkersV2: val.BuildPaddingMarkers(fidlgen.PaddingConfig{
+			FlattenStructs: true,
+			FlattenArrays:  true,
+			ResolveStruct:  c.resolveStruct,
+		}),
 	}
 
 	for _, v := range val.Members {

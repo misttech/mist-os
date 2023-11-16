@@ -85,8 +85,9 @@ unsafe impl fidl::encoding::Encode<{{ .Name }}> for &{{ if .IsResourceType }}mut
                 // Zero out padding regions. Unlike `fidl_struct_impl_noncopy!`, this must be
                 // done second because the memcpy will write garbage to these bytes.
                 {{- range .FlattenedPaddingMarkersV2 }}
-                let padding_ptr = buf_ptr.offset({{ .Offset }}) as *mut {{ .Type }};
-                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !{{ .Mask }});
+                let padding_ptr = buf_ptr.offset({{ .Offset }}) as *mut u{{ .MaskBitWidth }};
+                let padding_mask = {{ .Mask | printf "%#x" }}u{{ .MaskBitWidth }};
+                padding_ptr.write_unaligned(padding_ptr.read_unaligned() & !padding_mask);
                 {{- end }}
             }
             Ok(())
@@ -121,7 +122,7 @@ unsafe impl<{{ range $i, $member := .Members }} T{{ $i }}: fidl::encoding::Encod
         {{- range .PaddingMarkersV2 }}
         unsafe {
             let ptr = encoder.buf.as_mut_ptr().add(offset).offset({{ .Offset }});
-            (ptr as *mut {{ .Type }}).write_unaligned(0);
+            (ptr as *mut u{{ .MaskBitWidth }}).write_unaligned(0);
         }
         {{- end }}
         // Write the fields.
@@ -159,11 +160,12 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             // Verify that padding bytes are zero.
             {{- range .FlattenedPaddingMarkersV2 }}
             let ptr = unsafe { buf_ptr.offset({{ .Offset }}) };
-            let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
-            let maskedval = padval & {{ .Mask }};
-            if (maskedval != 0) {
+            let padval = unsafe { (ptr as *const u{{ .MaskBitWidth }}).read_unaligned() };
+            let mask = {{ .Mask | printf "%#x" }}u{{ .MaskBitWidth }};
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + {{ .Offset }} + (({{ .Mask }} as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + {{ .Offset }} + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             {{- end }}
@@ -177,11 +179,12 @@ impl fidl::encoding::Decode<Self> for {{ .Name }} {
             // Verify that padding bytes are zero.
             {{- range .PaddingMarkersV2 }}
             let ptr = unsafe { decoder.buf.as_ptr().add(offset).offset({{ .Offset }}) };
-            let padval = unsafe { (ptr as *const {{ .Type }}).read_unaligned() };
-            let maskedval = padval & {{ .Mask }};
-            if (maskedval != 0) {
+            let padval = unsafe { (ptr as *const u{{ .MaskBitWidth }}).read_unaligned() };
+            let mask = {{ .Mask | printf "%#x" }}u{{ .MaskBitWidth }};
+            let maskedval = padval & mask;
+            if maskedval != 0 {
                 return Err(fidl::Error::NonZeroPadding {
-                    padding_start: offset + {{ .Offset }} + (({{ .Mask }} as u64).trailing_zeros() / 8) as usize,
+                    padding_start: offset + {{ .Offset }} + ((mask as u64).trailing_zeros() / 8) as usize,
                 });
             }
             {{- end }}
