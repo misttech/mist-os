@@ -1759,8 +1759,8 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 impl MemoryAccessor for MemoryManager {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            let num_copied = usercopy.copyin(addr.ptr(), bytes);
-            if num_copied == bytes.len() {
+            let (_read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
+            if unread_bytes.is_empty() {
                 Ok(())
             } else {
                 error!(EFAULT)
@@ -1784,11 +1784,11 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            let num_copied = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
-            if num_copied == 0 && !bytes.is_empty() {
+            let (read_bytes, unread_bytes) = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
+            if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
             } else {
-                Ok(num_copied)
+                Ok(read_bytes.len())
             }
         } else {
             self.vmo_read_memory_partial(addr, bytes)
@@ -1801,11 +1801,11 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            let num_copied = usercopy.copyin(addr.ptr(), bytes);
-            if num_copied == 0 && !bytes.is_empty() {
+            let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
+            if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
             } else {
-                Ok(num_copied)
+                Ok(read_bytes.len())
             }
         } else {
             self.vmo_read_memory_partial(addr, bytes)
