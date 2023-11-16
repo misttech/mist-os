@@ -175,6 +175,30 @@ If a test case requires an vim3 hardware then
     $ ffx -t <vim3_device_name> target show
     ```
 
+## SL4F vs Fuchsia-Controller
+Any given HoneyDew functional test can be run using either SL4F or
+Fuchsia-Controller transport as long as underlying APIs that are being used in
+the functional test supports those transports.
+
+Depending on which transports <test> support, we have created
+`<test>_<transport>` python_mobly_test build rule.
+
+So, if a `<test>` support:
+* both sl4f and fuchsia-controller, it will have both
+`<test>_sl4f` and  `<test>_fc` build rules defined
+* only sl4f, it will have just `<test>_sl4f` build rule defined
+* only fuchsia-controller, it will have just `<test>_fc` build rule defined
+
+In order to run `<test>_sl4f`, we will need to provide below additional args to
+`fx set`:
+```
+    --with //src/testing/sl4f \
+    --with //src/sys/bin/start_sl4f \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]'
+```
+
+You can safely avoid passing these args if you want to run `<test>_fc`
+
 ## FuchsiaDevice tests
 
 ### X64 Emu tests
@@ -188,7 +212,7 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_sl4f --e2e --output
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_emu_test_fc --e2e --output
 ```
@@ -202,7 +226,7 @@ $ fx set core.x64 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_nuc_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_sl4f --e2e --output
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:x64_nuc_test_fc --e2e --output
 ```
@@ -215,7 +239,7 @@ $ fx set core.vim3 \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:vim3_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:vim3_test_sl4f --e2e --output
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/fuchsia_device_tests/test_fuchsia_device:vim3_test_fc --e2e --output
 ```
@@ -232,10 +256,10 @@ $ fx set core.x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 # GAP functional test
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_gap_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_gap_test_sl4f --e2e --output
 
 # AVRCP functional test
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_avrcp_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_bluetooth:bluetooth_avrcp_test_sl4f --e2e --output
 ```
 
 ### Tracing tests
@@ -249,49 +273,34 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test_sl4f --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_tracing:tracing_test_fc --e2e --output
 ```
 
-### Screenshot tests
-
-For SL4F test
-
+### UI tests
 ```shell
-$ fx set terminal.qemu-x64 \
+$ fx set workbench_eng.qemu-x64 \
     --with //src/testing/sl4f \
     --with //src/sys/bin/start_sl4f \
     --with //src/ui/examples:flatland-examples \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:screenshot_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:screenshot_test_sl4f --e2e --output
+
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:user_input_test_sl4f --e2e --output
 ```
 
 ### Session tests
-
-For SL4F test
-
 ```shell
-$ fx set core.qemu-x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
+$ fx set workbench_eng.qemu-x64 \
     --with //src/ui/examples:flatland-examples \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_session:session_test_fc --e2e --output
 ```
 
-### UserInput tests
-```shell
-$ fx set terminal.qemu-x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
-    --with //src/ui/examples:flatland-examples \
-    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
-
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_ui:user_input_test --e2e --output
-```
-
-###  Wlan policy tests
+###  WLAN tests
 ```shell
 $ fx set core.x64 \
     --with //src/testing/sl4f \
@@ -300,15 +309,6 @@ $ fx set core.x64 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_wlan:wlan_policy_test --e2e --output
-```
-
-###  Wlan tests
-```shell
-$ fx set core.x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
-    --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_tests/test_wlan:wlan_test --e2e --output
 ```
@@ -317,21 +317,15 @@ $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/affordance_te
 
 ### Fastboot tests
 ``` shell
-$ fx set core.x64 \
-    --with //build/images/recovery:recovery-installer \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+$ fx set core.vim3 \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
-$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_fastboot:fastboot_test --e2e --output
+$ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_fastboot:fastboot_test_fc --e2e --output
 ```
 
 ### FFX tests
 ``` shell
 $ fx set core.qemu-x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
     --with-host //src/testing/end_to_end/honeydew/tests/functional_tests:tests
 
 $ fx test //src/testing/end_to_end/honeydew/tests/functional_tests/transport_tests/test_ffx:ffx_test_fc --e2e --output

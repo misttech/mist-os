@@ -18,6 +18,10 @@ or not. For more information, refer to
 [Lacewing Mobly Config YAML file](../README.md#Mobly-Config-YAML-File))
 
 ## Test execution in local mode
+
+Refer to [SL4F vs Fuchsia-Controller] to learn more about how to run these
+example lacewing tests using SL4F or Fuchsia-Controller transports.
+
 ### Hello World Test
 ```shell
 $ fx set core.qemu-x64 \
@@ -37,7 +41,9 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_sl4f --e2e --output
+
+$ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc --e2e --output
 ```
 
 ### Hybrid Test
@@ -49,8 +55,14 @@ $ fx set core.qemu-x64 \
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
-$ fx test //src/testing/end_to_end/examples/test_hybrid:simple_hybrid_test --e2e --output
+$ fx test //src/testing/end_to_end/examples/test_hybrid:simple_hybrid_test_fc --e2e --output
 ```
+
+### Multi Device Test
+Refer to [Multi Device Test]
+
+[SL4F vs Fuchsia-Controller]: ../honeydew/tests/functional_tests/README.md#SL4F-vs-Fuchsia_Controller
 
 [Fuchsia Emulator]: ../honeydew/tests/functional_tests/README.md#Fuchsia-Emulator
 
+[Multi Device Test]: test_multi_device/README.md
