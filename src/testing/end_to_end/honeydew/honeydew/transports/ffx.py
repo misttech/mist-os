@@ -142,12 +142,19 @@ class FFX:
         except subprocess.TimeoutExpired as err:
             _LOGGER.debug(err, exc_info=True)
             raise
-        except Exception as err:  # pylint: disable=broad-except
-            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
-                _LOGGER.debug(
-                    "stdout/stderr returned by the command is: %s", err.stdout
-                )
+        except subprocess.CalledProcessError as err:
+            message: str = (
+                f"Command '{cmd}' failed. returncode = {err.returncode}"
+            )
+            if err.stdout:
+                message += f", stdout = {err.stdout}"
+            if err.stderr:
+                message += f", stderr = {err.stderr}."
+            _LOGGER.debug(message)
 
+            raise errors.FfxCommandError(f"`{cmd}` command failed") from err
+
+        except Exception as err:  # pylint: disable=broad-except
             raise errors.FfxCommandError(f"`{cmd}` command failed") from err
 
     def check_connection(
@@ -414,7 +421,7 @@ class FFX:
                 _LOGGER.debug(err, exc_info=True)
                 raise
 
-            if isinstance(err, subprocess.CalledProcessError) and err.stdout:
+            if isinstance(err, subprocess.CalledProcessError):
                 message: str = (
                     f"Command '{ffx_cmd}' failed. returncode = {err.returncode}"
                 )
