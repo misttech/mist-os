@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        bedrock::program,
         capability::CapabilitySource,
         model::{events::error::EventsError, routing::RouteRequest, storage::StorageError},
     },
@@ -674,7 +675,7 @@ pub enum StartActionError {
     StartProgramError {
         moniker: Moniker,
         #[source]
-        err: crate::bedrock::program::StartError,
+        err: program::StartError,
     },
     #[error("Couldn't start `{moniker}` due to a structured configuration error: {err}")]
     StructuredConfigError {
@@ -734,10 +735,8 @@ impl Into<fcomponent::Error> for StartActionError {
 
 #[derive(Debug, Clone, Error)]
 pub enum StopActionError {
-    #[error("stop failed with unexpected FIDL error ({0})")]
-    ControllerStopFidlError(#[source] fidl::Error),
-    #[error("kill failed with unexpected FIDL error ({0})")]
-    ControllerKillFidlError(#[source] fidl::Error),
+    #[error("failed to stop program: {0}")]
+    ProgramStopError(#[source] program::StopError),
     #[error("failed to get top instance")]
     GetTopInstanceFailed,
     #[error("failed to get parent instance")]
@@ -763,14 +762,7 @@ impl Into<fcomponent::Error> for StopActionError {
 impl PartialEq for StopActionError {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
-            (
-                StopActionError::ControllerStopFidlError(_),
-                StopActionError::ControllerStopFidlError(_),
-            ) => true,
-            (
-                StopActionError::ControllerKillFidlError(_),
-                StopActionError::ControllerKillFidlError(_),
-            ) => true,
+            (StopActionError::ProgramStopError(_), StopActionError::ProgramStopError(_)) => true,
             (StopActionError::GetTopInstanceFailed, StopActionError::GetTopInstanceFailed) => true,
             (StopActionError::GetParentFailed, StopActionError::GetParentFailed) => true,
             (
@@ -778,26 +770,6 @@ impl PartialEq for StopActionError {
                 StopActionError::DestroyDynamicChildrenFailed { .. },
             ) => true,
             _ => false,
-        }
-    }
-
-    fn ne(&self, other: &Self) -> bool {
-        match (self, other) {
-            (
-                StopActionError::ControllerStopFidlError(_),
-                StopActionError::ControllerStopFidlError(_),
-            ) => false,
-            (
-                StopActionError::ControllerKillFidlError(_),
-                StopActionError::ControllerKillFidlError(_),
-            ) => false,
-            (StopActionError::GetTopInstanceFailed, StopActionError::GetTopInstanceFailed) => false,
-            (StopActionError::GetParentFailed, StopActionError::GetParentFailed) => false,
-            (
-                StopActionError::DestroyDynamicChildrenFailed { .. },
-                StopActionError::DestroyDynamicChildrenFailed { .. },
-            ) => false,
-            _ => true,
         }
     }
 }
