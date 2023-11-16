@@ -153,8 +153,6 @@ if (is_fuchsia) {
   product_bundle("product_bundle") {
     testonly = true
     name = "scrutiny-structured-config-test"
-    skip_scrutiny = true
-    skip_scrutiny_recovery = true
     deps = [
       ":assembly",
       ":partitions_config",
@@ -199,7 +197,6 @@ if (is_host) {
       deps = [
         ":check_extracted_config",
         ":check_failing_policy",
-        ":verifier_pass",
       ]
     }
   }
@@ -254,13 +251,6 @@ if (is_host) {
       ":test_bin",
       "//build/python:interpreter",
     ]
-  }
-
-  verify_assembled_structured_config("verifier_pass") {
-    testonly = true
-    product_bundle_path = files.product_bundle_dir
-    policy = "passing_policy.json5"
-    deps = [ labels.product_bundle ]
   }
 
   python_binary("check_failed_verifier_bin") {

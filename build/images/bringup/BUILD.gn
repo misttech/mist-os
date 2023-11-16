@@ -157,10 +157,6 @@ product_bundle("product_bundle") {
   partitions_contents = partitions_config_contents
   system_a_contents = _assembly_contents
   system_r_contents = _recovery_contents
-
-  # Skip scrutiny.
-  skip_scrutiny = true
-  skip_scrutiny_recovery = true
 }
 
 group("bringup") {
