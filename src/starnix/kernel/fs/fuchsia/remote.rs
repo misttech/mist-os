@@ -279,7 +279,6 @@ pub fn new_remote_file(
             content_size: true,
             storage_size: true,
             link_count: true,
-            modification_time: true,
             ..Default::default()
         })
         .map_err(|status| from_status_like_fdio!(status))?;
@@ -708,23 +707,36 @@ impl FsNodeOps for RemoteNode {
 
     fn refresh_info<'a>(
         &self,
-        _node: &FsNode,
+        node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime and atime, we should refresh
+        // with the corresponding values.
         let attrs = self
             .zxio
             .attr_get(zxio_node_attr_has_t {
                 content_size: true,
                 storage_size: true,
                 link_count: true,
-                modification_time: true,
+                // If the filesystem can manage timestamps, update `info` with those timestamps.
+                modification_time: self.filesystem_manages_timestamps(&node),
                 ..Default::default()
             })
             .map_err(|status| from_status_like_fdio!(status))?;
         let mut info = info.write();
         update_info_from_attrs(&mut info, &attrs);
         Ok(RwLockWriteGuard::downgrade(info))
+    }
+
+    // Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
+    // The filesystem should also support getting and setting these timestamps, which for atime and
+    // ctime is only true when the filesystem supports open2 (and thus supports GetAttributes (io2)
+    // and UpdateAttributes (io2))
+    fn filesystem_manages_timestamps(&self, node: &FsNode) -> bool {
+        let fs = node.fs();
+        let fs_ops = RemoteFs::from_fs(&fs);
+        fs_ops.supports_open2
     }
 
     fn update_attributes(&self, info: &FsNodeInfo, has: zxio_node_attr_has_t) -> Result<(), Errno> {
@@ -2383,6 +2395,67 @@ mod test {
             assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
         })
         .await;
+        fixture.close().await;
+    }
+
+    #[::fuchsia::test]
+    async fn test_time_modify_managed_by_fs() {
+        let fixture = TestFixture::new().await;
+        let (server, client) = zx::Channel::create();
+        fixture
+            .root()
+            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+            .expect("clone failed");
+
+        const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
+
+        let (kernel, current_task) = create_kernel_and_task();
+        fasync::unblock(move || {
+            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                rights,
+            )
+            .expect("new_fs failed");
+            let ns: Arc<Namespace> = Namespace::new(fs);
+            current_task.fs().set_umask(FileMode::from_bits(0));
+            let child = ns
+                .root()
+                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                .expect("create_node failed");
+            let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+            // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+            // underlying filesystem
+            let time_before_write = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+            let written = file
+                .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                .expect("write failed");
+            assert_eq!(written, write_bytes.len());
+
+            let last_modified_on_starnix = child.entry.node.info().time_modify;
+            // As Fxfs, the underlying filesystem in this test, can manage file timestamps,
+            // we should not see an update in mtime without first refreshing the node.
+            assert_eq!(last_modified_on_starnix, time_before_write);
+
+            // Get mtime from filesystem
+            let last_modified = child
+                .entry
+                .node
+                .refresh_info(&current_task)
+                .expect("refresh info failed")
+                .time_modify;
+            assert!(last_modified > time_before_write);
+        })
+        .await;
+
         fixture.close().await;
     }
 }

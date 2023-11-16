@@ -637,6 +637,15 @@ pub trait FsNodeOps: Send + Sync + AsAny + 'static {
         Ok(info.read())
     }
 
+    /// Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
+    ///
+    /// Starnix updates the timestamps in node.info directly. However, if the filesystem can manage
+    /// the timestamps, then Starnix does not need to do so. `node.info`` will be refreshed with the
+    /// timestamps from the filesystem by calling `refresh_info(..)`.
+    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
+        false
+    }
+
     /// Update node attributes persistently.
     fn update_attributes(
         &self,
@@ -1820,15 +1829,25 @@ impl FsNode {
 
     /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) {
-        self.update_info(|info| {
-            let now = utc::utc_now();
-            info.time_status_change = now;
-            info.time_modify = now;
-        });
+        let now = utc::utc_now();
+        if self.ops().filesystem_manages_timestamps(self) {
+            // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime, we don't have to update
+            // node info with ctime
+            self.update_info(|info| {
+                info.time_status_change = now;
+            })
+        } else {
+            self.update_info(|info| {
+                info.time_status_change = now;
+                info.time_modify = now;
+            });
+        }
     }
 
     /// Update the ctime of a file to now.
     pub fn update_ctime(&self) {
+        // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime, we don't have to update
+        // node info with ctime
         self.update_info(|info| {
             let now = utc::utc_now();
             info.time_status_change = now;
