@@ -23,6 +23,7 @@
             storage: "data",
             path: "/data",
         },
+        { protocol: "fuchsia.metrics.MetricEventLoggerFactory" },
     ],
     expose: [
         {

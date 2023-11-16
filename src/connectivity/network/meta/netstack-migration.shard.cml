@@ -29,6 +29,11 @@
             from: "parent",
             to: [ "#netstack-migration" ],
         },
+        {
+            protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
+            from: "parent",
+            to: [ "#netstack-migration" ],
+        },
     ],
     expose: [
         {

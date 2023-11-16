@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use async_utils::stream::FlattenUnorderedExt as _;
+use cobalt_client::traits::AsEventCode as _;
+use fidl_fuchsia_metrics as fmetrics;
 use fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::Property as _;
-use futures::stream::StreamExt as _;
+use futures::StreamExt as _;
+use networking_metrics_registry::networking_metrics_registry as metrics_registry;
 use std::convert::From;
 use tracing::{error, info, warn};
 
@@ -238,6 +241,100 @@ impl InspectNodes {
     }
 }
 
+/// Wraps communication with metrics (cobalt) server.
+struct MetricsLogger {
+    logger: Option<fmetrics::MetricEventLoggerProxy>,
+}
+
+impl MetricsLogger {
+    async fn new() -> Self {
+        let (logger, server_end) =
+            fidl::endpoints::create_proxy::<fmetrics::MetricEventLoggerMarker>()
+                .expect("create event logger");
+
+        let factory = match fuchsia_component::client::connect_to_protocol::<
+            fmetrics::MetricEventLoggerFactoryMarker,
+        >() {
+            Ok(f) => f,
+            Err(e) => {
+                warn!("can't connect to logger factory {e:?}");
+                return Self { logger: None };
+            }
+        };
+
+        match factory
+            .create_metric_event_logger(
+                &fmetrics::ProjectSpec {
+                    customer_id: Some(metrics_registry::CUSTOMER_ID),
+                    project_id: Some(metrics_registry::PROJECT_ID),
+                    ..Default::default()
+                },
+                server_end,
+            )
+            .await
+        {
+            Ok(Ok(())) => Self { logger: Some(logger) },
+            Ok(Err(e)) => {
+                warn!("can't create event logger {e:?}");
+                Self { logger: None }
+            }
+            Err(e) => {
+                warn!("error connecting to metric event logger {e:?}");
+                Self { logger: None }
+            }
+        }
+    }
+
+    /// Logs metrics from `migration` to the metrics server.
+    async fn log_metrics<P>(&self, migration: &Migration<P>) {
+        let logger = if let Some(logger) = self.logger.as_ref() {
+            logger
+        } else {
+            // Silently don't log metrics if we didn't manage to create a
+            // logger, warnings are emitted upon creation.
+            return;
+        };
+
+        let current_boot = match migration.current_boot {
+            NetstackVersion::Netstack2 => {
+                metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack2
+            }
+            NetstackVersion::Netstack3 => {
+                metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack3
+            }
+        }
+        .as_event_code();
+        let user = match migration.persisted.user {
+            None => metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::NoSelection,
+            Some(NetstackVersion::Netstack2) => metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::Netstack2,
+            Some(NetstackVersion::Netstack3) => metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::Netstack3,
+        }
+        .as_event_code();
+        let automated = match migration.persisted.automated {
+            None => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::NoSelection,
+            Some(NetstackVersion::Netstack2) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack2,
+            Some(NetstackVersion::Netstack3) => metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack3,
+        }
+        .as_event_code();
+        for (metric_id, event_code) in [
+            (metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID, current_boot),
+            (metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID, user),
+            (metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID, automated),
+        ] {
+            let occurrence_count = 1;
+            logger
+                .log_occurrence(metric_id, occurrence_count, &[event_code][..])
+                .await
+                .map(|r| {
+                    r.unwrap_or_else(|e| warn!("error reported logging metric {metric_id} {e:?}"))
+                })
+                .unwrap_or_else(|fidl_error| {
+                    warn!("error logging metric {metric_id} {fidl_error:?}")
+                });
+        }
+    }
+}
+
 #[fuchsia::main]
 pub async fn main() {
     info!("running netstack migration service");
@@ -262,24 +359,44 @@ pub async fn main() {
             .expect("failed to serve inspector");
     let inspect_nodes = InspectNodes::new(inspector, &migration);
 
-    let () = fs
-        .fuse()
-        .flatten_unordered()
-        .for_each(|req| {
-            let result = req.and_then(|req| migration.handle_request(req));
-            // Always update inspector state after handling a request.
-            inspect_nodes.update(&migration);
-            match result {
-                Ok(()) => (),
-                Err(e) => {
-                    if !e.is_closed() {
-                        error!("error processing FIDL request {:?}", e)
+    let metrics_logger = MetricsLogger::new().await;
+
+    enum Action {
+        ServiceRequest(Result<ServiceRequest, fidl::Error>),
+        LogMetrics,
+    }
+
+    let metrics_logging_interval = fuchsia_async::Duration::from_hours(1);
+    let mut stream = futures::stream::select(
+        // Always log metrics once on startup then periodically log new values so
+        // the aggregation window always contains one sample of the current
+        // settings.
+        futures::stream::once(futures::future::ready(()))
+            .chain(fuchsia_async::Interval::new(metrics_logging_interval))
+            .map(|()| Action::LogMetrics),
+        fs.fuse().flatten_unordered().map(Action::ServiceRequest),
+    );
+
+    while let Some(action) = stream.next().await {
+        match action {
+            Action::ServiceRequest(req) => {
+                let result = req.and_then(|req| migration.handle_request(req));
+                // Always update inspector state after handling a request.
+                inspect_nodes.update(&migration);
+                match result {
+                    Ok(()) => (),
+                    Err(e) => {
+                        if !e.is_closed() {
+                            error!("error processing FIDL request {:?}", e)
+                        }
                     }
                 }
             }
-            futures::future::ready(())
-        })
-        .await;
+            Action::LogMetrics => {
+                metrics_logger.log_metrics(&migration).await;
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -574,5 +691,79 @@ mod tests {
                 automated_setting: 2u64,
             }
         );
+    }
+
+    #[test_case::test_matrix(
+    [
+        (NetstackVersion::Netstack2, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack2),
+        (NetstackVersion::Netstack3, metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion::Netstack3),
+    ],
+    [
+        (None, metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::NoSelection),
+        (Some(NetstackVersion::Netstack2), metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::Netstack2),
+        (Some(NetstackVersion::Netstack3), metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion::Netstack3),
+    ],
+    [
+        (None, metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::NoSelection),
+        (Some(NetstackVersion::Netstack2), metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack2),
+        (Some(NetstackVersion::Netstack3), metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion::Netstack3),
+    ]
+    )]
+    #[fuchsia::test]
+    async fn metrics_logger(
+        current_boot: (
+            NetstackVersion,
+            metrics_registry::StackMigrationCurrentBootMetricDimensionNetstackVersion,
+        ),
+        user: (
+            Option<NetstackVersion>,
+            metrics_registry::StackMigrationUserSettingMetricDimensionNetstackVersion,
+        ),
+        automated: (
+            Option<NetstackVersion>,
+            metrics_registry::StackMigrationAutomatedSettingMetricDimensionNetstackVersion,
+        ),
+    ) {
+        let (current_boot, current_boot_expect) = current_boot;
+        let (user, user_expect) = user;
+        let (automated, automated_expect) = automated;
+        let mut m = Migration::new(InMemory::with_persisted(Persisted { user, automated }));
+        m.current_boot = current_boot;
+        let (logger, mut logger_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fmetrics::MetricEventLoggerMarker>()
+                .expect("create proxy");
+
+        let metrics_logger = MetricsLogger { logger: Some(logger) };
+
+        let ((), ()) = futures::future::join(metrics_logger.log_metrics(&m), async {
+            let expect = [
+                (
+                    metrics_registry::STACK_MIGRATION_CURRENT_BOOT_METRIC_ID,
+                    current_boot_expect.as_event_code(),
+                ),
+                (
+                    metrics_registry::STACK_MIGRATION_USER_SETTING_METRIC_ID,
+                    user_expect.as_event_code(),
+                ),
+                (
+                    metrics_registry::STACK_MIGRATION_AUTOMATED_SETTING_METRIC_ID,
+                    automated_expect.as_event_code(),
+                ),
+            ];
+            for (id, ev) in expect {
+                let (metric, occurences, codes, responder) = logger_stream
+                    .next()
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .into_log_occurrence()
+                    .expect("bad request");
+                assert_eq!(metric, id);
+                assert_eq!(occurences, 1);
+                assert_eq!(codes, vec![ev]);
+                responder.send(Ok(())).unwrap();
+            }
+        })
+        .await;
     }
 }
