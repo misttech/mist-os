@@ -86,13 +86,6 @@ enum class PageType {
   kMetaFlush,
 };
 
-// Types of inode number lists
-enum class InoType {
-  kOrphanIno,       // Orphan ino list
-  kModifiedDirIno,  // Modified directory ino list
-  kNrInoType,
-};
-
 // Block allocation mode.
 // Available types are:
 // kModeAdaptive    use both lfs/ssr allocation
@@ -136,49 +129,6 @@ class FlagAcquireGuard {
   std::atomic_flag *flag_ = nullptr;
   bool acquired_ = false;
   bool wake_waiters_ = false;
-};
-
-// The VnodeSet stores and manages vnode number that should be specially managed, such as
-// orphan vnodes.
-class VnodeSet {
- public:
-  VnodeSet() = default;
-  VnodeSet(const VnodeSet &) = delete;
-  VnodeSet &operator=(const VnodeSet &) = delete;
-  VnodeSet(VnodeSet &&) = delete;
-  VnodeSet &operator=(VnodeSet &&) = delete;
-
-  void AddVnode(nid_t ino) __TA_EXCLUDES(vnode_mutex_) {
-    std::lock_guard lock(vnode_mutex_);
-    // std::set removes duplicate insertion.
-    vnodes.insert(ino);
-  }
-
-  void RemoveVnode(nid_t ino) __TA_EXCLUDES(vnode_mutex_) {
-    std::lock_guard lock(vnode_mutex_);
-    vnodes.erase(ino);
-  }
-
-  bool FindVnode(nid_t ino) __TA_EXCLUDES(vnode_mutex_) {
-    fs::SharedLock lock(vnode_mutex_);
-    return vnodes.find(ino) != vnodes.end();
-  }
-
-  void ForAllVnodes(fit::function<void(nid_t)> callback) __TA_EXCLUDES(vnode_mutex_) {
-    std::lock_guard lock(vnode_mutex_);
-    for (auto ino : vnodes) {
-      callback(ino);
-    }
-  }
-
-  uint64_t GetSize() const __TA_EXCLUDES(vnode_mutex_) {
-    fs::SharedLock lock(vnode_mutex_);
-    return vnodes.size();
-  }
-
- private:
-  mutable fs::SharedMutex vnode_mutex_;               // for vnode set
-  std::set<nid_t> vnodes __TA_GUARDED(vnode_mutex_);  // vnode set
 };
 
 class SuperblockInfo {

@@ -505,9 +505,9 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
     }
 
     // Add new parent directory to VnodeSet to ensure consistency of renamed vnode.
-    fs()->AddVnodeToVnodeSet(InoType::kModifiedDirIno, new_dir->Ino());
+    fs()->AddToVnodeSet(VnodeSet::kModifiedDir, new_dir->Ino());
     if (old_vnode->IsDir()) {
-      fs()->AddVnodeToVnodeSet(InoType::kModifiedDirIno, old_vnode->Ino());
+      fs()->AddToVnodeSet(VnodeSet::kModifiedDir, old_vnode->Ino());
     }
   }
 

@@ -428,4 +428,55 @@ zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
   reset.cancel();
   return ZX_OK;
 }
+
+void F2fs::AddToVnodeSet(VnodeSet type, nid_t ino) {
+  std::lock_guard lock(vnode_set_mutex_);
+  uint32_t flag = 1 << static_cast<uint32_t>(type);
+  auto& node = vnode_set_[ino];
+  if (node & flag) {
+    return;
+  }
+  node |= flag;
+  ++vnode_set_size_[static_cast<size_t>(type)];
+}
+void F2fs::RemoveFromVnodeSet(VnodeSet type, nid_t ino) {
+  std::lock_guard lock(vnode_set_mutex_);
+  uint32_t flag = 1 << static_cast<uint32_t>(type);
+  auto vnode = vnode_set_.find(ino);
+  if (vnode == vnode_set_.end() || !(vnode->second & flag)) {
+    return;
+  }
+  vnode->second &= ~flag;
+  --vnode_set_size_[static_cast<uint32_t>(type)];
+}
+bool F2fs::FindVnodeSet(VnodeSet type, nid_t ino) {
+  fs::SharedLock lock(vnode_set_mutex_);
+  uint32_t flag = 1 << static_cast<uint32_t>(type);
+  const auto vnode = vnode_set_.find(ino);
+  if (vnode == vnode_set_.end()) {
+    return false;
+  }
+  return vnode->second & flag;
+}
+size_t F2fs::GetVnodeSetSize(VnodeSet type) {
+  fs::SharedLock lock(vnode_set_mutex_);
+  return vnode_set_size_[static_cast<uint32_t>(type)];
+}
+void F2fs::ForAllVnodeSet(VnodeSet type, fit::function<void(nid_t)> callback) {
+  fs::SharedLock lock(vnode_set_mutex_);
+  uint32_t flag = 1 << static_cast<uint32_t>(type);
+  for (const auto& nid : vnode_set_) {
+    if (nid.second & flag) {
+      callback(nid.first);
+    }
+  }
+}
+void F2fs::ClearVnodeSet() {
+  std::lock_guard lock(vnode_set_mutex_);
+  for (uint32_t i = 0; i < static_cast<uint32_t>(VnodeSet::kMax); ++i) {
+    vnode_set_size_[i] = 0;
+  }
+  vnode_set_.clear();
+}
+
 }  // namespace f2fs

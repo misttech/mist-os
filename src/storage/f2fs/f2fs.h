@@ -292,21 +292,13 @@ class F2fs final {
   void SetOnRecovery() { on_recovery_ = true; }
   void ClearOnRecovery() { on_recovery_ = false; }
 
-  void AddVnodeToVnodeSet(InoType type, nid_t ino) {
-    vnode_set_[static_cast<uint8_t>(type)].AddVnode(ino);
-  }
-  void RemoveVnodeFromVnodeSet(InoType type, nid_t ino) {
-    vnode_set_[static_cast<uint8_t>(type)].RemoveVnode(ino);
-  }
-  bool FindVnodeFromVnodeSet(InoType type, nid_t ino) {
-    return vnode_set_[static_cast<uint8_t>(type)].FindVnode(ino);
-  }
-  uint64_t GetVnodeSetSize(InoType type) {
-    return vnode_set_[static_cast<uint8_t>(type)].GetSize();
-  }
-  void ForAllVnodesInVnodeSet(InoType type, fit::function<void(nid_t)> callback) {
-    vnode_set_[static_cast<uint8_t>(type)].ForAllVnodes(std::move(callback));
-  }
+  void AddToVnodeSet(VnodeSet type, nid_t ino) __TA_EXCLUDES(vnode_set_mutex_);
+  void RemoveFromVnodeSet(VnodeSet type, nid_t ino) __TA_EXCLUDES(vnode_set_mutex_);
+  bool FindVnodeSet(VnodeSet type, nid_t ino) __TA_EXCLUDES(vnode_set_mutex_);
+  size_t GetVnodeSetSize(VnodeSet type) __TA_EXCLUDES(vnode_set_mutex_);
+  void ForAllVnodeSet(VnodeSet type, fit::function<void(nid_t)> callback)
+      __TA_EXCLUDES(vnode_set_mutex_);
+  void ClearVnodeSet() __TA_EXCLUDES(vnode_set_mutex_);
 
   fs::SharedMutex &GetFsLock(LockType type) { return fs_lock_[static_cast<int>(type)]; }
   void mutex_lock_op(LockType t) __TA_ACQUIRE(&fs_lock_[static_cast<int>(t)]) {
@@ -354,7 +346,12 @@ class F2fs final {
 
   bool on_recovery_ = false;  // recovery is doing or not
   // for inode number management
-  VnodeSet vnode_set_[static_cast<uint8_t>(InoType::kNrInoType)];
+  fs::SharedMutex vnode_set_mutex_;
+  std::map<ino_t, uint32_t> vnode_set_ __TA_GUARDED(vnode_set_mutex_);
+  size_t vnode_set_size_[static_cast<size_t>(VnodeSet::kMax)] __TA_GUARDED(vnode_set_mutex_) = {
+      0,
+  };
+
   fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations
 
   zx::event fs_id_;

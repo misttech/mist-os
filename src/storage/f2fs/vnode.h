@@ -30,6 +30,13 @@ struct LockedPagesAndAddrs {
   std::vector<LockedPage> pages;     // Pages matched with block address
 };
 
+// Used to track orphans and modified dirs
+enum class VnodeSet {
+  kOrphan = 0,
+  kModifiedDir,
+  kMax,
+};
+
 class VnodeF2fs : public fs::PagedVnode,
                   public fbl::Recyclable<VnodeF2fs>,
                   public fbl::WAVLTreeContainable<VnodeF2fs *>,

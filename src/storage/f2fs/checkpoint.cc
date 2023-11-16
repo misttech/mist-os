@@ -65,7 +65,7 @@ zx_status_t F2fs::CheckOrphanSpace() {
    * for cp pack we can have max 1020*507 orphan entries
    */
   size_t max_orphans = (superblock_info_->GetBlocksPerSeg() - 5) * kOrphansPerBlock;
-  if (GetVnodeSetSize(InoType::kOrphanIno) >= max_orphans) {
+  if (GetVnodeSetSize(VnodeSet::kOrphan) >= max_orphans) {
     inspect_tree_->OnOutOfSpace();
     return ZX_ERR_NO_SPACE;
   }
@@ -73,7 +73,7 @@ zx_status_t F2fs::CheckOrphanSpace() {
 }
 
 void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
-  AddVnodeToVnodeSet(InoType::kOrphanIno, vnode->GetKey());
+  AddToVnodeSet(VnodeSet::kOrphan, vnode->GetKey());
   if (vnode->IsDir()) {
     vnode->Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
   }
@@ -128,9 +128,9 @@ void F2fs::WriteOrphanInodes(block_t start_blk) {
   uint16_t orphan_blocks;
 
   orphan_blocks = static_cast<uint16_t>(
-      (GetVnodeSetSize(InoType::kOrphanIno) + (kOrphansPerBlock - 1)) / kOrphansPerBlock);
+      (GetVnodeSetSize(VnodeSet::kOrphan) + (kOrphansPerBlock - 1)) / kOrphansPerBlock);
 
-  ForAllVnodesInVnodeSet(InoType::kOrphanIno, [&](nid_t ino) {
+  ForAllVnodeSet(VnodeSet::kOrphan, [&](nid_t ino) {
     if (nentries == kOrphansPerBlock) {
       // an orphan block is full of 1020 entries,
       // then we need to flush current orphan blocks
@@ -396,7 +396,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
 
   block_t num_cp_payload = superblock_info.GetNumCpPayload();
   uint32_t orphan_blocks = static_cast<uint32_t>(
-      (GetVnodeSetSize(InoType::kOrphanIno) + kOrphansPerBlock - 1) / kOrphansPerBlock);
+      (GetVnodeSetSize(VnodeSet::kOrphan) + kOrphansPerBlock - 1) / kOrphansPerBlock);
   uint32_t cp_pack_total_block_count = 2 + data_sum_blocks + orphan_blocks + num_cp_payload;
   if (is_umount) {
     superblock_info.SetCpFlags(CpFlag::kCpUmountFlag);
@@ -407,7 +407,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
   ckpt_block->cp_pack_start_sum = CpuToLe(1 + orphan_blocks + num_cp_payload);
   ckpt_block->cp_pack_total_block_count = CpuToLe(cp_pack_total_block_count);
 
-  if (GetVnodeSetSize(InoType::kOrphanIno) > 0) {
+  if (GetVnodeSetSize(VnodeSet::kOrphan) > 0) {
     superblock_info.SetCpFlags(CpFlag::kCpOrphanPresentFlag);
   } else {
     superblock_info.ClearCpFlags(CpFlag::kCpOrphanPresentFlag);
@@ -440,7 +440,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     offset += cp_page->Size();
   }
 
-  if (GetVnodeSetSize(InoType::kOrphanIno) > 0) {
+  if (GetVnodeSetSize(VnodeSet::kOrphan) > 0) {
     WriteOrphanInodes(start_blk);
     start_blk += orphan_blocks;
   }
@@ -476,6 +476,7 @@ zx_status_t F2fs::DoCheckpoint(bool is_umount) {
     GetSegmentManager().ClearPrefreeSegments();
     superblock_info.ClearDirty();
     meta_vnode_->InvalidatePages();
+    ClearVnodeSet();
   }
   return ZX_OK;
 }

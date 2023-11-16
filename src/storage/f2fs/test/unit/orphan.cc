@@ -58,15 +58,16 @@ TEST(OrphanInode, RecoverOrphanInode) {
   }
 
   // 2. Make orphan inodes
-  ASSERT_EQ(fs->GetVnodeSetSize(InoType::kOrphanIno), static_cast<uint64_t>(0));
+  ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), static_cast<uint64_t>(0));
   FileTester::DeleteChildren(vnodes, root_dir, kOrphanCnt);
-  ASSERT_EQ(fs->GetVnodeSetSize(InoType::kOrphanIno), kOrphanCnt);
+  ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), kOrphanCnt);
 
   for (const auto &iter : vnodes) {
     ASSERT_EQ(iter->GetNlink(), (uint32_t)0);
   }
 
   fs->WriteCheckpoint(false, true);
+  ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), 0UL);
 
   // 3. Sudden power off
   for (const auto &iter : vnodes) {
@@ -83,7 +84,7 @@ TEST(OrphanInode, RecoverOrphanInode) {
   // 4. Remount and purge orphan inodes
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
-  ASSERT_EQ(fs->GetVnodeSetSize(InoType::kOrphanIno), static_cast<uint64_t>(0));
+  ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), static_cast<uint64_t>(0));
   ASSERT_EQ(fs->GetSuperblockInfo().GetValidInodeCount(), static_cast<uint64_t>(1));
   ASSERT_EQ(fs->GetSuperblockInfo().GetValidNodeCount(), static_cast<uint64_t>(1));
   ASSERT_EQ(fs->GetSuperblockInfo().GetValidBlockCount(), static_cast<uint64_t>(2));
@@ -106,31 +107,30 @@ TEST_F(OrphanTest, VnodeSet) {
   std::iota(inos.begin(), inos.end(), 0);
 
   for (auto ino : inos) {
-    fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, ino);
+    fs_->AddToVnodeSet(VnodeSet::kOrphan, ino);
   }
-  ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), inode_count);
+  ASSERT_EQ(fs_->GetVnodeSetSize(VnodeSet::kOrphan), inode_count);
 
   // Duplicate ino insertion
-  fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, 1);
-  fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, 2);
-  fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, 3);
-  fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, 4);
-  ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), inode_count);
+  fs_->AddToVnodeSet(VnodeSet::kOrphan, 1);
+  fs_->AddToVnodeSet(VnodeSet::kOrphan, 2);
+  fs_->AddToVnodeSet(VnodeSet::kOrphan, 3);
+  fs_->AddToVnodeSet(VnodeSet::kOrphan, 4);
+  ASSERT_EQ(fs_->GetVnodeSetSize(VnodeSet::kOrphan), inode_count);
 
-  fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, 10);
-  ASSERT_EQ(fs_->GetVnodeSetSize(InoType::kOrphanIno), inode_count - 1);
+  fs_->RemoveFromVnodeSet(VnodeSet::kOrphan, 10);
+  ASSERT_EQ(fs_->GetVnodeSetSize(VnodeSet::kOrphan), inode_count - 1);
 
-  ASSERT_FALSE(fs_->FindVnodeFromVnodeSet(InoType::kOrphanIno, 10));
-  ASSERT_TRUE(fs_->FindVnodeFromVnodeSet(InoType::kOrphanIno, 11));
-  fs_->AddVnodeToVnodeSet(InoType::kOrphanIno, 10);
+  ASSERT_FALSE(fs_->FindVnodeSet(VnodeSet::kOrphan, 10));
+  ASSERT_TRUE(fs_->FindVnodeSet(VnodeSet::kOrphan, 11));
+  fs_->AddToVnodeSet(VnodeSet::kOrphan, 10);
 
   std::vector<uint32_t> tmp_inos;
-  fs_->ForAllVnodesInVnodeSet(InoType::kOrphanIno,
-                              [&tmp_inos](nid_t ino) { tmp_inos.push_back(ino); });
+  fs_->ForAllVnodeSet(VnodeSet::kOrphan, [&tmp_inos](nid_t ino) { tmp_inos.push_back(ino); });
   ASSERT_TRUE(std::equal(inos.begin(), inos.end(), tmp_inos.begin()));
 
   for (auto ino : inos) {
-    fs_->RemoveVnodeFromVnodeSet(InoType::kOrphanIno, ino);
+    fs_->RemoveFromVnodeSet(VnodeSet::kOrphan, ino);
   }
 }
 

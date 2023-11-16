@@ -368,7 +368,7 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       continue;
     }
 
-    if (gc_type == GcType::kFgGc && fs_->FindVnodeFromVnodeSet(InoType::kOrphanIno, ino)) {
+    if (gc_type == GcType::kFgGc && fs_->FindVnodeSet(VnodeSet::kOrphan, ino)) {
       // Here, GC already uploaded victim data block to the filecache.
       // Once a page of an orphan file is uploaded to the filecache, the page is not reclaimed until
       // the vnode is recycled. Therefore, even if we truncate it here, orphan files that are
