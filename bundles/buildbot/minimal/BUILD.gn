@@ -79,6 +79,7 @@ group("minimal") {
     "//src/lib:tests",
     "//src/performance:tests",
     "//src/power:tests",
+    "//src/starnix:tests",
     "//src/storage:tests",
     "//src/sys:tests",
     "//src/ui:tests",
