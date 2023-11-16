@@ -33,7 +33,7 @@ The majority of users will be using this local test execution method for test
 development.
 ```shell
 $ fx test //src/testing/end_to_end/mobly_driver/tests/functional_tests/smoke_test --e2e --output
-$ fx test //src/testing/end_to_end/mobly_driver/tests/functional_tests/test_honeydew_integration --e2e --output
+$ fx test //src/testing/end_to_end/mobly_driver/tests/functional_tests/test_honeydew_integration_fc --e2e --output
 ```
 
 ## Infra mode

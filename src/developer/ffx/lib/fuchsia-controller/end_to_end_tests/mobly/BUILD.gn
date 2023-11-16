@@ -22,6 +22,7 @@ python_mobly_test("target_identity_tests") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  transport = "fuchsia-controller"
   environments = [ emu_env ]
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
@@ -39,6 +40,7 @@ python_mobly_test("reboot_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  transport = "fuchsia-controller"
   environments = [ emu_env ]
   deps = [
     "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
@@ -59,6 +61,7 @@ python_mobly_test("tracing_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  transport = "fuchsia-controller"
   environments = [ emu_env ]
   deps = [
     ":tracing_runtime_deps",
@@ -74,6 +77,7 @@ python_mobly_test("multi_device_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/mobly_controller",
   ]
+  transport = "fuchsia-controller"
   multi_fuchsia_device = true
   deps = [
     ":tracing_runtime_deps",

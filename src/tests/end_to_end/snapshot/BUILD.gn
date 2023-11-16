@@ -6,7 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("snapshot_test") {
+  python_mobly_test("snapshot_test_sl4f") {
     main_source = "snapshot_test.py"
     libraries = [
       "//src/testing/end_to_end/honeydew",
@@ -14,6 +14,7 @@ if (is_host) {
     ]
 
     params_source = "params.yaml"
+    transport = "sl4f"
 
     environments = [ emu_env ]
   }

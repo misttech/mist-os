@@ -6,7 +6,7 @@ import("//build/python/python_mobly_test.gni")
 import("//build/testing/environments.gni")
 
 if (is_host) {
-  python_mobly_test("bluetooth_avrcp_test") {
+  python_mobly_test("bluetooth_avrcp_test_sl4f") {
     main_source = "bluetooth_avrcp_test.py"
 
     # The library below provides device interaction APIs.
@@ -18,6 +18,7 @@ if (is_host) {
 
     deps = [ "//src/tests/end_to_end/connectivity/bluetooth:bluetooth_utils" ]
     params_source = "params.yaml"
+    transport = "sl4f"
     environments = [
       sherlock_env,
       vim3_env,
@@ -27,5 +28,5 @@ if (is_host) {
 
 group("e2e_avrcp_test") {
   testonly = true
-  public_deps = [ ":bluetooth_avrcp_test($host_toolchain)" ]
+  public_deps = [ ":bluetooth_avrcp_test_sl4f($host_toolchain)" ]
 }
