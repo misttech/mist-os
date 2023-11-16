@@ -24,6 +24,9 @@ const MAX_COUNT_DUPLICATES uint32 = 64;
 @available(added=HEAD)
 const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 
+@available(added=HEAD)
+const MAX_CLIENT_NAME_LENGTH int32 = 256;
+
 // A protocol mixin for all nodes in the tree established by
 // `BufferCollectionToken` creation and `BufferCollectionTokenGroup` creation,
 // including `BufferCollectionToken`(s) which have since been converted to a
@@ -150,7 +153,7 @@ closed protocol Node {
     ///
     /// All table fields are currently required.
     strict SetDebugClientInfo(table {
-        1: name string:64;
+        1: name string:MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
 

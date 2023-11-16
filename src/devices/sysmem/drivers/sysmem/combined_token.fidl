@@ -125,7 +125,7 @@ closed protocol CombinedBufferCollectionToken {
     });
     @selector("fuchsia.sysmem2/Node.SetDebugClientInfo")
     strict SetDebugClientInfoV2(table {
-        1: name string:64;
+        1: name string:fuchsia.sysmem2.MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
     @selector("fuchsia.sysmem2/Node.SetDebugTimeoutLogDeadline")

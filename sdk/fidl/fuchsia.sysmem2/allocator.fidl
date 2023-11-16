@@ -130,7 +130,7 @@ closed protocol Allocator {
     /// allocator. It does not affect BufferCollectionTokens, since they are
     /// often passed cross-process and should have their names managed manually.
     strict SetDebugClientInfo(table {
-        1: name string:64;
+        1: name string:MAX_CLIENT_NAME_LENGTH;
         2: id uint64;
     });
 
