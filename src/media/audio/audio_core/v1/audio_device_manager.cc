@@ -46,7 +46,7 @@ zx_status_t AudioDeviceManager::Init() {
 
   // Start monitoring for plug/unplug events of pluggable audio output devices.
   zx_status_t res =
-      plug_detector_->Start(fit::bind_member<&AudioDeviceManager::AddDeviceByChannel>(this));
+      plug_detector_->Start(fit::bind_member<&AudioDeviceManager::AddDeviceFromDevFs>(this));
   if (res != ZX_OK) {
     FX_PLOGS(ERROR, res) << "AudioDeviceManager failed to start plug detector";
     return res;
@@ -468,13 +468,35 @@ void AudioDeviceManager::UpdateDefaultDevice(bool input) {
   }
 }
 
+// The entry point from AudioDeviceEnumerator FIDL method
 void AudioDeviceManager::AddDeviceByChannel(
     std::string device_name, bool is_input,
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) {
-  TRACE_DURATION("audio", "AudioDeviceManager::AddDeviceByChannel");
+  if constexpr (kLogAddRemoveDevice) {
+    FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name
+                  << "' from AudioDeviceEnumerator";
+  }
+  AddDeviceInternal(device_name, is_input, std::move(stream_config));
+}
+
+// The entry point from PlugDetector device-watcher (devfs)
+void AudioDeviceManager::AddDeviceFromDevFs(
+    const std::string& device_name, bool is_input,
+    fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) {
   if constexpr (kLogAddRemoveDevice) {
     FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name << "'";
   }
+  AddDeviceInternal(device_name, is_input, std::move(stream_config));
+}
+
+// The common code, once these parallel device-discovery streams come together.
+void AudioDeviceManager::AddDeviceInternal(
+    const std::string& device_name, bool is_input,
+    fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) {
+  if constexpr (kLogAddRemoveDevice) {
+    FX_LOGS(INFO) << __FUNCTION__ << (is_input ? ": Input '" : ": Output '") << device_name << "'";
+  }
+  TRACE_DURATION("audio", "AudioDeviceManager::AddDeviceByChannel");
 
   // Hand the stream off to the proper type of class to manage.
   std::shared_ptr<AudioDevice> new_device;

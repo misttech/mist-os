@@ -94,9 +94,15 @@ class AudioDeviceManager : public fuchsia::media::AudioDeviceEnumerator, public 
   void GetDeviceGain(uint64_t device_token, GetDeviceGainCallback cbk) final;
   void SetDeviceGain(uint64_t device_token, fuchsia::media::AudioGainInfo gain_info,
                      fuchsia::media::AudioGainValidFlags) final;
-  void AddDeviceByChannel(
+  inline void AddDeviceByChannel(
       std::string device_name, bool is_input,
       fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config) final;
+  inline void AddDeviceFromDevFs(
+      const std::string& device_name, bool is_input,
+      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config);
+  void AddDeviceInternal(
+      const std::string& device_name, bool is_input,
+      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config);
 
  private:
   // Find the most-recently plugged device (per type: input or output) excluding throttle_output. If

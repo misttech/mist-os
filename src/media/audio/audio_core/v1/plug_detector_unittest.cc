@@ -74,7 +74,7 @@ class DeviceTracker {
     fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> stream_config;
   };
 
-  fit::function<void(std::string, bool,
+  fit::function<void(const std::string&, bool,
                      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig>)>
   GetHandler() {
     return [this](auto name, auto is_input, auto stream_config) {
