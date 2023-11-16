@@ -1,4 +1,0 @@
-//build/sdk/meta:meta
-//sdk/testing/sl4f/client:client_sdk
-//src/performance/trace2json:bin_sdk
-//src/sys/pkg/testing/fake-omaha-client:bin_sdk

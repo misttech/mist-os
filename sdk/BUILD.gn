@@ -56,7 +56,6 @@ group("sdk") {
 
   public_deps = _sdk_public_deps
   data_deps = [ ":sdk_source_set_list" ]
-  deps = [ ":sdk_atom_manifest_goldens($target_toolchain)" ]
 }
 
 # This file contains the list of all source files used in sdk_source_set()
@@ -69,14 +68,6 @@ build_api_module("sdk_source_set_list") {
   testonly = true
   data_keys = [ "sdk_source_set_sources" ]
   deps = _sdk_public_deps
-}
-
-# Create generated file for fidldoc to read.
-generated_file("all_fidl_sdk_json") {
-  deps = [ "//sdk/fidl" ]
-
-  outputs = [ "$root_build_dir/all_fidl_sdk_json.txt" ]
-  data_keys = [ "fidl_json" ]
 }
 
 # Compatibility testing goldens for SDK publishable FIDLs.
@@ -802,52 +793,6 @@ sdk_molecule("driver_atoms") {
   if (!sdk_no_host_tools) {
     deps += [ ":driver_host_tools" ]
   }
-}
-
-action("get_atoms_from_sdk_manifest") {
-  testonly = true
-
-  deps = []
-  inputs = []
-  outputs = []
-  sdk_manifests = []
-  foreach(dep, _sdk_public_deps) {
-    name = get_label_info(dep, "name")
-    copy_dep = dep + "_final_manifest"
-    foreach(output, get_target_outputs(copy_dep)) {
-      sdk_manifests += [ rebase_path(output, root_build_dir) ]
-      inputs += [ output ]
-    }
-    deps += [ copy_dep ]
-
-    outputs += [ "$target_gen_dir/$name" ]
-  }
-
-  script = "//sdk/ctf/build/scripts/get_atoms_from_sdk_manifest.py"
-
-  args = [ "--sdk_manifests" ]
-  args += sdk_manifests
-  args += [
-    "--output_path",
-    rebase_path(target_gen_dir, root_build_dir),
-  ]
-}
-
-golden_files("sdk_atom_manifest_goldens") {
-  testonly = true
-
-  comparisons = []
-  sdk_manifests = get_target_outputs(":get_atoms_from_sdk_manifest")
-  foreach(manifest, sdk_manifests) {
-    name = get_path_info(manifest, "name")
-    comparisons += [
-      {
-        golden = "//sdk/manifests/atoms/${name}.golden"
-        candidate = manifest
-      },
-    ]
-  }
-  deps = [ ":get_atoms_from_sdk_manifest($target_toolchain)" ]
 }
 
 # These markers are used to define dependencies on FIDL bindings
