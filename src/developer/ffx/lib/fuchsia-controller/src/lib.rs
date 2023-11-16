@@ -455,6 +455,46 @@ pub unsafe extern "C" fn ffx_channel_create(
     unsafe { *out1 = ch1.into_raw() };
 }
 
+#[no_mangle]
+pub unsafe extern "C" fn ffx_config_get_string(
+    ctx: *const EnvContext,
+    config_key: *const u8,
+    config_key_len: u64,
+    out_buf: *mut u8,
+    out_buf_len: *mut u64,
+) -> zx_status::Status {
+    if ctx == std::ptr::null()
+        || config_key == std::ptr::null()
+        || out_buf == std::ptr::null_mut()
+        || out_buf_len == std::ptr::null_mut()
+    {
+        return zx_status::Status::INVALID_ARGS;
+    }
+    let ctx = unsafe { get_arc(ctx) };
+    let (tx, rx) = mpsc::sync_channel(1);
+    let config_key = unsafe { std::slice::from_raw_parts(config_key, config_key_len as usize) };
+    let config_key_str = match std::str::from_utf8(config_key) {
+        Ok(s) => s.to_owned(),
+        Err(e) => {
+            ctx.write_err(e);
+            return zx_status::Status::INTERNAL;
+        }
+    };
+    ctx.lib_ctx().run(LibraryCommand::ConfigGetString {
+        responder: tx,
+        env_ctx: ctx.clone(),
+        config_key: config_key_str,
+        out_buf: ExtBuffer::new(out_buf, unsafe { *out_buf_len } as usize),
+    });
+    match rx.recv().unwrap() {
+        Ok(size) => {
+            safe_write(out_buf_len, size as u64);
+            zx_status::Status::OK
+        }
+        Err(e) => e,
+    }
+}
+
 // LINT.ThenChange(../cpp/abi/fuchsia_controller.h)
 
 #[cfg(test)]

@@ -507,6 +507,37 @@ PyObject *context_connect_device_proxy(PyObject *self, PyObject *args) {
   return MakePyObject<PythonChannel>(handle);
 }
 
+PyObject *context_config_get_string(PyObject *self, PyObject *args) {
+  PyObject *obj = nullptr;
+  Py_ssize_t key_len;
+  const char *key = nullptr;
+  if (!PyArg_ParseTuple(args, "Oz#", &obj, &key, &key_len)) {
+    return nullptr;
+  }
+  auto context = DowncastPyObject<PythonContext>(obj);
+  if (!context) {
+    PyErr_SetString(PyExc_TypeError, "Expected a Context.");
+    return nullptr;
+  }
+  uint64_t buf_size = 4096;
+  char buf[buf_size];
+  if (zx_status_t res = ffx_config_get_string(context->context(), key,
+                                              static_cast<uint64_t>(key_len), buf, &buf_size);
+      res != ZX_OK) {
+    switch (res) {
+      case ZX_ERR_BUFFER_TOO_SMALL:
+        PyErr_SetString(PyExc_BufferError, "config key larger than 4096 characters");
+        break;
+      case ZX_ERR_NOT_FOUND:
+        Py_RETURN_NONE;
+      default:
+        mod::dump_python_err();
+    }
+    return nullptr;
+  }
+  return PyUnicode_FromStringAndSize(buf, static_cast<Py_ssize_t>(buf_size));
+}
+
 PyObject *connect_handle_notifier(PyObject *self, PyObject *Py_UNUSED(arg)) {
   auto descriptor = ffx_connect_handle_notifier(mod::get_module_state()->ctx);
   if (descriptor <= 0) {
@@ -868,6 +899,8 @@ PyMethodDef FuchsiaControllerMethods[] = {
      reinterpret_cast<PyCFunction>(context_connect_remote_control_proxy), METH_VARARGS, nullptr},
     {"context_target_wait", reinterpret_cast<PyCFunction>(context_target_wait), METH_VARARGS,
      nullptr},
+    {"context_config_get_string", reinterpret_cast<PyCFunction>(context_config_get_string),
+     METH_VARARGS, nullptr},
 
     // v2 methods for channel
     {"channel_read", reinterpret_cast<PyCFunction>(channel_read), METH_VARARGS, nullptr},

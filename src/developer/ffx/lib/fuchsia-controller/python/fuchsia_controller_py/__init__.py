@@ -205,6 +205,22 @@ class Context:
             )
         )
 
+    def config_get_string(self, key) -> str:
+        """Looks up a string from the context's config environment.
+
+        This is the same config that ffx uses. If there is an IsolateDir in use,
+        then the config will be derived from there, else it will be
+        autodetected using the same mechanism as ffx.
+
+        Returns:
+            The string value iff the key points to an existing value in the
+            config, and said value can be converted into a string.
+            Otherwise None is returned.
+        """
+        return fuchsia_controller_internal.context_config_get_string(
+            self._handle, key
+        )
+
     def connect_device_proxy(
         self, moniker: str, capability_name: str
     ) -> "Channel":
