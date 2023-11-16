@@ -278,11 +278,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/libmsd_vsi.cm" ]
     },
     {
-      package_target = "//src/devices/rtc/drivers/nxp:pcf8563"
-      package_set = "base"
-      driver_components = [ "meta/pcf8563.cm" ]
-    },
-    {
       package_target = "//src/connectivity/bluetooth/hci/transport/uart"
       package_set = "base"
       driver_components = [ "meta/bt-transport-uart.cm" ]
@@ -330,5 +325,11 @@ board_input_bundle("vulkan_arm_mali") {
 }
 
 board_input_bundle("rtc_driver") {
-  drivers = []
+  drivers = [
+    {
+      package_target = "//src/devices/rtc/drivers/nxp:pcf8563"
+      package_set = "base"
+      driver_components = [ "meta/pcf8563.cm" ]
+    },
+  ]
 }
