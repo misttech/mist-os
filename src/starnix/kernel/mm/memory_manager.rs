@@ -1759,15 +1759,11 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 impl MemoryAccessor for MemoryManager {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            match usercopy.copyin(addr.ptr(), bytes) {
-                Ok(()) => Ok(()),
-                Err(n) => {
-                    if n != bytes.len() {
-                        error!(EFAULT)
-                    } else {
-                        Ok(())
-                    }
-                }
+            let num_copied = usercopy.copyin(addr.ptr(), bytes);
+            if num_copied == bytes.len() {
+                Ok(())
+            } else {
+                error!(EFAULT)
             }
         } else {
             self.vmo_read_memory(addr, bytes)
@@ -1788,15 +1784,11 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            match usercopy.copyin_until_null_byte(addr.ptr(), bytes) {
-                Ok(()) => Ok(bytes.len()),
-                Err(n) => {
-                    if !bytes.is_empty() && n == 0 {
-                        error!(EFAULT)
-                    } else {
-                        Ok(n)
-                    }
-                }
+            let num_copied = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
+            if num_copied == 0 && !bytes.is_empty() {
+                error!(EFAULT)
+            } else {
+                Ok(num_copied)
             }
         } else {
             self.vmo_read_memory_partial(addr, bytes)
@@ -1809,15 +1801,11 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            match usercopy.copyin(addr.ptr(), bytes) {
-                Ok(()) => Ok(bytes.len()),
-                Err(n) => {
-                    if !bytes.is_empty() && n == 0 {
-                        error!(EFAULT)
-                    } else {
-                        Ok(n)
-                    }
-                }
+            let num_copied = usercopy.copyin(addr.ptr(), bytes);
+            if num_copied == 0 && !bytes.is_empty() {
+                error!(EFAULT)
+            } else {
+                Ok(num_copied)
             }
         } else {
             self.vmo_read_memory_partial(addr, bytes)
@@ -1834,15 +1822,11 @@ impl MemoryAccessor for MemoryManager {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            match usercopy.copyout(bytes, addr.ptr()) {
-                Ok(()) => Ok(bytes.len()),
-                Err(n) => {
-                    if n != bytes.len() {
-                        error!(EFAULT)
-                    } else {
-                        Ok(n)
-                    }
-                }
+            let num_copied = usercopy.copyout(bytes, addr.ptr());
+            if num_copied != bytes.len() {
+                error!(EFAULT)
+            } else {
+                Ok(num_copied)
             }
         } else {
             self.vmo_write_memory(addr, bytes)
@@ -1855,15 +1839,11 @@ impl MemoryAccessor for MemoryManager {
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
-            match usercopy.copyout(bytes, addr.ptr()) {
-                Ok(()) => Ok(bytes.len()),
-                Err(n) => {
-                    if !bytes.is_empty() && n == 0 {
-                        error!(EFAULT)
-                    } else {
-                        Ok(n)
-                    }
-                }
+            let num_copied = usercopy.copyout(bytes, addr.ptr());
+            if num_copied == 0 && !bytes.is_empty() {
+                error!(EFAULT)
+            } else {
+                Ok(num_copied)
             }
         } else {
             self.vmo_write_memory_partial(addr, bytes)
