@@ -206,7 +206,7 @@ Further reading:
 [doc-lifecycle]: /docs/concepts/components/v2/lifecycle.md
 [doc-realm-builder]: /docs/development/testing/components/realm_builder.md
 [doc-realms]: /docs/concepts/components/v2/realms.md
-[doc-runners]: /docs/concepts/components/v2/capabilities/runners.md
-[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
+[doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
+[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
 [doc-topology]: /docs/concepts/components/v2/topology.md
 [doc-packages]: /docs/concepts/packages/package.md

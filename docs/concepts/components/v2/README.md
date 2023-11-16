@@ -25,9 +25,9 @@ Components are the basic unit of executable software on Fuchsia.
 
 ## Extending the component framework
 
--   [Runners](capabilities/runners.md): Instantiate components; add support for
+-   [Runners](capabilities/runner.md): Instantiate components; add support for
     more runtimes.
--   [Resolvers](capabilities/resolvers.md): Find components from URLs; add
+-   [Resolvers](capabilities/resolver.md): Find components from URLs; add
     support for methods of software packaging and distribution.
 
 ## Internals

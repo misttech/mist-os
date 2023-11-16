@@ -1835,7 +1835,7 @@
   necessary processes, loading executable code, initializing language runtimes, handing control to
   the component's entry points, and terminating thecomponent when requested by the component framework."
   see_also: ["<a href=\"/docs/concepts/components/v2/elf_runner.md\">ELF runner</a>",
-             "<a href=\"/docs/concepts/components/v2/capabilities/runners.md\">Component runner</a>"]
+             "<a href=\"/docs/concepts/components/v2/capabilities/runner.md\">Component runner</a>"]
   related_guides: [""]
   area: ["Component Framework", "System"]
 

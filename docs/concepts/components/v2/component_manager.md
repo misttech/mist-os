@@ -61,6 +61,6 @@ components can implement to integrate new functionality with their
 [doc-capability-routing]: /docs/concepts/components/v2/topology.md#capability-routing
 [doc-environments]: /docs/concepts/components/v2/environments.md
 [doc-lifecycle]: lifecycle.md
-[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
-[doc-runners]: /docs/concepts/components/v2/capabilities/runners.md
+[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
+[doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
 [doc-topology]: /docs/concepts/components/v2/topology.md

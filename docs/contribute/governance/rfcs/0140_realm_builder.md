@@ -1129,8 +1129,8 @@ offer/expose API, and this approach results in a slightly simpler API.
 
 [realm-builder-docs]: /docs/development/testing/components/realm_builder.md
 [realm-docs]: /docs/concepts/components/v2/realms.md
-[resolver-docs]: /docs/concepts/components/v2/capabilities/resolvers.md
-[runner-docs]: /docs/concepts/components/v2/capabilities/runners.md
+[resolver-docs]: /docs/concepts/components/v2/capabilities/resolver.md
+[runner-docs]: /docs/concepts/components/v2/capabilities/runner.md
 [test-manager-lib-rs]: /src/sys/test_manager/src/lib.rs
 [lifecycle-controller]: https://fuchsia.dev/reference/fidl/fuchsia.sys2#LifecycleController
 [collection]: /docs/concepts/components/v2/realms.md#collections

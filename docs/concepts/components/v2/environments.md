@@ -37,7 +37,7 @@ strategy for executing their components, including:
 -   Execute the component as a job on a remote computer.
 
 For more details on using and implementing runners, see
-[runner capabilities](capabilities/runners.md).
+[runner capabilities](capabilities/runner.md).
 
 ### Resolvers {#resolvers}
 
@@ -52,7 +52,7 @@ returns a [`fuchsia.io.Directory`][fidl-directory] handle representing the
 package directory.
 
 For more details on using and implementing resolvers, see
-[resolver capabilities](capabilities/resolvers.md).
+[resolver capabilities](capabilities/resolver.md).
 
 ## Declaring {#declaring}
 
@@ -122,7 +122,7 @@ sub-realm decides to set a new environment with the runner absent).
 [doc-expose]: https://fuchsia.dev/reference/cml#expose
 [doc-offer]: https://fuchsia.dev/reference/cml#offer
 [doc-realms]: ./realms.md
-[doc-runners]: ./capabilities/runners.md
+[doc-runners]: ./capabilities/runner.md
 [doc-use]: https://fuchsia.dev/reference/cml#use
 [elf-runner]: /docs/concepts/components/v2/elf_runner.md
 [fidl-directory]: /sdk/fidl/fuchsia.io/directory.fidl

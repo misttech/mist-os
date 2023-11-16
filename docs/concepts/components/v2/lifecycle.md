@@ -121,8 +121,8 @@ Note: For more details on running components during development, see
 [doc-manifests-expose]: https://fuchsia.dev/reference/cml#expose
 [doc-manifests-offer]: https://fuchsia.dev/reference/cml#offer
 [doc-manifests]: component_manifests.md
-[doc-resolvers]: capabilities/resolvers.md
-[doc-runners]: capabilities/runners.md
+[doc-resolvers]: capabilities/resolver.md
+[doc-runners]: capabilities/runner.md
 [doc-storage]: capabilities/storage.md
 [doc-run]: /docs/development/components/run.md
 [handler-example]: /examples/components/lifecycle

@@ -820,8 +820,8 @@ the cause:
 [doc-package-set]: /docs/concepts/packages/package.md#types_of_packages
 [doc-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
 [doc-realms]: /docs/concepts/components/v2/realms.md
-[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
-[doc-runners]: /docs/concepts/components/v2/capabilities/runners.md
+[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
+[doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
 [elf-lifecycle]: /docs/concepts/components/v2/elf_runner.md#lifecycle
 [example-lifecycle]: /examples/components/lifecycle/
 [example-routing]: /examples/components/routing/

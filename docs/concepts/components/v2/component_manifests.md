@@ -51,8 +51,8 @@ using the [`Component`][fidl-component-decl] FIDL table.
 The framework calls a [component resolver][capability-resolver] to retrieve a
 component declaration from a component URL.
 
-[capability-resolver]: /docs/concepts/components/v2/capabilities/resolvers.md
-[capability-runner]: /docs/concepts/components/v2/capabilities/runners.md
+[capability-resolver]: /docs/concepts/components/v2/capabilities/resolver.md
+[capability-runner]: /docs/concepts/components/v2/capabilities/runner.md
 [doc-children]: /docs/concepts/components/v2/realms.md#child-component-instances
 [doc-capabilities]: /docs/concepts/components/v2/capabilities/README.md
 [doc-collections]: /docs/concepts/components/v2/realms.md#collections

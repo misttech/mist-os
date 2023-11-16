@@ -170,7 +170,7 @@ All fuzzers in that dependency graph will be made available to ClusterFuzz to se
 ClusterFuzz opens bugs, you can use its outputs to reproduce its findings.
 See [Handling results found through fuzzing](handle-results.md#clusterfuzz-bugs).
 
-[component-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
+[component-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
 [clusterfuzz]: https://google.github.io/clusterfuzz/
 [experimental_plugin]: /docs/development/tools/ffx/development/plugin-experimental.md
 [fuchsia-gn]: /docs/development/build/build_system/intro.md

@@ -640,8 +640,8 @@ controller, see [offering test capabilities](#routing-from-test).
 [offer]: https://fuchsia.dev/reference/cml#offer
 [realm-builder-shard]: /sdk/lib/sys/component/realm_builder_base.shard.cml
 [realms]: /docs/concepts/components/v2/realms.md
-[resolver]: /docs/concepts/components/v2/capabilities/resolvers.md
-[runner]: /docs/concepts/components/v2/capabilities/runners.md
+[resolver]: /docs/concepts/components/v2/capabilities/resolver.md
+[runner]: /docs/concepts/components/v2/capabilities/runner.md
 [shard-includes]: https://fuchsia.dev/reference/cml#include
 [test-runner]: /docs/development/testing/components/test_runner_framework.md#test-runners
 [use]: https://fuchsia.dev/reference/cml#use

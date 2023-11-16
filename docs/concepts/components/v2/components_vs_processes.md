@@ -27,7 +27,7 @@ instances.
 [processes]: /docs/reference/kernel_objects/process.md
 [task objects]: /docs/reference/kernel_objects/objects.md#tasks
 [component instances]: /docs/concepts/components/v2/topology.md#component-instances
-[component runners]: /docs/concepts/components/v2/capabilities/runners.md
+[component runners]: /docs/concepts/components/v2/capabilities/runner.md
 [ELF Runner]: /docs/concepts/components/v2/elf_runner.md
 [job]: /docs/reference/kernel_objects/job.md
 [threads]: /docs/reference/kernel_objects/thread.md

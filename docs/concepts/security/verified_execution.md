@@ -271,7 +271,7 @@ Fuchsia’s standard unit of software *execution*. One consequence of this
 distinction is that most Fuchsia components do not interact directly with the
 SWD stack. Instead, the main customer of the SWD package resolver is the
 component framework, which contains a number of
-[component resolvers](/docs/concepts/components/v2/capabilities/resolvers.md)
+[component resolvers](/docs/concepts/components/v2/capabilities/resolver.md)
 that delegate to the SWD stack to load code and data. Some component resolvers
 are limited to base packages, and others may allow access to universe packages.
 Like other Fuchsia capabilities, these resolvers are routed in component

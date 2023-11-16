@@ -989,8 +989,8 @@ impl Right {
 /// [doc-protocol]: /docs/concepts/components/v2/capabilities/protocol.md
 /// [doc-directory]: /docs/concepts/components/v2/capabilities/directory.md
 /// [doc-storage]: /docs/concepts/components/v2/capabilities/storage.md
-/// [doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
-/// [doc-runners]: /docs/concepts/components/v2/capabilities/runners.md
+/// [doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
+/// [doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
 /// [doc-event]: /docs/concepts/components/v2/capabilities/event.md
 /// [doc-service]: /docs/concepts/components/v2/capabilities/service.md
 /// [doc-directory-rights]: /docs/concepts/components/v2/capabilities/directory#directory-capability-rights
@@ -1174,7 +1174,7 @@ pub struct Document {
     /// dictionary of key and value pairs. Refer to the specific runner being used to
     /// determine what keys it expects to receive, and how it interprets them.
     ///
-    /// [doc-runners]: /docs/concepts/components/v2/capabilities/runners.md
+    /// [doc-runners]: /docs/concepts/components/v2/capabilities/runner.md
     #[reference_doc(json_type = "object")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub program: Option<Program>,

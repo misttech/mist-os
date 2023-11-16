@@ -122,7 +122,7 @@ settings, following Fuchsia's design principle of
 
 In runtimes where the standard library offers access to some default locale, it
 is the responsibility of the
-[runner](/docs/concepts/components/v2/capabilities/runners.md) to retrieve the
+[runner](/docs/concepts/components/v2/capabilities/runner.md) to retrieve the
 needed values from the realm of the component being run. In most cases, the
 runner should call `fuchsia.intl.PropertyProvider.GetProfile`.
 

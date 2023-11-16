@@ -137,7 +137,7 @@ Monikers may appear in system logs and the output of developer tools.
 [doc-manifests-declaration]: /docs/concepts/components/v2/component_manifests.md#component-declaration
 [doc-package]: /docs/concepts/packages/package.md
 [doc-subpackaging]: /docs/concepts/components/v2/subpackaging.md
-[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolvers.md
+[doc-resolvers]: /docs/concepts/components/v2/capabilities/resolver.md
 [moniker-reference]: /docs/reference/components/moniker.md
 [url-reference]: /docs/reference/components/url.md
 [test-hermeticity]: /docs/development/testing/components/test_runner_framework.md#hermeticity

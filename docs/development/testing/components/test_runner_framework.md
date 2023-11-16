@@ -798,9 +798,9 @@ offer: [
 [loader-service]: /docs/concepts/process/program_loading.md#the_loader_service
 [manifests-offer]: https://fuchsia.dev/reference/cml#offer
 [manifests-use]: https://fuchsia.dev/reference/cml#use
-[resolvers]:  /docs/concepts/components/v2/capabilities/resolvers.md
+[resolvers]:  /docs/concepts/components/v2/capabilities/resolver.md
 [restricted-logs]: /docs/development/diagnostics/test_and_logs.md#restricting_log_severity
-[runners]: /docs/concepts/components/v2/capabilities/runners.md
+[runners]: /docs/concepts/components/v2/capabilities/runner.md
 [Starnix tests]: /src/sys/testing/meta/starnix-tests.shard.cml
 [subpackages]: /docs/concepts/components/v2/subpackaging.md
 [System Validation Tests]: /src/testing/system-validation/meta/system_validation_test_realm.shard.cml

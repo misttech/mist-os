@@ -117,7 +117,7 @@ start][ffx-start].
 [GetIcdList]: https://fuchsia.dev/reference/fidl/fuchsia.gpu.magma#Device.GetIcdList
 [VMO]: /docs/glossary.md#virtual-memory-object
 [ICD]: /docs/concepts/packages/system.md#vulkan-icd
-[runner]: /docs/concepts/components/v2/capabilities/runners.md
+[runner]: /docs/concepts/components/v2/capabilities/runner.md
 [component]: /docs/glossary.md#component
 [package]: /docs/concepts/packages/package.md
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
