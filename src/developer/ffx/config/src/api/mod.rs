@@ -37,7 +37,7 @@ where
 }
 
 impl From<ConfigError> for std::convert::Infallible {
-    fn from(_value: ConfigError) -> Self {
-        panic!("never going to happen")
+    fn from(value: ConfigError) -> Self {
+        panic!("cannot convert value into `Infallible`: {value:#}")
     }
 }
