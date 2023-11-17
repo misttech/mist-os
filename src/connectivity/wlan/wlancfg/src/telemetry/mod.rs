@@ -2411,8 +2411,6 @@ impl StatsLogger {
 
     async fn log_active_scan_requested_cobalt_metrics(&mut self, num_ssids_requested: usize) {
         use metrics::ActiveScanRequestedForNetworkSelectionMigratedMetricDimensionActiveScanSsidsRequested as ActiveScanSsidsRequested;
-        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-        #[allow(unreachable_patterns)]
         let active_scan_ssids_requested_dim = match num_ssids_requested {
             0 => ActiveScanSsidsRequested::Zero,
             1 => ActiveScanSsidsRequested::One,
@@ -2422,11 +2420,6 @@ impl StatsLogger {
             21..=50 => ActiveScanSsidsRequested::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
-            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-            _ => {
-                error!("unreachable value for ActiveScanSsidsRequested");
-                return ();
-            }
         };
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
@@ -2442,8 +2435,6 @@ impl StatsLogger {
         num_ssids_requested: usize,
     ) {
         use metrics::ActiveScanRequestedForPolicyApiMetricDimensionActiveScanSsidsRequested as ActiveScanSsidsRequested;
-        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-        #[allow(unreachable_patterns)]
         let active_scan_ssids_requested_dim = match num_ssids_requested {
             0 => ActiveScanSsidsRequested::Zero,
             1 => ActiveScanSsidsRequested::One,
@@ -2453,11 +2444,6 @@ impl StatsLogger {
             21..=50 => ActiveScanSsidsRequested::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsRequested::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsRequested::OneHundredAndOneOrMore,
-            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-            _ => {
-                error!("unreachable value for ActiveScanSsidsRequested");
-                return ();
-            }
         };
         log_cobalt_1dot1!(
             self.cobalt_1dot1_proxy,
@@ -2477,8 +2463,6 @@ impl StatsLogger {
 
         // Count the total number of saved networks
         use metrics::SavedNetworksMigratedMetricDimensionSavedNetworks as SavedNetworksCount;
-        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-        #[allow(unreachable_patterns)]
         let num_networks = match saved_network_count {
             0 => SavedNetworksCount::Zero,
             1 => SavedNetworksCount::One,
@@ -2486,11 +2470,6 @@ impl StatsLogger {
             5..=40 => SavedNetworksCount::FiveToForty,
             41..=500 => SavedNetworksCount::FortyToFiveHundred,
             501.. => SavedNetworksCount::FiveHundredAndOneOrMore,
-            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-            _ => {
-                error!("unreachable value for SavedNetworksCount");
-                return ();
-            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SAVED_NETWORKS_MIGRATED_METRIC_ID,
@@ -2501,8 +2480,6 @@ impl StatsLogger {
         // Count the number of configs for each saved network
         use metrics::SavedConfigurationsForSavedNetworkMigratedMetricDimensionSavedConfigurations as ConfigCountDimension;
         for config_count in config_count_per_saved_network {
-            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-            #[allow(unreachable_patterns)]
             let num_configs = match config_count {
                 0 => ConfigCountDimension::Zero,
                 1 => ConfigCountDimension::One,
@@ -2510,11 +2487,6 @@ impl StatsLogger {
                 5..=40 => ConfigCountDimension::FiveToForty,
                 41..=500 => ConfigCountDimension::FortyToFiveHundred,
                 501.. => ConfigCountDimension::FiveHundredAndOneOrMore,
-                // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-                _ => {
-                    error!("unreachable value for ConfigCountDimension");
-                    return ();
-                }
             };
             metric_events.push(MetricEvent {
                 metric_id: metrics::SAVED_CONFIGURATIONS_FOR_SAVED_NETWORK_MIGRATED_METRIC_ID,
@@ -2551,8 +2523,6 @@ impl StatsLogger {
         use metrics::SavedNetworkInScanResultMigratedMetricDimensionBssCount as BssCount;
         for bss_count in bss_count_per_saved_network {
             // Record how many BSSs are visible in the scan results for this saved network.
-            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-            #[allow(unreachable_patterns)]
             let bss_count_metric = match bss_count {
                 0 => BssCount::Zero, // The ::Zero enum exists, but we shouldn't get a scan result with no BSS
                 1 => BssCount::One,
@@ -2560,11 +2530,6 @@ impl StatsLogger {
                 5..=10 => BssCount::FiveToTen,
                 11..=20 => BssCount::ElevenToTwenty,
                 21.. => BssCount::TwentyOneOrMore,
-                // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-                _ => {
-                    error!("unreachable value for BssCount");
-                    return ();
-                }
             };
             metric_events.push(MetricEvent {
                 metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_MIGRATED_METRIC_ID,
@@ -2574,8 +2539,6 @@ impl StatsLogger {
         }
 
         use metrics::ScanResultsReceivedMigratedMetricDimensionSavedNetworksCount as SavedNetworkCount;
-        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-        #[allow(unreachable_patterns)]
         let saved_network_count_metric = match saved_network_count {
             0 => SavedNetworkCount::Zero,
             1 => SavedNetworkCount::One,
@@ -2583,11 +2546,6 @@ impl StatsLogger {
             5..=20 => SavedNetworkCount::FiveToTwenty,
             21..=40 => SavedNetworkCount::TwentyOneToForty,
             41.. => SavedNetworkCount::FortyOneOrMore,
-            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-            _ => {
-                error!("unreachable value for SavedNetworkCount");
-                return ();
-            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SCAN_RESULTS_RECEIVED_MIGRATED_METRIC_ID,
@@ -2596,8 +2554,6 @@ impl StatsLogger {
         });
 
         use metrics::SavedNetworkInScanResultWithActiveScanMigratedMetricDimensionActiveScanSsidsObserved as ActiveScanSsidsObserved;
-        // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-        #[allow(unreachable_patterns)]
         let actively_scanned_networks_metrics = match saved_network_count_found_by_active_scan {
             0 => ActiveScanSsidsObserved::Zero,
             1 => ActiveScanSsidsObserved::One,
@@ -2607,11 +2563,6 @@ impl StatsLogger {
             21..=50 => ActiveScanSsidsObserved::TwentyOneToFifty,
             51..=100 => ActiveScanSsidsObserved::FiftyOneToOneHundred,
             101.. => ActiveScanSsidsObserved::OneHundredAndOneOrMore,
-            // TODO(fxbug.dev/135200): remove unreachable match arm once rustc handles open ranges on usize types
-            _ => {
-                error!("unreachable value for ActiveScanSsidsObserved");
-                return ();
-            }
         };
         metric_events.push(MetricEvent {
             metric_id: metrics::SAVED_NETWORK_IN_SCAN_RESULT_WITH_ACTIVE_SCAN_MIGRATED_METRIC_ID,
@@ -3145,8 +3096,6 @@ impl StatsLogger {
     ) {
         let fulfilled_requests_dim = {
             use metrics::ConnectivityWlanMetricDimensionScanRequestsFulfilled::*;
-            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-            #[allow(unreachable_patterns)]
             match fulfilled_requests {
                 0 => Zero,
                 1 => One,
@@ -3155,14 +3104,10 @@ impl StatsLogger {
                 4 => Four,
                 5..=9 => FiveToNine,
                 10.. => TenOrMore,
-                // `usize` does not have a fixed maximum, so `_` is necessary to match exhaustively
-                _ => Unknown,
             }
         };
         let remaining_requests_dim = {
             use metrics::ConnectivityWlanMetricDimensionScanRequestsRemaining::*;
-            // FIXME(http://b/309552229): This can be removed after the rust compiler is rolled.
-            #[allow(unreachable_patterns)]
             match remaining_requests {
                 0 => Zero,
                 1 => One,
@@ -3172,8 +3117,6 @@ impl StatsLogger {
                 5..=9 => FiveToNine,
                 10..=14 => TenToFourteen,
                 15.. => FifteenOrMore,
-                // `usize` does not have a fixed maximum, so `_` is necessary to match exhaustively
-                _ => Unknown,
             }
         };
         log_cobalt_1dot1!(
