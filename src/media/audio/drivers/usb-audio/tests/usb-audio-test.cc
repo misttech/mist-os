@@ -724,7 +724,6 @@ TEST_F(UsbAudioTest, DISABLED_RingBufferPropertiesAndStartOk) {
 
   auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported driver_transfer_bytes (the minimum required lead time)
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.
@@ -955,7 +954,6 @@ TEST_F(UsbAudioTest, Unplug) {
 
   auto result = fidl::WireCall<audio_fidl::RingBuffer>(local)->GetProperties();
   ASSERT_OK(result.status());
-  ASSERT_EQ(result.value().properties.external_delay(), 0);
   // We don't know what the reported driver_transfer_bytes (the minimum required lead time)
   // is going to be as it will depend on hardware details, but we do know that
   // it will need to be greater than 0.

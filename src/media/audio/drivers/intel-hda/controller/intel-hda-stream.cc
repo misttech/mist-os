@@ -302,9 +302,8 @@ void IntelHDAStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fbl::AutoLock channel_lock(&channel_lock_);
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties properties(allocator);
-  properties.set_driver_transfer_bytes(driver_transfer_bytes_);
-  // Report this properly based on the codec path delay.
-  properties.set_external_delay(allocator, 0).set_needs_cache_flush_or_invalidate(true);
+  properties.set_driver_transfer_bytes(driver_transfer_bytes_)
+      .set_needs_cache_flush_or_invalidate(true);
   completer.Reply(std::move(properties));
 }
 
@@ -629,6 +628,7 @@ void IntelHDAStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
     fidl::Arena allocator;
     auto delay_info = audio_fidl::wire::DelayInfo::Builder(allocator);
     // No external delay information is provided by this driver.
+    // Report this properly based on the codec path delay.
     delay_info.internal_delay(internal_delay_nsec_);
     completer.Reply(delay_info.Build());
     return;

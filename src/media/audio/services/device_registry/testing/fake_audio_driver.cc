@@ -311,9 +311,6 @@ void FakeAudioDriver::GetProperties(
 
   fuchsia::hardware::audio::RingBufferProperties props = {};
 
-  if (external_delay_.has_value()) {
-    props.set_external_delay(external_delay_->to_nsecs());
-  }
   if (needs_cache_flush_or_invalidate_.has_value()) {
     props.set_needs_cache_flush_or_invalidate(*needs_cache_flush_or_invalidate_);
   }

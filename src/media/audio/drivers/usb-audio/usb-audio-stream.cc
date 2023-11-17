@@ -643,6 +643,7 @@ void UsbAudioStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
     fidl::Arena allocator;
     auto delay_info = audio_fidl::wire::DelayInfo::Builder(allocator);
     // No external delay information is provided by this driver.
+    // TODO(johngro): Report the actual external delay.
     delay_info.internal_delay(internal_delay_nsec_);
     completer.Reply(delay_info.Build());
     return;
@@ -741,10 +742,8 @@ void UsbAudioStream::GetProperties(StreamChannel::GetPropertiesCompleter::Sync& 
 void UsbAudioStream::GetProperties(GetPropertiesCompleter::Sync& completer) {
   fidl::Arena allocator;
   audio_fidl::wire::RingBufferProperties ring_buffer_properties(allocator);
-  ring_buffer_properties.set_driver_transfer_bytes(fifo_bytes_);
-  // TODO(johngro): Report the actual external delay.
-  ring_buffer_properties.set_external_delay(allocator, 0);
-  ring_buffer_properties.set_needs_cache_flush_or_invalidate(true);
+  ring_buffer_properties.set_driver_transfer_bytes(fifo_bytes_)
+      .set_needs_cache_flush_or_invalidate(true);
   completer.Reply(std::move(ring_buffer_properties));
 }
 

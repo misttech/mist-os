@@ -255,8 +255,8 @@ between the reception of a TDM frame and the rendering of that frame at the
 speakers themselves, then the external delay of this audio path is the time
 duration equivalent to 4 audio frames.
 
-External delay is reported in the `external_delay` field of a `RingBufferProperties`
-response to a `GetProperties`.  Drivers should make their best attempt to
+External delay is reported in the `external_delay` field of a `DelayInfo`
+response to a `WatchDelayInfo`.  Drivers should make their best attempt to
 accurately report the total of all of the sources of delay the driver knows about.
 Information about this delay can frequently be found in codec data sheets,
 dynamically reported as properties of codecs using protocols such as Intel HDA

@@ -531,7 +531,7 @@ TEST_F(AmlG12TdmDaiRingBufferTest, RingBufferProperties) {
   ASSERT_OK(ring_buffer_->GetProperties(&properties));
 
   EXPECT_EQ(properties.driver_transfer_bytes(), kFifoSize);
-  EXPECT_EQ(properties.external_delay(), 0);
+  EXPECT_FALSE(properties.has_external_delay());
   EXPECT_TRUE(properties.needs_cache_flush_or_invalidate());
 }
 

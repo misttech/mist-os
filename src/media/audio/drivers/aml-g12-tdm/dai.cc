@@ -385,9 +385,8 @@ void AmlG12TdmDai::ResetRingBuffer() {
 void AmlG12TdmDai::GetProperties(
     ::fuchsia::hardware::audio::RingBuffer::GetPropertiesCallback callback) {
   ::fuchsia::hardware::audio::RingBufferProperties prop;
-  prop.set_external_delay(0);
-  prop.set_driver_transfer_bytes(aml_audio_->fifo_depth());
-  prop.set_needs_cache_flush_or_invalidate(true);
+  prop.set_driver_transfer_bytes(aml_audio_->fifo_depth())
+      .set_needs_cache_flush_or_invalidate(true);
   callback(std::move(prop));
 }
 
