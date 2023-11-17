@@ -7,10 +7,8 @@ import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-config_data("enable-report-filing") {
-  for_pkg = "triage-detect"
-  sources = [ "configs/enable-filing.json" ]
-  outputs = [ "config.json" ]
+# TODO(b/287516299): Remove transitional labels
+group("enable-report-filing") {
 }
 
 rustc_library("lib") {

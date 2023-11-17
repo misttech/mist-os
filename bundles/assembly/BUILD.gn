@@ -1019,6 +1019,25 @@ assembly_input_bundle("feedback_low_memory_product_config") {
       [ "//src/developer/forensics:feedback_low_memory_product_config" ]
 }
 
+assembly_input_bundle("feedback_remote_device_id_provider") {
+  config_data_labels = [
+    "//src/developer/forensics:feedback_remote_device_id_provider_for_assembly",
+  ]
+}
+
+assembly_input_bundle("feedback_large_disk") {
+  config_data_labels =
+      [ "//src/developer/forensics:feedback_large_disk_product_config" ]
+}
+
+assembly_input_bundle("feedback_userdebug_config") {
+  config_data_labels = [ "//src/developer/forensics:feedback_userdebug_config" ]
+}
+
+assembly_input_bundle("feedback_user_config") {
+  config_data_labels = [ "//src/developer/forensics:feedback_user_config" ]
+}
+
 assembly_input_bundle("factory_reset_trigger") {
   base_packages = [ "//src/recovery/factory-reset-trigger" ]
   compiled_packages = [
@@ -1275,6 +1294,24 @@ assembly_input_bundle("minimal_userdebug") {
         {
           source = "//src/cobalt/bin/app/configs/userdebug_config.json"
           destination = "config.json"
+        },
+      ]
+    },
+    {
+      package_name = "triage-detect"
+      files = [
+        {
+          source = "//src/diagnostics/detect/configs/enable-filing.json"
+          destination = "config.json"
+        },
+      ]
+    },
+    {
+      package_name = "memory_monitor"
+      files = [
+        {
+          source = "//src/developer/memory/monitor/config/send_critical_pressure_crash_reports"
+          destination = "send_critical_pressure_crash_reports"
         },
       ]
     },

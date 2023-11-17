@@ -114,8 +114,6 @@ core_shard("memory_monitor_core_shard") {
   shard_file = "meta/memory_monitor.core_shard.cml"
 }
 
-config_data("userdebug_config") {
-  for_pkg = "memory_monitor"
-  sources = [ "config/send_critical_pressure_crash_reports" ]
-  outputs = [ "send_critical_pressure_crash_reports" ]
+# TODO(b/287516299): Remove transitional labels
+group("userdebug_config") {
 }

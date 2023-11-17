@@ -178,10 +178,6 @@ if (is_fuchsia) {
 
         # Support privacy switch
         "//src/settings/service:setui_service",
-
-        # Forensics and crash reporting
-        "//src/developer/forensics:user_configs",
-        "//src/developer/forensics:feedback_remote_device_id_provider",
       ]
 
   recovery_installer_packages =
@@ -235,6 +231,11 @@ if (is_fuchsia) {
       connectivity = {
         wlan = {
           legacy_privacy_support = true
+        }
+      }
+      forensics = {
+        feedback = {
+          remote_device_id_provider = true
         }
       }
       forward_variables_from(_storage_config, "*")

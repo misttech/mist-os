@@ -11,7 +11,13 @@ declare_args() {
   #   "LOCAL" - record log data locally to a file
   #   "DEVEL" - the non-prod environment for use in testing
   #   "PROD" - the production environment
-  cobalt_environment = "PROD"
+  #   false - use the default environment supplied by assembly
+  cobalt_environment = false
+}
+
+if (cobalt_environment != false && cobalt_environment != "PROD" &&
+    cobalt_environment != "DEVEL" && cobalt_environment != "LOCAL") {
+  assert(false, "Unknown cobalt_environment: $cobalt_environment")
 }
 
 # Generates the global_metrics_registry.pb file.
@@ -125,7 +131,7 @@ fuchsia_component("component-v2") {
 
 resource("cobalt_environment") {
   # Environment selection for cobalt.
-  if (cobalt_environment == "PROD") {
+  if (cobalt_environment == false || cobalt_environment == "PROD") {
     sources = [ "configs/prod_environment" ]
   } else if (cobalt_environment == "DEVEL") {
     sources = [ "configs/devel_environment" ]
@@ -175,11 +181,14 @@ fuchsia_package("cobalt") {
   deps = [
     ":analyzer_devel_public",
     ":analyzer_prod_public",
-    ":cobalt_environment",
     ":component-v2",
     ":shuffler_devel_public",
     ":shuffler_prod_public",
   ]
+
+  if (cobalt_environment != false) {
+    deps += [ ":cobalt_environment" ]
+  }
 }
 
 metrics_registry("testapp_metrics_registry") {

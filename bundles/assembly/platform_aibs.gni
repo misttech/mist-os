@@ -205,7 +205,11 @@ user_platform_aib_names =
       "battery_manager",
 
       # Forensics
+      "feedback_large_disk",
       "feedback_low_memory_product_config",
+      "feedback_remote_device_id_provider",
+      "feedback_user_config",
+      "feedback_userdebug_config",
 
       # Kernel Compression
       "kernel_anonymous_memory_compression",
