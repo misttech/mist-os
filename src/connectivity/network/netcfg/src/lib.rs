@@ -369,6 +369,8 @@ struct Config {
     pub interface_name_prefix: String,
     #[serde(default)]
     pub interface_naming_policy: Vec<interface::NamingRule>,
+    #[serde(default)]
+    pub interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 }
 
 impl Config {
@@ -596,6 +598,10 @@ pub struct NetCfg<'a> {
     // Policy configuration to determine the name of an interface.
     #[allow(unused)]
     interface_naming_policy: Vec<interface::NamingRule>,
+    // TODO(fxbug.dev/135110): Begin using configuration based provisioning
+    // Policy configuration to determine whether to provision an interface.
+    #[allow(unused)]
+    interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 }
 
 /// Returns a [`fnet_name::DnsServer_`] with a static source from a [`std::net::IpAddr`].
@@ -790,6 +796,7 @@ impl<'a> NetCfg<'a> {
         install_only: bool,
         interface_name_prefix: String,
         interface_naming_policy: Vec<interface::NamingRule>,
+        interface_provisioning_policy: Vec<interface::ProvisioningRule>,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
         let svc_dir = clone_namespace_svc().context("error cloning svc directory handle")?;
         let stack = svc_connect::<fnet_stack::StackMarker>(&svc_dir)
@@ -854,6 +861,7 @@ impl<'a> NetCfg<'a> {
             install_only,
             interface_name_prefix,
             interface_naming_policy,
+            interface_provisioning_policy,
         })
     }
 
@@ -2763,6 +2771,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         install_only,
         interface_name_prefix,
         interface_naming_policy,
+        interface_provisioning_policy,
     } = Config::load(config_data)?;
 
     let mut netcfg = NetCfg::new(
@@ -2774,6 +2783,7 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         install_only,
         interface_name_prefix,
         interface_naming_policy,
+        interface_provisioning_policy,
     )
     .await
     .context("error creating new netcfg instance")?;
@@ -3033,6 +3043,7 @@ mod tests {
                 install_only: false,
                 interface_name_prefix: String::new(),
                 interface_naming_policy: Default::default(),
+                interface_provisioning_policy: Default::default(),
             },
             ServerEnds {
                 stack: stack_server
@@ -4526,9 +4537,16 @@ mod tests {
         { "dynamic": "device_class" },
         { "static": "x" },
         { "dynamic": "normalized_mac" },
-        { "dynamic": "bus_type" },
+        {  "dynamic": "bus_type" },
         { "dynamic": "bus_path" }
-    ] } ]
+    ] } ],
+    "interface_provisioning_policy": [ {
+        "matchers": [ {"any": false } ],
+        "provisioning": "delegated"
+    }, {
+        "matchers": [ {"any": true } ],
+        "provisioning": "local"
+    } ]
 }
 "#;
 
@@ -4544,6 +4562,7 @@ mod tests {
             install_only,
             interface_name_prefix,
             interface_naming_policy,
+            interface_provisioning_policy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(vec!["8.8.8.8".parse::<std::net::IpAddr>().unwrap()], servers);
@@ -4610,6 +4629,18 @@ mod tests {
             ],
         }]);
         assert_eq!(interface_naming_policy, expected_naming_policy);
+
+        let expected_provisioning_policy = Vec::from([
+            interface::ProvisioningRule {
+                matchers: HashSet::from([interface::MatchingRule::Any(false)]),
+                provisioning: interface::ProvisioningAction::Delegated,
+            },
+            interface::ProvisioningRule {
+                matchers: HashSet::from([interface::MatchingRule::Any(true)]),
+                provisioning: interface::ProvisioningAction::Local,
+            },
+        ]);
+        assert_eq!(interface_provisioning_policy, expected_provisioning_policy);
     }
 
     #[test]
@@ -4638,6 +4669,7 @@ mod tests {
             install_only,
             interface_name_prefix,
             interface_naming_policy,
+            interface_provisioning_policy,
         } = Config::load_str(config_str).unwrap();
 
         assert_eq!(allowed_upstream_device_classes, Default::default());
@@ -4647,6 +4679,7 @@ mod tests {
         assert_eq!(install_only, false);
         assert_eq!(interface_name_prefix, "".to_string());
         assert_eq!(interface_naming_policy.len(), 0);
+        assert_eq!(interface_provisioning_policy.len(), 0);
     }
 
     #[test_case(
@@ -4688,6 +4721,7 @@ mod tests {
             install_only: _,
             interface_name_prefix: _,
             interface_naming_policy: _,
+            interface_provisioning_policy: _,
         } = Config::load_str(&config_str).unwrap();
 
         let expected_metrics = InterfaceMetrics { wlan_metric, eth_metric };
@@ -4926,6 +4960,40 @@ mod tests {
   "interface_naming_policy": [{
     "matchers": [ { "any": true } ],
     "naming_scheme": [ { "dynamic": "speling" } ]
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_provisioning_policy": [{
+    "matchers": [ { "any": true } ],
+    "speling": ""
+  }]
+}
+"#,
+            r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_provisioning_policy": [{
+    "matchers": [ { "any": true } ],
+    "provisioning": "speling"
   }]
 }
 "#,

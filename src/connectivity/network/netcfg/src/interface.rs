@@ -620,6 +620,36 @@ impl NamingRule {
     }
 }
 
+/// Whether the interface should be provisioned locally by netcfg, or
+/// delegated. Provisioning is the set of events that occurs after
+/// interface enumeration, such as starting a DHCP client and assigning
+/// an IP to the interface. Provisioning actions work to support
+/// Internet connectivity.
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub enum ProvisioningAction {
+    /// Netcfg will provision the interface
+    Local,
+    /// Netcfg will not provision the interface. The provisioning
+    /// of the interface will occur elsewhere
+    Delegated,
+}
+
+/// A rule that dictates how interfaces that align with the property matching
+/// rules should be provisioned.
+#[derive(Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase")]
+pub struct ProvisioningRule {
+    /// A set of rules to check against an interface's properties. All rules
+    /// must apply for the provisioning action to take effect.
+    #[allow(unused)]
+    pub matchers: HashSet<MatchingRule>,
+    /// The provisioning policy that netcfg applies to a matching
+    /// interface.
+    #[allow(unused)]
+    pub provisioning: ProvisioningAction,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
