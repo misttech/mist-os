@@ -79,7 +79,7 @@ template("config_data") {
       }
     }
 
-    deps = []
+    deps = [ "//build/validate:config_data_tag" ]
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }

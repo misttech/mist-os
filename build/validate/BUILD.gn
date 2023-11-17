@@ -7,3 +7,13 @@
 # build to fail.
 group("non_production_tag") {
 }
+
+# This is added to all config_data targets so that targets can assert_no_deps
+# that any transitive dependency includes config_data.
+group("config_data_tag") {
+}
+
+# This is added to all fuchsia_shell_package targets so that targets can
+# assert_no_deps that any transitive dependency includes a shell package.
+group("shell_command_tag") {
+}

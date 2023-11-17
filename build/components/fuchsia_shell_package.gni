@@ -67,6 +67,7 @@ template("fuchsia_shell_package") {
       if (defined(component_target)) {
         deps += [ ":$component_target" ]
       }
+      deps += [ "//build/validate:shell_command_tag" ]
 
       # The shell environment is not intended for production use.
       deps += [ "//build/validate:non_production_tag" ]

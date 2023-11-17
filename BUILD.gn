@@ -1788,6 +1788,10 @@ group("discoverable_packages") {
   testonly = true
   visibility = [ "//build/images/updates:universe_packages" ]
   public_deps = discoverable_package_labels + [ ":discoverable_tests" ]
+  assert_no_deps = [
+    "//build/validate:config_data_tag",
+    "//build/validate:shell_command_tag",
+  ]
 }
 
 ###
