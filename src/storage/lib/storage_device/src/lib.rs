@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use {
-    crate::buffer::{Buffer, BufferRef, MutableBufferRef},
+    crate::buffer::{BufferFuture, BufferRef, MutableBufferRef},
     anyhow::{bail, Error},
     async_trait::async_trait,
     futures::channel::oneshot::{channel, Sender},
@@ -31,7 +31,7 @@ pub mod fake_device;
 pub trait Device: Send + Sync {
     /// Allocates a transfer buffer of at least |size| bytes for doing I/O with the device.
     /// The actual size of the buffer will be rounded up to a block-aligned size.
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_>;
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_>;
 
     /// Returns the block size of the device. Buffers are aligned to block-aligned chunks.
     fn block_size(&self) -> u32;

@@ -172,7 +172,7 @@ impl JournalReader {
             let last_read_checksum = self.last_read_checksum();
 
             // Read the next block's worth, verify its checksum, and append it to |buf|.
-            let mut buffer = self.handle.allocate_buffer(bs);
+            let mut buffer = self.handle.allocate_buffer(bs).await;
             assert!(self.read_offset % bs as u64 == 0);
             if self.handle.read(self.read_offset, buffer.as_mut()).await? != bs {
                 // This shouldn't happen -- it shouldn't be possible to read to the end
@@ -343,7 +343,8 @@ mod tests {
             writer.write_record(item).unwrap();
         }
         writer.pad_to_block().expect("pad_to_block failed");
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
     }
 
@@ -353,7 +354,7 @@ mod tests {
         let handle = FakeObjectHandle::new(object.clone());
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let len = BLOCK_SIZE as usize * 2;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         write_items(FakeObjectHandle::new(object.clone()), &[4u32]).await;
@@ -376,7 +377,7 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 2;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         write_items(FakeObjectHandle::new(object.clone()), &[4u32, 7u32]).await;
@@ -396,7 +397,7 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
@@ -404,7 +405,8 @@ mod tests {
         writer.pad_to_block().expect("pad_to_block failed");
         writer.write_record(&7u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
         let mut reader = JournalReader::new(
             FakeObjectHandle::new(object.clone()),
@@ -421,7 +423,7 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut reader = JournalReader::new(
@@ -437,7 +439,7 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
@@ -451,7 +453,8 @@ mod tests {
         // Check that writing didn't end up being aligned on a block.
         assert_ne!(writer.journal_file_checkpoint().file_offset, BLOCK_SIZE);
         writer.pad_to_block().expect("pad_to_block failed");
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let mut reader = JournalReader::new(
@@ -473,7 +476,7 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         write_items(FakeObjectHandle::new(object.clone()), &[4u32, 7u32]).await;
@@ -504,7 +507,8 @@ mod tests {
         writer.pad_to_block().expect("pad_to_block failed");
         writer.write_record(&90u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let mut reader = JournalReader::new(
@@ -552,13 +556,14 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         let len = 2 * (BLOCK_SIZE as usize - std::mem::size_of::<Checksum>());
         assert_eq!(writer.write(&vec![78u8; len]).expect("write failed"), len);
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let checkpoint = JournalCheckpoint {
@@ -585,13 +590,14 @@ mod tests {
         // Make the journal file a minimum of two blocks since reading to EOF is an error.
         let handle = FakeObjectHandle::new(object.clone());
         let len = BLOCK_SIZE as usize * 3;
-        let mut buf = handle.allocate_buffer(len);
+        let mut buf = handle.allocate_buffer(len).await;
         buf.as_mut_slice().fill(0u8);
         handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
         let mut writer = JournalWriter::new(BLOCK_SIZE as usize, 0);
         let len = BLOCK_SIZE as usize - std::mem::size_of::<Checksum>();
         assert_eq!(writer.write(&vec![78u8; len]).expect("write failed"), len);
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
         assert_eq!(offset, 0);
 

@@ -7,7 +7,7 @@ use {
     anyhow::Error,
     async_trait::async_trait,
     std::{future::Future, pin::Pin},
-    storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
+    storage_device::buffer::{BufferFuture, BufferRef, MutableBufferRef},
 };
 
 // Some places use Default and assume that zero is an invalid object ID, so this cannot be changed
@@ -26,7 +26,7 @@ pub trait ObjectHandle: Send + Sync + 'static {
     fn block_size(&self) -> u64;
 
     /// Allocates a buffer for doing I/O (read and write) for the object.
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_>;
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_>;
 
     /// Sets tracing for this object.
     fn set_trace(&self, _v: bool) {}
@@ -128,7 +128,7 @@ impl ObjectHandle for Box<dyn ReadObjectHandle> {
         (**self).block_size()
     }
 
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         (**self).allocate_buffer(size)
     }
 

@@ -60,7 +60,7 @@ use {
     anyhow::{anyhow, bail, Context, Error},
     event_listener::Event,
     fprint::TypeFingerprint,
-    futures::{self, future::poll_fn, FutureExt},
+    futures::{self, future::poll_fn, FutureExt as _},
     once_cell::sync::OnceCell,
     rand::Rng,
     rustc_hash::FxHashMap as HashMap,
@@ -77,7 +77,6 @@ use {
         task::{Poll, Waker},
         vec::Vec,
     },
-    storage_device::buffer::Buffer,
 };
 
 // Exposed for serialized_types.
@@ -1428,11 +1427,10 @@ impl Journal {
         poll_fn(|ctx| loop {
             {
                 let mut inner = self.inner.lock().unwrap();
-                if flush_fut.is_none() && !flush_error {
-                    if let Some(handle) = self.handle.get() {
-                        if let Some((offset, buf)) = inner.writer.take_buffer(handle) {
-                            flush_fut = Some(self.flush(offset, buf).boxed());
-                        }
+                if flush_fut.is_none() && !flush_error && self.handle.get().is_some() {
+                    let flushable = inner.writer.flushable_bytes();
+                    if flushable > 0 {
+                        flush_fut = Some(self.flush(flushable).boxed());
                     }
                 }
                 if inner.terminate && flush_fut.is_none() && compact_fut.is_none() {
@@ -1484,7 +1482,10 @@ impl Journal {
         .await;
     }
 
-    async fn flush(&self, offset: u64, mut buf: Buffer<'_>) -> Result<(), Error> {
+    async fn flush(&self, amount: usize) -> Result<(), Error> {
+        let handle = self.handle.get().unwrap();
+        let mut buf = handle.allocate_buffer(amount).await;
+        let offset = self.inner.lock().unwrap().writer.take_flushable(buf.as_mut());
         let len = buf.len() as u64;
         self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
         let mut inner = self.inner.lock().unwrap();
@@ -1633,7 +1634,7 @@ mod tests {
                 .expect("create_child_file failed");
 
             transaction.commit().await.expect("commit failed");
-            let mut buf = handle.allocate_buffer(TEST_DATA.len());
+            let mut buf = handle.allocate_buffer(TEST_DATA.len()).await;
             buf.as_mut_slice().copy_from_slice(TEST_DATA);
             handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
             // As this is the first sync, this will actually trigger a new super-block, but normally
@@ -1655,7 +1656,7 @@ mod tests {
             )
             .await
             .expect("open_object failed");
-            let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize);
+            let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize).await;
             assert_eq!(handle.read(0, buf.as_mut()).await.expect("read failed"), TEST_DATA.len());
             assert_eq!(&buf.as_slice()[..TEST_DATA.len()], TEST_DATA);
             fsck(fs.clone()).await.expect("fsck failed");
@@ -1694,7 +1695,7 @@ mod tests {
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
-            let mut buf = handle.allocate_buffer(TEST_DATA.len());
+            let mut buf = handle.allocate_buffer(TEST_DATA.len()).await;
             buf.as_mut_slice().copy_from_slice(TEST_DATA);
             handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
             fs.sync(SyncOptions::default()).await.expect("sync failed");
@@ -1719,7 +1720,7 @@ mod tests {
                     .await
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
-                let mut buf = handle.allocate_buffer(TEST_DATA.len());
+                let mut buf = handle.allocate_buffer(TEST_DATA.len()).await;
                 buf.as_mut_slice().copy_from_slice(TEST_DATA);
                 handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
                 object_ids.push(handle.object_id());
@@ -1742,7 +1743,7 @@ mod tests {
                 )
                 .await
                 .expect("open_object failed");
-                let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize);
+                let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize).await;
                 assert_eq!(
                     handle.read(0, buf.as_mut()).await.expect("read failed"),
                     TEST_DATA.len()
@@ -1771,7 +1772,7 @@ mod tests {
                 .await
                 .expect("create_child_file failed");
             transaction.commit().await.expect("commit failed");
-            let mut buf = handle.allocate_buffer(TEST_DATA.len());
+            let mut buf = handle.allocate_buffer(TEST_DATA.len()).await;
             buf.as_mut_slice().copy_from_slice(TEST_DATA);
             handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
             fs.sync(SyncOptions::default()).await.expect("sync failed");
@@ -1797,7 +1798,7 @@ mod tests {
                 .unwrap_or_else(|e| {
                     panic!("open_object failed (object_id: {}): {:?}", object_id, e)
                 });
-                let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize);
+                let mut buf = handle.allocate_buffer(TEST_DEVICE_BLOCK_SIZE as usize).await;
                 assert_eq!(
                     handle.read(0, buf.as_mut()).await.expect("read failed"),
                     TEST_DATA.len()

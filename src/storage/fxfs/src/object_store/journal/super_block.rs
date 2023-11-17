@@ -30,6 +30,7 @@ use {
         log::*,
         lsm_tree::{types::MutableLayer, LSMTree, LayerSet},
         metrics,
+        object_handle::ObjectHandle as _,
         object_store::{
             allocator::Reservation,
             journal::{
@@ -495,8 +496,11 @@ impl SuperBlockHeader {
     /// This isn't a secure shred in any way, it just ensures the super-block is not recognized as a
     /// super-block.
     pub async fn shred<S: HandleOwner>(handle: DataObjectHandle<S>) -> Result<(), Error> {
-        let mut buf =
-            handle.store().device().allocate_buffer(handle.store().device().block_size() as usize);
+        let mut buf = handle
+            .store()
+            .device()
+            .allocate_buffer(handle.store().device().block_size() as usize)
+            .await;
         buf.as_mut_slice().fill(0u8);
         handle.overwrite(0, buf.as_mut(), false).await
     }
@@ -611,7 +615,8 @@ impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
     }
 
     async fn flush_buffer(&mut self) -> Result<(), Error> {
-        let (offset, mut buf) = self.writer.take_buffer(&self.handle).unwrap();
+        let mut buf = self.handle.allocate_buffer(self.writer.flushable_bytes()).await;
+        let offset = self.writer.take_flushable(buf.as_mut());
         self.handle.overwrite(offset, buf.as_mut(), false).await
     }
 }

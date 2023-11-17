@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        buffer::{Buffer, BufferRef, MutableBufferRef},
+        buffer::{BufferFuture, BufferRef, MutableBufferRef},
         buffer_allocator::{BufferAllocator, BufferSource},
         Device,
     },
@@ -40,7 +40,7 @@ impl BlockDevice {
 
 #[async_trait]
 impl Device for BlockDevice {
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.allocator.allocate_buffer(size)
     }
 
@@ -133,7 +133,7 @@ mod tests {
             .expect("new failed");
 
         {
-            let _buf = device.allocate_buffer(8192);
+            let _buf = device.allocate_buffer(8192).await;
         }
 
         device.close().await.expect("Close failed");
@@ -146,15 +146,15 @@ mod tests {
             .expect("new failed");
 
         {
-            let mut buf1 = device.allocate_buffer(8192);
-            let mut buf2 = device.allocate_buffer(1024);
+            let mut buf1 = device.allocate_buffer(8192).await;
+            let mut buf2 = device.allocate_buffer(1024).await;
             buf1.as_mut_slice().fill(0xaa as u8);
             buf2.as_mut_slice().fill(0xbb as u8);
             device.write(65536, buf1.as_ref()).await.expect("Write failed");
             device.write(65536 + 8192, buf2.as_ref()).await.expect("Write failed");
         }
         {
-            let mut buf = device.allocate_buffer(8192 + 1024);
+            let mut buf = device.allocate_buffer(8192 + 1024).await;
             device.read(65536, buf.as_mut()).await.expect("Read failed");
             assert_eq!(buf.as_slice()[..8192], vec![0xaa as u8; 8192]);
             assert_eq!(buf.as_slice()[8192..], vec![0xbb as u8; 1024]);
@@ -168,7 +168,7 @@ mod tests {
         let device = BlockDevice::new(Box::new(FakeBlockClient::new(1024, 1024)), true)
             .await
             .expect("new failed");
-        let mut buf1 = device.allocate_buffer(8192);
+        let mut buf1 = device.allocate_buffer(8192).await;
         buf1.as_mut_slice().fill(0xaa as u8);
         let err = device.write(65536, buf1.as_ref()).await.expect_err("Write succeeded");
         assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::ACCESS_DENIED);

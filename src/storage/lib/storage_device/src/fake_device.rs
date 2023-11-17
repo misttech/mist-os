@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        buffer::{Buffer, BufferRef, MutableBufferRef},
+        buffer::{BufferFuture, BufferRef, MutableBufferRef},
         buffer_allocator::{BufferAllocator, BufferSource},
         Device, DeviceHolder,
     },
@@ -77,7 +77,7 @@ impl FakeDevice {
 
 #[async_trait]
 impl Device for FakeDevice {
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         assert!(!self.closed.load(Ordering::Relaxed));
         self.allocator.allocate_buffer(size)
     }

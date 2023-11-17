@@ -152,7 +152,7 @@ impl Inner {
 
         // Copy data into transfer buffer, zero pad if required.
         let aligned_len = round_up(len, block_size).ok_or(FxfsError::OutOfRange)?;
-        let mut buffer = handle.allocate_buffer(aligned_len);
+        let mut buffer = handle.allocate_buffer(aligned_len).await;
         buffer.as_mut_slice()[..len].copy_from_slice(&self.buffer[..len]);
         buffer.as_mut_slice()[len..].fill(0);
 

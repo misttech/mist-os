@@ -148,7 +148,7 @@ async fn install_items_in_store<K: Key, V: Value>(
 
     {
         let mut writer = SimplePersistentLayerWriter::<Writer<'_>, K, V>::new(
-            Writer::new(&layer_handle),
+            Writer::new(&layer_handle).await,
             filesystem.block_size(),
         )
         .await
@@ -183,7 +183,7 @@ async fn install_items_in_store<K: Key, V: Value>(
     store_info.layers.push(layer_handle.object_id());
     let mut store_info_vec = vec![];
     store_info.serialize_with_version(&mut store_info_vec).expect("serialize failed");
-    let mut buf = device.allocate_buffer(store_info_vec.len());
+    let mut buf = device.allocate_buffer(store_info_vec.len()).await;
     buf.as_mut_slice().copy_from_slice(&store_info_vec[..]);
 
     let mut transaction =
@@ -347,7 +347,7 @@ async fn test_malformed_allocation() {
         {
             let mut writer =
                 SimplePersistentLayerWriter::<Writer<'_>, AllocatorKey, AllocatorValue>::new(
-                    Writer::new(&layer_handle),
+                    Writer::new(&layer_handle).await,
                     fs.block_size(),
                 )
                 .await
@@ -370,7 +370,7 @@ async fn test_malformed_allocation() {
         allocator_info.layers.push(layer_handle.object_id());
         let mut allocator_info_vec = vec![];
         allocator_info.serialize_with_version(&mut allocator_info_vec).expect("serialize failed");
-        let mut buf = device.allocate_buffer(allocator_info_vec.len());
+        let mut buf = device.allocate_buffer(allocator_info_vec.len()).await;
         buf.as_mut_slice().copy_from_slice(&allocator_info_vec[..]);
 
         let handle = ObjectStore::open_object(
@@ -603,7 +603,7 @@ async fn test_volume_allocation_mismatch() {
                 )
                 .await
                 .expect("new_transaction failed");
-            let buf = device.allocate_buffer(1);
+            let buf = device.allocate_buffer(1).await;
             handle
                 .txn_write(&mut transaction, 1_048_576, buf.as_ref())
                 .await
@@ -1648,7 +1648,7 @@ async fn test_file_length_mismatch() {
             )
             .await
             .expect("new_transaction failed");
-        let buf = device.allocate_buffer(1);
+        let buf = device.allocate_buffer(1).await;
         handle.txn_write(&mut transaction, 1_048_576, buf.as_ref()).await.expect("write failed");
         transaction.commit().await.expect("commit transaction failed");
 
@@ -1774,7 +1774,7 @@ async fn test_missing_encryption_key() {
             .create_child_file(&mut transaction, "child_file", None)
             .await
             .expect("create_child_file failed");
-        let buf = handle.allocate_buffer(1);
+        let buf = handle.allocate_buffer(1).await;
         handle.txn_write(&mut transaction, 1_048_576, buf.as_ref()).await.expect("write failed");
 
         let txn_mutation = transaction

@@ -4,7 +4,7 @@
 
 use {
     crate::{
-        buffer::{Buffer, BufferRef, MutableBufferRef},
+        buffer::{BufferFuture, BufferRef, MutableBufferRef},
         buffer_allocator::{BufferAllocator, BufferSource},
         Device,
     },
@@ -54,7 +54,7 @@ impl FileBackedDevice {
 
 #[async_trait]
 impl Device for FileBackedDevice {
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.allocator.allocate_buffer(size)
     }
 
@@ -131,7 +131,7 @@ mod tests {
         let device = FileBackedDevice::new(file, 512);
 
         {
-            let _buf = device.allocate_buffer(8192);
+            let _buf = device.allocate_buffer(8192).await;
         }
 
         device.close().await.expect("Close failed");
@@ -143,15 +143,15 @@ mod tests {
         let device = FileBackedDevice::new(file, 512);
 
         {
-            let mut buf1 = device.allocate_buffer(8192);
-            let mut buf2 = device.allocate_buffer(8192);
+            let mut buf1 = device.allocate_buffer(8192).await;
+            let mut buf2 = device.allocate_buffer(8192).await;
             buf1.as_mut_slice().fill(0xaa as u8);
             buf2.as_mut_slice().fill(0xbb as u8);
             device.write(65536, buf1.as_ref()).await.expect("Write failed");
             device.write(65536 + 8192, buf2.as_ref()).await.expect("Write failed");
         }
         {
-            let mut buf = device.allocate_buffer(16384);
+            let mut buf = device.allocate_buffer(16384).await;
             device.read(65536, buf.as_mut()).await.expect("Read failed");
             assert_eq!(buf.as_slice()[..8192], vec![0xaa as u8; 8192]);
             assert_eq!(buf.as_slice()[8192..], vec![0xbb as u8; 8192]);
@@ -166,7 +166,7 @@ mod tests {
         let device = FileBackedDevice::new(file, 512);
 
         {
-            let mut buf = device.allocate_buffer(8192);
+            let mut buf = device.allocate_buffer(8192).await;
             let offset = (device.size() as usize - buf.len() + device.block_size() as usize) as u64;
             buf.as_mut_slice().fill(0xaa as u8);
             device.write(offset, buf.as_ref()).await.expect_err("Write should have failed");
@@ -182,8 +182,8 @@ mod tests {
         let device = FileBackedDevice::new(file, 512);
 
         {
-            let mut buf1 = device.allocate_buffer(8192);
-            let mut buf2 = device.allocate_buffer(8192);
+            let mut buf1 = device.allocate_buffer(8192).await;
+            let mut buf2 = device.allocate_buffer(8192).await;
             buf1.as_mut_slice().fill(0xaa as u8);
             buf2.as_mut_slice().fill(0xbb as u8);
             device.write(65536, buf1.as_ref()).await.expect("Write failed");
@@ -195,7 +195,7 @@ mod tests {
         let device = FileBackedDevice::new(file, 512);
 
         {
-            let mut buf = device.allocate_buffer(16384);
+            let mut buf = device.allocate_buffer(16384).await;
             device.read(65536, buf.as_mut()).await.expect("Read failed");
             assert_eq!(buf.as_slice()[..8192], vec![0xaa as u8; 8192]);
             assert_eq!(buf.as_slice()[8192..], vec![0xbb as u8; 8192]);

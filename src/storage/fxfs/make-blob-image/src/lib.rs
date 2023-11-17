@@ -267,7 +267,7 @@ async fn install_blob(
     transaction.commit().await.context("transaction commit")?;
 
     {
-        let mut writer = DirectWriter::new(&handle, Default::default());
+        let mut writer = DirectWriter::new(&handle, Default::default()).await;
         match blob.data {
             BlobData::Uncompressed(data) => {
                 writer.write_bytes(&data).await.context("write blob contents")?;

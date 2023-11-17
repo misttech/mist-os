@@ -487,7 +487,7 @@ mod tests {
             let layer_set = tree.immutable_layer_set();
             let mut merger = layer_set.merger();
             let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
-            tree.compact_with_iterator(iter, Writer::new(&handle), handle.block_size())
+            tree.compact_with_iterator(iter, Writer::new(&handle).await, handle.block_size())
                 .await
                 .expect("compact failed");
         }
@@ -540,7 +540,7 @@ mod tests {
             let layer_set = tree.immutable_layer_set();
             let mut merger = layer_set.merger();
             let iter = merger.seek(Bound::Unbounded).await.expect("create merger");
-            tree.compact_with_iterator(iter, Writer::new(&handle), handle.block_size())
+            tree.compact_with_iterator(iter, Writer::new(&handle).await, handle.block_size())
                 .await
                 .expect("compact failed");
         }

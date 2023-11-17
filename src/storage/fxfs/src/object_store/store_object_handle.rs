@@ -43,7 +43,7 @@ use {
             Arc,
         },
     },
-    storage_device::buffer::{Buffer, BufferRef, MutableBufferRef},
+    storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef},
 };
 
 /// Maximum size for an extended attribute name.
@@ -129,7 +129,7 @@ impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
         return self.object_id;
     }
 
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.store().device.allocate_buffer(size)
     }
 
@@ -437,7 +437,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             round_down(offset, block_size)..round_up(end, block_size).ok_or(FxfsError::TooBig)?;
 
         let mut aligned_buf =
-            self.store().device.allocate_buffer((aligned.end - aligned.start) as usize);
+            self.store().device.allocate_buffer((aligned.end - aligned.start) as usize).await;
 
         // Deal with head alignment.
         if aligned.start < offset {
@@ -758,7 +758,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 // Deal with end alignment by reading the existing contents into an alignment
                 // buffer.
                 if offset < extent_key.range.end && end_align > 0 {
-                    let mut align_buf = self.store().device.allocate_buffer(block_size as usize);
+                    let mut align_buf =
+                        self.store().device.allocate_buffer(block_size as usize).await;
                     if trace {
                         info!(
                             store_id = self.store().store_object_id(),
@@ -800,7 +801,8 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                     (
                         store
                             .device
-                            .allocate_buffer(round_up(*size, self.block_size()).unwrap() as usize),
+                            .allocate_buffer(round_up(*size, self.block_size()).unwrap() as usize)
+                            .await,
                         *size as usize,
                     )
                 }
@@ -1023,7 +1025,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         } else {
             false
         };
-        let mut buffer = self.store().device.allocate_buffer(rounded_len as usize);
+        let mut buffer = self.store().device.allocate_buffer(rounded_len as usize).await;
         let slice = buffer.as_mut_slice();
         slice[..data.len()].copy_from_slice(data);
         slice[data.len()..].fill(0);
@@ -1951,7 +1953,7 @@ mod tests {
         let attribute_id = 10;
 
         let mut transaction = handle.new_transaction(attribute_id).await.unwrap();
-        let mut buffer = handle.allocate_buffer(buf_size as usize);
+        let mut buffer = handle.allocate_buffer(buf_size as usize).await;
         buffer.as_mut_slice().fill(3);
         // Writing two separate ranges, even if they are contiguous, forces them to be separate
         // extent records.

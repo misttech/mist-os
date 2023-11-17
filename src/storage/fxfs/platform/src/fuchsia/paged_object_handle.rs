@@ -32,7 +32,7 @@ use {
         ops::{FnOnce, Range},
         sync::{Arc, Mutex},
     },
-    storage_device::buffer::Buffer,
+    storage_device::buffer::{Buffer, BufferFuture},
     vfs::temp_clone::{unblock, TempClonable},
 };
 
@@ -308,7 +308,7 @@ impl PagedObjectHandle {
     }
 
     pub async fn read_uncached(&self, range: std::ops::Range<u64>) -> Result<Buffer<'_>, Error> {
-        let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
+        let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize).await;
         let read = self.handle.read(range.start, buffer.as_mut()).await?;
         buffer.as_mut_slice()[read..].fill(0);
         Ok(buffer)
@@ -933,7 +933,7 @@ impl ObjectHandle for PagedObjectHandle {
     fn object_id(&self) -> u64 {
         self.handle.object_id()
     }
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.handle.allocate_buffer(size)
     }
     fn block_size(&self) -> u64 {
@@ -1043,7 +1043,8 @@ impl FlushBatch {
         }
 
         if self.dirty_byte_count > 0 {
-            let mut buffer = handle.allocate_buffer(self.dirty_byte_count.try_into().unwrap());
+            let mut buffer =
+                handle.allocate_buffer(self.dirty_byte_count.try_into().unwrap()).await;
             let mut slice = buffer.as_mut_slice();
 
             let mut dirty_ranges = Vec::new();

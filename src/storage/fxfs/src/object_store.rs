@@ -645,15 +645,18 @@ impl ObjectStore {
             let graveyard_directory_object_id = Graveyard::create(transaction, &self);
             let root_directory = Directory::create(transaction, &self, Default::default()).await?;
 
-            let mut store_info = self.store_info.lock().unwrap();
-            let store_info = store_info.info_mut().unwrap();
+            let serialized_info = {
+                let mut store_info = self.store_info.lock().unwrap();
+                let store_info = store_info.info_mut().unwrap();
 
-            store_info.graveyard_directory_object_id = graveyard_directory_object_id;
-            store_info.root_directory_object_id = root_directory.object_id();
+                store_info.graveyard_directory_object_id = graveyard_directory_object_id;
+                store_info.root_directory_object_id = root_directory.object_id();
 
-            let mut serialized_info = Vec::new();
-            store_info.serialize_with_version(&mut serialized_info)?;
-            let mut buf = self.device.allocate_buffer(serialized_info.len());
+                let mut serialized_info = Vec::new();
+                store_info.serialize_with_version(&mut serialized_info)?;
+                serialized_info
+            };
+            let mut buf = self.device.allocate_buffer(serialized_info.len()).await;
             buf.as_mut_slice().copy_from_slice(&serialized_info[..]);
             buf
         };
@@ -1709,12 +1712,15 @@ impl ObjectStore {
 
         // Update StoreInfo.
         let buf = {
-            let mut store_info = self.store_info.lock().unwrap();
-            let store_info = store_info.info_mut().unwrap();
-            store_info.object_id_key = Some(object_id_wrapped);
-            let mut serialized_info = Vec::new();
-            store_info.serialize_with_version(&mut serialized_info)?;
-            let mut buf = self.device.allocate_buffer(serialized_info.len());
+            let serialized_info = {
+                let mut store_info = self.store_info.lock().unwrap();
+                let store_info = store_info.info_mut().unwrap();
+                store_info.object_id_key = Some(object_id_wrapped);
+                let mut serialized_info = Vec::new();
+                store_info.serialize_with_version(&mut serialized_info)?;
+                serialized_info
+            };
+            let mut buf = self.device.allocate_buffer(serialized_info.len()).await;
             buf.as_mut_slice().copy_from_slice(&serialized_info[..]);
             buf
         };
@@ -2367,7 +2373,7 @@ mod tests {
 
         store.flush().await.expect("flush failed");
 
-        let mut buf = object.allocate_buffer(5);
+        let mut buf = object.allocate_buffer(5).await;
         buf.as_mut_slice().copy_from_slice(b"hello");
         object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
 
@@ -2427,7 +2433,7 @@ mod tests {
             transaction.commit().await.expect("commit failed");
 
             // Allocate an extent in the file.
-            let mut buffer = child.allocate_buffer(8192);
+            let mut buffer = child.allocate_buffer(8192).await;
             buffer.as_mut_slice().fill(0xaa);
             child.write_or_append(Some(0), buffer.as_ref()).await.expect("write failed");
 
@@ -2462,7 +2468,7 @@ mod tests {
             transaction.commit().await.expect("commit failed");
 
             // Allocate an extent in the file.
-            let mut buffer = child.allocate_buffer(8192);
+            let mut buffer = child.allocate_buffer(8192).await;
             buffer.as_mut_slice().fill(0xaa);
             child.write_or_append(Some(0), buffer.as_ref()).await.expect("write failed");
 
@@ -2514,7 +2520,7 @@ mod tests {
             .expect("create_child_file failed");
         transaction.commit().await.expect("commit failed");
 
-        let buf = object.allocate_buffer(16384);
+        let buf = object.allocate_buffer(16384).await;
         object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
 
         store.flush().await.expect("flush failed");
@@ -2570,7 +2576,7 @@ mod tests {
                     .expect("create_child_file failed");
                 transaction.commit().await.expect("commit failed");
 
-                let mut buf = object.allocate_buffer(1000);
+                let mut buf = object.allocate_buffer(1000).await;
                 for i in 0..buf.len() {
                     buf.as_mut_slice()[i] = i as u8;
                 }
@@ -2596,7 +2602,7 @@ mod tests {
                     )
                     .await
                     .expect("open_object failed");
-                    let mut buf = object.allocate_buffer(1000);
+                    let mut buf = object.allocate_buffer(1000).await;
                     assert_eq!(object.read(0, buf.as_mut()).await.expect("read failed"), 1000);
                     for i in 0..buf.len() {
                         assert_eq!(buf.as_slice()[i], i as u8);
@@ -2849,7 +2855,7 @@ mod tests {
                     ObjectStore::open_object(&store, object_id, HandleOptions::default(), None)
                         .await
                         .expect("open_object failed");
-                let buffer = handle.allocate_buffer(100);
+                let buffer = handle.allocate_buffer(100).await;
                 handle
                     .write_or_append(Some(0), buffer.as_ref())
                     .await

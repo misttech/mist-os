@@ -208,7 +208,7 @@ impl PagerBacked for FxBlob {
         ensure!(block_alignment > 0, FxfsError::Inconsistent);
         debug_assert_eq!(block_alignment % zx::system_get_page_size() as u64, 0);
 
-        let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize);
+        let mut buffer = self.handle.allocate_buffer((range.end - range.start) as usize).await;
         let read = if self.compressed_offsets.is_empty() {
             self.handle.read(range.start, buffer.as_mut()).await?
         } else {
@@ -232,7 +232,7 @@ impl PagerBacked for FxBlob {
             let aligned = round_down(compressed_offsets.start, bs)
                 ..round_up(compressed_offsets.end, bs).unwrap();
             let mut compressed_buf =
-                self.handle.allocate_buffer((aligned.end - aligned.start) as usize);
+                self.handle.allocate_buffer((aligned.end - aligned.start) as usize).await;
             let (read, _) =
                 try_join!(self.handle.read(aligned.start, compressed_buf.as_mut()), async {
                     buffer
@@ -369,7 +369,7 @@ mod tests {
             let handle = fixture.get_blob_handle(&name).await;
             let mut transaction =
                 handle.new_transaction().await.expect("failed to create transaction");
-            let mut buf = handle.allocate_buffer(BLOCK_SIZE as usize);
+            let mut buf = handle.allocate_buffer(BLOCK_SIZE as usize).await;
             buf.as_mut_slice().fill(0);
             handle
                 .txn_write(&mut transaction, READ_AHEAD_SIZE, buf.as_ref())

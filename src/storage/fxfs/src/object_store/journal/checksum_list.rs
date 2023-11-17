@@ -220,7 +220,7 @@ impl ChecksumList {
         >,
         mut journal_offset: u64,
     ) -> Result<u64, Error> {
-        let mut buf = device.allocate_buffer(self.max_chunk_size as usize);
+        let mut buf = device.allocate_buffer(self.max_chunk_size as usize).await;
         'try_again: loop {
             for e in &mut self.checksum_entries {
                 if e.start_journal_offset >= journal_offset {
@@ -275,7 +275,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_verify() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(2048);
+        let mut buffer = device.allocate_buffer(2048).await;
         let mut list = ChecksumList::new(0);
 
         buffer.as_mut_slice()[0..512].copy_from_slice(&[1; 512]);
@@ -346,7 +346,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_verify_entry_prior_to_flushed_offset_is_ignored() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(2048);
+        let mut buffer = device.allocate_buffer(2048).await;
         let mut list = ChecksumList::new(2);
 
         buffer.as_mut_slice()[0..512].copy_from_slice(&[1; 512]);
@@ -365,7 +365,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_deallocate_overlap() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(512);
+        let mut buffer = device.allocate_buffer(512).await;
         let mut list = ChecksumList::new(1);
 
         buffer.as_mut_slice().copy_from_slice(&[2; 512]);
@@ -382,7 +382,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_mark_for_deletion_valid() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(512);
+        let mut buffer = device.allocate_buffer(512).await;
         let mut list = ChecksumList::new(1);
 
         let mut marked_for_deletion = HashMap::default();
@@ -406,7 +406,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_mark_for_deletion_invalid() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(512);
+        let mut buffer = device.allocate_buffer(512).await;
         let mut list = ChecksumList::new(1);
 
         let mut marked_for_deletion = HashMap::default();
@@ -431,7 +431,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_duplicate_entries() {
         let device = FakeDevice::new(2048, 512);
-        let mut buffer = device.allocate_buffer(1024);
+        let mut buffer = device.allocate_buffer(1024).await;
         let mut list = ChecksumList::new(1);
 
         buffer.as_mut_slice().copy_from_slice(&[2; 1024]);

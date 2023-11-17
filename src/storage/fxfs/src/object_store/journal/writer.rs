@@ -7,7 +7,6 @@ use {
         checksum::{fletcher64, Checksum},
         log::*,
         metrics,
-        object_handle::ObjectHandle,
         object_store::journal::JournalCheckpoint,
         serialized_types::{Versioned, LATEST_VERSION},
     },
@@ -15,7 +14,7 @@ use {
     byteorder::{LittleEndian, WriteBytesExt},
     fuchsia_inspect::{Property as _, UintProperty},
     std::{cmp::min, io::Write},
-    storage_device::buffer::Buffer,
+    storage_device::buffer::MutableBufferRef,
 };
 
 /// JournalWriter is responsible for writing log records to a journal file.  Each block contains a
@@ -94,21 +93,28 @@ impl JournalWriter {
         }
     }
 
-    /// Flushes any outstanding complete blocks to the journal object.  Part blocks can be flushed
-    /// by calling pad_to_block first.  Returns the checkpoint of the last flushed bit of data.
-    pub fn take_buffer<'a>(&mut self, handle: &'a impl ObjectHandle) -> Option<(u64, Buffer<'a>)> {
-        let to_do = self.buf.len() - self.buf.len() % self.block_size;
-        if to_do == 0 {
-            return None;
-        }
-        let mut buf = handle.allocate_buffer(to_do);
-        buf.as_mut_slice()[..to_do].copy_from_slice(&self.buf[..to_do]);
+    /// Returns true if there are complete blocks ready for flushing.
+    pub fn flushable_bytes(&self) -> usize {
+        self.buf.len() - self.buf.len() % self.block_size
+    }
+
+    /// Fills `buf` with as many outstanding complete blocks from the journal object as possible, so
+    /// they can be flushed.  Part blocks can be flushed by calling pad_to_block first.  Returns the
+    /// checkpoint of the last flushed bit of data.  The caller must ensure there's data available
+    /// to flush by first checking `Self::flushable_bytes`.
+    /// If `buf` is smaller than the available blocks, more data will still be available.
+    pub fn take_flushable<'a>(&mut self, mut buf: MutableBufferRef<'a>) -> u64 {
+        // The buffer should always be completely filled.
+        assert!(self.flushable_bytes() >= buf.len());
+        let len = buf.len();
+        debug_assert!(len % self.block_size == 0);
+        buf.as_mut_slice().copy_from_slice(&self.buf[..len]);
         let offset = self.checkpoint.file_offset;
         self.journal_checkpoint_offset.set(offset);
-        self.buf.drain(..to_do);
-        self.checkpoint.file_offset += to_do as u64;
+        self.buf.drain(..len);
+        self.checkpoint.file_offset += len as u64;
         self.checkpoint.checksum = self.last_checksum;
-        Some((offset, buf))
+        offset
     }
 
     /// Seeks to the given offset in the journal file -- to be used once replay has finished.
@@ -190,11 +196,12 @@ mod tests {
         writer.write_record(&4u32).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let handle = FakeObjectHandle::new(object.clone());
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let handle = FakeObjectHandle::new(object.clone());
-        let mut buf = handle.allocate_buffer(object.get_size() as usize);
+        let mut buf = handle.allocate_buffer(object.get_size() as usize).await;
         assert_eq!(buf.len(), TEST_BLOCK_SIZE);
         handle.read(0, buf.as_mut()).await.expect("read failed");
         let mut cursor = std::io::Cursor::new(buf.as_slice());
@@ -225,11 +232,12 @@ mod tests {
         writer.write_record(&17u64).unwrap();
         writer.pad_to_block().expect("pad_to_block failed");
         let handle = FakeObjectHandle::new(object.clone());
-        let (offset, buf) = writer.take_buffer(&handle).unwrap();
+        let mut buf = handle.allocate_buffer(writer.flushable_bytes()).await;
+        let offset = writer.take_flushable(buf.as_mut());
         handle.write_or_append(Some(offset), buf.as_ref()).await.expect("overwrite failed");
 
         let handle = FakeObjectHandle::new(object.clone());
-        let mut buf = handle.allocate_buffer(object.get_size() as usize);
+        let mut buf = handle.allocate_buffer(object.get_size() as usize).await;
         assert_eq!(buf.len(), TEST_BLOCK_SIZE);
         handle.read(0, buf.as_mut()).await.expect("read failed");
         let mut cursor = std::io::Cursor::new(&buf.as_slice()[checkpoint.file_offset as usize..]);

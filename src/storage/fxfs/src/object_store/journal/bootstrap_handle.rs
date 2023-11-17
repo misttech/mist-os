@@ -20,7 +20,7 @@ use {
         },
     },
     storage_device::{
-        buffer::{Buffer, MutableBufferRef},
+        buffer::{BufferFuture, MutableBufferRef},
         Device,
     },
 };
@@ -71,7 +71,7 @@ impl ObjectHandle for BootstrapObjectHandle {
         self.object_id
     }
 
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.device.allocate_buffer(size)
     }
 

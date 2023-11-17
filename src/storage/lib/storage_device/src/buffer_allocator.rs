@@ -4,10 +4,15 @@
 
 use {
     crate::buffer::{round_down, round_up, Buffer},
-    std::collections::BTreeMap,
-    std::ops::Range,
-    std::sync::Mutex,
-    std::vec::Vec,
+    futures::Future,
+    std::{
+        collections::BTreeMap,
+        ops::Range,
+        pin::Pin,
+        sync::Mutex,
+        task::{Context, Poll},
+        vec::Vec,
+    },
 };
 
 #[cfg(target_os = "fuchsia")]
@@ -178,6 +183,22 @@ fn initial_free_lists(size: usize, block_size: usize) -> Vec<FreeList> {
     free_lists
 }
 
+/// A future which will resolve to an allocated [`Buffer`].
+pub struct BufferFuture<'a>(&'a BufferAllocator, usize);
+
+impl<'a> Future for BufferFuture<'a> {
+    type Output = Buffer<'a>;
+
+    fn poll(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<Self::Output> {
+        // TODO(b/299206422): Wait until a buffer is free, rather than asserting.
+        Poll::Ready(
+            self.0
+                .try_allocate_buffer(self.1)
+                .unwrap_or_else(|| panic!("Unable to allocate {} bytes", self.1)),
+        )
+    }
+}
+
 impl BufferAllocator {
     pub fn new(block_size: usize, source: BufferSource) -> Self {
         let free_lists = initial_free_lists(source.size(), block_size);
@@ -208,10 +229,8 @@ impl BufferAllocator {
     /// be used by the buffer.
     ///
     /// Allocation is O(lg(N) + M), where N = size and M = number of allocations.
-    pub fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
-        // TODO(jfsulliv): Wait until a buffer is free, rather than asserting.
-        self.try_allocate_buffer(size)
-            .unwrap_or_else(|| panic!("Unable to allocate {} bytes", size))
+    pub fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
+        BufferFuture(self, size)
     }
 
     /// Like |allocate_buffer|, but returns None if the allocation cannot be satisfied.
@@ -299,10 +318,7 @@ impl BufferAllocator {
 #[cfg(test)]
 mod tests {
     use {
-        crate::{
-            buffer::Buffer,
-            buffer_allocator::{order, BufferAllocator, BufferSource},
-        },
+        crate::buffer_allocator::{order, BufferAllocator, BufferSource},
         fuchsia_async as fasync,
         futures::future::join_all,
         rand::{prelude::SliceRandom, thread_rng, Rng},
@@ -316,8 +332,10 @@ mod tests {
 
         // 123 == 64 + 32 + 16 + 8 + 2 + 1. (The last byte is unusable.)
         let sizes = vec![64, 32, 16, 8, 2];
-        let bufs: Vec<Buffer<'_>> =
-            sizes.iter().map(|size| allocator.allocate_buffer(*size)).collect();
+        let mut bufs = vec![];
+        for size in sizes.iter() {
+            bufs.push(allocator.allocate_buffer(*size).await);
+        }
         for (expected_size, buf) in sizes.iter().zip(bufs.iter()) {
             assert_eq!(*expected_size, buf.len());
         }
@@ -329,7 +347,7 @@ mod tests {
         let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
-        let mut buf = allocator.allocate_buffer(8192);
+        let mut buf = allocator.allocate_buffer(8192).await;
         buf.as_mut_slice().fill(0xaa as u8);
         let mut vec = vec![0 as u8; 8192];
         vec.copy_from_slice(buf.as_slice());
@@ -341,8 +359,8 @@ mod tests {
         let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
-        let buf1 = allocator.allocate_buffer(8192);
-        let buf2 = allocator.allocate_buffer(8192);
+        let buf1 = allocator.allocate_buffer(8192).await;
+        let buf2 = allocator.allocate_buffer(8192).await;
         assert!(buf1.range().end <= buf2.range().start || buf2.range().end <= buf1.range().start);
     }
 
@@ -352,7 +370,7 @@ mod tests {
         let allocator = BufferAllocator::new(8192, source);
 
         for _ in 0..10 {
-            let _ = allocator.allocate_buffer(8192);
+            let _ = allocator.allocate_buffer(8192).await;
         }
     }
 
@@ -361,8 +379,8 @@ mod tests {
         let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
-        let buf1 = allocator.allocate_buffer(1);
-        let buf2 = allocator.allocate_buffer(1);
+        let buf1 = allocator.allocate_buffer(1).await;
+        let buf2 = allocator.allocate_buffer(1).await;
         assert!(buf1.range().end <= buf2.range().start || buf2.range().end <= buf1.range().start);
     }
 
@@ -371,7 +389,7 @@ mod tests {
         let source = BufferSource::new(1024 * 1024);
         let allocator = BufferAllocator::new(8192, source);
 
-        let mut buf = allocator.allocate_buffer(1024 * 1024);
+        let mut buf = allocator.allocate_buffer(1024 * 1024).await;
         assert_eq!(buf.len(), 1024 * 1024);
         buf.as_mut_slice().fill(0xaa as u8);
         let mut vec = vec![0 as u8; 1024 * 1024];
@@ -390,7 +408,7 @@ mod tests {
                 buffers.push(buffer);
             }
         }
-        let buf = allocator.allocate_buffer(1024 * 1024);
+        let buf = allocator.allocate_buffer(1024 * 1024).await;
         assert_eq!(buf.len(), 1024 * 1024);
     }
 
@@ -405,7 +423,7 @@ mod tests {
         }
         // Deallocate a single buffer, and reallocate a single one back.
         buffers.pop();
-        let buf = allocator.allocate_buffer(8192);
+        let buf = allocator.allocate_buffer(8192).await;
         assert_eq!(buf.len(), 8192);
     }
 
@@ -464,8 +482,8 @@ mod tests {
 
         // Allocate one buffer first so that |buf| is not starting at offset 0. This helps catch
         // bugs.
-        let _buf = allocator.allocate_buffer(512);
-        let mut buf = allocator.allocate_buffer(4096);
+        let _buf = allocator.allocate_buffer(512).await;
+        let mut buf = allocator.allocate_buffer(4096).await;
         let base = buf.range().start;
         {
             let mut bref = buf.subslice_mut(1000..2000);
@@ -518,8 +536,8 @@ mod tests {
 
         // Allocate one buffer first so that |buf| is not starting at offset 0. This helps catch
         // bugs.
-        let _buf = allocator.allocate_buffer(512);
-        let mut buf = allocator.allocate_buffer(4096);
+        let _buf = allocator.allocate_buffer(512).await;
+        let mut buf = allocator.allocate_buffer(4096).await;
         let base = buf.range().start;
         {
             let bref = buf.as_mut();

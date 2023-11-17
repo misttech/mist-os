@@ -8,7 +8,7 @@ use {
     async_trait::async_trait,
     event_listener::{Event, EventListener},
     std::{cell::UnsafeCell, sync::RwLock, vec::Vec},
-    storage_device::buffer::{Buffer, MutableBufferRef},
+    storage_device::buffer::{BufferFuture, MutableBufferRef},
 };
 
 const CHUNK_SIZE: usize = 128 * 1024;
@@ -116,7 +116,7 @@ impl<S: ReadObjectHandle> CachingObjectHandle<S> {
                     let read_start = chunk_num * CHUNK_SIZE;
                     let read_end =
                         std::cmp::min(read_start + CHUNK_SIZE, block_aligned_size(&self.source));
-                    let mut read_buf = self.source.allocate_buffer(read_end - read_start);
+                    let mut read_buf = self.source.allocate_buffer(read_end - read_start).await;
                     let amount_read =
                         self.source.read(read_start as u64, read_buf.as_mut()).await?;
 
@@ -155,7 +155,7 @@ impl<S: ReadObjectHandle> ObjectHandle for CachingObjectHandle<S> {
         self.source.object_id()
     }
 
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.source.allocate_buffer(size)
     }
 
@@ -198,7 +198,7 @@ mod tests {
             Arc,
         },
         storage_device::{
-            buffer::{Buffer, MutableBufferRef},
+            buffer::{BufferFuture, MutableBufferRef},
             fake_device::FakeDevice,
             Device,
         },
@@ -279,7 +279,7 @@ mod tests {
             self.device.block_size().into()
         }
 
-        fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+        fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
             self.device.allocate_buffer(size)
         }
     }
@@ -449,7 +449,7 @@ mod tests {
         source.start();
         let caching_object_handle = CachingObjectHandle::new(source);
 
-        let mut buf = device.allocate_buffer(4096);
+        let mut buf = device.allocate_buffer(4096).await;
         assert_eq!(
             ReadObjectHandle::read(
                 &caching_object_handle,

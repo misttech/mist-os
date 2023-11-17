@@ -8,6 +8,8 @@ use {
     std::slice::SliceIndex,
 };
 
+pub use crate::buffer_allocator::BufferFuture;
+
 pub(super) fn round_down<T>(value: T, granularity: T) -> T
 where
     T: num::Num + Copy,

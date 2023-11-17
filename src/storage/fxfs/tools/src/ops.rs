@@ -162,7 +162,7 @@ pub async fn get(vol: &Arc<ObjectStore>, src: &Path) -> Result<Vec<u8>, Error> {
             ObjectStore::open_object(dir.owner(), object_id, HandleOptions::default(), None)
                 .await?;
         let mut out: Vec<u8> = Vec::new();
-        let mut buf = handle.allocate_buffer(handle.block_size() as usize);
+        let mut buf = handle.allocate_buffer(handle.block_size() as usize).await;
         let mut ofs = 0;
         loop {
             let bytes = handle.read(ofs, buf.as_mut()).await?;
@@ -199,7 +199,7 @@ pub async fn put(
     }
     let handle = dir.create_child_file(&mut transaction, &filename, None).await?;
     transaction.commit().await?;
-    let mut buf = handle.allocate_buffer(data.len());
+    let mut buf = handle.allocate_buffer(data.len()).await;
     buf.as_mut_slice().copy_from_slice(&data);
     handle.write_or_append(Some(0), buf.as_ref()).await?;
     handle.flush().await

@@ -133,7 +133,7 @@ impl FxFile {
     // TODO(fxbug.dev/89873): might be better to have a cached/uncached mode for file and call
     // this when in uncached mode
     pub async fn write_at_uncached(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
-        let mut buf = self.handle.uncached_handle().allocate_buffer(content.len());
+        let mut buf = self.handle.uncached_handle().allocate_buffer(content.len()).await;
         buf.as_mut_slice().copy_from_slice(content);
         let _ = self
             .handle
@@ -147,7 +147,7 @@ impl FxFile {
     // TODO(fxbug.dev/89873): might be better to have a cached/uncached mode for file and call
     // this when in uncached mode
     pub async fn read_at_uncached(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
-        let mut buf = self.handle.uncached_handle().allocate_buffer(buffer.len());
+        let mut buf = self.handle.uncached_handle().allocate_buffer(buffer.len()).await;
         buf.as_mut_slice().fill(0);
         let bytes_read = self
             .handle

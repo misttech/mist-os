@@ -308,7 +308,7 @@ impl SimplePersistentLayer {
         let physical_block_size = object_handle.block_size();
 
         // The first block contains layer file information instead of key/value data.
-        let mut buffer = object_handle.allocate_buffer(physical_block_size as usize);
+        let mut buffer = object_handle.allocate_buffer(physical_block_size as usize).await;
         let (layer_info, _version) = {
             object_handle.read(0, buffer.as_mut()).await?;
             let mut cursor = std::io::Cursor::new(buffer.as_slice());
@@ -731,7 +731,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -759,7 +759,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -809,7 +809,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -837,7 +837,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -864,7 +864,7 @@ mod tests {
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -893,9 +893,12 @@ mod tests {
 
         let handle =
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
-        SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(Writer::new(&handle), BLOCK_SIZE)
-            .await
-            .expect_err("Creating writer with overlarge block size.");
+        SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
+            Writer::new(&handle).await,
+            BLOCK_SIZE,
+        )
+        .await
+        .expect_err("Creating writer with overlarge block size.");
     }
 
     #[fuchsia::test]
@@ -906,7 +909,7 @@ mod tests {
         let handle = FakeObjectHandle::new(Arc::new(FakeObject::new()));
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, i32, i32>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -997,7 +1000,7 @@ mod tests {
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -1123,7 +1126,7 @@ mod tests {
             FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
         {
             let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
-                Writer::new(&handle),
+                Writer::new(&handle).await,
                 BLOCK_SIZE,
             )
             .await
@@ -1196,7 +1199,7 @@ mod tests {
             );
             {
                 let mut writer = SimplePersistentLayerWriter::<Writer<'_>, TestKey, u64>::new(
-                    Writer::new(&handle),
+                    Writer::new(&handle).await,
                     BLOCK_SIZE,
                 )
                 .await

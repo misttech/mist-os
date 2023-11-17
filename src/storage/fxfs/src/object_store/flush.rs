@@ -206,7 +206,7 @@ impl ObjectStore {
             None,
         )
         .await?;
-        let writer = DirectWriter::new(&new_object_tree_layer, txn_options);
+        let writer = DirectWriter::new(&new_object_tree_layer, txn_options).await;
         let new_object_tree_layer_object_id = new_object_tree_layer.object_id();
         parent_store.add_to_graveyard(&mut transaction, new_object_tree_layer_object_id);
         parent_store.remove_from_graveyard(&mut end_transaction, new_object_tree_layer_object_id);
@@ -386,7 +386,7 @@ impl ObjectStore {
             .read_transactions_for_object(self.store_object_id)
             .await
             .context("Failed to read encrypted mutations from journal")?;
-        let mut buffer = handle.allocate_buffer(MAX_ENCRYPTED_MUTATIONS_SIZE);
+        let mut buffer = handle.allocate_buffer(MAX_ENCRYPTED_MUTATIONS_SIZE).await;
         let mut cursor = std::io::Cursor::new(buffer.as_mut_slice());
         EncryptedMutations::from_replayed_mutations(self.store_object_id, journaled)
             .serialize_with_version(&mut cursor)?;
@@ -424,7 +424,7 @@ impl ObjectStore {
     ) -> Result<(), Error> {
         let mut serialized_info = Vec::new();
         new_store_info.serialize_with_version(&mut serialized_info)?;
-        let mut buf = self.device.allocate_buffer(serialized_info.len());
+        let mut buf = self.device.allocate_buffer(serialized_info.len()).await;
         buf.as_mut_slice().copy_from_slice(&serialized_info[..]);
 
         self.store_info_handle.get().unwrap().txn_write(transaction, 0u64, buf.as_ref()).await

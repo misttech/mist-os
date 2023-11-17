@@ -17,7 +17,7 @@ use {
         vec::Vec,
     },
     storage_device::{
-        buffer::{Buffer, BufferRef, MutableBufferRef},
+        buffer::{BufferFuture, BufferRef, MutableBufferRef},
         buffer_allocator::{BufferAllocator, BufferSource},
     },
 };
@@ -74,7 +74,6 @@ impl FakeObjectHandle {
     }
 }
 
-#[async_trait]
 impl ObjectHandle for FakeObjectHandle {
     fn object_id(&self) -> u64 {
         0
@@ -84,7 +83,7 @@ impl ObjectHandle for FakeObjectHandle {
         self.allocator.block_size().try_into().unwrap()
     }
 
-    fn allocate_buffer(&self, size: usize) -> Buffer<'_> {
+    fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
         self.allocator.allocate_buffer(size)
     }
 }

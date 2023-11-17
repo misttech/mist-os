@@ -18,8 +18,8 @@ pub struct Writer<'a> {
 }
 
 impl<'a> Writer<'a> {
-    pub fn new(handle: &'a dyn WriteObjectHandle) -> Self {
-        Self { handle, buffer: handle.allocate_buffer(BUFFER_SIZE), offset: 0 }
+    pub async fn new(handle: &'a dyn WriteObjectHandle) -> Writer<'a> {
+        Self { handle, buffer: handle.allocate_buffer(BUFFER_SIZE).await, offset: 0 }
     }
 }
 

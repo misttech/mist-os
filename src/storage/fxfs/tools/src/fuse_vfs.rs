@@ -219,7 +219,7 @@ impl FuseFs {
             let mut out: Vec<u8> = Vec::new();
             let align = offset % self.fs.block_size();
 
-            let mut buf = handle.allocate_buffer(handle.block_size() as usize);
+            let mut buf = handle.allocate_buffer(handle.block_size() as usize).await;
             // Round down for the block alignment.
             let mut ofs = offset - align;
             let len = size as u64 + align + ofs;
@@ -258,7 +258,7 @@ impl FuseFs {
     async fn write_fxfs(&self, inode: u64, offset: u64, data: &[u8]) -> FxfsResult<ReplyWrite> {
         if self.get_object_type(inode).await? == ObjectDescriptor::File {
             let handle = self.get_object_handle(inode).await?;
-            let mut buf = handle.allocate_buffer(data.len());
+            let mut buf = handle.allocate_buffer(data.len()).await;
 
             buf.as_mut_slice().copy_from_slice(data);
             handle.write_or_append(Some(offset), buf.as_ref()).await?;

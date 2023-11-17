@@ -824,7 +824,7 @@ mod tests {
             transaction.commit().await.expect("commit failed");
             tasks.push(fasync::Task::spawn(async move {
                 const TEST_DATA: &[u8] = b"hello";
-                let mut buf = handle.allocate_buffer(TEST_DATA.len());
+                let mut buf = handle.allocate_buffer(TEST_DATA.len()).await;
                 buf.as_mut_slice().copy_from_slice(TEST_DATA);
                 for _ in 0..1500 {
                     handle.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
@@ -914,7 +914,7 @@ mod tests {
         transaction.commit().await.expect("commit failed");
 
         // Append some data.
-        let buf = object.allocate_buffer(10000);
+        let buf = object.allocate_buffer(10000).await;
         object.write_or_append(Some(0), buf.as_ref()).await.expect("write failed");
 
         // Overwrite some data.
