@@ -10,7 +10,7 @@
 
 namespace fidl {
 
-// Envelope is a typed version of fidl_envelope_t and represents the in-memory
+// Envelope is a typed version of fidl_envelope_v2_t and represents the in-memory
 // structure of LLCPP envelopes.
 // Envelope has three template specializations:
 // - sizeof(T) > 4 - Out-of-line - envelope is a pointer to out-of-line data.

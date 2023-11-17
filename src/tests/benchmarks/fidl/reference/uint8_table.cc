@@ -6,6 +6,9 @@
 // Table1Struct, Table16Struct and Table63Struct as defined in
 // the fidl benchmark suite.
 
+#include <lib/fit/function.h>
+#include <zircon/fidl.h>
+
 #include <algorithm>
 #include <cstdint>
 
@@ -17,16 +20,12 @@
 #include <zircon/syscalls.h>
 #endif
 
-#include <lib/fit/function.h>
-
 namespace {
 
 template <size_t N>
 bool EncodeUint8TableStruct(void* value, const char** error,
                             fit::function<void(const uint8_t*, size_t)> callback) {
-  uint8_t out_buf[sizeof(fidl_vector_t) + sizeof(fidl_envelope_t) * N + 8 * N];
-  uint8_t* next = out_buf;
-
+  uint8_t out_buf[sizeof(fidl_vector_t) + sizeof(fidl_envelope_v2_t) * N];
   fidl_vector_t* table_vec = reinterpret_cast<fidl_vector_t*>(value);
   size_t count = table_vec->count;
   void* data = table_vec->data;
@@ -34,37 +33,12 @@ bool EncodeUint8TableStruct(void* value, const char** error,
     *error = "table with null data had non-zero element count";
     return false;
   }
-  *reinterpret_cast<fidl_vector_t*>(next) = fidl_vector_t{
+  *reinterpret_cast<fidl_vector_t*>(out_buf) = fidl_vector_t{
       .count = count,
       .data = reinterpret_cast<void*>(FIDL_ALLOC_PRESENT),
   };
-  next += sizeof(fidl_vector_t);
-
-  fidl_envelope_t* start_envelopes = reinterpret_cast<fidl_envelope_t*>(data);
-  fidl_envelope_t* end_envelopes = start_envelopes + count;
-  uint64_t* next_out_of_line = reinterpret_cast<uint64_t*>(next + count * sizeof(fidl_envelope_t));
-
-  for (fidl_envelope_t* envelope = start_envelopes; envelope < end_envelopes; envelope++) {
-    if (envelope->data == nullptr) {
-      *reinterpret_cast<fidl_envelope_t*>(next) = fidl_envelope_t{
-          .num_bytes = 0,
-          .num_handles = 0,
-          // This doesn't compile when FIDL_ALLOC_ABSENT is used in place of 0.
-          .presence = 0,
-      };
-    } else {
-      *reinterpret_cast<fidl_envelope_t*>(next) = fidl_envelope_t{
-          .num_bytes = 8,
-          .num_handles = 0,
-          .presence = FIDL_ALLOC_PRESENT,
-      };
-      *next_out_of_line = *reinterpret_cast<uint8_t*>(envelope->data);
-      next_out_of_line++;
-    }
-    next += sizeof(fidl_vector_t);
-  }
-
-  callback(out_buf, static_cast<size_t>(reinterpret_cast<uint8_t*>(next_out_of_line) - out_buf));
+  memcpy(out_buf + sizeof(fidl_vector_t), data, sizeof(fidl_envelope_v2_t) * N);
+  callback(out_buf, sizeof out_buf);
   return true;
 }
 
@@ -82,71 +56,54 @@ bool DecodeUint8TableStruct(uint8_t* bytes, size_t bytes_size, zx_handle_t* hand
     return false;
   }
 
-  fidl_envelope_t* start_envelopes =
-      reinterpret_cast<fidl_envelope_t*>(bytes + sizeof(fidl_vector_t));
+  fidl_envelope_v2_t* start_envelopes =
+      reinterpret_cast<fidl_envelope_v2_t*>(bytes + sizeof(fidl_vector_t));
   table_vec->data = start_envelopes;
-  fidl_envelope_t* end_known_envelopes = start_envelopes + std::min(N, table_vec->count);
-  fidl_envelope_t* end_all_envelopes = start_envelopes + table_vec->count;
+  fidl_envelope_v2_t* end_known_envelopes = start_envelopes + std::min(N, table_vec->count);
+  fidl_envelope_v2_t* end_all_envelopes = start_envelopes + table_vec->count;
 
   uint8_t* next_out_of_line = reinterpret_cast<uint8_t*>(end_all_envelopes);
-  if (unlikely(reinterpret_cast<uint8_t*>(next_out_of_line) - bytes > int64_t(bytes_size))) {
+  if (unlikely(next_out_of_line - bytes > static_cast<int64_t>(bytes_size))) {
     *error = "byte size exceeds available size";
     return false;
   }
 
-  for (fidl_envelope_t* envelope = start_envelopes; envelope != end_known_envelopes; envelope++) {
+  for (fidl_envelope_v2_t* envelope = start_envelopes; envelope != end_known_envelopes;
+       envelope++) {
     if (unlikely(envelope->num_handles != 0)) {
       *error = "incorrect num_handles in envelope";
       return false;
     }
-    if (envelope->data == nullptr) {
-      if (unlikely(envelope->num_bytes != 0)) {
-        *error = "incorrect num_bytes in envelope";
-        return false;
-      }
-    } else {
-      if (unlikely(envelope->num_bytes != 8)) {
-        *error = "incorrect num_bytes in envelope";
-        return false;
-      }
-      if (unlikely((*reinterpret_cast<uint64_t*>(next_out_of_line) & 0xffffffffffffff00) != 0)) {
-        *error = "invalid padding byte";
-        return false;
-      }
-      envelope->data = next_out_of_line;
-      next_out_of_line += 8;
-      if (unlikely(reinterpret_cast<uint8_t*>(next_out_of_line) - bytes > int64_t(bytes_size))) {
-        *error = "byte size exceeds available size";
-        return false;
-      }
+    if (unlikely(envelope->flags != FIDL_ENVELOPE_FLAGS_INLINING_MASK)) {
+      *error = "invalid envelope flags";
+      return false;
     }
   }
 
   // Unknown envelopes
   uint32_t num_handles = 0;
-  for (fidl_envelope_t* envelope = end_known_envelopes; envelope != end_all_envelopes; envelope++) {
-    if (envelope->data == nullptr) {
-      if (unlikely(envelope->num_bytes != 0)) {
-        *error = "incorrect num_bytes in envelope";
-        return false;
-      }
-      if (unlikely(envelope->num_handles != 0)) {
-        *error = "incorrect num_handles in envelope";
-        return false;
-      }
-    } else {
-      size_t aligned_bytes = envelope->num_bytes;
-      if (unlikely(!FidlIsAligned(reinterpret_cast<uint8_t*>(aligned_bytes)))) {
-        *error = "incorrect num_bytes in envelope";
-        return false;
-      }
-      num_handles += envelope->num_handles;
-      envelope->data = next_out_of_line;
-      next_out_of_line += aligned_bytes;
-      if (unlikely(reinterpret_cast<uint8_t*>(next_out_of_line) - bytes > int64_t(bytes_size))) {
-        *error = "byte size exceeds available size";
-        return false;
-      }
+  for (fidl_envelope_v2_t* envelope = end_known_envelopes; envelope != end_all_envelopes;
+       envelope++) {
+    uint16_t flags = envelope->flags;
+    if (flags == FIDL_ENVELOPE_FLAGS_INLINING_MASK) {
+      continue;
+    }
+    if (unlikely(flags != 0)) {
+      *error = "invalid envelope flags";
+      return false;
+    }
+    size_t num_bytes = envelope->num_bytes;
+    if (unlikely(num_bytes % 8 != 0)) {
+      *error = "incorrect num_bytes in envelope";
+      return false;
+    }
+    num_handles += envelope->num_handles;
+    auto envelope_as_ptr = reinterpret_cast<uint8_t**>(envelope);
+    *envelope_as_ptr = next_out_of_line;
+    next_out_of_line += num_bytes;
+    if (unlikely(next_out_of_line - bytes > static_cast<int64_t>(bytes_size))) {
+      *error = "byte size exceeds available size";
+      return false;
     }
   }
 #ifdef __Fuchsia__

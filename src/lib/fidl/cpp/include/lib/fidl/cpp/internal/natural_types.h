@@ -523,7 +523,7 @@ struct NaturalUnionCodingTraits {
       encoder->SetError(kCodingErrorRecursionDepthExceeded);
       return;
     }
-    const size_t envelope_offset = offset + offsetof(fidl_xunion_t, envelope);
+    const size_t envelope_offset = offset + offsetof(fidl_xunion_v2_t, envelope);
     EncodeMember(encoder, value, envelope_offset, index, recursion_depth + 1);
     // Call GetPtr after Encode because the buffer may move.
     fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
@@ -547,12 +547,6 @@ struct NaturalUnionCodingTraits {
   }
 
   static void Decode(NaturalDecoder* decoder, T* value, size_t offset, size_t recursion_depth) {
-    // Note: fidl_xunion_t and fidl_xunion_v2_t have xunion->tag in the same layout position
-    // and the same value of offsetof(fidl_xunion_t, envelope).
-    static_assert(sizeof(fidl_xunion_t::tag) == sizeof(fidl_xunion_v2_t::tag));
-    static_assert(offsetof(fidl_xunion_t, tag) == offsetof(fidl_xunion_v2_t, tag));
-    static_assert(offsetof(fidl_xunion_t, envelope) == offsetof(fidl_xunion_v2_t, envelope));
-
     fidl_xunion_v2_t* xunion = decoder->GetPtr<fidl_xunion_v2_t>(offset);
     const size_t index = T::TagToIndex(decoder, static_cast<typename T::Tag>(xunion->tag));
     if (unlikely(decoder->status() != ZX_OK)) {

@@ -30,11 +30,6 @@ static_assert(offsetof(fidl_vector_t, count) == 0u, "fidl_vector_t layout");
 static_assert(offsetof(fidl_vector_t, data) == 8u, "fidl_vector_t layout");
 static_assert(sizeof(fidl_vector_t) == 16u, "fidl_vector_t layout");
 
-static_assert(offsetof(fidl_envelope_t, num_bytes) == 0u, "fidl_envelope_t layout");
-static_assert(offsetof(fidl_envelope_t, num_handles) == 4u, "fidl_envelope_t layout");
-static_assert(offsetof(fidl_envelope_t, data) == 8u, "fidl_envelope_t layout");
-static_assert(sizeof(fidl_envelope_t) == 16u, "fidl_envelope_t layout");
-
 static_assert(offsetof(fidl_envelope_v2_t, num_bytes) == 0u, "fidl_envelope_v2_t layout");
 static_assert(offsetof(fidl_envelope_v2_t, inline_value) == 0u, "fidl_envelope_v2_t layout");
 static_assert(offsetof(fidl_envelope_v2_t, num_handles) == 4u, "fidl_envelope_v2_t layout");

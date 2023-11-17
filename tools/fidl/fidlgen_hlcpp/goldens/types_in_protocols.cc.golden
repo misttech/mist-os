@@ -186,7 +186,7 @@ void Union::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::typesinprotocols::Union::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -467,7 +467,7 @@ void ResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::typesinprotocols::ResourceUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }

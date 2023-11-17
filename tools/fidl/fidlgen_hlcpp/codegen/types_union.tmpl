@@ -341,9 +341,9 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
     {{- if .IsFlexible }}
     case {{ .TagUnknown }}: {
       {{- if .IsResourceType }}
-      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       {{- else }}
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       {{- end }}
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
@@ -518,7 +518,7 @@ struct CodingTraits<std::unique_ptr<{{ . }}>> {
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<{{ . }}>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

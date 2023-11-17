@@ -2663,7 +2663,7 @@ void MainProtocolTwoWayAnonRequest::Encode(::fidl::Encoder* encoder, size_t offs
       break;
     }
     case ::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -3088,7 +3088,7 @@ void MainProtocol_TwoWayAnonWithError_Response::Encode(::fidl::Encoder* encoder,
       break;
     }
     case ::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -3470,7 +3470,7 @@ void MainProtocolOnAnonRequest::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }

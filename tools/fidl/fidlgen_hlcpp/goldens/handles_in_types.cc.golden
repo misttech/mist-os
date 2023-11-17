@@ -232,7 +232,7 @@ void UnionWithHandle::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::handlesintypes::UnionWithHandle::Tag::kUnknown: {
-      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -543,7 +543,7 @@ void EmptyResourceUnion::Encode(::fidl::Encoder* encoder, size_t offset,
                                 cpp17::optional<::fidl::HandleInformation> maybe_handle_info) {
   switch (Which()) {
     case ::test::handlesintypes::EmptyResourceUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }

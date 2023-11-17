@@ -1147,7 +1147,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyDart_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1248,7 +1248,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyGo_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1349,7 +1349,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyLibfuzzer_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1450,7 +1450,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenyRust_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1551,7 +1551,7 @@ struct CodingTraits<std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_On
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::bindingsdenylist::DenyEachBinding_OnlyDenySyzkaller_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

@@ -121,7 +121,7 @@ void UnknownInteractionsProtocolStrictTwoWayUnionResponse::Encode(::fidl::Encode
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -888,7 +888,7 @@ void UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Encode(::fidl::E
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -2065,7 +2065,7 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Encode(::fidl::En
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -3344,7 +3344,7 @@ void UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Encode(::fidl:
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4185,7 +4185,7 @@ void UnknownInteractionsProtocolStrictEventUnionRequest::Encode(::fidl::Encoder*
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4952,7 +4952,7 @@ void UnknownInteractionsProtocol_StrictEventUnionErr_Response::Encode(::fidl::En
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -5691,7 +5691,7 @@ void UnknownInteractionsProtocolFlexibleEventUnionRequest::Encode(::fidl::Encode
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -6458,7 +6458,7 @@ void UnknownInteractionsProtocol_FlexibleEventUnionErr_Response::Encode(::fidl::
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -7197,7 +7197,7 @@ void UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Encode(::fidl::En
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -7964,7 +7964,7 @@ void UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Encode(::fid
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -8703,7 +8703,7 @@ void UnknownInteractionsAjarProtocolStrictEventUnionRequest::Encode(::fidl::Enco
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -9470,7 +9470,7 @@ void UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response::Encode(::fidl
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -10209,7 +10209,7 @@ void UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Encode(::fidl::En
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -10976,7 +10976,7 @@ void UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response::Encode(::fi
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -11715,7 +11715,7 @@ void UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Encode(::fidl::
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -12482,7 +12482,7 @@ void UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Encode(::f
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -13221,7 +13221,7 @@ void UnknownInteractionsClosedProtocolStrictEventUnionRequest::Encode(::fidl::En
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -13988,7 +13988,7 @@ void UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response::Encode(::fi
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -14727,7 +14727,7 @@ void UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Encode(::fidl::
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -15494,7 +15494,7 @@ void UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Encode(::f
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -16671,7 +16671,7 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Encode(::fi
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -17950,7 +17950,7 @@ void UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Encode(:
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -18791,7 +18791,7 @@ void UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Encode(::fi
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -19558,7 +19558,7 @@ void UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Encode
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -20297,7 +20297,7 @@ void UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Encode(::
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -21064,7 +21064,7 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Enco
       break;
     }
     case ::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }

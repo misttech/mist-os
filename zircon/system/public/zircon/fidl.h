@@ -218,26 +218,6 @@ typedef struct fidl_vector {
 // - <valid pointer> : envelope is non-null, |data| is at indicated memory address
 
 typedef struct {
-  // The size of the entire envelope contents, including any additional
-  // out-of-line objects that the envelope may contain. For example, a
-  // vector<string>'s num_bytes for ["hello", "world"] would include the
-  // string contents in the size, not just the outer vector. Always a multiple
-  // of 8; must be zero if envelope is null.
-  uint32_t num_bytes;
-
-  // The number of handles in the envelope, including any additional
-  // out-of-line objects that the envelope contains. Must be zero if envelope is null.
-  uint32_t num_handles;
-
-  // A pointer to the out-of-line envelope data in decoded form, or
-  // FIDL_ALLOC_(ABSENT|PRESENT) in encoded form.
-  union {
-    void* data;
-    uintptr_t presence;
-  };
-} fidl_envelope_t;
-
-typedef struct {
   union {
     // The size of the entire envelope contents, including any additional
     // out-of-line objects that the envelope may contain. For example, a
@@ -264,7 +244,6 @@ typedef struct {
   uint16_t flags;
 } fidl_envelope_v2_t;
 
-static_assert(sizeof(fidl_envelope_t) == 16, "");
 static_assert(sizeof(fidl_envelope_v2_t) == 8, "");
 
 // Bit 0 in flags indicates if the object is inlined in the envelope.
@@ -417,15 +396,9 @@ enum {
 
 typedef struct {
   fidl_xunion_tag_t tag;
-  fidl_envelope_t envelope;
-} fidl_xunion_t;
-
-typedef struct {
-  fidl_xunion_tag_t tag;
   fidl_envelope_v2_t envelope;
 } fidl_xunion_v2_t;
 
-static_assert(sizeof(fidl_xunion_t) == 24, "");
 static_assert(sizeof(fidl_xunion_v2_t) == 16, "");
 
 // Messages.

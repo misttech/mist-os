@@ -607,7 +607,7 @@ void FlexiblePizzaOrPasta::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::FlexiblePizzaOrPasta::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -1350,7 +1350,7 @@ void FlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::FlexibleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -2446,7 +2446,7 @@ void FlexibleFoo::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::FlexibleFoo::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -2884,7 +2884,7 @@ void ExplicitFoo::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::ExplicitFoo::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -3320,7 +3320,7 @@ void OlderSimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::OlderSimpleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -3586,7 +3586,7 @@ void NewerSimpleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::NewerSimpleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4089,7 +4089,7 @@ void UnionContainingEmptyStruct::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::UnionContainingEmptyStruct::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4541,7 +4541,7 @@ void ExplicitFlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::ExplicitFlexibleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4773,7 +4773,7 @@ void UnionWithAttributes::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::union_::UnionWithAttributes::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -4914,7 +4914,7 @@ void EmptyFlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
 
   switch (Which()) {
     case ::test::union_::EmptyFlexibleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -5027,7 +5027,7 @@ void OnlyReservedFlexibleUnion::Encode(::fidl::Encoder* encoder, size_t offset,
 
   switch (Which()) {
     case ::test::union_::OnlyReservedFlexibleUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }

@@ -463,7 +463,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unionsandwich::UnionSize8Alignment4>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -549,7 +549,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unionsandwich::UnionSize12Alignment4>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -660,7 +660,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unionsandwich::UnionSize24Alignment8>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -746,7 +746,7 @@ struct CodingTraits<std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unionsandwich::UnionSize36Alignment4>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

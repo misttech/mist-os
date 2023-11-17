@@ -1142,7 +1142,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWa
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1199,7 +1199,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_OnLoc
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_OnLocalWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1381,7 +1381,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWa
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1488,7 +1488,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_OnAno
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_OnAnonWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1545,7 +1545,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWa
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_TwoWayImportWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -1602,7 +1602,7 @@ struct CodingTraits<std::unique_ptr<::test::protocolpayloads::MainProtocol_OnImp
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocolpayloads::MainProtocol_OnImportWithError_Result>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

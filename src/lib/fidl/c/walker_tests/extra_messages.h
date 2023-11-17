@@ -103,22 +103,22 @@ struct LLCPPStyleUnionStruct {
   LLCPPStyleUnion u;
 };
 
-using SimpleTable = fidl::VectorView<fidl_envelope_t>;
+using SimpleTable = fidl::VectorView<fidl_envelope_v2_t>;
 struct SimpleTableEnvelopes {
-  alignas(FIDL_ALIGNMENT) fidl_envelope_t x;
-  fidl_envelope_t reserved1;
-  fidl_envelope_t reserved2;
-  fidl_envelope_t reserved3;
-  fidl_envelope_t y;
+  alignas(FIDL_ALIGNMENT) fidl_envelope_v2_t x;
+  fidl_envelope_v2_t reserved1;
+  fidl_envelope_v2_t reserved2;
+  fidl_envelope_v2_t reserved3;
+  fidl_envelope_v2_t y;
 };
 struct IntStruct {
   alignas(FIDL_ALIGNMENT) int64_t v;
 };
 
-using TableOfStruct = fidl::VectorView<fidl_envelope_t>;
+using TableOfStruct = fidl::VectorView<fidl_envelope_v2_t>;
 struct TableOfStructEnvelopes {
-  alignas(FIDL_ALIGNMENT) fidl_envelope_t a;
-  fidl_envelope_t b;
+  alignas(FIDL_ALIGNMENT) fidl_envelope_v2_t a;
+  fidl_envelope_v2_t b;
 };
 struct OrdinalOneStructWithHandle {
   alignas(FIDL_ALIGNMENT) zx_handle_t h;
@@ -136,14 +136,14 @@ struct TableOfStructLayout {
   OrdinalTwoStructWithManyHandles b;
 };
 
-using SmallerTableOfStruct = fidl::VectorView<fidl_envelope_t>;
+using SmallerTableOfStruct = fidl::VectorView<fidl_envelope_v2_t>;
 struct SmallerTableOfStructEnvelopes {
-  alignas(FIDL_ALIGNMENT) fidl_envelope_t b;
+  alignas(FIDL_ALIGNMENT) fidl_envelope_v2_t b;
 };
 
 struct SampleXUnion {
   FIDL_ALIGNDECL
-  fidl_xunion_t header;
+  fidl_xunion_v2_t header;
 
   // Representing out-of-line part.
   // There are three possibilities. All are allocated here, but only one will be set and used.
@@ -177,7 +177,7 @@ constexpr uint32_t kSampleXUnionRawIntOrdinal = 3;
 
 struct SampleStrictXUnion {
   FIDL_ALIGNDECL
-  fidl_xunion_t header;
+  fidl_xunion_v2_t header;
 
   // Representing out-of-line part.
   // There are three possibilities. All are allocated here, but only one will be set and used.

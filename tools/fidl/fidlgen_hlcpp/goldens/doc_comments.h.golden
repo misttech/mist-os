@@ -741,7 +741,7 @@ struct CodingTraits<std::unique_ptr<::test::doccomments::StrictUnion>> {
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::doccomments::StrictUnion>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -796,7 +796,7 @@ struct CodingTraits<std::unique_ptr<::test::doccomments::FlexibleUnion>> {
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::doccomments::FlexibleUnion>* value, size_t offset) {
-    fidl_xunion_t* encoded = _decoder->GetPtr<fidl_xunion_t>(offset);
+    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

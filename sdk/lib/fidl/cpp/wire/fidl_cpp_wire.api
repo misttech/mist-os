@@ -10,7 +10,7 @@
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/coding_errors.h": "be750bc859242469747a577ad4145cec",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/connect_service.h": "ee99e479827dec3e93febec1666be3ac",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/decoded_value.h": "7a8e90cf66823415144a094fe6e896f3",
-  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/envelope.h": "15a442eecd8650eebb6004903381a9ae",
+  "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/envelope.h": "922e7c2b8f8e2b85b3f6cb5c1a12de1a",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/extract_resource_on_destruction.h": "efc8e2fa8b64ae542f78a7930a20be09",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/incoming_message.h": "5a120124a9525df65089e742b7572c1a",
   "pkg/fidl_cpp_wire/include/lib/fidl/cpp/wire/internal/arrow.h": "0947aa0d59afac68044de5027f5f1f5b",
