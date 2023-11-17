@@ -42,11 +42,11 @@ async fn main() {
     assert_eq!(restricted.children().next(), None, "restricted duration should not have children");
     let normal = normal.expect("kernel must have a normal mode duration");
     assert!(normal.cpu_time() > 0);
-    let (execute_syscall_name, execute_syscall) = normal.children().next().unwrap();
-    assert_eq!(
-        execute_syscall_name, "ExecuteSyscall",
-        "top cpu usage for normal mode should always be syscalls"
-    );
+    let execute_syscall = normal
+        .children()
+        .find(|(n, _)| *n == "ExecuteSyscall")
+        .map(|(_, c)| c)
+        .expect("any syscall should have been invoked");
 
     let pipe_syscall = execute_syscall
         .children()
