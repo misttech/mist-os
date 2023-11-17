@@ -14,6 +14,7 @@ ffx/scrutiny/verify.golden
 ffx/scrutiny/verify/bootfs.golden
 ffx/scrutiny/verify/component-resolvers.golden
 ffx/scrutiny/verify/kernel-cmdline.golden
+ffx/scrutiny/verify/pre-signing.golden
 ffx/scrutiny/verify/route-sources.golden
 ffx/scrutiny/verify/routes.golden
 ffx/scrutiny/verify/static-pkgs.golden

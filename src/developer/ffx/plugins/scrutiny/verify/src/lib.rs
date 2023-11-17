@@ -11,6 +11,7 @@ use std::{fs, io::Write, path::PathBuf};
 mod bootfs;
 mod component_resolvers;
 mod kernel_cmdline;
+mod pre_signing;
 mod route_sources;
 mod routes;
 mod static_pkgs;
@@ -40,6 +41,7 @@ pub async fn scrutiny_verify(cmd: Command) -> Result<()> {
             component_resolvers::verify(subcommand, tmp_dir, recovery).await
         }
         SubCommand::KernelCmdline(subcommand) => kernel_cmdline::verify(subcommand, recovery).await,
+        SubCommand::PreSigning(subcommand) => pre_signing::verify(subcommand, recovery).await,
         SubCommand::RouteSources(subcommand) => {
             route_sources::verify(subcommand, tmp_dir, recovery).await
         }

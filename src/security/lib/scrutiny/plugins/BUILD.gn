@@ -248,6 +248,7 @@ if (is_host) {
       "src/verify/controller/capability_routing.rs",
       "src/verify/controller/component_resolvers.rs",
       "src/verify/controller/mod.rs",
+      "src/verify/controller/pre_signing.rs",
       "src/verify/controller/route_sources.rs",
       "src/verify/controller/structured_config.rs",
       "src/verify/mod.rs",

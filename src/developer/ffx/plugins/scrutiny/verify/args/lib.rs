@@ -5,6 +5,7 @@
 pub mod bootfs;
 pub mod component_resolvers;
 pub mod kernel_cmdline;
+pub mod pre_signing;
 pub mod route_sources;
 pub mod routes;
 pub mod static_pkgs;
@@ -40,6 +41,7 @@ pub enum SubCommand {
     Bootfs(bootfs::Command),
     ComponentResolvers(component_resolvers::Command),
     KernelCmdline(kernel_cmdline::Command),
+    PreSigning(pre_signing::Command),
     RouteSources(route_sources::Command),
     Routes(routes::Command),
     StaticPkgs(static_pkgs::Command),

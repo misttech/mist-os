@@ -5,5 +5,6 @@
 pub mod build;
 pub mod capability_routing;
 pub mod component_resolvers;
+pub mod pre_signing;
 pub mod route_sources;
 pub mod structured_config;

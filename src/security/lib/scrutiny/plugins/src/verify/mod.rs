@@ -13,6 +13,7 @@ use {
             build::VerifyBuildController,
             capability_routing::{CapabilityRouteController, V2ComponentModelMappingController},
             component_resolvers::ComponentResolversController,
+            pre_signing::PreSigningController,
             route_sources::RouteSourcesController,
             structured_config::ExtractStructuredConfigController,
             structured_config::VerifyStructuredConfigController,
@@ -29,6 +30,7 @@ use {
 };
 
 pub use controller::{
+    pre_signing::PreSigningResponse,
     route_sources::{
         RouteSourceError, Source, VerifyRouteSourcesResult, VerifyRouteSourcesResults,
     },
@@ -46,6 +48,7 @@ plugin!(
             "/verify/build" => VerifyBuildController::default(),
             "/verify/v2_component_model" => V2ComponentModelMappingController::default(),
             "/verify/capability_routes" => CapabilityRouteController::default(),
+            "/verify/pre_signing" => PreSigningController::default(),
             "/verify/route_sources" => RouteSourcesController::default(),
             "/verify/component_resolvers" => ComponentResolversController::default(),
             "/verify/structured_config" => VerifyStructuredConfigController::default(),
