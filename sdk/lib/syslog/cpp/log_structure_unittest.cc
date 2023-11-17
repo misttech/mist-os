@@ -41,6 +41,24 @@ TEST(StructuredLogging, NoSideEffectsIfLoggingIsDisabled) {
   ASSERT_TRUE(called);
 }
 
+template <typename T>
+static cpp17::optional<cpp17::string_view> ToStringView(T input) {
+  return input;
+}
+
+TEST(StructuredLogging, NullSafeStringView) {
+  // Construct from nullptr directly.
+  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(nullptr)), cpp17::nullopt);
+  // Construct from nullptr via const char*.
+  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(static_cast<const char*>(nullptr))),
+            cpp17::nullopt);
+  // Construct from std::string
+  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView(std::string("test"))),
+            cpp17::string_view("test"));
+  // Construct from non-null const char*
+  ASSERT_EQ(ToStringView(syslog_backend::NullSafeStringView("test")), cpp17::string_view("test"));
+}
+
 // Test to validate that SetLogSettings and log initialization is thread-safe.
 TEST(StructuredLogging, ThreadInitialization) {
   // TODO(bbosak): Convert to actual stress test.

@@ -34,10 +34,14 @@ sdk_source_set("cpp") {
   if (is_fuchsia) {
     public_deps = [
       "//sdk/lib/fit-promise",
+      "//sdk/lib/stdcompat",
       "//zircon/system/ulib/zx",
     ]
   } else {
-    public_deps = [ "//sdk/lib/fit-promise" ]
+    public_deps = [
+      "//sdk/lib/fit-promise",
+      "//sdk/lib/stdcompat",
+    ]
   }
   public_configs = [ "//sdk/config" ]
 }
@@ -66,7 +70,10 @@ sdk_source_set("cpp-macros") {
     "macros.h",
   ]
 
-  public_deps = [ "//sdk/lib/fit-promise" ]
+  public_deps = [
+    "//sdk/lib/fit-promise",
+    "//sdk/lib/stdcompat",
+  ]
 
   public_configs = [ "//sdk/config" ]
 }

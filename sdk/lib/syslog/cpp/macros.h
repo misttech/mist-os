@@ -5,6 +5,8 @@
 #ifndef LIB_SYSLOG_CPP_MACROS_H_
 #define LIB_SYSLOG_CPP_MACROS_H_
 
+#include <lib/stdcompat/optional.h>
+#include <lib/stdcompat/string_view.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <zircon/types.h>
 
@@ -17,6 +19,44 @@
 namespace syslog_backend {
 
 struct LogBuffer;
+
+// A null-safe wrapper around cpp17::optional<cpp17::string_view>
+//
+// This class is used to represent a string that may be nullptr. It is used
+// to avoid the need to check for nullptr before passing a string to the
+// syslog macros.
+//
+// This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
+// NOLINT is used as implicit conversions are intentional here.
+class NullSafeStringView {
+ public:
+  //  Constructs a NullSafeStringView from a cpp17::string_view.
+  constexpr NullSafeStringView(cpp17::string_view string_view)
+      : string_view_(string_view) {}  // NOLINT
+
+  // Constructs a NullSafeStringView from a nullptr.
+  constexpr NullSafeStringView(std::nullptr_t) : string_view_(cpp17::nullopt) {}  // NOLINT
+
+  constexpr NullSafeStringView(const NullSafeStringView&) = default;
+
+  // Constructs a NullSafeStringView from a const char* which may be nullptr.
+  // string Nullable string to construct from.
+  constexpr NullSafeStringView(const char* input) {  // NOLINT
+    if (!input) {
+      string_view_ = cpp17::nullopt;
+    } else {
+      string_view_ = cpp17::string_view(input);
+    }
+  }
+
+  // Constructs a NullSafeStringView from an std::string.
+  constexpr NullSafeStringView(const std::string& input) : string_view_(input) {}  // NOLINT
+
+  // Converts this NullSafeStringView to a cpp17::optional<cpp17::string_view>.
+  constexpr operator cpp17::optional<cpp17::string_view>() const { return string_view_; }  // NOLINT
+ private:
+  cpp17::optional<cpp17::string_view> string_view_;
+};
 
 #define WEAK __attribute__((weak))
 
