@@ -25,30 +25,38 @@ using MetadataMap = std::unordered_map<MetadataKey, const Metadata>;
 using BanjoProtoId = uint32_t;
 
 class ForwardMetadata {
-  using AllMetadata = bool;
-  using SpecificMetadata = std::unordered_set<MetadataKey>;
-
  public:
-  // Use this to forward all or none of the metadata available through the parent(s).
-  explicit ForwardMetadata(AllMetadata all_metadata = false) : forward_type_(all_metadata) {}
+  // Creates a ForwardMetadata object in which all of the available metadata from the parent(s)
+  // are forwarded.
+  static ForwardMetadata All();
 
-  // Use this to forward specific metadata available through the parent(s).
+  // Creates a ForwardMetadata object in which none of the available metadata from the parent(s)
+  // are forwarded.
+  static ForwardMetadata None();
+
+  // Creates a ForwardMetadata object in which some of the available metadata from the parent(s)
+  // are forwarded. The given filter set must not be empty.
   //
   // The given set is used as a filter when looking through all of the available metadata to the
   // driver. This means if a given metadata key is not found through the parent(s), it will be
   // ignored.
-  explicit ForwardMetadata(SpecificMetadata specific_metadata) : forward_type_(specific_metadata) {}
+  static ForwardMetadata Some(std::unordered_set<MetadataKey> filter);
 
-  // Returns true when there's nothing to forward. This would be the case if |all_metadata|
-  // was false, or the given |specific_metadata| set was empty.
+  // Deprecated constructor. Use All(), Some(), None() instead.
+  // TODO(fxb/136476): Remove once all usages are migrated
+  explicit ForwardMetadata(std::unordered_set<MetadataKey> filter) : filter_(filter) {}
+
+  // Returns true when there's nothing to forward.
   bool empty() const;
 
   // Returns true if the given key meets the requirements for forwarding.
-  // That means either |all_metadata| was true, or this key exists in |specific_metadata|.
   bool should_forward(MetadataKey key) const;
 
  private:
-  std::variant<AllMetadata, SpecificMetadata> forward_type_;
+  explicit ForwardMetadata(std::optional<std::unordered_set<MetadataKey>> filter)
+      : filter_(std::move(filter)) {}
+
+  std::optional<std::unordered_set<MetadataKey>> filter_;
 };
 
 // The DeviceServer class vends the fuchsia_driver_compat::Device interface.
@@ -98,7 +106,9 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
   // Initialize empty. Can use |Init| to fill in information later.
   DeviceServer() : state_(std::in_place_type<Initialized>) {}
 
-  // Remove when dependencies are removed.
+  // Deprecated constructor. Use empty constructor with |Init| call after to manually initialize,
+  // or use the sync/async-initialization constructors.
+  // TODO(fxb/136476): Remove once all usages are migrated
   DeviceServer(std::string name, uint32_t proto_id, std::string topological_path)
       : state_(std::in_place_type<Initialized>) {
     ZX_ASSERT(proto_id == 0);
@@ -129,7 +139,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                const std::optional<std::string>& node_name, std::string_view child_node_name,
                const std::optional<std::string>& child_additional_path,
-               const ForwardMetadata& forward_metadata = ForwardMetadata{false},
+               const ForwardMetadata& forward_metadata = ForwardMetadata::None(),
                std::optional<BanjoConfig> banjo_config = std::nullopt)
       : state_(AsyncInit{dispatcher, incoming, outgoing, node_name.value_or("NA"),
                          std::string(child_node_name), child_additional_path, forward_metadata}),
@@ -158,7 +168,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
                const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                const std::optional<std::string>& node_name, std::string_view child_node_name,
                const std::optional<std::string>& child_additional_path,
-               const ForwardMetadata& forward_metadata = ForwardMetadata{false},
+               const ForwardMetadata& forward_metadata = ForwardMetadata::None(),
                std::optional<BanjoConfig> banjo_config = std::nullopt)
       : state_(std::in_place_type<Initialized>),
         name_(child_node_name),

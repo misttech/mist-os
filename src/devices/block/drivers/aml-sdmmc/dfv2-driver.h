@@ -83,7 +83,7 @@ class Dfv2Driver : public fdf::DriverBase, public ddk::SdmmcProtocol<Dfv2Driver>
       node_name(),
       name(),
       std::nullopt,
-      compat::ForwardMetadata{{DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}},
+      compat::ForwardMetadata::Some({DEVICE_METADATA_SDMMC, DEVICE_METADATA_GPT_INFO}),
       get_banjo_config()};
 };
 

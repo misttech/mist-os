@@ -40,32 +40,25 @@ void CollectMetadataFrom(fidl::VectorView<fuchsia_driver_compat::wire::Metadata>
 
 namespace fcd = fuchsia_component_decl;
 
-bool ForwardMetadata::empty() const {
-  const bool* all = std::get_if<AllMetadata>(&forward_type_);
-  if (all != nullptr) {
-    return !(*all);
-  }
+ForwardMetadata ForwardMetadata::All() { return ForwardMetadata(std::nullopt); }
 
-  const SpecificMetadata* specific_metadata = std::get_if<SpecificMetadata>(&forward_type_);
-  if (specific_metadata != nullptr) {
-    return specific_metadata->empty();
-  }
-
-  return true;
+ForwardMetadata ForwardMetadata::None() {
+  return ForwardMetadata(std::make_optional(std::unordered_set<MetadataKey>{}));
 }
 
+ForwardMetadata ForwardMetadata::Some(std::unordered_set<MetadataKey> filter) {
+  ZX_ASSERT_MSG(!filter.empty(), "ForwardMetadata::Some 'filter' cannot be empty.");
+  return ForwardMetadata(std::make_optional(filter));
+}
+
+bool ForwardMetadata::empty() const { return filter_.has_value() && filter_->empty(); }
+
 bool ForwardMetadata::should_forward(MetadataKey key) const {
-  const bool* all = std::get_if<AllMetadata>(&forward_type_);
-  if (all != nullptr) {
-    return *all;
+  if (!filter_.has_value()) {
+    return true;
   }
 
-  const SpecificMetadata* specific_metadata = std::get_if<SpecificMetadata>(&forward_type_);
-  if (specific_metadata != nullptr) {
-    return specific_metadata->find(key) != specific_metadata->end();
-  }
-
-  return false;
+  return filter_->find(key) != filter_->end();
 }
 
 std::optional<zx::result<>> DeviceServer::InitResult() const {
