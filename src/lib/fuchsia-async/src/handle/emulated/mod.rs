@@ -1002,6 +1002,11 @@ impl Socket {
             Poll::Pending => Err(zx_status::Status::SHOULD_WAIT),
         }
     }
+
+    /// Get an OnSignals that returns when this handle's peer closes.
+    pub fn on_closed(&self) -> on_signals::OnSignals<'_> {
+        on_signals::OnSignals::new(self, Signals::OBJECT_PEER_CLOSED)
+    }
 }
 
 /// Emulation of Zircon EventPair.
