@@ -659,10 +659,14 @@ fn sendmsg_internal(
             data_size,
         )?;
         next_message_offset += round_up_to_increment(header_size + data.len(), size_of::<usize>())?;
-        ancillary_data.push(AncillaryData::from_cmsg(
+        let data = AncillaryData::from_cmsg(
             current_task,
             ControlMsg::new(cmsg.cmsg_level, cmsg.cmsg_type, data),
-        )?);
+        )?;
+        if data.total_size() == 0 {
+            continue;
+        }
+        ancillary_data.push(data);
     }
 
     let flags = SocketMessageFlags::from_bits(flags).ok_or_else(|| errno!(EOPNOTSUPP))?;
