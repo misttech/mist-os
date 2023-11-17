@@ -71,12 +71,12 @@ void TaskQueue::Stop() {
 }
 
 void TaskQueue::OnWake(zx_status_t status) {
-  std::lock_guard guard(checker_);
+  std::lock_guard outer(checker_);
   list_node_t tasks;
 
   // Harvest tasks under the lock.
   {
-    std::lock_guard guard(mutex_);
+    std::lock_guard inner(mutex_);
     wake_pending_ = false;
     if (status != ZX_OK) {
       StopLocked();
