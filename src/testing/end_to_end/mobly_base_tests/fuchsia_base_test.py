@@ -10,7 +10,9 @@ from typing import Dict, List
 
 from honeydew import custom_types, transports
 from honeydew.interfaces.device_classes import fuchsia_device
-from mobly import base_test, test_runner
+from honeydew.interfaces.auxiliary_devices import power_switch
+from honeydew.auxiliary_devices import power_switch_dmc
+from mobly import base_test, signals, test_runner
 from mobly_controller import fuchsia_device as fuchsia_device_mobly_controller
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
@@ -65,10 +67,11 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             * Stores the current test case path into self.test_case_path
             * Logs a info message onto device that test case has started.
         """
+        self._devices_not_healthy: bool = False
+
         self.test_case_path: str = (
             f"{self.log_path}/{self.current_test_info.name}"
         )
-        self._health_check()
         self._log_message_to_devices(
             message=f"Started executing '{self.current_test_info.name}' "
             f"Lacewing test case...",
@@ -84,6 +87,8 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
               "teardown_test"
             * Logs a info message onto device that test case has ended.
         """
+        self._health_check_and_recover()
+
         if self.snapshot_on == SnapshotOn.TEARDOWN_TEST:
             self._collect_snapshot(directory=self.test_case_path)
         self._log_message_to_devices(
@@ -91,6 +96,14 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             f"Lacewing test case...",
             level=custom_types.LEVEL.INFO,
         )
+
+        if self._devices_not_healthy:
+            message: str = (
+                "One or more FuchsiaDevice's health check failed in "
+                "teardown_test. So failing the test case..."
+            )
+            _LOGGER.warning(message)
+            raise signals.TestFailure(message)
 
     def teardown_class(self) -> None:
         """teardown_class is called once after running all tests.
@@ -253,13 +266,70 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
                 return controller_config
         return {}
 
-    def _health_check(self) -> None:
-        """Ensure all FuchsiaDevice objects are healthy."""
+    def _health_check_and_recover(self) -> None:
+        """Ensure all FuchsiaDevice objects are healthy and if unhealthy perform
+        a power_cycle in an attempt to recover.
+
+        If health check failed for any device then fail the test case even if we
+        are able to recover the device successfully.
+
+        If the recovery fails, then abort the test class.
+        """
         _LOGGER.info(
             "Performing health checks on all the FuchsiaDevice objects..."
         )
+
         for fx_device in self.fuchsia_devices:
-            fx_device.health_check()
+            try:
+                fx_device.health_check()
+            except Exception as err:  # pylint: disable=broad-except
+                self._devices_not_healthy = True
+                _LOGGER.warning(
+                    "Health check on %s failed with error '%s', will try to "
+                    "recover the device",
+                    fx_device.device_name,
+                    err,
+                )
+                self._recover_device(fx_device)
+
+        _LOGGER.info(
+            "Successfully performed health checks and/or recoveries on all the "
+            "FuchsiaDevice objects..."
+        )
+
+    def _recover_device(self, fx_device: fuchsia_device.FuchsiaDevice) -> None:
+        """Try to recover the fuchsia device by power cycling it if the test has
+        access to DMC.
+
+        Args:
+            fx_device: FuchsiaDevice object
+        """
+        try:
+            dmc_power_switch: power_switch_dmc.PowerSwitchDmc = (
+                power_switch_dmc.PowerSwitchDmc(
+                    device_name=fx_device.device_name
+                )
+            )
+            fx_device.power_cycle(power_switch=dmc_power_switch, outlet=None)
+        except power_switch_dmc.PowerSwitchDmcError as err:
+            _LOGGER.warning(
+                "Unable to power cycle %s as test does not have access to DMC. "
+                "Aborting the test class...",
+                fx_device.device_name,
+            )
+            raise signals.TestAbortClass(
+                f"{fx_device.device_name} is unhealthy and unable to recover it"
+            ) from err
+        except power_switch.PowerSwitchError as err:
+            _LOGGER.warning(
+                "Power cycling %s failed with error '%s'. "
+                "Aborting the test class...",
+                fx_device.device_name,
+                err,
+            )
+            raise signals.TestAbortClass(
+                f"{fx_device.device_name} is unhealthy and failed to recover it"
+            ) from err
 
     def _is_fuchsia_controller_based_device(
         self, fx_device: fuchsia_device.FuchsiaDevice

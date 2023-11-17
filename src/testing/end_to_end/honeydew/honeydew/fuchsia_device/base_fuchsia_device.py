@@ -241,10 +241,17 @@ class BaseFuchsiaDevice(
             errors.Sl4FError: On communications failure.
         """
         _LOGGER.info("Power cycling %s...", self.device_name)
-        self.log_message_to_device(
-            message=f"Powering cycling {self.device_name}...",
-            level=custom_types.LEVEL.INFO,
-        )
+
+        try:
+            self.log_message_to_device(
+                message=f"Powering cycling {self.device_name}...",
+                level=custom_types.LEVEL.INFO,
+            )
+        except Exception:  # pylint: disable=broad-except
+            # power_cycle can be used as a recovery mechanism when device is
+            # unhealthy. So any calls to device prior to power_cycle can
+            # fail in such cases and thus ignore them.
+            pass
 
         _LOGGER.info("Powering off %s...", self.device_name)
         power_switch.power_off(outlet)
