@@ -21,6 +21,7 @@ use {
     cml_macro::{CheckedVec, OneOrMany, Reference},
     fidl_fuchsia_io as fio,
     indexmap::IndexMap,
+    itertools::Itertools,
     json5format::{FormatOptions, PathOption},
     lazy_static::lazy_static,
     maplit::{hashmap, hashset},
@@ -1551,7 +1552,7 @@ impl Document {
         merge_from_other_field!(self, other, include);
         merge_from_other_field!(self, other, children);
         merge_from_other_field!(self, other, collections);
-        merge_from_other_field!(self, other, environments);
+        self.merge_environment(other, include_path)?;
         self.merge_program(other, include_path)?;
         self.merge_facets(other, include_path)?;
         self.merge_config(other, include_path)?;
@@ -1616,6 +1617,47 @@ impl Document {
             include_path,
             Some(vec!["environ"]),
         )
+    }
+
+    fn merge_environment(
+        &mut self,
+        other: &mut Document,
+        _include_path: &path::Path,
+    ) -> Result<(), Error> {
+        if let None = other.environments {
+            return Ok(());
+        }
+        if let None = self.environments {
+            self.environments = Some(vec![]);
+        }
+
+        let my_environments = self.environments.as_mut().unwrap();
+        let other_environments = other.environments.as_mut().unwrap();
+        my_environments.sort_by(|x, y| x.name.cmp(&y.name));
+        other_environments.sort_by(|x, y| x.name.cmp(&y.name));
+
+        let all_environments =
+            my_environments.into_iter().merge_by(other_environments, |x, y| x.name <= y.name);
+        let groups = all_environments.group_by(|e| e.name.clone());
+
+        let mut merged_environments = vec![];
+        for (name, group) in groups.into_iter() {
+            let mut merged_environment = Environment {
+                name: name.clone(),
+                extends: None,
+                runners: None,
+                resolvers: None,
+                debug: None,
+                stop_timeout_ms: None,
+            };
+            for e in group {
+                merged_environment.merge_from(e)?;
+            }
+            merged_environments.push(merged_environment);
+        }
+
+        self.environments = Some(merged_environments);
+        Ok(())
     }
 
     fn merge_maps<'s, Source, Dest>(
@@ -1987,6 +2029,56 @@ pub struct Environment {
     pub stop_timeout_ms: Option<StopTimeoutMs>,
 }
 
+impl Environment {
+    pub fn merge_from(&mut self, other: &mut Self) -> Result<(), Error> {
+        if self.extends.is_none() {
+            self.extends = other.extends.take();
+        } else if other.extends.is_some() && other.extends != self.extends {
+            return Err(Error::validate(
+                "cannot merge `environments` that declare conflicting `extends`",
+            ));
+        }
+
+        if self.stop_timeout_ms.is_none() {
+            self.stop_timeout_ms = other.stop_timeout_ms;
+        } else if other.stop_timeout_ms.is_some() && other.stop_timeout_ms != self.stop_timeout_ms {
+            return Err(Error::validate(
+                "cannot merge `environments` that declare conflicting `stop_timeout_ms`",
+            ));
+        }
+
+        // Perform naive vector concatenation and rely on later validation to ensure
+        // no conflicting entries.
+        match &mut self.runners {
+            Some(r) => {
+                if let Some(o) = &mut other.runners {
+                    r.append(o);
+                }
+            }
+            None => self.runners = other.runners.take(),
+        }
+
+        match &mut self.resolvers {
+            Some(r) => {
+                if let Some(o) = &mut other.resolvers {
+                    r.append(o);
+                }
+            }
+            None => self.resolvers = other.resolvers.take(),
+        }
+
+        match &mut self.debug {
+            Some(r) => {
+                if let Some(o) = &mut other.debug {
+                    r.append(o);
+                }
+            }
+            None => self.debug = other.debug.take(),
+        }
+        Ok(())
+    }
+}
+
 #[derive(Clone, Hash, Debug, PartialEq, PartialOrd, Eq, Ord, Serialize)]
 pub struct ConfigKey(String);
 
@@ -2199,6 +2291,7 @@ pub struct RunnerRegistration {
 
     /// An explicit name for the runner as it will be known in
     /// this environment. If omitted, defaults to `runner`.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub r#as: Option<Name>,
 }
 
@@ -2339,6 +2432,7 @@ pub struct DebugRegistration {
 
     /// If specified, the name that the capability in `protocol` should be made
     /// available as to clients. Disallowed if `protocol` is an array.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub r#as: Option<Name>,
 }
 
@@ -3945,7 +4039,7 @@ mod tests {
         assert_matches::assert_matches,
         difference::Changeset,
         error::{Error, Location},
-        serde_json::{self, json, to_string_pretty},
+        serde_json::{self, json, to_string_pretty, to_value},
         serde_json5,
         std::path::Path,
         test_case::test_case,
@@ -4419,7 +4513,7 @@ mod tests {
         let mut other = document(json!({ "expose": [{ "protocol": "bar", "from": "self" }] }));
         some.merge_from(&mut other, &Path::new("some/path")).unwrap();
         let uses = some.r#use.as_ref().unwrap();
-        let exposes = some.r#expose.as_ref().unwrap();
+        let exposes = some.expose.as_ref().unwrap();
         assert_eq!(uses.len(), 1);
         assert_eq!(exposes.len(), 1);
         assert_eq!(
@@ -4430,6 +4524,166 @@ mod tests {
             exposes[0].protocol.as_ref().unwrap(),
             &OneOrMany::One("bar".parse::<Name>().unwrap())
         );
+    }
+
+    #[test]
+    fn test_merge_environments() {
+        let mut some = document(json!({ "environments": [
+            {
+                "name": "one",
+                "extends": "realm",
+            },
+            {
+                "name": "two",
+                "extends": "none",
+                "runners": [
+                    {
+                        "runner": "r1",
+                        "from": "#c1",
+                    },
+                    {
+                        "runner": "r2",
+                        "from": "#c2",
+                    },
+                ],
+                "resolvers": [
+                    {
+                        "resolver": "res1",
+                        "from": "#c1",
+                        "scheme": "foo",
+                    },
+                ],
+                "debug": [
+                    {
+                        "protocol": "baz",
+                        "from": "#c2"
+                    }
+                ]
+            },
+        ]}));
+        let mut other = document(json!({ "environments": [
+            {
+                "name": "two",
+                "__stop_timeout_ms": 100,
+                "runners": [
+                    {
+                        "runner": "r3",
+                        "from": "#c3",
+                    },
+                ],
+                "resolvers": [
+                    {
+                        "resolver": "res2",
+                        "from": "#c1",
+                        "scheme": "bar",
+                    },
+                ],
+                "debug": [
+                    {
+                        "protocol": "faz",
+                        "from": "#c2"
+                    }
+                ]
+            },
+            {
+                "name": "three",
+                "__stop_timeout_ms": 1000,
+            },
+        ]}));
+        some.merge_from(&mut other, &Path::new("some/path")).unwrap();
+        assert_eq!(
+            to_value(some).unwrap(),
+            json!({"environments": [
+                {
+                    "name": "one",
+                    "extends": "realm",
+                },
+                {
+                    "name": "three",
+                    "__stop_timeout_ms": 1000,
+                },
+                {
+                    "name": "two",
+                    "extends": "none",
+                    "__stop_timeout_ms": 100,
+                    "runners": [
+                        {
+                            "runner": "r1",
+                            "from": "#c1",
+                        },
+                        {
+                            "runner": "r2",
+                            "from": "#c2",
+                        },
+                        {
+                            "runner": "r3",
+                            "from": "#c3",
+                        },
+                    ],
+                    "resolvers": [
+                        {
+                            "resolver": "res1",
+                            "from": "#c1",
+                            "scheme": "foo",
+                        },
+                        {
+                            "resolver": "res2",
+                            "from": "#c1",
+                            "scheme": "bar",
+                        },
+                    ],
+                    "debug": [
+                        {
+                            "protocol": "baz",
+                            "from": "#c2"
+                        },
+                        {
+                            "protocol": "faz",
+                            "from": "#c2"
+                        }
+                    ]
+                },
+            ]})
+        );
+    }
+
+    #[test]
+    fn test_merge_environments_errors() {
+        {
+            let mut some = document(json!({"environments": [{"name": "one", "extends": "realm"}]}));
+            let mut other = document(json!({"environments": [{"name": "one", "extends": "none"}]}));
+            assert!(some.merge_from(&mut other, &Path::new("some/path")).is_err());
+        }
+        {
+            let mut some =
+                document(json!({"environments": [{"name": "one", "__stop_timeout_ms": 10}]}));
+            let mut other =
+                document(json!({"environments": [{"name": "one", "__stop_timeout_ms": 20}]}));
+            assert!(some.merge_from(&mut other, &Path::new("some/path")).is_err());
+        }
+
+        // It's ok if the values match.
+        {
+            let mut some = document(json!({"environments": [{"name": "one", "extends": "realm"}]}));
+            let mut other =
+                document(json!({"environments": [{"name": "one", "extends": "realm"}]}));
+            some.merge_from(&mut other, &Path::new("some/path")).unwrap();
+            assert_eq!(
+                to_value(some).unwrap(),
+                json!({"environments": [{"name": "one", "extends": "realm"}]})
+            );
+        }
+        {
+            let mut some =
+                document(json!({"environments": [{"name": "one", "__stop_timeout_ms": 10}]}));
+            let mut other =
+                document(json!({"environments": [{"name": "one", "__stop_timeout_ms": 10}]}));
+            some.merge_from(&mut other, &Path::new("some/path")).unwrap();
+            assert_eq!(
+                to_value(some).unwrap(),
+                json!({"environments": [{"name": "one", "__stop_timeout_ms": 10}]})
+            );
+        }
     }
 
     #[test]
