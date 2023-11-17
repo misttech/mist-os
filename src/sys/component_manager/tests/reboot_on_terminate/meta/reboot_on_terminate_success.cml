@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/reboot_on_terminate_success_bin",
     },
     children: [
@@ -17,11 +17,13 @@
 
             // When this component exits, it should trigger reboot.
             startup: "eager",
+            environment: "#elf-env",
             on_terminate: "reboot",
         },
         {
             name: "shutdown_shim",
             url: "#meta/shutdown-shim.cm",
+            environment: "#elf-env",
         },
     ],
     use: [

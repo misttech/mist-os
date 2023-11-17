@@ -9,6 +9,7 @@
         args: [
             "--config",
             "/pkg/data/cm_config",
+            "--add_builtin_runner",
         ],
     },
     capabilities: [
