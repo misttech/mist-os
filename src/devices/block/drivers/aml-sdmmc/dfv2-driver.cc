@@ -177,22 +177,13 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   properties[1] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdmmc::SDMMCSERVICE,
                                     bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT);
 
-  const std::vector<fuchsia_component_decl::wire::Offer> compat_offers =
-      compat_server_.CreateOffers(arena);
-  fidl::VectorView<fuchsia_component_decl::wire::Offer> offers(arena, compat_offers.size() + 1);
-  for (size_t i = 0; i < compat_offers.size(); i++) {
-    offers[i] = compat_offers[i];
-  }
-  const auto sdmmc_service = fuchsia_component_decl::wire::OfferService::Builder(arena)
-                                 .source_name(arena, fuchsia_hardware_sdmmc::SdmmcService::Name)
-                                 .target_name(arena, fuchsia_hardware_sdmmc::SdmmcService::Name)
-                                 .Build();
-  offers[compat_offers.size()] =
-      fuchsia_component_decl::wire::Offer::WithService(arena, sdmmc_service);
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_.CreateOffers(arena);
+  offers.push_back(
+      fdf::MakeOffer<fuchsia_hardware_sdmmc::SdmmcService>(arena, component::kDefaultInstance));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
-                        .offers(offers)
+                        .offers(arena, std::move(offers))
                         .properties(properties)
                         .Build();
 
