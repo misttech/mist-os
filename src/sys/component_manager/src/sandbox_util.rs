@@ -21,16 +21,20 @@ use {
     },
     lazy_static::lazy_static,
     moniker::Moniker,
-    sandbox::{AnyCapability, AsTrait, AsTraitError, Capability, Data, Dict, Receiver, Sender},
+    sandbox::{
+        AnyCapability, AsTrait, AsTraitError, Capability, Completer, Dict, Receiver, Request,
+        Router,
+    },
     std::sync::Arc,
     tracing::warn,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
 
 lazy_static! {
-    static ref SENDER: Name = "sender".parse().unwrap();
-    static ref RECEIVER: Name = "receiver".parse().unwrap();
     static ref AVAILABILITY: Name = "availability".parse().unwrap();
+    static ref RECEIVER: Name = "receiver".parse().unwrap();
+    static ref ROUTER: Name = "router".parse().unwrap();
+    static ref SENDER: Name = "sender".parse().unwrap();
 }
 
 #[derive(Debug)]
@@ -179,20 +183,12 @@ pub struct CapabilityDict<'a> {
 }
 
 impl<'a> CapabilityDict<'a> {
-    pub fn get_sender(&self) -> Option<&Sender<Message>> {
-        self.inner.entries.get(&SENDER.as_str().to_string()).and_then(|v| v.try_into().ok())
-    }
-
     pub fn get_receiver(&self) -> Option<&Receiver<Message>> {
         self.inner.entries.get(&RECEIVER.as_str().to_string()).and_then(|v| v.try_into().ok())
     }
 
-    pub fn get_availability(&self) -> Option<&cm_rust::Availability> {
-        self.inner
-            .entries
-            .get(&AVAILABILITY.as_str().to_string())
-            .and_then(|v| v.try_into().ok())
-            .map(|d: &Data<cm_rust::Availability>| &d.value)
+    pub fn get_router(&self) -> Option<&Router> {
+        self.inner.entries.get(&ROUTER.as_str().to_string()).and_then(|v| v.try_into().ok())
     }
 }
 
@@ -202,52 +198,37 @@ pub struct CapabilityDictMut<'a> {
 }
 
 impl<'a> CapabilityDictMut<'a> {
-    pub fn get_sender(&mut self) -> Option<&mut Sender<Message>> {
-        self.inner.entries.get_mut(&SENDER.as_str().to_string()).and_then(|v| v.try_into().ok())
+    pub fn get_router(&mut self) -> Option<&mut Router> {
+        self.inner.entries.get_mut(&ROUTER.as_str().to_string()).and_then(|v| v.try_into().ok())
     }
 
-    pub fn remove_sender(&mut self) {
-        self.inner.entries.remove(&SENDER.as_str().to_string());
+    pub fn insert_router(&mut self, router: Router) {
+        let old_val = self.inner.entries.insert(ROUTER.as_str().to_string(), Box::new(router));
+        assert!(old_val.is_none(), "overwrote a router, this shouldn't be possible");
     }
 
-    pub fn insert_sender(&mut self, sender: Sender<Message>) {
-        self.inner.entries.insert(SENDER.as_str().to_string(), Box::new(sender));
+    pub fn remove_router(&mut self) {
+        self.inner.entries.remove(&ROUTER.as_str().to_string());
     }
 
-    #[allow(unused)]
     pub fn get_receiver(&mut self) -> Option<&mut Receiver<Message>> {
         self.inner.entries.get_mut(&RECEIVER.as_str().to_string()).and_then(|v| v.try_into().ok())
     }
 
-    #[allow(unused)]
     pub fn insert_receiver(&mut self, receiver: Receiver<Message>) {
-        self.inner.entries.insert(RECEIVER.as_str().to_string(), Box::new(receiver));
+        let old_val = self.inner.entries.insert(RECEIVER.as_str().to_string(), Box::new(receiver));
+        assert!(old_val.is_none(), "overwrote a receiver, this shouldn't be possible");
     }
+}
 
-    #[allow(unused)]
-    pub fn get_availability(&mut self) -> Option<&mut cm_rust::Availability> {
-        self.inner
-            .entries
-            .get_mut(&AVAILABILITY.as_str().to_string())
-            .and_then(|v| v.try_into().ok())
-            .map(|d: &mut Data<cm_rust::Availability>| &mut d.value)
-    }
-
-    pub fn insert_availability(&mut self, availability: cm_rust::Availability) {
-        self.inner
-            .entries
-            .insert(AVAILABILITY.as_str().to_string(), Box::new(Data { value: availability }));
-    }
-
-    /// Sends the message to the sender in this capability dict. If that fails, returns the message.
-    pub fn send(&mut self, message: Message) -> Result<(), Message> {
-        if let Some(sender) = self.get_sender() {
-            sender.send_message(message);
-            Ok(())
-        } else {
-            Err(message)
-        }
-    }
+pub fn new_terminating_router(capability_provider: Receiver<Message>) -> Router {
+    Router::new(move |_request: Request, completer: Completer| {
+        let sender = capability_provider.new_sender();
+        // TODO: request has rights and a relative path, we could make a sender that constructs a
+        // message with these?
+        // TODO: target_moniker in Request is unused, because Message has a reference to the target
+        completer.complete(Ok(Box::new(sender)));
+    })
 }
 
 /// Waits for any Receiver in a Dict to become readable, and calls a closure when that happens.

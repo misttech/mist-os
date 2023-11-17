@@ -73,7 +73,7 @@ use {
             storage::admin_protocol::StorageAdminDerivedCapability,
         },
         root_stop_notifier::RootStopNotifier,
-        sandbox_util::{DictExt, LaunchTaskOnReceive},
+        sandbox_util::{new_terminating_router, DictExt, LaunchTaskOnReceive},
     },
     ::routing::{
         capability_source::{CapabilitySource, InternalCapability},
@@ -439,10 +439,8 @@ impl BuiltinDictBuilder {
             return;
         }
         let receiver = Receiver::new();
-        let sender = receiver.new_sender();
-        let mut cap_dict = self.dict.get_or_insert_protocol_mut(&name);
-        cap_dict.insert_sender(sender);
-        cap_dict.insert_availability(cm_rust::Availability::Required);
+        let router = new_terminating_router(receiver.clone());
+        self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
             top_instance: Arc::downgrade(&self.top_instance),
@@ -1218,11 +1216,8 @@ impl BuiltinEnvironment {
         P: ProtocolMarker,
     {
         let receiver = Receiver::new();
-        let sender = receiver.new_sender();
-
-        let mut cap_dict = self.dict.get_or_insert_protocol_mut(&name);
-        cap_dict.insert_sender(sender);
-        cap_dict.insert_availability(cm_rust::Availability::Required);
+        let router = new_terminating_router(receiver.clone());
+        self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
 
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
