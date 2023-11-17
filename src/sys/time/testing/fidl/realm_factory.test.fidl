@@ -16,7 +16,6 @@ using fuchsia.hardware.rtc;
 using fuchsia.io;
 using fuchsia.metrics.test;
 using fuchsia.testing.harness;
-using fuchsia.testing;
 using fuchsia.time.external;
 using zx;
 
@@ -124,6 +123,10 @@ open protocol RealmFactory {
 
         /// A standardized `RealmProxy`, for connecting to some of the
         /// exported FIDL protocols in the created test realm.
+        ///
+        /// Use the client counterpart of this server end to request any
+        /// FIDL protocol connection for a protocol served from within the
+        /// created test realm.
         realm_server server_end:fuchsia.testing.harness.RealmProxy;
     }) -> (@generated_name("CreateResponse") resource struct {
         /// The push source puppet. It is returned as a client_end because of
@@ -135,16 +138,6 @@ open protocol RealmFactory {
             /// The channel for retrieving the RTC updates. To be be populated
             /// only if the realm is created with `RealmOptions.rtc.rtc_handle`.
             1: rtc_updates client_end:RtcUpdates;
-
-            /// A protocol for fake monotonic clock. You don't normally need
-            /// to use this directly. Special setup is needed to use fake clock,
-            /// see `//src/lib/fake-clock/README.md`.
-            2: clock client_end:fuchsia.testing.FakeClock;
-
-            /// A protocol for controlling how the fake monotonic clock
-            /// behaves. Allows setting named deadlines and controlling how
-            /// monotonic clock advances.
-            3: clock_control client_end:fuchsia.testing.FakeClockControl;
         };
 
         /// The cobalt metric querier. Used to collect the metrics information.

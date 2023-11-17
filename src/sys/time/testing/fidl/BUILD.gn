@@ -25,6 +25,5 @@ fidl("test.time.realm") {
     "//sdk/fidl/fuchsia.metrics.test",
     "//sdk/fidl/fuchsia.testing.harness",
     "//sdk/fidl/fuchsia.time.external",
-    "//src/lib/fake-clock/fidl:fidl",
   ]
 }
