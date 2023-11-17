@@ -81,12 +81,7 @@ pub fn get_categories() -> HashMap<String, HashSet<String>> {
         .take_while(|line| !line.is_empty())
         .map(parse_categories)
         .collect::<HashMap<_, _>>();
-    lines
-        .find(|s| {
-            s.starts_with("Lint groups provided by plugins")
-                || s.starts_with("Lint groups loaded by this crate")
-        })
-        .expect(&err_msg);
+    lines.find(|s| s.starts_with("Lint groups loaded by this crate")).expect(&err_msg);
     categories.extend(lines.skip(1).take_while(|line| !line.is_empty()).map(parse_categories));
     categories
 }
