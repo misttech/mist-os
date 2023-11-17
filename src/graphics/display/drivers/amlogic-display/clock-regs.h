@@ -5,11 +5,14 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CLOCK_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_CLOCK_REGS_H_
 
+#include <lib/stdcompat/span.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
 
 #include <hwreg/bitfields.h>
+
+#include "src/graphics/display/drivers/amlogic-display/fixed-point-util.h"
 
 namespace amlogic_display {
 
@@ -219,7 +222,7 @@ class VideoClock2Divider : public hwreg::RegisterBase<VideoClock2Divider, uint32
   static constexpr int kMaxDivider2 = 256;
   static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
 
-  VideoClock2Divider &SetDivider2(int divider2) {
+  VideoClock2Divider& SetDivider2(int divider2) {
     ZX_DEBUG_ASSERT(divider2 >= kMinDivider2);
     ZX_DEBUG_ASSERT(divider2 <= kMaxDivider2);
     return set_divider2_minus_one(divider2 - 1);
@@ -239,9 +242,11 @@ class VideoClock2Control : public hwreg::RegisterBase<VideoClock2Control, uint32
  public:
   DEF_RSVDZ_FIELD(31, 20);
 
-  // Gate-controls the input (also gate-controlled by the `divider_enabled` bit
-  // of the `VideoClock2Divider` register) and output signals for the video
-  // clock 2 divider.
+  // If false, the input and output signals for the video clock 2 divider are
+  // gated.
+  //
+  // The input signal may be also gated by the `divider_enabled` bit of the
+  // `VideoClock2Divider` register.
   DEF_BIT(19, clock_enabled);
 
   DEF_ENUM_FIELD(VideoClockMuxSource, 18, 16, mux_source);
@@ -293,7 +298,7 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
   static constexpr int kMaxDivider1 = 256;
   static_assert(kMaxDivider1 == 1 << (15 - 8 + 1));
 
-  VideoClock1Divider &SetDivider1(int divider1) {
+  VideoClock1Divider& SetDivider1(int divider1) {
     ZX_DEBUG_ASSERT(divider1 >= kMinDivider1);
     ZX_DEBUG_ASSERT(divider1 <= kMaxDivider1);
     return set_divider1_minus_one(divider1 - 1);
@@ -309,7 +314,7 @@ class VideoClock1Divider : public hwreg::RegisterBase<VideoClock1Divider, uint32
   static constexpr int kMaxDivider0 = 256;
   static_assert(kMaxDivider0 == 1 << (7 - 0 + 1));
 
-  VideoClock1Divider &SetDivider0(int divider0) {
+  VideoClock1Divider& SetDivider0(int divider0) {
     ZX_DEBUG_ASSERT(divider0 >= kMinDivider0);
     ZX_DEBUG_ASSERT(divider0 <= kMaxDivider0);
     return set_divider0_minus_one(divider0 - 1);
@@ -336,12 +341,14 @@ class VideoClock1Control : public hwreg::RegisterBase<VideoClock1Control, uint32
   // S905D3 Datasheet, Section 6.7.2 Clock Trees, Page 99.
   DEF_FIELD(31, 21, timing_controller_clock_control);
 
-  // Gate-controls the output signal of divider /N1.
+  // If false, the output signal of divider /N1 is gated.
+  //
   // Divider /N1 works iff `divider1_enabled` and the `dividers_enabled`
   // field in `VideoClock1Divider` register are both true.
   DEF_BIT(20, divider1_enabled);
 
-  // Gate-controls the output signal of divider /N0.
+  // If false, the output signal of divider /N0 is gated.
+  //
   // Divider /N0 works iff `divider0_enabled` and the `dividers_enabled`
   // field in `VideoClock1Divider` register are both true.
   DEF_BIT(19, divider0_enabled);
@@ -475,7 +482,7 @@ class HdmiClockControl : public hwreg::RegisterBase<HdmiClockControl, uint32_t> 
   // accessing the field directly.
   DEF_FIELD(6, 0, hdmi_tx_system_clock_divider_minus_one);
 
-  HdmiClockControl &SetHdmiTxSystemClockDivider(int divider) {
+  HdmiClockControl& SetHdmiTxSystemClockDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinHdmiTxSystemClockDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxHdmiTxSystemClockDivider);
     return set_hdmi_tx_system_clock_divider_minus_one(divider - 1);
@@ -593,7 +600,7 @@ class VpuClockCControl : public hwreg::RegisterBase<VpuClockCControl, uint32_t> 
   DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
   static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
 
-  VpuClockCControl &SetBranch1MuxDivider(int divider) {
+  VpuClockCControl& SetBranch1MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch1_mux_divider_minus_one(divider - 1);
@@ -601,7 +608,7 @@ class VpuClockCControl : public hwreg::RegisterBase<VpuClockCControl, uint32_t> 
 
   int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
 
-  VpuClockCControl &SetBranch0MuxDivider(int divider) {
+  VpuClockCControl& SetBranch0MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch0_mux_divider_minus_one(divider - 1);
@@ -674,7 +681,7 @@ class VpuClockControl : public hwreg::RegisterBase<VpuClockControl, uint32_t> {
   DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
   static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
 
-  VpuClockControl &SetBranch1MuxDivider(int divider) {
+  VpuClockControl& SetBranch1MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch1_mux_divider_minus_one(divider - 1);
@@ -682,7 +689,7 @@ class VpuClockControl : public hwreg::RegisterBase<VpuClockControl, uint32_t> {
 
   int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
 
-  VpuClockControl &SetBranch0MuxDivider(int divider) {
+  VpuClockControl& SetBranch0MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch0_mux_divider_minus_one(divider - 1);
@@ -735,8 +742,8 @@ class VideoAdvancedPeripheralBusClockControl
 
   DEF_ENUM_FIELD(FinalMuxSource, 31, 31, final_mux_selection);
 
-  // Gate-controls "cts_ge2d_clk" which takes "cts_vapbclk" output as its clock
-  // source and has no frequency dividers.
+  // If false, the "cts_ge2d_clk" signal is gated. "cts_ge2d_clk" takes
+  // "cts_vapbclk" output as its clock source and has no frequency dividers.
   //
   // This bit is named "enable" in A311D, S905D2 and S905D3 datasheet register
   // descriptions, but the "EE clock table" shows that it gates the
@@ -766,7 +773,7 @@ class VideoAdvancedPeripheralBusClockControl
   DEF_FIELD(6, 0, branch0_mux_divider_minus_one);
   static_assert(kMaxBranchMuxDivider == 1 << (6 - 0 + 1));
 
-  VideoAdvancedPeripheralBusClockControl &SetBranch1MuxDivider(int divider) {
+  VideoAdvancedPeripheralBusClockControl& SetBranch1MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch1_mux_divider_minus_one(divider - 1);
@@ -774,7 +781,7 @@ class VideoAdvancedPeripheralBusClockControl
 
   int Branch1MuxDivider() const { return branch1_mux_divider_minus_one() + 1; }
 
-  VideoAdvancedPeripheralBusClockControl &SetBranch0MuxDivider(int divider) {
+  VideoAdvancedPeripheralBusClockControl& SetBranch0MuxDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinBranchMuxDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxBranchMuxDivider);
     return set_branch0_mux_divider_minus_one(divider - 1);
@@ -848,7 +855,7 @@ class VpuClockBControl : public hwreg::RegisterBase<VpuClockBControl, uint32_t> 
   DEF_FIELD(7, 0, divider2_minus_one);
   static_assert(kMaxDivider2 == 1 << (7 - 0 + 1));
 
-  VpuClockBControl &SetDivider1(int divider1) {
+  VpuClockBControl& SetDivider1(int divider1) {
     ZX_DEBUG_ASSERT(divider1 >= kMinDivider1);
     ZX_DEBUG_ASSERT(divider1 <= kMaxDivider1);
     return set_divider1_minus_one(divider1 - 1);
@@ -856,7 +863,7 @@ class VpuClockBControl : public hwreg::RegisterBase<VpuClockBControl, uint32_t> 
 
   int Divider1() const { return divider1_minus_one() + 1; }
 
-  VpuClockBControl &SetDivider2(int divider2) {
+  VpuClockBControl& SetDivider2(int divider2) {
     ZX_DEBUG_ASSERT(divider2 >= kMinDivider2);
     ZX_DEBUG_ASSERT(divider2 <= kMaxDivider2);
     return set_divider2_minus_one(divider2 - 1);
@@ -932,7 +939,7 @@ class VideoInputMeasureClockControl
   DEF_FIELD(6, 0, video_input_measure_clock_divider_minus_one);
   static_assert(kMaxVideoInputMeasureClockDivider == 1 << (6 - 0 + 1));
 
-  VideoInputMeasureClockControl &SetDsiMeasureClockDivider(int divider) {
+  VideoInputMeasureClockControl& SetDsiMeasureClockDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinDsiMeasureClockDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxDsiMeasureClockDivider);
     return set_dsi_measure_clock_divider_minus_one(divider - 1);
@@ -940,7 +947,7 @@ class VideoInputMeasureClockControl
 
   int DsiMeasureClockDivider() const { return dsi_measure_clock_divider_minus_one() + 1; }
 
-  VideoInputMeasureClockControl &SetVideoInputMeasureClockDivider(int divider) {
+  VideoInputMeasureClockControl& SetVideoInputMeasureClockDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinVideoInputMeasureClockDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxVideoInputMeasureClockDivider);
     return set_video_input_measure_clock_divider_minus_one(divider - 1);
@@ -988,13 +995,130 @@ class MipiDsiPhyClockControl : public hwreg::RegisterBase<MipiDsiPhyClockControl
   // Prefer `Divider()` and `SetDivider()` to accessing the field directly.
   DEF_FIELD(6, 0, divider_minus_one);
 
-  MipiDsiPhyClockControl &SetDivider(int divider) {
+  MipiDsiPhyClockControl& SetDivider(int divider) {
     ZX_DEBUG_ASSERT(divider >= kMinDivider);
     ZX_DEBUG_ASSERT(divider <= kMaxDivider);
     return set_divider_minus_one(divider - 1);
   }
 
   int Divider() const { return divider_minus_one() + 1; }
+};
+
+// ## HDMI Clock Tree
+//
+// The **HDMI Clock Tree** takes the HDMI PLL as its clock input and produces
+// the "vid_pll_clk" clock signal to be used by the EE (Everything Else) clock
+// tree, which includes the VPU (display engine). It uses a pattern repeater as
+// a frequency divider circuit, which is controlled by the
+// `HdmiClockTreeControl` register.
+
+// Values for the `pattern_generator_mode_selection` field in `HdmiClockTreeControl`.
+enum class HdmiClockTreePatternGeneratorModeSource : uint32_t {
+  // Source 0: Repeating the lower 12 bits of the provided pattern.
+  kRepeated12BitPattern = 0,
+  // Source 1: Repeating the lower 14 bits of the provided pattern.
+  kRepeated14BitPattern = 1,
+  // Source 2: Repeating the lower 15 bits of the provided pattern.
+  kRepeated15BitPattern = 2,
+  // Source 3: Repeating a fixed 25-bit pattern:
+  //           (MSB) 111 000 111 000 111 000 1111 000 (LSB)
+  kFixed25BitPattern = 3,
+};
+
+// HHI_VID_PLL_CLK_DIV - Configures the "vid_pll_clk" clock signal.
+//
+// The HDMI clock tree has a pattern repeater that can repeat a given (or
+// fixed) bit pattern, one bit at each clock cycle, which effectively acts as a
+// frequency divider of the input clock signal. This register controls the
+// behavior of the pattern generator.
+//
+// A311D Datasheet, Section 8.7.1.3 "HDMI Clock Tree", Page 112-113; Section
+//   8.7.6 Register Descriptions, Page 153.
+// S905D2 Datasheet, Section 6.6.2.3 "HDMI Clock Tree", Page 96-97; Section
+//   6.6.6 Register Descriptions, Page 138-139.
+// S905D3 Datasheet, Section 6.7.2.3 "HDMI Clock Tree", Page 96-97; Section
+//   6.7.6 Register Descriptions, Page 131.
+class HdmiClockTreeControl : public hwreg::RegisterBase<HdmiClockTreeControl, uint32_t> {
+ public:
+  static auto Get() { return hwreg::RegisterAddr<HdmiClockTreeControl>(0x68 * sizeof(uint32_t)); }
+
+  // Bits 31-24 are reserved.
+  DEF_RSVDZ_FIELD(23, 20);
+
+  // If false, the output clock vid_pll_clk is gated.
+  DEF_BIT(19, clock_output_enabled);
+
+  // If true, the output clock matches the HDMI PLL clock.
+  //
+  // When this bit is true, the pattern repeater configuration does not
+  // influence the output signal.
+  //
+  // `Pattern()`, `PatternSize()` and `SetFrequencyDividerRatio()` helpers are
+  // preferred over direct field manipulations.
+  DEF_BIT(18, bypass_pattern_generators);
+
+  // `Pattern()`, `PatternSize()` and `SetFrequencyDividerRatio()` helpers are
+  // preferred over direct field manipulations.
+  DEF_ENUM_FIELD(HdmiClockTreePatternGeneratorModeSource, 17, 16, pattern_generator_mode_selection);
+
+  // If false, the `preset_pattern` field is ignored when the register is
+  // written.
+  DEF_BIT(15, preset_pattern_update_enabled);
+
+  // The bits output by the pattern generator, when not in fixed pattern mode.
+  //
+  // For example, to get a clock signal at 1/5 of the HDMI PLL frequency (with a
+  // 60/40 duty cycle), use 15-bit repeater (source 2) and set the pattern to
+  // 0b111'00'111'00'111'00 to generate the following pattern (assuming the bits
+  // are emitted from the least significant bit to the most significant bit):
+  //
+  // (output) 0 0 1 1 1 0 0 1 1 1 0 0 1 1 1
+  //        1     ______    ______    ______
+  //        0 ____      ____      ____
+  //
+  // The pattern must fulfill the following constraints:
+  // - The pattern's least significant bit must be zero.
+  // - If PatternSize() is non-zero, the bit `PatternSize() - 1` is the most
+  //   significant bit set. In testing, this means the pattern will be at least
+  //   `1 << PatternSize()` and less than `1 << (PatternSize() + 1)`.
+  // - The number of 1 -> 0 bit transitions (when reading from the most
+  //   significant bit to the least significant bit) in `Pattern()` equals
+  //   `PatternSize() / (divider_ratio - 1.0)` for divider ratios greater than
+  //   one.
+  // - The maximum length of a consecutive sequence of ones or zeros will
+  //   differ by at most 1 from the minimum length of a consecutive sequence
+  //   of ones or zeros.
+  //
+  // `Pattern()`, `PatternSize()` and `SetFrequencyDividerRatio()` helpers are
+  // preferred over direct field manipulations.
+  DEF_FIELD(14, 0, pattern_generator_state);
+
+  // The generated signal's period (cycle size), in bits.
+  // Returns 0 if the pattern generator is bypassed.
+  int PatternSize() const;
+
+  // The pattern repeated by the pattern generator.
+  // Returns 0 if the pattern generator is bypassed.
+  uint32_t Pattern() const;
+
+  // Frequency division ratios supported by the pattern generator.
+  static constexpr uint32_t kSupportedFrequencyDividerRatiosArray[] = {
+      ToU28_4(1.0),  ToU28_4(2.0), ToU28_4(2.5),  ToU28_4(3.0),  ToU28_4(3.5),
+      ToU28_4(3.75), ToU28_4(4.0), ToU28_4(5.0),  ToU28_4(6.0),  ToU28_4(6.25),
+      ToU28_4(7.0),  ToU28_4(7.5), ToU28_4(12.0), ToU28_4(14.0), ToU28_4(15.0),
+  };
+  static constexpr cpp20::span<const uint32_t> kSupportedFrequencyDividerRatios =
+      kSupportedFrequencyDividerRatiosArray;
+
+  // Sets the pattern generator so that it works as a frequency divider with a
+  // division ratio of `division_ratio_u28_4`.
+  //
+  // `division_ratio_u28_4` is a U28.4 format fixed-point fraction with 28
+  // integer bits and 4 fractional bits.
+  //
+  // `division_ratio_u28_4` must be one of the values in
+  // `kSupportedFrequencyDividerRatios`.
+  HdmiClockTreeControl& SetFrequencyDividerRatio(uint32_t divider_ratio_u28_4);
 };
 
 }  // namespace amlogic_display
