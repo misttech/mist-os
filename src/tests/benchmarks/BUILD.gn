@@ -35,10 +35,4 @@ fuchsia_component_perf_test("kernel_boot_benchmarks") {
   component_name = "kernel-boot-benchmarks"
   test_type = "system"
   expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.kernel.boot.txt"
-
-  environments = [
-    astro_env,
-    sherlock_env,
-    nelson_env,
-  ]
 }
