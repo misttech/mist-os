@@ -71,11 +71,11 @@ class FuchsiaConfigurationData {
   static const char kDefaultConfigDir[];
   static const char kDefaultEnvironmentDir[];
   static const char kDefaultBuildDir[];
+  JSONHelper json_helper_;
   config::Environment backend_environment_;
   config::ConfigurationData backend_configuration_;
   std::string api_key_;
 
-  JSONHelper json_helper_;
   cobalt::ReleaseStage release_stage_;
   cobalt::CobaltServiceInterface::DataCollectionPolicy data_collection_policy_;
   bool watch_for_user_consent_;

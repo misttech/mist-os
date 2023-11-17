@@ -37,6 +37,7 @@ constexpr char kReleaseStageKey[] = "release_stage";
 const cobalt::ReleaseStage kDefaultReleaseStage = cobalt::ReleaseStage::GA;
 
 constexpr char kDefaultDataCollectionPolicyKey[] = "default_data_collection_policy";
+constexpr char kDefaultEnvironmentKey[] = "default_environment";
 // When we start Cobalt, we have no idea what the current state of user consent is. Starting with
 // DO_NOT_UPLOAD will allow us to collect metrics while the system is booting, before we get an
 // updated policy from the UserConsentWatcher.
@@ -113,27 +114,55 @@ Status JSONHelper::EnsureKey(const std::string& key) const {
 }
 
 namespace {
-// Parse the cobalt environment value from the config data.
-config::Environment LookupCobaltEnvironment(const std::string& environment_dir) {
-  auto environment_path = files::JoinPath(environment_dir, kCobaltEnvironmentFile);
-  std::string cobalt_environment;
-  if (files::ReadFileToString(environment_path, &cobalt_environment)) {
-    FX_LOGS(INFO) << "Loaded Cobalt environment from config file " << environment_path << ": "
-                  << cobalt_environment;
-    if (cobalt_environment == "LOCAL")
-      return config::Environment::LOCAL;
-    if (cobalt_environment == "PROD")
-      return config::Environment::PROD;
-    if (cobalt_environment == "DEVEL")
-      return config::Environment::DEVEL;
-    FX_LOGS(ERROR) << "Failed to parse the contents of config file " << environment_path << ": "
-                   << cobalt_environment
-                   << ". Falling back to default environment: " << kDefaultEnvironment;
-  } else {
-    FX_LOGS(ERROR) << "Failed to read config file " << environment_path
-                   << ". Falling back to default environment: " << kDefaultEnvironment;
+config::Environment ParseEnvironment(std::string environment,
+                                     config::Environment default_environment) {
+  if (environment == "LOCAL") {
+    return config::Environment::LOCAL;
+  } else if (environment == "PROD") {
+    return config::Environment::PROD;
+  } else if (environment == "DEVEL") {
+    return config::Environment::DEVEL;
   }
-  return kDefaultEnvironment;
+  FX_LOGS(ERROR) << "Failed to parse the cobalt environment: " << environment
+                 << ". Falling back to default environment: " << default_environment;
+  return default_environment;
+}
+
+// Parse the cobalt environment value from the config data.
+config::Environment LookupCobaltEnvironment(const JSONHelper& json_helper,
+                                            const std::string& environment_dir) {
+  // Read the default environment.
+  config::Environment cobalt_environment;
+  StatusOr<std::string> statusor = json_helper.GetString(kDefaultEnvironmentKey);
+  if (!statusor.ok()) {
+    Status status = statusor.status();
+    if (status.error_details().empty()) {
+      FX_LOGS(ERROR) << "Failed to read default environment from config. " << status.error_message()
+                     << ". Using hardcoded default.";
+    } else {
+      FX_LOGS(ERROR) << "Failed to read default environment from config. " << status.error_message()
+                     << " (" << status.error_details() << "). Using hardcoded default.";
+    }
+    cobalt_environment = kDefaultEnvironment;
+  } else {
+    cobalt_environment = ParseEnvironment(std::move(statusor.ValueOrDie()), kDefaultEnvironment);
+  }
+
+  // Check if the developer has overridden the environment.
+  auto environment_path = files::JoinPath(environment_dir, kCobaltEnvironmentFile);
+  if (files::IsFile(environment_path)) {
+    std::string environment;
+    if (files::ReadFileToString(environment_path, &environment)) {
+      FX_LOGS(INFO) << "Loaded Cobalt environment from config file " << environment_path << ": "
+                    << environment;
+      cobalt_environment = ParseEnvironment(environment, cobalt_environment);
+    } else {
+      FX_LOGS(INFO) << "Failed to read override environment file " << environment_path
+                    << ". Falling back to default environment: " << cobalt_environment;
+    }
+  }
+
+  return cobalt_environment;
 }
 
 std::string LookupApiKeyOrDefault(const std::string& config_dir) {
@@ -252,10 +281,10 @@ SystemProfile::BuildType LookupBuildType(const std::string& build_type_dir) {
 FuchsiaConfigurationData::FuchsiaConfigurationData(const std::string& config_dir,
                                                    const std::string& environment_dir,
                                                    const std::string& build_type_dir)
-    : backend_environment_(LookupCobaltEnvironment(environment_dir)),
+    : json_helper_(files::JoinPath(config_dir, kConfigFile)),
+      backend_environment_(LookupCobaltEnvironment(json_helper_, environment_dir)),
       backend_configuration_(config::ConfigurationData(backend_environment_)),
       api_key_(LookupApiKeyOrDefault(config_dir)),
-      json_helper_(files::JoinPath(config_dir, kConfigFile)),
       release_stage_(LookupReleaseStage(json_helper_)),
       data_collection_policy_(LookupDataCollectionPolicy(json_helper_)),
       watch_for_user_consent_(LookupWatchForUserConsent(json_helper_)),

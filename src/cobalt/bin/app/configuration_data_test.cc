@@ -37,6 +37,17 @@ TEST(ConfigTest, Empty) {
   EXPECT_EQ(cobalt::ReleaseStage::GA, config_data.GetReleaseStage());
 }
 
+TEST(ConfigTest, DefaultEnvironment) {
+  EXPECT_TRUE(files::DeletePath(kTestDir, true));
+  EXPECT_TRUE(files::CreateDirectory(kTestDir));
+  EXPECT_TRUE(WriteFile("config.json", "{\"default_environment\": \"DEVEL\"}"));
+
+  FuchsiaConfigurationData config_data(kTestDir, kTestDir);
+
+  auto env = config_data.GetBackendEnvironment();
+  EXPECT_EQ(config::Environment::DEVEL, env);
+}
+
 // Tests behavior when there is one valid config file.
 TEST(ConfigTest, OneValidFile) {
   EXPECT_TRUE(files::DeletePath(kTestDir, true));
