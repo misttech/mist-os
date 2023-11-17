@@ -21,7 +21,7 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<RealmProxyClient> 
 
 #[fuchsia::test]
 async fn test_example() -> Result<()> {
-    let realm_options = ftest::RealmOptions { ..Default::default() };
+    let realm_options = ftest::RealmOptions::default();
     let _realm = create_realm(realm_options).await?;
 
     info!("connected to the test realm!");
