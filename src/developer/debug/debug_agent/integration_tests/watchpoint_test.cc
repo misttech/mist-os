@@ -106,45 +106,46 @@ TEST(Watchpoint, DISABLED_DefaultCase) {
   {
     auto* loop = loop_wrapper.loop();
 
-    WatchpointStreamBackend backend(loop);
+    auto backend = std::make_unique<WatchpointStreamBackend>(loop);
+    WatchpointStreamBackend& mock_backend = *backend;
     DebugAgent agent(std::make_unique<ZirconSystemInterface>());
     RemoteAPI* remote_api = &agent;
 
-    agent.Connect(&backend.stream());
-    backend.set_remote_api(remote_api);
+    agent.Connect(std::move(backend));
+    mock_backend.set_remote_api(remote_api);
 
     static constexpr const char kExecutable[] = "/pkg/bin/watchpoint_test_exe";
-    auto [lnch_request, lnch_reply] = GetLaunchRequest(backend, kExecutable);
+    auto [lnch_request, lnch_reply] = GetLaunchRequest(mock_backend, kExecutable);
     remote_api->OnRunBinary(lnch_request, &lnch_reply);
     ASSERT_TRUE(lnch_reply.status.ok());
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // The first thread should've started.
-    ASSERT_NE(backend.process_koid(), 0u);
-    ASSERT_NE(backend.thread_koid(), 0u);
+    ASSERT_NE(mock_backend.process_koid(), 0u);
+    ASSERT_NE(mock_backend.thread_koid(), 0u);
 
     // We should have the correct module by now.
-    ASSERT_NE(backend.so_test_base_addr(), 0u);
-    uint64_t address = backend.so_test_base_addr() + variable_offset;
+    ASSERT_NE(mock_backend.so_test_base_addr(), 0u);
+    uint64_t address = mock_backend.so_test_base_addr() + variable_offset;
 
-    DEBUG_LOG(Test) << std::hex << "Base: 0x" << backend.so_test_base_addr() << ", Offset: 0x"
+    DEBUG_LOG(Test) << std::hex << "Base: 0x" << mock_backend.so_test_base_addr() << ", Offset: 0x"
                     << variable_offset << ", Actual Address: 0x" << address;
 
-    auto [wp_request, wp_reply] = GetWatchpointRequest(backend, address);
+    auto [wp_request, wp_reply] = GetWatchpointRequest(mock_backend, address);
     remote_api->OnAddOrChangeBreakpoint(wp_request, &wp_reply);
     ASSERT_TRUE(wp_reply.status.ok());
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // We should've gotten an exception.
-    auto& exceptions = backend.exceptions();
+    auto& exceptions = mock_backend.exceptions();
     ASSERT_EQ(exceptions.size(), 1u);
 
     auto& exception = exceptions[0];
     EXPECT_EQ(exception.type, ExceptionType::kWatchpoint) << ExceptionTypeToString(exception.type);
-    EXPECT_EQ(exception.thread.id.process, backend.process_koid());
-    EXPECT_EQ(exception.thread.id.thread, backend.thread_koid());
+    EXPECT_EQ(exception.thread.id.process, mock_backend.process_koid());
+    EXPECT_EQ(exception.thread.id.thread, mock_backend.thread_koid());
 
     ASSERT_EQ(exception.hit_breakpoints.size(), 1u);
     auto& wp = exception.hit_breakpoints[0];
@@ -152,10 +153,10 @@ TEST(Watchpoint, DISABLED_DefaultCase) {
     EXPECT_EQ(wp.hit_count, 1u);
     EXPECT_EQ(wp.should_delete, true);
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // The process should've exited correctly.
-    EXPECT_EQ(backend.return_code(), 0);
+    EXPECT_EQ(mock_backend.return_code(), 0);
   }
 }
 

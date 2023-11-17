@@ -98,6 +98,8 @@ static_library("lib") {
 
   if (is_fuchsia) {
     sources += [
+      "debug_agent_server.cc",
+      "debug_agent_server.h",
       "test_realm.cc",
       "test_realm.h",
       "zircon_arch.h",
@@ -124,6 +126,7 @@ static_library("lib") {
     ]
 
     public_deps += [
+      "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_cpp",
       "//sdk/fidl/fuchsia.exception:fuchsia.exception_cpp",
       "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
@@ -190,6 +193,7 @@ executable("launcher") {
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
+    "//zircon/system/ulib/async-default",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
   ]

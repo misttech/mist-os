@@ -9,7 +9,10 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.debugger.DebugAgent" ],
+            protocol: [
+                "fuchsia.debugger.DebugAgent",
+                "fuchsia.debugger.Launcher",
+            ],
         },
     ],
     use: [
@@ -52,6 +55,10 @@
     expose: [
         {
             protocol: "fuchsia.debugger.DebugAgent",
+            from: "self",
+        },
+        {
+            protocol: "fuchsia.debugger.Launcher",
             from: "self",
         },
     ],

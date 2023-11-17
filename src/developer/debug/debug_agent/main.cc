@@ -2,10 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.debugger/cpp/fidl.h>
 #include <zircon/processargs.h>
 
+#include <memory>
+
+#include "lib/stdcompat/functional.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
-#include "src/developer/debug/debug_agent/remote_api_adapter.h"
+#include "src/developer/debug/debug_agent/debug_agent_server.h"
 #include "src/developer/debug/debug_agent/zircon_system_interface.h"
 #include "src/developer/debug/shared/platform_message_loop.h"
 
@@ -19,33 +23,24 @@ int main(int argc, const char* argv[]) {
 
   // The scope ensures the objects are destroyed before calling Cleanup on the MessageLoop.
   {
-    debug_agent::DebugAgent debug_agent(std::make_unique<debug_agent::ZirconSystemInterface>());
+    // Take the server_end of the DebugAgent protocol we are handed from the launcher.
+    zx::channel server_end(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
+    FX_CHECK(server_end.is_valid());
 
-    // Must correspond to main_launcher.cc.
-    zx::socket socket(zx_take_startup_handle(PA_HND(PA_USER0, 0)));
-    FX_CHECK(socket.is_valid());
+    auto zircon_system_interface = std::make_unique<debug_agent::ZirconSystemInterface>();
+    debug_agent::DebugAgent debug_agent(std::move(zircon_system_interface));
 
-    debug::BufferedZxSocket buffer(std::move(socket));
+    auto debug_agent_server =
+        std::make_unique<debug_agent::DebugAgentServer>(debug_agent.GetWeakPtr());
 
-    // Route data from the zx::socket -> BufferedZxSocket -> RemoteAPIAdapter -> DebugAgent.
-    debug_agent::RemoteAPIAdapter adapter(&debug_agent, &buffer.stream());
-    buffer.set_data_available_callback([&adapter]() { adapter.OnStreamReadable(); });
+    fidl::BindServer(
+        message_loop.dispatcher(),
+        fidl::ServerEnd<fuchsia_debugger::DebugAgent>(std::move(server_end)),
+        std::move(debug_agent_server),
+        cpp20::bind_front(&debug_agent::DebugAgentServer::OnUnboundFn, debug_agent_server.get()));
 
-    // Exit the message loop on error.
-    buffer.set_error_callback([&debug_agent, &message_loop]() {
-      DEBUG_LOG(Agent) << "Remote socket connection lost";
-      message_loop.QuitNow();
-      debug_agent.Disconnect();
-    });
-
-    // Connect the buffer into the agent.
-    debug_agent.Connect(&buffer.stream());
-    if (!buffer.Start()) {
-      LOGS(Error) << "Fail to connect to the FIDL socket";
-    } else {
-      LOGS(Info) << "Remote client connected to debug_agent";
-      message_loop.Run();
-    }
+    // Run the loop.
+    message_loop.Run();
   }
 
   message_loop.Cleanup();

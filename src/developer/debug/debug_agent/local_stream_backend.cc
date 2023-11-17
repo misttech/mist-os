@@ -12,7 +12,7 @@
 
 namespace debug_agent {
 
-LocalStreamBackend::LocalStreamBackend() { stream_.set_writer(this); }
+LocalStreamBackend::LocalStreamBackend() { stream().set_writer(this); }
 
 LocalStreamBackend::~LocalStreamBackend() = default;
 

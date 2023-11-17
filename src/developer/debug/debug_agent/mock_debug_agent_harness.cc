@@ -8,6 +8,13 @@
 
 namespace debug_agent {
 
+MockDebugAgentHarness::MockDebugAgentHarness(std::unique_ptr<MockSystemInterface> system_interface)
+    : system_interface_(system_interface.get()), agent_(std::move(system_interface)) {
+  auto stream_backend = std::make_unique<MockStreamBackend>();
+  stream_backend_ = stream_backend.get();
+  agent_.Connect(std::move(stream_backend));
+}
+
 MockProcess* MockDebugAgentHarness::AddProcess(zx_koid_t process_koid) {
   auto owning_process = std::make_unique<MockProcess>(debug_agent(), process_koid);
   MockProcess* result = owning_process.get();

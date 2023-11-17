@@ -29,17 +29,14 @@ class MockProcess;
 //   MockThread* thread = process->AddThread(kThreadKoid);
 class MockDebugAgentHarness {
  public:
-  explicit MockDebugAgentHarness(
-      std::unique_ptr<MockSystemInterface> system_interface = MockSystemInterface::CreateWithData())
-      : system_interface_(system_interface.get()), agent_(std::move(system_interface)) {
-    agent_.Connect(&stream_backend_.stream());
-  }
+  explicit MockDebugAgentHarness(std::unique_ptr<MockSystemInterface> system_interface =
+                                     MockSystemInterface::CreateWithData());
 
   DebugAgent* debug_agent() { return &agent_; }
 
   MockSystemInterface* system_interface() { return system_interface_; }
 
-  MockStreamBackend* stream_backend() { return &stream_backend_; }
+  MockStreamBackend* stream_backend() { return stream_backend_; }
 
   // Adds a mocked process to the debug agent.
   MockProcess* AddProcess(zx_koid_t process_koid);
@@ -58,7 +55,7 @@ class MockDebugAgentHarness {
       zx_koid_t process_koid = 0, zx_koid_t thread_koid = 0);
 
  private:
-  MockStreamBackend stream_backend_;
+  MockStreamBackend* stream_backend_;      // Owned by |agent_|.
   MockSystemInterface* system_interface_;  // Owned by |agent_|.
   DebugAgent agent_;
 };

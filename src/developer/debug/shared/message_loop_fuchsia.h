@@ -72,6 +72,9 @@ class MessageLoopFuchsia : public MessageLoop {
   // restriction as |WatchSocket| will apply.
   virtual zx_status_t WatchChannel(zx_handle_t channel, ChannelWatcher* watcher, WatchHandle* out);
 
+  // Expose the underlying dispatcher from the async loop.
+  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+
   // Attaches to the exception port of the given process and issues callbacks on the given watcher.
   // The watcher must outlive the returned WatchHandle. Must only be called on the message loop
   // thread.

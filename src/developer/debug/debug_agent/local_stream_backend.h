@@ -23,7 +23,7 @@ namespace debug_agent {
 // We use this class to intercept the messages sent back from the agent and
 // react accordingly. This class is somwhat geared towards tests, mainly in the sense that
 // notification handlers are needed as they're needed.
-class LocalStreamBackend : public debug::StreamBuffer::Writer {
+class LocalStreamBackend : public debug::BufferedStream {
  public:
   LocalStreamBackend();
   virtual ~LocalStreamBackend();
@@ -41,16 +41,18 @@ class LocalStreamBackend : public debug::StreamBuffer::Writer {
   virtual void HandleNotifyThreadStarting(debug_ipc::NotifyThreadStarting) {}
   virtual void HandleNotifyLog(debug_ipc::NotifyLog) {}
 
+  // BufferedStream implementation.
+  bool Start() override { return true; }
+  bool Stop() override { return true; }
+  bool IsValid() override { return true; }
+
   // The stream will call this function to send the data to whatever backend it
   // is connected to. It returns how much of the input message it could actually
   // write. For this tests purposes, we always read the whole message.
   size_t ConsumeStreamBufferData(const char* data, size_t len) override;
 
-  debug::StreamBuffer& stream() { return stream_; }
-
  private:
-  // This is the stream the debug agent will be given to write to.
-  debug::StreamBuffer stream_;
+  void ResetInternal() override {}
 };
 
 }  // namespace debug_agent

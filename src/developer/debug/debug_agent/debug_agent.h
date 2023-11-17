@@ -7,7 +7,6 @@
 
 #include <zircon/types.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -18,6 +17,7 @@
 #include "src/developer/debug/debug_agent/filter.h"
 #include "src/developer/debug/debug_agent/limbo_provider.h"
 #include "src/developer/debug/debug_agent/remote_api.h"
+#include "src/developer/debug/debug_agent/remote_api_adapter.h"
 #include "src/developer/debug/ipc/message_writer.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/ipc/records.h"
@@ -45,10 +45,12 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   SystemInterface& system_interface() { return *system_interface_; }
   const std::map<uint32_t, Breakpoint>& breakpoints() { return breakpoints_; }
 
-  // Connects the debug agent to a stream buffer.
-  // The buffer can be disconnected and the debug agent will remain intact until the moment a new
-  // buffer is connected and messages start flowing through again.
-  void Connect(debug::StreamBuffer*);
+  bool is_connected() const { return !!buffered_stream_; }
+
+  // Wire |stream| up to |adapter_| and then pass it to |Connect|.
+  void TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedStream> stream);
+  // Take ownership of |stream| and start listening.
+  void Connect(std::unique_ptr<debug::BufferedStream> stream);
   void Disconnect();
 
   void RemoveDebuggedProcess(zx_koid_t process_koid);
@@ -84,7 +86,7 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
   void SendNotification(const NotifyType& notify) {
     std::vector<char> serialized = debug_ipc::Serialize(notify, ipc_version_);
     if (!serialized.empty())
-      stream_->Write(std::move(serialized));
+      buffered_stream_->stream().Write(std::move(serialized));
   }
 
   // RemoteAPI implementation.
@@ -132,11 +134,14 @@ class DebugAgent : public RemoteAPI, public Breakpoint::ProcessDelegate, public 
 
   // Members ---------------------------------------------------------------------------------------
 
+  std::unique_ptr<RemoteAPIAdapter> adapter_;
+
   std::vector<Filter> filters_;
 
   std::unique_ptr<SystemInterface> system_interface_;
 
-  debug::StreamBuffer* stream_ = nullptr;
+  std::unique_ptr<debug::BufferedStream> buffered_stream_;
+
   uint32_t ipc_version_ = 0;
 
   std::unique_ptr<JobHandle> root_job_;

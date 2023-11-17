@@ -172,53 +172,54 @@ TEST(MultithreadedBreakpoint, DISABLED_SWBreakpoint) {
 
     // The stream backend will intercept the calls from the debug agent.
     // Second arguments is the amount of threads to create.
-    BreakpointStreamBackend backend(loop, 5);
+    auto backend = std::make_unique<BreakpointStreamBackend>(loop, 5);
+    BreakpointStreamBackend& mock_backend = *backend;
 
     DebugAgent agent(std::make_unique<ZirconSystemInterface>());
     RemoteAPI* remote_api = &agent;
 
-    agent.Connect(&backend.stream());
-    backend.set_remote_api(remote_api);
+    agent.Connect(std::move(backend));
+    mock_backend.set_remote_api(remote_api);
 
     static constexpr const char kExecutable[] = "/pkg/bin/multithreaded_breakpoint_test_exe";
-    auto [lnch_request, lnch_reply] = GetLaunchRequest(backend, kExecutable);
+    auto [lnch_request, lnch_reply] = GetLaunchRequest(mock_backend, kExecutable);
     remote_api->OnRunBinary(lnch_request, &lnch_reply);
     ASSERT_TRUE(lnch_reply.status.ok());
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // We should have the correct module by now.
-    ASSERT_NE(backend.so_test_base_addr(), 0u);
+    ASSERT_NE(mock_backend.so_test_base_addr(), 0u);
 
     // We let the main thread spin up all the other threads.
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // At this point all sub-threads should have started.
-    ASSERT_EQ(backend.thread_starts().size(), backend.thread_count() + 1);
+    ASSERT_EQ(mock_backend.thread_starts().size(), mock_backend.thread_count() + 1);
 
     // Set a breakpoint
-    auto& thread_koids = backend.thread_koids();
+    auto& thread_koids = mock_backend.thread_koids();
     auto thread_koid = thread_koids[1];
 
     // We get the offset of the loaded function within the process space.
-    uint64_t module_base = backend.so_test_base_addr();
+    uint64_t module_base = mock_backend.so_test_base_addr();
     uint64_t module_function = module_base + symbol_offset;
     DEBUG_LOG(Test) << std::hex << "BASE: 0x" << module_base << ", OFFSET: 0x" << symbol_offset
                     << ", FINAL: 0x" << module_function;
 
     auto [brk_request, brk_reply] =
-        GetBreakpointRequest(backend.process_koid(), thread_koid, module_function);
+        GetBreakpointRequest(mock_backend.process_koid(), thread_koid, module_function);
     remote_api->OnAddOrChangeBreakpoint(brk_request, &brk_reply);
     ASSERT_TRUE(brk_reply.status.ok());
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // At this point all threads should've exited except one in breakpoint and
     // the initial thread.
-    auto& thread_exits = backend.thread_exits();
+    auto& thread_exits = mock_backend.thread_exits();
     ASSERT_EQ(thread_exits.size(), thread_koids.size() - 2);
 
-    auto& thread_excp = backend.thread_excp();
+    auto& thread_excp = mock_backend.thread_excp();
     ASSERT_EQ(thread_excp.size(), 1u);
     auto& brk_notify = thread_excp.front();
     EXPECT_EQ(brk_notify.thread.id.thread, thread_koid);
@@ -230,12 +231,12 @@ TEST(MultithreadedBreakpoint, DISABLED_SWBreakpoint) {
     EXPECT_EQ(hit_brk.hit_count, 1u);
     EXPECT_EQ(hit_brk.should_delete, false);
 
-    backend.ResumeAllThreadsAndRunLoop();
+    mock_backend.ResumeAllThreadsAndRunLoop();
 
     // At this point all threads and processes should've exited.
-    EXPECT_EQ(backend.thread_exits().size(), backend.thread_starts().size());
-    ASSERT_TRUE(backend.process_exited());
-    EXPECT_EQ(backend.return_code(), 0);
+    EXPECT_EQ(mock_backend.thread_exits().size(), mock_backend.thread_starts().size());
+    ASSERT_TRUE(mock_backend.process_exited());
+    EXPECT_EQ(mock_backend.return_code(), 0);
   }
 }
 

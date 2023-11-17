@@ -8,9 +8,22 @@ using zx;
 
 @discoverable
 open protocol DebugAgent {
-    /// Hand the debug agent a socket that connects it to the debugger. This
-    /// will return ZX_ERR_ALREADY_BOUND if a connection already exists.
+    /// Hand the DebugAgent a socket that connects it to the debugger. This
+    /// will return ZX_ERR_ALREADY_BOUND if a connection already exists. When
+    /// the socket is closed, the DebugAgent will exit.
     flexible Connect(resource struct {
         socket zx.Handle:SOCKET;
+    }) -> () error zx.Status;
+};
+
+@discoverable
+@available(added=HEAD)
+open protocol Launcher {
+    /// Launch a new instance of DebugAgent listening on |agent|. The DebugAgent
+    /// will exit upon closing the corresponding client_end of this channel.
+    /// Clients must not close the channel until the debugging session is
+    /// completed.
+    flexible Launch(resource struct {
+        agent server_end:DebugAgent;
     }) -> () error zx.Status;
 };

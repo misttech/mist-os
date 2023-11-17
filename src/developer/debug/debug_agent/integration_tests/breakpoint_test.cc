@@ -148,12 +148,13 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
   {
     auto* loop = loop_wrapper.loop();
     // This stream backend will take care of intercepting the calls from the debug agent.
-    BreakpointStreamBackend mock_stream_backend(loop);
+    auto backend = std::make_unique<BreakpointStreamBackend>(loop);
+    BreakpointStreamBackend& mock_backend = *backend;
 
     DebugAgent agent(std::make_unique<ZirconSystemInterface>());
     RemoteAPI* remote_api = &agent;
 
-    agent.Connect(&mock_stream_backend.stream());
+    agent.Connect(std::move(backend));
 
     // We launch the test binary.
     debug_ipc::RunBinaryRequest launch_request = {};
@@ -167,13 +168,13 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     loop->Run();
 
     // We should have only received a thread started notification.
-    ASSERT_TRUE(mock_stream_backend.thread_started());
-    ASSERT_TRUE(mock_stream_backend.exceptions().empty());
-    ASSERT_FALSE(mock_stream_backend.thread_exited());
+    ASSERT_TRUE(mock_backend.thread_started());
+    ASSERT_TRUE(mock_backend.exceptions().empty());
+    ASSERT_FALSE(mock_backend.thread_exited());
 
     // We resume the thread because the new thread will be stopped.
     debug_ipc::ResumeRequest resume_request;
-    resume_request.ids.push_back({.process = mock_stream_backend.process_koid(), .thread = 0});
+    resume_request.ids.push_back({.process = mock_backend.process_koid(), .thread = 0});
     debug_ipc::ResumeReply resume_reply;
     remote_api->OnResume(resume_request, &resume_reply);
 
@@ -182,12 +183,12 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     loop->Run();
 
     // We should have found the correct module by now.
-    ASSERT_NE(mock_stream_backend.so_test_base_addr(), 0u);
+    ASSERT_NE(mock_backend.so_test_base_addr(), 0u);
 
     DEBUG_LOG(Test) << "Modules found. Adding breakpoint.";
 
     // We get the offset of the loaded function within the process space.
-    uint64_t module_base = mock_stream_backend.so_test_base_addr();
+    uint64_t module_base = mock_backend.so_test_base_addr();
     uint64_t module_function1 = module_base + symbol_offset1;
     uint64_t module_function2 = module_base + symbol_offset2;
 
@@ -216,8 +217,8 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     loop->Run();
 
     // We should have received a breakpoint exception by now.
-    ASSERT_EQ(mock_stream_backend.exceptions().size(), 1u);
-    debug_ipc::NotifyException exception = mock_stream_backend.exceptions()[0];
+    ASSERT_EQ(mock_backend.exceptions().size(), 1u);
+    debug_ipc::NotifyException exception = mock_backend.exceptions()[0];
     EXPECT_EQ(exception.thread.id.process, launch_reply.process_id);
     EXPECT_EQ(exception.type, debug_ipc::ExceptionType::kSoftwareBreakpoint);
     ASSERT_EQ(exception.hit_breakpoints.size(), 1u);
@@ -235,8 +236,8 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     loop->Run();
 
     // We should've received a second breakpoint exception.
-    ASSERT_EQ(mock_stream_backend.exceptions().size(), 2u);
-    exception = mock_stream_backend.exceptions()[1];
+    ASSERT_EQ(mock_backend.exceptions().size(), 2u);
+    exception = mock_backend.exceptions()[1];
     EXPECT_EQ(exception.thread.id.process, launch_reply.process_id);
     EXPECT_EQ(exception.type, debug_ipc::ExceptionType::kSoftwareBreakpoint);
     ASSERT_EQ(exception.hit_breakpoints.size(), 1u);
@@ -253,7 +254,7 @@ TEST(BreakpointIntegration, DISABLED_SWBreakpoint) {
     loop->Run();
 
     // We verify that the thread exited or the process exited.
-    ASSERT_TRUE(mock_stream_backend.thread_exited() || mock_stream_backend.process_exited());
+    ASSERT_TRUE(mock_backend.thread_exited() || mock_backend.process_exited());
   }
 }
 
@@ -278,12 +279,13 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     auto* loop = loop_wrapper.loop();
 
     // This stream backend will take care of intercepting the calls from the debug agent.
-    BreakpointStreamBackend mock_stream_backend(loop);
+    auto backend = std::make_unique<BreakpointStreamBackend>(loop);
+    BreakpointStreamBackend& mock_backend = *backend;
 
     DebugAgent agent(std::make_unique<ZirconSystemInterface>());
     RemoteAPI* remote_api = &agent;
 
-    agent.Connect(&mock_stream_backend.stream());
+    agent.Connect(std::move(backend));
 
     DEBUG_LOG(Test) << "Launching binary.";
 
@@ -299,13 +301,13 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     loop->Run();
 
     // We should have only received a thread started notification.
-    ASSERT_TRUE(mock_stream_backend.thread_started());
-    ASSERT_TRUE(mock_stream_backend.exceptions().empty());
-    ASSERT_FALSE(mock_stream_backend.thread_exited());
+    ASSERT_TRUE(mock_backend.thread_started());
+    ASSERT_TRUE(mock_backend.exceptions().empty());
+    ASSERT_FALSE(mock_backend.thread_exited());
 
     // We resume the thread because the new thread will be stopped.
     debug_ipc::ResumeRequest resume_request;
-    resume_request.ids.push_back({.process = mock_stream_backend.process_koid(), .thread = 0});
+    resume_request.ids.push_back({.process = mock_backend.process_koid(), .thread = 0});
     debug_ipc::ResumeReply resume_reply;
     remote_api->OnResume(resume_request, &resume_reply);
 
@@ -314,10 +316,10 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     loop->Run();
 
     // We should have found the correct module by now.
-    ASSERT_NE(mock_stream_backend.so_test_base_addr(), 0u);
+    ASSERT_NE(mock_backend.so_test_base_addr(), 0u);
 
     // We get the offset of the loaded function within the process space.
-    uint64_t module_base = mock_stream_backend.so_test_base_addr();
+    uint64_t module_base = mock_backend.so_test_base_addr();
     uint64_t module_function = module_base + symbol_offset;
 
     DEBUG_LOG(Test) << "Setting breakpoint at 0x" << std::hex << module_function;
@@ -346,8 +348,8 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     DEBUG_LOG(Test) << "Hit breakpoint.";
 
     // We should have received an exception now.
-    ASSERT_EQ(mock_stream_backend.exceptions().size(), 1u);
-    debug_ipc::NotifyException exception = mock_stream_backend.exceptions()[0];
+    ASSERT_EQ(mock_backend.exceptions().size(), 1u);
+    debug_ipc::NotifyException exception = mock_backend.exceptions()[0];
     EXPECT_EQ(exception.thread.id.process, launch_reply.process_id);
     EXPECT_EQ(exception.type, debug_ipc::ExceptionType::kHardwareBreakpoint)
         << "Got: " << debug_ipc::ExceptionTypeToString(exception.type);
@@ -366,7 +368,7 @@ TEST(BreakpointIntegration, DISABLED_HWBreakpoint) {
     DEBUG_LOG(Test) << "Verifyint thread exited correctly.";
 
     // We verify that the thread exited or the process exited.
-    ASSERT_TRUE(mock_stream_backend.thread_exited() || mock_stream_backend.process_exited());
+    ASSERT_TRUE(mock_backend.thread_exited() || mock_backend.process_exited());
   }
 }
 

@@ -212,13 +212,14 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   MessageLoopWrapper message_loop_wrapper;
   debug::MessageLoop* message_loop = message_loop_wrapper.loop();
 
-  JobStreamBackend backend(message_loop);
+  auto backend = std::make_unique<JobStreamBackend>(message_loop);
+  JobStreamBackend& mock_backend = *backend;
 
   DebugAgent agent(std::make_unique<ZirconSystemInterface>());
   RemoteAPI* remote_api = &agent;
 
-  agent.Connect(&backend.stream());
-  backend.set_remote_api(remote_api);
+  agent.Connect(std::move(backend));
+  mock_backend.set_remote_api(remote_api);
 
   FX_VLOGS(1) << "Setting filters.";
 
@@ -242,55 +243,55 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   // We should receive all the start events.
   for (size_t i = 0; i < processes.size(); i++) {
     message_loop->Run();
-    ASSERT_EQ(backend.process_start_events().size(), i + 1);
+    ASSERT_EQ(mock_backend.process_start_events().size(), i + 1);
   }
   // We resume the processes, which are in the initial waiting state.
-  VerifyAllProcessesStarted(backend, {"true", "false"});
+  VerifyAllProcessesStarted(mock_backend, {"true", "false"});
 
   FX_VLOGS(1) << "Starting threads.";
 
   // All threads should start
   for (size_t i = 0; i < processes.size(); i++) {
     message_loop->Run();
-    ASSERT_EQ(backend.thread_start_events().size(), i + 1);
+    ASSERT_EQ(mock_backend.thread_start_events().size(), i + 1);
   }
 
   // Now that all threads started, we resume them all.
-  ResumeAllProcesses(remote_api, backend);
+  ResumeAllProcesses(remote_api, mock_backend);
 
   FX_VLOGS(1) << "Receiving modules.";
 
   // We should receive all the modules notifications.
   for (size_t i = 0; i < processes.size(); i++) {
     message_loop->Run();
-    ASSERT_EQ(backend.module_events().size(), i + 1);
+    ASSERT_EQ(mock_backend.module_events().size(), i + 1);
   }
 
   FX_VLOGS(1) << "Resuming proceses.";
 
   // We need to resume the thread again after getting the modules.
-  ResumeAllProcesses(remote_api, backend);
+  ResumeAllProcesses(remote_api, mock_backend);
 
   // All processes should exit.
   for (size_t i = 0; i < processes.size(); i++) {
     message_loop->Run();
-    ASSERT_EQ(backend.process_exit_events().size(), i + 1);
+    ASSERT_EQ(mock_backend.process_exit_events().size(), i + 1);
   }
 
   // Create the expected.
   std::vector<ProcessIdentifier> expected;
-  for (const auto& start_event : backend.process_start_events()) {
+  for (const auto& start_event : mock_backend.process_start_events()) {
     ProcessIdentifier identifier;
     identifier.process_name = start_event.name;
     identifier.koid = start_event.koid;
     identifier.expected_return_code = start_event.name == "true" ? 0 : 1;
     expected.push_back(std::move(identifier));
   }
-  VerifyAllProcessesExited(backend, expected);
+  VerifyAllProcessesExited(mock_backend, expected);
 
   // We reset the state so that the stats are easier to reason about.
   processes.clear();
-  backend.Reset();
+  mock_backend.Reset();
 
   FX_VLOGS(1) << "Changing filters.";
 
@@ -308,17 +309,17 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
 
   // Should only catch one.
   message_loop->Run();
-  ASSERT_EQ(backend.process_start_events().size(), 1u);
+  ASSERT_EQ(mock_backend.process_start_events().size(), 1u);
 
   // Catch thread start event.
   message_loop->Run();
-  ASSERT_EQ(backend.thread_start_events().size(), 1u);
+  ASSERT_EQ(mock_backend.thread_start_events().size(), 1u);
 
   // Need to resume the thread at this point.
-  ResumeAllProcesses(remote_api, backend);
+  ResumeAllProcesses(remote_api, mock_backend);
   message_loop->Run();
 
-  ASSERT_EQ(backend.module_events().size(), 1u);
+  ASSERT_EQ(mock_backend.module_events().size(), 1u);
 
   FX_VLOGS(1) << "Setting up breakpoint.";
 
@@ -336,10 +337,11 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   uint64_t symbol_offset = so_wrapper.GetSymbolOffset(kTestSo, kExportedFunctionName);
   ASSERT_NE(symbol_offset, 0u);
 
-  uint64_t base_address = FindModuleBaseAddress(backend.module_events().back(), kModuleToSearch);
+  uint64_t base_address =
+      FindModuleBaseAddress(mock_backend.module_events().back(), kModuleToSearch);
   uint64_t function_address = base_address + symbol_offset;
 
-  uint64_t process_koid = backend.process_start_events().back().koid;
+  uint64_t process_koid = mock_backend.process_start_events().back().koid;
   uint32_t breakpoint_id = 1;
 
   // We add a breakpoint.
@@ -355,15 +357,15 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   ASSERT_TRUE(breakpoint_reply.status.ok());
 
   // Resume the process.
-  ResumeAllProcesses(remote_api, backend);
+  ResumeAllProcesses(remote_api, mock_backend);
 
   message_loop->Run();
 
   FX_VLOGS(1) << "Hit breakpoint.";
 
   // We should've received a breakpoint event.
-  ASSERT_EQ(backend.exceptions().size(), 1u);
-  const auto& exception = backend.exceptions().back();
+  ASSERT_EQ(mock_backend.exceptions().size(), 1u);
+  const auto& exception = mock_backend.exceptions().back();
   EXPECT_EQ(exception.type, ExceptionType::kSoftwareBreakpoint);
   EXPECT_EQ(exception.thread.id.process, process_koid);
   ASSERT_EQ(exception.hit_breakpoints.size(), 1u);
@@ -375,16 +377,16 @@ TEST(DebuggedJobIntegrationTest, DISABLED_RepresentativeScenario) {
   FX_VLOGS(1) << "Resuming process.";
 
   // We resume the thread.
-  ResumeAllProcesses(remote_api, backend);
+  ResumeAllProcesses(remote_api, mock_backend);
   message_loop->Run();
 
   // We should've received the exit event.
   // There should be no events except for the process exiting.
-  ASSERT_EQ(backend.process_start_events().size(), 1u);
-  ASSERT_EQ(backend.thread_start_events().size(), 1u);
-  ASSERT_EQ(backend.module_events().size(), 1u);
-  ASSERT_EQ(backend.process_exit_events().size(), 1u);
-  const auto& exit_event = backend.process_exit_events().back();
+  ASSERT_EQ(mock_backend.process_start_events().size(), 1u);
+  ASSERT_EQ(mock_backend.thread_start_events().size(), 1u);
+  ASSERT_EQ(mock_backend.module_events().size(), 1u);
+  ASSERT_EQ(mock_backend.process_exit_events().size(), 1u);
+  const auto& exit_event = mock_backend.process_exit_events().back();
   EXPECT_EQ(exit_event.process_koid, process_koid);
   EXPECT_EQ(exit_event.return_code, 0);
 }

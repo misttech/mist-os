@@ -44,9 +44,12 @@ void DispatchMessage(RemoteAPIAdapter* adapter,
 RemoteAPIAdapter::RemoteAPIAdapter(RemoteAPI* remote_api, debug::StreamBuffer* stream)
     : api_(remote_api), stream_(stream) {}
 
-RemoteAPIAdapter::~RemoteAPIAdapter() {}
-
 void RemoteAPIAdapter::OnStreamReadable() {
+  if (!api_ || !stream_) {
+    LOGS(Error) << "Attempt to call OnStreamReadable with invalid RemoteAPI or StreamBuffer!";
+    return;
+  }
+
   while (true) {
     debug_ipc::MsgHeader header;
     size_t bytes_read = stream_->Peek(reinterpret_cast<char*>(&header), sizeof(header));

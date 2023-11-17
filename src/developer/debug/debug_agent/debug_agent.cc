@@ -4,7 +4,6 @@
 
 #include "src/developer/debug/debug_agent/debug_agent.h"
 
-#include <inttypes.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/features.h>
@@ -14,7 +13,6 @@
 #include <zircon/types.h>
 
 #include <algorithm>
-#include <iterator>
 #include <memory>
 
 #include "src/developer/debug/debug_agent/arch.h"
@@ -26,15 +24,8 @@
 #include "src/developer/debug/debug_agent/process_breakpoint.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/debug_agent/time.h"
-#include "src/developer/debug/ipc/message_reader.h"
-#include "src/developer/debug/ipc/message_writer.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/logging/logging.h"
-#include "src/developer/debug/shared/platform_message_loop.h"
-#include "src/developer/debug/shared/stream_buffer.h"
-#include "src/developer/debug/shared/zx_status.h"
-#include "src/lib/fxl/strings/concatenate.h"
-#include "src/lib/fxl/strings/string_printf.h"
 
 #if defined(__linux__)
 #include <unistd.h>
@@ -71,7 +62,9 @@ std::string LogResumeRequest(const debug_ipc::ResumeRequest& request) {
 }  // namespace
 
 DebugAgent::DebugAgent(std::unique_ptr<SystemInterface> system_interface)
-    : system_interface_(std::move(system_interface)), weak_factory_(this) {
+    : adapter_(std::make_unique<RemoteAPIAdapter>(this, nullptr)),
+      system_interface_(std::move(system_interface)),
+      weak_factory_(this) {
   // Register ourselves to receive component events and limbo events.
   //
   // It's safe to pass |this| here because |this| owns |system_interface|, which owns
@@ -83,9 +76,31 @@ DebugAgent::DebugAgent(std::unique_ptr<SystemInterface> system_interface)
 
 fxl::WeakPtr<DebugAgent> DebugAgent::GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
 
-void DebugAgent::Connect(debug::StreamBuffer* stream) {
-  FX_DCHECK(!stream_) << "A debug agent should not be connected twice!";
-  stream_ = stream;
+void DebugAgent::TakeAndConnectRemoteAPIStream(std::unique_ptr<debug::BufferedStream> stream) {
+  // Now we can create a BufferedZxSocket to pass to the RemoteAPIAdapter. The data path is:
+  //
+  // BufferedZxSocket -> RemoteAPIAdapter -> DebugAgent
+  //
+  // DebugAgent owns both the BufferedZxSocket and RemoteAPIAdapter, since the DebugAgent can be
+  // started without a socket connection to a host tool, so it is safe to capture |this|. When the
+  // socket is closed, we exit.
+  adapter_->set_stream(&stream->stream());
+  stream->set_data_available_callback([this]() { adapter_->OnStreamReadable(); });
+  stream->set_error_callback([this]() {
+    Disconnect();
+    debug::MessageLoop::Current()->QuitNow();
+  });
+
+  // Start listening.
+  Connect(std::move(stream));
+}
+
+void DebugAgent::Connect(std::unique_ptr<debug::BufferedStream> stream) {
+  FX_DCHECK(stream) << "Cannot connect to an invalid stream!";
+
+  buffered_stream_ = std::move(stream);
+
+  FX_CHECK(buffered_stream_->Start()) << "Failed to connect to the FIDL socket";
 
   // Watch the root job.
   root_job_ = system_interface_->GetRootJob();
@@ -97,14 +112,20 @@ void DebugAgent::Connect(debug::StreamBuffer* stream) {
 }
 
 void DebugAgent::Disconnect() {
-  FX_DCHECK(stream_);
-  stream_ = nullptr;
+  // Can only disconnect from a connected state.
+  FX_DCHECK(buffered_stream_);
+
+  // Release all resources associated with the previous connection.
+  buffered_stream_->Reset();
+
+  // Reset debugging State
+  // TODO(jruthe): remove this to preserve state across connections.
   debug::LogBackend::Unset();
 
   // Stop watching for process starting.
   root_job_.reset();
-  // Removes breakpoints before we detach from the processes, although it should also be safe to
-  // reverse the order.
+  // Removes breakpoints before we detach from the processes, although it should also be safe
+  // to reverse the order.
   breakpoints_.clear();
   // Detach us from the processes.
   procs_.clear();

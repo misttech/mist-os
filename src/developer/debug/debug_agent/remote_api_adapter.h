@@ -18,6 +18,10 @@ class RemoteAPI;
 // Converts a raw stream of input data to a series of RemoteAPI calls.
 class RemoteAPIAdapter {
  public:
+  // Construct a RemoteAPIAdapter that's not hooked up to any streams. Attempting to call
+  // |OnStreamReadable| in this state will do nothing.
+  RemoteAPIAdapter() = default;
+
   // The stream will be used to read input and send replies back to the
   // client. The creator must set it up so that OnStreamReadable() is called
   // whenever there is new data to read on the stream.
@@ -25,9 +29,11 @@ class RemoteAPIAdapter {
   // The pointers must outlive this class (ownership is not taken).
   RemoteAPIAdapter(RemoteAPI* remote_api, debug::StreamBuffer* stream);
 
-  ~RemoteAPIAdapter();
+  ~RemoteAPIAdapter() = default;
 
+  void set_api(RemoteAPI* api) { api_ = api; }
   RemoteAPI* api() { return api_; }
+  void set_stream(debug::StreamBuffer* stream) { stream_ = stream; }
   debug::StreamBuffer* stream() { return stream_; }
 
   // Callback for when data is available to read on the stream.
@@ -35,8 +41,8 @@ class RemoteAPIAdapter {
 
  private:
   // All pointers are non-owning.
-  RemoteAPI* api_;
-  debug::StreamBuffer* stream_;
+  RemoteAPI* api_ = nullptr;
+  debug::StreamBuffer* stream_ = nullptr;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(RemoteAPIAdapter);
 };
