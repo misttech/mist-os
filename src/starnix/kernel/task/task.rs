@@ -1052,12 +1052,11 @@ impl Task {
     /// Create a task that runs inside the kernel.
     ///
     /// There is no underlying Zircon process to host the task.
-    pub fn create_kernel_task(
+    pub fn create_system_task(
         kernel: &Arc<Kernel>,
-        initial_name: CString,
         fs: Arc<FsContext>,
     ) -> Result<CurrentTask, Errno> {
-        Self::create_task(kernel, initial_name, fs, |pid, process_group| {
+        Self::create_task(kernel, CString::new("[kthreadd]").unwrap(), fs, |pid, process_group| {
             let process = zx::Process::from(zx::Handle::invalid());
             let memory_manager = Arc::new(MemoryManager::new_empty());
             let thread_group = ThreadGroup::new(

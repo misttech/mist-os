@@ -333,12 +333,8 @@ async fn create_container(
     debug_assert!(init_pid == 1);
 
     let system_task = OwnedRefByRef::new(
-        Task::create_kernel_task(
-            &kernel,
-            CString::new("[kthreadd]").unwrap(),
-            Arc::clone(&fs_context),
-        )
-        .source_context("create system task")?,
+        Task::create_system_task(&kernel, Arc::clone(&fs_context))
+            .source_context("create system task")?,
     );
 
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;

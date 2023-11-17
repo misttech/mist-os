@@ -85,10 +85,8 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         fs.clone(),
     )
     .expect("failed to create first task");
-    let system_task = OwnedRefByRef::new(
-        Task::create_kernel_task(&kernel, CString::new("[kthreadd]").unwrap(), fs)
-            .expect("create system task"),
-    );
+    let system_task =
+        OwnedRefByRef::new(Task::create_system_task(&kernel, fs).expect("create system task"));
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     init_common_devices(&kernel);

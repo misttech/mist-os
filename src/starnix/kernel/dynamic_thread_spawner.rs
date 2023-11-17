@@ -3,23 +3,22 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::FsContext,
     log_error,
-    task::{CurrentTask, Kernel, Task},
+    task::{CurrentTask, Task},
 };
 use futures::{channel::oneshot, TryFutureExt};
 use starnix_lock::Mutex;
 use starnix_uapi::{
     errno,
     errors::Errno,
-    ownership::{release_after, ReleasableByRef},
+    ownership::{release_after, ReleasableByRef, WeakRef},
 };
 use std::{
     ffi::CString,
     future::Future,
     sync::{
         mpsc::{sync_channel, SendError, SyncSender, TrySendError},
-        Arc, Weak,
+        Arc,
     },
     thread::JoinHandle,
 };
@@ -31,10 +30,8 @@ type BoxedClosure = Box<dyn FnOnce(&CurrentTask) + Send + 'static>;
 #[derive(Debug)]
 pub struct DynamicThreadSpawner {
     state: Arc<Mutex<DynamicThreadSpawnerState>>,
-    /// The `kernel` to create the kernel task associated with each thread.
-    kernel: Weak<Kernel>,
-    /// The `FsContext` to create the kernel task associated with each thread.
-    fs_context: Arc<FsContext>,
+    /// The weak system task to create the kernel thread associated with each thread.
+    system_task: WeakRef<Task>,
     /// A persistent thread that is used to create new thread. This ensures that threads are
     /// created from the initial starnix process and are not tied to a specific task.
     persistent_thread: RunningThread,
@@ -48,16 +45,14 @@ struct DynamicThreadSpawnerState {
 }
 
 impl DynamicThreadSpawner {
-    pub fn new(max_idle_threads: u8, kernel: Weak<Kernel>, fs_context: Arc<FsContext>) -> Self {
-        let persistent_thread =
-            RunningThread::new_persistent(kernel.clone(), Arc::clone(&fs_context));
+    pub fn new(max_idle_threads: u8, system_task: WeakRef<Task>) -> Self {
+        let persistent_thread = RunningThread::new_persistent(system_task.clone());
         Self {
             state: Arc::new(Mutex::new(DynamicThreadSpawnerState {
                 max_idle_threads,
                 ..Default::default()
             })),
-            kernel,
-            fs_context,
+            system_task,
             persistent_thread,
         }
     }
@@ -124,11 +119,10 @@ impl DynamicThreadSpawner {
         let (sender, receiver) = sync_channel::<RunningThread>(0);
         let dispatch_function: BoxedClosure = Box::new({
             let state = self.state.clone();
-            let kernel = self.kernel.clone();
-            let fs_context = Arc::clone(&self.fs_context);
+            let system_task = self.system_task.clone();
             move |_| {
                 sender
-                    .send(RunningThread::new(state, kernel, fs_context, function))
+                    .send(RunningThread::new(state, system_task, function))
                     .expect("receiver must not be dropped");
             }
         });
@@ -148,8 +142,7 @@ struct RunningThread {
 impl RunningThread {
     fn new(
         state: Arc<Mutex<DynamicThreadSpawnerState>>,
-        kernel: Weak<Kernel>,
-        fs_context: Arc<FsContext>,
+        system_task: WeakRef<Task>,
         f: BoxedClosure,
     ) -> Self {
         let (sender, receiver) = sync_channel::<BoxedClosure>(0);
@@ -158,18 +151,16 @@ impl RunningThread {
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
                     let current_task = {
-                        let Some(kernel) = kernel.upgrade() else {
-                            log_error!("Unable to upgrade kernel.");
+                        let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
-                        match Task::create_kernel_task(
-                            &kernel,
+                        match Task::create_kernel_thread(
+                            &system_task,
                             CString::new("[kthreadd]").unwrap(),
-                            fs_context,
                         ) {
                             Ok(task) => task,
                             Err(e) => {
-                                log_error!("Unable to create a kernel task: {e:?}");
+                                log_error!("Unable to create a kernel thread: {e:?}");
                                 return;
                             }
                         }
@@ -203,7 +194,7 @@ impl RunningThread {
         result
     }
 
-    fn new_persistent(kernel: Weak<Kernel>, fs_context: Arc<FsContext>) -> Self {
+    fn new_persistent(system_task: WeakRef<Task>) -> Self {
         // The persistent thread doesn't need to do any rendez-vous when received task.
         let (sender, receiver) = sync_channel::<BoxedClosure>(20);
         let thread = Some(
@@ -211,18 +202,16 @@ impl RunningThread {
                 .name("kthread-persistent-worker".to_string())
                 .spawn(move || {
                     let current_task = {
-                        let Some(kernel) = kernel.upgrade() else {
-                            log_error!("Unable to upgrade kernel.");
+                        let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
-                        match Task::create_kernel_task(
-                            &kernel,
+                        match Task::create_kernel_thread(
+                            &system_task,
                             CString::new("[kthreadd]").unwrap(),
-                            fs_context,
                         ) {
                             Ok(task) => task,
                             Err(e) => {
-                                log_error!("Unable to create a kernel task: {e:?}");
+                                log_error!("Unable to create a kernel thread: {e:?}");
                                 return;
                             }
                         }
@@ -260,27 +249,23 @@ impl Drop for RunningThread {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::create_kernel_and_task;
+    use crate::testing::{create_kernel_and_task, AutoReleasableTask};
 
-    fn build_spawner(max_idle_threads: u8) -> (Arc<Kernel>, DynamicThreadSpawner) {
-        let (kernel, task) = create_kernel_and_task();
-        let spawner = DynamicThreadSpawner::new(
-            max_idle_threads,
-            Arc::downgrade(&kernel),
-            Arc::clone(task.fs()),
-        );
-        (kernel, spawner)
+    fn build_spawner(max_idle_threads: u8) -> (AutoReleasableTask, DynamicThreadSpawner) {
+        let (_kernel, task) = create_kernel_and_task();
+        let spawner = DynamicThreadSpawner::new(max_idle_threads, task.weak_task());
+        (task, spawner)
     }
 
     #[fuchsia::test]
     async fn run_simple_task() {
-        let (_kernel, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         spawner.spawn(|_| {});
     }
 
     #[fuchsia::test]
     async fn run_10_tasks() {
-        let (_kernel, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         for _ in 0..10 {
             spawner.spawn(|_| {});
         }
@@ -288,7 +273,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn blocking_task_do_not_prevent_further_processing() {
-        let (_kernel, spawner) = build_spawner(1);
+        let (_task, spawner) = build_spawner(1);
 
         let pair = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         for _ in 0..10 {
@@ -328,7 +313,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn run_spawn_and_get_result() {
-        let (_kernel, spawner) = build_spawner(2);
+        let (_task, spawner) = build_spawner(2);
         assert_eq!(spawner.spawn_and_get_result(|_| 3).await, Ok(3));
     }
 }

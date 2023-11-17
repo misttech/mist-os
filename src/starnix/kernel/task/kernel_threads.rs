@@ -14,7 +14,7 @@ use starnix_uapi::{
     errors::Errno,
     ownership::{OwnedRefByRef, ReleasableByRef, WeakRef},
 };
-use std::{ffi::CString, sync::Arc};
+use std::ffi::CString;
 
 /// The threads that the kernel runs internally.
 ///
@@ -61,11 +61,9 @@ impl Drop for KernelThreads {
 
 impl KernelThreads {
     pub fn init(&self, system_task: OwnedRefByRef<CurrentTask>) -> Result<(), Errno> {
-        let kernel = Arc::downgrade(system_task.kernel());
-        let fs_context = Arc::clone(system_task.fs());
         self.system_task.set(system_task).map_err(|_| errno!(EEXIST))?;
         self.spawner
-            .set(DynamicThreadSpawner::new(2, kernel, fs_context))
+            .set(DynamicThreadSpawner::new(2, self.system_task().weak_task()))
             .map_err(|_| errno!(EEXIST))?;
         Ok(())
     }
@@ -82,9 +80,8 @@ impl KernelThreads {
         &self,
     ) -> Result<OwnedRefByRef<CurrentTask>, Errno> {
         let system_task = self.system_task();
-        Ok(OwnedRefByRef::new(Task::create_kernel_task(
+        Ok(OwnedRefByRef::new(Task::create_system_task(
             system_task.kernel(),
-            CString::new("[workaround_for_b297439724]").unwrap(),
             system_task.fs().clone(),
         )?))
     }
