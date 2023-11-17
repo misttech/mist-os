@@ -23,7 +23,7 @@ type ReadData = struct {
 /// Low-level protocol for i2c drivers.
 @discoverable
 @transport("Driver")
-open protocol I2cImpl {
+open protocol Device {
     flexible GetMaxTransferSize() -> (struct {
         size uint64;
     }) error zx.Status;
@@ -47,5 +47,5 @@ open protocol I2cImpl {
 };
 
 service Service {
-    device client_end:I2cImpl;
+    device client_end:Device;
 };

@@ -22,7 +22,7 @@ class TransportAdapter {
  public:
   virtual ~TransportAdapter() = default;
 
-  // I2cImpl protocol methods.
+  // Device protocol methods.
   virtual zx_status_t GetMaxTransferSize(uint64_t* size) = 0;
   virtual zx_status_t SetBitrate(uint32_t bitrate) = 0;
   virtual zx_status_t Transact(std::vector<i2c_impl_op_t>& ops, size_t count) = 0;
@@ -54,10 +54,10 @@ class BanjoTransportAdapter : public TransportAdapter {
 };
 
 // A TransportAdapter for the FIDL transport. The banjo-style interface is transformed into the
-// requisite FIDL operations, and then executed on a fidl::SyncClient<I2cImpl>.
+// requisite FIDL operations, and then executed on a fidl::SyncClient<fi2cimpl::Device>.
 class FidlTransportAdapter : public TransportAdapter {
  public:
-  explicit FidlTransportAdapter(fdf::ClientEnd<fuchsia_hardware_i2cimpl::I2cImpl>&& client_end)
+  explicit FidlTransportAdapter(fdf::ClientEnd<fuchsia_hardware_i2cimpl::Device>&& client_end)
       : i2cimpl_{std::move(client_end)} {}
 
   zx_status_t GetMaxTransferSize(uint64_t* size) override {
@@ -128,7 +128,7 @@ class FidlTransportAdapter : public TransportAdapter {
   bool is_valid() override { return i2cimpl_.is_valid(); }
 
  private:
-  fdf::WireSyncClient<fuchsia_hardware_i2cimpl::I2cImpl> i2cimpl_;
+  fdf::WireSyncClient<fuchsia_hardware_i2cimpl::Device> i2cimpl_;
 };
 
 }  // namespace i2c

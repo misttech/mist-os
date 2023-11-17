@@ -62,7 +62,7 @@ class FakeBanjoI2cImpl : public ddk::I2cImplProtocol<FakeBanjoI2cImpl> {
   std::function<zx_status_t(const i2c_impl_op_t*, size_t)> transact_;
 };
 
-class FakeFidlI2cImpl : public fdf::WireServer<fi2cimpl::I2cImpl> {
+class FakeFidlI2cImpl : public fdf::WireServer<fi2cimpl::Device> {
  public:
   explicit FakeFidlI2cImpl(
       std::function<void(TransactRequestView, fdf::Arena&, TransactCompleter::Sync&)> transact)
@@ -84,7 +84,7 @@ class FakeFidlI2cImpl : public fdf::WireServer<fi2cimpl::I2cImpl> {
     transact_(req, arena, completer);
   }
 
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fi2cimpl::I2cImpl> metadata,
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fi2cimpl::Device> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}  // No-op.
 
  private:
