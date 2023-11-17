@@ -14,15 +14,6 @@ sdk_source_set("cpp") {
   public_configs = [ "//sdk/config" ]
 
   sources = [
-    "commands.cc",
-    "commands.h",
-    "commands_sizing.cc",
-    "commands_sizing.h",
-    "id.h",
-    "resources.cc",
-    "resources.h",
-    "session.cc",
-    "session.h",
     "view_creation_tokens.cc",
     "view_creation_tokens.h",
     "view_identity.cc",
@@ -36,7 +27,6 @@ sdk_source_set("cpp") {
   public_deps = [
     "//sdk/fidl/fuchsia.images:fuchsia.images_hlcpp",
     "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_hlcpp",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_hlcpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/fit",
