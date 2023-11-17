@@ -12,7 +12,7 @@ use crate::{
         FsNodeInfo, FsStr, MountInfo, SpecialNode,
     },
     mm::{MemoryAccessorExt, PAGE_SIZE},
-    signals::send_standard_signal,
+    signals::{send_standard_signal, SignalInfo},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
 };
@@ -174,7 +174,7 @@ impl Pipe {
         }
 
         if self.reader_count == 0 {
-            send_standard_signal(current_task, SIGPIPE);
+            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 

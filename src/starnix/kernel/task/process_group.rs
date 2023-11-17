@@ -4,7 +4,7 @@
 
 use crate::{
     mutable_state::{state_accessor, state_implementation},
-    signals::send_standard_signal,
+    signals::{send_standard_signal, SignalInfo},
     task::{Session, ThreadGroup},
 };
 use starnix_lock::RwLock;
@@ -152,7 +152,7 @@ impl ProcessGroup {
                 })
                 .collect::<Vec<_>>();
             for task in tasks {
-                send_standard_signal(&task, *signal);
+                send_standard_signal(&task, SignalInfo::default(*signal));
             }
         }
     }

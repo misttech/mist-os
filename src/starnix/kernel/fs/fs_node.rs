@@ -12,7 +12,7 @@ use crate::{
         RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
     },
     logging::log_error,
-    signals::send_standard_signal,
+    signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
     time::utc,
 };
@@ -1348,7 +1348,7 @@ impl FsNode {
     // Called by `truncate` and `ftruncate` above.
     fn truncate_common(&self, current_task: &CurrentTask, length: u64) -> Result<(), Errno> {
         if length > current_task.thread_group.get_rlimit(Resource::FSIZE) {
-            send_standard_signal(current_task, SIGXFSZ);
+            send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
         self.clear_suid_and_sgid_bits(current_task)?;
@@ -1371,7 +1371,7 @@ impl FsNode {
     ) -> Result<(), Errno> {
         let allocate_size = offset.checked_add(length).ok_or_else(|| errno!(EINVAL))?;
         if allocate_size > current_task.thread_group.get_rlimit(Resource::FSIZE) {
-            send_standard_signal(current_task, SIGXFSZ);
+            send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
             return error!(EFBIG);
         }
 

@@ -233,13 +233,16 @@ async fn serve_component_controller(
             Event::Controller(request) => match request {
                 Ok(ComponentControllerRequest::Stop { .. }) => {
                     if let Some(task) = task.upgrade() {
-                        signals::send_standard_signal(task.as_ref(), SIGINT);
+                        signals::send_standard_signal(
+                            task.as_ref(),
+                            signals::SignalInfo::default(SIGINT),
+                        );
                         log_info!("Sent SIGINT to program {:}", task.command().to_string_lossy());
                     }
                 }
                 Ok(ComponentControllerRequest::Kill { .. }) => {
                     if let Some(task) = task.upgrade() {
-                        signals::send_standard_signal(&task, SIGKILL);
+                        signals::send_standard_signal(&task, signals::SignalInfo::default(SIGKILL));
                         log_info!("Sent SIGKILL to program {:}", task.command().to_string_lossy());
                         controller_handle.shutdown_with_epitaph(zx::Status::from_raw(
                             fcomponent::Error::InstanceDied.into_primitive() as i32,

@@ -26,10 +26,10 @@ use starnix_uapi::{
     resource_limits::Resource,
     sigaction_t,
     signals::{
-        SigSet, Signal, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT,
-        SIGIO, SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS,
-        SIGTERM, SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH,
-        SIGXCPU, SIGXFSZ,
+        SigSet, SIGABRT, SIGALRM, SIGBUS, SIGCHLD, SIGCONT, SIGFPE, SIGHUP, SIGILL, SIGINT, SIGIO,
+        SIGKILL, SIGPIPE, SIGPROF, SIGPWR, SIGQUIT, SIGSEGV, SIGSTKFLT, SIGSTOP, SIGSYS, SIGTERM,
+        SIGTRAP, SIGTSTP, SIGTTIN, SIGTTOU, SIGURG, SIGUSR1, SIGUSR2, SIGVTALRM, SIGWINCH, SIGXCPU,
+        SIGXFSZ,
     },
     user_address::UserAddress,
     SA_ONSTACK, SA_RESTART, SA_SIGINFO, SIG_DFL, SIG_IGN,
@@ -51,12 +51,10 @@ pub fn send_signal_first(task: &Task, siginfo: SignalInfo) {
 }
 
 // Sends `signal` to `task`. The signal must be a standard (i.e. not real-time) signal.
-pub fn send_standard_signal(task: &Task, signal: Signal) {
-    if signal.is_real_time() {
-        panic!("send_standard_signal() can't be used for real-time signals.")
-    }
-    send_signal_prio(task, SignalInfo::default(signal), SignalPriority::Last)
-        .expect("send_signal(SignalPriority::First) is not expected to fail")
+pub fn send_standard_signal(task: &Task, siginfo: SignalInfo) {
+    debug_assert!(!siginfo.signal.is_real_time());
+    send_signal_prio(task, siginfo, SignalPriority::Last)
+        .expect("send_signal(SignalPriority::First) is not expected to fail for standard signals.")
 }
 
 pub fn send_signal(task: &Task, siginfo: SignalInfo) -> Result<(), Errno> {

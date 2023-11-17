@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::not_implemented,
+    logging::{log_warn, not_implemented},
     signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
     task::{
         timers::{ClockId, TimerId},
@@ -151,7 +151,8 @@ impl IntervalTimer {
 
                 if let Some(target) = &signal_target {
                     if let Some(signal_info) = self.signal_info() {
-                        send_signal(target, signal_info).expect("Failed to send timer signal");
+                        send_signal(target, signal_info)
+                            .unwrap_or_else(|e| log_warn!("Failed to queue timer signal: {}", e));
                     }
                 }
             }

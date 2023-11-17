@@ -398,7 +398,7 @@ impl ThreadGroup {
 
         for task in tasks {
             task.set_exit_status(&mut *task.write(), exit_status.clone());
-            send_standard_signal(&task, SIGKILL);
+            send_standard_signal(&task, SignalInfo::default(SIGKILL));
         }
     }
 

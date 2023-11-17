@@ -1838,7 +1838,7 @@ mod tests {
 
         // Send a signal to the task. `wait_on_pid` should realize there is a signal pending when
         // entering a wait and return with `EINTR`.
-        send_standard_signal(&task, SIGUSR1);
+        send_standard_signal(&task, SignalInfo::default(SIGUSR1));
 
         let errno = wait_on_pid(
             &task,
@@ -1855,7 +1855,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(0, Some(SIGCHLD));
 
         // Send SIGKILL to the child. As kill is handled immediately, no need to dequeue signals.
-        send_standard_signal(&child, SIGKILL);
+        send_standard_signal(&child, SignalInfo::default(SIGKILL));
         dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 
@@ -1874,7 +1874,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(0, exit_signal);
 
         // Send the signal to the child.
-        send_standard_signal(&child, sig);
+        send_standard_signal(&child, SignalInfo::default(sig));
         dequeue_signal_for_test(&mut child);
         std::mem::drop(child);
 

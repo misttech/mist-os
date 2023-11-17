@@ -37,7 +37,9 @@ use crate::{
     loader::{load_executable, resolve_executable, ResolvedElf},
     logging::{log_error, log_warn, not_implemented, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
-    signals::{send_signal, RunState, SignalActions, SignalDetail, SignalInfo, SignalState},
+    signals::{
+        send_standard_signal, RunState, SignalActions, SignalDetail, SignalInfo, SignalState,
+    },
     syscalls::{decls::Syscall, SyscallResult},
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Kernel, ProcessEntryRef,
@@ -2145,11 +2147,11 @@ impl CurrentTask {
         if let Err(err) = self.finish_exec(path, resolved_elf) {
             // TODO(tbodt): Replace this panic with a log and force a SIGSEGV.
             log_warn!("unrecoverable error in exec: {err:?}");
-            send_signal(
+
+            send_standard_signal(
                 self,
                 SignalInfo { code: SI_KERNEL as i32, force: true, ..SignalInfo::default(SIGSEGV) },
-            )
-            .expect("Failed to send SIGSEGV");
+            );
             return Err(err);
         }
 

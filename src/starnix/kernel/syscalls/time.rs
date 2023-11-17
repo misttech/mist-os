@@ -580,7 +580,10 @@ mod test {
                         .get_signal_target(signal.into())
                         .map(TempRef::into_static);
                     if let Some(task) = signal_target {
-                        crate::signals::send_standard_signal(&task, signal);
+                        crate::signals::send_standard_signal(
+                            &task,
+                            crate::signals::SignalInfo::default(signal),
+                        );
                     }
                 }
             })
