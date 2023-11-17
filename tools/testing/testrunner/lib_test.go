@@ -847,7 +847,7 @@ func TestRunAndOutputTests(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir)
+			err = runAndOutputTests(ctx, tc.tests, testerForTest, outputs, resultsDir, nil)
 			if tc.wantErr != (err != nil) {
 				t.Errorf("want err: %t, got %s", tc.wantErr, err)
 			}

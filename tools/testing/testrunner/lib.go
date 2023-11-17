@@ -22,14 +22,18 @@ import (
 	"sync"
 	"time"
 
-	"go.fuchsia.dev/fuchsia/tools/botanist"
+	resultpb "go.chromium.org/luci/resultdb/proto/v1"
+	sinkpb "go.chromium.org/luci/resultdb/sink/proto/v1"
+	botanist "go.fuchsia.dev/fuchsia/tools/botanist"
 	botanistconstants "go.fuchsia.dev/fuchsia/tools/botanist/constants"
 	"go.fuchsia.dev/fuchsia/tools/botanist/targets"
+	"go.fuchsia.dev/fuchsia/tools/build"
 	"go.fuchsia.dev/fuchsia/tools/integration/testsharder"
 	"go.fuchsia.dev/fuchsia/tools/lib/clock"
 	"go.fuchsia.dev/fuchsia/tools/lib/environment"
 	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/testing/resultdb"
 	"go.fuchsia.dev/fuchsia/tools/testing/runtests"
 	"go.fuchsia.dev/fuchsia/tools/testing/tap"
 	"go.fuchsia.dev/fuchsia/tools/testing/testparser"
@@ -68,6 +72,10 @@ type Options struct {
 	//
 	// See //tools/botanist/cmd/run.go for the mapping of features to levels.
 	FFXExperimentLevel int
+
+	// Whether to upload to upload test results to ResultDB from testrunner
+	// Bool enables soft transition from tefmocheck running in the recipe vs the processing happening in botanist.
+	UploadToResultDB bool
 }
 
 func SetupAndExecute(ctx context.Context, opts Options, testsPath string) error {
@@ -302,8 +310,16 @@ func execute(
 		}
 	}
 
+	var client *resultdb.Client
+	var err error
+	if opts.UploadToResultDB {
+		client, err = resultdb.NewClient()
+		if err != nil {
+			return err
+		}
+	}
 	var finalError error
-	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir); err != nil {
+	if err := runAndOutputTests(ctx, tests, testerForTest, outputs, outDir, client); err != nil {
 		finalError = err
 	}
 
@@ -411,12 +427,14 @@ type testToRun struct {
 
 // runAndOutputTests runs all the tests, possibly with retries, and records the
 // results to `outputs`.
+// TODO(danikay): Make this testable by extracting an interface for resultdb
 func runAndOutputTests(
 	ctx context.Context,
 	tests []testsharder.Test,
 	testerForTest func(testsharder.Test) (Tester, *[]runtests.DataSinkReference, error),
 	outputs *TestOutputs,
 	globalOutDir string,
+	resultdbClient *resultdb.Client,
 ) error {
 	// Since only a single goroutine writes to and reads from the queue it would
 	// be more appropriate to use a true Queue data structure, but we'd need to
@@ -428,6 +446,8 @@ func runAndOutputTests(
 	for _, test := range tests {
 		testQueue <- testToRun{Test: test}
 	}
+
+	var resultdbResults []*sinkpb.TestResult
 
 	// `for test := range testQueue` might seem simpler, but it would block
 	// instead of exiting once the queue becomes empty. To exit the loop we
@@ -457,6 +477,16 @@ func runAndOutputTests(
 		test.previousRuns++
 		test.totalDuration += result.Duration()
 
+		// TODO(danikay): Temporarily using the existence of the resultdb client to
+		// enable the soft transition from uploading to resultdb from the fuchsia.py
+		// recipe to uploading the test results here, as they complete
+		if resultdbClient != nil {
+			testTags := testTagsToStringPairs(result.Tags)
+			testDetails := testDetailsFromTestResult(result.Name, result.StartTime, result)
+			testResults, _ := resultdb.TestCaseToResultSink(result.Cases, testTags, &testDetails, outDir)
+			resultdbResults = append(resultdbResults, testResults...)
+		}
+
 		if shouldKeepGoing(test.Test, result, test.totalDuration) {
 			// Schedule the test to be run again.
 			testQueue <- test
@@ -464,6 +494,13 @@ func runAndOutputTests(
 		// TODO(olivernewman): Add a unit test to make sure data sinks are
 		// recorded correctly.
 		*sinks = append(*sinks, result.DataSinks)
+	}
+	// TODO @danikay upload test results immediately as they happen, in a background
+	// go routine
+	if resultdbClient != nil {
+		if err := resultdbClient.ReportTestResults(resultdb.CreateTestResultsRequests(resultdbResults, 500)); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -649,4 +686,27 @@ func runTestOnce(
 	}
 	result.Affected = test.Affected
 	return result, nil
+}
+
+// Helper function to convert []build.TestTag to []resultpb.StringPair
+func testTagsToStringPairs(tags []build.TestTag) []*resultpb.StringPair {
+	stringPairs := make([]*resultpb.StringPair, 0, len(tags))
+
+	for _, tag := range tags {
+		stringPairs = append(stringPairs, &resultpb.StringPair{
+			Key:   tag.Key,
+			Value: tag.Value,
+		})
+	}
+
+	return stringPairs
+}
+
+// Helper function to create runtests.TestDetails from result.TestResult
+func testDetailsFromTestResult(name string, startTime time.Time, result *TestResult) runtests.TestDetails {
+	return runtests.TestDetails{
+		Name:      name,
+		StartTime: startTime,
+		Result:    result.Result,
+	}
 }

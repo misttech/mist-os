@@ -105,6 +105,9 @@ type RunCommand struct {
 
 	// Args passed to testrunner
 	testrunnerOptions testrunner.Options
+
+	// When true, upload to resultdb from testrunner.
+	uploadToResultDB bool
 }
 
 type imageOverridesFlagValue build.ImageOverrides
@@ -156,6 +159,8 @@ func (r *RunCommand) SetFlags(f *flag.FlagSet) {
 	f.IntVar(&r.ffxExperimentLevel, "ffx-experiment-level", 0, "The level of experimental features to enable. If -ffx is not set, this will have no effect.")
 	f.BoolVar(&r.skipSetup, "skip-setup", false, "if set, botanist will not set up a target.")
 	f.Var(&r.imageOverrides, "image-overrides", "A json struct following the ImageOverrides schema at //tools/build/tests.go with the names of the images to use from images.json.")
+	// Temporary flag to enable a soft transition to uploading test results from botanist rather than from the recipe.
+	f.BoolVar(&r.uploadToResultDB, "upload-to-resultdb", false, "if set, test results will be uploaded to ResultDB from testrunner.")
 
 	// Parsing of testrunner options.
 	f.StringVar(&r.testrunnerOptions.OutDir, "out-dir", "", "Optional path where a directory containing test results should be created.")
