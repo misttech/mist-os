@@ -2639,6 +2639,12 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kInitial);
 
   FIELD_DEFAULT_ZERO(constraints, pixel_format);
+  ZX_DEBUG_ASSERT(constraints.pixel_format().has_value());
+  if (*constraints.pixel_format() == fuchsia_images2::PixelFormat::kInvalid) {
+    // Un-set or kInvalid not allowed; see kDoNotCare if that is the intent.
+    LogError(FROM_HERE, "PixelFormatType INVALID not allowed");
+    return false;
+  }
 
   ZX_DEBUG_ASSERT(constraints.pixel_format_modifier().has_value() ||
                   stage == CheckSanitizeStage::kNotAggregated);
@@ -2700,11 +2706,6 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   FIELD_DEFAULT_1(constraints, bytes_per_row_divisor);
 
   FIELD_DEFAULT_1(constraints, start_offset_divisor);
-
-  if (constraints.pixel_format().value() == fuchsia_images2::PixelFormat::kInvalid) {
-    LogError(FROM_HERE, "PixelFormatType INVALID not allowed");
-    return false;
-  }
 
   auto is_pixel_format_do_not_care_result =
       IsImageFormatConstraintsPixelFormatDoNotCare(constraints);
