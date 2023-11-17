@@ -782,6 +782,9 @@ impl Daemon {
                 )
                 .await;
             }
+            DaemonRequest::_UnknownMethod { ordinal, method_type, .. } => {
+                tracing::warn!(ordinal, method_type = ?method_type, "Received unknown method request");
+            }
         }
 
         Ok(())

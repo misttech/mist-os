@@ -30,8 +30,8 @@ group("fuchsia_controller_test_data") {
   testonly = true
   deps = [
     ":fuchsia_controller_host_test_data",
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
     "//src/developer/ffx:test_data",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
   ]
 }
 

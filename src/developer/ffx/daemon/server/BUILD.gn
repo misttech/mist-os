@@ -11,7 +11,6 @@ rustc_library("lib") {
   with_unit_tests = true
 
   deps = [
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.overnet.protocol:fuchsia.overnet.protocol_rust",
@@ -23,6 +22,7 @@ rustc_library("lib") {
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/daemon/protocols:ffx_daemon_protocols_lib",
     "//src/developer/ffx/daemon/target:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/metrics:lib",
     "//src/developer/ffx/lib/protocols:lib",

@@ -94,7 +94,7 @@ your Fuchsia device.
 In this section, we create a simple program that doesn't yet connect to a
 Fuchsia device, but connect to the `ffx` daemon to verify that the device is
 up and running. To do this, we leverage the existing `ffx` FIDL libraries for
-interacting with the daemon, which is defined in `//sdk/fidl/fuchsia.developer.ffx`.
+interacting with the daemon, which is defined in `//src/developer/ffx/fidl`.
 
 ### Include FIDL dependencies {:#include-fidl-dependencies .numbered}
 
@@ -104,7 +104,7 @@ dependency in your `BUILD.gn` for the `fidlc` target to create these FIDL
 bindings:
 
 ```gn
-"//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_compile_fidlc($fidl_toolchain)"
+"//src/developer/ffx/fidl:fuchsia.developer.ffx_compile_fidlc($fidl_toolchain)"
 ```
 
 If you're writing a test, you need to include the host test data (which will
@@ -112,7 +112,7 @@ allow infra tests to run correctly, given they need access to the IR on test
 runners as well), for example:
 
 ```gn
-"//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data"
+"//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data"
 ```
 
 Including the host test data rule will also include the FIDL IR, so no need
@@ -240,7 +240,7 @@ python_binary("example_echo") {
     deps = [
         "//src/developer/ffx:host",
         "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
-        "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_compile_fidlc($fidl_toolchain)",
+        "//src/developer/ffx/fidl:fuchsia.developer.ffx_compile_fidlc($fidl_toolchain)",
     ]
 }
 ```
@@ -511,4 +511,4 @@ There are a few things to note when implementing a server:
 [femu-guide]: /docs/get-started/set_up_femu.md
 [product-config]: /docs/development/build/build_system/boards_and_products.md
 [integration-testing]: /docs/development/tools/ffx/development/integration_testing/README.md
-[echo-fidl]: /sdk/fidl/fuchsia.developer.ffx/echo.fidl
+[echo-fidl]: /src/developer/ffx/fidl/echo.fidl

@@ -20,8 +20,8 @@ if (is_host) {
     ]
     deps = [
       "//build/sdk/meta:rust",
-      "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/config:lib",
+      "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/emulator_instance:lib",
       "//src/developer/ffx/lib/errors:lib",
       "//src/developer/ffx/lib/ssh:lib",

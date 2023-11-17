@@ -1,6 +1,6 @@
 # Target Collection
 
-The daemon maintains discovered and connected targets that are accessible by the `TargetCollection` fidl protocol defined in `sdk/fidl/fuchsia.developer.ffx/target.fidl`.
+The daemon maintains discovered and connected targets that are accessible by the `TargetCollection` fidl protocol defined in `src/developer/ffx/fidl/target.fidl`.
 
 ## Daemon Events
 

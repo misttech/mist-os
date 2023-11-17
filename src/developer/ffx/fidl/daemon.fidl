@@ -4,6 +4,9 @@
 library fuchsia.developer.ffx;
 using zx;
 using fuchsia.io;
+using fuchsia.developer.ffxdaemonlifecycle;
+
+alias VersionInfo = fuchsia.developer.ffxdaemonlifecycle.VersionInfo;
 
 type DaemonError = strict enum {
     TARGET_CACHE_ERROR = 1;
@@ -38,17 +41,8 @@ type DaemonError = strict enum {
 };
 
 @discoverable
-closed protocol Daemon {
-    /// Requests for the Daemon to exit. Receives 'true' to indicate the request
-    /// was received and the Daemon will then shut down shortly thereafter.
-    strict Quit() -> (struct {
-        success bool;
-    });
-
-    // Retrieves version information about this daemon instance.
-    strict GetVersionInfo() -> (struct {
-        info VersionInfo;
-    });
+open protocol Daemon {
+    compose fuchsia.developer.ffxdaemonlifecycle.DaemonLifecycleControl;
 
     /// Connects to a daemon protocol.
     ///
@@ -60,7 +54,7 @@ closed protocol Daemon {
     ///
     /// Again for emphasis: if you are a developer and you are invoking this
     /// function directly, you should reconsider your actions.
-    strict ConnectToProtocol(resource struct {
+    flexible ConnectToProtocol(resource struct {
         name fuchsia.io.Name;
         server_end zx.Handle:CHANNEL;
     }) -> () error DaemonError;

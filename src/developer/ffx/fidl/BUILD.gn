@@ -4,8 +4,10 @@
 
 import("//build/fidl/fidl.gni")
 
+assert(is_host || current_toolchain == fidl_toolchain,
+       "fuchsia.developer.ffx is only to be used for host tool communication")
+
 fidl("fuchsia.developer.ffx") {
-  sdk_category = "internal"
   sources = [
     "agis.fidl",
     "daemon.fidl",
@@ -18,10 +20,10 @@ fidl("fuchsia.developer.ffx") {
     "testing.fidl",
     "tracing.fidl",
     "tunnel.fidl",
-    "version.fidl",
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.buildinfo",
+    "//sdk/fidl/fuchsia.developer.ffxdaemonlifecycle",
     "//sdk/fidl/fuchsia.developer.remotecontrol",
     "//sdk/fidl/fuchsia.gpu.agis",
     "//sdk/fidl/fuchsia.io",
@@ -31,9 +33,10 @@ fidl("fuchsia.developer.ffx") {
     "//zircon/vdso/zx",
   ]
 
-  fuzzers = [
-    {
-      protocol = "fidl.developer.ffx.Daemon"
-    },
+  visibility = [
+    "//build/sdk/meta:*",
+    "//src/developer/ffx/*",
+    "//src/sys/pkg/lib/*",
+    "//tools/funnel/*",
   ]
 }

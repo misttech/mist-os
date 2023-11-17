@@ -25,11 +25,11 @@ python_mobly_test("target_identity_tests") {
   transport = "fuchsia-controller"
   environments = [ emu_env ]
   deps = [
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
     "//sdk/fidl/fuchsia.device:fuchsia.device_host_test_data",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_host_test_data",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
     "//sdk/fidl/fuchsia.io:fuchsia.io_host_test_data",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }
@@ -43,8 +43,8 @@ python_mobly_test("reboot_test") {
   transport = "fuchsia-controller"
   environments = [ emu_env ]
   deps = [
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_host_test_data",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_host_test_data",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_host_test_data",
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",
   ]
 }

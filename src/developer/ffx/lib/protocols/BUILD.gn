@@ -13,12 +13,12 @@ rustc_library("lib") {
 
   deps = [
     "macros:lib",
-    "//sdk/fidl/fuchsia.developer.ffx:fuchsia.developer.ffx_rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//src/connectivity/overnet/lib/core",
     "//src/developer/ffx/daemon/core:lib",
     "//src/developer/ffx/daemon/events:lib",
     "//src/developer/ffx/daemon/target:lib",
+    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

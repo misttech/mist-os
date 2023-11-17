@@ -244,7 +244,7 @@ Repeat these steps to include additional FIDL proxies to your `ffx` plugin.
 The following FIDL proxies are built into `ffx`, and do not require additional
 dependencies or mappings:
 
-- [DaemonProxy](/sdk/fidl/fuchsia.developer.ffx/daemon.fidl)
+- [DaemonProxy](/src/developer/ffx/fidl/daemon.fidl)
 - [Remote Control Service (RCS)](/sdk/fidl/fuchsia.developer.remotecontrol/remote-control.fidl)
 
 You can simply add the above proxies to your plugin's parameter list to access
