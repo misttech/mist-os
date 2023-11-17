@@ -14,7 +14,11 @@ if (is_host) {
     main_source = "fidlcat_e2e_tests.py"
     extra_args = [ "-v" ]
 
-    deps = [ ":runtime_deps" ]
+    deps = [
+      ":runtime_deps",
+      "//src/developer/ffx:test_data",
+      "//src/developer/ffx/plugins/debug:ffx_debug_plugin_tool_test_data",
+    ]
 
     # Runs on "main" builders (try and ci) in QEMU environments, but only on x64, as we don't
     # support running host test on arm64 host.

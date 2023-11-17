@@ -2,7 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import ipaddress
 import os
+import pathlib
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -23,14 +26,85 @@ os.environ.update(
 
 
 class Ffx:
-    _path = "host_x64/ffx"
-    _args = ["--target", os.environ["FUCHSIA_DEVICE_ADDR"]]
+    # Relative to outdir.
+    _path = "host-tools/ffx"
+    # Automatically deleted when |self| is destructed.
+    _isolate_dir = tempfile.TemporaryDirectory()
+    # The isolate args are kept separately from the rest of the FFX configuration to make adding the
+    # target in |init_isolate| simpler.
+    _isolate_args = [
+        "--isolate-dir",
+        _isolate_dir.name,
+    ]
+    # General FFX configuration.
+    _ffx_config = [
+        "--config",
+        "ffx.subtool-search-paths=" + os.getcwd() + "/host-tools",
+        "--config",
+        "log.level=DEBUG,log.dir=" + os.environ["FUCHSIA_TEST_OUTDIR"],
+        "--config",
+        "fastboot.usb.disabled=true",
+        "--config",
+        "discovery.mdns.enabled=false",
+    ]
+    # The target address will be in environment variables and determined at initialization.
+    _target = ["--target"]
+    # The actual ffx command to run.
+    _command = []
 
     def __init__(self, *args: str):
+        self._command = list(args)
+        self._target.append(self.get_target())
+
+    @staticmethod
+    def get_target():
+        if not "FUCHSIA_DEVICE_ADDR" in os.environ.keys():
+            raise RuntimeError("FUCHSIA_DEVICE_ADDR must be specified.")
+
+        addr = ipaddress.ip_address(os.environ["FUCHSIA_DEVICE_ADDR"])
+        target = ""
+
+        # Fixup IPv6 address.
+        if addr.version == 6:
+            target = "[" + str(addr) + "]"
+        else:
+            target = str(addr)
+
+        # FUCHSIA_SSH_PORT is set when the test is run from `fx test`.
+        if "FUCHSIA_SSH_PORT" in os.environ.keys():
+            port = os.environ["FUCHSIA_SSH_PORT"]
+            target = target + ":" + port
+
+        return target
+
+    # Initialize the ffx isolate with the connected target device indicated by the environment
+    # variables FUCHSIA_DEVICE_ADDR and FUCHSIA_SSH_PORT.
+    def init_isolate(self, addr):
+        # Add the target to the isolate.
+        target_add_process = subprocess.Popen(
+            [self._path] + self._isolate_args + ["target", "add", addr],
+        )
+
+        target_add_process.wait()
+
+        if target_add_process.returncode != 0:
+            raise RuntimeError(
+                "Failed to spawn FFX isolate " + target_add_process.returncode
+            )
+
+    # Run the requested ffx command.
+    def start(self):
+        self.init_isolate(self._target[-1])
+
         self.process = subprocess.Popen(
-            [self._path] + self._args + list(args),
+            [self._path]
+            + self._isolate_args
+            + self._ffx_config
+            + self._target
+            + self._command,
             text=True,
             stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
     def wait(self):
@@ -42,6 +116,7 @@ class Fidlcat:
     _path = "host_x64/fidlcat"
     _args = []
     _ffx_bridge = None
+    _debug_agent_socket_path = None
 
     def __init__(self, *args, merge_stderr=False):
         """
@@ -105,11 +180,16 @@ class Fidlcat:
     @classmethod
     def setup(cls):
         cls._ffx_bridge = Ffx("debug", "connect", "--agent-only")
-        socket_path = cls._ffx_bridge.process.stdout.readline().strip()
-        assert os.path.exists(socket_path)
+        cls._ffx_bridge.start()
+        cls._debug_agent_socket_path = (
+            cls._ffx_bridge.process.stdout.readline().strip()
+        )
+
+        assert os.path.exists(cls._debug_agent_socket_path)
+
         cls._args = [
             "--unix-connect",
-            socket_path,
+            cls._debug_agent_socket_path,
             "--fidl-ir-path",
             TEST_DATA_DIR,
             "--symbol-path",
@@ -119,6 +199,13 @@ class Fidlcat:
     @classmethod
     def teardown(cls):
         cls._ffx_bridge.process.terminate()
+
+        socket_path = pathlib.Path(cls._debug_agent_socket_path)
+
+        # The host end of debug_agent's socket is supposed to be cleaned up when the ffx isolate is
+        # destroyed, but sometimes doesn't for unknown reasons. Clean it up explicitly here just in
+        # case.
+        socket_path.unlink(missing_ok=True)
 
 
 # fuchsia-pkg URL for an echo realm. The echo realm contains echo client and echo server components.
