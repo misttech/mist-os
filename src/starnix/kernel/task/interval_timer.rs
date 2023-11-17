@@ -198,7 +198,7 @@ impl IntervalTimer {
         // TODO(fxb/123084): check on clock_id to see if the clock supports creating a timer.
 
         let self_ref = self.clone();
-        executor.spawn_detached(async move {
+        executor.spawn_local_detached(async move {
             let _ = {
                 // 1. Lock the state to update `abort_handle` when the timer is still armed.
                 // 2. MutexGuard needs to be dropped before calling await on the future task.

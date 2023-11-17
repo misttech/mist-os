@@ -55,7 +55,7 @@ pub fn serve_file_at(
     //                 `current_task`. Do we need to retain these credentials?
     let system_task = kernel.kthreads.weak_system_task();
     let starnix_file = StarnixNodeConnection::new(system_task, file);
-    kernel.kthreads.ehandle.spawn_detached(async move {
+    kernel.kthreads.ehandle.spawn_local_detached(async move {
         let scope = execution_scope::ExecutionScope::new();
         starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
         scope.wait().await;
