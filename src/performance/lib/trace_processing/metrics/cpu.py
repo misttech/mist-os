@@ -84,29 +84,29 @@ def metrics_processor(
             )
             test_case_results.append(
                 trace_metrics.TestCaseResult(
-                    f"cpu_p{percentile}",
+                    f"CpuP{percentile}",
                     trace_metrics.Unit.percent,
                     [cpu_percentile],
                 )
             )
         test_case_results.append(
             trace_metrics.TestCaseResult(
-                f"cpu_min", trace_metrics.Unit.percent, [min(cpu_percentages)]
+                f"CpuMin", trace_metrics.Unit.percent, [min(cpu_percentages)]
             )
         )
         test_case_results.append(
             trace_metrics.TestCaseResult(
-                f"cpu_max", trace_metrics.Unit.percent, [max(cpu_percentages)]
+                f"CpuMax", trace_metrics.Unit.percent, [max(cpu_percentages)]
             )
         )
         test_case_results.append(
             trace_metrics.TestCaseResult(
-                f"cpu_average", trace_metrics.Unit.percent, [cpu_mean]
+                f"CpuAverage", trace_metrics.Unit.percent, [cpu_mean]
             )
         )
     else:
         result: trace_metrics.TestCaseResult = trace_metrics.TestCaseResult(
-            "CPU Load", trace_metrics.Unit.percent, cpu_percentages
+            "CpuLoad", trace_metrics.Unit.percent, cpu_percentages
         )
         test_case_results.append(result)
 
