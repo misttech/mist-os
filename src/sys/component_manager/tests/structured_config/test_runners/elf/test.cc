@@ -12,4 +12,10 @@ TEST(ScTest, CheckValues) {
   ASSERT_EQ(c.my_flag(), true);
   ASSERT_EQ(c.my_uint8(), 255);
 }
+
+TEST(ScTest, CreateOwnConfig) {
+  receiver_config::Config c;
+  c.my_uint8() = 5;
+  ASSERT_EQ(c.my_uint8(), 5);
+}
 }  // namespace
