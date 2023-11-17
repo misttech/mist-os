@@ -140,8 +140,7 @@ driver_bind_rules("aml-g12-composite-bind") {
   ]
 }
 
-fuchsia_driver("aml-g12-composite-driver") {
-  output_name = "aml-g12-composite"
+source_set("aml-g12-composite-common") {
   sources = [
     "aml-tdm-config-device.cc",
     "composite-server.cc",
@@ -150,8 +149,7 @@ fuchsia_driver("aml-g12-composite-driver") {
     "composite.h",
   ]
 
-  deps = [
-    ":aml-g12-composite-bind",
+  public_deps = [
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
@@ -159,8 +157,15 @@ fuchsia_driver("aml-g12-composite-driver") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
+  ]
+}
+fuchsia_driver("aml-g12-composite-driver") {
+  output_name = "aml-g12-composite"
+
+  deps = [
+    ":aml-g12-composite-bind",
+    ":aml-g12-composite-common",
   ]
 }
 
@@ -184,6 +189,7 @@ group("tests") {
     ":aml-g12-composite-bind_test",
     ":aml-g12-tdm-bind_test",
     ":aml-g12-tdm-dai-bind_test",
+    "test:composite-test-package",
     "test:dai-test-package",
     "test:stream-test-package",
   ]
