@@ -7,10 +7,6 @@ import("//build/config.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/sys/core/build/core_shard.gni")
 
-# TODO(b/287516299): Remove transitional labels
-group("enable-report-filing") {
-}
-
 rustc_library("lib") {
   name = "detect"
   edition = "2021"

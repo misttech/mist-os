@@ -113,7 +113,3 @@ fuchsia_package("monitor_with_memory_sampler") {
 core_shard("memory_monitor_core_shard") {
   shard_file = "meta/memory_monitor.core_shard.cml"
 }
-
-# TODO(b/287516299): Remove transitional labels
-group("userdebug_config") {
-}

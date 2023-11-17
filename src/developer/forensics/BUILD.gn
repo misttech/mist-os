@@ -36,16 +36,6 @@ group("tests") {
   ]
 }
 
-# TODO(b/287516299): Remove transitional labels
-group("userdebug_configs") {
-}
-group("user_configs") {
-}
-group("large_disk_configs") {
-}
-group("feedback_remote_device_id_provider") {
-}
-
 ###############################################################################
 # PACKAGES
 ###############################################################################
