@@ -47,6 +47,7 @@ zx_library("fbl") {
     "fbl/string_printf.h",
     "fbl/string_traits.h",
     "fbl/type_info.h",
+    "fbl/unaligned.h",
     "fbl/unique_fd.h",
     "fbl/vector.h",
     "fbl/wavl_tree_best_node_observer.h",
