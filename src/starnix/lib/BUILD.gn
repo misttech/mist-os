@@ -10,6 +10,7 @@ group("lib") {
     "selinux",
     "starnix-lock",
     "starnix-sync",
+    "starnix-uapi",
     "syncio",
   ]
 }
@@ -24,6 +25,7 @@ group("tests") {
     "selinux:tests",
     "starnix-lock:tests",
     "starnix-sync:tests",
+    "starnix-uapi:tests",
     "syncio:tests",
     "ubpf:tests",
     "usercopy:tests",
