@@ -207,7 +207,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:100
+From //boards/common/x64-common.gni:58
 
 **Overridden from the default:** `""`
 
@@ -227,7 +227,7 @@ From //build/images/vbmeta.gni:17
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:98
+From //boards/common/x64-common.gni:56
 
 **Overridden from the default:** `""`
 
@@ -322,7 +322,7 @@ From //build/images/args.gni:202
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:35
+From //boards/x64.gni:25
 
 **Overridden from the default:** `false`
 
@@ -388,7 +388,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:102
+From //boards/common/x64-common.gni:60
 
 **Overridden from the default:** `false`
 
@@ -561,7 +561,7 @@ From //build/board.gni:88
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:33
+From //boards/x64.gni:23
 
 **Overridden from the default:** `false`
 
@@ -867,7 +867,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:106
+From //boards/common/x64-common.gni:64
 
 **Overridden from the default:** `false`
 
@@ -1108,10 +1108,11 @@ Selects the Cobalt environment to send data to. Choices:
   "LOCAL" - record log data locally to a file
   "DEVEL" - the non-prod environment for use in testing
   "PROD" - the production environment
+  false - use the default environment supplied by assembly
 
-**Current value (from the default):** `"PROD"`
+**Current value (from the default):** `false`
 
-From //src/cobalt/bin/app/BUILD.gn:14
+From //src/cobalt/bin/app/BUILD.gn:15
 
 ### comparison_diagnostics_dir
 
@@ -3484,7 +3485,7 @@ From //build/board.gni:8
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:14
+From //boards/common/x64-common.gni:10
 
 **Overridden from the default:** `false`
 
@@ -4411,7 +4412,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:104
+From //boards/common/x64-common.gni:62
 
 **Overridden from the default:** `false`
 
@@ -5171,7 +5172,7 @@ From //build/board.gni:94
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:94
+From //boards/common/x64-common.gni:52
 
 **Overridden from the default:** `[]`
 
@@ -5192,7 +5193,7 @@ From //build/board.gni:93
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:93
+From //boards/common/x64-common.gni:51
 
 **Overridden from the default:** `false`
 
@@ -8376,7 +8377,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:107
+From //boards/common/x64-common.gni:65
 
 **Overridden from the default:** `false`
 
@@ -8555,7 +8556,7 @@ From //build/images/vbmeta.gni:14
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:96
+From //boards/common/x64-common.gni:54
 
 **Overridden from the default:** `false`
 
