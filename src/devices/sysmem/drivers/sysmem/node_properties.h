@@ -216,6 +216,7 @@ class NodeProperties : public std::enable_shared_from_this<NodeProperties> {
   void set_marked(bool is_marked) { is_marked_ = is_marked; }
 
   void LogInfo(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
+  void LogError(Location location, const char* format, ...) const __PRINTFLIKE(3, 4);
 
   // For debugging.
   void LogConstraints(Location location);

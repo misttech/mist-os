@@ -599,16 +599,16 @@ zx_status_t LogicalBufferCollection::ValidateBufferCollectionToken(Device* paren
 }
 
 void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, zx_status_t status) {
-  // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED,
-  // and ZX_OK is never passed to the error handler.
+  // Clean close from FIDL channel point of view is ZX_ERR_PEER_CLOSED, and ZX_OK is never passed to
+  // the error handler.
   ZX_DEBUG_ASSERT(status != ZX_OK);
 
-  // We know |this| is alive because the token is alive and the token has
-  // a fbl::RefPtr<LogicalBufferCollection>.  The token is alive because
-  // the token is still under the tree rooted at root_.
+  // We know |this| is alive because the token is alive and the token has a
+  // fbl::RefPtr<LogicalBufferCollection>.  The token is alive because the token is still under the
+  // tree rooted at root_.
   //
-  // Any other deletion of the token_ptr out of the tree at root_ (outside of
-  // this error handler) doesn't run this error handler.
+  // Any other deletion of the token_ptr out of the tree at root_ (outside of this error handler)
+  // doesn't run this error handler.
   ZX_DEBUG_ASSERT(root_);
 
   std::optional<CollectionServerEnd> buffer_collection_request =
@@ -618,15 +618,14 @@ void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, z
         (token.is_done() || buffer_collection_request.has_value()))) {
     // LogAndFailDownFrom() will also remove any no-longer-needed nodes from the tree.
     //
-    // A token whose error handler sees anything other than clean close
-    // with is_done() implies LogicalBufferCollection failure.  The
-    // ability to detect unexpected closure of a token is a main reason
-    // we use a channel for BufferCollectionToken instead of an
-    // eventpair.
+    // A token whose error handler sees anything other than clean close with is_done() implies
+    // LogicalBufferCollection failure.  The ability to detect unexpected closure of a token is a
+    // main reason we use a channel for BufferCollectionToken instead of an eventpair.
     //
     // If a participant for some reason finds itself with an extra token it doesn't need, the
     // participant should use Close() to avoid triggering this failure.
     NodeProperties* tree_to_fail = FindTreeToFail(&token.node_properties());
+    token.node_properties().LogError(FROM_HERE, "token failure - status: %d", status);
     if (tree_to_fail == root_.get()) {
       LogAndFailDownFrom(FROM_HERE, tree_to_fail, status,
                          "Token failure causing LogicalBufferCollection failure - status: %d",
@@ -650,9 +649,9 @@ void LogicalBufferCollection::HandleTokenFailure(BufferCollectionToken& token, z
   if (!buffer_collection_request.has_value()) {
     ZX_DEBUG_ASSERT(token.is_done());
     // This was a token::Close().  We want to stop tracking the token now that we've processed all
-    // its previously-queued inbound messages.  This might be the last token, so we
-    // MaybeAllocate().  This path isn't a failure (unless there are also zero BufferCollection
-    // views in which case MaybeAllocate() calls Fail()).
+    // its previously-queued inbound messages.  This might be the last token, so we MaybeAllocate().
+    // This path isn't a failure (unless there are also zero BufferCollection views in which case
+    // MaybeAllocate() calls Fail()).
     //
     // Keep self alive via "self" in case this will drop connected_node_count_ to zero.
     auto self = token.shared_logical_buffer_collection();
