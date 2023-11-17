@@ -5,8 +5,10 @@
 use fidl;
 use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::{self as bt, PeerId};
-use futures::StreamExt;
+use futures::{Stream, StreamExt};
 use profile_client::ProfileClient;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
 pub struct TestProfileServerEndpoints {
     pub proxy: bredr::ProfileProxy,
@@ -29,11 +31,17 @@ pub struct TestProfileServer {
     profile_request_stream: bredr::ProfileRequestStream,
     search_results_proxy: Option<bredr::SearchResultsProxy>,
     connection_receiver_proxy: Option<bredr::ConnectionReceiverProxy>,
+    advertise_responder: Option<bredr::ProfileAdvertiseResponder>,
 }
 
 impl From<bredr::ProfileRequestStream> for TestProfileServer {
     fn from(profile_request_stream: bredr::ProfileRequestStream) -> Self {
-        Self { profile_request_stream, search_results_proxy: None, connection_receiver_proxy: None }
+        Self {
+            profile_request_stream,
+            search_results_proxy: None,
+            connection_receiver_proxy: None,
+            advertise_responder: None,
+        }
     }
 }
 
@@ -87,8 +95,11 @@ impl TestProfileServer {
     pub async fn expect_advertise(&mut self) {
         let request = self.profile_request_stream.next().await;
         match request {
-            Some(Ok(bredr::ProfileRequest::Advertise { receiver, .. })) => {
+            Some(Ok(bredr::ProfileRequest::Advertise { receiver, responder, .. })) => {
                 self.connection_receiver_proxy = Some(receiver.into_proxy().unwrap());
+                if let Some(_old_responder) = self.advertise_responder.replace(responder) {
+                    panic!("Got new advertise request before old request is comeplete.");
+                }
             }
             _ => panic!(
                 "unexpected result on profile request stream while waiting for advertisement: {:?}",
@@ -161,5 +172,23 @@ impl TestProfileServer {
             .expect("Connected");
 
         near_bt_channel
+    }
+}
+
+/// Expose the underlying ProfileRequestStream
+impl Stream for TestProfileServer {
+    type Item = Result<bredr::ProfileRequest, fidl::Error>;
+
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let pinned_stream = Pin::new(&mut self.profile_request_stream);
+        pinned_stream.poll_next(context)
+    }
+}
+
+impl Drop for TestProfileServer {
+    fn drop(&mut self) {
+        if let Some(responder) = self.advertise_responder.take() {
+            responder.send(Ok(())).expect("Drop responder");
+        }
     }
 }

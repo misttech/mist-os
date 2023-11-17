@@ -9,7 +9,7 @@ use profile_client::ProfileClient;
 use crate::config::HandsFreeFeatureSupport;
 use crate::service_definition;
 
-pub fn register(
+pub fn register_with_proxy(
     proxy: bredr::ProfileProxy,
     features: HandsFreeFeatureSupport,
 ) -> anyhow::Result<ProfileClient> {
@@ -31,6 +31,6 @@ pub fn register_hands_free(
 ) -> anyhow::Result<(ProfileClient, bredr::ProfileProxy)> {
     let proxy = fuchsia_component::client::connect_to_protocol::<bredr::ProfileMarker>()
         .context("Failed to connect to Bluetooth Profile service")?;
-    let profile_client = register(proxy.clone(), features)?;
+    let profile_client = register_with_proxy(proxy.clone(), features)?;
     Ok((profile_client, proxy))
 }
