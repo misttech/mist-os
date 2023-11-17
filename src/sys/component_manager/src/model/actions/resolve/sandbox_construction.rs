@@ -8,13 +8,10 @@ use {
         model::component::WeakComponentInstance,
         sandbox_util::{new_terminating_router, DictExt, Message},
     },
-    ::routing::{
-        availability::AvailabilityState,
-        capability_source::{ComponentCapability, InternalCapability},
-    },
+    ::routing::capability_source::{ComponentCapability, InternalCapability},
     cm_rust::{self, OfferDeclCommon, SourceName, UseDeclCommon},
     cm_types::Name,
-    sandbox::{Completer, Dict, Receiver, Request, Router},
+    sandbox::{Dict, Receiver},
     std::collections::HashMap,
     tracing::{debug, warn},
 };
@@ -200,29 +197,6 @@ pub fn extend_dict_with_offers(
     sources_and_receivers
 }
 
-fn new_forwarding_router(next_router: Router, availability: cm_rust::Availability) -> Router {
-    Router::new(move |mut request: Request, completer: Completer| {
-        // Protocols may not specify a relative path.
-        // TODO: enforce this, but with what error? Is this even something we enforce today?
-        // if !request.relative_path.is_empty() {
-        //     completer.complete(Err("todo"));
-        //     return;
-        // }
-
-        // The availability of the request must be compatible with the availability of this step of
-        // the route.
-        let mut availability_state = AvailabilityState(request.availability);
-        if let Err(e) = availability_state.advance(&availability) {
-            completer.complete(Err(e.into()));
-            return;
-        }
-        request.availability = availability_state.0;
-
-        // Everything checks out, forward the request
-        next_router.route(request, completer);
-    })
-}
-
 fn extend_dict_with_offer(
     dict_from_parent: &Dict,
     program_dict: &Dict,
@@ -251,9 +225,9 @@ fn extend_dict_with_offer(
         cm_rust::OfferSource::Parent => {
             if let Some(source_cap_dict) = dict_from_parent.get_protocol(source_name) {
                 if let Some(parent_router) = source_cap_dict.get_router() {
-                    target_dict.get_or_insert_protocol_mut(target_name).insert_router(
-                        new_forwarding_router(parent_router.clone(), *offer.availability()),
-                    );
+                    target_dict
+                        .get_or_insert_protocol_mut(target_name)
+                        .insert_router(parent_router.clone().availability(*offer.availability()));
                 }
             }
         }
@@ -315,6 +289,6 @@ fn insert_receiver_into_target_dict(
     availability: cm_rust::Availability,
 ) {
     let terminating_router = new_terminating_router(receiver);
-    let forwarding_router = new_forwarding_router(terminating_router, availability);
+    let forwarding_router = terminating_router.availability(availability);
     target_dict.get_or_insert_protocol_mut(target_name).insert_router(forwarding_router);
 }

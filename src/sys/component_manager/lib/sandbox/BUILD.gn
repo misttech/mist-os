@@ -28,6 +28,7 @@ rustc_library("sandbox") {
     "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/lib/cm_types",
     "//src/sys/lib/moniker",
+    "//src/sys/lib/routing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:futures",

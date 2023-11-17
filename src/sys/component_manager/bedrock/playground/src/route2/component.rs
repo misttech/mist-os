@@ -7,7 +7,7 @@ use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
-use sandbox::{AsRouter, Capability, Completer, Data, Dict, Request, Router};
+use sandbox::{AsRouter, Capability, Data, Dict, Request, Router};
 use std::{
     collections::HashMap,
     fmt,
@@ -155,22 +155,6 @@ fn route_from(
     Ok(source.get(cap_name.clone()))
 }
 
-/// Returns a router that transforms and checks availability.
-fn availability(router: Router, availability: Availability) -> Router {
-    let route_fn = move |mut request: Request, completer: Completer| {
-        use routing::availability::AvailabilityState;
-        let mut state = AvailabilityState(request.availability);
-        match state.advance(&availability) {
-            Ok(()) => {
-                request.availability = state.0;
-                router.route(request, completer);
-            }
-            Err(e) => completer.complete(Err(e.into())),
-        }
-    };
-    Router::new(route_fn)
-}
-
 /// Resolving a component creates the program and children, and returns an output
 /// dictionary, in effect "locking down" the set of exposed capabilities for this
 /// particular resolution.
@@ -223,7 +207,7 @@ fn resolve_impl(
             program.as_router(),
             &children_outputs,
         )?;
-        let cap = availability(router, use_.availability);
+        let cap = router.availability(use_.availability);
         program_input.entries.insert(use_.name, Box::new(cap));
     }
 
@@ -235,7 +219,7 @@ fn resolve_impl(
             program.as_router(),
             &children_outputs,
         )?;
-        let cap = availability(router, offer.availability);
+        let cap = router.availability(offer.availability);
         // Determine the target dict and insert the capability into it.
         let target_dict: &mut Dict = match offer.to {
             decl::Ref::Hammerspace => &mut program_input,
@@ -256,7 +240,7 @@ fn resolve_impl(
             program.as_router(),
             &children_outputs,
         )?;
-        let cap = availability(router, expose.availability);
+        let cap = router.availability(expose.availability);
         output.entries.insert(expose.name.clone(), Box::new(cap));
     }
 

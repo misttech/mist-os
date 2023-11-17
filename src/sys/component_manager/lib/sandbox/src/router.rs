@@ -135,6 +135,25 @@ impl Router {
         };
         Router::new(route_fn)
     }
+
+    /// Returns a router that ensures the capability request has an availability
+    /// strength that is at least the provided `availability`.
+    pub fn availability(self, availability: Availability) -> Router {
+        let route_fn = move |mut request: Request, completer: Completer| {
+            // The availability of the request must be compatible with the
+            // availability of this step of the route.
+            let mut state = routing::availability::AvailabilityState(request.availability);
+            match state.advance(&availability) {
+                Ok(()) => {
+                    request.availability = state.0;
+                    // Everything checks out, forward the request.
+                    self.route(request, completer);
+                }
+                Err(e) => completer.complete(Err(e.into())),
+            }
+        };
+        Router::new(route_fn)
+    }
 }
 
 impl From<&AnyCapability> for Router {
@@ -201,4 +220,52 @@ pub async fn route(router: &Router, request: Request) -> Result<AnyCapability> {
     let (fut, completer) = Completer::new();
     router.route(request, completer);
     fut.await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Data;
+    use assert_matches::assert_matches;
+
+    #[fuchsia::test]
+    async fn availability_good() {
+        let source = Box::new(Data::new("hello")) as AnyCapability;
+        let base = Router::from(&source);
+        let proxy = base.availability(Availability::Optional);
+        let capability = route(
+            &proxy,
+            Request {
+                rights: None,
+                relative_path: Path::default(),
+                target_moniker: Moniker::default(),
+                availability: Availability::Optional,
+            },
+        )
+        .await
+        .unwrap();
+        let capability: Data<&str> = capability.try_into().unwrap();
+        assert_eq!(capability.value, "hello");
+    }
+
+    #[fuchsia::test]
+    async fn availability_bad() {
+        let source = Box::new(Data::new("hello")) as AnyCapability;
+        let base = Router::from(&source);
+        let proxy = base.availability(Availability::Optional);
+        let error = route(
+            &proxy,
+            Request {
+                rights: None,
+                relative_path: Path::default(),
+                target_moniker: Moniker::default(),
+                availability: Availability::Required,
+            },
+        )
+        .await
+        .unwrap_err();
+        use routing::error::AvailabilityRoutingError;
+        let error = error.downcast_ref::<AvailabilityRoutingError>().unwrap();
+        assert_matches!(error, AvailabilityRoutingError::TargetHasStrongerAvailability);
+    }
 }
