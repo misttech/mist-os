@@ -232,18 +232,8 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
   EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{}),
             ZX_ERR_INVALID_ARGS);
 
-  // bad external_delay
-  EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .external_delay = -1,
-                .needs_cache_flush_or_invalidate = true,
-                .turn_on_delay = 125,
-                .driver_transfer_bytes = 128,
-            }}),
-            ZX_ERR_OUT_OF_RANGE);
-
   // missing needs_cache_flush_or_invalidate
   EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .external_delay = 25,
                 .turn_on_delay = 125,
                 .driver_transfer_bytes = 128,
             }}),
@@ -251,7 +241,6 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
 
   // bad turn_on_delay
   EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .external_delay = 25,
                 .needs_cache_flush_or_invalidate = true,
                 .turn_on_delay = -1,
                 .driver_transfer_bytes = 128,
@@ -260,7 +249,6 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
 
   // missing driver_transfer_bytes
   EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-                .external_delay = 25,
                 .needs_cache_flush_or_invalidate = true,
                 .turn_on_delay = 125,
             }}),
@@ -268,7 +256,6 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
 
   // // bad driver_transfer_bytes (larger than RB size?)
   // EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
-  //               .external_delay = 25,
   //               .needs_cache_flush_or_invalidate = true,
   //               .turn_on_delay = 125,
   //               .driver_transfer_bytes = 0xFFFFFFFF,
@@ -443,21 +430,18 @@ TEST(ValidateWarningTest, BadFormatCompatibility) {
 // Negative-test ValidateDelayInfo for internal_delay
 TEST(ValidateWarningTest, BadInternalDelayInfo) {
   // empty
-  EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{}, std::nullopt),
-            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{}), ZX_ERR_INVALID_ARGS);
 
   // missing internal_delay
   EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
-                                  .external_delay = 0,
-                              }},
-                              std::nullopt),
+                .external_delay = 0,
+            }}),
             ZX_ERR_INVALID_ARGS);
 
   // bad internal_delay
   EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
-                                  .internal_delay = -1,
-                              }},
-                              std::nullopt),
+                .internal_delay = -1,
+            }}),
             ZX_ERR_OUT_OF_RANGE);
 }
 
@@ -465,34 +449,10 @@ TEST(ValidateWarningTest, BadInternalDelayInfo) {
 TEST(ValidateWarningTest, BadExternalDelayInfo) {
   // bad external_delay
   EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
-                                  .internal_delay = 0,
-                                  .external_delay = -1,
-                              }},
-                              std::nullopt),
+                .internal_delay = 0,
+                .external_delay = -1,
+            }}),
             ZX_ERR_OUT_OF_RANGE);
-
-  // mismatch external_delay (implicit)
-  EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
-                                  .internal_delay = 0,
-                              }},
-                              fuchsia_hardware_audio::RingBufferProperties{{
-                                  .external_delay = 124,
-                                  .needs_cache_flush_or_invalidate = true,
-                                  .driver_transfer_bytes = 64,
-                              }}),
-            ZX_ERR_INVALID_ARGS);
-
-  // mismatch external_delay (explicit)
-  EXPECT_EQ(ValidateDelayInfo(fuchsia_hardware_audio::DelayInfo{{
-                                  .internal_delay = 0,
-                                  .external_delay = 124,
-                              }},
-                              fuchsia_hardware_audio::RingBufferProperties{{
-                                  .external_delay = 0,
-                                  .needs_cache_flush_or_invalidate = true,
-                                  .driver_transfer_bytes = 64,
-                              }}),
-            ZX_ERR_INVALID_ARGS);
 }
 
 }  // namespace media_audio

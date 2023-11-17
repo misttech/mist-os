@@ -128,11 +128,6 @@ void AdminTest::RequestRingBufferProperties() {
   }
   ASSERT_TRUE(ring_buffer_props_.has_value()) << "No RingBufferProperties table received";
 
-  if (ring_buffer_props_->has_external_delay()) {
-    // As a zx::duration, a negative value is theoretically possible, but this is disallowed.
-    EXPECT_GE(ring_buffer_props_->external_delay(), 0);
-  }
-
   // This field is required.
   EXPECT_TRUE(ring_buffer_props_->has_needs_cache_flush_or_invalidate());
 
@@ -326,33 +321,6 @@ void AdminTest::ValidateExternalDelay() {
   }
 }
 
-// As of SDK version 9, `RingBufferProperties.external_delay` is deprecated; it is replaced by the
-// new `DelayInfo.external_delay`. If both are present, they must match. If only the new is present,
-// then we Pass. If the driver chose to specify neither, we Skip (we have no values to compare).
-// TODO(fxbug.dev/116898): remove this method once RingBufferProperties.external_delay is gone.
-void AdminTest::ExpectExternalDelayMatchesRingBufferProperties() {
-  ASSERT_TRUE(ring_buffer_props_.has_value())
-      << "Internal test error: should have called RequestRingBufferProperties by now";
-  ASSERT_TRUE(delay_info_.has_value())
-      << "Internal test error: should have called WatchDelayAndExpectUpdate by now";
-
-  if (ring_buffer_props_->has_external_delay()) {
-    EXPECT_EQ(ring_buffer_props_->external_delay(),
-              delay_info_->has_external_delay() ? delay_info_->external_delay() : 0ll)
-        << "WatchDelayInfo `external_delay` must match GetProperties `external_delay`";
-    return;
-  }
-
-  if (!delay_info_->has_external_delay()) {
-    // If neither RingBufferProps nor DelayInfo specified external_delay, then we just Skip.
-    // Although theoretically valid, we cannot actually test anything (no values to compare).
-    GTEST_SKIP() << "Neither DelayInfo nor RingBufferProperties specified external_delay; "
-                 << "they cannot be compared";
-    __UNREACHABLE;
-  }
-  // Otherwise we Pass; "RingBufferProps.external_delay not specified" is valid and expected.
-}
-
 #define DEFINE_ADMIN_TEST_CLASS(CLASS_NAME, CODE)                               \
   class CLASS_NAME : public AdminTest {                                         \
    public:                                                                      \
@@ -541,20 +509,6 @@ DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterStart, {
   WaitForError();
 });
 
-// If a driver states RingBufferProperties.external_delay, then DelayInfo.external_delay must exist
-// and match. If only DelayInfo (not RingBufferProperties) specifies it, the case passes.
-// If neither includes it, the test case is skipped; this is how we treat other "cannot test this
-// optional aspect since driver does not support it" cases such as SetActiveChannels or SetGain.
-// TODO(fxbug.dev/116898): eliminate this case once RingBufferProperties.external_delay is removed.
-DEFINE_ADMIN_TEST_CLASS(GetDelayInfoExternalDelayMatchesRingBufferProps, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
-
-  WatchDelayAndExpectUpdate();
-  ExpectExternalDelayMatchesRingBufferProperties();
-});
-
 // Create RingBuffer, fully exercise it, drop it, recreate it, then validate GetDelayInfo.
 DEFINE_ADMIN_TEST_CLASS(GetDelayInfoAfterDroppingFirstRingBuffer, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
@@ -647,8 +601,6 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
     REGISTER_ADMIN_TEST(Stop, device_entry);
     REGISTER_ADMIN_TEST(StopBeforeGetVmoShouldDisconnect, device_entry);
     REGISTER_ADMIN_TEST(StopWhileStoppedIsPermitted, device_entry);
-
-    REGISTER_ADMIN_TEST(GetDelayInfoExternalDelayMatchesRingBufferProps, device_entry);
 
     REGISTER_ADMIN_TEST(GetDelayInfoAfterDroppingFirstRingBuffer, device_entry);
     REGISTER_ADMIN_TEST(SetActiveChannelsAfterDroppingFirstRingBuffer, device_entry);

@@ -230,8 +230,7 @@ void Device::FetchDelayInfo() {
     if (destroyed_ || !LogResultError(result, "RingBuffer.WatchDelayInfo")) {
       return;
     }
-    if (!result->value()->has_delay_info() || !result->value()->delay_info().has_internal_delay() ||
-        !result->value()->delay_info().has_external_delay()) {
+    if (!result->value()->has_delay_info() || !result->value()->delay_info().has_internal_delay()) {
       FX_LOGS(ERROR) << "RingBuffer.WatchDelayInfo bug: response missing required field";
       return;
     }

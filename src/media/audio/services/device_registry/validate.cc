@@ -472,16 +472,12 @@ zx_status_t ValidateRingBufferProperties(
   LogRingBufferProperties(rb_props);
   ADR_LOG(kLogDeviceMethods);
 
-  if (rb_props.external_delay() && *rb_props.external_delay() < 0) {
-    FX_LOGS(WARNING) << "Reported RingBufferProperties.external_delay is negative";
-    return ZX_ERR_OUT_OF_RANGE;
-  }
   if (!rb_props.needs_cache_flush_or_invalidate()) {
     FX_LOGS(WARNING) << "Reported RingBufferProperties.needs_cache_flush_or_invalidate is missing";
     return ZX_ERR_INVALID_ARGS;
   }
   if (rb_props.turn_on_delay() && *rb_props.turn_on_delay() < 0) {
-    FX_LOGS(WARNING) << "Reported RingBufferProperties.external_delay is negative";
+    FX_LOGS(WARNING) << "Reported RingBufferProperties.turn_on_delay is negative";
     return ZX_ERR_OUT_OF_RANGE;
   }
   if (!rb_props.driver_transfer_bytes()) {
@@ -590,9 +586,7 @@ zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
   return ZX_OK;
 }
 
-zx_status_t ValidateDelayInfo(
-    const fuchsia_hardware_audio::DelayInfo& delay_info,
-    const std::optional<const fuchsia_hardware_audio::RingBufferProperties>& rb_props) {
+zx_status_t ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_info) {
   LogDelayInfo(delay_info);
   ADR_LOG(kLogDeviceMethods);
 
@@ -612,17 +606,6 @@ zx_status_t ValidateDelayInfo(
     FX_LOGS(WARNING) << "WatchDelayInfo: reported 'external_delay' (" << ext_delay
                      << " ns) cannot be negative";
     return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  // If we have a (redundant) delay value from RingBufferProperties, double-check against that.
-  if (rb_props) {
-    if (rb_props->external_delay() && *rb_props->external_delay() != ext_delay) {
-      FX_LOGS(WARNING) << "RingBufferProperties reported 'external_delay' ("
-                       << *rb_props->external_delay()
-                       << " ns) must match WatchDelayInfo 'external_delay' (" << ext_delay
-                       << " ns)";
-      return ZX_ERR_INVALID_ARGS;
-    }
   }
 
   return ZX_OK;

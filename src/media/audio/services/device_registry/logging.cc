@@ -367,12 +367,6 @@ void LogRingBufferProperties(const fuchsia_hardware_audio::RingBufferProperties&
   }
 
   FX_LOGS(INFO) << "fuchsia_hardware_audio/RingBufferProperties:";
-  if (props.external_delay()) {
-    FX_LOGS(INFO) << "    external_delay          " << *props.external_delay() << " ns";
-  } else {
-    FX_LOGS(INFO) << "    external_delay          NONE (0 ns)";
-  }
-
   FX_LOGS(INFO) << "    needs_cache_flush       "
                 << (props.needs_cache_flush_or_invalidate()
                         ? (*props.needs_cache_flush_or_invalidate() ? "TRUE" : "FALSE")

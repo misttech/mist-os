@@ -278,9 +278,6 @@ zx_status_t AudioDeviceStream::SetFormat(uint32_t frames_per_second, uint16_t ch
     return ZX_ERR_BAD_STATE;
   }
   driver_transfer_bytes_ = result1.value().properties.driver_transfer_bytes();
-  if (result1.value().properties.has_external_delay()) {
-    external_delay_nsec_ = result1.value().properties.external_delay();
-  }
 
   // TODO(81650): Add support to audio-driver-ctl to interactively activate/deactivate channels.
   auto result2 = fidl::WireCall(rb_ch_)->SetActiveChannels(channels_to_use_bitmask);

@@ -968,7 +968,7 @@ void Device::RetrieveDelayInfo() {
         }
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/WatchDelayInfo: success";
 
-        auto status = ValidateDelayInfo(result->delay_info(), ring_buffer_properties_);
+        auto status = ValidateDelayInfo(result->delay_info());
         if (status != ZX_OK) {
           OnError(status);
           return;
