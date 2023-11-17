@@ -17,6 +17,7 @@ group("chromium") {
   visibility += [ "//src:*" ]
 }
 
+# There is no (non-flavor) suffix for targets generated in this file.
 archive_path_suffix = ""
 
 # TODO(crbug.com/1385930): Change this to "chromium.org".
@@ -55,6 +56,8 @@ generate_fuchsia_web_targets("chromium") {
 generate_fuchsia_web_test_targets("chromium") {
 }
 
+# The targets below do not use generate_package_flavors(), so the paths must be
+# modified manually.
 # TODO(fxbug.dev/70573, fxbug.dev/119526): Replace with a solution that
 # does not rely on GN args.
 if (use_chromium_canary) {
