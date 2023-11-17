@@ -61,8 +61,7 @@ type RingBufferProperties = table {
     // # Deprecation
     //
     // Not needed anymore since the functionality is available via `WatchDelayInfo` below.
-    // Should match `DelayInfo` `external_delay` until it is removed.
-    @available(deprecated=9)
+    @available(deprecated=9, removed=HEAD)
     1: external_delay zx.Duration;
 
     /// Size (in bytes) of the temporary buffer used by the driver when consuming or generating ring
