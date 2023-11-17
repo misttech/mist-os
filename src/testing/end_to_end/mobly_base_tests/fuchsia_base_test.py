@@ -6,6 +6,7 @@
 
 import enum
 import logging
+import os
 from typing import Dict, List
 
 from honeydew import custom_types, transports
@@ -72,6 +73,7 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
         self.test_case_path: str = (
             f"{self.log_path}/{self.current_test_info.name}"
         )
+        os.mkdir(self.test_case_path)
         self._log_message_to_devices(
             message=f"Started executing '{self.current_test_info.name}' "
             f"Lacewing test case...",
@@ -96,6 +98,8 @@ class FuchsiaBaseTest(base_test.BaseTestClass):
             f"Lacewing test case...",
             level=custom_types.LEVEL.INFO,
         )
+        if len(os.listdir(self.test_case_path)) == 0:
+            os.rmdir(self.test_case_path)
 
         if self._devices_not_healthy:
             message: str = (

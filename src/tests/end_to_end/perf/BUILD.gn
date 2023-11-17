@@ -23,7 +23,6 @@ test_list = [
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
-  "microbenchmarks_test",
   "netstack3_benchmarks_test",
   "netstack_benchmarks_test",
   "netstack_benchmarks_with_tracing_test",
@@ -229,7 +228,6 @@ if (is_host) {
     "fuchsia.microbenchmarks.starnix.txt",
     "fuchsia.microbenchmarks.tracing.txt",
     "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
-    "fuchsia.microbenchmarks.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_recv.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_send.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_udp_recv.txt",
@@ -316,7 +314,7 @@ group("package_deps") {
     "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",
     "//src/starnix:benchmarks",
     "//src/tests/benchmarks",
-    "//src/tests/microbenchmarks:fuchsia_microbenchmarks",
+    "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",

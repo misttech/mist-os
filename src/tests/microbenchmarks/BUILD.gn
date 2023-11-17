@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/fidl/fidl.gni")
 import("//build/testing/host_test.gni")
+import("//build/testing/perf/test.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
@@ -206,6 +207,33 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
     ":round_trips_helper",
   ]
   test_type = "system"
+}
+
+fuchsia_component_perf_test("fuchsia_microbenchmarks_test") {
+  package = ":fuchsia_microbenchmarks"
+  component_name = "fuchsia_microbenchmarks"
+  system_test = true
+
+  # We run the fuchsia_microbenchmarks process multiple times.  That is useful
+  # for tests that exhibit between-process variation in results (e.g. due to
+  # memory layout chosen when a process starts) -- it reduces the variation in
+  # the average that we report.
+  process_runs = 6
+
+  # Runs: we override the default number of within-process iterations of each
+  # test case and use a lower value.  This reduces the overall time taken and
+  # reduces the chance that these invocations hit Infra Swarming tasks' IO
+  # timeout (swarming_io_timeout_secs -- the amount of time that a task is
+  # allowed to run without producing log output).
+  test_component_args = [
+    "-p",
+    "--quiet",
+    "--runs",
+    "120",
+  ]
+  results_path_test_arg = "--out"
+
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.txt"
 }
 
 if (is_linux) {
