@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/components/fuchsia_test_component.gni")
 import("//build/python/python_action.gni")
 import("//build/python/python_mobly_test.gni")
 import("//build/testing/host_test_data.gni")
@@ -155,10 +156,11 @@ template("python_perf_test") {
 #     The absolute path to the file containing the expected metrics.
 #     Type: string
 #
-#   system_test (optional)
-#     Whether or not the component must be run in the system tests collection.
-#     Type: bool
-#     Default: False
+#   test_type (optional)
+#     The type of test (as also used in fuchsia_test_component) that specifies in which realm to
+#     run the test.
+#     Type: string
+#     Default: none, which would result in running the test in the regular hermetic tests realm.
 #
 #   process_runs (optional)
 #     How many times to run the test. This is useful for tests which exhibit between-process
@@ -189,8 +191,6 @@ template("fuchsia_component_perf_test") {
     _package_name = get_label_info(invoker.package, "name")
   }
 
-  _is_system_test = defined(invoker.system_test) && invoker.system_test
-
   _config_file = "${target_gen_dir}/${target_name}_config.json"
   generated_file("${target_name}_generated_config") {
     output_conversion = "json"
@@ -207,10 +207,10 @@ template("fuchsia_component_perf_test") {
 
       ffx_test_options = []
 
-      if (_is_system_test) {
+      if (defined(invoker.test_type)) {
         ffx_test_options += [
           "--realm",
-          "/core/testing:system-tests",
+          type_moniker_map[invoker.test_type],
         ]
       }
 

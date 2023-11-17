@@ -36,10 +36,7 @@ test_list = [
 ]
 
 if (!is_asan && host_os == "linux") {
-  test_list += [
-    "starnix_benchmarks_test",
-    "storage_starnix_benchmarks_test",
-  ]
+  test_list += [ "storage_starnix_benchmarks_test" ]
 
   # TODO(b/298565565): Enable these on vim3.
   if (target_cpu == "x64") {
@@ -225,7 +222,6 @@ if (is_host) {
     "fuchsia.fidlc_microbenchmarks.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
-    "fuchsia.microbenchmarks.starnix.txt",
     "fuchsia.microbenchmarks.tracing.txt",
     "fuchsia.microbenchmarks.tracing_categories_disabled.txt",
     "fuchsia.netstack.iperf_benchmarks.ethernet_tcp_recv.txt",
@@ -345,9 +341,10 @@ group("package_deps") {
       # This is used by storage_starnix_benchmarks_test.
       "//src/storage/benchmarks/starnix:benchmarks",
     ]
+
     if (host_os == "linux") {
       public_deps +=
-          [ "//src/tests/microbenchmarks:starnix_microbenchmarks_perftestmode" ]
+          [ "//src/tests/microbenchmarks:starnix_microbenchmarks_test" ]
     }
   }
 }

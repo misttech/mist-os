@@ -4,7 +4,7 @@
 
 import("fuchsia_component.gni")
 
-_type_moniker_map = {
+type_moniker_map = {
   chromium = "/core/testing:chromium-tests"
   ctf = "/core/testing:ctf-tests"
   device = "/core/testing:devices-tests"
@@ -52,7 +52,7 @@ template("fuchsia_test_component") {
           {
             test_component = {
               label = get_label_info(":$target_name", "label_with_toolchain")
-              moniker = _type_moniker_map[invoker.test_type]
+              moniker = type_moniker_map[invoker.test_type]
             }
           },
         ]

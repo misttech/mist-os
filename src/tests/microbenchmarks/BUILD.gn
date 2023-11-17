@@ -212,7 +212,7 @@ fuchsia_unittest_package("fuchsia_microbenchmarks") {
 fuchsia_component_perf_test("fuchsia_microbenchmarks_test") {
   package = ":fuchsia_microbenchmarks"
   component_name = "fuchsia_microbenchmarks"
-  system_test = true
+  test_type = "system"
 
   # We run the fuchsia_microbenchmarks process multiple times.  That is useful
   # for tests that exhibit between-process variation in results (e.g. due to
@@ -298,6 +298,33 @@ if (host_os == "linux" && !is_asan) {
     # are not under /data/, and some of them are even unstripped, so disable
     # these checks to build successfully.
     disable_elf_binaries_checks = true
+  }
+
+  fuchsia_component_perf_test("starnix_microbenchmarks_test") {
+    package = ":starnix_microbenchmarks_perftestmode"
+    component_name = "starnix_microbenchmarks"
+    test_type = "starnix"
+
+    # We run the fuchsia_microbenchmarks process multiple times.  That is useful
+    # for tests that exhibit between-process variation in results (e.g. due to
+    # memory layout chosen when a process starts) -- it reduces the variation in
+    # the average that we report.
+    process_runs = 6
+
+    # Runs: we override the default number of within-process iterations of each
+    # test case and use a lower value.  This reduces the overall time taken and
+    # reduces the chance that these invocations hit Infra Swarming tasks' IO
+    # timeout (swarming_io_timeout_secs -- the amount of time that a task is
+    # allowed to run without producing log output).
+    test_component_args = [
+      "-p",
+      "--quiet",
+      "--runs",
+      "120",
+    ]
+    results_path_test_arg = "--out"
+
+    expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.microbenchmarks.starnix.txt"
   }
 }
 
