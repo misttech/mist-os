@@ -241,6 +241,7 @@ class TestMagmaSyncFile : public testing::Test {
     FIRST_SIGNALED,
     SECOND_SIGNALED,
     MERGE_SELF,
+    MERGE_PAIR_OF_PAIRS,
   };
 
   int CreateMergedSyncFile(TestMergeType merge_type,
@@ -248,6 +249,10 @@ class TestMagmaSyncFile : public testing::Test {
     int fd[2] = {-1};
 
     for (uint32_t i = 0; i < 2; i++) {
+      if (merge_type == TestMergeType::MERGE_PAIR_OF_PAIRS) {
+        fd[i] = CreateMergedSyncFile(TestMergeType::NONE_SIGNALED, semaphores_out);
+        continue;
+      }
       if (fd[0] >= 0 && merge_type == TestMergeType::MERGE_SELF) {
         fd[i] = fd[0];
         continue;
@@ -317,6 +322,9 @@ class TestMagmaSyncFile : public testing::Test {
         break;
       case TestMergeType::MERGE_SELF:
         initial_fence_state = {0};
+        break;
+      case TestMergeType::MERGE_PAIR_OF_PAIRS:
+        initial_fence_state = {0, 0, 0, 0};
         break;
       default:
         initial_fence_state = {0, 0};
@@ -715,6 +723,8 @@ TEST_F(TestMagmaSyncFile, InfoMergeSecondSignaledOneShot) {
 }
 
 TEST_F(TestMagmaSyncFile, InfoMergeSelf) { TestMerge(TestMergeType::MERGE_SELF); }
+
+TEST_F(TestMagmaSyncFile, InfoMergePairOfPairs) { TestMerge(TestMergeType::MERGE_PAIR_OF_PAIRS); }
 
 class TestMagmaSyncFileWithCount : public TestMagmaSyncFile,
                                    public testing::WithParamInterface<uint32_t> {};
