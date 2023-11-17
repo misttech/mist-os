@@ -52,6 +52,11 @@ fuchsia_driver_component("i2c-hid") {
   manifest = "meta/i2c-hid.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "i2c-hid"
+  driver_components = [ ":i2c-hid" ]
+}
+
 test("i2c-hid-test") {
   configs += [ "//build/config:all_source" ]
   sources = [

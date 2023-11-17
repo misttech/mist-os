@@ -43,6 +43,11 @@ fuchsia_driver_component("abr-shim") {
   manifest = "meta/abr-shim.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "abr-shim"
+  driver_components = [ ":abr-shim" ]
+}
+
 test("abr-shim-test-bin") {
   output_name = "abr-shim-test"
   sources = [

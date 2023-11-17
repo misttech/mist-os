@@ -43,6 +43,11 @@ fuchsia_driver_component("intel-rtc") {
   manifest = "meta/intel-rtc.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "intel-rtc"
+  driver_components = [ ":intel-rtc" ]
+}
+
 test("intel-rtc-test-bin") {
   output_name = "intel-rtc-test"
   sources = [

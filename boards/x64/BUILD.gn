@@ -25,6 +25,7 @@ board_configuration("x64") {
     ":main_bundle",
     ":prebuilt_codec_runner",
     ":x64_common",
+    "//boards/emulation/virtio",
   ]
 
   filesystems = {
@@ -57,8 +58,41 @@ board_input_bundle("main_bundle") {
       package_set = "base"
       driver_components = [ "meta/iwlwifi.cm" ]
     },
-  ]
+    {
+      package_target = "//src/connectivity/ethernet/drivers/gvnic:gvnic-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/gvnic.cm" ]
+    },
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/realtek-8111:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/realtek-8111.cm" ]
+    },
+    {
+      package_target = "//src/devices/serial/drivers/uart16550:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/uart16550.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/simple:simple-amd-kaveri-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.amd-kaveri.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/simple:simple-nv-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.nv.cm" ]
+    },
 
+    # Driver to handle oneshot reboot flags for bootloader
+    {
+      package_target = "//src/devices/block/drivers/abr-shim:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/abr-shim.cm" ]
+    },
+  ]
   base_packages = [
     "//src/graphics/bin/vulkan_loader",
     "//src/graphics/lib/goldfish-vulkan/gnbuild:goldfish",
@@ -67,6 +101,173 @@ board_input_bundle("main_bundle") {
 }
 
 board_input_bundle("x64_common") {
+  drivers = [
+    {
+      package_target = "//src/devices/block/drivers/ahci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/ahci.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/mbr:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/mbr.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/nvme:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/nvme.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/pci-sdhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/pci-sdhci.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/sdhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/sdhci.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/ufs:pkg"
+      package_set = "bootfs"
+      driver_components = [ "meta/ufs.cm" ]
+    },
+    {
+      package_target = "//src/devices/board/drivers/x86:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/platform-bus-x86.cm" ]
+    },
+    {
+      package_target = "//src/devices/bus/drivers/pci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+    {
+      package_target = "//src/devices/i2c/drivers/intel-i2c:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-i2c.cm" ]
+    },
+    {
+      package_target = "//src/devices/rtc/drivers/intel-rtc:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-rtc.cm" ]
+    },
+    {
+      package_target = "//src/devices/spi/drivers/intel-gspi"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-gspi.cm" ]
+    },
+    {
+      package_target = "//src/devices/tpm/drivers/tpm:tpm-pkg"
+      package_set = "bootfs"
+      driver_components = [ "meta/tpm-driver.cm" ]
+    },
+    {
+      package_target = "//src/devices/usb/drivers/xhci:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/xhci.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/intel-i915:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-i915.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/codecs/alc5514:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/alc5514.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/codecs/alc5663:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/alc5663.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/codecs/max98373:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/max98373.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/codecs/max98927:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/max98927.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/hdmi:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/hdmi-audio-codec.cm" ]
+    },
+    {
+      package_target =
+          "//src/media/audio/drivers/intel-hda/codecs/realtek:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/realtek-audio-codec.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/controller:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/intel-hda.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/ctaphid:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/ctaphid.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/i2c-hid:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/i2c-hid.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/pc-ps2:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/pc-ps2.cm" ]
+    },
+  ]
+
+  # Additional drivers to support running as a virtualization guest.
+  drivers += [
+    {
+      package_target =
+          "//src/connectivity/ethernet/drivers/third_party/igc:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/igc.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/simple:simple-bochs-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.bochs.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/simple:simple-gga-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.gga.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/simple:simple-intel-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.intel.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/simple:simple-vmware-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/simple.vmware.cm" ]
+    },
+    {
+      package_target = "//src/media/audio/drivers/intel-hda/codecs/qemu:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/qemu-audio-codec.cm" ]
+    },
+    {
+      package_target = "//zircon/third_party/dev/ethernet/e1000:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/e1000.cm" ]
+    },
+  ]
 }
 
 board_input_bundle("prebuilt_codec_runner") {

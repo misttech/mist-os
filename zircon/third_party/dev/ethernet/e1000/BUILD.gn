@@ -65,6 +65,11 @@ fuchsia_driver_component("e1000") {
   manifest = "meta/e1000.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "e1000"
+  driver_components = [ ":e1000" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":e1000_bind_test" ]

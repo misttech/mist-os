@@ -48,6 +48,11 @@ fuchsia_driver_component("realtek-audio-codec") {
   manifest = "meta/realtek-audio-codec.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "realtek-audio-codec"
+  driver_components = [ ":realtek-audio-codec" ]
+}
+
 group("tests") {
   testonly = true
 

@@ -51,6 +51,11 @@ fuchsia_driver_component("alc5663") {
   manifest = "meta/alc5663.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "alc5663"
+  driver_components = [ ":alc5663" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

@@ -41,6 +41,11 @@ if (current_cpu == "x64") {
     info = "realtek-8111-info.json"
     manifest = "meta/realtek-8111.cml"
   }
+
+  fuchsia_driver_package("package") {
+    package_name = "realtek-8111"
+    driver_components = [ ":realtek-8111" ]
+  }
 }
 
 group("tests") {

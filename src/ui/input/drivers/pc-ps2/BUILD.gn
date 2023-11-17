@@ -63,6 +63,11 @@ fuchsia_driver_component("pc-ps2") {
   manifest = "meta/pc-ps2.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "pc-ps2"
+  driver_components = [ ":pc-ps2" ]
+}
+
 test("pc-ps2-tests-bin") {
   output_name = "pc-ps2-tests"
   sources = [

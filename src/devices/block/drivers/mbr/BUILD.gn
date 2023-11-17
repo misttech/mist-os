@@ -58,6 +58,11 @@ fuchsia_driver_component("mbr") {
   manifest = "meta/mbr.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "mbr"
+  driver_components = [ ":mbr" ]
+}
+
 test("mbr-test-bin") {
   output_name = "mbr-test"
   sources = [

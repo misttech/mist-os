@@ -131,6 +131,11 @@ fuchsia_driver_component("platform-bus-x86") {
   manifest = "meta/platform-bus-x86.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "platform-bus-x86"
+  driver_components = [ ":platform-bus-x86" ]
+}
+
 test("x86-ec-test-bin") {
   output_name = "x86-ec-test"
   sources = [

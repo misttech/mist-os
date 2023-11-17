@@ -53,6 +53,11 @@ fuchsia_driver_component("ctaphid") {
   manifest = "meta/ctaphid.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ctaphid"
+  driver_components = [ ":ctaphid" ]
+}
+
 test("ctaphid-test-bin") {
   sources = [ "test.cc" ]
   deps = [

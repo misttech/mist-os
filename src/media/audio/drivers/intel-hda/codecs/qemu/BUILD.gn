@@ -49,6 +49,11 @@ fuchsia_driver_component("qemu-audio-codec") {
   manifest = "meta/qemu-audio-codec.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "qemu-audio-code"
+  driver_components = [ ":qemu-audio-codec" ]
+}
+
 group("tests") {
   testonly = true
 

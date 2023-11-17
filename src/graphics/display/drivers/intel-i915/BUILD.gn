@@ -138,6 +138,11 @@ fuchsia_driver_component("intel-i915") {
   manifest = "meta/intel-i915.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "intel-i915"
+  driver_components = [ ":intel-i915" ]
+}
+
 test("intel-i915-test") {
   configs += [ "//build/config:all_source" ]
   sources = [

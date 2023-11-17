@@ -42,6 +42,11 @@ fuchsia_driver_component("pci-sdhci") {
   manifest = "meta/pci-sdhci.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "pci-sdhci"
+  driver_components = [ ":pci-sdhci" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":pci-sdhci-bind_test" ]

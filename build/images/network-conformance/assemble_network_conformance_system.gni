@@ -38,6 +38,12 @@ template("assemble_network_conformance_system") {
         }
       }
     }
+    if (target_cpu == "x64") {
+      input_bundles = [
+        "//boards/x64:x64_common",
+        "//boards/emulation/virtio",
+      ]
+    }
   }
 
   product_assembly_configuration(labels.product_config) {

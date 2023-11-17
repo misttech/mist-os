@@ -128,6 +128,11 @@ fuchsia_driver_component("intel-hda") {
   manifest = "meta/intel-hda.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "intel-hda"
+  driver_components = [ ":intel-hda" ]
+}
+
 test("controller_test") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]

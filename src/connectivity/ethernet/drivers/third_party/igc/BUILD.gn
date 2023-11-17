@@ -57,6 +57,11 @@ fuchsia_driver_component("igc") {
   manifest = "meta/igc.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "igc"
+  driver_components = [ ":igc" ]
+}
+
 group("tests") {
   testonly = true
   deps = [ ":igc_bind_test" ]

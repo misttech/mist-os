@@ -61,6 +61,11 @@ fuchsia_driver_component("sdhci") {
   manifest = "meta/sdhci.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "sdhci"
+  driver_components = [ ":sdhci" ]
+}
+
 test("sdhci-test-bin") {
   output_name = "sdhci-test"
   configs += [ "//build/config:all_source" ]

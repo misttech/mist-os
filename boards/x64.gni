@@ -11,18 +11,8 @@ board_name = "x64"
 board_description = "A generic x64 device"
 
 _bootfs_deps = [
-  # Drivers
-  "//src/connectivity/ethernet/drivers/gvnic",
-  "//src/connectivity/ethernet/drivers/realtek-8111",
-  "//src/devices/serial/drivers/uart16550",
-  "//src/graphics/display/drivers/simple:simple.amd-kaveri",
-  "//src/graphics/display/drivers/simple:simple.nv",
-
   # Use legacy serial for bootfs.
   "//boards/kernel_cmdline:serial-legacy",
-
-  # Driver to handle oneshot reboot flags for bootloader
-  "//src/devices/block/drivers/abr-shim",
 ]
 
 board_bootfs_labels += _bootfs_deps

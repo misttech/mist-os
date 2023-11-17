@@ -115,6 +115,11 @@ template("simple_fuchsia_driver") {
     info = "simple.${driver_name}-info.json"
     manifest = "meta/${driver_name}.cml"
   }
+
+  fuchsia_driver_package("simple-${driver_name}-package") {
+    package_name = "simple.${driver_name}"
+    driver_components = [ ":simple.${driver_name}" ]
+  }
 }
 
 simple_fuchsia_driver("amd-kaveri") {

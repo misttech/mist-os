@@ -46,6 +46,11 @@ fuchsia_driver_component("max98373") {
   manifest = "meta/max98373.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "max98373"
+  driver_components = [ ":max98373" ]
+}
+
 test("max98373-test") {
   output_name = "max98373-test"
   configs += [ "//build/config:all_source" ]
