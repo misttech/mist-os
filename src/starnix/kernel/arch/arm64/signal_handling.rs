@@ -9,11 +9,11 @@ use crate::{
     mm::vmo::round_up_to_increment,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
-    types::errno::{ErrnoCode, ERESTART_RESTARTBLOCK},
-    types::signals::SigSet,
-    types::{
-        __NR_restart_syscall, sigaction_t, sigaltstack, sigcontext, siginfo_t, sigset_t, ucontext,
-    },
+};
+use starnix_uapi::{
+    __NR_restart_syscall,
+    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
+    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -83,18 +83,6 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
-    }
-}
-
-impl From<sigset_t> for SigSet {
-    fn from(value: sigset_t) -> Self {
-        SigSet(value.sig[0])
-    }
-}
-
-impl From<SigSet> for sigset_t {
-    fn from(val: SigSet) -> Self {
-        sigset_t { sig: [val.0] }
     }
 }
 

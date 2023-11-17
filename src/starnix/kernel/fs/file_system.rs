@@ -8,21 +8,16 @@ use crate::{
         XattrOp,
     },
     task::{CurrentTask, Kernel},
-    types::{
-        arc_key::ArcKey,
-        as_any::AsAny,
-        device_type::DeviceType,
-        errno::{error, Errno},
-        ino_t,
-        mount_flags::MountFlags,
-        statfs,
-    },
 };
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    arc_key::ArcKey, as_any::AsAny, device_type::DeviceType, error, errors::Errno, ino_t,
+    mount_flags::MountFlags, statfs,
+};
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
     sync::{

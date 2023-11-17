@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::uapi::epoll_event,
     fs::{
         buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
         eventfd::{new_eventfd, EventFdType},
@@ -23,47 +22,48 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
-    types::{
-        __kernel_fd_set,
-        auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
-        device_type::DeviceType,
-        errno::{errno, error, Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
-        f_owner_ex,
-        file_mode::{Access, FileMode},
-        itimerspec,
-        mount_flags::MountFlags,
-        off_t,
-        open_flags::OpenFlags,
-        personality::PersonalityFlags,
-        pid_t, pollfd, pselect6_sigmask,
-        resource_limits::Resource,
-        seal_flags::SealFlags,
-        signals::SigSet,
-        sigset_t, statfs, statx,
-        time::{
-            duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
-            timespec_from_duration,
-        },
-        timespec, uapi, uid_t,
-        user_address::{UserAddress, UserCString, UserRef},
-        AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
-        AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
-        CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
-        EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS,
-        F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
-        F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
-        F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK,
-        MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX,
-        O_CLOEXEC, PATH_MAX, PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI,
-        POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE,
-        POSIX_FADV_NORMAL, POSIX_FADV_RANDOM, POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED,
-        RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK, TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET,
-        UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
-    },
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    __kernel_fd_set,
+    auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},
+    device_type::DeviceType,
+    epoll_event, errno, error,
+    errors::{Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
+    f_owner_ex,
+    file_mode::{Access, FileMode},
+    itimerspec,
+    mount_flags::MountFlags,
+    off_t,
+    open_flags::OpenFlags,
+    personality::PersonalityFlags,
+    pid_t, pollfd, pselect6_sigmask,
+    resource_limits::Resource,
+    seal_flags::SealFlags,
+    signals::SigSet,
+    sigset_t, statfs, statx,
+    time::{
+        duration_from_poll_timeout, duration_from_timespec, time_from_timespec,
+        timespec_from_duration,
+    },
+    timespec, uapi, uid_t,
+    user_address::{UserAddress, UserCString, UserRef},
+    AT_EACCESS, AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW,
+    AT_SYMLINK_NOFOLLOW, CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME,
+    CLOCK_REALTIME_ALARM, CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK,
+    EFD_SEMAPHORE, EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS,
+    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
+    F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
+    F_SETFL, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK, MFD_ALLOW_SEALING,
+    MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, PATH_MAX,
+    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
+    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
+    POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
+    TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, UMOUNT_NOFOLLOW, XATTR_CREATE, XATTR_NAME_MAX,
+    XATTR_REPLACE,
+};
 use std::{
     cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
 };
@@ -1938,7 +1938,7 @@ pub fn sys_select(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    timeout_addr: UserRef<crate::types::timeval>,
+    timeout_addr: UserRef<starnix_uapi::timeval>,
 ) -> Result<i32, Errno> {
     let start_time = zx::Time::get_monotonic();
 
@@ -1946,7 +1946,7 @@ pub fn sys_select(
         zx::Time::INFINITE
     } else {
         let timeval = current_task.read_object(timeout_addr)?;
-        start_time + crate::types::time::duration_from_timeval(timeval)?
+        start_time + starnix_uapi::time::duration_from_timeval(timeval)?
     };
 
     let num_fds = select(
@@ -1965,7 +1965,7 @@ pub fn sys_select(
         let now = zx::Time::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task
-            .write_object(timeout_addr, &crate::types::time::timeval_from_duration(remaining))?;
+            .write_object(timeout_addr, &starnix_uapi::time::timeval_from_duration(remaining))?;
     }
 
     Ok(num_fds)
@@ -2481,11 +2481,8 @@ pub fn sys_splice(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::PAGE_SIZE,
-        testing::*,
-        types::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET},
-    };
+    use crate::{mm::PAGE_SIZE, testing::*};
+    use starnix_uapi::{O_RDONLY, SEEK_CUR, SEEK_END, SEEK_SET};
     use std::sync::Arc;
 
     #[::fuchsia::test]

@@ -8,21 +8,22 @@ use crate::{
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
     task::{CurrentTask, EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter},
-    types::{
-        errno::{error, from_status_like_fdio, Errno},
-        itimerspec,
-        open_flags::OpenFlags,
-        time::{
-            duration_from_timespec, itimerspec_from_deadline_interval, time_from_timespec,
-            timespec_from_duration, timespec_is_zero,
-        },
-        TFD_TIMER_ABSTIME,
-    },
 };
 use fuchsia_runtime::zx_utc_reference_get;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, Clock, Unowned};
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    error,
+    errors::Errno,
+    from_status_like_fdio, itimerspec,
+    open_flags::OpenFlags,
+    time::{
+        duration_from_timespec, itimerspec_from_deadline_interval, time_from_timespec,
+        timespec_from_duration, timespec_is_zero,
+    },
+    TFD_TIMER_ABSTIME,
+};
 use std::sync::Arc;
 use zerocopy::AsBytes;
 

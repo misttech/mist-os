@@ -24,13 +24,13 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, Kernel, Task},
-    types::{
-        errno::Errno,
-        open_flags::OpenFlags,
-        ownership::{OwnedRefByRef, ReleasableByRef},
-        user_address::UserAddress,
-        MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
-    },
+};
+use starnix_uapi::{
+    errors::Errno,
+    open_flags::OpenFlags,
+    ownership::{OwnedRefByRef, ReleasableByRef},
+    user_address::UserAddress,
+    MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 
 /// Create a FileSystemHandle for use in testing.
@@ -246,7 +246,7 @@ pub fn check_page_ne(current_task: &CurrentTask, addr: UserAddress, data: char) 
 pub fn check_unmapped(current_task: &CurrentTask, addr: UserAddress) {
     match current_task.read_memory_to_vec(addr, *PAGE_SIZE as usize) {
         Ok(_) => panic!("read page: page @ {addr:?} should be unmapped"),
-        Err(err) if err == crate::types::errno::EFAULT => {}
+        Err(err) if err == starnix_uapi::errors::EFAULT => {}
         Err(err) => {
             panic!("read page: expected EFAULT reading page @ {addr:?} but got {err:?} instead")
         }

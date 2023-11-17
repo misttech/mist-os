@@ -15,16 +15,12 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
     },
     task::{CurrentTask, Task},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        open_flags::OpenFlags,
-        ownership::WeakRef,
-        pid_t,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
+    open_flags::OpenFlags, ownership::WeakRef, pid_t,
+};
 use std::sync::Arc;
 
 type ControlGroupHandle = Arc<Mutex<ControlGroup>>;

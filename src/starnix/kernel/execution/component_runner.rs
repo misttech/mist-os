@@ -10,16 +10,6 @@ use crate::{
     logging::{log_error, log_info},
     signals,
     task::{CurrentTask, ExitStatus, Task},
-    types::{
-        auth::Capabilities,
-        device_type::DeviceType,
-        errno::{Errno, EEXIST, ENOTDIR},
-        file_mode::mode,
-        mount_flags::MountFlags,
-        open_flags::OpenFlags,
-        ownership::{release_on_error, ReleasableByRef, WeakRef},
-        signals::{SIGINT, SIGKILL},
-    },
 };
 use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};
@@ -34,6 +24,16 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
+use starnix_uapi::{
+    auth::Capabilities,
+    device_type::DeviceType,
+    errors::{Errno, EEXIST, ENOTDIR},
+    file_mode::mode,
+    mount_flags::MountFlags,
+    open_flags::OpenFlags,
+    ownership::{release_on_error, ReleasableByRef, WeakRef},
+    signals::{SIGINT, SIGKILL},
+};
 use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path};
 
 /// Component controller epitaph value used as the base value to pass non-zero error

@@ -10,8 +10,8 @@ use crate::{
         FsNodeInfo, FsStr, StaticDirectoryBuilder,
     },
     task::CurrentTask,
-    types::{errno::Errno, file_mode::mode, statfs, TRACEFS_MAGIC},
 };
+use starnix_uapi::{errors::Errno, file_mode::mode, statfs, TRACEFS_MAGIC};
 use std::sync::Arc;
 
 pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {

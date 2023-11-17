@@ -4,10 +4,8 @@
 
 use fuchsia_zircon as zx;
 
-use crate::{
-    task::PageFaultExceptionReport,
-    types::signals::{Signal, SIGFPE},
-};
+use crate::task::PageFaultExceptionReport;
+use starnix_uapi::signals::{Signal, SIGFPE};
 
 // Returns "Exception Class" from the exception context. See
 // https://developer.arm.com/documentation/ddi0601/2022-03/AArch64-Registers/ESR-EL1--Exception-Syndrome-Register--EL1-

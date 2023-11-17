@@ -11,17 +11,18 @@ use crate::{
         SignalDetail, SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
-    types::{
-        auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
-        errno::{errno, error, Errno},
-        ownership::{OwnedRefByRef, WeakRef},
-        pid_t,
-        signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP},
-        user_address::{UserAddress, UserRef},
-        PTRACE_CONT, PTRACE_DETACH, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_INTERRUPT,
-        PTRACE_KILL, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA, PTRACE_POKETEXT,
-        PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
-    },
+};
+use starnix_uapi::{
+    auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
+    errno, error,
+    errors::Errno,
+    ownership::{OwnedRefByRef, WeakRef},
+    pid_t,
+    signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP},
+    user_address::{UserAddress, UserRef},
+    PTRACE_CONT, PTRACE_DETACH, PTRACE_GETSIGINFO, PTRACE_GETSIGMASK, PTRACE_INTERRUPT,
+    PTRACE_KILL, PTRACE_PEEKDATA, PTRACE_PEEKTEXT, PTRACE_POKEDATA, PTRACE_POKETEXT,
+    PTRACE_SETSIGINFO, PTRACE_SETSIGMASK, SI_MAX_SIZE,
 };
 use std::sync::{atomic::Ordering, Arc};
 use zerocopy::FromBytes;
@@ -441,8 +442,8 @@ mod tests {
     use crate::{
         task::syscalls::sys_prctl,
         testing::{create_kernel_task_and_unlocked, create_task},
-        types::PR_SET_PTRACER,
     };
+    use starnix_uapi::PR_SET_PTRACER;
 
     #[::fuchsia::test]
     async fn test_set_ptracer() {

@@ -8,13 +8,9 @@ use crate::{
         fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps,
     },
     task::{CurrentTask, Kernel},
-    types::{
-        as_any::AsAny,
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-    },
 };
 
+use starnix_uapi::{as_any::AsAny, errno, error, errors::Errno, open_flags::OpenFlags};
 use std::{
     borrow::Cow,
     sync::{Arc, Weak},

@@ -16,11 +16,8 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    types::{
-        errno::{error, Errno},
-        open_flags::OpenFlags,
-    },
 };
+use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags};
 
 pub fn new_socket_file(
     current_task: &CurrentTask,

@@ -4,7 +4,9 @@
 
 use crate::{logging::log_warn, vdso::vdso_loader::MemoryMappedVvar};
 use fuchsia_runtime::duplicate_utc_clock_handle;
-use fuchsia_zircon::{self as zx, AsHandleRef, ClockTransformation};
+use fuchsia_zircon::{
+    AsHandleRef, ClockTransformation, {self as zx},
+};
 use once_cell::sync::Lazy;
 use starnix_lock::Mutex;
 

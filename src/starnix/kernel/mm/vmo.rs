@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::PAGE_SIZE,
-    types::errno::{errno, Errno},
-};
+use crate::mm::PAGE_SIZE;
+use starnix_uapi::{errno, errors::Errno};
 
 // TODO: Move this function to somewhere more generic. It doesn't really have
 // anything to do with the memory manager.

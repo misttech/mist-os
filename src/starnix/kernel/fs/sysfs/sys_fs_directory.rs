@@ -12,12 +12,8 @@ use crate::{
         VecDirectory, VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::{
-        errno::{error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-    },
 };
+use starnix_uapi::{error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
 pub struct SysFsDirectory {

@@ -5,7 +5,7 @@
 use fuchsia_zircon as zx;
 
 use crate::task::PageFaultExceptionReport;
-use crate::types::signals::Signal;
+use starnix_uapi::signals::Signal;
 
 // See "4.1.8 Supervisor Cause Register" in "The RISC-V Instruction Set Manual, Volume II:
 // Privileged Architecture".

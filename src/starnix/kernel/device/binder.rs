@@ -26,49 +26,6 @@ use crate::{
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
-    types::{
-        arc_key::ArcKey,
-        binder_buffer_object, binder_driver_command_protocol,
-        binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
-        binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION,
-        binder_driver_command_protocol_BC_DEAD_BINDER_DONE,
-        binder_driver_command_protocol_BC_DECREFS, binder_driver_command_protocol_BC_ENTER_LOOPER,
-        binder_driver_command_protocol_BC_FREE_BUFFER, binder_driver_command_protocol_BC_INCREFS,
-        binder_driver_command_protocol_BC_INCREFS_DONE,
-        binder_driver_command_protocol_BC_REGISTER_LOOPER,
-        binder_driver_command_protocol_BC_RELEASE, binder_driver_command_protocol_BC_REPLY,
-        binder_driver_command_protocol_BC_REPLY_SG,
-        binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION,
-        binder_driver_command_protocol_BC_TRANSACTION,
-        binder_driver_command_protocol_BC_TRANSACTION_SG, binder_driver_return_protocol,
-        binder_driver_return_protocol_BR_ACQUIRE,
-        binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE,
-        binder_driver_return_protocol_BR_DEAD_BINDER, binder_driver_return_protocol_BR_DEAD_REPLY,
-        binder_driver_return_protocol_BR_DECREFS, binder_driver_return_protocol_BR_ERROR,
-        binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_INCREFS,
-        binder_driver_return_protocol_BR_RELEASE, binder_driver_return_protocol_BR_REPLY,
-        binder_driver_return_protocol_BR_SPAWN_LOOPER,
-        binder_driver_return_protocol_BR_TRANSACTION,
-        binder_driver_return_protocol_BR_TRANSACTION_COMPLETE,
-        binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
-        binder_object_header, binder_transaction_data,
-        binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
-        binder_uintptr_t, binder_version, binder_write_read,
-        device_type::DeviceType,
-        errno::{errno, errno_from_code, error, Errno, EINTR},
-        file_mode::mode,
-        flat_binder_object,
-        open_flags::OpenFlags,
-        ownership::{
-            release_after, release_on_error, OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef,
-        },
-        pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi,
-        union::struct_with_union_into_bytes,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
-        BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
-    },
 };
 use derivative::Derivative;
 use fidl::endpoints::ClientEnd;
@@ -77,10 +34,52 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
+use starnix_uapi::{
+    arc_key::ArcKey,
+    binder_buffer_object, binder_driver_command_protocol,
+    binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
+    binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION,
+    binder_driver_command_protocol_BC_DEAD_BINDER_DONE, binder_driver_command_protocol_BC_DECREFS,
+    binder_driver_command_protocol_BC_ENTER_LOOPER, binder_driver_command_protocol_BC_FREE_BUFFER,
+    binder_driver_command_protocol_BC_INCREFS, binder_driver_command_protocol_BC_INCREFS_DONE,
+    binder_driver_command_protocol_BC_REGISTER_LOOPER, binder_driver_command_protocol_BC_RELEASE,
+    binder_driver_command_protocol_BC_REPLY, binder_driver_command_protocol_BC_REPLY_SG,
+    binder_driver_command_protocol_BC_REQUEST_DEATH_NOTIFICATION,
+    binder_driver_command_protocol_BC_TRANSACTION,
+    binder_driver_command_protocol_BC_TRANSACTION_SG, binder_driver_return_protocol,
+    binder_driver_return_protocol_BR_ACQUIRE,
+    binder_driver_return_protocol_BR_CLEAR_DEATH_NOTIFICATION_DONE,
+    binder_driver_return_protocol_BR_DEAD_BINDER, binder_driver_return_protocol_BR_DEAD_REPLY,
+    binder_driver_return_protocol_BR_DECREFS, binder_driver_return_protocol_BR_ERROR,
+    binder_driver_return_protocol_BR_FAILED_REPLY, binder_driver_return_protocol_BR_INCREFS,
+    binder_driver_return_protocol_BR_RELEASE, binder_driver_return_protocol_BR_REPLY,
+    binder_driver_return_protocol_BR_SPAWN_LOOPER, binder_driver_return_protocol_BR_TRANSACTION,
+    binder_driver_return_protocol_BR_TRANSACTION_COMPLETE,
+    binder_driver_return_protocol_BR_TRANSACTION_SEC_CTX, binder_fd_array_object,
+    binder_object_header, binder_transaction_data,
+    binder_transaction_data__bindgen_ty_2__bindgen_ty_1, binder_transaction_data_sg,
+    binder_uintptr_t, binder_version, binder_write_read,
+    device_type::DeviceType,
+    errno, errno_from_code, error,
+    errors::{Errno, EINTR},
+    file_mode::mode,
+    flat_binder_object,
+    open_flags::OpenFlags,
+    ownership::{
+        release_after, release_on_error, DropGuard, OwnedRef, Releasable, ReleaseGuard, TempRef,
+        WeakRef,
+    },
+    pid_t, statfs, transaction_flags_TF_ONE_WAY, uapi,
+    union::struct_with_union_into_bytes,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
+    BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
+    BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
+};
 use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     mem::MaybeUninit,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Weak,
@@ -549,6 +548,8 @@ struct TransientTransactionState<'a> {
     accessor: &'a dyn ResourceAccessor,
     /// The file descriptors to close in case of an error.
     transient_fds: Vec<FdNumber>,
+    /// A guard that will ensure a panic on drop if `state` has not been released.
+    drop_guard: DropGuard,
 }
 
 impl<'a> Releasable for TransientTransactionState<'a> {
@@ -558,6 +559,7 @@ impl<'a> Releasable for TransientTransactionState<'a> {
             let _: Result<(), Errno> = self.accessor.close_fd(*fd);
         }
         self.state.release(context);
+        self.drop_guard.disarm();
     }
 }
 
@@ -574,7 +576,7 @@ impl<'a> std::fmt::Debug for TransientTransactionState<'a> {
 impl<'a> TransientTransactionState<'a> {
     /// Creates a new [`TransientTransactionState`], whose resources will belong to `accessor` and
     /// `target_proc` for FDs and binder handles respectively.
-    fn new(accessor: &'a dyn ResourceAccessor, target_proc: &BinderProcess) -> ReleaseGuard<Self> {
+    fn new(accessor: &'a dyn ResourceAccessor, target_proc: &BinderProcess) -> Self {
         TransientTransactionState {
             state: Some(
                 TransactionState {
@@ -590,6 +592,7 @@ impl<'a> TransientTransactionState<'a> {
             ),
             accessor,
             transient_fds: vec![],
+            drop_guard: DropGuard::default(),
         }
         .into()
     }
@@ -616,9 +619,7 @@ impl<'a> TransientTransactionState<'a> {
     fn push_transient_fd(&mut self, fd: FdNumber) {
         self.transient_fds.push(fd)
     }
-}
 
-impl<'a> ReleaseGuard<TransientTransactionState<'a>> {
     fn into_state(mut self, context: ()) -> ReleaseGuard<TransactionState> {
         // Clear the transient FD list, so that these FDs no longer get closed.
         self.transient_fds.clear();
@@ -1514,15 +1515,47 @@ impl BinderObjectRef {
 
 /// A set of `BinderObject` whose reference counts may have changed. Releasing it will enqueue all
 /// the corresponding actions and remove any freed object from the owner process.
-type RefCountActions = ReleaseGuard<HashSet<ArcKey<BinderObject>>>;
+#[derive(Default)]
+struct RefCountActions {
+    objects: HashSet<ArcKey<BinderObject>>,
+    drop_guard: DropGuard,
+}
 
-impl Releasable for HashSet<ArcKey<BinderObject>> {
+impl Deref for RefCountActions {
+    type Target = HashSet<ArcKey<BinderObject>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.objects
+    }
+}
+
+impl DerefMut for RefCountActions {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.objects
+    }
+}
+
+impl Releasable for RefCountActions {
     type Context<'a> = ();
 
     fn release(self, _context: ()) {
-        for object in &self {
+        for object in self.iter() {
             object.apply_deferred_refcounts();
         }
+        self.drop_guard.disarm();
+    }
+}
+
+impl RefCountActions {
+    fn iter(&self) -> std::collections::hash_set::Iter<'_, ArcKey<BinderObject>> {
+        self.objects.iter()
+    }
+
+    #[cfg(test)]
+    fn default_released() -> Self {
+        let r = RefCountActions::default();
+        r.drop_guard.disarm();
+        r
     }
 }
 
@@ -2249,11 +2282,34 @@ impl<R: RefReleaser> Releasable for RefGuardInner<R> {
 
 /// A guard for the specified reference type. The guard must be released exactly once before going
 /// out of scope to release the reference it represents.
-type RefGuard<R> = ReleaseGuard<RefGuardInner<R>>;
+#[derive(Debug)]
+struct RefGuard<R: RefReleaser>(RefGuardInner<R>);
+
+impl<R: RefReleaser> Deref for RefGuard<R> {
+    type Target = RefGuardInner<R>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<R: RefReleaser> DerefMut for RefGuard<R> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl<R: RefReleaser> RefGuard<R> {
     fn new(binder_object: Arc<BinderObject>) -> Self {
-        RefGuardInner::<R> { binder_object, phantom: Default::default() }.into()
+        RefGuard(RefGuardInner::<R> { binder_object, phantom: Default::default() })
+    }
+}
+
+impl<R: RefReleaser> Releasable for RefGuard<R> {
+    type Context<'a> = &'a mut RefCountActions;
+
+    fn release(self, context: &mut RefCountActions) {
+        self.0.release(context);
     }
 }
 
@@ -3580,8 +3636,7 @@ impl BinderDriver {
         target_proc: &BinderProcess,
         data: &binder_transaction_data_sg,
         security_context: Option<&[u8]>,
-    ) -> Result<(TransactionBuffers, ReleaseGuard<TransientTransactionState<'a>>), TransactionError>
-    {
+    ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError> {
         profile_duration!("CopyTransactionBuffers");
         // Get the shared memory of the target process.
         let mut shared_memory_lock = target_proc.shared_memory.lock();
@@ -3663,7 +3718,7 @@ impl BinderDriver {
         offsets: &[binder_uintptr_t],
         transaction_data: &mut [u8],
         sg_buffer: &mut SharedBuffer<'_, u8>,
-    ) -> Result<ReleaseGuard<TransientTransactionState<'a>>, TransactionError> {
+    ) -> Result<TransientTransactionState<'a>, TransactionError> {
         profile_duration!("TranslateObjects");
         let mut transaction_state =
             TransientTransactionState::new(target_resource_accessor, target_proc);
@@ -4198,42 +4253,6 @@ impl From<Errno> for TransactionError {
     }
 }
 
-impl From<OpenFlags> for fbinder::FileFlags {
-    fn from(flags: OpenFlags) -> Self {
-        let mut result = Self::empty();
-        if flags.can_read() {
-            result |= Self::RIGHT_READABLE;
-        }
-        if flags.can_write() {
-            result |= Self::RIGHT_WRITABLE;
-        }
-        if flags.contains(OpenFlags::DIRECTORY) {
-            result |= Self::DIRECTORY;
-        }
-
-        result
-    }
-}
-
-impl From<fbinder::FileFlags> for OpenFlags {
-    fn from(flags: fbinder::FileFlags) -> Self {
-        let readable = flags.contains(fbinder::FileFlags::RIGHT_READABLE);
-        let writable = flags.contains(fbinder::FileFlags::RIGHT_WRITABLE);
-        let mut result = Self::empty();
-        if readable && writable {
-            result = Self::RDWR;
-        } else if writable {
-            result = Self::WRONLY;
-        } else if readable {
-            result = Self::RDONLY;
-        }
-        if flags.contains(fbinder::FileFlags::DIRECTORY) {
-            result |= Self::DIRECTORY;
-        }
-        result
-    }
-}
-
 pub struct BinderFs;
 impl FileSystemOps for BinderFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
@@ -4330,11 +4349,6 @@ pub mod tests {
         fs::FdFlags,
         mm::{MemoryAccessor, PAGE_SIZE},
         testing::*,
-        types::{
-            binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
-            errno::{EBADF, EINVAL},
-            BINDER_TYPE_WEAK_HANDLE,
-        },
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};
@@ -4342,6 +4356,11 @@ pub mod tests {
     use fuchsia_async::LocalExecutor;
     use futures::TryStreamExt;
     use memoffset::offset_of;
+    use starnix_uapi::{
+        binder_transaction_data__bindgen_ty_1, binder_transaction_data__bindgen_ty_2,
+        errors::{EBADF, EINVAL},
+        BINDER_TYPE_WEAK_HANDLE,
+    };
     use std::ops::Deref;
     use zerocopy::FromZeroes;
 

@@ -4,6 +4,30 @@
 
 #![allow(non_upper_case_globals)]
 
+use super::{
+    ffi::{
+        create_connection, create_image, device_import, device_release, execute_command,
+        execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2,
+        query, read_notification_channel, release_connection,
+    },
+    magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
+};
+use crate::{
+    device::{
+        sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
+        wayland::image_file::{ImageFile, ImageInfo},
+    },
+    fs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable,
+        fuchsia::RemoteFileObject,
+        Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
+    },
+    logging::{impossible_error, log_error, log_warn, set_zx_name},
+    mm::{MemoryAccessorExt, ProtectionFlags},
+    syscalls::{SyscallArg, SyscallResult, SUCCESS},
+    task::CurrentTask,
+};
 use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
@@ -125,43 +149,19 @@ use magma::{
     MAGMA_STATUS_OK,
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
+};
 use std::{
     collections::HashMap,
     sync::{
         atomic::{AtomicU64, Ordering},
         Arc, Once,
-    },
-};
-
-use super::{
-    ffi::{
-        create_connection, create_image, device_import, device_release, execute_command,
-        execute_immediate_commands, export_buffer, flush, get_buffer_handle, import_semaphore2,
-        query, read_notification_channel, release_connection,
-    },
-    magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
-};
-use crate::{
-    device::{
-        sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-        wayland::image_file::{ImageFile, ImageInfo},
-    },
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable,
-        fuchsia::RemoteFileObject,
-        Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
-    },
-    logging::{impossible_error, log_error, log_warn, set_zx_name},
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
-    task::CurrentTask,
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
     },
 };
 

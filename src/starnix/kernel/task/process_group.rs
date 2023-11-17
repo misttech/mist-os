@@ -6,13 +6,13 @@ use crate::{
     mutable_state::{state_accessor, state_implementation},
     signals::send_standard_signal,
     task::{Session, ThreadGroup},
-    types::{
-        ownership::TempRef,
-        pid_t,
-        signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
-    },
 };
 use starnix_lock::RwLock;
+use starnix_uapi::{
+    ownership::TempRef,
+    pid_t,
+    signals::{Signal, UncheckedSignal, SIGCONT, SIGHUP},
+};
 use std::{
     collections::BTreeMap,
     sync::{Arc, Weak},

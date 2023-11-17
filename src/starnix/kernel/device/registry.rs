@@ -12,11 +12,12 @@ use crate::{
     },
     logging::log_error,
     task::CurrentTask,
-    types::{
-        device_type::{DeviceType, DYN_MAJOR},
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-    },
+};
+use starnix_uapi::{
+    device_type::{DeviceType, DYN_MAJOR},
+    errno, error,
+    errors::Errno,
+    open_flags::OpenFlags,
 };
 
 use starnix_lock::{Mutex, RwLock};
@@ -388,12 +389,8 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        device::mem::DevNull,
-        fs::*,
-        testing::*,
-        types::device_type::{INPUT_MAJOR, MEM_MAJOR},
-    };
+    use crate::{device::mem::DevNull, fs::*, testing::*};
+    use starnix_uapi::device_type::{INPUT_MAJOR, MEM_MAJOR};
 
     #[::fuchsia::test]
     fn registry_fails_to_add_duplicate_device() {

@@ -16,13 +16,6 @@ use crate::{
     fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
-    types::{
-        errno::{errno, Errno},
-        file_mode::FileMode,
-        open_flags::OpenFlags,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-    },
 };
 use fuchsia_zircon::{
     AsHandleRef, HandleBased, {self as zx},
@@ -60,6 +53,14 @@ use magma::{
     virtio_magma_virt_connection_create_image_resp_t, virtmagma_command_descriptor,
     MAGMA_QUERY_VENDOR_ID, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_OK, MAGMA_VENDOR_ID_INTEL,
     MAGMA_VENDOR_ID_MALI,
+};
+use starnix_uapi::{
+    errno,
+    errors::Errno,
+    file_mode::FileMode,
+    open_flags::OpenFlags,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
 };
 use std::{mem::ManuallyDrop, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};

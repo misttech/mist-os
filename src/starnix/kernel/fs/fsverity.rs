@@ -2,20 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    logging::not_implemented,
-    mm::MemoryAccessorExt,
-    task::CurrentTask,
-    types::{
-        errno::{errno, error, Errno},
-        fsverity_descriptor, fsverity_enable_arg, fsverity_read_metadata_arg,
-        user_address::UserAddress,
-        FS_VERITY_HASH_ALG_SHA256, FS_VERITY_HASH_ALG_SHA512,
-    },
-};
+use crate::{logging::not_implemented, mm::MemoryAccessorExt, task::CurrentTask};
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use starnix_uapi::{
+    errno, error, errors::Errno, fsverity_descriptor, fsverity_enable_arg,
+    fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
+    FS_VERITY_HASH_ALG_SHA512,
+};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 #[derive(Copy, Clone, Debug, Eq, FromPrimitive, PartialEq)]
@@ -153,12 +148,13 @@ pub mod ioctl {
         mm::{MemoryAccessor, MemoryAccessorExt},
         syscalls::{SyscallResult, SUCCESS},
         task::CurrentTask,
-        types::{
-            errno::{errno, error, Errno},
-            user_address::{UserAddress, UserRef},
-        },
     };
     use num_traits::FromPrimitive;
+    use starnix_uapi::{
+        errno, error,
+        errors::Errno,
+        user_address::{UserAddress, UserRef},
+    };
     use zerocopy::AsBytes;
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.

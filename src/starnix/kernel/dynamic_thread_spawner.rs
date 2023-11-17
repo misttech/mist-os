@@ -6,13 +6,14 @@ use crate::{
     fs::FsContext,
     log_error,
     task::{CurrentTask, Kernel, Task},
-    types::{
-        errno::{errno, Errno},
-        ownership::{release_after, ReleasableByRef},
-    },
 };
 use futures::{channel::oneshot, TryFutureExt};
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    errno,
+    errors::Errno,
+    ownership::{release_after, ReleasableByRef},
+};
 use std::{
     ffi::CString,
     future::Future,

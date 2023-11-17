@@ -7,8 +7,8 @@ use crate::{
     task::{
         EventHandler, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter, ZxioSignalHandler,
     },
-    types::errno::{error, Errno},
 };
+use starnix_uapi::{error, errors::Errno};
 
 use fuchsia_zircon as zx;
 use std::sync::Arc;

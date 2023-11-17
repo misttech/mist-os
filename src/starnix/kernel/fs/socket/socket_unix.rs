@@ -21,17 +21,18 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        errno::{errno, error, Errno, EACCES, EINTR, EPERM},
-        gid_t,
-        open_flags::OpenFlags,
-        socklen_t, uapi, ucred, uid_t,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER,
-        SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
-        SO_SNDBUF,
-    },
+};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, EACCES, EINTR, EPERM},
+    gid_t,
+    open_flags::OpenFlags,
+    socklen_t, uapi, ucred, uid_t,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
+    FIONREAD, SOL_SOCKET, SO_ACCEPTCONN, SO_BROADCAST, SO_ERROR, SO_KEEPALIVE, SO_LINGER,
+    SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
+    SO_SNDBUF,
 };
 
 use starnix_lock::Mutex;

@@ -12,18 +12,19 @@ use crate::{
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        arc_key::WeakKey,
-        auth::CAP_SYS_ADMIN,
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        inotify_event,
-        open_flags::OpenFlags,
-        user_address::{UserAddress, UserRef},
-        FIONREAD,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    arc_key::WeakKey,
+    auth::CAP_SYS_ADMIN,
+    errno, error,
+    errors::Errno,
+    file_mode::FileMode,
+    inotify_event,
+    open_flags::OpenFlags,
+    user_address::{UserAddress, UserRef},
+    FIONREAD,
+};
 use std::{
     borrow::Cow,
     collections::{HashMap, VecDeque},
@@ -572,8 +573,8 @@ mod tests {
     use crate::{
         fs::{buffers::VecOutputBuffer, InotifyMask, OutputBuffer, WdNumber},
         testing::create_kernel_and_task,
-        types::{arc_key::WeakKey, file_mode::FileMode},
     };
+    use starnix_uapi::{arc_key::WeakKey, file_mode::FileMode};
 
     #[::fuchsia::test]
     fn inotify_event() {

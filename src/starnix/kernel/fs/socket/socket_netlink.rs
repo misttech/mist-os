@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
+use futures::channel::mpsc::{
+    UnboundedReceiver, UnboundedSender, {self},
+};
 use netlink::{
     messaging::{Sender, SenderReceiverProvider},
     multicast_groups::{
@@ -36,18 +38,16 @@ use crate::{
     logging::{log_error, log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
-    types::auth::CAP_NET_ADMIN,
-    types::errno::{errno, error, Errno},
-    types::user_buffer::UserBuffer,
-    types::{
-        nlmsghdr, sockaddr_nl, socklen_t, ucred, AF_NETLINK, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT,
-        NETLINK_CONNECTOR, NETLINK_CRYPTO, NETLINK_DNRTMSG, NETLINK_ECRYPTFS, NETLINK_FIB_LOOKUP,
-        NETLINK_FIREWALL, NETLINK_GENERIC, NETLINK_IP6_FW, NETLINK_ISCSI, NETLINK_KOBJECT_UEVENT,
-        NETLINK_NETFILTER, NETLINK_NFLOG, NETLINK_RDMA, NETLINK_ROUTE, NETLINK_SCSITRANSPORT,
-        NETLINK_SELINUX, NETLINK_SMC, NETLINK_SOCK_DIAG, NETLINK_USERSOCK, NETLINK_XFRM,
-        NLMSG_DONE, NLM_F_MULTI, SOL_SOCKET, SO_PASSCRED, SO_PROTOCOL, SO_RCVBUF, SO_RCVBUFFORCE,
-        SO_SNDBUF, SO_SNDBUFFORCE, SO_TIMESTAMP,
-    },
+};
+use starnix_uapi::{
+    auth::CAP_NET_ADMIN, errno, error, errors::Errno, nlmsghdr, sockaddr_nl, socklen_t, ucred,
+    user_buffer::UserBuffer, AF_NETLINK, NETLINK_ADD_MEMBERSHIP, NETLINK_AUDIT, NETLINK_CONNECTOR,
+    NETLINK_CRYPTO, NETLINK_DNRTMSG, NETLINK_ECRYPTFS, NETLINK_FIB_LOOKUP, NETLINK_FIREWALL,
+    NETLINK_GENERIC, NETLINK_IP6_FW, NETLINK_ISCSI, NETLINK_KOBJECT_UEVENT, NETLINK_NETFILTER,
+    NETLINK_NFLOG, NETLINK_RDMA, NETLINK_ROUTE, NETLINK_SCSITRANSPORT, NETLINK_SELINUX,
+    NETLINK_SMC, NETLINK_SOCK_DIAG, NETLINK_USERSOCK, NETLINK_XFRM, NLMSG_DONE, NLM_F_MULTI,
+    SOL_SOCKET, SO_PASSCRED, SO_PROTOCOL, SO_RCVBUF, SO_RCVBUFFORCE, SO_SNDBUF, SO_SNDBUFFORCE,
+    SO_TIMESTAMP,
 };
 
 // From netlink/socket.go in gVisor.

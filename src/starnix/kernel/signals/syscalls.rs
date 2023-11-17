@@ -17,22 +17,23 @@ use crate::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,
     },
-    types::{
-        errno::{errno, error, Errno, ErrnoResultExt, ETIMEDOUT},
-        open_flags::OpenFlags,
-        ownership::{TempRef, WeakRef},
-        pid_t, rusage, sigaction_t, sigaltstack_t,
-        signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
-        time::{duration_from_timespec, timeval_from_duration},
-        timespec,
-        user_address::{UserAddress, UserRef},
-        MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK,
-        SIG_SETMASK, SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE,
-        SS_ONSTACK, WCONTINUED, WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
-    },
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, ErrnoResultExt, ETIMEDOUT},
+    open_flags::OpenFlags,
+    ownership::{TempRef, WeakRef},
+    pid_t, rusage, sigaction_t, sigaltstack_t,
+    signals::{SigSet, Signal, UncheckedSignal, UNBLOCKABLE_SIGNALS},
+    time::{duration_from_timespec, timeval_from_duration},
+    timespec,
+    user_address::{UserAddress, UserRef},
+    MINSIGSTKSZ, P_ALL, P_PGID, P_PID, P_PIDFD, SFD_CLOEXEC, SFD_NONBLOCK, SIG_BLOCK, SIG_SETMASK,
+    SIG_UNBLOCK, SI_MAX_SIZE, SI_TKILL, SI_USER, SS_AUTODISARM, SS_DISABLE, SS_ONSTACK, WCONTINUED,
+    WEXITED, WNOHANG, WNOWAIT, WSTOPPED, WUNTRACED, __WALL, __WCLONE,
+};
 use static_assertions::const_assert_eq;
 use std::{convert::TryFrom, sync::Arc};
 use zerocopy::FromBytes;
@@ -858,14 +859,14 @@ mod tests {
         signals::{send_standard_signal, testing::dequeue_signal_for_test},
         task::{ExitStatus, ProcessExitInfo},
         testing::*,
-        types::{
-            errno::ERESTARTSYS,
-            signals::{
-                SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM,
-                SIGTRAP, SIGUSR1,
-            },
-            uid_t, SI_QUEUE,
+    };
+    use starnix_uapi::{
+        errors::ERESTARTSYS,
+        signals::{
+            SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,
+            SIGUSR1,
         },
+        uid_t, SI_QUEUE,
     };
     use std::convert::TryInto;
     use zerocopy::AsBytes;
@@ -1589,7 +1590,7 @@ mod tests {
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
-        let new_mask = SigSet::from(crate::types::signals::SIGRTMIN);
+        let new_mask = SigSet::from(starnix_uapi::signals::SIGRTMIN);
         let set = UserRef::<SigSet>::new(addr);
         current_task.write_object(set, &new_mask).expect("failed to set mask");
 
@@ -1605,11 +1606,11 @@ mod tests {
             Ok(())
         );
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(crate::types::signals::SIGRTMIN), 1);
+        assert_eq!(current_task.read().signals.queued_count(starnix_uapi::signals::SIGRTMIN), 1);
 
         // A second signal should increment the number of pending signals.
         assert_eq!(sys_kill(&mut locked, &current_task, current_task.id, SIGRTMIN.into()), Ok(()));
-        assert_eq!(current_task.read().signals.queued_count(crate::types::signals::SIGRTMIN), 2);
+        assert_eq!(current_task.read().signals.queued_count(starnix_uapi::signals::SIGRTMIN), 2);
     }
 
     #[::fuchsia::test]

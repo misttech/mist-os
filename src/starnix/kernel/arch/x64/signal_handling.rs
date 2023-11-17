@@ -8,12 +8,11 @@ use crate::{
     arch::registers::RegisterState,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
-    types::errno::{ErrnoCode, ERESTART_RESTARTBLOCK},
-    types::signals::SigSet,
-    types::{
-        __NR_restart_syscall, _fpstate_64, sigaction_t, sigaltstack, sigcontext, siginfo_t,
-        sigset_t, ucontext,
-    },
+};
+use starnix_uapi::{
+    __NR_restart_syscall, _fpstate_64,
+    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
+    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -117,18 +116,6 @@ impl SignalStackFrame {
     }
 }
 
-impl From<sigset_t> for SigSet {
-    fn from(value: sigset_t) -> Self {
-        SigSet(value)
-    }
-}
-
-impl From<SigSet> for sigset_t {
-    fn from(val: SigSet) -> Self {
-        val.0
-    }
-}
-
 /// Aligns the stack pointer to be 16 byte aligned, and then misaligns it by 8 bytes.
 ///
 /// This is done because x86-64 functions expect the stack to be misaligned by 8 bytes,
@@ -184,14 +171,17 @@ mod tests {
     use crate::{
         fs::FileWriteGuardRef,
         mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
-        signals::testing::dequeue_signal_for_test,
-        signals::{restore_from_signal_handler, SignalDetail},
+        signals::{restore_from_signal_handler, testing::dequeue_signal_for_test, SignalDetail},
         task::Kernel,
         testing::*,
-        types::errno::{EINTR, ERESTARTSYS},
-        types::signals::{SIGUSR1, SIGUSR2},
-        types::user_address::UserAddress,
-        types::{__NR_rt_sigreturn, sigaction_t, SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER},
+    };
+    use starnix_uapi::{
+        __NR_rt_sigreturn,
+        errors::{EINTR, ERESTARTSYS},
+        sigaction_t,
+        signals::{SIGUSR1, SIGUSR2},
+        user_address::UserAddress,
+        SA_RESTART, SA_RESTORER, SA_SIGINFO, SI_USER,
     };
 
     const SYSCALL_INSTRUCTION_ADDRESS: UserAddress = UserAddress::const_from(100);

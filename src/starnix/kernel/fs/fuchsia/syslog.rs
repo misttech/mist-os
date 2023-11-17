@@ -10,8 +10,8 @@ use crate::{
     logging::log,
     syscalls::{SyscallArg, SyscallResult},
     task::CurrentTask,
-    types::{errno::Errno, open_flags::OpenFlags},
 };
+use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
 pub struct SyslogFile;
 

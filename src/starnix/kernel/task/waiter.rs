@@ -19,10 +19,11 @@ use crate::{
     fs::{FdEvents, FdNumber},
     signals::RunState,
     task::CurrentTask,
-    types::{
-        errno::{error, Errno, EINTR},
-        ownership::debug_assert_no_local_temp_ref,
-    },
+};
+use starnix_uapi::{
+    error,
+    errors::{Errno, EINTR},
+    ownership::debug_assert_no_local_temp_ref,
 };
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
@@ -1023,8 +1024,8 @@ mod tests {
             FdEvents,
         },
         testing::*,
-        types::open_flags::OpenFlags,
     };
+    use starnix_uapi::open_flags::OpenFlags;
     use std::sync::atomic::AtomicU64;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);

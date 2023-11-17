@@ -5,8 +5,8 @@
 use crate::{
     fs::{fileops_impl_dataless, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps},
     task::CurrentTask,
-    types::{errno::Errno, open_flags::OpenFlags, pid_t},
 };
+use starnix_uapi::{errors::Errno, open_flags::OpenFlags, pid_t};
 
 struct PidFdFileObject {
     // In principle, we need some way to designate a Task that is durable for

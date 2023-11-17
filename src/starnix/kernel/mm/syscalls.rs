@@ -18,22 +18,23 @@ use crate::{
         MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
     task::{CurrentTask, Task},
-    types::{
-        auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
-        errno::{errno, error, Errno},
-        pid_t, robust_list_head,
-        time::{duration_from_timespec, time_from_timespec},
-        timespec, uapi,
-        user_address::{UserAddress, UserRef},
-        FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_PRIVATE_FLAG,
-        FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET, MAP_ANONYMOUS,
-        MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE,
-        MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
-    },
+};
+use starnix_uapi::{
+    auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
+    errno, error,
+    errors::Errno,
+    pid_t, robust_list_head,
+    time::{duration_from_timespec, time_from_timespec},
+    timespec, uapi,
+    user_address::{UserAddress, UserRef},
+    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_PRIVATE_FLAG,
+    FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET, MAP_ANONYMOUS,
+    MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE,
+    MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
 };
 
 #[cfg(target_arch = "x86_64")]
-use crate::types::MAP_32BIT;
+use starnix_uapi::MAP_32BIT;
 
 // Returns any platform-specific mmap flags. This is a separate function because as of this writing
 // "attributes on expressions are experimental."
@@ -474,10 +475,8 @@ pub fn sys_set_robust_list(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        testing::*,
-        types::{errno::EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ},
-    };
+    use crate::testing::*;
+    use starnix_uapi::{errors::EEXIST, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_READ};
 
     #[::fuchsia::test]
     async fn test_mmap_with_colliding_hint() {
@@ -973,7 +972,7 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     async fn test_map_32_bit() {
-        use crate::types::PROT_WRITE;
+        use starnix_uapi::PROT_WRITE;
 
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
         let page_size = *PAGE_SIZE;

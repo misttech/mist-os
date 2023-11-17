@@ -10,13 +10,14 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
     task::CurrentTask,
-    types::{
-        device_type::DeviceType,
-        errno::{errno, Errno},
-        file_mode::{mode, FileMode},
-        off_t,
-        open_flags::OpenFlags,
-    },
+};
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno,
+    errors::Errno,
+    file_mode::{mode, FileMode},
+    off_t,
+    open_flags::OpenFlags,
 };
 use std::{collections::BTreeMap, sync::Arc};
 

@@ -14,16 +14,17 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        device_type::{DeviceType, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, TOUCH_INPUT_MINOR},
-        errno::{error, Errno},
-        open_flags::OpenFlags,
-        time::timeval_from_time,
-        timeval, uapi,
-        user_address::{UserAddress, UserRef},
-        ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, BUS_VIRTUAL, FF_CNT,
-        INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
-    },
+};
+use starnix_uapi::{
+    device_type::{DeviceType, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, TOUCH_INPUT_MINOR},
+    error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    time::timeval_from_time,
+    timeval, uapi,
+    user_address::{UserAddress, UserRef},
+    ABS_CNT, ABS_X, ABS_Y, BTN_MISC, BTN_TOOL_FINGER, BTN_TOUCH, BUS_VIRTUAL, FF_CNT,
+    INPUT_PROP_CNT, INPUT_PROP_DIRECT, KEY_CNT, KEY_POWER, LED_CNT, MSC_CNT, REL_CNT, SW_CNT,
 };
 
 use fidl::endpoints::Proxy as _; // for `on_closed()`
@@ -889,7 +890,6 @@ mod test {
         fs::{buffers::VecOutputBuffer, FileHandle},
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
-        types::errno::EAGAIN,
     };
     use anyhow::anyhow;
     use assert_matches::assert_matches;
@@ -899,6 +899,7 @@ mod test {
         EventPhase, TouchEvent, TouchPointerSample, TouchResponse, TouchSourceMarker,
         TouchSourceRequest,
     };
+    use starnix_uapi::errors::EAGAIN;
     use test_case::test_case;
     use test_util::assert_near;
     use zerocopy::FromBytes as _; // for `read_from()`

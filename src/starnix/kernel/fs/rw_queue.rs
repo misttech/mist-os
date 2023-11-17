@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{task::CurrentTask, types::errno::Errno};
+use crate::task::CurrentTask;
+use starnix_uapi::errors::Errno;
 
 use fuchsia_zircon as zx;
 use starnix_lock::Mutex;
 use starnix_sync::InterruptibleEvent;
-use std::collections::VecDeque;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 use lock_api as _;
 

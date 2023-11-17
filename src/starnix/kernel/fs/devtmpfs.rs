@@ -9,8 +9,8 @@ use crate::{
         kobject::DeviceMetadata, tmpfs::TmpFs, DirEntryHandle, FileSystemHandle, FsStr, MountInfo,
     },
     task::Kernel,
-    types::{device_type::DeviceType, errno::Errno, file_mode::mode},
 };
+use starnix_uapi::{device_type::DeviceType, errors::Errno, file_mode::mode};
 use std::sync::Arc;
 
 pub fn dev_tmp_fs(kernel: &Arc<Kernel>) -> &FileSystemHandle {

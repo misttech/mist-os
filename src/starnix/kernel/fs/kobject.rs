@@ -17,12 +17,8 @@ use crate::{
         FileObject, FileOps, FsNode, FsNodeOps, FsStr, FsString,
     },
     task::CurrentTask,
-    types::{
-        device_type::DeviceType,
-        errno::{error, Errno},
-        open_flags::OpenFlags,
-    },
 };
+use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
 
 /// ktype is the type of object that embeds a `kobject`.
 #[derive(Debug, PartialEq)]

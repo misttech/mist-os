@@ -21,26 +21,26 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::{
-        device_type::{DeviceType, TTY_ALT_MAJOR},
-        errno::{errno, error, Errno},
-        file_mode::mode,
-        ino_t,
-        open_flags::OpenFlags,
-        pid_t,
-        signals::SIGWINCH,
-        statfs, uapi,
-        user_address::{UserAddress, UserRef},
-        DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH,
-        TCGETA, TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF,
-        TCSETSW, TCSETX, TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD,
-        TIOCGICOUNT, TIOCGLCKTRMIOS, TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485, TIOCGSERIAL,
-        TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ, TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET, TIOCMIWAIT,
-        TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ, TIOCPKT, TIOCSBRK, TIOCSCTTY, TIOCSERCONFIG,
-        TIOCSERGETLSR, TIOCSERGETMULTI, TIOCSERGSTRUCT, TIOCSERGWILD, TIOCSERSETMULTI,
-        TIOCSERSWILD, TIOCSETD, TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK, TIOCSRS485, TIOCSSERIAL,
-        TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
-    },
+};
+use starnix_uapi::{
+    device_type::{DeviceType, TTY_ALT_MAJOR},
+    errno, error,
+    errors::Errno,
+    file_mode::mode,
+    ino_t,
+    open_flags::OpenFlags,
+    pid_t,
+    signals::SIGWINCH,
+    statfs, uapi,
+    user_address::{UserAddress, UserRef},
+    DEVPTS_SUPER_MAGIC, FIOASYNC, FIOCLEX, FIONBIO, FIONCLEX, FIONREAD, FIOQSIZE, TCFLSH, TCGETA,
+    TCGETS, TCGETX, TCSBRK, TCSBRKP, TCSETA, TCSETAF, TCSETAW, TCSETS, TCSETSF, TCSETSW, TCSETX,
+    TCSETXF, TCSETXW, TCXONC, TIOCCBRK, TIOCCONS, TIOCEXCL, TIOCGETD, TIOCGICOUNT, TIOCGLCKTRMIOS,
+    TIOCGPGRP, TIOCGPTLCK, TIOCGPTN, TIOCGRS485, TIOCGSERIAL, TIOCGSID, TIOCGSOFTCAR, TIOCGWINSZ,
+    TIOCLINUX, TIOCMBIC, TIOCMBIS, TIOCMGET, TIOCMIWAIT, TIOCMSET, TIOCNOTTY, TIOCNXCL, TIOCOUTQ,
+    TIOCPKT, TIOCSBRK, TIOCSCTTY, TIOCSERCONFIG, TIOCSERGETLSR, TIOCSERGETMULTI, TIOCSERGSTRUCT,
+    TIOCSERGWILD, TIOCSERSETMULTI, TIOCSERSWILD, TIOCSETD, TIOCSLCKTRMIOS, TIOCSPGRP, TIOCSPTLCK,
+    TIOCSRS485, TIOCSSERIAL, TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
 };
 use std::sync::{Arc, Weak};
 
@@ -624,10 +624,10 @@ mod tests {
             MountInfo, NamespaceNode,
         },
         testing::*,
-        types::{
-            file_mode::FileMode,
-            signals::{SIGCHLD, SIGTTOU},
-        },
+    };
+    use starnix_uapi::{
+        file_mode::FileMode,
+        signals::{SIGCHLD, SIGTTOU},
     };
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + Copy>(

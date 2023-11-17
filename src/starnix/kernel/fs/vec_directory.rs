@@ -8,9 +8,8 @@ use crate::{
         FileObject, FileOps, FsString, SeekTarget,
     },
     task::CurrentTask,
-    types::errno::Errno,
-    types::{ino_t, off_t},
 };
+use starnix_uapi::{errors::Errno, ino_t, off_t};
 
 /// A directory entry used for [`VecDirectory`].
 #[derive(Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]

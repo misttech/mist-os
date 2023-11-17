@@ -10,12 +10,12 @@ use crate::{
         ThreadGroup,
     },
     time::utc,
-    types::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER},
 };
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::stream::AbortHandle;
 use starnix_lock::Mutex;
+use starnix_uapi::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER};
 use std::sync::{Arc, Weak};
 
 #[derive(Default)]

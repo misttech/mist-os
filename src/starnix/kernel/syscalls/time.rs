@@ -14,19 +14,20 @@ use crate::{
     signals::{RunState, SignalEvent},
     task::{ClockId, CurrentTask, TimerId},
     time::utc::utc_now,
-    types::{
-        errno::{errno, error, from_status_like_fdio, Errno, EINTR},
-        itimerspec, itimerval, pid_t, sigevent,
-        time::{
-            duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
-            timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
-        },
-        timespec, timeval, timezone, tms, uapi,
-        user_address::UserRef,
-        CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
-        CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
-        CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
+};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, EINTR},
+    from_status_like_fdio, itimerspec, itimerval, pid_t, sigevent,
+    time::{
+        duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
+        timespec_from_duration, timespec_is_zero, timeval_from_time, NANOS_PER_SECOND,
     },
+    timespec, timeval, timezone, tms, uapi,
+    user_address::UserRef,
+    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
+    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
+    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
 
 pub fn sys_clock_getres(
@@ -478,13 +479,9 @@ pub fn sys_times(
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        mm::PAGE_SIZE,
-        testing::*,
-        time::utc::UtcClockOverrideGuard,
-        types::{ownership::TempRef, signals, user_address::UserAddress},
-    };
+    use crate::{mm::PAGE_SIZE, testing::*, time::utc::UtcClockOverrideGuard};
     use fuchsia_zircon::HandleBased;
+    use starnix_uapi::{ownership::TempRef, signals, user_address::UserAddress};
     use test_util::{assert_geq, assert_leq};
 
     #[::fuchsia::test]

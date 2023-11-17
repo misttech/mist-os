@@ -7,7 +7,6 @@ use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
-    arch::uapi::epoll_event,
     fs::{
         syscalls::{
             poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
@@ -22,21 +21,22 @@ use crate::{
     signals::{syscalls::sys_signalfd4, RunState},
     task::{syscalls::do_clone, CurrentTask},
     time::utc,
-    types::{
-        __kernel_time_t, clone_args,
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        gid_t, itimerval,
-        open_flags::OpenFlags,
-        pid_t, pollfd,
-        signals::{SigSet, SIGCHLD},
-        time::{duration_from_poll_timeout, duration_from_timeval, timeval_from_duration},
-        uapi, uid_t,
-        user_address::{UserAddress, UserCString, UserRef},
-        ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM,
-        CSIGNAL, ITIMER_REAL,
-    },
+};
+use starnix_uapi::{
+    __kernel_time_t, clone_args,
+    device_type::DeviceType,
+    epoll_event, errno, error,
+    errors::Errno,
+    file_mode::FileMode,
+    gid_t, itimerval,
+    open_flags::OpenFlags,
+    pid_t, pollfd,
+    signals::{SigSet, SIGCHLD},
+    time::{duration_from_poll_timeout, duration_from_timeval, timeval_from_duration},
+    uapi, uid_t,
+    user_address::{UserAddress, UserCString, UserRef},
+    ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL,
+    ITIMER_REAL,
 };
 
 pub fn sys_access(

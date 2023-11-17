@@ -20,16 +20,6 @@ use crate::{
     mm::ProtectionFlags,
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, from_status_like_fdio, Errno},
-        file_mode::FileMode,
-        fsverity_descriptor, ino_t,
-        mount_flags::MountFlags,
-        off_t,
-        open_flags::OpenFlags,
-        statfs,
-    },
     vmex_resource::VMEX_RESOURCE,
 };
 use fidl::AsHandleRef;
@@ -38,6 +28,11 @@ use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_uapi::{
+    device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
+    from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,
+    open_flags::OpenFlags, statfs,
+};
 use std::sync::Arc;
 use syncio::{
     zxio::{zxio_get_posix_mode, ZXIO_NODE_PROTOCOL_SYMLINK},
@@ -1524,7 +1519,6 @@ impl FsNodeOps for RemoteSymlink {
 mod test {
     use super::*;
     use crate::{
-        arch::uapi::epoll_event,
         auth::Credentials,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
@@ -1532,7 +1526,6 @@ mod test {
         },
         mm::PAGE_SIZE,
         testing::*,
-        types::{errno::EINVAL, file_mode::mode},
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::Proxy;
@@ -1541,6 +1534,7 @@ mod test {
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
+    use starnix_uapi::{epoll_event, errors::EINVAL, file_mode::mode};
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {

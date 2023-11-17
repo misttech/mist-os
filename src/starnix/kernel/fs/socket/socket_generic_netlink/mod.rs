@@ -25,10 +25,8 @@ use std::{
     sync::Arc,
 };
 
-use crate::{
-    logging::{log_error, log_info, log_warn},
-    types::errno::{error, Errno},
-};
+use crate::logging::{log_error, log_info, log_warn};
+use starnix_uapi::{error, errors::Errno};
 
 mod messages;
 mod nl80211;
@@ -437,9 +435,9 @@ impl<S> GenericNetlinkClientHandle<S> {
 
 #[cfg(test)]
 mod test_utils {
-    use {
-        super::*, netlink::multicast_groups::ModernGroup, netlink_packet_core::NetlinkSerializable,
-    };
+    use super::*;
+    use netlink::multicast_groups::ModernGroup;
+    use netlink_packet_core::NetlinkSerializable;
 
     #[derive(Clone)]
     pub(crate) struct TestSender<M> {
@@ -455,16 +453,13 @@ mod test_utils {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::{test_utils::*, *},
-        assert_matches::assert_matches,
-        fuchsia_async::TestExecutor,
-        futures::pin_mut,
-        netlink_packet_core::NetlinkPayload,
-        netlink_packet_generic::GenlHeader,
-        std::sync::Arc,
-        std::task::Poll,
-    };
+    use super::{test_utils::*, *};
+    use assert_matches::assert_matches;
+    use fuchsia_async::TestExecutor;
+    use futures::pin_mut;
+    use netlink_packet_core::NetlinkPayload;
+    use netlink_packet_generic::GenlHeader;
+    use std::{sync::Arc, task::Poll};
 
     const TEST_FAMILY: &str = "test_family";
     const MCAST_GROUP_1: &str = "m1";

@@ -17,15 +17,16 @@ use crate::{
     mm::{MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo,
-        open_flags::OpenFlags,
-        user_address::{UserAddress, UserRef},
-        FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS,
-        FB_VISUAL_TRUECOLOR,
-    },
+};
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    fb_bitfield, fb_fix_screeninfo, fb_var_screeninfo,
+    open_flags::OpenFlags,
+    user_address::{UserAddress, UserRef},
+    FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS,
+    FB_VISUAL_TRUECOLOR,
 };
 
 use fidl_fuchsia_io as fio;

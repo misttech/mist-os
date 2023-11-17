@@ -12,8 +12,8 @@ use crate::{
         FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },
     task::{CurrentTask, NetstackDevicesDirectory},
-    types::{errno::Errno, file_mode::mode, statfs, SYSFS_MAGIC},
 };
+use starnix_uapi::{errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
 use std::sync::Arc;
 
 struct SysFs;

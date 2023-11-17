@@ -6,13 +6,14 @@ use crate::{
     fs::{FileSystemHandle, Namespace, NamespaceNode},
     logging::log_trace,
     task::CurrentTask,
-    types::{
-        auth::CAP_SYS_CHROOT,
-        errno::{errno, error, Errno},
-        file_mode::{Access, FileMode},
-    },
 };
 use starnix_lock::RwLock;
+use starnix_uapi::{
+    auth::CAP_SYS_CHROOT,
+    errno, error,
+    errors::Errno,
+    file_mode::{Access, FileMode},
+};
 use std::sync::Arc;
 
 /// The mutable state for an FsContext.
@@ -171,8 +172,8 @@ mod test {
     use crate::{
         fs::{tmpfs::TmpFs, FsContext},
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
-        types::{file_mode::FileMode, open_flags::OpenFlags},
     };
+    use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
 
     #[::fuchsia::test]
     async fn test_umask() {

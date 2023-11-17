@@ -14,15 +14,6 @@ use crate::{
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, Kernel},
-    types::{
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        ino_t,
-        mount_flags::MountFlags,
-        off_t,
-        open_flags::OpenFlags,
-        statfs, EXT4_SUPER_MAGIC,
-    },
 };
 use ext4_read_only::{
     parser::{Parser as ExtParser, XattrMap as ExtXattrMap},
@@ -31,6 +22,10 @@ use ext4_read_only::{
 };
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use starnix_uapi::{
+    errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags, off_t,
+    open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,
+};
 use std::sync::Arc;
 
 mod pager;

@@ -5,9 +5,8 @@
 use crate::{
     fs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
     task::CurrentTask,
-    types::file_mode::mode,
 };
-
+use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
 /// This directory contains various files and subdirectories that provide information about

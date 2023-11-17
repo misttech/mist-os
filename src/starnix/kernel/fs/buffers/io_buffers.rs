@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
-    types::errno::{errno, error, Errno},
-    types::user_address::UserAddress,
-    types::user_buffer::UserBuffer,
+use crate::mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager};
+use starnix_uapi::{
+    errno, error, errors::Errno, user_address::UserAddress, user_buffer::UserBuffer,
 };
 use zerocopy::FromBytes;
 

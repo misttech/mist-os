@@ -8,8 +8,8 @@ use crate::{
         MemoryXattrStorage, SymlinkTarget,
     },
     task::CurrentTask,
-    types::errno::Errno,
 };
+use starnix_uapi::errors::Errno;
 
 /// A node that represents a symlink to another node.
 pub struct SymlinkNode {

@@ -19,24 +19,25 @@ use crate::{
     },
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
-    types::{
-        as_any::AsAny,
-        errno::{errno, error, Errno, EAGAIN, ETIMEDOUT},
-        fsxattr, off_t,
-        open_flags::OpenFlags,
-        pid_t,
-        resource_limits::Resource,
-        seal_flags::SealFlags,
-        uapi,
-        user_address::UserAddress,
-        FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR,
-        FS_IOC_GETFLAGS, FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS,
-        FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
-    },
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    as_any::AsAny,
+    errno, error,
+    errors::{Errno, EAGAIN, ETIMEDOUT},
+    fsxattr, off_t,
+    open_flags::OpenFlags,
+    pid_t,
+    resource_limits::Resource,
+    seal_flags::SealFlags,
+    uapi,
+    user_address::UserAddress,
+    FIONBIO, FIONREAD, FS_IOC_ENABLE_VERITY, FS_IOC_FSGETXATTR, FS_IOC_FSSETXATTR, FS_IOC_GETFLAGS,
+    FS_IOC_MEASURE_VERITY, FS_IOC_READ_VERITY_METADATA, FS_IOC_SETFLAGS, FS_VERITY_FL, SEEK_CUR,
+    SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
+};
 use std::{
     fmt,
     sync::{Arc, Weak},
@@ -426,7 +427,7 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             current_task: &crate::task::CurrentTask,
             offset: usize,
             data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::errno::Errno> {
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
             $delegate.read(file, current_task, offset, data)
         }
 
@@ -434,9 +435,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             &$self,
             file: &FileObject,
             current_task: &crate::task::CurrentTask,
-            current_offset: crate::types::off_t,
+            current_offset: starnix_uapi::off_t,
             target: crate::fs::SeekTarget,
-        ) -> Result<crate::types::off_t, crate::types::errno::Errno> {
+        ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             $delegate.seek(file, current_task, current_offset, target)
         }
     };
@@ -453,12 +454,12 @@ macro_rules! fileops_impl_seekable {
             &self,
             file: &crate::fs::FileObject,
             current_task: &crate::task::CurrentTask,
-            current_offset: crate::types::off_t,
+            current_offset: starnix_uapi::off_t,
             target: crate::fs::SeekTarget,
-        ) -> Result<crate::types::off_t, crate::types::errno::Errno> {
+        ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             crate::fs::default_seek(current_offset, target, |offset| {
                 let eof_offset = crate::fs::default_eof_offset(file, current_task)?;
-                offset.checked_add(eof_offset).ok_or_else(|| crate::types::errno::errno!(EINVAL))
+                offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
             })
         }
     };
@@ -475,10 +476,10 @@ macro_rules! fileops_impl_nonseekable {
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _current_offset: crate::types::off_t,
+            _current_offset: starnix_uapi::off_t,
             _target: crate::fs::SeekTarget,
-        ) -> Result<crate::types::off_t, crate::types::errno::Errno> {
-            crate::types::errno::error!(ESPIPE)
+        ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
+            starnix_uapi::error!(ESPIPE)
         }
     };
 }
@@ -499,9 +500,9 @@ macro_rules! fileops_impl_seekless {
             &self,
             _file: &crate::fs::FileObject,
             _current_task: &crate::task::CurrentTask,
-            _current_offset: crate::types::off_t,
+            _current_offset: starnix_uapi::off_t,
             _target: crate::fs::SeekTarget,
-        ) -> Result<crate::types::off_t, crate::types::errno::Errno> {
+        ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             Ok(0)
         }
     };
@@ -516,7 +517,7 @@ macro_rules! fileops_impl_dataless {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::InputBuffer,
         ) -> Result<usize, Errno> {
-            crate::types::errno::error!(EINVAL)
+            starnix_uapi::error!(EINVAL)
         }
 
         fn read(
@@ -526,7 +527,7 @@ macro_rules! fileops_impl_dataless {
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::OutputBuffer,
         ) -> Result<usize, Errno> {
-            crate::types::errno::error!(EINVAL)
+            starnix_uapi::error!(EINVAL)
         }
     };
 }
@@ -545,8 +546,8 @@ macro_rules! fileops_impl_directory {
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, crate::types::errno::Errno> {
-            crate::types::errno::error!(EISDIR)
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
+            starnix_uapi::error!(EISDIR)
         }
 
         fn write(
@@ -555,8 +556,8 @@ macro_rules! fileops_impl_directory {
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, crate::types::errno::Errno> {
-            crate::types::errno::error!(EISDIR)
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
+            starnix_uapi::error!(EISDIR)
         }
     };
 }
@@ -1430,8 +1431,8 @@ mod tests {
             MountInfo,
         },
         testing::*,
-        types::{device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags},
     };
+    use starnix_uapi::{device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags};
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,

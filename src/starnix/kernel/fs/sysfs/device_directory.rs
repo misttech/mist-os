@@ -14,12 +14,9 @@ use crate::{
     },
     logging::not_implemented,
     task::CurrentTask,
-    types::{
-        device_type::DeviceType,
-        errno::{error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-    },
+};
+use starnix_uapi::{
+    device_type::DeviceType, error, errors::Errno, file_mode::mode, open_flags::OpenFlags,
 };
 use std::sync::{Arc, Weak};
 

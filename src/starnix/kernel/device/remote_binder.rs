@@ -13,14 +13,6 @@ use crate::{
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, errno_from_code, error, Errno, ErrnoCode, EAGAIN, EINTR},
-        open_flags::OpenFlags,
-        pid_t, uapi,
-        user_address::{UserAddress, UserCString, UserRef},
-        PATH_MAX,
-    },
 };
 use anyhow::{Context, Error};
 use derivative::Derivative;
@@ -40,6 +32,15 @@ use futures::{
     Future, Stream, StreamExt, TryStreamExt,
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, errno_from_code, error,
+    errors::{Errno, ErrnoCode, EAGAIN, EINTR},
+    open_flags::OpenFlags,
+    pid_t, uapi,
+    user_address::{UserAddress, UserCString, UserRef},
+    PATH_MAX,
+};
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     rc::Rc,
@@ -1059,7 +1060,6 @@ mod tests {
         mm::MemoryAccessor,
         task::Task,
         testing::*,
-        types::{file_mode::mode, mount_flags::MountFlags},
     };
     use fidl::{
         endpoints::{create_endpoints, create_proxy, Proxy},
@@ -1067,6 +1067,7 @@ mod tests {
     };
     use once_cell::sync::Lazy;
     use rand::distributions::{Alphanumeric, DistString};
+    use starnix_uapi::{file_mode::mode, mount_flags::MountFlags};
     use std::{collections::BTreeMap, ffi::CString, future::Future};
 
     static REMOTE_CONTROLLER_CLIENT: Lazy<

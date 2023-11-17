@@ -12,10 +12,14 @@ use crate::{
         CurrentTask,
     },
     time::utc,
-    types::errno::{error, Errno},
-    types::signals::SIGALRM,
-    types::time::{duration_from_timespec, time_from_timespec},
-    types::{__kernel_timer_t, itimerspec, uapi, TIMER_ABSTIME},
+};
+use starnix_uapi::{
+    __kernel_timer_t, error,
+    errors::Errno,
+    itimerspec,
+    signals::SIGALRM,
+    time::{duration_from_timespec, time_from_timespec},
+    uapi, TIMER_ABSTIME,
 };
 
 // Table for POSIX timers from timer_create() that deliver timers via signals (not new-style

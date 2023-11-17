@@ -13,17 +13,18 @@ use crate::{
     logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
-    types::{
-        device_type::DeviceType,
-        errno::{error, Errno},
-        file_mode::{mode, FileMode},
-        gid_t,
-        open_flags::OpenFlags,
-        seal_flags::SealFlags,
-        statfs, uid_t, TMPFS_MAGIC,
-    },
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_uapi::{
+    device_type::DeviceType,
+    error,
+    errors::Errno,
+    file_mode::{mode, FileMode},
+    gid_t,
+    open_flags::OpenFlags,
+    seal_flags::SealFlags,
+    statfs, uid_t, TMPFS_MAGIC,
+};
 use std::sync::Arc;
 
 pub struct TmpFs(());
@@ -353,8 +354,8 @@ mod test {
             FdNumber, UnlinkKind,
         },
         testing::*,
-        types::{errno::errno, mount_flags::MountFlags},
     };
+    use starnix_uapi::{errno, mount_flags::MountFlags};
     use zerocopy::AsBytes;
 
     #[::fuchsia::test]

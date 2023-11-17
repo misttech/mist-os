@@ -16,15 +16,6 @@ use crate::{
     logging::{log_error, log_info, log_warn},
     task::{CurrentTask, ExitStatus, Kernel, Task},
     time::utc::update_utc_clock,
-    types::{
-        errno::{errno, SourceContext, ENOENT},
-        mount_flags::MountFlags,
-        open_flags::OpenFlags,
-        ownership::{release_on_error, OwnedRefByRef, ReleasableByRef},
-        pid_t,
-        resource_limits::Resource,
-        rlimit,
-    },
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -47,6 +38,16 @@ use fuchsia_zircon::Task as _;
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
+use starnix_uapi::{
+    errno,
+    errors::{SourceContext, ENOENT},
+    mount_flags::MountFlags,
+    open_flags::OpenFlags,
+    ownership::{release_on_error, OwnedRefByRef, ReleasableByRef},
+    pid_t,
+    resource_limits::Resource,
+    rlimit,
+};
 use std::{collections::BTreeMap, ffi::CString, sync::Arc};
 
 /// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
@@ -520,13 +521,10 @@ async fn wait_for_init_file(
 #[cfg(test)]
 mod test {
     use super::wait_for_init_file;
-    use crate::{
-        fs::FdNumber,
-        testing::create_kernel_and_task,
-        types::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS},
-    };
+    use crate::{fs::FdNumber, testing::create_kernel_and_task};
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
+    use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS};
 
     #[fuchsia::test]
     async fn test_init_file_already_exists() {

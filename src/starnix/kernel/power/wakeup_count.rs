@@ -8,8 +8,8 @@ use crate::{
         SimpleFileNode,
     },
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
 };
+use starnix_uapi::{errno, error, errors::Errno};
 
 /// This file allows user space to put the system into a sleep state while taking into account the
 /// concurrent arrival of wakeup events.

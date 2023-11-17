@@ -10,8 +10,6 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, EventHandler, Kernel, Task, Waiter},
-    types::errno::{errno, Errno},
-    types::{AF_UNIX, SOCK_STREAM},
 };
 use lock_sequence::{Locked, Unlocked};
 use perfetto_consumer_proto::perfetto::protos::{
@@ -21,6 +19,7 @@ use perfetto_consumer_proto::perfetto::protos::{
     FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
+use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
     ffi::CString,

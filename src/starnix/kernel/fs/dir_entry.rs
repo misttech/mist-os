@@ -17,12 +17,13 @@ use crate::{
         MountInfo, NamespaceNode, UnlinkKind,
     },
     task::CurrentTask,
-    types::{
-        errno::{errno, error, Errno, ENOENT},
-        file_mode::{Access, FileMode},
-        open_flags::OpenFlags,
-        NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT,
-    },
+};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, ENOENT},
+    file_mode::{Access, FileMode},
+    open_flags::OpenFlags,
+    NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT,
 };
 
 bitflags! {
@@ -308,8 +309,8 @@ impl DirEntry {
                 current_task,
                 mount,
                 name,
-                crate::types::file_mode::mode!(IFDIR, 0o777),
-                crate::types::device_type::DeviceType::NONE,
+                starnix_uapi::file_mode::mode!(IFDIR, 0o777),
+                starnix_uapi::device_type::DeviceType::NONE,
                 FsCred::root(),
             )
         })

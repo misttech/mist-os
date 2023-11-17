@@ -13,13 +13,9 @@ use crate::{
         VecDirectoryEntry,
     },
     task::CurrentTask,
-    types::{
-        errno::{error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-    },
 };
 use fuchsia_zircon as zx;
+use starnix_uapi::{error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::{Arc, Weak};
 
 pub struct CpuClassDirectory {

@@ -5,9 +5,8 @@
 use crate::{
     fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
     task::{CurrentTask, Kernel},
-    types::errno::Errno,
-    types::{statfs, SOCKFS_MAGIC},
 };
+use starnix_uapi::{errors::Errno, statfs, SOCKFS_MAGIC};
 use std::sync::Arc;
 
 /// `SocketFs` is the file system where anonymous socket nodes are created, for example in

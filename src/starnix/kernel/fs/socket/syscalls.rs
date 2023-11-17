@@ -15,23 +15,23 @@ use crate::{
     logging::{log_trace, not_implemented},
     mm::{vmo::round_up_to_increment, MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, IpTables, Task, WaitCallback, Waiter},
-    types::{
-        cmsghdr,
-        errno::{errno, error, Errno, EEXIST, EINPROGRESS},
-        file_mode::FileMode,
-        mmsghdr, msghdr,
-        open_flags::OpenFlags,
-        socklen_t,
-        time::duration_from_timespec,
-        timespec,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR,
-        SOCK_CLOEXEC, SOCK_NONBLOCK, UIO_MAXIOV,
-    },
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
+use starnix_uapi::{
+    cmsghdr, errno, error,
+    errors::{Errno, EEXIST, EINPROGRESS},
+    file_mode::FileMode,
+    mmsghdr, msghdr,
+    open_flags::OpenFlags,
+    socklen_t,
+    time::duration_from_timespec,
+    timespec,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
+    MSG_CTRUNC, MSG_DONTWAIT, MSG_TRUNC, MSG_WAITFORONE, SHUT_RD, SHUT_RDWR, SHUT_WR, SOCK_CLOEXEC,
+    SOCK_NONBLOCK, UIO_MAXIOV,
+};
 use std::{convert::TryInto, mem::size_of};
 
 pub fn sys_socket(
@@ -832,10 +832,8 @@ pub fn sys_shutdown(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        testing::*,
-        types::{AF_INET, AF_UNIX, SOCK_STREAM},
-    };
+    use crate::testing::*;
+    use starnix_uapi::{AF_INET, AF_UNIX, SOCK_STREAM};
 
     #[::fuchsia::test]
     async fn test_socketpair_invalid_arguments() {

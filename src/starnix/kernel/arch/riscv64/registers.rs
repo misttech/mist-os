@@ -5,7 +5,7 @@
 use fuchsia_zircon as zx;
 
 use crate::syscalls::decls::Syscall;
-use crate::types::uapi::user_regs_struct;
+use starnix_uapi::uapi::user_regs_struct;
 
 /// The state of the task's registers when the thread of execution entered the kernel.
 /// This is a thin wrapper around [`zx::sys::zx_thread_state_general_regs_t`].

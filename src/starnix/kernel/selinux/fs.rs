@@ -13,18 +13,19 @@ use crate::{
     },
     logging::not_implemented,
     task::{CurrentTask, Task},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-        ownership::{TempRef, WeakRef},
-        statfs, SELINUX_MAGIC,
-    },
 };
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    file_mode::mode,
+    open_flags::OpenFlags,
+    ownership::{TempRef, WeakRef},
+    statfs, SELINUX_MAGIC,
+};
 use std::{borrow::Cow, collections::BTreeMap, sync::Arc};
 use zerocopy::AsBytes;
 

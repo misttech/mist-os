@@ -16,15 +16,6 @@ use crate::{
     logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    types::{
-        errno::{errno, error, from_status_like_fdio, Errno, SourceContext},
-        file_mode::FileMode,
-        ino_t,
-        mount_flags::MountFlags,
-        off_t,
-        open_flags::OpenFlags,
-        statfs,
-    },
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
@@ -34,6 +25,16 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, SourceContext},
+    file_mode::FileMode,
+    from_status_like_fdio, ino_t,
+    mount_flags::MountFlags,
+    off_t,
+    open_flags::OpenFlags,
+    statfs,
+};
 use std::{
     io::Read,
     sync::{Arc, Mutex},
@@ -508,10 +509,10 @@ mod test {
             LookupContext, Namespace, SymlinkMode, SymlinkTarget,
         },
         testing::create_kernel_and_task,
-        types::{errno::Errno, file_mode::FileMode, ino_t, off_t, open_flags::OpenFlags},
     };
     use fidl_fuchsia_io as fio;
     use fuchsia_zircon as zx;
+    use starnix_uapi::{errors::Errno, file_mode::FileMode, ino_t, off_t, open_flags::OpenFlags};
     use std::collections::{HashMap, HashSet};
 
     #[::fuchsia::test]

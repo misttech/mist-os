@@ -15,25 +15,26 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt, ProcMapsFile, ProcSmapsFile, PAGE_SIZE},
     selinux::fs::selinux_proc_attrs,
     task::{CurrentTask, Task, TaskPersistentInfo, TaskStateCode, ThreadGroup},
-    types::{
-        auth::CAP_SYS_RESOURCE,
-        errno::{errno, error, Errno},
-        file_mode::mode,
-        off_t,
-        open_flags::OpenFlags,
-        ownership::{TempRef, WeakRef},
-        pid_t,
-        resource_limits::Resource,
-        time::duration_to_scheduler_clock,
-        uapi,
-        user_address::UserAddress,
-        OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
-    },
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use starnix_uapi::{
+    auth::CAP_SYS_RESOURCE,
+    errno, error,
+    errors::Errno,
+    file_mode::mode,
+    off_t,
+    open_flags::OpenFlags,
+    ownership::{TempRef, WeakRef},
+    pid_t,
+    resource_limits::Resource,
+    time::duration_to_scheduler_clock,
+    uapi,
+    user_address::UserAddress,
+    OOM_ADJUST_MIN, OOM_DISABLE, OOM_SCORE_ADJ_MIN, RLIM_INFINITY,
+};
 use std::{borrow::Cow, ffi::CString, sync::Arc};
 
 /// TaskDirectory delegates most of its operations to StaticDirectory, but we need to override

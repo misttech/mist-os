@@ -10,20 +10,18 @@ use crate::{
         MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE,
     },
     task::CurrentTask,
-    types::{
-        errno::{errno, error, from_status_like_fdio, Errno},
-        open_flags::OpenFlags,
-        time::SCHEDULER_CLOCK_HZ,
-        user_address::UserAddress,
-        AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY, AT_EUID, AT_EXECFN, AT_GID, AT_NULL, AT_PAGESZ,
-        AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM, AT_SECURE, AT_SYSINFO_EHDR, AT_UID,
-    },
     vmex_resource::VMEX_RESOURCE,
 };
 use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use process_builder::{elf_load, elf_parse};
+use starnix_uapi::{
+    errno, error, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
+    time::SCHEDULER_CLOCK_HZ, user_address::UserAddress, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY,
+    AT_EUID, AT_EXECFN, AT_GID, AT_NULL, AT_PAGESZ, AT_PHDR, AT_PHENT, AT_PHNUM, AT_RANDOM,
+    AT_SECURE, AT_SYSINFO_EHDR, AT_UID,
+};
 use std::{
     ffi::{CStr, CString},
     mem::size_of,

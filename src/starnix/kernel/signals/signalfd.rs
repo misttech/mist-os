@@ -9,15 +9,12 @@ use crate::{
     },
     signals::SignalDetail,
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
-    types::{
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-        signalfd_siginfo,
-        signals::SigSet,
-        SFD_NONBLOCK,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    errno, error, errors::Errno, open_flags::OpenFlags, signalfd_siginfo, signals::SigSet,
+    SFD_NONBLOCK,
+};
 use std::convert::TryInto;
 use zerocopy::AsBytes;
 

@@ -9,12 +9,13 @@ use crate::{
     fs::FsStr,
     mm::{vmo::round_up_to_increment, MemoryAccessor},
     task::CurrentTask,
-    types::{
-        errno::{errno, error, Errno, ENOSPC},
-        file_mode::FileMode,
-        ino_t, off_t,
-        user_address::UserAddress,
-    },
+};
+use starnix_uapi::{
+    errno, error,
+    errors::{Errno, ENOSPC},
+    file_mode::FileMode,
+    ino_t, off_t,
+    user_address::UserAddress,
 };
 
 #[derive(Debug, Default, Copy, Clone, PartialOrd, Ord, PartialEq, Eq)]

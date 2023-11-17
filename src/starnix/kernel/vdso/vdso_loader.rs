@@ -6,13 +6,14 @@ use crate::{
     arch::vdso::{raw_ticks, VDSO_SIGRETURN_NAME},
     mm::PAGE_SIZE,
     time::utc::update_utc_clock,
-    types::errno::{errno, from_status_like_fdio, Errno},
-    types::uapi,
 };
 use fidl::AsHandleRef;
-use fuchsia_zircon::{self as zx, ClockTransformation, HandleBased};
+use fuchsia_zircon::{
+    ClockTransformation, HandleBased, {self as zx},
+};
 use once_cell::sync::Lazy;
 use process_builder::elf_parse;
+use starnix_uapi::{errno, errors::Errno, from_status_like_fdio, uapi};
 use std::{
     mem::size_of,
     sync::{atomic::Ordering, Arc},

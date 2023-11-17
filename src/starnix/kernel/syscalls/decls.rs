@@ -7,7 +7,7 @@
 use paste::paste;
 
 use crate::syscalls::SyscallArg;
-use crate::types::{
+use starnix_uapi::{
     __NR_accept, __NR_accept4, __NR_acct, __NR_add_key, __NR_adjtimex, __NR_bind, __NR_bpf,
     __NR_brk, __NR_capget, __NR_capset, __NR_chdir, __NR_chroot, __NR_clock_adjtime,
     __NR_clock_getres, __NR_clock_gettime, __NR_clock_nanosleep, __NR_clock_settime, __NR_clone,
@@ -66,21 +66,122 @@ use crate::types::{
 };
 
 #[cfg(target_arch = "x86_64")]
-use crate::types::{
-    __NR__sysctl, __NR_access, __NR_afs_syscall, __NR_alarm, __NR_arch_prctl, __NR_chmod,
-    __NR_chown, __NR_creat, __NR_create_module, __NR_dup2, __NR_epoll_create, __NR_epoll_ctl_old,
-    __NR_epoll_wait, __NR_epoll_wait_old, __NR_eventfd, __NR_fork, __NR_futimesat,
-    __NR_get_kernel_syms, __NR_get_thread_area, __NR_getdents, __NR_getpgrp, __NR_getpmsg,
-    __NR_inotify_init, __NR_ioperm, __NR_iopl, __NR_lchown, __NR_link, __NR_lstat, __NR_mkdir,
-    __NR_mknod, __NR_modify_ldt, __NR_open, __NR_pause, __NR_pipe, __NR_poll, __NR_putpmsg,
-    __NR_query_module, __NR_readlink, __NR_rename, __NR_renameat, __NR_rmdir, __NR_security,
-    __NR_select, __NR_set_thread_area, __NR_signalfd, __NR_stat, __NR_symlink, __NR_sysfs,
-    __NR_time, __NR_tuxcall, __NR_unlink, __NR_uselib, __NR_ustat, __NR_utime, __NR_utimes,
-    __NR_vfork, __NR_vserver,
-};
+use starnix_uapi::__NR__sysctl;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_access;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_afs_syscall;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_alarm;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_arch_prctl;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_chmod;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_chown;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_creat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_create_module;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_dup2;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_epoll_create;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_epoll_ctl_old;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_epoll_wait;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_epoll_wait_old;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_eventfd;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_fork;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_futimesat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_get_kernel_syms;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_get_thread_area;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_getdents;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_getpgrp;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_getpmsg;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_inotify_init;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_ioperm;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_iopl;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_lchown;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_link;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_lstat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_mkdir;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_mknod;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_modify_ldt;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_open;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_pause;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_pipe;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_poll;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_putpmsg;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_query_module;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_readlink;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_rename;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_renameat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_rmdir;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_security;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_select;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_set_thread_area;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_signalfd;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_stat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_symlink;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_sysfs;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_time;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_tuxcall;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_unlink;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_uselib;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_ustat;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_utime;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_utimes;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_vfork;
+#[cfg(target_arch = "x86_64")]
+use starnix_uapi::__NR_vserver;
 
 #[cfg(target_arch = "aarch64")]
-use crate::types::__NR_renameat;
+use starnix_uapi::__NR_renameat;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
 ///
@@ -552,7 +653,8 @@ impl SyscallDecl {
 
 #[cfg(feature = "syscall_stats")]
 mod syscall_stats {
-    use crate::{syscalls::decls::SyscallDecl, types::*};
+    use crate::syscalls::decls::SyscallDecl;
+    use starnix_uapi::*;
 
     use fuchsia_inspect as inspect;
     use once_cell::sync::Lazy;

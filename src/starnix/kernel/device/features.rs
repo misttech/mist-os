@@ -8,12 +8,12 @@ use crate::{
         perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
     task::Kernel,
-    types::errno::{error, Errno},
 };
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
 use selinux::security_server;
+use starnix_uapi::{error, errors::Errno};
 use std::sync::Arc;
 
 use fidl_fuchsia_io as fio;

@@ -10,8 +10,8 @@ use crate::{
         SimpleFileNode,
     },
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
 };
+use starnix_uapi::{errno, error, errors::Errno};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub enum SuspendState {

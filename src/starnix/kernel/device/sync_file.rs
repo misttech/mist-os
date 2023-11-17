@@ -14,18 +14,18 @@ use crate::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
         WaitCanceler, WaitCancelerOneVmo, Waiter,
     },
-    types::{
-        c_char,
-        errno::{error, Errno},
-        open_flags::OpenFlags,
-        sync_fence_info, sync_file_info, sync_merge_data,
-        user_address::{UserAddress, UserRef},
-        SYNC_IOC_MAGIC,
-    },
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
+use starnix_uapi::{
+    c_char, error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    sync_fence_info, sync_file_info, sync_merge_data,
+    user_address::{UserAddress, UserRef},
+    SYNC_IOC_MAGIC,
+};
 use std::{
     collections::HashSet,
     sync::{

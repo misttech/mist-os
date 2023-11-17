@@ -8,8 +8,8 @@ use crate::{
         SimpleFileNode,
     },
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
 };
+use starnix_uapi::{errno, error, errors::Errno};
 
 pub struct PowerSyncOnSuspendFile;
 

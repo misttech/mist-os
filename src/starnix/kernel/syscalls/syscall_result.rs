@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::{FdFlags, FdNumber, WdNumber},
-    types::{
-        file_mode::FileMode, open_flags::OpenFlags, seal_flags::SealFlags, signals::Signal,
-        user_address::UserAddress,
-    },
+use crate::fs::{FdFlags, FdNumber, WdNumber};
+use starnix_uapi::{
+    file_mode::FileMode, open_flags::OpenFlags, seal_flags::SealFlags, signals::Signal,
+    user_address::UserAddress,
 };
 
 #[derive(Eq, PartialEq, Debug)]

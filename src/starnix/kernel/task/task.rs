@@ -45,30 +45,32 @@ use crate::{
         SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
         ThreadGroup, UtsNamespaceHandle, Waiter,
     },
-    types::{
-        auth::{
-            PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
-            PTRACE_MODE_REALCREDS,
-        },
-        device_type::DeviceType,
-        errno::{errno, error, from_status_like_fdio, Errno},
-        file_mode::{Access, FileMode},
-        open_flags::OpenFlags,
-        ownership::{release_on_error, OwnedRefByRef, ReleasableByRef, TempRef, WeakRef},
-        pid_t, robust_list_head,
-        signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
-        sock_filter, sock_fprog,
-        stats::TaskTimeStats,
-        ucred,
-        user_address::{UserAddress, UserRef},
-        BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
-        CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
-        CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM,
-        CLONE_THREAD, CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY, FUTEX_OWNER_DIED,
-        FUTEX_TID_MASK, PTRACE_EVENT_STOP, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG,
-        SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC,
-        SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
+};
+use starnix_uapi::{
+    auth::{
+        PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
+        PTRACE_MODE_REALCREDS,
     },
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    file_mode::{Access, FileMode},
+    from_status_like_fdio,
+    open_flags::OpenFlags,
+    ownership::{release_on_error, OwnedRefByRef, ReleasableByRef, TempRef, WeakRef},
+    pid_t, robust_list_head,
+    signals::{SigSet, Signal, UncheckedSignal, SIGBUS, SIGCONT, SIGILL, SIGSEGV, SIGTRAP},
+    sock_filter, sock_fprog,
+    stats::TaskTimeStats,
+    ucred,
+    user_address::{UserAddress, UserRef},
+    BPF_MAXINSNS, CLD_CONTINUED, CLD_DUMPED, CLD_EXITED, CLD_KILLED, CLD_STOPPED,
+    CLONE_CHILD_CLEARTID, CLONE_CHILD_SETTID, CLONE_FILES, CLONE_FS, CLONE_INTO_CGROUP,
+    CLONE_NEWUTS, CLONE_PARENT_SETTID, CLONE_SETTLS, CLONE_SIGHAND, CLONE_SYSVSEM, CLONE_THREAD,
+    CLONE_VFORK, CLONE_VM, FUTEX_BITSET_MATCH_ANY, FUTEX_OWNER_DIED, FUTEX_TID_MASK,
+    PTRACE_EVENT_STOP, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG,
+    SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
+    SI_KERNEL,
 };
 
 /// The task object associated with the currently executing thread.
@@ -2567,10 +2569,8 @@ impl From<&Task> for FsCred {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        testing::*,
-        types::{resource_limits::Resource, rlimit, signals::SIGCHLD},
-    };
+    use crate::testing::*;
+    use starnix_uapi::{resource_limits::Resource, rlimit, signals::SIGCHLD};
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {

@@ -22,41 +22,40 @@ use crate::{
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
         SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
     },
-    types::{
-        __user_cap_data_struct, __user_cap_header_struct,
-        auth::{
-            Capabilities, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
-            CAP_SYS_PTRACE,
-        },
-        c_int, clone_args,
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        gid_t,
-        kcmp::KcmpResource,
-        open_flags::OpenFlags,
-        ownership::{release_on_error, ReleasableByRef, WeakRef},
-        pid_t,
-        resource_limits::Resource,
-        rlimit, rusage, sched_param,
-        signals::{Signal, UncheckedSignal},
-        time::timeval_from_duration,
-        uid_t,
-        user_address::{UserAddress, UserCString, UserRef},
-        AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
-        CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
-        NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
-        PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER,
-        PR_CAP_AMBIENT_RAISE, PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS,
-        PR_GET_NAME, PR_GET_NO_NEW_PRIVS, PR_GET_SECCOMP, PR_GET_SECUREBITS,
-        PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS,
-        PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK,
-        PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_TRACEME, RUSAGE_CHILDREN,
-        SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-        SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
-        SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
-        SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
-        _LINUX_CAPABILITY_VERSION_3,
+};
+use starnix_uapi::{
+    __user_cap_data_struct, __user_cap_header_struct,
+    auth::{
+        Capabilities, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
+        CAP_SYS_PTRACE,
     },
+    c_int, clone_args, errno, error,
+    errors::Errno,
+    file_mode::FileMode,
+    gid_t,
+    kcmp::KcmpResource,
+    open_flags::OpenFlags,
+    ownership::{release_on_error, ReleasableByRef, WeakRef},
+    pid_t,
+    resource_limits::Resource,
+    rlimit, rusage, sched_param,
+    signals::{Signal, UncheckedSignal},
+    time::timeval_from_duration,
+    uid_t,
+    user_address::{UserAddress, UserCString, UserRef},
+    AT_EMPTY_PATH, AT_SYMLINK_NOFOLLOW, CLONE_ARGS_SIZE_VER0, CLONE_ARGS_SIZE_VER1,
+    CLONE_ARGS_SIZE_VER2, CLONE_FILES, CLONE_NEWNS, CLONE_NEWUTS, CLONE_SETTLS, CLONE_VFORK,
+    NGROUPS_MAX, PATH_MAX, PRIO_PROCESS, PR_CAPBSET_DROP, PR_CAPBSET_READ, PR_CAP_AMBIENT,
+    PR_CAP_AMBIENT_CLEAR_ALL, PR_CAP_AMBIENT_IS_SET, PR_CAP_AMBIENT_LOWER, PR_CAP_AMBIENT_RAISE,
+    PR_GET_CHILD_SUBREAPER, PR_GET_DUMPABLE, PR_GET_KEEPCAPS, PR_GET_NAME, PR_GET_NO_NEW_PRIVS,
+    PR_GET_SECCOMP, PR_GET_SECUREBITS, PR_SET_CHILD_SUBREAPER, PR_SET_DUMPABLE, PR_SET_KEEPCAPS,
+    PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG, PR_SET_PTRACER, PR_SET_SECCOMP,
+    PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA, PR_SET_VMA_ANON_NAME, PTRACE_ATTACH,
+    PTRACE_TRACEME, RUSAGE_CHILDREN, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
+    SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT,
+    SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1,
+    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
 pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
@@ -1100,8 +1099,8 @@ pub fn sys_getrusage(
     who: i32,
     user_usage: UserRef<rusage>,
 ) -> Result<(), Errno> {
-    const RUSAGE_SELF: i32 = crate::types::uapi::RUSAGE_SELF as i32;
-    const RUSAGE_THREAD: i32 = crate::types::uapi::RUSAGE_THREAD as i32;
+    const RUSAGE_SELF: i32 = starnix_uapi::uapi::RUSAGE_SELF as i32;
+    const RUSAGE_THREAD: i32 = starnix_uapi::uapi::RUSAGE_THREAD as i32;
     // TODO(fxb/76811): Implement proper rusage.
     let time_stats = match who {
         RUSAGE_CHILDREN => current_task.task.thread_group.read().children_time_stats,
@@ -1621,12 +1620,8 @@ pub fn sys_kcmp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        mm::syscalls::sys_munmap,
-        syscalls::SUCCESS,
-        testing::*,
-        types::{SCHED_FIFO, SCHED_NORMAL},
-    };
+    use crate::{mm::syscalls::sys_munmap, syscalls::SUCCESS, testing::*};
+    use starnix_uapi::{SCHED_FIFO, SCHED_NORMAL};
     use std::{mem, u64};
 
     #[::fuchsia::test]

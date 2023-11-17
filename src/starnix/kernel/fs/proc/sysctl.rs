@@ -11,13 +11,9 @@ use crate::{
     task::{
         ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
     },
-    types::{
-        auth::CAP_SYS_ADMIN,
-        errno::{error, Errno},
-        file_mode::mode,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{auth::CAP_SYS_ADMIN, error, errors::Errno, file_mode::mode};
 use std::{borrow::Cow, sync::Arc};
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {

@@ -8,16 +8,17 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::{
-        device_type,
-        errno::{self, Errno},
-        open_flags::OpenFlags,
-        uapi,
-        user_address::{UserAddress, UserRef},
-    },
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    device_type::DeviceType,
+    error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    uapi,
+    user_address::{UserAddress, UserRef},
+};
 use std::sync::Arc;
 
 // Return the current uinput API version 5, it also told caller this uinput
@@ -26,7 +27,7 @@ const UINPUT_VERSION: u32 = 5;
 
 pub fn create_uinput_device(
     _current_task: &CurrentTask,
-    _id: device_type::DeviceType,
+    _id: DeviceType,
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
@@ -63,7 +64,7 @@ impl UinputDevice {
             }
             _ => {
                 log_warn!("UI_SET_EVBIT with unsupported evbit {}", evbit);
-                errno::error!(EPERM)
+                error!(EPERM)
             }
         }
     }
@@ -78,7 +79,7 @@ impl UinputDevice {
     ) -> Result<SyscallResult, Errno> {
         let user_arg = UserAddress::from(arg);
         if user_arg.is_null() {
-            return errno::error!(EFAULT);
+            return error!(EFAULT);
         }
         let response: u32 = UINPUT_VERSION;
         match current_task.mm.write_object(UserRef::new(user_arg), &response) {
@@ -96,7 +97,7 @@ impl UinputDevice {
     ) -> Result<SyscallResult, Errno> {
         let user_arg = UserAddress::from(arg);
         if user_arg.is_null() {
-            return errno::error!(EFAULT);
+            return error!(EFAULT);
         }
         let uinput_setup = current_task
             .mm
@@ -171,7 +172,7 @@ impl FileOps for Arc<UinputDevice> {
         _data: &mut dyn crate::fs::buffers::OutputBuffer,
     ) -> Result<usize, Errno> {
         log_warn!("uinput FD does not support read().");
-        errno::error!(EINVAL)
+        error!(EINVAL)
     }
 }
 
@@ -184,6 +185,7 @@ mod test {
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
     };
+    use starnix_uapi::user_address::UserAddress;
     use test_case::test_case;
 
     fn make_kernel_objects(
@@ -223,12 +225,12 @@ mod test {
             uapi::UI_GET_VERSION,
             SyscallArg::from(0 as u64),
         );
-        assert_eq!(r, errno::error!(EFAULT));
+        assert_eq!(r, error!(EFAULT));
     }
 
     #[test_case(uapi::EV_KEY, vec![uapi::EV_KEY as usize] => Ok(SUCCESS))]
     #[test_case(uapi::EV_ABS, vec![uapi::EV_ABS as usize] => Ok(SUCCESS))]
-    #[test_case(uapi::EV_REL, vec![] => errno::error!(EPERM))]
+    #[test_case(uapi::EV_REL, vec![] => error!(EPERM))]
     #[::fuchsia::test]
     async fn ui_set_evbit(bit: u32, expected_evbits: Vec<usize>) -> Result<SyscallResult, Errno> {
         let dev = UinputDevice::new();
@@ -384,6 +386,6 @@ mod test {
         // call with invalid argument.
         let r =
             dev.ioctl(&file_object, &current_task, uapi::UI_DEV_SETUP, SyscallArg::from(0 as u64));
-        assert_eq!(r, errno::error!(EFAULT));
+        assert_eq!(r, error!(EFAULT));
     }
 }

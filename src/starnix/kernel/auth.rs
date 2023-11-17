@@ -4,11 +4,13 @@
 
 use bitflags::bitflags;
 
-use crate::types::auth::{
-    Capabilities, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER, CAP_FSETID,
-    CAP_LINUX_IMMUTABLE, CAP_MAC_OVERRIDE, CAP_MKNOD,
+use starnix_uapi::{
+    auth::{
+        Capabilities, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_DAC_READ_SEARCH, CAP_FOWNER, CAP_FSETID,
+        CAP_LINUX_IMMUTABLE, CAP_MAC_OVERRIDE, CAP_MKNOD,
+    },
+    gid_t, uapi, uid_t,
 };
-use crate::types::{gid_t, uapi, uid_t};
 
 #[derive(Debug, Clone)]
 pub struct Credentials {

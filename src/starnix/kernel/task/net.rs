@@ -9,13 +9,9 @@ use crate::{
         FsNode, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
     task::CurrentTask,
-    types::{
-        errno::{errno, Errno},
-        off_t,
-        open_flags::OpenFlags,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{errno, errors::Errno, off_t, open_flags::OpenFlags};
 use std::{collections::HashMap, sync::Arc};
 
 struct NetstackDevice {

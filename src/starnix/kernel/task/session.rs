@@ -12,8 +12,8 @@ use crate::{
     device::terminal::Terminal,
     mutable_state::{state_accessor, state_implementation},
     task::ProcessGroup,
-    types::pid_t,
 };
+use starnix_uapi::pid_t;
 
 #[derive(Debug)]
 pub struct SessionMutableState {

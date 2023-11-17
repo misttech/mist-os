@@ -13,16 +13,12 @@ use crate::{
     logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
-    types::{
-        errno::{errno, error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-        seal_flags::SealFlags,
-    },
     vmex_resource::VMEX_RESOURCE,
 };
-use fuchsia_zircon::{
-    HandleBased, {self as zx},
+use fidl::HandleBased;
+use fuchsia_zircon as zx;
+use starnix_uapi::{
+    errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, seal_flags::SealFlags,
 };
 use std::sync::Arc;
 

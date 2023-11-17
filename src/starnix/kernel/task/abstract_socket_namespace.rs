@@ -11,8 +11,8 @@ use std::{
 use crate::{
     fs::socket::{Socket, SocketAddress, SocketHandle},
     task::CurrentTask,
-    types::errno::{errno, error, Errno},
 };
+use starnix_uapi::{errno, error, errors::Errno};
 
 /// A registry of abstract sockets.
 ///

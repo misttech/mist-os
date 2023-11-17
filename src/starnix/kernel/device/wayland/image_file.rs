@@ -9,12 +9,12 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::{errno::Errno, file_mode::FileMode, open_flags::OpenFlags},
 };
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::{AsHandleRef, HandleBased};
 use magma::magma_image_info_t;
+use starnix_uapi::{errors::Errno, file_mode::FileMode, open_flags::OpenFlags};
 use std::sync::Arc;
 
 pub struct ImageInfo {

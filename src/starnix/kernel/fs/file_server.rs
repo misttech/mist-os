@@ -10,14 +10,6 @@ use crate::{
     },
     mm::ProtectionFlags,
     task::CurrentTask,
-    types::{
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        file_mode::FileMode,
-        ino_t, off_t,
-        open_flags::OpenFlags,
-        ownership::{TempRef, WeakRef},
-    },
 };
 use async_trait::async_trait;
 use fidl::{
@@ -26,6 +18,15 @@ use fidl::{
 };
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    file_mode::FileMode,
+    ino_t, off_t,
+    open_flags::OpenFlags,
+    ownership::{TempRef, WeakRef},
+};
 use std::sync::Arc;
 use vfs::{
     attributes, directory, directory::entry::DirectoryEntry, execution_scope, file, path,

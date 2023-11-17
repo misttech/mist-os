@@ -6,9 +6,8 @@ use crate::{
     fs::{create_bytes_file_with_handler, StaticDirectoryBuilder},
     power::{PowerStateFile, PowerSyncOnSuspendFile, PowerWakeupCountFile},
     task::CurrentTask,
-    types::file_mode::mode,
 };
-
+use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
 pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {

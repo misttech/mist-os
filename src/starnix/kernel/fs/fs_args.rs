@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::FsStr,
-    types::errno::{errno, Errno},
-};
+use crate::fs::FsStr;
+use starnix_uapi::{errno, errors::Errno};
 use std::collections::HashMap;
 
 /// generic_parse_mount_options parses a comma-separated list of options of the

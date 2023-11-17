@@ -16,20 +16,21 @@ use crate::{
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        device_type::DeviceType,
-        errno::{errno, errno_from_code, error, Errno, EINTR, EINVAL, ENOSYS},
-        file_mode::{Access, FileMode},
-        off_t,
-        open_flags::OpenFlags,
-        ownership::ReleasableByRef,
-        statfs,
-        time::time_from_timespec,
-        uapi, FUSE_SUPER_MAGIC,
-    },
 };
 use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_uapi::{
+    device_type::DeviceType,
+    errno, errno_from_code, error,
+    errors::{Errno, EINTR, EINVAL, ENOSYS},
+    file_mode::{Access, FileMode},
+    off_t,
+    open_flags::OpenFlags,
+    ownership::ReleasableByRef,
+    statfs,
+    time::time_from_timespec,
+    uapi, FUSE_SUPER_MAGIC,
+};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,

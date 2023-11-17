@@ -28,20 +28,21 @@ use crate::{
     selinux::fs::selinux_fs,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
     time::utc,
-    types::{
-        arc_key::{ArcKey, PtrKey, WeakKey},
-        device_type::DeviceType,
-        errno::{errno, error, Errno},
-        file_mode::{Access, FileMode},
-        mount_flags::MountFlags,
-        open_flags::OpenFlags,
-        ownership::WeakRef,
-        NAME_MAX,
-    },
 };
 use fidl_fuchsia_io as fio;
 use ref_cast::RefCast;
 use starnix_lock::{Mutex, RwLock};
+use starnix_uapi::{
+    arc_key::{ArcKey, PtrKey, WeakKey},
+    device_type::DeviceType,
+    errno, error,
+    errors::Errno,
+    file_mode::{Access, FileMode},
+    mount_flags::MountFlags,
+    open_flags::OpenFlags,
+    ownership::WeakRef,
+    NAME_MAX,
+};
 use std::{
     collections::{HashMap, HashSet},
     fmt,
@@ -1488,8 +1489,8 @@ mod test {
     use crate::{
         fs::{tmpfs::TmpFs, LookupContext, Namespace, UnlinkKind, WhatToMount},
         testing::create_kernel_and_task,
-        types::{errno::errno, mount_flags::MountFlags},
     };
+    use starnix_uapi::{errno, mount_flags::MountFlags};
     use std::sync::Arc;
 
     #[::fuchsia::test]

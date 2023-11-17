@@ -4,6 +4,12 @@
 
 #![allow(non_upper_case_globals)]
 
+use crate::{
+    device::wayland::vulkan::{BufferCollectionTokens, Loader},
+    logging::log_warn,
+    mm::MemoryAccessorExt,
+    task::CurrentTask,
+};
 use fidl_fuchsia_sysmem as fsysmem;
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -30,17 +36,13 @@ use magma::{
     MAGMA_MAX_IMAGE_PLANES, MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INTERNAL_ERROR,
     MAGMA_STATUS_INVALID_ARGS,
 };
+use starnix_uapi::{
+    errno,
+    errors::Errno,
+    user_address::{UserAddress, UserRef},
+};
 use vk_sys as vk;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
-
-use crate::{
-    device::wayland::vulkan::{BufferCollectionTokens, Loader},
-    logging::log_warn,
-    mm::MemoryAccessorExt,
-    task::CurrentTask,
-    types::errno::{errno, Errno},
-    types::user_address::{UserAddress, UserRef},
-};
 
 /// Reads a magma command and its type from user space.
 ///

@@ -15,17 +15,18 @@ use crate::{
     signals::send_standard_signal,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        errno::{errno, error, Errno},
-        file_mode::mode,
-        open_flags::OpenFlags,
-        signals::SIGPIPE,
-        statfs, uapi,
-        user_address::{UserAddress, UserRef},
-        FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
-    },
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_uapi::{
+    errno, error,
+    errors::Errno,
+    file_mode::mode,
+    open_flags::OpenFlags,
+    signals::SIGPIPE,
+    statfs, uapi,
+    user_address::{UserAddress, UserRef},
+    FIONREAD, F_GETPIPE_SZ, F_SETPIPE_SZ, PIPEFS_MAGIC,
+};
 use std::{convert::TryInto, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;

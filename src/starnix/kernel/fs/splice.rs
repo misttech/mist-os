@@ -11,16 +11,17 @@ use crate::{
     logging::{log_warn, not_implemented},
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
-    types::{
-        errno::{error, Errno},
-        off_t,
-        open_flags::OpenFlags,
-        uapi,
-        user_address::{UserAddress, UserRef},
-        user_buffer::MAX_RW_COUNT,
-    },
 };
 use starnix_lock::{ordered_lock, MutexGuard};
+use starnix_uapi::{
+    error,
+    errors::Errno,
+    off_t,
+    open_flags::OpenFlags,
+    uapi,
+    user_address::{UserAddress, UserRef},
+    user_buffer::MAX_RW_COUNT,
+};
 use std::{cmp::Ordering, sync::Arc, usize};
 
 pub fn sendfile(

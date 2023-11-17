@@ -6,8 +6,8 @@ use crate::{
     device::{magma::MagmaFile, DeviceMode},
     fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
     task::{CurrentTask, Kernel},
-    types::{device_type::DeviceType, errno::Errno, open_flags::OpenFlags},
 };
+use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 
 use std::sync::Arc;
 

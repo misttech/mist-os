@@ -4,14 +4,16 @@
 
 use fuchsia_zircon as zx;
 
-use crate::arch::registers::RegisterState;
-use crate::mm::vmo::round_up_to_increment;
-use crate::signals::{SignalInfo, SignalState};
-use crate::task::{CurrentTask, Task};
-use crate::types::errno::{ErrnoCode, ERESTART_RESTARTBLOCK};
-use crate::types::signals::SigSet;
-use crate::types::{
-    __NR_restart_syscall, sigaction_t, sigaltstack, sigcontext, siginfo_t, sigset_t, ucontext,
+use crate::{
+    arch::registers::RegisterState,
+    mm::vmo::round_up_to_increment,
+    signals::{SignalInfo, SignalState},
+    task::{CurrentTask, Task},
+};
+use starnix_uapi::{
+    __NR_restart_syscall,
+    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
+    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
 /// The size of the red zone.
@@ -76,18 +78,6 @@ impl SignalStackFrame {
 
     pub fn from_bytes(bytes: [u8; SIG_STACK_SIZE]) -> SignalStackFrame {
         unsafe { std::mem::transmute(bytes) }
-    }
-}
-
-impl From<sigset_t> for SigSet {
-    fn from(value: sigset_t) -> Self {
-        SigSet(value.sig[0])
-    }
-}
-
-impl From<SigSet> for sigset_t {
-    fn from(val: SigSet) -> Self {
-        sigset_t { sig: [val.0] }
     }
 }
 

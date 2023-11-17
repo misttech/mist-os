@@ -16,10 +16,8 @@ use crate::{
     logging::impossible_error,
     mm::ProtectionFlags,
     task::{CurrentTask, Task},
-    types::errno::{error, Errno},
-    types::user_address::UserAddress,
-    types::FUTEX_BITSET_MATCH_ANY,
 };
+use starnix_uapi::{error, errors::Errno, user_address::UserAddress, FUTEX_BITSET_MATCH_ANY};
 
 /// A table of futexes.
 ///

@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    task::{ProcessGroup, Task, ThreadGroup, ZombieProcess},
-    types::{
-        ownership::{TempRef, WeakRef},
-        pid_t,
-    },
+use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
+use starnix_uapi::{
+    ownership::{TempRef, WeakRef},
+    pid_t,
 };
 use std::{
     collections::HashMap,

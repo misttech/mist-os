@@ -13,13 +13,9 @@ use crate::{
         FdEvents, FileHandle,
     },
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
-    types::{
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-        ucred,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{errno, error, errors::Errno, open_flags::OpenFlags, ucred};
 
 // An implementation of AF_VSOCK.
 // See https://man7.org/linux/man-pages/man7/vsock.7.html
@@ -298,7 +294,6 @@ impl VsockSocketInner {
 mod tests {
     use super::*;
     use crate::{
-        arch::uapi::epoll_event,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             fuchsia::create_fuchsia_pipe,
@@ -309,6 +304,7 @@ mod tests {
     };
     use fuchsia_zircon as zx;
     use fuchsia_zircon::HandleBased;
+    use starnix_uapi::epoll_event;
     use syncio::Zxio;
 
     #[::fuchsia::test]

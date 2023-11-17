@@ -2,14 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::{FdNumber, WdNumber},
-    types::{
-        device_type::DeviceType,
-        file_mode::FileMode,
-        signals::UncheckedSignal,
-        user_address::{UserAddress, UserCString, UserRef},
-    },
+use crate::fs::{FdNumber, WdNumber};
+use starnix_uapi::{
+    device_type::DeviceType,
+    file_mode::FileMode,
+    signals::UncheckedSignal,
+    user_address::{UserAddress, UserCString, UserRef},
 };
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]

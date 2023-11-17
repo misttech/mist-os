@@ -10,17 +10,6 @@ use crate::{
     logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
     task::{CurrentTask, Task},
-    types::{
-        errno::{errno, error, Errno},
-        ownership::WeakRef,
-        range_ext::RangeExt,
-        resource_limits::Resource,
-        user_address::{UserAddress, UserCString, UserRef},
-        user_buffer::UserBuffer,
-        MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL,
-        MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC,
-        PROT_READ, PROT_WRITE, UIO_MAXIOV,
-    },
     vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, Error};
@@ -32,6 +21,18 @@ use fuchsia_zircon::{
 use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
 use starnix_lock::{Mutex, RwLock};
+use starnix_uapi::{
+    errno, error,
+    errors::Errno,
+    ownership::WeakRef,
+    range_ext::RangeExt,
+    resource_limits::Resource,
+    user_address::{UserAddress, UserCString, UserRef},
+    user_buffer::UserBuffer,
+    MADV_DOFORK, MADV_DONTFORK, MADV_DONTNEED, MADV_KEEPONFORK, MADV_NOHUGEPAGE, MADV_NORMAL,
+    MADV_WILLNEED, MADV_WIPEONFORK, MREMAP_DONTUNMAP, MREMAP_FIXED, MREMAP_MAYMOVE, PROT_EXEC,
+    PROT_READ, PROT_WRITE, UIO_MAXIOV,
+};
 use static_assertions::const_assert_eq;
 use std::{
     collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
@@ -2818,18 +2819,13 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::FdNumber,
-        mm::syscalls::do_mmap,
-        task::syscalls::sys_prctl,
-        testing::*,
-        types::{
-            MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
-            PR_SET_VMA_ANON_NAME,
-        },
-    };
+    use crate::{fs::FdNumber, mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*};
     use assert_matches::assert_matches;
     use itertools::assert_equal;
+    use starnix_uapi::{
+        MAP_ANONYMOUS, MAP_FIXED, MAP_GROWSDOWN, MAP_PRIVATE, PROT_NONE, PR_SET_VMA,
+        PR_SET_VMA_ANON_NAME,
+    };
     use std::ffi::CString;
     use zerocopy::FromZeroes;
 

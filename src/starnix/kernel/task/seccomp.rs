@@ -15,21 +15,21 @@ use crate::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
     },
-    types::{
-        __NR_exit, __NR_read, __NR_write,
-        errno::{errno, errno_from_code, error, Errno},
-        open_flags::OpenFlags,
-        seccomp_data, seccomp_notif, seccomp_notif_resp,
-        signals::{SIGKILL, SIGSYS},
-        sock_filter,
-        user_address::{UserAddress, UserRef},
-        BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
-        SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL,
-        SECCOMP_RET_ALLOW, SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
-    },
 };
 use bstr::ByteSlice;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    seccomp_data, seccomp_notif, seccomp_notif_resp,
+    signals::{SIGKILL, SIGSYS},
+    sock_filter,
+    user_address::{UserAddress, UserRef},
+    BPF_ABS, BPF_LD, BPF_ST, SECCOMP_IOCTL_NOTIF_ADDFD, SECCOMP_IOCTL_NOTIF_ID_VALID,
+    SECCOMP_IOCTL_NOTIF_RECV, SECCOMP_IOCTL_NOTIF_SEND, SECCOMP_RET_ACTION_FULL, SECCOMP_RET_ALLOW,
+    SECCOMP_RET_DATA, SECCOMP_USER_NOTIF_FLAG_CONTINUE, SYS_SECCOMP,
+};
 use std::{
     collections::HashMap,
     sync::{
@@ -43,27 +43,27 @@ use ubpf::{
 };
 
 #[cfg(target_arch = "aarch64")]
-use crate::types::__NR_clock_getres;
+use starnix_uapi::__NR_clock_getres;
 #[cfg(target_arch = "aarch64")]
-use crate::types::__NR_clock_gettime;
+use starnix_uapi::__NR_clock_gettime;
 #[cfg(target_arch = "aarch64")]
-use crate::types::__NR_gettimeofday;
+use starnix_uapi::__NR_gettimeofday;
 #[cfg(target_arch = "aarch64")]
-use crate::types::AUDIT_ARCH_AARCH64;
+use starnix_uapi::AUDIT_ARCH_AARCH64;
 
 #[cfg(target_arch = "x86_64")]
-use crate::types::__NR_clock_gettime;
+use starnix_uapi::__NR_clock_gettime;
 #[cfg(target_arch = "x86_64")]
-use crate::types::__NR_getcpu;
+use starnix_uapi::__NR_getcpu;
 #[cfg(target_arch = "x86_64")]
-use crate::types::__NR_gettimeofday;
+use starnix_uapi::__NR_gettimeofday;
 #[cfg(target_arch = "x86_64")]
-use crate::types::__NR_time;
+use starnix_uapi::__NR_time;
 #[cfg(target_arch = "x86_64")]
-use crate::types::AUDIT_ARCH_X86_64;
+use starnix_uapi::AUDIT_ARCH_X86_64;
 
 #[cfg(target_arch = "riscv64")]
-use crate::types::AUDIT_ARCH_RISCV64;
+use starnix_uapi::AUDIT_ARCH_RISCV64;
 
 pub struct SeccompFilter {
     /// The BPF program associated with this filter.

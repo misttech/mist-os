@@ -9,8 +9,8 @@ use crate::{
     arch::syscalls::sys_clone,
     syscalls::{decls::Syscall, SyscallResult},
     task::CurrentTask,
-    types::errno::Errno,
 };
+use starnix_uapi::errors::Errno;
 
 macro_rules! syscall_match {
     {
@@ -21,7 +21,7 @@ macro_rules! syscall_match {
             match $syscall_number as u32 {
                 $(
                     $(#[$match])?
-                    crate::types::[<__NR_ $call>] => {
+                    starnix_uapi::[<__NR_ $call>] => {
                         profile_duration!(stringify!($call));
                         match syscall_match!(@call $locked; $current_task; $args; [<sys_ $call>][$num_args]) {
                             Ok(x) => Ok(SyscallResult::from(x)),
@@ -115,16 +115,73 @@ pub fn dispatch_syscall(
     use crate::arch::syscalls::sys_renameat;
 
     #[cfg(target_arch = "x86_64")]
-    use crate::{
-        arch::syscalls::{
-            sys_access, sys_alarm, sys_arch_prctl, sys_chmod, sys_chown, sys_creat, sys_dup2,
-            sys_epoll_create, sys_epoll_wait, sys_eventfd, sys_fork, sys_getdents, sys_getpgrp,
-            sys_inotify_init, sys_lchown, sys_link, sys_lstat, sys_mkdir, sys_mknod, sys_open,
-            sys_pause, sys_pipe, sys_poll, sys_readlink, sys_rename, sys_renameat, sys_rmdir,
-            sys_signalfd, sys_stat, sys_symlink, sys_time, sys_unlink, sys_vfork,
-        },
-        fs::syscalls::sys_select,
-    };
+    use crate::arch::syscalls::sys_access;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_alarm;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_arch_prctl;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_chmod;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_chown;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_creat;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_dup2;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_epoll_create;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_epoll_wait;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_eventfd;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_fork;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_getdents;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_getpgrp;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_inotify_init;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_lchown;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_link;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_lstat;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_mkdir;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_mknod;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_open;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_pause;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_pipe;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_poll;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_readlink;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_rename;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_renameat;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_rmdir;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_signalfd;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_stat;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_symlink;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_time;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_unlink;
+    #[cfg(target_arch = "x86_64")]
+    use crate::arch::syscalls::sys_vfork;
+    #[cfg(target_arch = "x86_64")]
+    use crate::fs::syscalls::sys_select;
 
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
     syscall_match! {

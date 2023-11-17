@@ -206,15 +206,13 @@ impl<S: Sender<GenericMessage>> GenericNetlinkFamily<S> for Nl80211Family {
 
 #[cfg(test)]
 mod tests {
-    use {
-        super::*,
-        crate::fs::socket::socket_generic_netlink::test_utils::*,
-        assert_matches::assert_matches,
-        fidl::endpoints::create_proxy_and_stream,
-        fuchsia_async::TestExecutor,
-        futures::{pin_mut, StreamExt},
-        std::task::Poll,
-    };
+    use super::*;
+    use crate::fs::socket::socket_generic_netlink::test_utils::*;
+    use assert_matches::assert_matches;
+    use fidl::endpoints::create_proxy_and_stream;
+    use fuchsia_async::TestExecutor;
+    use futures::{pin_mut, StreamExt};
+    use std::task::Poll;
 
     #[test]
     fn test_fidl_message_to_netlink() {

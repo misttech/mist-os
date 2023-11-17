@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    fs::FileHandle,
-    task::CurrentTask,
-    types::{errno::Errno, open_flags::OpenFlags},
-};
+use crate::{fs::FileHandle, task::CurrentTask};
 use fuchsia_zircon as zx;
+use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
 mod remote;
 mod remote_bundle;

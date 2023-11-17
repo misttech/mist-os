@@ -5,16 +5,17 @@
 use crate::{
     fs::{FdNumber, FileHandle, RecordLockOwner},
     task::{CurrentTask, Task},
-    types::{
-        errno::{errno, error, Errno},
-        open_flags::OpenFlags,
-        ownership::{OwnedRef, Releasable, ReleasableByRef},
-        resource_limits::Resource,
-        FD_CLOEXEC,
-    },
 };
 use bitflags::bitflags;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    errno, error,
+    errors::Errno,
+    open_flags::OpenFlags,
+    ownership::{OwnedRef, Releasable, ReleasableByRef},
+    resource_limits::Resource,
+    FD_CLOEXEC,
+};
 use std::ops::DerefMut;
 
 bitflags! {

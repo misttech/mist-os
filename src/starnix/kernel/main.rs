@@ -51,7 +51,6 @@ mod signals;
 mod syscalls;
 mod task;
 mod time;
-mod types;
 mod vdso;
 mod vmex_resource;
 

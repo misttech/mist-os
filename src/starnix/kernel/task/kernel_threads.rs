@@ -5,14 +5,15 @@
 use crate::{
     dynamic_thread_spawner::DynamicThreadSpawner,
     task::{CurrentTask, Task},
-    types::{
-        errno::{errno, Errno},
-        ownership::{OwnedRefByRef, ReleasableByRef, WeakRef},
-    },
 };
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use starnix_uapi::{
+    errno,
+    errors::Errno,
+    ownership::{OwnedRefByRef, ReleasableByRef, WeakRef},
+};
 use std::{ffi::CString, sync::Arc};
 
 /// The threads that the kernel runs internally.

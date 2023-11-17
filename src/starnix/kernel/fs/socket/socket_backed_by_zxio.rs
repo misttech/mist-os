@@ -14,11 +14,10 @@ use crate::{
     logging::not_implemented,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    types::errno::{
-        errno, errno_from_code, errno_from_zxio_code, error, from_status_like_fdio, Errno,
-    },
-    types::user_buffer::UserBuffer,
-    types::{c_int, uapi, ucred, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER},
+};
+use starnix_uapi::{
+    c_int, errno, errno_from_zxio_code, error, errors::Errno, from_status_like_fdio, uapi, ucred,
+    user_buffer::UserBuffer, MSG_DONTWAIT, MSG_WAITALL, SOL_SOCKET, SO_ATTACH_FILTER,
 };
 
 use fidl::endpoints::DiscoverableProtocolMarker as _;

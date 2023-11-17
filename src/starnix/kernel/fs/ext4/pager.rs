@@ -6,18 +6,14 @@
 //! the target, hence the need for a transfer VMO.  This also uses a static zeroed VMO to transfer
 //! pages that should be zeroed.
 
-use crate::{
-    fs::FsStr,
-    log_debug, log_error, log_warn,
-    task::CurrentTask,
-    types::errno::{errno, error, Errno},
-};
+use crate::{fs::FsStr, log_debug, log_error, log_warn, task::CurrentTask};
 use fidl::AsHandleRef;
 use fuchsia_zircon::{
-    self as zx,
     sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ},
+    {self as zx},
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{errno, error, errors::Errno};
 use std::{
     collections::{hash_map::Entry, HashMap},
     ops::Range,

@@ -4,13 +4,8 @@
 
 use std::sync::Arc;
 
-use crate::{
-    fs::fs_node::FsNodeHandle,
-    types::{
-        errno::{errno, error, Errno},
-        seal_flags::SealFlags,
-    },
-};
+use crate::fs::fs_node::FsNodeHandle;
+use starnix_uapi::{errno, error, errors::Errno, seal_flags::SealFlags};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum FileWriteGuardMode {
@@ -178,11 +173,8 @@ impl Eq for FileWriteGuardRef {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        fs::FsNode,
-        testing::*,
-        types::{device_type::DeviceType, file_mode::FileMode},
-    };
+    use crate::{fs::FsNode, testing::*};
+    use starnix_uapi::{device_type::DeviceType, file_mode::FileMode};
 
     fn create_fs_node() -> Arc<FsNode> {
         let (_kernel, current_task) = create_kernel_and_task();

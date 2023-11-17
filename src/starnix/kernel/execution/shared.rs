@@ -19,10 +19,6 @@ use crate::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
         Waiter,
     },
-    types::{
-        errno::{errno, Errno},
-        mount_flags::MountFlags,
-    },
 };
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_io as fio;
@@ -32,6 +28,7 @@ use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use lock_sequence::{Locked, Unlocked};
+use starnix_uapi::{errno, errors::Errno, mount_flags::MountFlags};
 use std::{convert::TryFrom, sync::Arc};
 
 /// Contains context to track the most recently failing system call.
@@ -275,11 +272,8 @@ fn block_while_stopped(current_task: &mut CurrentTask) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        signals::SignalInfo,
-        testing::*,
-        types::signals::{SIGCONT, SIGSTOP},
-    };
+    use crate::{signals::SignalInfo, testing::*};
+    use starnix_uapi::signals::{SIGCONT, SIGSTOP};
 
     #[::fuchsia::test]
     async fn test_block_while_stopped_stop_and_continue() {

@@ -8,10 +8,9 @@ use crate::{
         FsString, SeekTarget,
     },
     task::CurrentTask,
-    types::errno::{error, Errno},
-    types::off_t,
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{error, errors::Errno, off_t};
 use std::ops::Bound;
 
 pub struct MemoryDirectoryFile {

@@ -14,17 +14,19 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS},
     task::CurrentTask,
-    types::{
-        auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
-        errno::{errno, error, from_status_like_fdio, Errno},
-        personality::PersonalityFlags,
-        uapi,
-        user_address::{UserAddress, UserCString, UserRef},
-        utsname_t, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
-        LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
-        LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
-        LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
-    },
+};
+use starnix_uapi::{
+    auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
+    errno, error,
+    errors::Errno,
+    from_status_like_fdio,
+    personality::PersonalityFlags,
+    uapi,
+    user_address::{UserAddress, UserCString, UserRef},
+    utsname_t, GRND_NONBLOCK, GRND_RANDOM, LINUX_REBOOT_CMD_CAD_OFF, LINUX_REBOOT_CMD_CAD_ON,
+    LINUX_REBOOT_CMD_HALT, LINUX_REBOOT_CMD_KEXEC, LINUX_REBOOT_CMD_RESTART,
+    LINUX_REBOOT_CMD_RESTART2, LINUX_REBOOT_CMD_SW_SUSPEND, LINUX_REBOOT_MAGIC1,
+    LINUX_REBOOT_MAGIC2, LINUX_REBOOT_MAGIC2A, LINUX_REBOOT_MAGIC2B, LINUX_REBOOT_MAGIC2C,
 };
 
 pub fn sys_uname(

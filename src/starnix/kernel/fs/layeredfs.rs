@@ -9,13 +9,8 @@ use crate::{
         FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
     },
     task::{CurrentTask, Kernel},
-    types::{
-        errno::{errno, Errno},
-        ino_t, off_t,
-        open_flags::OpenFlags,
-        statfs,
-    },
 };
+use starnix_uapi::{errno, errors::Errno, ino_t, off_t, open_flags::OpenFlags, statfs};
 use std::{collections::BTreeMap, sync::Arc};
 
 /// A filesystem that will delegate most operation to a base one, but have a number of top level

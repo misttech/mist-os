@@ -5,9 +5,9 @@
 use crate::{
     logging::not_implemented,
     power::{SuspendState, SuspendStats},
-    types::errno::{error, Errno},
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{error, errors::Errno};
 use std::{collections::HashSet, sync::Arc};
 
 #[derive(Default)]

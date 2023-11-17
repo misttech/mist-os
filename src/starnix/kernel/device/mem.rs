@@ -16,16 +16,13 @@ use crate::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
     task::{CurrentTask, Kernel},
-    types::{
-        device_type::DeviceType,
-        errno::{error, Errno},
-        file_mode::FileMode,
-        open_flags::OpenFlags,
-        user_address::UserAddress,
-    },
 };
 use fuchsia_zircon::{
     cprng_draw, {self as zx},
+};
+use starnix_uapi::{
+    device_type::DeviceType, error, errors::Errno, file_mode::FileMode, open_flags::OpenFlags,
+    user_address::UserAddress,
 };
 use std::sync::Arc;
 

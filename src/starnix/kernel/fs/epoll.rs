@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    arch::uapi::epoll_event,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps, WeakFileHandle,
@@ -13,15 +12,16 @@ use crate::{
         CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
         WaitQueue, Waiter,
     },
-    types::{
-        errno::{errno, error, Errno, EBADF, EINTR, ETIMEDOUT},
-        open_flags::OpenFlags,
-        EPOLLET, EPOLLONESHOT,
-    },
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    epoll_event, errno, error,
+    errors::{Errno, EBADF, EINTR, ETIMEDOUT},
+    open_flags::OpenFlags,
+    EPOLLET, EPOLLONESHOT,
+};
 use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,

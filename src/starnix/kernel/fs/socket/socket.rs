@@ -21,24 +21,6 @@ use crate::{
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
-    types::{
-        as_any::AsAny,
-        auth::CAP_NET_RAW,
-        c_char,
-        errno::{errno, error, Errno, ErrnoCode},
-        file_mode::mode,
-        ifreq, in_addr,
-        open_flags::OpenFlags,
-        sockaddr, sockaddr_in,
-        time::{duration_from_timeval, timeval_from_duration},
-        ucred,
-        union::struct_with_union_into_bytes,
-        user_address::{UserAddress, UserRef},
-        user_buffer::UserBuffer,
-        AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
-        SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO,
-        SO_TYPE,
-    },
 };
 use fuchsia_zircon as zx;
 use net_types::ip::IpAddress;
@@ -48,6 +30,23 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{
+    as_any::AsAny,
+    auth::CAP_NET_RAW,
+    c_char, errno, error,
+    errors::{Errno, ErrnoCode},
+    file_mode::mode,
+    ifreq, in_addr,
+    open_flags::OpenFlags,
+    sockaddr, sockaddr_in,
+    time::{duration_from_timeval, timeval_from_duration},
+    ucred,
+    union::struct_with_union_into_bytes,
+    user_address::{UserAddress, UserRef},
+    user_buffer::UserBuffer,
+    AF_INET, SIOCGIFADDR, SIOCGIFFLAGS, SIOCGIFHWADDR, SIOCGIFINDEX, SIOCGIFMTU, SIOCSIFADDR,
+    SIOCSIFFLAGS, SOL_SOCKET, SO_DOMAIN, SO_MARK, SO_PROTOCOL, SO_RCVTIMEO, SO_SNDTIMEO, SO_TYPE,
+};
 use static_assertions::const_assert;
 use std::{collections::VecDeque, ffi::CStr, mem::size_of, sync::Arc};
 use zerocopy::{AsBytes, ByteOrder as _, FromBytes as _, NativeEndian};
@@ -939,8 +938,8 @@ mod tests {
     use crate::{
         fs::UnixControlData,
         testing::{create_kernel_and_task, map_memory},
-        types::SO_PASSCRED,
     };
+    use starnix_uapi::SO_PASSCRED;
 
     #[::fuchsia::test]
     async fn test_dgram_socket() {

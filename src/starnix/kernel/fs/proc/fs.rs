@@ -6,8 +6,9 @@ use super::proc_directory::ProcDirectory;
 use crate::{
     fs::{CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsStr},
     task::CurrentTask,
-    types::{errno::Errno, statfs, PROC_SUPER_MAGIC},
 };
+use starnix_uapi::{errors::Errno, statfs, PROC_SUPER_MAGIC};
+
 use std::sync::Arc;
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.

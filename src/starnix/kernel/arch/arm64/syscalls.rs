@@ -5,11 +5,15 @@
 use crate::{
     fs::{syscalls::sys_renameat2, FdNumber},
     task::{syscalls::do_clone, CurrentTask},
-    types::errno::Errno,
-    types::user_address::{UserAddress, UserCString, UserRef},
-    types::{clone_args, pid_t, CSIGNAL},
 };
 use lock_sequence::{Locked, Unlocked};
+use starnix_uapi::{
+    clone_args,
+    errors::Errno,
+    pid_t,
+    user_address::{UserAddress, UserCString, UserRef},
+    CSIGNAL,
+};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(

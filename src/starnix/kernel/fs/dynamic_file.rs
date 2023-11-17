@@ -9,12 +9,9 @@ use crate::{
         SeekTarget, SimpleFileNode,
     },
     task::CurrentTask,
-    types::{
-        errno::{errno, error, Errno},
-        off_t,
-    },
 };
 use starnix_lock::Mutex;
+use starnix_uapi::{errno, error, errors::Errno, off_t};
 use std::collections::VecDeque;
 
 pub trait SequenceFileSource: Send + Sync + 'static {
@@ -331,9 +328,9 @@ mod tests {
             SequenceFileSource, VecOutputBuffer,
         },
         testing::{create_kernel_and_task, AutoReleasableTask},
-        types::{errno::Errno, open_flags::OpenFlags},
     };
     use starnix_lock::Mutex;
+    use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
     use std::sync::Arc;
 
     struct Counter {

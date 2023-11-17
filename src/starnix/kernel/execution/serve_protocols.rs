@@ -14,12 +14,6 @@ use crate::{
     },
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel, Task},
-    types::{
-        errno::Errno,
-        open_flags::OpenFlags,
-        ownership::{release_on_error, ReleasableByRef},
-        uapi,
-    },
 };
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
@@ -32,6 +26,12 @@ use fuchsia_async::{
 };
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use starnix_uapi::{
+    errors::Errno,
+    open_flags::OpenFlags,
+    ownership::{release_on_error, ReleasableByRef},
+    uapi,
+};
 use std::{ffi::CString, sync::Arc};
 
 use super::start_component;
