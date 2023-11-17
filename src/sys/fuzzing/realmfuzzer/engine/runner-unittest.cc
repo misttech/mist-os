@@ -16,6 +16,7 @@ namespace {
 #undef RUNNER_TYPE
 #undef RUNNER_TEST
 
+TEST_F(RealmFuzzerRunnerTest, Stop) { Stop(); }
 TEST_F(RealmFuzzerRunnerTest, Merge) { Merge(/* keep_errors= */ true); }
 
 }  // namespace
