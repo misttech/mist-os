@@ -24,6 +24,7 @@ pub(crate) mod prelude {
 use prelude::*;
 
 mod battery;
+mod bluetooth;
 mod build_info;
 mod component;
 mod connectivity;
@@ -206,6 +207,13 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'battery' subsystem")?;
+
+    bluetooth::BluetoothSubsystemConfig::define_configuration(
+        context,
+        &config.platform.bluetooth,
+        builder,
+    )
+    .context("Configuring the `bluetooth` subsystem")?;
 
     build_info::BuildInfoSubsystem::define_configuration(
         context,

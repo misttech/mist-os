@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 pub mod battery_config;
+pub mod bluetooth_config;
 pub mod connectivity_config;
 pub mod development_support_config;
 pub mod diagnostics_config;
@@ -61,6 +62,10 @@ pub struct PlatformConfig {
     /// Platform configuration options for the battery.
     #[serde(default)]
     pub battery: battery_config::BatteryConfig,
+
+    /// Platform configuration options for the bluetooth area.
+    #[serde(default)]
+    pub bluetooth: bluetooth_config::BluetoothConfig,
 
     /// Platform configuration options for the connectivity area.
     #[serde(default)]

@@ -1486,6 +1486,52 @@ assembly_input_bundle("bluetooth_core") {
   ]
 }
 
+# Bluetooth snoop support
+#
+# feature_set_levels: minimal
+# build-types: all
+# This AIB provides packages for the Bluetooth snoop configuration which lazily starts. It is
+# mutually exclusive with the `bluetooth_snoop_eager` AIB.
+assembly_input_bundle("bluetooth_snoop_lazy") {
+  base_packages = [ "//src/connectivity/bluetooth/tools/bt-snoop" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
+# Bluetooth snoop support
+#
+# feature_set_levels: minimal
+# build-types: all
+# This AIB provides packages for the Bluetooth snoop configuration which eagerly starts at device
+# boot. It is mutually exclusive with the `bluetooth_snoop_lazy` AIB.
+assembly_input_bundle("bluetooth_snoop_eager") {
+  base_packages = [ "//src/connectivity/bluetooth/tools/bt-snoop" ]
+  compiled_packages = [
+    {
+      name = "core"
+      component_shards = [
+        {
+          component_name = "core"
+          shards = rebase_path(
+                  [ "//src/connectivity/bluetooth/tools/bt-snoop/meta/bt-snoop-eager.core_shard.cml" ],
+                  root_build_dir)
+        },
+      ]
+    },
+  ]
+}
+
 assembly_input_bundle("input_group_two") {
   kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
   base_packages = [

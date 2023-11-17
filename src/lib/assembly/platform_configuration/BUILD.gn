@@ -16,6 +16,7 @@ rustc_library("platform_configuration") {
     "src/lib.rs",
     "src/subsystems.rs",
     "src/subsystems/battery.rs",
+    "src/subsystems/bluetooth.rs",
     "src/subsystems/build_info.rs",
     "src/subsystems/component.rs",
     "src/subsystems/connectivity.rs",

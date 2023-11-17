@@ -52,7 +52,7 @@ BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
 ]
 
 # This is the combined set of valid AIBs for "bringup" builds (which are the
-# ones that need to use the bootstrap feature-set-level
+# ones that need to use the bootstrap feature-set-level)
 BRINGUP_PLATFORM_AIB_NAMES = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES + BOOTSTRAP_ENG_PLATFORM_AIB_NAMES
 
 # The names of all of the platform's 'testonly=false' Assembly Input Bundles
@@ -65,6 +65,8 @@ USER_PLATFORM_AIB_NAMES_RISCV64 = BOOTSTRAP_USER_PLATFORM_AIB_NAMES + [
     "audio_device_registry",
     "battery_manager",
     "bluetooth_core",
+    "bluetooth_snoop_eager",
+    "bluetooth_snoop_lazy",
     "brightness_manager",
     "camera",
     "common_minimal",
