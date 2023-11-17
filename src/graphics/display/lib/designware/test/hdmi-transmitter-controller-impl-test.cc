@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/designware/hdmi-dw.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
 
 #include <lib/ddk/debug.h>
 
@@ -166,9 +166,12 @@ constexpr int kI2cmSdaHoldOffset = 0x7e13;
 constexpr int kI2cmScdcReadUpdateOffset = 0x7e14;
 constexpr int kI2cmReadBuff0Offset = 0x7e20;
 
-class HdmiDwTest : public testing::Test {
+class HdmiTransmitterControllerImplTest : public testing::Test {
  public:
-  void SetUp() override { hdmi_dw_ = std::make_unique<HdmiDw>(mmio_range_.GetMmioBuffer()); }
+  void SetUp() override {
+    hdmitx_controller_ =
+        std::make_unique<HdmiTransmitterControllerImpl>(mmio_range_.GetMmioBuffer());
+  }
 
   void TearDown() override { mmio_range_.CheckAllAccessesReplayed(); }
 
@@ -194,10 +197,10 @@ class HdmiDwTest : public testing::Test {
   constexpr static int kMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange mmio_range_{kMmioRangeSize, ddk_mock::MockMmioRange::Size::k8};
 
-  std::unique_ptr<HdmiDw> hdmi_dw_;
+  std::unique_ptr<HdmiTransmitterControllerImpl> hdmitx_controller_;
 };
 
-TEST_F(HdmiDwTest, InitHwTest) {
+TEST_F(HdmiTransmitterControllerImplTest, InitHwTest) {
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMcLockonclockOffset, .value = 0b1111'1111, .write = true},
       {.address = kMcClkdisOffset, .value = 0b0000'0000, .write = true},
@@ -219,10 +222,10 @@ TEST_F(HdmiDwTest, InitHwTest) {
       {.address = kI2cmScdcReadUpdateOffset, .value = 0b0000'0000, .write = true},
   }));
 
-  hdmi_dw_->InitHw();
+  hdmitx_controller_->InitHw();
 }
 
-TEST_F(HdmiDwTest, EdidTransferTest) {
+TEST_F(HdmiTransmitterControllerImplTest, EdidTransferTest) {
   uint8_t in_data[] = {1, 2};
   uint8_t out_data[16] = {0};
   i2c_impl_op_t op_list[]{
@@ -285,14 +288,14 @@ TEST_F(HdmiDwTest, EdidTransferTest) {
       {.address = kI2cmReadBuff0Offset + 7, .value = 8},
   }));
 
-  hdmi_dw_->EdidTransfer(op_list, sizeof(op_list) / sizeof(op_list[0]));
+  hdmitx_controller_->EdidTransfer(op_list, sizeof(op_list) / sizeof(op_list[0]));
   uint8_t expected_out[] = {8, 7, 6, 5, 4, 3, 2, 1, 1, 2, 3, 4, 5, 6, 7, 8};
   for (uint32_t i = 0; i < 16; i++) {
     EXPECT_EQ(out_data[i], expected_out[i]);
   }
 }
 
-TEST_F(HdmiDwTest, ConfigHdmitxTest) {
+TEST_F(HdmiTransmitterControllerImplTest, ConfigHdmitxTest) {
   fidl::Arena allocator;
   display::DisplayTiming display_timing = {
       .horizontal_active_px = 24,
@@ -422,10 +425,10 @@ TEST_F(HdmiDwTest, ConfigHdmitxTest) {
       {.address = kHdcp22regStatOffset, .value = 0b1111'1111, .write = true},
   }));
 
-  hdmi_dw_->ConfigHdmitx(color, display_timing, p);
+  hdmitx_controller_->ConfigHdmitx(color, display_timing, p);
 }
 
-TEST_F(HdmiDwTest, SetupInterruptsTest) {
+TEST_F(HdmiTransmitterControllerImplTest, SetupInterruptsTest) {
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kIhMuteFcStat0Offset, .value = 0b1111'1111, .write = true},
       {.address = kIhMuteFcStat1Offset, .value = 0b1111'1111, .write = true},
@@ -441,10 +444,10 @@ TEST_F(HdmiDwTest, SetupInterruptsTest) {
       {.address = kIhMuteOffset, .value = 0b00, .write = true},
   }));
 
-  hdmi_dw_->SetupInterrupts();
+  hdmitx_controller_->SetupInterrupts();
 }
 
-TEST_F(HdmiDwTest, ResetTest) {
+TEST_F(HdmiTransmitterControllerImplTest, ResetTest) {
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kMcSwrstzreqOffset, .value = 0b0000'0000, .write = true},
       {.address = kMcSwrstzreqOffset, .value = 0b0111'1101, .write = true},
@@ -454,10 +457,10 @@ TEST_F(HdmiDwTest, ResetTest) {
       {.address = kMcClkdisOffset, .value = 0b00, .write = true},
   }));
 
-  hdmi_dw_->Reset();
+  hdmitx_controller_->Reset();
 }
 
-TEST_F(HdmiDwTest, SetupScdcTest) {
+TEST_F(HdmiTransmitterControllerImplTest, SetupScdcTest) {
   // is4k = true
   ExpectScdcRead(0x1, 0);
   ExpectScdcWrite(0x2, 0x1);
@@ -466,7 +469,7 @@ TEST_F(HdmiDwTest, SetupScdcTest) {
   ExpectScdcWrite(0x20, 0x3);
   ExpectScdcWrite(0x20, 0x3);
 
-  hdmi_dw_->SetupScdc(true);
+  hdmitx_controller_->SetupScdc(true);
 
   // is4k = false
   ExpectScdcRead(0x1, 0);
@@ -476,10 +479,10 @@ TEST_F(HdmiDwTest, SetupScdcTest) {
   ExpectScdcWrite(0x20, 0x0);
   ExpectScdcWrite(0x20, 0x0);
 
-  hdmi_dw_->SetupScdc(false);
+  hdmitx_controller_->SetupScdc(false);
 }
 
-TEST_F(HdmiDwTest, ResetFcTest) {
+TEST_F(HdmiTransmitterControllerImplTest, ResetFcTest) {
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kFcInvidconfOffset, .value = 0b1111'1111},
       {.address = kFcInvidconfOffset, .value = 0b1111'0111, .write = true},
@@ -487,23 +490,23 @@ TEST_F(HdmiDwTest, ResetFcTest) {
       {.address = kFcInvidconfOffset, .value = 0b0000'1000, .write = true},
   }));
 
-  hdmi_dw_->ResetFc();
+  hdmitx_controller_->ResetFc();
 }
 
-TEST_F(HdmiDwTest, SetFcScramblerCtrlTest) {
+TEST_F(HdmiTransmitterControllerImplTest, SetFcScramblerCtrlTest) {
   // is4k = true
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000},
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0001, .write = true},
   }));
-  hdmi_dw_->SetFcScramblerCtrl(true);
+  hdmitx_controller_->SetFcScramblerCtrl(true);
 
   // is4k = false
   mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kFcScamblerCtrlOffset, .value = 0b0000'0000, .write = true},
   }));
 
-  hdmi_dw_->SetFcScramblerCtrl(false);
+  hdmitx_controller_->SetFcScramblerCtrl(false);
 }
 
 }  // namespace

@@ -4,11 +4,10 @@
 
 import("//build/cpp/library_headers.gni")
 
-source_set("hdmi-dw") {
+source_set("hdmi-transmitter-controller") {
   sources = [
     "color-param.h",
-    "hdmi-dw.cc",
-    "hdmi-dw.h",
+    "hdmi-transmitter-controller.h",
     "regs.h",
   ]
   public_deps = [
@@ -17,6 +16,14 @@ source_set("hdmi-dw") {
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
   ]
+}
+
+source_set("hdmi-transmitter-controller-impl") {
+  sources = [
+    "hdmi-transmitter-controller-impl.cc",
+    "hdmi-transmitter-controller-impl.h",
+  ]
+  public_deps = [ ":hdmi-transmitter-controller" ]
   deps = [ "//src/lib/ddk" ]
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
@@ -25,5 +32,5 @@ source_set("hdmi-dw") {
 
 group("tests") {
   testonly = true
-  deps = [ "test:hdmi-dw-test" ]
+  deps = [ "test:hdmi-transmitter-controller-impl-test" ]
 }

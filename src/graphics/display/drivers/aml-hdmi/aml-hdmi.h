@@ -23,7 +23,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/ref_counted.h>
 
-#include "src/graphics/display/lib/designware/hdmi-dw.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
 
 namespace aml_hdmi {
 
@@ -48,7 +48,8 @@ class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
   // 10.2.3.43 "HDMITX Top-Level and HDMI TX Contoller IP Register Access" of
   // the AMLogic A311D datasheet.
   AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
-                std::unique_ptr<designware_hdmi::HdmiDw> hdmi_dw, zx::resource smc);
+                std::unique_ptr<designware_hdmi::HdmiTransmitterController> hdmi_dw,
+                zx::resource smc);
 
   AmlHdmiDevice(const AmlHdmiDevice&) = delete;
   AmlHdmiDevice(AmlHdmiDevice&&) = delete;
@@ -108,7 +109,7 @@ class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
 
   ddk::PDevFidl pdev_;
   fbl::Mutex dw_lock_;
-  std::unique_ptr<designware_hdmi::HdmiDw> hdmi_dw_ TA_GUARDED(dw_lock_);
+  std::unique_ptr<designware_hdmi::HdmiTransmitterController> hdmi_dw_ TA_GUARDED(dw_lock_);
   zx::resource smc_;
 
   std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio_;

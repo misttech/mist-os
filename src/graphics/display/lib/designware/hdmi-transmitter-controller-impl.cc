@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/designware/hdmi-dw.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
 
 #include <lib/ddk/debug.h>
 
@@ -12,7 +12,7 @@
 
 namespace designware_hdmi {
 
-void HdmiDw::ScdcWrite(uint8_t addr, uint8_t val) {
+void HdmiTransmitterControllerImpl::ScdcWrite(uint8_t addr, uint8_t val) {
   WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
   WriteReg(HDMITX_DWC_I2CM_ADDRESS, addr);
   WriteReg(HDMITX_DWC_I2CM_DATAO, val);
@@ -20,7 +20,7 @@ void HdmiDw::ScdcWrite(uint8_t addr, uint8_t val) {
   usleep(2000);
 }
 
-void HdmiDw::ScdcRead(uint8_t addr, uint8_t* val) {
+void HdmiTransmitterControllerImpl::ScdcRead(uint8_t addr, uint8_t* val) {
   WriteReg(HDMITX_DWC_I2CM_SLAVE, 0x54);
   WriteReg(HDMITX_DWC_I2CM_ADDRESS, addr);
   WriteReg(HDMITX_DWC_I2CM_OPERATION, 1);
@@ -28,7 +28,7 @@ void HdmiDw::ScdcRead(uint8_t addr, uint8_t* val) {
   *val = (uint8_t)ReadReg(HDMITX_DWC_I2CM_DATAI);
 }
 
-zx_status_t HdmiDw::InitHw() {
+zx_status_t HdmiTransmitterControllerImpl::InitHw() {
   WriteReg(HDMITX_DWC_MC_LOCKONCLOCK, 0xff);
   WriteReg(HDMITX_DWC_MC_CLKDIS, 0x00);
 
@@ -61,8 +61,9 @@ zx_status_t HdmiDw::InitHw() {
   return ZX_OK;
 }
 
-void HdmiDw::ConfigHdmitx(const ColorParam& color_param, const display::DisplayTiming& mode,
-                          const hdmi_param_tx& p) {
+void HdmiTransmitterControllerImpl::ConfigHdmitx(const ColorParam& color_param,
+                                                 const display::DisplayTiming& mode,
+                                                 const hdmi_param_tx& p) {
   // setup video input mapping
   uint32_t hdmi_data = 0;
   if (color_param.input_color_format == ColorFormat::kCfRgb) {
@@ -269,7 +270,7 @@ void HdmiDw::ConfigHdmitx(const ColorParam& color_param, const display::DisplayT
   WriteReg(HDMITX_DWC_HDCP22REG_STAT, 0xff);
 }
 
-void HdmiDw::SetupInterrupts() {
+void HdmiTransmitterControllerImpl::SetupInterrupts() {
   // setup interrupts we care about
   WriteReg(HDMITX_DWC_IH_MUTE_FC_STAT0, 0xff);
   WriteReg(HDMITX_DWC_IH_MUTE_FC_STAT1, 0xff);
@@ -292,7 +293,7 @@ void HdmiDw::SetupInterrupts() {
   WriteReg(HDMITX_DWC_IH_MUTE, 0x0);
 }
 
-void HdmiDw::Reset() {
+void HdmiTransmitterControllerImpl::Reset() {
   // reset
   WriteReg(HDMITX_DWC_MC_SWRSTZREQ, 0x00);
   usleep(10);
@@ -303,7 +304,7 @@ void HdmiDw::Reset() {
   WriteReg(HDMITX_DWC_MC_CLKDIS, 0);
 }
 
-void HdmiDw::SetupScdc(bool is4k) {
+void HdmiTransmitterControllerImpl::SetupScdc(bool is4k) {
   uint8_t scdc_data = 0;
   ScdcRead(0x1, &scdc_data);
   zxlogf(INFO, "version is %s\n", (scdc_data == 1) ? "2.0" : "<= 1.4");
@@ -321,7 +322,7 @@ void HdmiDw::SetupScdc(bool is4k) {
   }
 }
 
-void HdmiDw::ResetFc() {
+void HdmiTransmitterControllerImpl::ResetFc() {
   auto regval = ReadReg(HDMITX_DWC_FC_INVIDCONF);
   regval &= ~(1 << 3);  // clear hdmi mode select
   WriteReg(HDMITX_DWC_FC_INVIDCONF, regval);
@@ -332,7 +333,7 @@ void HdmiDw::ResetFc() {
   usleep(1);
 }
 
-void HdmiDw::SetFcScramblerCtrl(bool is4k) {
+void HdmiTransmitterControllerImpl::SetFcScramblerCtrl(bool is4k) {
   if (is4k) {
     // Set
     WriteReg(HDMITX_DWC_FC_SCRAMBLER_CTRL, ReadReg(HDMITX_DWC_FC_SCRAMBLER_CTRL) | (1 << 0));
@@ -342,7 +343,7 @@ void HdmiDw::SetFcScramblerCtrl(bool is4k) {
   }
 }
 
-void HdmiDw::ConfigCsc(const ColorParam& color_param) {
+void HdmiTransmitterControllerImpl::ConfigCsc(const ColorParam& color_param) {
   uint8_t csc_coef_a1_msb;
   uint8_t csc_coef_a1_lsb;
   uint8_t csc_coef_a2_msb;
@@ -553,7 +554,8 @@ void HdmiDw::ConfigCsc(const ColorParam& color_param) {
   WriteReg(HDMITX_DWC_CSC_SCALE, hdmi_data);
 }
 
-zx_status_t HdmiDw::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) {
+zx_status_t HdmiTransmitterControllerImpl::EdidTransfer(const i2c_impl_op_t* op_list,
+                                                        size_t op_count) {
   uint8_t segment_num = 0;
   uint8_t offset = 0;
   for (unsigned i = 0; i < op_count; i++) {
@@ -610,11 +612,11 @@ zx_status_t HdmiDw::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) 
 }
 
 #define PRINT_REG(name) PrintReg(#name, (name))
-void HdmiDw::PrintReg(std::string name, uint8_t reg) {
+void HdmiTransmitterControllerImpl::PrintReg(std::string name, uint8_t reg) {
   zxlogf(INFO, "%s (0x%4x): %u", &name[0], reg, ReadReg(reg));
 }
 
-void HdmiDw::PrintRegisters() {
+void HdmiTransmitterControllerImpl::PrintRegisters() {
   zxlogf(INFO, "------------HdmiDw Registers------------");
 
   PRINT_REG(HDMITX_DWC_A_APIINTCLR);

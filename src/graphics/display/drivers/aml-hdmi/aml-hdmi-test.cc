@@ -6,14 +6,13 @@
 
 #include <lib/async-loop/cpp/loop.h>
 
-#include <queue>
+#include <list>
 
 #include <fbl/alloc_checker.h>
 #include <fbl/array.h>
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/devices/testing/fake-mmio-reg/include/fake-mmio-reg/fake-mmio-reg.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -23,7 +22,7 @@ namespace {
 
 using HdmiClient = fidl::WireSyncClient<fuchsia_hardware_hdmi::Hdmi>;
 
-enum class HdmiDwFn {
+enum class HdmiTransmitterControllerCall : uint8_t {
   kConfigHdmitx,
   kSetupInterrupts,
   kReset,
@@ -32,118 +31,90 @@ enum class HdmiDwFn {
   kSetFcScramblerCtrl,
 };
 
-class AmlHdmiTest;
-
-class FakeHdmiDw : public designware_hdmi::HdmiDw {
+// TODO(fxbug.dev/136257): Consider replacing the mock class with a fake
+// HdmiTransmitterController implementation instead.
+class MockHdmiTransmitterController : public designware_hdmi::HdmiTransmitterController {
  public:
-  explicit FakeHdmiDw(AmlHdmiTest* test, fdf::MmioBuffer controller_mmio)
-      : HdmiDw(std::move(controller_mmio)), test_(test) {}
+  MockHdmiTransmitterController() = default;
+  ~MockHdmiTransmitterController() { EXPECT_TRUE(expected_calls_.empty()); }
+
+  zx_status_t InitHw() override { return ZX_OK; }
+  zx_status_t EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) override { return ZX_OK; }
 
   void ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
                     const display::DisplayTiming& mode,
-                    const designware_hdmi::hdmi_param_tx& p) override;
-  void SetupInterrupts() override;
-  void Reset() override;
-  void SetupScdc(bool is4k) override;
-  void ResetFc() override;
-  void SetFcScramblerCtrl(bool is4k) override;
+                    const designware_hdmi::hdmi_param_tx& p) override {
+    OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kConfigHdmitx);
+  }
+  void SetupInterrupts() override {
+    OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kSetupInterrupts);
+  }
+  void Reset() override { OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kReset); }
+  void SetupScdc(bool is4k) override {
+    OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kSetupScdc);
+  }
+  void ResetFc() override {
+    OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kResetFc);
+  }
+  void SetFcScramblerCtrl(bool is4k) override {
+    OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall::kSetFcScramblerCtrl);
+  }
+
+  void OnHdmiTransmitterControllerCall(HdmiTransmitterControllerCall call) {
+    ASSERT_FALSE(expected_calls_.empty());
+    EXPECT_EQ(expected_calls_.front(), call);
+    expected_calls_.pop_front();
+  }
+
+  void ExpectCalls(const cpp20::span<const HdmiTransmitterControllerCall> expected_calls) {
+    std::copy(expected_calls.begin(), expected_calls.end(), std::back_inserter(expected_calls_));
+  }
+
+  void PrintRegisters() override {}
 
  private:
-  AmlHdmiTest* test_;
-};
-
-class FakeAmlHdmiDevice : public AmlHdmiDevice {
- public:
-  static std::unique_ptr<FakeAmlHdmiDevice> Create(AmlHdmiTest* test,
-                                                   fdf::MmioBuffer controller_ip_mmio,
-                                                   fdf::MmioBuffer top_level_mmio,
-                                                   zx::resource smc) {
-    auto device = std::make_unique<FakeAmlHdmiDevice>(test, std::move(controller_ip_mmio),
-                                                      std::move(top_level_mmio), std::move(smc));
-    return device;
-  }
-
-  explicit FakeAmlHdmiDevice(AmlHdmiTest* test, fdf::MmioBuffer controller_ip_mmio,
-                             fdf::MmioBuffer top_level_mmio, zx::resource smc)
-      : AmlHdmiDevice(nullptr, std::move(top_level_mmio),
-                      std::make_unique<FakeHdmiDw>(test, std::move(controller_ip_mmio)),
-                      std::move(smc)) {
-    loop_.StartThread("fake-aml-hdmi-test-thread");
-  }
-
-  void BindServer(fidl::ServerEnd<fuchsia_hardware_hdmi::Hdmi> server) {
-    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(server), this);
-  }
-
- private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-  std::optional<fidl::ServerBindingRef<fuchsia_hardware_hdmi::Hdmi>> binding_;
+  std::list<HdmiTransmitterControllerCall> expected_calls_;
 };
 
 class AmlHdmiTest : public testing::Test {
  public:
   void SetUp() override {
+    loop_.StartThread("aml-hdmi-test-thread");
+
+    auto mock_hdmitx_controller = std::make_unique<MockHdmiTransmitterController>();
+    mock_hdmitx_controller_ = mock_hdmitx_controller.get();
+
     // TODO(fxbug.dev/123426): Use a fake SMC resource, when the
     // implementation lands.
-    dut_ = FakeAmlHdmiDevice::Create(this, controller_ip_mmio_range_.GetMmioBuffer(),
-                                     top_level_mmio_range_.GetMmioBuffer(), /*smc=*/zx::resource{});
+    dut_ =
+        std::make_unique<AmlHdmiDevice>(nullptr, top_level_mmio_range_.GetMmioBuffer(),
+                                        std::move(mock_hdmitx_controller), /*smc=*/zx::resource{});
     ASSERT_TRUE(dut_);
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_hdmi::Hdmi>();
     ASSERT_TRUE(endpoints.is_ok());
-    dut_->BindServer(std::move(endpoints->server));
+
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server), dut_.get());
     hdmi_client_.Bind(std::move(endpoints->client));
   }
 
-  void TearDown() override {
-    ASSERT_EQ(expected_dw_calls_.size(), 0u);
-    top_level_mmio_range_.CheckAllAccessesReplayed();
-  }
-
-  void HdmiDwCall(HdmiDwFn func) {
-    ASSERT_FALSE(expected_dw_calls_.empty());
-    ASSERT_EQ(expected_dw_calls_.front(), func);
-    expected_dw_calls_.pop();
-  }
-  void ExpectHdmiDwConfigHdmitx() { expected_dw_calls_.push(HdmiDwFn::kConfigHdmitx); }
-  void ExpectHdmiDwSetupInterrupts() { expected_dw_calls_.push(HdmiDwFn::kSetupInterrupts); }
-  void ExpectHdmiDwReset() { expected_dw_calls_.push(HdmiDwFn::kReset); }
-  void ExpectHdmiDwSetupScdc() { expected_dw_calls_.push(HdmiDwFn::kSetupScdc); }
-  void ExpectHdmiDwResetFc() { expected_dw_calls_.push(HdmiDwFn::kResetFc); }
-  void ExpectHdmiDwSetFcScramblerCtrl() { expected_dw_calls_.push(HdmiDwFn::kSetFcScramblerCtrl); }
+  void TearDown() override { top_level_mmio_range_.CheckAllAccessesReplayed(); }
 
  protected:
-  // This test doesn't check the register read / write operations on the
-  // Controller IP region (which should be covered by hdmi-dw tests); so we
-  // use a `FakeMmioRegRegion` for this region.
-  constexpr static size_t kControllerIpMmioRegCount = 0x8000;
-  ddk_fake::FakeMmioRegRegion controller_ip_mmio_range_{/*reg_size=*/1, kControllerIpMmioRegCount};
-
   constexpr static int kTopLevelMmioRangeSize = 0x8000;
   ddk_mock::MockMmioRange top_level_mmio_range_{kTopLevelMmioRangeSize,
                                                 ddk_mock::MockMmioRange::Size::k32};
 
-  std::unique_ptr<FakeAmlHdmiDevice> dut_;
+  std::unique_ptr<AmlHdmiDevice> dut_;
+
+  // Owned by `dut_`.
+  MockHdmiTransmitterController* mock_hdmitx_controller_ = nullptr;
+
+  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
+  std::optional<fidl::ServerBindingRef<fuchsia_hardware_hdmi::Hdmi>> binding_;
+
   HdmiClient hdmi_client_;
-
-  std::queue<HdmiDwFn> expected_dw_calls_;
 };
-
-void FakeHdmiDw::ConfigHdmitx(const designware_hdmi::ColorParam& color_param,
-                              const display::DisplayTiming& mode,
-                              const designware_hdmi::hdmi_param_tx& p) {
-  test_->HdmiDwCall(HdmiDwFn::kConfigHdmitx);
-}
-
-void FakeHdmiDw::SetupInterrupts() { test_->HdmiDwCall(HdmiDwFn::kSetupInterrupts); }
-
-void FakeHdmiDw::Reset() { test_->HdmiDwCall(HdmiDwFn::kReset); }
-
-void FakeHdmiDw::SetupScdc(bool is4k) { test_->HdmiDwCall(HdmiDwFn::kSetupScdc); }
-
-void FakeHdmiDw::ResetFc() { test_->HdmiDwCall(HdmiDwFn::kResetFc); }
-
-void FakeHdmiDw::SetFcScramblerCtrl(bool is4k) { test_->HdmiDwCall(HdmiDwFn::kSetFcScramblerCtrl); }
 
 // Register addresses from the A311D datasheet section 10.2.3.44 "HDCP2.2 IP
 // Register Access".
@@ -185,9 +156,11 @@ TEST_F(AmlHdmiTest, ModeSetTest) {
       .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb,
       .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
   };
-  fuchsia_hardware_hdmi::wire::DisplayMode mode(allocator);
-  mode.set_mode(allocator, standard_display_mode);
-  mode.set_color(color);
+  const fuchsia_hardware_hdmi::wire::DisplayMode mode =
+      fuchsia_hardware_hdmi::wire::DisplayMode::Builder(allocator)
+          .mode(standard_display_mode)
+          .color(color)
+          .Build();
 
   top_level_mmio_range_.Expect(ddk_mock::MockMmioRange::AccessList({
       {.address = kHdmiTxTopBistCntl, .value = 1 << 12, .write = true},
@@ -199,12 +172,16 @@ TEST_F(AmlHdmiTest, ModeSetTest) {
       {.address = kHdmiTxTopTmdsClkPttnCntl, .value = 0x02, .write = true},
   }));
 
-  ExpectHdmiDwConfigHdmitx();
-  ExpectHdmiDwSetupInterrupts();
-  ExpectHdmiDwReset();
-  ExpectHdmiDwSetFcScramblerCtrl();
-  ExpectHdmiDwSetupScdc();
-  ExpectHdmiDwResetFc();
+  static constexpr HdmiTransmitterControllerCall kExpectedCalls[] = {
+      HdmiTransmitterControllerCall::kConfigHdmitx,
+      HdmiTransmitterControllerCall::kSetupInterrupts,
+      HdmiTransmitterControllerCall::kReset,
+      HdmiTransmitterControllerCall::kSetFcScramblerCtrl,
+      HdmiTransmitterControllerCall::kSetupScdc,
+      HdmiTransmitterControllerCall::kResetFc,
+  };
+  mock_hdmitx_controller_->ExpectCalls(kExpectedCalls);
+
   auto pres = hdmi_client_->ModeSet(1, mode);
   ASSERT_OK(pres.status());
 }

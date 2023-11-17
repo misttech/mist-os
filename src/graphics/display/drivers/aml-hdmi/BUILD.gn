@@ -34,7 +34,7 @@ source_set("common_srcs") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/designware:hdmi-dw",
+    "//src/graphics/display/lib/designware:hdmi-transmitter-controller-impl",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

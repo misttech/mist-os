@@ -23,7 +23,8 @@
 #include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware/color-param.h"
-#include "src/graphics/display/lib/designware/hdmi-dw.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
 
 #define HDMI_ASPECT_RATIO_NONE 0
 #define HDMI_ASPECT_RATIO_4x3 1
@@ -65,7 +66,8 @@ zx_status_t AmlHdmiDevice::Bind() {
   }
   {
     fbl::AutoLock dw_lock(&dw_lock_);
-    hdmi_dw_ = std::make_unique<designware_hdmi::HdmiDw>(std::move(*hdmitx_controller_ip_mmio));
+    hdmi_dw_ = std::make_unique<designware_hdmi::HdmiTransmitterControllerImpl>(
+        std::move(*hdmitx_controller_ip_mmio));
   }
 
   static constexpr uint32_t kHdmitxTopLevelIndex = 1;
@@ -215,7 +217,7 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   // AMLogic-provided bringup code initializes HDCP before clearing
   // interrupts on the DesignWare HDMI IP's. Following the same sequence
   // would be difficult given our current layering, as we clear interrupts
-  // in HdmiDw::ConfigHdmitx().
+  // in HdmiTransmitterController::ConfigHdmitx().
   //
   // Fortunately, experiments on VIM3 (using A311D) show that the HDCP
   // initialization SMC still works if invoked after the interrupts are
@@ -387,7 +389,8 @@ AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
     : DeviceType(parent), pdev_(parent), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {}
 
 AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
-                             std::unique_ptr<designware_hdmi::HdmiDw> hdmi_dw, zx::resource smc)
+                             std::unique_ptr<designware_hdmi::HdmiTransmitterController> hdmi_dw,
+                             zx::resource smc)
     : DeviceType(parent),
       pdev_(parent),
       hdmi_dw_(std::move(hdmi_dw)),
