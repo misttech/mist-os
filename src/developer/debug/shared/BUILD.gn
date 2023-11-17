@@ -18,6 +18,8 @@ sdk_source_set("shared") {
     "arch_arm64.h",
     "arch_x86.cc",
     "arch_x86.h",
+    "buffered_bidi_pipe.cc",
+    "buffered_bidi_pipe.h",
     "buffered_fd.cc",
     "buffered_fd.h",
     "buffered_stream.h",

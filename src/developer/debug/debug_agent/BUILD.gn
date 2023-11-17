@@ -162,6 +162,8 @@ static_library("lib") {
     }
   } else if (is_linux) {
     sources += [
+      "aligned_chunk.cc",
+      "aligned_chunk.h",
       "linux_utils.cc",
       "linux_utils.h",
       "posix/dir_reader_linux.h",
@@ -340,6 +342,7 @@ test("unit_tests") {
     ]
   } else if (is_linux) {
     sources += [
+      "aligned_chunk_unittest.cc",
       "linux_utils_unittest.cc",
       "posix/file_descriptor_shuffle_unittest.cc",
     ]
