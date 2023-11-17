@@ -265,11 +265,6 @@ fit::result<zx_status_t, bool> IsImageFormatConstraintsPixelFormatDoNotCare(
   if (*x.pixel_format() != fuchsia_images2::PixelFormat::kDoNotCare) {
     return fit::ok(false);
   }
-  if (x.pixel_format_modifier().has_value() &&
-      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierNone &&
-      *x.pixel_format_modifier() != fuchsia_images2::kFormatModifierDoNotCare) {
-    return fit::error(ZX_ERR_INVALID_ARGS);
-  }
   return fit::ok(true);
 }
 
@@ -293,7 +288,7 @@ fit::result<zx_status_t, bool> IsImageFormatConstraintsArrayPixelFormatDoNotCare
   for (uint32_t i = 0; i < x.size(); ++i) {
     auto element_result = IsImageFormatConstraintsPixelFormatDoNotCare(x[i]);
     if (element_result.is_error()) {
-      return element_result;
+      return element_result.take_error();
     }
     if (element_result.value()) {
       ++do_not_care_count;
@@ -348,7 +343,11 @@ void ReplicatePixelFormatDoNotCare(
     ZX_DEBUG_ASSERT(to_match[i].pixel_format().has_value());
     ZX_DEBUG_ASSERT(to_match[i].pixel_format_modifier().has_value());
     to_update[i].pixel_format() = *to_match[i].pixel_format();
-    to_update[i].pixel_format_modifier() = *to_match[i].pixel_format_modifier();
+    // A client is allowed to constrain pixel_format_modifier but have pixel_format DoNotCare.
+    // This can be used to force LINEAR without constraining which pixel_format.
+    if (*to_update[i].pixel_format_modifier() == fuchsia_images2::kFormatModifierDoNotCare) {
+      to_update[i].pixel_format_modifier() = *to_match[i].pixel_format_modifier();
+    }
   }
   ZX_DEBUG_ASSERT(to_update.size() == to_match.size());
   ZX_DEBUG_ASSERT(!to_update.empty());
@@ -1391,7 +1390,8 @@ void LogicalBufferCollection::MaybeAllocate() {
           ignore_result(done_with_subtree ||
                         (NextGroupChildSelection(groups_by_priority), false))) {
         if (combination_ordinal == kMaxGroupChildCombinations) {
-          LOG(INFO, "hit kMaxGroupChildCombinations before successful constraint aggregation");
+          LogInfo(FROM_HERE,
+                  "hit kMaxGroupChildCombinations before successful constraint aggregation");
           subtree_status = ZX_ERR_OUT_OF_RANGE;
           done_with_subtree = true;
           break;
@@ -1501,7 +1501,7 @@ void LogicalBufferCollection::MaybeAllocate() {
           SetFailedLateLogicalAllocationResult(all_subtree_nodes[0], subtree_status);
         } else {
           // fail the initial allocation from root_ down
-          LOG(INFO, "fail the initial allocation from root_ down");
+          LogInfo(FROM_HERE, "fail the initial allocation from root_ down");
           SetFailedAllocationResult(subtree_status);
         }
       }
@@ -2644,11 +2644,16 @@ bool LogicalBufferCollection::CheckSanitizeImageFormatConstraints(
   ZX_DEBUG_ASSERT(constraints.pixel_format_modifier().has_value() ||
                   stage == CheckSanitizeStage::kNotAggregated);
   if (stage == CheckSanitizeStage::kNotAggregated) {
-    if (IsAnyUsage(buffer_usage)) {
-      // kFormatModifierNone / kFormatModifierLinear is the default when there is any usage. A
-      // client with usage which doesn't care what the pixel format modifier is (what tiling is
-      // used) can explicitly specify kFormatModifierDoNotCare instead of leaving
-      // pixel_format_modifier un-set..
+    if (*constraints.pixel_format() == fuchsia_images2::PixelFormat::kDoNotCare) {
+      // pixel_format kDoNotCare and un-set pixel_format_modifier implies kFormatModifierDoNotCare.
+      // A client that wants to constrain pixel_format_modifier can set the pixel_format_modifier
+      // field.
+      FIELD_DEFAULT(constraints, pixel_format_modifier, fuchsia_images2::kFormatModifierDoNotCare);
+    } else if (IsAnyUsage(buffer_usage)) {
+      // When pixel_format != kDoNotCare, kFormatModifierNone / kFormatModifierLinear is the default
+      // when there is any usage. A client with usage which doesn't care what the pixel format
+      // modifier is (what tiling is used) can explicitly specify kFormatModifierDoNotCare instead
+      // of leaving pixel_format_modifier un-set..
       FIELD_DEFAULT_ZERO_64_BIT(constraints, pixel_format_modifier);
     } else {
       // A client with no usage, which also doesn't set pixel_format_modifier, doesn't prevent using
