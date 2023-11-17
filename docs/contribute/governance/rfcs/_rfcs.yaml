@@ -3048,3 +3048,16 @@
   reviewers: ['']
   submitted: '2023-08-23'
   reviewed: '2023-10-24'
+
+- name: 'RFC-0234'
+  title: 'Updating the RISC-V ABI: RVA22 + V'
+  short_description: "Update Fuchsia's RISC-V ABI to RVA22 + V"
+  authors: ['joshuaseaton@google.com']
+  file: '0234_riscv_abi_rva22+v.md'
+  area: ['Kernel', 'Toolchain']
+  issue: ['']
+  gerrit_change_id: ['940906']
+  status: 'Pending'
+  reviewers: ['mcgrathr@google.com', 'travisg@google.com']
+  submitted: ''
+  reviewed: ''

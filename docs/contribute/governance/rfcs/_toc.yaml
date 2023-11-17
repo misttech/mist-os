@@ -482,3 +482,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
   - title: "RFC-0233: FIDL legacy by default"
     path: /docs/contribute/governance/rfcs/0233_fidl_legacy_by_default.md
+  - title: "RFC-0234: Updating the RISC-V ABI: RVA22 + V"
+    path: /docs/contribute/governance/rfcs/0234_riscv_abi_rva22+v.md
