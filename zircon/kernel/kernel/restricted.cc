@@ -74,7 +74,7 @@ template <typename T>
   vmm_set_active_aspace(up->normal_aspace());
 
   // bounce into normal mode
-  KTRACE_INSTANT("kernel:restricted", "RestrictedLeave", ("reason", reason));
+  KTRACE_DURATION_END("kernel:restricted", "restricted mode", ("reason", reason));
   RestrictedState::ArchEnterFull(rs->arch_normal_state(), rs->vector_ptr(), rs->context(), reason);
 
   __UNREACHABLE;
@@ -161,6 +161,7 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // Now that the normal mode state has been saved, we can decide if we're going to continue on with
   // the mode switch or simply vector-return to normal mode because of a pending kick.
   if (Thread::Current::CheckForRestrictedKick()) {
+    KTRACE_DURATION_END("kernel:syscall", "restricted_enter");
     RestrictedState::ArchEnterFull(rs->arch_normal_state(), vector_table_ptr, context,
                                    ZX_RESTRICTED_REASON_KICK);
     __UNREACHABLE;
@@ -170,7 +171,6 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   // user mode to ensure the thread's active aspace and "in restricted mode" flags are consistent
   // with the thread being in restricted mode.  No error returns from here on out.  Interrupts must
   // remain disabled.
-  KTRACE_INSTANT("kernel:restricted", "RestrictedEnter");
   ProcessDispatcher* up = ProcessDispatcher::GetCurrent();
   VmAspace* restricted_aspace = up->restricted_aspace();
   // This check can be removed once the restricted mode tests can and do run with a restricted
@@ -180,6 +180,8 @@ zx_status_t RestrictedEnter(uint32_t options, uintptr_t vector_table_ptr, uintpt
   }
   rs->set_in_restricted(true);
   arch_set_restricted_flag(true);
+  KTRACE_DURATION_END("kernel:syscall", "restricted_enter");
+  KTRACE_DURATION_BEGIN("kernel:restricted", "restricted mode");
   RestrictedState::ArchEnterRestricted(state);
 
   __UNREACHABLE;
@@ -190,8 +192,8 @@ void RedirectRestrictedExceptionToNormalMode(RestrictedState* rs) {
   zx_restricted_state_t* state = rs->state_ptr();
   DEBUG_ASSERT(state);
 
-  KTRACE_INSTANT("kernel:restricted", "RestrictedLeave",
-                 ("reason", ZX_RESTRICTED_REASON_EXCEPTION));
+  KTRACE_DURATION_END("kernel:restricted", "restricted mode",
+                      ("reason", ZX_RESTRICTED_REASON_EXCEPTION));
 
   // Save the exception register state into the restricted state.
   RestrictedState::ArchSaveRestrictedExceptionState(*state);
