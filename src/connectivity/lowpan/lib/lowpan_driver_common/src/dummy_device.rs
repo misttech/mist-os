@@ -268,7 +268,7 @@ impl Driver for DummyDevice {
         use futures::stream::pending;
         let initial = Ok(DeviceState {
             connectivity_state: Some(ConnectivityState::Ready),
-            role: None,
+            role: Some(Role::Detached),
             ..Default::default()
         });
 

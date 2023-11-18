@@ -1022,11 +1022,12 @@ mod tests {
                 "events": {
                     "0": {
                         "@time": AnyProperty,
-                        "msg": "connectivity_state:->Ready"
+                        "msg": "connectivity_state:->Ready;role:->Detached\n"
                     }
                 },
                 "status": {
                     "connectivity_state": "Ready",
+                    "role": "Detached"
                 },
                 "counters": contains {
                     "rx_ack_requested": AnyProperty,
