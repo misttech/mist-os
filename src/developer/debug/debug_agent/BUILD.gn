@@ -9,7 +9,6 @@ static_library("lib") {
   sources = [
     "align.cc",
     "align.h",
-    "arch.cc",
     "arch.h",
     "automation_handler.cc",
     "automation_handler.h",
@@ -102,6 +101,7 @@ static_library("lib") {
       "debug_agent_server.h",
       "test_realm.cc",
       "test_realm.h",
+      "zircon_arch.cc",
       "zircon_arch.h",
       "zircon_binary_launcher.cc",
       "zircon_binary_launcher.h",
@@ -164,6 +164,15 @@ static_library("lib") {
     sources += [
       "aligned_chunk.cc",
       "aligned_chunk.h",
+      "linux_arch.h",
+      "linux_binary_launcher.cc",
+      "linux_binary_launcher.h",
+      "linux_exception_handle.cc",
+      "linux_exception_handle.h",
+      "linux_suspend_handle.h",
+      "linux_task.cc",
+      "linux_task.h",
+      "linux_task_observer.h",
       "linux_utils.cc",
       "linux_utils.h",
       "posix/dir_reader_linux.h",
@@ -171,6 +180,14 @@ static_library("lib") {
       "posix/file_descriptor_shuffle.cc",
       "posix/file_descriptor_shuffle.h",
     ]
+    if (current_cpu == "x64") {
+      sources += [ "linux_arch_x64.cc" ]
+    } else if (current_cpu == "arm64") {
+      sources += [ "linux_arch_arm64.cc" ]
+    } else if (current_cpu == "riscv64") {
+      # TODO(https://fxbug.dev/123097): Implement this:
+      # sources += [ "linux_arch_riscv64.cc" ]
+    }
   }
 
   # TODO(https://fxbug.dev/58162): delete the below and fix compiler warnings
