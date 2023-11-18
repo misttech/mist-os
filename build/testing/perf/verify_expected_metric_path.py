@@ -1,14 +1,16 @@
-# Copyright 2021 The Fuchsia Authors. All rights reserved.
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-""" This script generates the component manifest used by the validation-client component."""
+""" This script asserts that expected_metric_names_filepath refers to a file in
+an allowlisted directory."""
 
 import argparse
 import os.path
 
-EXPECTED_METRICS_DIR_PATH = os.path.join(
-    "tests", "end_to_end", "perf", "expected_metric_names"
-)
+ALLOWED_METRICS_DIR_PATHS = [
+    "//src/tests/end_to_end/perf/expected_metric_names",
+    "//vendor/google/tests/end_to_end/perf/expected_metric_names",
+]
 
 
 def main():
@@ -25,10 +27,10 @@ def main():
 
     metric_names_filepath = args.expected_metric_names_filepath
     dir_path = os.path.dirname(metric_names_filepath)
-    if not dir_path.endswith(EXPECTED_METRICS_DIR_PATH):
+    if not dir_path in ALLOWED_METRICS_DIR_PATHS:
         raise Exception(
-            f"Directory containing expected metric file must end in "
-            '"{EXPECTED_METRICS_DIR_PATH}": {metric_names_filepath}'
+            "Directory containing expected metric file must be one of: "
+            f'"{ALLOWED_METRICS_DIR_PATHS}": {metric_names_filepath}'
         )
 
     with open(args.output_file, "w") as f:
