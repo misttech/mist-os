@@ -283,7 +283,7 @@ type ToggledState = strict enum {
 };
 
 /// Represents the enabled/disabled state of an element.
-@available(added=16)
+@available(added=15)
 type EnabledState = strict enum {
     /// Element is enabled.
     ENABLED = 1;
@@ -341,7 +341,7 @@ type States = table {
    10: has_input_focus bool;
 
     /// State of an element with enabled/disabled state.
-    @available(added=16)
+    @available(added=15)
    11: enabled_state EnabledState;
 };
 
