@@ -3,6 +3,9 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_lowpan::MacAddress;
+use fidl_fuchsia_lowpan_device::ConnectivityState as lowpan_ConnectivityState;
+use fidl_fuchsia_lowpan_device::DeviceState;
+use fidl_fuchsia_lowpan_device::Role as lowpan_RoleState;
 use fidl_fuchsia_lowpan_test::{
     MacAddressFilterItem, MacAddressFilterMode, MacAddressFilterSettings, NeighborInfo,
 };
@@ -15,6 +18,7 @@ pub enum WpanMethod {
     GetNcpChannel,
     GetNcpMacAddress,
     GetNcpRssi,
+    GetNcpDeviceState,
     GetNcpState,
     GetNetworkName,
     GetNeighborTable,
@@ -37,6 +41,7 @@ impl std::str::FromStr for WpanMethod {
             "GetNcpChannel" => Ok(WpanMethod::GetNcpChannel),
             "GetNcpMacAddress" => Ok(WpanMethod::GetNcpMacAddress),
             "GetNcpRssi" => Ok(WpanMethod::GetNcpRssi),
+            "GetNcpDeviceState" => Ok(WpanMethod::GetNcpDeviceState),
             "GetNcpState" => Ok(WpanMethod::GetNcpState),
             "GetNeighborTable" => Ok(WpanMethod::GetNeighborTable),
             "GetNetworkName" => Ok(WpanMethod::GetNetworkName),
@@ -62,6 +67,60 @@ pub enum ConnectivityState {
     Isolated,
     Commissioning,
     Unknown,
+}
+
+#[derive(Serialize)]
+pub enum RoleState {
+    Detached,
+    Child,
+    Router,
+    Leader,
+    Unknown,
+}
+
+#[derive(Serialize)]
+pub struct DeviceStateDto {
+    pub connectivity_state: Option<ConnectivityState>,
+    pub role: Option<RoleState>,
+}
+
+impl From<DeviceState> for DeviceStateDto {
+    fn from(d: DeviceState) -> Self {
+        DeviceStateDto {
+            connectivity_state: d.connectivity_state.map(|state| state.into()),
+            role: d.role.map(|role| role.into()),
+        }
+    }
+}
+
+impl From<lowpan_RoleState> for RoleState {
+    fn from(value: lowpan_RoleState) -> Self {
+        match value {
+            lowpan_RoleState::Detached => RoleState::Detached,
+            lowpan_RoleState::EndDevice => RoleState::Child,
+            lowpan_RoleState::Router => RoleState::Router,
+            lowpan_RoleState::SleepyEndDevice => RoleState::Child,
+            lowpan_RoleState::SleepyRouter => RoleState::Router,
+            lowpan_RoleState::Leader => RoleState::Leader,
+            lowpan_RoleState::Coordinator => RoleState::Leader,
+            _ => RoleState::Unknown,
+        }
+    }
+}
+
+impl From<lowpan_ConnectivityState> for ConnectivityState {
+    fn from(value: lowpan_ConnectivityState) -> Self {
+        match value {
+            lowpan_ConnectivityState::Inactive => ConnectivityState::Inactive,
+            lowpan_ConnectivityState::Ready => ConnectivityState::Ready,
+            lowpan_ConnectivityState::Offline => ConnectivityState::Offline,
+            lowpan_ConnectivityState::Attaching => ConnectivityState::Attaching,
+            lowpan_ConnectivityState::Attached => ConnectivityState::Attached,
+            lowpan_ConnectivityState::Isolated => ConnectivityState::Isolated,
+            lowpan_ConnectivityState::Commissioning => ConnectivityState::Commissioning,
+            _ => ConnectivityState::Unknown,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]

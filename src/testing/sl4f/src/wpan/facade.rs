@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::types::{ConnectivityState, MacAddressFilterSettingsDto, NeighborInfoDto};
+use super::types::{
+    ConnectivityState, DeviceStateDto, MacAddressFilterSettingsDto, NeighborInfoDto,
+};
 use crate::common_utils::lowpan_context::LowpanContext;
 use anyhow::Error;
-use fidl_fuchsia_lowpan_device::ConnectivityState as lowpan_ConnectivityState;
 use fidl_fuchsia_lowpan_device::{DeviceExtraProxy, DeviceProxy};
 use fidl_fuchsia_lowpan_test::DeviceTestProxy;
 use parking_lot::{RwLock, RwLockUpgradableReadGuard};
@@ -124,6 +125,15 @@ impl WpanFacade {
         Ok(router_id)
     }
 
+    /// Returns the device state from the DeviceTest proxy service.
+    pub async fn get_ncp_device_state(&self) -> Result<DeviceStateDto, Error> {
+        let device_state = match self.device.read().as_ref() {
+            Some(device) => device.watch_device_state().await?,
+            _ => bail!("DeviceTest proxy is not set"),
+        };
+        Ok(device_state.into())
+    }
+
     /// Returns the connectivity state from the DeviceTest proxy service.
     pub async fn get_ncp_state(&self) -> Result<ConnectivityState, Error> {
         let device_state = match self.device.read().as_ref() {
@@ -131,7 +141,7 @@ impl WpanFacade {
             _ => bail!("DeviceTest proxy is not set"),
         };
         match device_state {
-            Some(connectivity_state) => Ok(WpanFacade::to_connectivity_state(connectivity_state)),
+            Some(connectivity_state) => Ok(connectivity_state.into()),
             None => bail!("Device state is not defined!"),
         }
     }
@@ -192,19 +202,6 @@ impl WpanFacade {
             _ => bail!("DeviceTest proxy is not set!"),
         };
         Ok(settings.into_iter().map(|setting| setting.into()).collect())
-    }
-
-    fn to_connectivity_state(connectivity_state: lowpan_ConnectivityState) -> ConnectivityState {
-        match connectivity_state {
-            lowpan_ConnectivityState::Inactive => ConnectivityState::Inactive,
-            lowpan_ConnectivityState::Ready => ConnectivityState::Ready,
-            lowpan_ConnectivityState::Offline => ConnectivityState::Offline,
-            lowpan_ConnectivityState::Attaching => ConnectivityState::Attaching,
-            lowpan_ConnectivityState::Attached => ConnectivityState::Attached,
-            lowpan_ConnectivityState::Isolated => ConnectivityState::Isolated,
-            lowpan_ConnectivityState::Commissioning => ConnectivityState::Commissioning,
-            _ => ConnectivityState::Unknown,
-        }
     }
 }
 
@@ -337,6 +334,12 @@ mod tests {
     async fn test_get_thread_router_id() {
         let facade = MOCK_TESTER.create_facade_and_serve();
         MockTester::assert_wpan_fn(facade.0.get_thread_router_id(), facade.1).await;
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_get_ncp_device_state() {
+        let facade = MOCK_TESTER.create_facade_and_serve();
+        MockTester::assert_wpan_fn(facade.0.get_ncp_device_state(), facade.1).await;
     }
 
     #[fasync::run_singlethreaded(test)]
