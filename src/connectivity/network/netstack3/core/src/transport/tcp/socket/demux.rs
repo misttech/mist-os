@@ -34,8 +34,8 @@ use crate::{
     },
     socket::{
         address::{
-            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr,
-            ListenerIpAddr, SocketIpAddr,
+            AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr,
+            SocketIpAddr,
         },
         AddrVec, InsertError,
     },
@@ -49,7 +49,7 @@ use crate::{
             do_send_inner, isn::IsnGenerator, BoundSocketState, Connection, DemuxState,
             DemuxSyncContext as _, HandshakeStatus, Listener, ListenerAddrState,
             ListenerSharingState, MaybeListener, NonSyncContext, PrimaryRc, SyncContext,
-            TcpBindingsTypes, TcpIpTransportContext, TcpSocketId, TcpSocketSetEntry,
+            TcpBindingsTypes, TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry,
             TcpSocketState,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
@@ -163,7 +163,7 @@ fn handle_incoming_packet<I, B, C, SC>(
     trace_duration!(ctx, "tcp::handle_incoming_packet");
     let mut tw_reuse = None;
 
-    let mut addrs_to_search = AddrVecIter::<I, SC::WeakDeviceId, IpPortSpec>::with_device(
+    let mut addrs_to_search = AddrVecIter::<I, SC::WeakDeviceId, TcpPortSpec>::with_device(
         conn_addr.into(),
         sync_ctx.downgrade_device_id(incoming_device),
     );
@@ -230,7 +230,7 @@ fn handle_incoming_packet<I, B, C, SC>(
                         // Reset the address vector iterator and go again, a
                         // conflicting connection was found.
                         addrs_to_search =
-                            AddrVecIter::<I, SC::WeakDeviceId, IpPortSpec>::with_device(
+                            AddrVecIter::<I, SC::WeakDeviceId, TcpPortSpec>::with_device(
                                 conn_addr.into(),
                                 sync_ctx.downgrade_device_id(incoming_device),
                             );
@@ -327,7 +327,7 @@ enum SocketLookupResult<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> {
 
 fn lookup_socket<I, SC, C>(
     DemuxState { socketmap, .. }: &DemuxState<I, SC::WeakDeviceId, C>,
-    addrs_to_search: &mut AddrVecIter<I, SC::WeakDeviceId, IpPortSpec>,
+    addrs_to_search: &mut AddrVecIter<I, SC::WeakDeviceId, TcpPortSpec>,
 ) -> Option<SocketLookupResult<I, SC::WeakDeviceId, C>>
 where
     I: IpLayerIpExt,

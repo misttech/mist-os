@@ -61,13 +61,13 @@ use crate::{
     },
     socket::{
         address::{
-            AddrIsMappedError, ConnAddr, ConnIpAddr, IpPortSpec, ListenerAddr, ListenerIpAddr,
-            SocketIpAddr, SocketZonedIpAddr,
+            AddrIsMappedError, ConnAddr, ConnIpAddr, ListenerAddr, ListenerIpAddr, SocketIpAddr,
+            SocketZonedIpAddr,
         },
         AddrVec, Bound, BoundSocketMap, IncompatibleError, InsertError, Inserter, ListenerAddrInfo,
-        RemoveResult, Shutdown, SocketMapAddrStateSpec, SocketMapAddrStateUpdateSharingSpec,
-        SocketMapConflictPolicy, SocketMapStateSpec, SocketMapUpdateSharingPolicy,
-        UpdateSharingError,
+        RemoveResult, Shutdown, SocketMapAddrSpec, SocketMapAddrStateSpec,
+        SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
+        SocketMapUpdateSharingPolicy, UpdateSharingError,
     },
     sync::RwLock,
     transport::tcp::{
@@ -357,6 +357,14 @@ impl<A: IpAddress, D: fmt::Display> fmt::Display for SocketAddr<A, D> {
     }
 }
 
+/// Uninstantiable type used to implement [`SocketMapAddrSpec`] for TCP
+pub(crate) enum TcpPortSpec {}
+
+impl SocketMapAddrSpec for TcpPortSpec {
+    type RemoteIdentifier = NonZeroU16;
+    type LocalIdentifier = NonZeroU16;
+}
+
 /// An implementation of [`IpTransportContext`] for TCP.
 pub(crate) enum TcpIpTransportContext {}
 
@@ -584,11 +592,11 @@ impl<I: IpExt, D: device::Id, S: SpecSocketId>
         ListenerSharingState,
         I,
         D,
-        IpPortSpec,
+        TcpPortSpec,
     > for TcpSocketSpec<I, D, S>
 {
     fn allows_sharing_update(
-        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, TcpPortSpec>, Bound<Self>>,
         addr: &ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
         ListenerSharingState{listening: old_listening, sharing: old_sharing}: &ListenerSharingState,
         ListenerSharingState{listening: new_listening, sharing: new_sharing}: &ListenerSharingState,
@@ -786,13 +794,13 @@ impl<I: IpExt, D: device::Id, S: SpecSocketId>
         ListenerSharingState,
         I,
         D,
-        IpPortSpec,
+        TcpPortSpec,
     > for TcpSocketSpec<I, D, S>
 {
     fn check_insert_conflicts(
         sharing: &ListenerSharingState,
         addr: &ListenerAddr<ListenerIpAddr<I::Addr, NonZeroU16>, D>,
-        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, TcpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         let addr = AddrVec::Listen(addr.clone());
         let ListenerSharingState { listening: _, sharing } = sharing;
@@ -844,13 +852,13 @@ impl<I: IpExt, D: device::Id, S: SpecSocketId>
         SharingState,
         I,
         D,
-        IpPortSpec,
+        TcpPortSpec,
     > for TcpSocketSpec<I, D, S>
 {
     fn check_insert_conflicts(
         _sharing: &SharingState,
         addr: &ConnAddr<ConnIpAddr<I::Addr, NonZeroU16, NonZeroU16>, D>,
-        socketmap: &SocketMap<AddrVec<I, D, IpPortSpec>, Bound<Self>>,
+        socketmap: &SocketMap<AddrVec<I, D, TcpPortSpec>, Bound<Self>>,
     ) -> Result<(), InsertError> {
         // We need to make sure there are no present sockets that have the same
         // 4-tuple with the to-be-added socket.
@@ -1002,8 +1010,8 @@ impl<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> Drop for TcpSocketSet<I,
 
 pub(crate) struct DemuxState<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes> {
     port_alloc:
-        PortAlloc<BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, TcpSocketId<I, D, BT>>>>,
-    socketmap: BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, TcpSocketId<I, D, BT>>>,
+        PortAlloc<BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, TcpSocketId<I, D, BT>>>>,
+    socketmap: BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, TcpSocketId<I, D, BT>>>,
 }
 
 /// Holds all the TCP socket states.
@@ -1022,7 +1030,7 @@ pub(crate) enum TcpSocketState<I: IpExt, D: device::WeakId, BT: TcpBindingsTypes
 }
 
 impl<I: IpExt, D: device::WeakId, S: SpecSocketId> PortAllocImpl
-    for BoundSocketMap<I, D, IpPortSpec, TcpSocketSpec<I, D, S>>
+    for BoundSocketMap<I, D, TcpPortSpec, TcpSocketSpec<I, D, S>>
 {
     const EPHEMERAL_RANGE: RangeInclusive<u16> = 49152..=65535;
     type Id = Option<SocketIpAddr<I::Addr>>;

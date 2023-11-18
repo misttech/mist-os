@@ -6,7 +6,6 @@
 
 use core::{
     fmt::{self, Debug, Display, Formatter},
-    num::NonZeroU16,
     ops::Deref,
 };
 
@@ -241,15 +240,6 @@ where
     A::Version: DualStackIpExt,
 {
     type Type = DualStackConnIpAddr<NewIp::Addr, LI, RI>;
-}
-
-/// Uninstantiable type used to implement [`SocketMapAddrSpec`] for addresses
-/// with IP addresses and 16-bit local and remote port identifiers.
-pub(crate) enum IpPortSpec {}
-
-impl SocketMapAddrSpec for IpPortSpec {
-    type RemoteIdentifier = NonZeroU16;
-    type LocalIdentifier = NonZeroU16;
 }
 
 impl<I: Ip, A: SocketMapAddrSpec> From<ListenerIpAddr<I::Addr, A::LocalIdentifier>>
