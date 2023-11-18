@@ -19,6 +19,10 @@ class ProcessHandleObserver {
   virtual void OnThreadStarting(std::unique_ptr<ExceptionHandle> exception) = 0;
   virtual void OnThreadExiting(std::unique_ptr<ExceptionHandle> exception) = 0;
   virtual void OnException(std::unique_ptr<ExceptionHandle> exception) = 0;
+
+  // Linux only (Fuchsia process launches are detected on jobs). This is called on the process
+  // executing the fork and is passed the newly forked process.
+  virtual void OnProcessStarting(std::unique_ptr<ProcessHandle> new_process_handle) = 0;
 };
 
 }  // namespace debug_agent

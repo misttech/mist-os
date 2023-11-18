@@ -510,6 +510,14 @@ void DebuggedProcess::OnException(std::unique_ptr<ExceptionHandle> exception) {
   thread->OnException(std::move(exception));
 }
 
+void DebuggedProcess::OnProcessStarting(std::unique_ptr<ProcessHandle> new_process_handle) {
+  // This is called only on Linux when we observe a fork. Fuchsia new processes are detected by
+  // the job.
+#if defined(__linux__)
+  // TODO(brettw) implement this.
+#endif
+}
+
 void DebuggedProcess::OnAddressSpace(const debug_ipc::AddressSpaceRequest& request,
                                      debug_ipc::AddressSpaceReply* reply) {
   reply->map = process_handle_->GetAddressSpace(request.address);

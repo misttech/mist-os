@@ -9,6 +9,7 @@
 
 #include "src/developer/debug/debug_agent/linux_arch.h"
 #include "src/developer/debug/debug_agent/linux_task.h"
+#include "src/developer/debug/debug_agent/linux_thread_handle.h"
 
 namespace debug_agent {
 
@@ -36,9 +37,7 @@ LinuxExceptionHandle::~LinuxExceptionHandle() {
 }
 
 std::unique_ptr<ThreadHandle> LinuxExceptionHandle::GetThreadHandle() const {
-  // TODO(brettw) implement this:
-  // return std::make_unique<LinuxThreadHandle>(task_);
-  return nullptr;
+  return std::make_unique<LinuxThreadHandle>(task_);
 }
 
 debug_ipc::ExceptionType LinuxExceptionHandle::GetType(const ThreadHandle& thread) const {
