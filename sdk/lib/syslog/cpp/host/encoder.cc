@@ -10,15 +10,18 @@
 
 namespace syslog_backend {
 
-const char* StripDots(const char* path) {
-  while (strncmp(path, "../", 3) == 0) {
-    path += 3;
-  }
-  return path;
+cpp17::string_view StripDots(cpp17::string_view path) {
+  auto pos = path.rfind("../");
+  return pos == cpp17::string_view::npos ? path : path.substr(pos + 3);
 }
 
-void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
-                       unsigned int line, const char* msg, const char* condition) {
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                       cpp17::optional<cpp17::string_view> file, unsigned int line,
+                       cpp17::optional<cpp17::string_view> msg,
+                       cpp17::optional<cpp17::string_view> condition) {
+  if (!file) {
+    file = "";
+  }
   auto header = MsgHeader::CreatePtr(buffer);
   header->buffer = buffer;
   header->Init(buffer, severity);
@@ -28,7 +31,7 @@ void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
   header->WriteString(": ");
 #endif
   header->WriteChar('[');
-  header->WriteString(StripDots(file));
+  header->WriteString(StripDots(*file));
   header->WriteChar('(');
   char a_buffer[128];
   snprintf(a_buffer, 128, "%i", line);
@@ -36,18 +39,18 @@ void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
   header->WriteString(")] ");
   if (condition) {
     header->WriteString("Check failed: ");
-    header->WriteString(condition);
+    header->WriteString(*condition);
     header->WriteString(". ");
   }
   if (msg) {
-    header->WriteString(msg);
+    header->WriteString(*msg);
     header->has_msg = true;
   }
 }
 
 // Common initialization for all KV pairs.
 // Returns the header for writing the value.
-MsgHeader* StartKv(LogBuffer* buffer, const char* key) {
+MsgHeader* StartKv(LogBuffer* buffer, cpp17::string_view key) {
   auto header = MsgHeader::CreatePtr(buffer);
   if (!header->first_kv || header->has_msg) {
     header->WriteChar(' ');
@@ -58,27 +61,21 @@ MsgHeader* StartKv(LogBuffer* buffer, const char* key) {
   return header;
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value) {
-  WriteKeyValueLegacy(buffer, key, value, strlen(value));
-}
-
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value,
-                         size_t value_length) {
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
   // "tag" has special meaning to our logging API
-  if (strncmp("tag", key, value_length) == 0) {
+  if (key == "tag") {
     auto header = MsgHeader::CreatePtr(buffer);
-    auto tag_size = value_length + 1;
+    auto tag_size = value.size() + 1;
     header->user_tag = (reinterpret_cast<char*>(buffer->data) + sizeof(buffer->data)) - tag_size;
-    memcpy(header->user_tag, value, value_length);
-    header->user_tag[value_length] = '\0';
+    memcpy(header->user_tag, value.data(), value.size());
+    header->user_tag[value.size()] = '\0';
     return;
   }
   auto header = StartKv(buffer, key);
   header->WriteChar('"');
-  if (memchr(value, '"', value_length) != nullptr) {
+  if (memchr(value.data(), '"', value.size()) != nullptr) {
     // Escape quotes in strings.
-    for (size_t i = 0; i < value_length; ++i) {
-      char c = value[i];
+    for (char c : value) {
       if (c == '"') {
         header->WriteChar('\\');
       }
@@ -90,28 +87,28 @@ void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value,
   header->WriteChar('"');
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, int64_t value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%" PRId64, value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, uint64_t value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%" PRIu64, value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, double value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, double value) {
   auto header = StartKv(buffer, key);
   char a_buffer[128];
   snprintf(a_buffer, 128, "%f", value);
   header->WriteString(a_buffer);
 }
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, bool value) {
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value) {
   auto header = StartKv(buffer, key);
   header->WriteString(value ? "true" : "false");
 }

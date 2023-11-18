@@ -54,11 +54,12 @@ struct MsgHeader {
     offset++;
   }
 
-  void WriteString(const char* c_str) {
-    size_t total_chars = strlen(c_str);
+  void WriteString(cpp17::string_view value) {
+    size_t total_chars = value.size();
     size_t written_chars = 0;
     while (written_chars < total_chars) {
-      size_t written = WriteStringInternal(c_str + written_chars);
+      size_t written = WriteStringInternal(
+          std::string_view(value.data() + written_chars, value.size() - written_chars));
       written_chars += written;
       if (written_chars < total_chars) {
         FlushAndReset();
@@ -76,14 +77,14 @@ struct MsgHeader {
   // number of bytes written. Returns 0 only if
   // the length of the string is 0, or if we're
   // exactly at the end of the buffer and need a reset.
-  size_t WriteStringInternal(const char* c_str) {
-    size_t len = strlen(c_str);
+  size_t WriteStringInternal(cpp17::string_view value) {
+    size_t len = value.size();
     auto remaining = RemainingSpace();
     if (len > remaining) {
       len = remaining;
     }
     assert((offset + len) < (reinterpret_cast<const char*>(this) + sizeof(LogBuffer)));
-    memcpy(offset, c_str, len);
+    memcpy(offset, value.data(), len);
     offset += len;
     return len;
   }
@@ -110,21 +111,20 @@ const std::string GetNameForLogSeverity(fuchsia_logging::LogSeverity severity);
 static_assert(sizeof(MsgHeader) <= sizeof(LogBuffer::record_state),
               "message header must be no larger than record_state");
 
-void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
-                       unsigned int line, const char* msg, const char* condition);
+void BeginRecordLegacy(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                       cpp17::optional<cpp17::string_view> file, unsigned int line,
+                       cpp17::optional<cpp17::string_view> msg,
+                       cpp17::optional<cpp17::string_view> condition);
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value);
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, const char* value,
-                         size_t value_length);
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, int64_t value);
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, int64_t value);
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, uint64_t value);
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, double value);
 
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, double value);
-
-void WriteKeyValueLegacy(LogBuffer* buffer, const char* key, bool value);
+void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, bool value);
 
 void EndRecordLegacy(LogBuffer* buffer);
 

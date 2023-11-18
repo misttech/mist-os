@@ -83,32 +83,28 @@ void SetLogTags(const std::initializer_list<std::string>& tags) {
 
 fuchsia_logging::LogSeverity GetMinLogLevel() { return g_log_settings.min_log_level; }
 
-void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
-                 unsigned int line, const char* msg, const char* condition) {
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
+                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition) {
   BeginRecordLegacy(buffer, severity, file, line, msg, condition);
 }
 
-void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value) {
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
-void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value, size_t value_length) {
-  WriteKeyValueLegacy(buffer, key, value, value_length);
-}
-
-void WriteKeyValue(LogBuffer* buffer, const char* key, int64_t value) {
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
-void WriteKeyValue(LogBuffer* buffer, const char* key, uint64_t value) {
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
-void WriteKeyValue(LogBuffer* buffer, const char* key, double value) {
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 
-void WriteKeyValue(LogBuffer* buffer, const char* key, bool value) {
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value) {
   WriteKeyValueLegacy(buffer, key, value);
 }
 

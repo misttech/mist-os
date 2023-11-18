@@ -62,26 +62,30 @@ class NullSafeStringView {
 
 #ifdef __Fuchsia__
 WEAK void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                                const char* file_name, unsigned int line, const char* msg,
-                                const char* condition, zx_handle_t socket);
+                                NullSafeStringView file_name, unsigned int line,
+                                NullSafeStringView msg, NullSafeStringView condition,
+                                zx_handle_t socket);
 WEAK void SetInterestChangedListener(void (*callback)(void* context,
                                                       fuchsia_logging::LogSeverity severity),
                                      void* context);
 #endif
-WEAK void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, const char* file,
-                      unsigned int line, const char* msg, const char* condition);
+WEAK void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                      NullSafeStringView file, unsigned int line, NullSafeStringView msg,
+                      NullSafeStringView condition);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value);
+WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, const char* value, size_t value_length);
+WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, int64_t value);
+WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, uint64_t value);
+WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, double value);
+WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, const char* key, bool value);
+static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char* value) {
+  WriteKeyValue(buffer, key, cpp17::string_view(value));
+}
 
 WEAK bool FlushRecord(LogBuffer* buffer);
 
@@ -198,12 +202,12 @@ struct LogBuffer {
 
   // Encodes a C++ std::string.
   void Encode(KeyValue<const char*, std::string> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value.data(), value.value.size());
+    syslog_backend::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a C++ std::string_view.
   void Encode(KeyValue<const char*, std::string_view> value) {
-    syslog_backend::WriteKeyValue(this, value.key, value.value.data(), value.value.size());
+    syslog_backend::WriteKeyValue(this, value.key, value.value);
   }
 
   // Encodes a double floating point value
