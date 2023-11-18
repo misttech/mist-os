@@ -80,6 +80,9 @@ as all of the in-tree code is developed using `fuchsia-vendored-python`
 # upgrade the `pip` module
 (fuchsia_python_venv)~/fuchsia$ python -m pip install --upgrade pip
 
+# Set FIDL_IR_PATH inorder to successfully imoport Fuchsia-Controller
+(fuchsia_python_venv)~/fuchsia$ export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
+
 # install honeydew
 (fuchsia_python_venv)~/fuchsia$ cd $FUCHSIA_DIR/src/testing/end_to_end/honeydew
 (fuchsia_python_venv)~/fuchsia/src/testing/end_to_end/honeydew$ python -m pip install --editable ".[test,guidelines]"

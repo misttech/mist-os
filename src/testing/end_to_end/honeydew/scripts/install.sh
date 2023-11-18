@@ -50,6 +50,8 @@ python -m pip install --editable ".[test,guidelines]"
 echo "Configuring environment for honeydew..."
 OLD_PYTHONPATH=$PYTHONPATH
 PYTHONPATH=$FUCHSIA_DIR/$BUILD_DIR/host_x64:$FUCHSIA_DIR/src/developer/ffx/lib/fuchsia-controller/python:$PYTHONPATH
+# Set FIDL_IR_PATH inorder to successfully imoport Fuchsia-Controller
+export FIDL_IR_PATH="$(fx get-build-dir)/fidling/gen/ir_root"
 
 python -c "import honeydew"
 if [ $? -eq 0 ]; then
@@ -69,5 +71,6 @@ cd $STARTING_DIR
 echo -e "Installation successful...\n"
 echo "To experiment with Honeydew locally in a Python interpreter, run:"
 echo "$ source $VENV_PATH/bin/activate"
+echo "$ export FIDL_IR_PATH=\"$(fx get-build-dir)/fidling/gen/ir_root\""
 echo "$ PYTHONPATH=$HD_PYTHONPATH python"
 echo -e ">>> import honeydew\n"
