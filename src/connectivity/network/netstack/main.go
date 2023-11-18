@@ -682,8 +682,7 @@ func Main() {
 			},
 		)
 		stub := stack.StackWithCtxStub{Impl: &stackImpl{
-			ns:          ns,
-			dnsWatchers: dnsWatchers,
+			ns: ns,
 		}}
 		componentCtx.OutgoingService.AddService(
 			stack.StackName,
@@ -700,7 +699,7 @@ func Main() {
 
 	componentCtx.OutgoingService.AddService(
 		name.DnsServerWatcherName,
-		dnsWatchers.Bind,
+		dnsWatchers.bind,
 	)
 
 	{

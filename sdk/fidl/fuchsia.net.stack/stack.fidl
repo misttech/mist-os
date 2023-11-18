@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.net.stack;
 
-using fuchsia.net.name;
 using fuchsia.net;
 using fuchsia.net.interfaces.admin;
 
@@ -70,11 +69,6 @@ closed protocol Stack {
         ip_version fuchsia.net.IpVersion;
         enabled bool;
     }) -> () error Error;
-
-    /// Get a [`fuchsia.net.name/DnsServerWatcher`].
-    strict GetDnsServerWatcher(resource struct {
-        watcher server_end:fuchsia.net.name.DnsServerWatcher;
-    });
 
     /// Enables or disables the DHCP client on an interface.
     /// TODO(https://fxbug.dev/81593): Remove this once the DHCP client is moved

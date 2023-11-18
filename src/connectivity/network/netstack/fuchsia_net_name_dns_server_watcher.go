@@ -109,11 +109,9 @@ func newDnsServerWatcherCollection(getServersCacheAndChannel func() ([]dns.Serve
 	return &collection
 }
 
-// Bind binds a new fuchsia.net.name.DnsServerWatcher request to the collection of watchers and
+// bind binds a new fuchsia.net.name.DnsServerWatcher request to the collection of watchers and
 // starts serving on its channel.
-//
-// TODO(https://fxbug.dev/134162): Inline this into main.go once GetDnsServerWatcher is removed.
-func (c *dnsServerWatcherCollection) Bind(ctx context.Context, ch zx.Channel) error {
+func (c *dnsServerWatcherCollection) bind(ctx context.Context, ch zx.Channel) error {
 	go func() {
 		ctx, cancel := context.WithCancel(ctx)
 		defer cancel()

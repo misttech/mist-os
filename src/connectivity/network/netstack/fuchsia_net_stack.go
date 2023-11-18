@@ -7,7 +7,6 @@
 package netstack
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"syscall/zx/fidl"
@@ -20,7 +19,6 @@ import (
 
 	"fidl/fuchsia/net"
 	"fidl/fuchsia/net/interfaces/admin"
-	"fidl/fuchsia/net/name"
 	"fidl/fuchsia/net/stack"
 
 	"gvisor.dev/gvisor/pkg/atomicbitops"
@@ -32,8 +30,7 @@ const metricNotSet uint32 = 0
 var _ stack.StackWithCtx = (*stackImpl)(nil)
 
 type stackImpl struct {
-	ns          *Netstack
-	dnsWatchers *dnsServerWatcherCollection
+	ns *Netstack
 }
 
 // validateSubnet returns true if the prefix length is valid and no
@@ -149,10 +146,6 @@ func (ni *stackImpl) SetInterfaceIpForwardingDeprecated(_ fidl.Context, id uint6
 	default:
 		panic(fmt.Sprintf("ni.ns.stack.SetNICForwarding(tcpip.NICID(%d), %d, %t): %s", id, netProto, enabled, err))
 	}
-}
-
-func (ni *stackImpl) GetDnsServerWatcher(ctx_ fidl.Context, watcher name.DnsServerWatcherWithCtxInterfaceRequest) error {
-	return ni.dnsWatchers.Bind(context.Background(), watcher.Channel)
 }
 
 func (ni *stackImpl) SetDhcpClientEnabled(ctx_ fidl.Context, id uint64, enable bool) (stack.StackSetDhcpClientEnabledResult, error) {

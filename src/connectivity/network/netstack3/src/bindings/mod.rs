@@ -1215,7 +1215,6 @@ impl NetstackSeed {
         let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
 
         let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
-        let (stack_waitgroup, stack_spawner) = TaskWaitGroup::new();
 
         // It is unclear why we need to wrap the `for_each_concurrent` call with
         // `async move { ... }` but it seems like we do. Without this, the
@@ -1231,11 +1230,7 @@ impl NetstackSeed {
                         Service::Stack(stack) => {
                             stack
                                 .serve_with(|rs| {
-                                    stack_fidl_worker::StackFidlWorker::serve(
-                                        netstack.clone(),
-                                        rs,
-                                        stack_spawner.clone(),
-                                    )
+                                    stack_fidl_worker::StackFidlWorker::serve(netstack.clone(), rs)
                                 })
                                 .await
                         }
@@ -1426,8 +1421,6 @@ impl NetstackSeed {
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
 
-        // Collect the fuchsia.net.stack waitgroup.
-        stack_waitgroup.await;
         // Collect the routes admin waitgroup.
         route_set_waitgroup.await;
 

@@ -14,7 +14,6 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 
 	"fidl/fuchsia/net"
-	"fidl/fuchsia/net/name"
 	"fidl/fuchsia/net/stack"
 
 	"github.com/google/go-cmp/cmp"
@@ -326,27 +325,6 @@ func TestFuchsiaNetStack(t *testing.T) {
 		setInterfaceForwarding(ifs1.nicid, net.IpVersionV4, false)
 		checkAllForwardingExcept(true, ifs1.nicid, net.IpVersionV4)
 	})
-}
-
-func TestDnsServerWatcher(t *testing.T) {
-	ns, _ := newNetstack(t, netstackTestOptions{})
-	watcherCollection := newDnsServerWatcherCollection(ns.dnsConfig.GetServersCacheAndChannel)
-	ni := stackImpl{ns: ns, dnsWatchers: watcherCollection}
-	request, watcher, err := name.NewDnsServerWatcherWithCtxInterfaceRequest()
-	if err != nil {
-		t.Fatalf("failed to create watcher request: %s", err)
-	}
-	defer func() {
-		if err := request.Close(); err != nil {
-			t.Errorf("failed to close DNS server watcher request: %s", err)
-		}
-		if err := watcher.Close(); err != nil {
-			t.Errorf("failed to close DNS server watcher: %s", err)
-		}
-	}()
-	if err := ni.GetDnsServerWatcher(context.Background(), request); err != nil {
-		t.Fatalf("failed to get watcher: %s", err)
-	}
 }
 
 func TestSetDhcpClientEnabled(t *testing.T) {
