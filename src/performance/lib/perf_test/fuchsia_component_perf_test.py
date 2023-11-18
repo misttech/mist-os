@@ -64,10 +64,21 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             options: list[str] = self.ffx_test_options[:]
             options.append("--")
             options += self.test_component_args
-            if self.results_path_test_arg:
-                options.append(self.results_path_test_arg)
+
             results_file = f"results_process{i}.fuchsiaperf_full.json"
-            options.append(f"/custom_artifacts/{results_file}")
+            results_file_path = f"/custom_artifacts/{results_file}"
+            if self.results_path_test_arg:
+                if self.results_path_test_arg.endswith("="):
+                    options.append(
+                        f"{self.results_path_test_arg}{results_file_path}"
+                    )
+                else:
+                    options += [
+                        self.results_path_test_arg,
+                        results_file_path,
+                    ]
+            else:
+                options.append(results_file_path)
 
             test_dir = os.path.join(self.test_case_path, f"ffx_test_{i}")
             cmd = [

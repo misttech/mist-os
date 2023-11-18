@@ -18,7 +18,6 @@ import("//build/testing/perf/test.gni")
 
 test_list = [
   # keep-sorted start
-  "audio_mixer_profiler_test",
   "driver_runtime_microbenchmarks_test",
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
@@ -67,15 +66,6 @@ foreach(target_name, test_list) {
       nuc_env,
       vim3_env,
     ]
-
-    # TODO(fxbug.dev/51799): Enable for all tests.
-    if (target_name == "audio_mixer_profiler_test") {
-      environments += [
-        astro_env,
-        sherlock_env,
-        nelson_env,
-      ]
-    }
 
     # We don't enable this test on Astro because of the potential for
     # it to cause extra flash wear on that device type.
@@ -307,7 +297,7 @@ group("package_deps") {
     "//src/devices/bin/driver_runtime/microbenchmarks",
     "//src/diagnostics:benchmarks",
     "//src/lib/diagnostics:benchmarks",
-    "//src/media/audio/audio_core/shared/mixer/tools:audio_mixer_profiler",
+    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
     "//src/starnix:benchmarks",
     "//src/tests/benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
@@ -363,8 +353,8 @@ group("tests_to_run_on_internal_builders") {
   testonly = true
 
   deps = [
-    ":audio_mixer_profiler_test($host_toolchain)",
     ":storage_benchmarks_test($host_toolchain)",
+    "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
     "//src/storage/benchmarks/fuchsia:benchmarks",
     "//src/tests/benchmarks:kernel_boot_benchmarks",
   ]
