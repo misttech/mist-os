@@ -17,6 +17,7 @@ def _fuchsia_scrutiny_config_impl(ctx):
             component_tree_config = ctx.file.component_tree_config,
             base_packages = ctx.file.base_packages,
             structured_config_policy = ctx.file.structured_config_policy,
+            pre_signing_policy = ctx.file.pre_signing_policy,
         ),
     ]
 
@@ -59,6 +60,10 @@ fuchsia_scrutiny_config = rule(
         ),
         "structured_config_policy": attr.label(
             doc = "File describing the policy of structured config",
+            allow_single_file = True,
+        ),
+        "pre_signing_policy": attr.label(
+            doc = "File describing the policy of checks required before signing",
             allow_single_file = True,
         ),
     },
