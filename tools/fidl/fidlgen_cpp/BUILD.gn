@@ -262,29 +262,11 @@ group("goldens") {
   }
 }
 
-# Soft transition to new version of Clang-Format.
-prebuilt_cipd_version = read_file(
-        "//prebuilt/third_party/llvm/${host_platform}/.versions/llvm.cipd_version",
-        "json")
-prebuilt_instance_id = prebuilt_cipd_version.instance_id
-
-old_prebuilt_instance_ids = [
-  "Tpc85d1ZwSlZ6UKl2d96GRUBGNA5JKholOKe24sRDr0C",  # linux-amd64
-  "wrYQSwUCcx0fls1Q-sLWa9F9D2Sq0wCT8eMKGNbl4BoC",  # linux-arm64
-  "MAOjNhwTu5JU3P_0C9dITiyCTtQ1n7lRJnMfB9hhvOkC",  # mac-amd64
-  "v8f_W3z5SdB88gWdm9bTBYRyt5z9PHui4tOWPnfKCzoC",  # mac-arm64
-]
-
-using_old_prebuilt = old_prebuilt_instance_ids + [ prebuilt_instance_id ] -
-                     [ prebuilt_instance_id ] != old_prebuilt_instance_ids
-
 group("tests") {
   testonly = true
   deps = [
+    ":fidlgen_cpp_golden_tests($host_toolchain)",
     ":goldens",
     ":goldens($host_toolchain)",
   ]
-  if (using_old_prebuilt) {
-    deps += [ ":fidlgen_cpp_golden_tests($host_toolchain)" ]
-  }
 }
