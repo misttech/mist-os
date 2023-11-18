@@ -8,6 +8,7 @@ use {
     crate::node::Node,
     anyhow::{format_err, Context, Result},
     async_trait::async_trait,
+    fidl::endpoints::Proxy as _,
     fidl_fuchsia_ui_activity as factivity,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect::{self as inspect, Property},
@@ -185,6 +186,16 @@ impl ActivityHandler {
     fn connect_activity_service(
         activity_provider: &factivity::ProviderProxy,
     ) -> Result<factivity::ListenerRequestStream> {
+        // TODO(b/311783026) Consider checking when the connection is initially established and/or
+        // adding reconnection logic. Even with this check it is still possible, due to racing,
+        // that the call to `watch_state` will be made on a closed connection, though that should
+        // only happen the first time, this check should prevent subsequent calls on the same
+        // closed connection.
+        if activity_provider.is_closed() {
+            return Err(format_err!(
+                "Cannot watch activity state, the activity provider connection is closed"
+            ));
+        }
         let (client, stream) =
             fidl::endpoints::create_request_stream::<factivity::ListenerMarker>()
                 .context("Failed to create request stream")?;
