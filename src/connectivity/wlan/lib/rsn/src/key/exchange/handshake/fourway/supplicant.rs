@@ -164,10 +164,10 @@ fn handle_message_3<B: ByteSlice>(
             let rsc = frame.key_frame_fields.key_rsc.to_native();
             Ok((
                 msg4,
-                Some(Gtk::from_gtk(
+                Some(Gtk::from_bytes(
                     gtk.gtk,
-                    gtk.info.key_id(),
                     negotiated_protection.group_data,
+                    gtk.info.key_id(),
                     rsc,
                 )?),
                 igtk,

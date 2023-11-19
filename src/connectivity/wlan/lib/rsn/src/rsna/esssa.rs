@@ -1171,7 +1171,7 @@ mod tests {
 
         // Verify GTK was reported.
         let reported_gtk = test_util::expect_reported_gtk(&updates[..]);
-        assert_eq!(&GTK[..], &reported_gtk.gtk[..]);
+        assert_eq!(&GTK[..], &reported_gtk.bytes[..]);
 
         // Verify ESS was reported to be established.
         let reported_status =
@@ -1210,7 +1210,7 @@ mod tests {
 
         // Verify GTK was installed.
         let reported_gtk = test_util::expect_reported_gtk(&updates[..]);
-        assert_eq!(&GTK_REKEY[..], &reported_gtk.gtk[..]);
+        assert_eq!(&GTK_REKEY[..], &reported_gtk.bytes[..]);
     }
 
     // Test to verify that GTKs derived in the 4-Way Handshake are not being re-installed
@@ -1289,12 +1289,12 @@ mod tests {
         let (result, updates) = send_group_key_msg1(&mut supplicant, &ptk, GTK_REKEY, 3, 3);
         assert!(result.is_ok());
         let reported_gtk = test_util::expect_reported_gtk(&updates[..]);
-        assert_eq!(&reported_gtk.gtk[..], &GTK_REKEY[..]);
+        assert_eq!(&reported_gtk.bytes[..], &GTK_REKEY[..]);
 
         let (result, updates) = send_group_key_msg1(&mut supplicant, &ptk, GTK_REKEY_2, 1, 4);
         assert!(result.is_ok(), "{:?}", result);
         let reported_gtk = test_util::expect_reported_gtk(&updates[..]);
-        assert_eq!(&reported_gtk.gtk[..], &GTK_REKEY_2[..]);
+        assert_eq!(&reported_gtk.bytes[..], &GTK_REKEY_2[..]);
 
         // Rotate GTK to already installed key. Verify GTK was not re-installed.
         let (result, updates) = send_group_key_msg1(&mut supplicant, &ptk, GTK_REKEY, 3, 5);

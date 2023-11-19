@@ -89,7 +89,7 @@ impl PartialEq for GtkInfo {
 pub struct Gtk {
     pub info: GtkInfo,
     // 1 byte reserved.
-    pub gtk: Vec<u8>,
+    pub gtk: Box<[u8]>,
 }
 
 impl Gtk {
@@ -97,7 +97,7 @@ impl Gtk {
         let mut gtk_info = GtkInfo(0);
         gtk_info.set_key_id(key_id);
         gtk_info.set_tx(tx as u8);
-        Self { info: gtk_info, gtk: gtk.to_vec() }
+        Self { info: gtk_info, gtk: gtk.into() }
     }
 
     /// Length of the GTK KDE including its fixed fields, not just the GTK.
@@ -193,7 +193,7 @@ named_args!(parse_gtk(data_len: usize) <Gtk>,
            eof!() >>
            (Gtk{
                 info: info,
-                gtk: gtk.to_vec(),
+                gtk: gtk.into(),
            })
     )
 );
@@ -326,8 +326,7 @@ mod tests {
     #[test]
     fn test_no_padding_expected_for_plaintext() {
         let mut w = Writer::new(vec![]);
-        w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &vec![2; 2]))
-            .expect("failure writing GTK KDE");
+        w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[2; 2])).expect("failure writing GTK KDE");
         let buf = w.finalize_for_plaintext().expect("failure finalizing key data");
         assert_eq!(
             buf,
@@ -366,8 +365,7 @@ mod tests {
     fn test_write_read_gtk_with_padding() {
         // Write KDE:
         let mut w = Writer::new(vec![]);
-        w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &vec![24; 5]))
-            .expect("failure writing GTK KDE");
+        w.write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5])).expect("failure writing GTK KDE");
         let buf = w.finalize_for_encryption().expect("failure finializing key data");
         #[rustfmt::skip]
         assert_eq!(buf, vec![
@@ -385,7 +383,7 @@ mod tests {
 
         assert_variant!(elements.remove(0), Element::Gtk(hdr, kde) => {
             assert_eq!(hdr, Header { type_: 0xDD, len: 11, oui: Oui::DOT11, data_type: 1 });
-            assert_eq!(kde, Gtk { info: GtkInfo(6), gtk: vec![24; 5] });
+            assert_eq!(kde, Gtk { info: GtkInfo(6), gtk: Box::new([24; 5]) });
         });
         assert_variant!(elements.remove(0), Element::Padding);
     }
@@ -419,40 +417,40 @@ mod tests {
     #[test]
     fn test_write_gtk_too_small_buffer() {
         Writer::new(FixedSizedTestBuffer::new(10))
-            .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &vec![24; 5]))
+            .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5]))
             .expect_err("expected failure writing GTK KDE");
     }
 
     #[test]
     fn test_write_gtk_sufficient_fixed_buffer() {
         Writer::new(FixedSizedTestBuffer::new(13))
-            .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &vec![24; 5]))
+            .write_gtk(&Gtk::new(2, GtkInfoTx::BothRxTx, &[24; 5]))
             .expect("expected success writing GTK KDE");
     }
 
     #[test]
     fn test_create_gtk_element() {
-        let gtk = Gtk::new(1, GtkInfoTx::_OnlyRx, &vec![24; 16][..]);
+        let gtk = Gtk::new(1, GtkInfoTx::_OnlyRx, &[24; 16][..]);
         assert_eq!(gtk.info.key_id(), 1);
         assert_eq!(gtk.info.tx(), 0);
-        assert_eq!(&gtk.gtk[..], &vec![24; 16][..]);
+        assert_eq!(&gtk.gtk[..], &[24; 16][..]);
     }
 
     #[test]
     fn test_gtk_len() {
-        let gtk_kde = Gtk { info: GtkInfo(0), gtk: vec![] };
+        let gtk_kde = Gtk { info: GtkInfo(0), gtk: Box::new([]) };
         assert_eq!(gtk_kde.len(), 2);
 
-        let gtk_kde = Gtk { info: GtkInfo(0), gtk: vec![0; 16] };
+        let gtk_kde = Gtk { info: GtkInfo(0), gtk: Box::new([0; 16]) };
         assert_eq!(gtk_kde.len(), 18);
 
-        let gtk_kde = Gtk { info: GtkInfo(0), gtk: vec![0; 8] };
+        let gtk_kde = Gtk { info: GtkInfo(0), gtk: Box::new([0; 8]) };
         assert_eq!(gtk_kde.len(), 10);
 
-        let gtk_kde = Gtk { info: GtkInfo(0), gtk: vec![0; 4] };
+        let gtk_kde = Gtk { info: GtkInfo(0), gtk: Box::new([0; 4]) };
         assert_eq!(gtk_kde.len(), 6);
 
-        let gtk_kde = Gtk { info: GtkInfo(0), gtk: vec![0; 32] };
+        let gtk_kde = Gtk { info: GtkInfo(0), gtk: Box::new([0; 32]) };
         assert_eq!(gtk_kde.len(), 34);
     }
 }

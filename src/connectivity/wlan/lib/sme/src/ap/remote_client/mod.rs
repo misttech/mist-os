@@ -185,10 +185,10 @@ impl RemoteClient {
                 key_id: gtk.key_id() as u16,
                 key_type: fidl_mlme::KeyType::Group,
                 address: [0xFFu8; 6],
-                rsc: gtk.rsc,
-                cipher_suite_oui: eapol::to_array(&gtk.cipher.oui[..]),
+                rsc: gtk.key_rsc(),
+                cipher_suite_oui: eapol::to_array(&gtk.cipher().oui[..]),
                 cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
-                    gtk.cipher.suite_type.into(),
+                    gtk.cipher().suite_type.into(),
                 ),
             },
             _ => {
@@ -451,7 +451,7 @@ mod tests {
         assert_variant!(mlme_event, MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist }) => {
             assert_eq!(keylist.len(), 1);
             let k = keylist.get(0).expect("expect key descriptor");
-            assert_eq!(k.key, test_utils::gtk_bytes());
+            assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);
             assert_eq!(k.address, [0xFFu8; 6]);

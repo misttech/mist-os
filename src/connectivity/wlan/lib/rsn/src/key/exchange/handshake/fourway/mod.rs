@@ -734,7 +734,7 @@ mod tests {
         let s_gtk = test_util::expect_reported_gtk(&updates[..]);
         let s_igtk = test_util::expect_reported_igtk(&updates[..]);
         assert_eq!(s_ptk, ptk);
-        assert_eq!(&s_gtk.gtk[..], &gtk[..]);
+        assert_eq!(&s_gtk.bytes[..], &gtk[..]);
         assert_eq!(&s_igtk.igtk[..], &igtk[..]);
     }
 
@@ -815,7 +815,7 @@ mod tests {
 
         // Replay third message pretending Authenticator did not receive Supplicant's response.
         // Modify GTK to simulate GTK rotation while 4-Way Handshake was in progress.
-        let mut other_gtk = s_gtk.gtk.clone();
+        let mut other_gtk = s_gtk.bytes.clone();
         other_gtk[0] ^= 0xFF;
         let msg3 = test_util::get_wpa2_4whs_msg3(&s_ptk, &anonce[..], &other_gtk[..], |msg3| {
             msg3.key_frame_fields.key_replay_counter.set_from_native(42);
@@ -936,7 +936,7 @@ mod tests {
 
     #[test]
     fn derive_correct_gtk_rsc() {
-        const GTK_RSC: u64 = 981234;
+        const KEY_RSC: u64 = 981234;
         let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
 
         let msg1 = env.initiate(11.into());
@@ -944,14 +944,14 @@ mod tests {
         let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let mut buf = vec![];
         let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
-        msg3.key_frame_fields.key_rsc = BigEndianU64::from_native(GTK_RSC);
+        msg3.key_frame_fields.key_rsc = BigEndianU64::from_native(KEY_RSC);
         env.finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
         let (msg4, _, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
         env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
-        // Verify Supplicant picked up the Authenticator's GTK RSC.
-        assert_eq!(s_gtk.rsc, GTK_RSC);
+        // Verify Supplicant picked up the Authenticator's Key RSC.
+        assert_eq!(s_gtk.key_rsc(), KEY_RSC);
     }
 
     fn make_protection_info_with_mfp_parameters(

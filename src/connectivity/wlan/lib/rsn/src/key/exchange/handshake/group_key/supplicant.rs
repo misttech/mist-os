@@ -119,9 +119,14 @@ impl Supplicant {
             }
         };
 
-        let rsc = frame.key_frame_fields.key_rsc.to_native();
+        let key_rsc = frame.key_frame_fields.key_rsc.to_native();
         Ok((
-            Gtk::from_gtk(gtk.gtk, gtk.info.key_id(), self.cfg.protection.group_data.clone(), rsc)?,
+            Gtk::from_bytes(
+                gtk.gtk,
+                self.cfg.protection.group_data.clone(),
+                gtk.info.key_id(),
+                key_rsc,
+            )?,
             igtk.map(|element| Igtk::from_kde(element, self.cfg.protection.group_mgmt_cipher())),
         ))
     }
@@ -173,15 +178,19 @@ mod tests {
     use crate::key::exchange::handshake::group_key::GroupKey;
     use crate::key_data::kde;
     use crate::rsna::{test_util, Dot11VerifiedKeyFrame, NegotiatedProtection, Role};
+    use lazy_static::lazy_static;
     use wlan_common::big_endian::BigEndianU64;
     use wlan_common::ie::rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, CIPHER_CCMP_128, TKIP};
     use wlan_common::organization::Oui;
 
+    lazy_static! {
+        static ref GTK: Box<[u8]> = vec![3; 16].into_boxed_slice();
+        static ref WPA1_GTK: Box<[u8]> = vec![3; 32].into_boxed_slice();
+    }
+
     const KCK: [u8; 16] = [1; 16];
     const KEK: [u8; 16] = [2; 16];
-    const GTK: [u8; 16] = [3; 16];
     const IGTK: [u8; 16] = [4; 16];
-    const WPA1_GTK: [u8; 32] = [3; 32];
     const GTK_RSC: u64 = 81234;
     const GTK_KEY_ID: u8 = 2;
     const IGTK_IPN: [u8; 6] = [0xab; 6];
@@ -242,7 +251,7 @@ mod tests {
     }
 
     fn fake_gtk() -> Gtk {
-        Gtk::from_gtk(GTK.to_vec(), GTK_KEY_ID, CIPHER_CCMP_128, GTK_RSC)
+        Gtk::from_bytes(GTK.clone(), CIPHER_CCMP_128, GTK_KEY_ID, GTK_RSC)
             .expect("error creating expected GTK")
     }
 
@@ -287,10 +296,10 @@ mod tests {
     }
 
     fn fake_gtk_wpa1() -> Gtk {
-        Gtk::from_gtk(
-            WPA1_GTK.to_vec(),
-            GTK_KEY_ID,
+        Gtk::from_bytes(
+            WPA1_GTK.clone(),
             Cipher { oui: Oui::MSFT, suite_type: TKIP },
+            GTK_KEY_ID,
             GTK_RSC,
         )
         .expect("error creating expected GTK")

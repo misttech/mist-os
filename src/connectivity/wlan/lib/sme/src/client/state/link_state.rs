@@ -426,7 +426,7 @@ fn cancel(event_id: &mut Option<EventId>) {
 fn inspect_log_key(context: &mut Context, key: &Key) {
     let (cipher, key_index) = match key {
         Key::Ptk(ptk) => (Some(&ptk.cipher), None),
-        Key::Gtk(gtk) => (Some(&gtk.cipher), Some(gtk.key_id())),
+        Key::Gtk(gtk) => (Some(gtk.cipher()), Some(gtk.key_id())),
         _ => (None, None),
     };
     inspect_log!(context.inspect.rsn_events.lock(), {
@@ -454,11 +454,11 @@ fn send_keys(mlme_sink: &MlmeSink, bssid: Bssid, key: Key) -> Option<u16> {
             key: gtk.tk().to_vec(),
             key_id: gtk.key_id() as u16,
             address: WILDCARD_BSSID.to_array(),
-            cipher_suite_oui: eapol::to_array(&gtk.cipher.oui[..]),
+            cipher_suite_oui: eapol::to_array(&gtk.cipher().oui[..]),
             cipher_suite_type: fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(
-                gtk.cipher.suite_type.into(),
+                gtk.cipher().suite_type.into(),
             ),
-            rsc: gtk.rsc,
+            rsc: gtk.key_rsc(),
         },
         Key::Igtk(igtk) => {
             let mut rsc = [0u8; 8];

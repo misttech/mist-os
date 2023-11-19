@@ -116,7 +116,7 @@ mod tests {
                     assert_eq!(hdr.oui, Oui::DOT11);
                     assert_eq!(hdr.data_type, 1);
                     assert_eq!(kde.info.value(), 5);
-                    assert_eq!(kde.gtk, vec![1, 2, 3, 4, 5, 6, 7, 8]);
+                    assert_eq!(&kde.gtk[..], &[1, 2, 3, 4, 5, 6, 7, 8][..]);
                 }
                 Element::UnsupportedIe(id, len) => match pos {
                     1 => {
@@ -240,7 +240,7 @@ mod tests {
                     kde::Header { type_: 0xDD, len: 14, oui: Oui::DOT11, data_type: 1 }
                 );
                 assert_eq!(kde.info.value(), 5);
-                assert_eq!(kde.gtk, vec![1, 2, 3, 4, 5, 6, 7, 8]);
+                assert_eq!(&kde.gtk[..], &[1, 2, 3, 4, 5, 6, 7, 8][..]);
             });
         }
     }
@@ -272,8 +272,8 @@ mod tests {
                 );
                 assert_eq!(kde.info.value(), 200);
                 assert_eq!(
-                    kde.gtk,
-                    vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+                    &kde.gtk[..],
+                    &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16][..]
                 );
             });
         }

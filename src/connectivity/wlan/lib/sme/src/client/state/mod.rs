@@ -3855,7 +3855,7 @@ mod tests {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
-            assert_eq!(k.key, test_utils::gtk_bytes());
+            assert_eq!(&k.key[..], &test_utils::gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);
             assert_eq!(k.address, [0xFFu8; 6]);
@@ -3883,7 +3883,7 @@ mod tests {
         assert_variant!(mlme_stream.try_next(), Ok(Some(MlmeRequest::SetKeys(set_keys_req))) => {
             assert_eq!(set_keys_req.keylist.len(), 1);
             let k = set_keys_req.keylist.get(0).expect("expect key descriptor");
-            assert_eq!(k.key, test_utils::wpa1_gtk_bytes());
+            assert_eq!(&k.key[..], &test_utils::wpa1_gtk_bytes()[..]);
             assert_eq!(k.key_id, 2);
             assert_eq!(k.key_type, fidl_mlme::KeyType::Group);
             assert_eq!(k.address, [0xFFu8; 6]);

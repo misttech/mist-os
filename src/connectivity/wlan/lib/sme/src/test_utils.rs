@@ -81,20 +81,20 @@ pub fn wpa1_ptk() -> Ptk {
     Ptk::from_ptk(ptk_bytes, &akm, cipher).expect("expect valid ptk")
 }
 
-pub fn gtk_bytes() -> Vec<u8> {
-    vec![0xDD; 16]
+pub fn gtk_bytes() -> Box<[u8]> {
+    vec![0xDD; 16].into_boxed_slice()
 }
 
 pub fn gtk() -> Gtk {
-    Gtk::from_gtk(gtk_bytes(), 2, cipher(), 0).expect("failed creating GTK")
+    Gtk::from_bytes(gtk_bytes(), cipher(), 2, 0).expect("failed creating GTK")
 }
 
-pub fn wpa1_gtk_bytes() -> Vec<u8> {
-    vec![0xDD; 32]
+pub fn wpa1_gtk_bytes() -> Box<[u8]> {
+    vec![0xDD; 32].into_boxed_slice()
 }
 
 pub fn wpa1_gtk() -> Gtk {
-    Gtk::from_gtk(wpa1_gtk_bytes(), 2, wpa1_cipher(), 0).expect("failed creating GTK")
+    Gtk::from_bytes(wpa1_gtk_bytes(), wpa1_cipher(), 2, 0).expect("failed creating GTK")
 }
 
 pub fn akm() -> Akm {

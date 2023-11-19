@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Remove once GtkProvider is used.
-use crate::key::Tk;
-#[allow(unused)]
-use crate::{prf, rsn_ensure, Error};
+use crate::{key::Tk, rsn_ensure, Error};
 use mundane::bytes;
 use std::hash::{Hash, Hasher};
 use wlan_common::ie::rsn::cipher::Cipher;
@@ -31,18 +28,17 @@ impl GtkProvider {
     }
 
     pub fn get_gtk(&self) -> Result<Gtk, Error> {
-        Gtk::from_gtk(self.key.to_vec(), 0, self.cipher.clone(), 0)
+        Gtk::from_bytes(self.key.clone(), self.cipher.clone(), 0, 0)
     }
 }
 
 #[derive(Debug, Clone, Eq)]
 pub struct Gtk {
-    pub gtk: Vec<u8>,
-    key_id: u8,
+    pub bytes: Box<[u8]>,
+    cipher: Cipher,
     tk_len: usize,
-    pub rsc: u64,
-    pub cipher: Cipher,
-    // TODO(hahnr): Add TKIP Tx/Rx MIC support (IEEE 802.11-2016, 12.8.2).
+    key_id: u8,
+    key_rsc: u64,
 }
 
 /// PartialEq implementation is the same as the default derive(PartialEq)
@@ -51,11 +47,10 @@ pub struct Gtk {
 /// together.
 impl PartialEq for Gtk {
     fn eq(&self, other: &Self) -> bool {
-        self.gtk == other.gtk
-            && self.key_id == other.key_id
+        self.bytes == other.bytes
             && self.tk_len == other.tk_len
-            && self.rsc == other.rsc
-            && self.cipher == other.cipher
+            && self.key_id == other.key_id
+            && self.key_rsc == other.key_rsc
     }
 }
 
@@ -69,44 +64,33 @@ impl Hash for Gtk {
 }
 
 impl Gtk {
-    pub fn from_gtk(gtk: Vec<u8>, key_id: u8, cipher: Cipher, rsc: u64) -> Result<Gtk, Error> {
-        let tk_bits = cipher.tk_bits().ok_or(Error::GtkHierarchyUnsupportedCipherError)?;
-        let tk_len = (tk_bits / 8) as usize;
-        rsn_ensure!(gtk.len() >= tk_len, "GTK must be larger than the resulting TK");
-
-        Ok(Gtk { tk_len, gtk, key_id, cipher, rsc })
-    }
-
-    // IEEE 802.11-2016, 12.7.1.4
-    pub fn new(
-        gmk: &[u8],
-        key_id: u8,
-        aa: &[u8; 6],
-        gnonce: &[u8; 32],
+    pub fn from_bytes(
+        bytes: Box<[u8]>,
         cipher: Cipher,
-        rsc: u64,
+        key_id: u8,
+        key_rsc: u64,
     ) -> Result<Gtk, Error> {
         let tk_len: usize =
             cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
-
-        // data length = 6 (aa) + 32 (gnonce)
-        let mut data: [u8; 38] = [0; 38];
-        data[0..6].copy_from_slice(&aa[..]);
-        data[6..].copy_from_slice(&gnonce[..]);
-
-        let gtk_bytes = prf::prf(gmk, "Group key expansion", &data, tk_len * 8)
-            .map_err(|e| Error::GenericError(e.to_string()))?;
-        Ok(Gtk { tk_len, gtk: gtk_bytes, key_id, rsc, cipher })
+        rsn_ensure!(bytes.len() >= tk_len, "GTK must be larger than the resulting TK");
+        Ok(Gtk { cipher, bytes, tk_len, key_id, key_rsc })
     }
 
+    pub fn cipher(&self) -> &Cipher {
+        &self.cipher
+    }
     pub fn key_id(&self) -> u8 {
         self.key_id
+    }
+
+    pub fn key_rsc(&self) -> u64 {
+        self.key_rsc
     }
 }
 
 impl Tk for Gtk {
     fn tk(&self) -> &[u8] {
-        &self.gtk[0..self.tk_len]
+        &self.bytes[0..self.tk_len]
     }
 }
 
@@ -117,15 +101,18 @@ mod tests {
     use wlan_common::ie::rsn::{cipher, suite_selector::OUI};
 
     #[test]
-    fn test_gtk_generation() {
+    fn generated_gtks_are_not_zero_and_not_constant_with_high_probability() {
         let mut gtks = HashSet::new();
-        for _ in 0..10000 {
+        for i in 0..10 {
             let provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 })
                 .expect("failed creating GTK Provider");
             let gtk = provider.get_gtk().expect("could not read GTK").tk().to_vec();
             assert!(gtk.iter().any(|&x| x != 0));
-            assert!(!gtks.contains(&gtk));
+            if i > 0 && !gtks.contains(&gtk) {
+                return;
+            }
             gtks.insert(gtk);
         }
+        panic!("GtkProvider::generate_gtk() generated the same GTK 10 times in a row.");
     }
 }
