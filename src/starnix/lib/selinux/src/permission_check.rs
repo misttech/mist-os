@@ -9,15 +9,15 @@ use super::{
 
 /// Private module for sealed traits with tightly controlled implementations.
 mod private {
-    /// Public super-trait to seal [`super::HasPermission`].
-    pub trait HasPermission {}
+    /// Public super-trait to seal [`super::PermissionCheck`].
+    pub trait PermissionCheck {}
 
-    /// Public super-trait to seal [`super::HasPermissionMut`].
-    pub trait HasPermissionMut {}
+    /// Public super-trait to seal [`super::PermissionCheckMut`].
+    pub trait PermissionCheckMut {}
 }
 
 /// Extension of [`Query`] that integrates sealed `has_permission()` trait method.
-pub trait HasPermission: Query + private::HasPermission {
+pub trait PermissionCheck: Query + private::PermissionCheck {
     /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
     /// `target_sid` as a `target_class`.
     ///
@@ -37,14 +37,14 @@ pub trait HasPermission: Query + private::HasPermission {
     }
 }
 
-/// Every [`Query`] implements [`private::HasPermission`].
-impl<Q: Query> private::HasPermission for Q {}
+/// Every [`Query`] implements [`private::PermissionCheck`].
+impl<Q: Query> private::PermissionCheck for Q {}
 
-/// Every [`Query`] implements [`HasPermission`] *without overriding `has_permission()`*.
-impl<Q: Query> HasPermission for Q {}
+/// Every [`Query`] implements [`PermissionCheck`] *without overriding `has_permission()`*.
+impl<Q: Query> PermissionCheck for Q {}
 
 /// Extension of [`QueryMut`] that integrates sealed `has_permission()` trait method.
-pub trait HasPermissionMut: QueryMut + private::HasPermissionMut {
+pub trait PermissionCheckMut: QueryMut + private::PermissionCheckMut {
     /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
     /// `target_sid` as a `target_class`.
     ///
@@ -64,11 +64,11 @@ pub trait HasPermissionMut: QueryMut + private::HasPermissionMut {
     }
 }
 
-/// Every [`QueryMut`] implements [`private::HasPermissionMut`].
-impl<QM: QueryMut> private::HasPermissionMut for QM {}
+/// Every [`QueryMut`] implements [`private::PermissionCheckMut`].
+impl<QM: QueryMut> private::PermissionCheckMut for QM {}
 
-/// Every [`QueryMut`] implements [`HasPermissionMut`] *without overriding `has_permission()`*.
-impl<QM: QueryMut> HasPermissionMut for QM {}
+/// Every [`QueryMut`] implements [`PermissionCheckMut`] *without overriding `has_permission()`*.
+impl<QM: QueryMut> PermissionCheckMut for QM {}
 
 #[cfg(test)]
 mod tests {

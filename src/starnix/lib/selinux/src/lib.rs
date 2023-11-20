@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 pub mod access_vector_cache;
-pub mod has_permission;
+pub mod permission_check;
 pub mod security_server;
 
 use bitflags::bitflags;
