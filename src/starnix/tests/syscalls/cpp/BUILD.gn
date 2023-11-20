@@ -236,11 +236,10 @@ resource("extended_pstate_initial_state_child_resource") {
 }
 
 generated_expectations_file("syscalls_cpp_test_expectations") {
-  includes = [ "expectations/syscalls_cpp_test.json5" ]
-
-  if (current_cpu == "riscv64") {
-    includes += [ "expectations/syscalls_cpp_test_riscv64.json5" ]
-  }
+  includes = [
+    "expectations/syscalls_cpp_test.json5",
+    "expectations/syscalls_cpp_test_${current_cpu}.json5",
+  ]
 }
 
 starnix_linux_test_component("syscalls_cpp_test") {

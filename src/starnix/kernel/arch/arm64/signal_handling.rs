@@ -10,6 +10,7 @@ use crate::{
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
 };
+use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall,
     errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
@@ -38,6 +39,7 @@ impl SignalStackFrame {
     pub fn new(
         task: &Task,
         registers: &mut RegisterState,
+        _extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         _action: sigaction_t,
@@ -65,6 +67,7 @@ impl SignalStackFrame {
                 // TODO(fxbug.dev/121659): Should actually contain the fault address for SIGBUS and
                 // SIGSEGV.
                 fault_address: 0,
+                // TODO(b/311770726): Save `extended_pstate`.
                 ..Default::default()
             },
             ..Default::default()

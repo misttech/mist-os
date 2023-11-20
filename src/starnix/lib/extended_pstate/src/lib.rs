@@ -20,7 +20,7 @@ pub struct ExtendedPstateState {
     state: aarch64::State,
 
     #[cfg(target_arch = "riscv64")]
-    state: riscv64::State,
+    pub state: riscv64::State,
 }
 
 impl ExtendedPstateState {
@@ -65,6 +65,21 @@ impl ExtendedPstateState {
 
     pub fn reset(&mut self) {
         self.state.reset()
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    pub fn get_riscv64_fp_registers(&self) -> &[u64; 32] {
+        &self.state.fp_registers
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    pub fn get_riscv64_fcsr(&self) -> u32 {
+        self.state.fcsr
+    }
+
+    #[cfg(target_arch = "riscv64")]
+    pub fn set_riscv64_fp(&mut self, fp_registers: &[u64; 32], fcsr: u32) {
+        self.state = riscv64::State { fp_registers: *fp_registers, fcsr }
     }
 }
 

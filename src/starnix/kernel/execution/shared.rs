@@ -113,10 +113,10 @@ pub fn process_completed_restricted_exit(
         if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
             || (!flags.contains(TaskFlags::EXITED) && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
         {
-            let CurrentTask { task, registers, .. } = current_task;
+            let CurrentTask { task, registers, extended_pstate, .. } = current_task;
             let task_state = task.write();
             if !task.is_exitted() {
-                dequeue_signal(task, task_state, registers);
+                dequeue_signal(task, task_state, registers, extended_pstate);
             }
         }
     }

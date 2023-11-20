@@ -9,6 +9,7 @@ use crate::{
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
 };
+use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall, _fpstate_64,
     errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
@@ -59,6 +60,7 @@ impl SignalStackFrame {
     pub fn new(
         _task: &Task,
         registers: &RegisterState,
+        _extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         action: sigaction_t,
@@ -84,6 +86,7 @@ impl SignalStackFrame {
                 rip: registers.rip,
                 eflags: registers.rflags,
                 oldmask: signal_state.mask().into(),
+                // TODO(b/311770726): Save `extended_pstate`.
                 ..Default::default()
             },
             uc_stack: signal_state

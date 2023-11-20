@@ -16,6 +16,7 @@ use crate::{
     syscalls::SyscallResult,
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
 };
+use extended_pstate::ExtendedPstateState;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::RwLockWriteGuard;
 use starnix_uapi::{
@@ -166,6 +167,7 @@ pub fn dequeue_signal(
     task: &Task,
     mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
     registers: &mut RegisterState,
+    extended_pstate: &ExtendedPstateState,
 ) {
     let mask = task_state.signals.mask();
     let siginfo =
@@ -205,7 +207,7 @@ pub fn dequeue_signal(
         if let SignalDetail::Timer { timer } = &siginfo.detail {
             timer.on_signal_delivered();
         }
-        deliver_signal(task, task_state, siginfo, registers);
+        deliver_signal(task, task_state, siginfo, registers, extended_pstate);
     }
 }
 
@@ -214,6 +216,7 @@ pub fn deliver_signal(
     mut task_state: RwLockWriteGuard<'_, TaskMutableState>,
     mut siginfo: SignalInfo,
     registers: &mut RegisterState,
+    extended_pstate: &ExtendedPstateState,
 ) {
     loop {
         let sigaction = task.thread_group.signal_actions.get(siginfo.signal);
@@ -226,6 +229,7 @@ pub fn deliver_signal(
                 if let Err(err) = dispatch_signal_handler(
                     task,
                     registers,
+                    extended_pstate,
                     &mut task_state.signals,
                     siginfo,
                     sigaction,
@@ -287,11 +291,13 @@ pub fn deliver_signal(
 pub fn dispatch_signal_handler(
     task: &Task,
     registers: &mut RegisterState,
+    extended_pstate: &ExtendedPstateState,
     signal_state: &mut SignalState,
     siginfo: SignalInfo,
     action: sigaction_t,
 ) -> Result<(), Errno> {
-    let signal_stack_frame = SignalStackFrame::new(task, registers, signal_state, &siginfo, action);
+    let signal_stack_frame =
+        SignalStackFrame::new(task, registers, extended_pstate, signal_state, &siginfo, action);
 
     let main_stack = registers.stack_pointer_register().checked_sub(RED_ZONE_SIZE);
     let stack_bottom = if (action.sa_flags & SA_ONSTACK as u64) != 0 {
@@ -421,8 +427,8 @@ pub(crate) mod testing {
     use crate::{signals::dequeue_signal, task::CurrentTask, testing::AutoReleasableTask};
 
     pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
-        let CurrentTask { task, registers, .. } = current_task.deref_mut();
+        let CurrentTask { task, registers, extended_pstate, .. } = current_task.deref_mut();
         let task_state = task.write();
-        dequeue_signal(task, task_state, registers);
+        dequeue_signal(task, task_state, registers, extended_pstate);
     }
 }

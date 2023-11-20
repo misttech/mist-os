@@ -415,7 +415,13 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
             let mut registers = current_task.registers;
             registers.reset_flags();
             let task = &current_task.task;
-            deliver_signal(&task, task.write(), signal, &mut registers);
+            deliver_signal(
+                &task,
+                task.write(),
+                signal,
+                &mut registers,
+                &current_task.extended_pstate,
+            );
             current_task.registers = registers;
         }
     }
