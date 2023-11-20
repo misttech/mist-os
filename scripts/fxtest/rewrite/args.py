@@ -317,7 +317,7 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
     )
     output.add_argument(
         "--logpath",
-        help="If passed and --log is enabled, custimizes the destination of the target log.",
+        help="If passed and --log is enabled, customizes the destination of the target log.",
         default=None,
     )
     output.add_argument(
