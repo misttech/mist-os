@@ -7,7 +7,7 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-// See note in //zircon/third_party/ulib/boringssl/BUILD.gn
+// See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
 #include <openssl/cipher.h>
 #include <openssl/digest.h>

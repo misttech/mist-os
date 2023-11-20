@@ -11,7 +11,7 @@
 #include <explicit-memory/bytes.h>
 #include <fbl/alloc_checker.h>
 
-// See note in //zircon/third_party/ulib/boringssl/BUILD.gn
+// See note in //zircon/kernel/lib/crypto/boringssl/BUILD.gn
 #define BORINGSSL_NO_CXX
 #include <openssl/crypto.h>
 #include <openssl/digest.h>
