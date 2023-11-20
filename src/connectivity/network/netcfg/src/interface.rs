@@ -445,9 +445,6 @@ pub enum MatchingRule {
 }
 
 impl MatchingRule {
-    // TODO(fxbug.dev/135098): Use interface matching fn when there is naming
-    // policy to apply
-    #[allow(unused)]
     fn does_interface_match(&self, info: &devices::DeviceInfo) -> Result<bool, anyhow::Error> {
         match &self {
             MatchingRule::BusTypes(type_list) => {
@@ -548,10 +545,8 @@ pub enum NameCompositionRule {
 #[derive(Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub struct NamingRule {
-    // TODO(fxbug.dev/135094): Add and use interface matching rules
     /// A set of rules to check against an interface's properties. All rules
     /// must apply for the naming scheme to take effect.
-    #[allow(unused)]
     pub matchers: HashSet<MatchingRule>,
     /// The rules to apply to the interface to produce the interface's name.
     pub naming_scheme: Vec<NameCompositionRule>,
@@ -637,6 +632,32 @@ impl NamingRule {
             return Ok(name);
         }
     }
+
+    // An interface must align with all specified `MatchingRule`s.
+    fn does_interface_match(&self, info: &devices::DeviceInfo) -> bool {
+        self.matchers.iter().all(|rule| rule.does_interface_match(info).unwrap_or_default())
+    }
+}
+
+// Find the first `NamingRule` that matches the device and attempt to
+// construct a name from the provided `NameCompositionRule`s.
+#[allow(unused)]
+fn generate_name_from_naming_rules(
+    naming_rules: &[NamingRule],
+    interfaces: &[InterfaceConfig],
+    info: &devices::DeviceInfo,
+) -> Result<String, NameGenerationError> {
+    // TODO(fxbug.dev/136397): Consider adding an option to the rules to allow
+    // fallback rules when name generation fails.
+    // Use the first naming rule that matches the interface to enforce consistent
+    // interface names, even if there are other matching rules.
+    let first_matching_rule =
+        naming_rules.iter().find(|rule| rule.does_interface_match(&info)).expect(
+            "There must always be at least one NamingRule that matches. \
+                 The fallback naming rules should match any interface.",
+        );
+
+    first_matching_rule.generate_name(interfaces, &info)
 }
 
 /// Whether the interface should be provisioned locally by netcfg, or
@@ -1257,6 +1278,40 @@ mod tests {
         assert!(!does_interface_match);
     }
 
+    #[test_case(
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])],
+        false;
+        "false_single_rule"
+    )]
+    #[test_case(
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan]), MatchingRule::Any(true)],
+        false;
+        "false_one_rule_of_multiple"
+    )]
+    #[test_case(
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        vec![MatchingRule::Any(true)],
+        true;
+        "true_single_rule"
+    )]
+    #[test_case(
+        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        vec![MatchingRule::DeviceClasses(vec![DeviceClass::Ethernet]), MatchingRule::Any(true)],
+        true;
+        "true_multiple_rules"
+    )]
+    fn test_does_interface_match(
+        info: devices::DeviceInfo,
+        matching_rules: Vec<MatchingRule>,
+        want_match: bool,
+    ) {
+        let naming_rule =
+            NamingRule { matchers: HashSet::from_iter(matching_rules), naming_scheme: Vec::new() };
+        assert_eq!(naming_rule.does_interface_match(&info), want_match);
+    }
+
     // Arbitrary values for devices::DeviceInfo for cases where DeviceInfo has
     // no impact on the test.
     fn default_device_info() -> devices::DeviceInfo {
@@ -1472,5 +1527,65 @@ mod tests {
                 device_class: crate::InterfaceType::Ethernet,
             });
         }
+    }
+
+    #[test_case(true, "x"; "matches_first_rule")]
+    #[test_case(false, "ethx1"; "fallback_default")]
+    fn test_generate_name_from_naming_rules(match_first_rule: bool, expected_name: &'static str) {
+        // Use an Ethernet device that is determined to have a USB bus type
+        // from the topological path.
+        let info = new_device_info(
+            fhwnet::DeviceClass::Ethernet,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
+            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet"
+        );
+        let name = generate_name_from_naming_rules(
+            &[
+                NamingRule {
+                    matchers: HashSet::from([MatchingRule::Any(match_first_rule)]),
+                    naming_scheme: vec![NameCompositionRule::Static { value: String::from("x") }],
+                },
+                NamingRule {
+                    matchers: HashSet::from([MatchingRule::Any(true)]),
+                    naming_scheme: vec![NameCompositionRule::Default],
+                },
+                // Include an arbitrary rule after the catch-all fallback rule
+                // to ensure that it has no impact on the test.
+                NamingRule {
+                    matchers: HashSet::from([MatchingRule::Any(false)]),
+                    naming_scheme: vec![NameCompositionRule::Static { value: String::from("y") }],
+                },
+            ],
+            &[],
+            &info,
+        )
+        .unwrap();
+        assert_eq!(name, expected_name.to_owned());
+    }
+
+    #[test]
+    fn test_generate_name_from_naming_rules_all_errors() {
+        // Create a `DeviceInfo` that has a device class, but has an empty
+        // topological path. This should prohibit the `BusType`
+        // dynamic `NameCompositionRule`s.
+        let info = device_info_from_device_class(fhwnet::DeviceClass::Ethernet);
+
+        // Both names should fail to be generated since the `BusType` relies on
+        // the topological path. The GenerationError should be surfaced.
+        let name = generate_name_from_naming_rules(
+            &[NamingRule {
+                matchers: HashSet::from([MatchingRule::Any(true)]),
+                naming_scheme: vec![NameCompositionRule::Dynamic {
+                    rule: DynamicNameCompositionRule::BusType,
+                }],
+            }],
+            &[],
+            &info,
+        );
+        assert_matches!(
+            name,
+            Err(NameGenerationError::GenerationError(e)) =>
+                e.to_string().contains("bus type")
+        );
     }
 }
