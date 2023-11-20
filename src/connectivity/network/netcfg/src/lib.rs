@@ -1952,9 +1952,8 @@ impl<'a> NetCfg<'a> {
                 // When it is a different logical interface, reject installing
                 // the new interface into netstack.
                 Err(interface::NameGenerationError::AlreadyExistsError(e)) => {
-                    return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
-                        e.context("error attempting to add an interface with the same name"),
-                    )))
+                    warn!("{:?}", e);
+                    return Err(devices::AddDeviceError::AlreadyExists);
                 }
             }
         } else {
