@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    atomic_counter::{AtomicU32Counter, AtomicU64Counter},
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
         BinderDriver, DeviceMode, DeviceOps, DeviceRegistry, Features,
@@ -46,7 +47,7 @@ use starnix_uapi::{
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicI32, AtomicU16, AtomicU32, AtomicU64, AtomicU8},
+        atomic::{AtomicI32, AtomicU16, AtomicU8},
         Arc, Weak,
     },
 };
@@ -184,12 +185,12 @@ pub struct Kernel {
     pub power_manager: PowerManager,
 
     /// Unique IDs for new mounts and mount namespaces.
-    pub next_mount_id: AtomicU64,
-    pub next_peer_group_id: AtomicU64,
-    pub next_namespace_id: AtomicU64,
+    pub next_mount_id: AtomicU64Counter,
+    pub next_peer_group_id: AtomicU64Counter,
+    pub next_namespace_id: AtomicU64Counter,
 
     /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
-    pub next_inotify_cookie: AtomicU32,
+    pub next_inotify_cookie: AtomicU32Counter,
 
     pub inotify_limits: InotifyLimits,
 
@@ -305,10 +306,10 @@ impl Kernel {
             core_dumps,
             actions_logged: AtomicU16::new(0),
             power_manager: PowerManager::default(),
-            next_mount_id: AtomicU64::new(1),
-            next_peer_group_id: AtomicU64::new(1),
-            next_namespace_id: AtomicU64::new(1),
-            next_inotify_cookie: AtomicU32::new(1),
+            next_mount_id: AtomicU64Counter::new(1),
+            next_peer_group_id: AtomicU64Counter::new(1),
+            next_namespace_id: AtomicU64Counter::new(1),
+            next_inotify_cookie: AtomicU32Counter::new(1),
             inotify_limits: InotifyLimits {
                 max_queued_events: AtomicI32::new(16384),
                 max_user_instances: AtomicI32::new(128),

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    atomic_counter::AtomicU64Counter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
@@ -33,7 +34,7 @@ use starnix_uapi::{
 use std::{
     collections::HashMap,
     sync::{
-        atomic::{AtomicU64, AtomicU8, Ordering},
+        atomic::{AtomicU8, Ordering},
         Arc,
     },
 };
@@ -76,7 +77,7 @@ pub struct SeccompFilter {
     unique_id: u64,
 
     /// The next cookie (unique id for this syscall), as used by SECCOMP_RET_USER_NOTIF
-    cookie: AtomicU64,
+    cookie: AtomicU64Counter,
 
     // Whether to log the results of this filter
     log: bool,
@@ -115,7 +116,7 @@ impl SeccompFilter {
             Ok(program) => Ok(SeccompFilter {
                 program,
                 unique_id: maybe_unique_id,
-                cookie: AtomicU64::new(0),
+                cookie: AtomicU64Counter::new(0),
                 log: should_log,
             }),
             Err(errmsg) => {
@@ -473,8 +474,7 @@ impl SeccompState {
             }
             SeccompAction::UserNotif => {
                 if let Some(notifier) = current_task.get_seccomp_notifier() {
-                    let cookie =
-                        result.filter.as_ref().unwrap().cookie.fetch_add(1, Ordering::Relaxed);
+                    let cookie = result.filter.as_ref().unwrap().cookie.next();
                     let msg = seccomp_notif {
                         id: cookie,
                         pid: current_task.id as u32,

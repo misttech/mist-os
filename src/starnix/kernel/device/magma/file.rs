@@ -13,6 +13,7 @@ use super::{
     magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
 };
 use crate::{
+    atomic_counter::AtomicU64Counter,
     device::{
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
         wayland::image_file::{ImageFile, ImageInfo},
@@ -159,10 +160,7 @@ use starnix_uapi::{
 };
 use std::{
     collections::HashMap,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Once,
-    },
+    sync::{Arc, Once},
 };
 
 #[derive(Clone)]
@@ -252,7 +250,7 @@ pub struct MagmaFile {
     connections: Arc<Mutex<ConnectionMap>>,
     buffers: Arc<Mutex<HashMap<magma_buffer_t, Arc<MagmaBuffer>>>>,
     semaphores: Arc<Mutex<HashMap<magma_semaphore_t, Arc<MagmaSemaphore>>>>,
-    semaphore_id_generator: AtomicU64,
+    semaphore_id_generator: AtomicU64Counter,
 }
 
 impl MagmaFile {
@@ -287,7 +285,7 @@ impl MagmaFile {
             connections: Arc::new(Mutex::new(HashMap::new())),
             buffers: Arc::new(Mutex::new(HashMap::new())),
             semaphores: Arc::new(Mutex::new(HashMap::new())),
-            semaphore_id_generator: AtomicU64::new(1),
+            semaphore_id_generator: AtomicU64Counter::new(1),
         }))
     }
 
@@ -430,7 +428,7 @@ impl MagmaFile {
             }
 
             if status == MAGMA_STATUS_OK {
-                result_semaphore_id = self.semaphore_id_generator.fetch_add(1, Ordering::Relaxed);
+                result_semaphore_id = self.semaphore_id_generator.next();
 
                 self.semaphores.lock().insert(
                     result_semaphore_id,
@@ -744,8 +742,7 @@ impl FileOps for MagmaFile {
                     let semaphore_id;
                     (status, semaphore, semaphore_id) = import_semaphore2(&connection, vmo, flags);
                     if status == MAGMA_STATUS_OK {
-                        result_semaphore_id =
-                            self.semaphore_id_generator.fetch_add(1, Ordering::Relaxed);
+                        result_semaphore_id = self.semaphore_id_generator.next();
 
                         self.semaphores.lock().insert(
                             result_semaphore_id,

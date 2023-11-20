@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    atomic_counter::AtomicU64Counter,
     fs::{
         DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
         XattrOp,
@@ -20,10 +21,7 @@ use starnix_uapi::{
 };
 use std::{
     collections::{hash_map::Entry, HashMap, HashSet},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
+    sync::{Arc, Weak},
 };
 
 pub const DEFAULT_LRU_CAPACITY: usize = 32;
@@ -32,7 +30,7 @@ pub const DEFAULT_LRU_CAPACITY: usize = 32;
 pub struct FileSystem {
     pub kernel: Weak<Kernel>,
     root: OnceCell<DirEntryHandle>,
-    next_node_id: AtomicU64,
+    next_node_id: AtomicU64Counter,
     ops: Box<dyn FileSystemOps>,
 
     /// The options specified when mounting the filesystem. Saved here for display in
@@ -139,7 +137,7 @@ impl FileSystem {
         Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
-            next_node_id: AtomicU64::new(1),
+            next_node_id: AtomicU64Counter::new(1),
             ops: Box::new(ops),
             options,
             dev_id: kernel.device_registry.next_anonymous_dev_id(),
@@ -287,7 +285,7 @@ impl FileSystem {
 
     pub fn next_node_id(&self) -> ino_t {
         assert!(!self.ops.generate_node_ids());
-        self.next_node_id.fetch_add(1, Ordering::Relaxed)
+        self.next_node_id.next()
     }
 
     /// Move |renamed| that is at |old_name| in |old_parent| to |new_name| in |new_parent|

@@ -488,6 +488,7 @@ impl FileOps for EpollFileObject {
 mod tests {
     use super::{epoll_event, EpollFileObject, EventHandler, OpenFlags};
     use crate::{
+        atomic_counter::AtomicUsizeCounter,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
@@ -502,12 +503,11 @@ mod tests {
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };
-    use std::sync::atomic::{AtomicU64, Ordering};
     use syncio::Zxio;
 
     #[::fuchsia::test]
     async fn test_epoll_read_ready() {
-        static WRITE_COUNT: AtomicU64 = AtomicU64::new(0);
+        static WRITE_COUNT: AtomicUsizeCounter = AtomicUsizeCounter::new(0);
         const EVENT_DATA: u64 = 42;
 
         let (kernel, _init_task) = create_kernel_and_task();
@@ -536,7 +536,7 @@ mod tests {
                 .write(&writer_task, &mut VecInputBuffer::new(test_string_copy.as_bytes()))
                 .unwrap();
             assert_eq!(bytes_written, test_len);
-            WRITE_COUNT.fetch_add(bytes_written as u64, Ordering::Relaxed);
+            WRITE_COUNT.add(bytes_written);
         });
         let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
         let _ = thread.join();
@@ -548,7 +548,7 @@ mod tests {
 
         let mut buffer = VecOutputBuffer::new(test_len);
         let bytes_read = pipe_out.read(&current_task, &mut buffer).unwrap();
-        assert_eq!(bytes_read as u64, WRITE_COUNT.load(Ordering::Relaxed));
+        assert_eq!(bytes_read, WRITE_COUNT.get());
         assert_eq!(bytes_read, test_len);
         assert_eq!(buffer.data(), test_string.as_bytes());
     }

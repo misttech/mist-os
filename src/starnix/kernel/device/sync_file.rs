@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    atomic_counter::AtomicUsizeCounter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
@@ -26,13 +27,7 @@ use starnix_uapi::{
     user_address::{UserAddress, UserRef},
     SYNC_IOC_MAGIC,
 };
-use std::{
-    collections::HashSet,
-    sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc,
-    },
-};
+use std::{collections::HashSet, sync::Arc};
 
 // Implementation of the sync framework described at:
 // https://source.android.com/docs/core/graphics/sync
@@ -253,7 +248,7 @@ impl FileOps for SyncFile {
             return None;
         }
 
-        let count = Arc::<AtomicUsize>::new(0.into());
+        let count = Arc::<AtomicUsizeCounter>::new(0.into());
 
         let mut cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; 1]> = smallvec::smallvec![];
 
@@ -296,7 +291,7 @@ impl FileOps for SyncFile {
             } else {
                 canceler_result.cancel(sync_point.handle.as_handle_ref());
 
-                count.fetch_add(1, Ordering::Relaxed);
+                count.next();
             }
         }
 

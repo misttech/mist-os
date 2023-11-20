@@ -32,6 +32,7 @@ use futures::{StreamExt, TryStreamExt};
 mod trace;
 
 mod arch;
+mod atomic_counter;
 mod auth;
 mod bpf;
 mod device;

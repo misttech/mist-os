@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    atomic_counter::AtomicU64Counter,
     auth::Credentials,
     device::terminal::{ControllingSession, Terminal},
     drop_notifier::DropNotifier,
@@ -44,10 +45,7 @@ use starnix_uapi::{
 use std::{
     collections::BTreeMap,
     fmt,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
+    sync::{atomic::Ordering, Arc, Weak},
 };
 
 /// The mutable state of the ThreadGroup.
@@ -181,7 +179,7 @@ pub struct ThreadGroup {
     /// able to distinguish identical seccomp filters, which are treated differently
     /// for the purposes of SECCOMP_FILTER_FLAG_TSYNC.  Inherited across clone because
     /// seccomp filters are also inherited across clone.
-    pub next_seccomp_filter_id: AtomicU64,
+    pub next_seccomp_filter_id: AtomicU64Counter,
 
     /// Timer id of ITIMER_REAL.
     itimer_real_id: TimerId,
@@ -303,7 +301,7 @@ impl ThreadGroup {
     ) -> Arc<ThreadGroup> {
         let timers = TimerTable::new();
         let itimer_real_id = timers.create(CLOCK_REALTIME as ClockId, None).unwrap();
-        let thread_group = Arc::new(ThreadGroup {
+        let mut thread_group = ThreadGroup {
             kernel,
             process,
             leader,
@@ -337,16 +335,17 @@ impl ThreadGroup {
                 personality: parent.as_ref().map(|p| p.personality).unwrap_or(Default::default()),
                 allowed_ptracers: PtraceAllowedPtracers::None,
             }),
-        });
+        };
 
-        if let Some(mut parent) = parent {
+        let thread_group = if let Some(mut parent) = parent {
+            thread_group.next_seccomp_filter_id.reset(parent.base.next_seccomp_filter_id.get());
+            let thread_group = Arc::new(thread_group);
             parent.children.insert(leader, Arc::downgrade(&thread_group));
             process_group.insert(&thread_group);
-            thread_group.next_seccomp_filter_id.store(
-                parent.base.next_seccomp_filter_id.load(Ordering::Relaxed),
-                Ordering::Relaxed,
-            );
-        }
+            thread_group
+        } else {
+            Arc::new(thread_group)
+        };
         thread_group
     }
 

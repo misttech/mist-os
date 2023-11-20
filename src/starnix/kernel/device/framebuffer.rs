@@ -18,6 +18,15 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
 };
+use fidl_fuchsia_io as fio;
+use fidl_fuchsia_math as fmath;
+use fidl_fuchsia_ui_composition as fuicomposition;
+use fidl_fuchsia_ui_display_singleton as fuidisplay;
+use fidl_fuchsia_ui_views as fuiviews;
+use fuchsia_component::client::connect_to_protocol_sync;
+use fuchsia_fs::directory as ffs_dir;
+use fuchsia_zircon as zx;
+use starnix_lock::RwLock;
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,
@@ -28,16 +37,6 @@ use starnix_uapi::{
     FBIOGET_FSCREENINFO, FBIOGET_VSCREENINFO, FBIOPUT_VSCREENINFO, FB_TYPE_PACKED_PIXELS,
     FB_VISUAL_TRUECOLOR,
 };
-
-use fidl_fuchsia_io as fio;
-use fidl_fuchsia_math as fmath;
-use fidl_fuchsia_ui_composition as fuicomposition;
-use fidl_fuchsia_ui_display_singleton as fuidisplay;
-use fidl_fuchsia_ui_views as fuiviews;
-use fuchsia_component::client::connect_to_protocol_sync;
-use fuchsia_fs::directory as ffs_dir;
-use fuchsia_zircon as zx;
-use starnix_lock::RwLock;
 use std::sync::Arc;
 use zerocopy::AsBytes;
 

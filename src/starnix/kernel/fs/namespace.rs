@@ -48,7 +48,7 @@ use std::{
     fmt,
     hash::{Hash, Hasher},
     ops::{Deref, DerefMut},
-    sync::{atomic::Ordering, Arc, Weak},
+    sync::{Arc, Weak},
 };
 
 /// A mount namespace.
@@ -651,15 +651,15 @@ pub trait FileSystemCreator {
 
 impl Kernel {
     pub fn get_next_mount_id(&self) -> u64 {
-        self.next_mount_id.fetch_add(1, Ordering::Relaxed)
+        self.next_mount_id.next()
     }
 
     pub fn get_next_peer_group_id(&self) -> u64 {
-        self.next_peer_group_id.fetch_add(1, Ordering::Relaxed)
+        self.next_peer_group_id.next()
     }
 
     pub fn get_next_namespace_id(&self) -> u64 {
-        self.next_namespace_id.fetch_add(1, Ordering::Relaxed)
+        self.next_namespace_id.next()
     }
 }
 

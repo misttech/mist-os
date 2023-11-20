@@ -5,6 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
+    atomic_counter::AtomicU64Counter,
     auth::FsCred,
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
     fs::{
@@ -80,10 +81,7 @@ use std::{
     collections::{BTreeMap, HashSet, VecDeque},
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Weak,
-    },
+    sync::{Arc, Weak},
 };
 use zerocopy::{AsBytes, FromBytes};
 
@@ -130,7 +128,7 @@ pub struct BinderDriver {
     procs: RwLock<BTreeMap<u64, OwnedRef<BinderProcess>>>,
 
     /// The identifier to use for the next created `BinderProcess`.
-    next_identifier: AtomicU64,
+    next_identifier: AtomicU64Counter,
 }
 
 impl Drop for BinderDriver {
@@ -2933,10 +2931,6 @@ impl BinderDriver {
         driver
     }
 
-    fn get_next_identifier(&self) -> u64 {
-        self.next_identifier.fetch_add(1, Ordering::Relaxed)
-    }
-
     fn find_process(&self, identifier: u64) -> Result<OwnedRef<BinderProcess>, Errno> {
         self.procs.read().get(&identifier).map(OwnedRef::clone).ok_or_else(|| errno!(ENOENT))
     }
@@ -2957,7 +2951,7 @@ impl BinderDriver {
         pid: pid_t,
         resource_accessor: Option<Arc<RemoteResourceAccessor>>,
     ) -> u64 {
-        let identifier = self.get_next_identifier();
+        let identifier = self.next_identifier.next();
         let binder_process = BinderProcess::new(identifier, pid, resource_accessor);
         assert!(
             self.procs.write().insert(identifier, binder_process).is_none(),

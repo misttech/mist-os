@@ -2238,7 +2238,7 @@ impl CurrentTask {
 
         let new_filter = Arc::new(SeccompFilter::from_cbpf(
             &code,
-            self.thread_group.next_seccomp_filter_id.fetch_add(1, Ordering::SeqCst),
+            self.thread_group.next_seccomp_filter_id.next(),
             flags & SECCOMP_FILTER_FLAG_LOG != 0,
         )?);
 

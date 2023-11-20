@@ -10,7 +10,7 @@
 //! To display the `Framebuffer` as its view, a component must add the `framebuffer` feature to its
 //! `.cml`.
 
-use crate::task::Kernel;
+use crate::{atomic_counter::AtomicU64Counter, task::Kernel};
 use anyhow::anyhow;
 use fidl::{
     endpoints::{create_proxy, create_request_stream},
@@ -37,11 +37,7 @@ use futures::{StreamExt, TryStreamExt};
 use starnix_lock::Mutex;
 use std::{
     ops::DerefMut,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        mpsc::channel,
-        Arc,
-    },
+    sync::{mpsc::channel, Arc},
 };
 
 use crate::logging::log_warn;
@@ -86,7 +82,7 @@ pub struct FramebufferServer {
     scene_state: Arc<Mutex<SceneState>>,
 
     /// Keeps track of the Flatland viewport ID.
-    viewport_id: AtomicU64,
+    viewport_id: AtomicU64Counter,
 }
 
 impl FramebufferServer {
@@ -246,8 +242,7 @@ pub fn init_viewport_scene(
         logical_size: Some(fmath::SizeU { width: server.image_width, height: server.image_height }),
         ..Default::default()
     };
-    let new_viewport =
-        fuicomposition::ContentId { value: server.viewport_id.fetch_add(1, Ordering::SeqCst) };
+    let new_viewport = fuicomposition::ContentId { value: server.viewport_id.next() };
     server
         .flatland
         .create_viewport(

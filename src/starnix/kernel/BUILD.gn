@@ -214,6 +214,7 @@ rustc_binary("starnix_kernel_bin") {
     "arch/${current_cpu}/task.rs",
     "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
+    "atomic_counter.rs",
     "auth.rs",
     "bpf.rs",
     "device/binder.rs",

@@ -488,10 +488,10 @@ impl InotifyWatchers {
 
 impl Kernel {
     pub fn get_next_inotify_cookie(&self) -> u32 {
-        let cookie = self.next_inotify_cookie.fetch_add(1, Ordering::Relaxed);
+        let cookie = self.next_inotify_cookie.next();
         // 0 is an invalid cookie.
         if cookie == 0 {
-            return self.next_inotify_cookie.fetch_add(1, Ordering::Relaxed);
+            return self.next_inotify_cookie.next();
         }
         cookie
     }

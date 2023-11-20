@@ -2,29 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fidl::AsHandleRef as _;
-use fuchsia_zircon as zx;
-use starnix_lock::Mutex;
-use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
-use std::{
-    collections::{HashMap, VecDeque},
-    sync::{
-        atomic::{AtomicU64, AtomicUsize, Ordering},
-        Arc, Weak,
-    },
-};
-use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
-
 use crate::{
+    atomic_counter::{AtomicU64Counter, AtomicUsizeCounter},
     fs::{FdEvents, FdNumber},
     signals::RunState,
     task::CurrentTask,
 };
+use fidl::AsHandleRef as _;
+use fuchsia_zircon as zx;
+use starnix_lock::Mutex;
+use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
 use starnix_uapi::{
     error,
     errors::{Errno, EINTR},
     ownership::debug_assert_no_local_temp_ref,
 };
+use std::{
+    collections::{HashMap, VecDeque},
+    sync::{Arc, Weak},
+};
+use syncio::{zxio::zxio_signals_t, Zxio, ZxioSignals};
 
 #[derive(Debug, Copy, Clone, Eq, Hash, PartialEq)]
 pub enum ReadyItemKey {
@@ -121,7 +118,7 @@ pub struct ZxioSignalHandler {
 // count, the event handler is called with the given events.
 pub struct ManyZxHandleSignalHandler {
     pub count: usize,
-    pub counter: Arc<AtomicUsize>,
+    pub counter: Arc<AtomicUsizeCounter>,
     pub expected_signals: zx::Signals,
     pub events: FdEvents,
 }
@@ -149,7 +146,7 @@ impl SignalHandler {
             }
             SignalHandlerInner::ManyZxHandle(signal_handler) => {
                 if signals.contains(signal_handler.expected_signals) {
-                    let new_count = signal_handler.counter.fetch_add(1, Ordering::Relaxed) + 1;
+                    let new_count = signal_handler.counter.next() + 1;
                     assert!(new_count <= signal_handler.count);
                     if new_count == signal_handler.count {
                         Some(signal_handler.events)
@@ -372,7 +369,7 @@ impl WaitCallback {
 struct PortWaiter {
     port: PortEvent,
     callbacks: Mutex<HashMap<WaitKey, WaitCallback>>, // the key 0 is reserved for 'no handler'
-    next_key: AtomicU64,
+    next_key: AtomicU64Counter,
     ignore_signals: bool,
 
     /// Collection of wait queues this Waiter is waiting on, so that when the Waiter is Dropped it
@@ -389,7 +386,7 @@ impl PortWaiter {
         Arc::new(PortWaiter {
             port: PortEvent::new(),
             callbacks: Default::default(),
-            next_key: AtomicU64::new(1),
+            next_key: AtomicU64Counter::new(1),
             ignore_signals,
             wait_queues: Default::default(),
         })
@@ -463,7 +460,7 @@ impl PortWaiter {
     }
 
     fn next_key(&self) -> WaitKey {
-        let key = self.next_key.fetch_add(1, Ordering::Relaxed);
+        let key = self.next_key.next();
         // TODO - find a better reaction to wraparound
         assert!(key != 0, "bad key from u64 wraparound");
         WaitKey { raw: key }
@@ -1026,7 +1023,6 @@ mod tests {
         testing::*,
     };
     use starnix_uapi::open_flags::OpenFlags;
-    use std::sync::atomic::AtomicU64;
 
     const KEY: ReadyItemKey = ReadyItemKey::Usize(1234);
 
@@ -1051,12 +1047,12 @@ mod tests {
         pipe.wait_async(&current_task, &waiter, FdEvents::POLLIN, handler).expect("wait_async");
         let test_string_clone = test_string.clone();
 
-        let write_count = AtomicU64::default();
+        let write_count = AtomicUsizeCounter::default();
         std::thread::scope(|s| {
             let thread = s.spawn(|| {
                 let test_data = test_string_clone.as_bytes();
                 let no_written = local_socket.write(test_data).unwrap();
-                assert_eq!(0, write_count.fetch_add(no_written as u64, Ordering::Relaxed));
+                assert_eq!(0, write_count.add(no_written));
                 assert_eq!(no_written, test_data.len());
             });
 
@@ -1070,8 +1066,8 @@ mod tests {
 
         let read_size = pipe.read(&current_task, &mut output_buffer).unwrap();
 
-        let no_written = write_count.load(Ordering::Relaxed);
-        assert_eq!(no_written, read_size as u64);
+        let no_written = write_count.get();
+        assert_eq!(no_written, read_size);
 
         assert_eq!(output_buffer.data(), test_string.as_bytes());
     }
