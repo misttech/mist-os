@@ -697,6 +697,21 @@ impl Use {
                 return Err(RoutingError::unsupported_route_source("debug capability"));
             }
             UseSource::Self_ => {
+                let use_: UseDecl = use_.into();
+                if let UseDecl::Config(config) = use_ {
+                    sources.capability_source()?;
+                    let target_capabilities = target.lock_resolved_state().await?.capabilities();
+                    return Ok(UseResult::Source(CapabilitySource::<C>::Component {
+                        capability: sources.find_component_source(
+                            config.source_name(),
+                            target.moniker(),
+                            &target_capabilities,
+                            visitor,
+                            mapper,
+                        )?,
+                        component: target.as_weak(),
+                    }));
+                }
                 return Err(RoutingError::unsupported_route_source("self"));
             }
             UseSource::Environment => {

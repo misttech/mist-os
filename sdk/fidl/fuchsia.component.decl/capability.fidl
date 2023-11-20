@@ -19,6 +19,8 @@ type Capability = flexible union {
     8: event_stream EventStream;
     @available(added=HEAD)
     9: dictionary Dictionary;
+    @available(added=HEAD)
+   10: config Configuration;
 };
 
 /// Declares a service capability backed by this component.
@@ -181,4 +183,14 @@ type Dictionary = table {
     ///
     /// This must be set iff `source` is not `void`.
     3: source_dictionary dictionary_path;
+};
+
+/// Declares a configuration capability.
+@available(added=HEAD)
+type Configuration = table {
+    /// (Required) The name of this configuration
+    1: name name;
+
+    /// (Required) The value of this Configuration.
+    2: value ConfigValue;
 };

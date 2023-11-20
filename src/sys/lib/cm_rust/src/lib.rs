@@ -18,6 +18,7 @@ use {
     std::fmt,
     std::hash::Hash,
     std::path::PathBuf,
+    std::string::ToString,
     thiserror::Error,
 };
 
@@ -261,6 +262,7 @@ pub enum UseDecl {
     Storage(UseStorageDecl),
     EventStream(UseEventStreamDecl),
     Runner(UseRunnerDecl),
+    Config(UseConfigurationDecl),
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -381,6 +383,33 @@ impl UseDeclCommon for UseRunnerDecl {
 
     fn availability(&self) -> &Availability {
         &Availability::Required
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::UseConfiguration")]
+pub struct UseConfigurationDecl {
+    pub source: UseSource,
+    pub source_name: Name,
+    pub target_name: Name,
+    #[fidl_decl(default)]
+    pub availability: Availability,
+}
+
+impl SourceName for UseConfigurationDecl {
+    fn source_name(&self) -> &Name {
+        &self.source_name
+    }
+}
+
+impl UseDeclCommon for UseConfigurationDecl {
+    fn source(&self) -> &UseSource {
+        &self.source
+    }
+
+    fn availability(&self) -> &Availability {
+        &self.availability
     }
 }
 
@@ -560,6 +589,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Storage(u) => u.source(),
             UseDecl::EventStream(u) => u.source(),
             UseDecl::Runner(u) => u.source(),
+            UseDecl::Config(u) => u.source(),
         }
     }
 
@@ -571,6 +601,7 @@ impl UseDeclCommon for UseDecl {
             UseDecl::Storage(u) => u.availability(),
             UseDecl::EventStream(u) => u.availability(),
             UseDecl::Runner(u) => u.availability(),
+            UseDecl::Config(u) => u.availability(),
         }
     }
 }
@@ -830,6 +861,7 @@ pub enum CapabilityDecl {
     Resolver(ResolverDecl),
     EventStream(EventStreamDecl),
     Dictionary(DictionaryDecl),
+    Config(ConfigurationDecl),
 }
 
 impl CapabilityDeclCommon for CapabilityDecl {
@@ -843,6 +875,7 @@ impl CapabilityDeclCommon for CapabilityDecl {
             Self::Resolver(c) => c.name(),
             Self::EventStream(c) => c.name(),
             Self::Dictionary(c) => c.name(),
+            Self::Config(c) => c.name(),
         }
     }
 }
@@ -924,6 +957,14 @@ pub struct DictionaryDecl {
     pub source_dictionary: Option<PathBuf>,
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, CapabilityDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::Configuration")]
+pub struct ConfigurationDecl {
+    pub name: Name,
+    pub value: ConfigValue,
+}
+
 impl CapabilityDecl {
     pub fn name(&self) -> &Name {
         match self {
@@ -935,6 +976,7 @@ impl CapabilityDecl {
             CapabilityDecl::Storage(decl) => decl.name(),
             CapabilityDecl::EventStream(decl) => decl.name(),
             CapabilityDecl::Dictionary(decl) => decl.name(),
+            CapabilityDecl::Config(decl) => decl.name(),
         }
     }
 
@@ -948,6 +990,7 @@ impl CapabilityDecl {
             CapabilityDecl::Storage(_) => None,
             CapabilityDecl::EventStream(_) => None,
             CapabilityDecl::Dictionary(_) => None,
+            CapabilityDecl::Config(_) => None,
         }
     }
 }
@@ -1581,6 +1624,7 @@ impl UseDecl {
             UseDecl::Storage(d) => Some(&d.target_path),
             UseDecl::EventStream(d) => Some(&d.target_path),
             UseDecl::Runner(_) => None,
+            UseDecl::Config(_) => None,
         }
     }
 
@@ -1592,6 +1636,7 @@ impl UseDecl {
             | UseDecl::Protocol(_)
             | UseDecl::Directory(_)
             | UseDecl::Runner(_) => None,
+            UseDecl::Config(_) => None,
         }
     }
 }
@@ -1605,6 +1650,7 @@ impl SourceName for UseDecl {
             UseDecl::Directory(directory_decl) => &directory_decl.source_name,
             UseDecl::EventStream(event_stream_decl) => &event_stream_decl.source_name,
             UseDecl::Runner(runner_decl) => &runner_decl.source_name,
+            UseDecl::Config(u) => &u.source_name,
         }
     }
 }
@@ -1662,6 +1708,7 @@ pub enum CapabilityTypeName {
     Service,
     Storage,
     Dictionary,
+    Config,
 }
 
 impl fmt::Display for CapabilityTypeName {
@@ -1675,6 +1722,7 @@ impl fmt::Display for CapabilityTypeName {
             CapabilityTypeName::Service => "service",
             CapabilityTypeName::Storage => "storage",
             CapabilityTypeName::Dictionary => "dictionary",
+            CapabilityTypeName::Config => "configuration",
         };
         write!(f, "{}", display_name)
     }
@@ -1689,6 +1737,7 @@ impl From<&UseDecl> for CapabilityTypeName {
             UseDecl::Storage(_) => Self::Storage,
             UseDecl::EventStream(_) => Self::EventStream,
             UseDecl::Runner(_) => Self::Runner,
+            UseDecl::Config(_) => Self::Config,
         }
     }
 }
@@ -1732,6 +1781,7 @@ impl From<&CapabilityDecl> for CapabilityTypeName {
             CapabilityDecl::Resolver(_) => Self::Resolver,
             CapabilityDecl::EventStream(_) => Self::EventStream,
             CapabilityDecl::Dictionary(_) => Self::Dictionary,
+            CapabilityDecl::Config(_) => Self::Config,
         }
     }
 }
@@ -2499,6 +2549,13 @@ mod tests {
                         source_dictionary: Some("in/dict".to_string()),
                         ..Default::default()
                     }),
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source: Some(fdecl::Ref::Parent(fdecl::ParentRef)),
+                        source_name: Some("fuchsia.config.MyConfig".to_string()),
+                        target_name: Some("my_config".to_string()),
+                        availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
+                    }),
                 ]),
                 exposes: Some(vec![
                     fdecl::Expose::Protocol(fdecl::ExposeProtocol {
@@ -2964,6 +3021,12 @@ mod tests {
                             source: UseSource::Environment,
                             source_name: "elf".parse().unwrap(),
                             source_dictionary: Some("in/dict".parse().unwrap()),
+                        }),
+                        UseDecl::Config(UseConfigurationDecl {
+                            source: UseSource::Parent,
+                            source_name: "fuchsia.config.MyConfig".parse().unwrap(),
+                            target_name: "my_config".parse().unwrap(),
+                            availability: Availability::Required,
                         }),
                     ],
                     exposes: vec![

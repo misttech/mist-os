@@ -430,6 +430,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `resolver`: (_optional `string`_) The [name](#name) for this resolver capability.
 - `event_stream`: (_optional `string or array of strings`_) The [name](#name) for this event_stream capability.
 - `dictionary`: (_optional `string`_) The [name](#name) for this dictionary capability.
+- `config`: (_optional `string`_) The [name](#name) for this configuration capability.
 - `path`: (_optional `string`_) The path within the [outgoing directory][glossary.outgoing directory] of the component's
     program to source the capability.
 
@@ -473,6 +474,10 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
         component ID index, the instance ID is used as the key for a component's
         storage. Otherwise, the component's moniker from the storage
         capability is used.
+- `config_type`: (_optional `string`_) (`configuration only`) The type of configuration, one of:
+    - `bool`: This is a boolean configuration
+- `value`: (_optional `string`_) (`configuration only`) The value of the configuration.
+    If `config_type` is `bool`, the valid values are `true` and `false`.
 
 
 ### `use` {#use}
@@ -494,6 +499,7 @@ this component and the capability's source.
 - `storage`: (_optional `string`_) When using a storage capability, the [name](#name) of a [storage capability][doc-storage].
 - `event_stream`: (_optional `string or array of strings`_) When using an event stream capability, the [name](#name) of an [event stream capability][doc-event].
 - `runner`: (_optional `string`_) When using a runner capability, the [name](#name) of a [runner capability][doc-runners].
+- `config`: (_optional `string`_) When using a configuration capability, the [name](#name) of a [configuration capability][doc-configuration].
 - `from`: (_optional `string`_) The source of the capability. Defaults to `parent`.  One of:
     - `parent`: The component's parent.
     - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
@@ -535,6 +541,8 @@ this component and the capability's source.
     - `transitional`: the source may omit the route completely without even having to route
         from `void`. Used for soft transitions that introduce new capabilities.
     This property is disallowed for runner capabilities, which are always `required`.
+- `config_key`: (_optional `string`_) (`config` only) The configuration key in the component's `config` block that this capability
+    will set.
 
 Example:
 

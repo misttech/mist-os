@@ -152,6 +152,7 @@ fn new_proxy_routing_fn(
                     sub_dir.open(ExecutionScope::new(), flags, path, server_end);
                 }
                 CapabilityTypeName::Runner => panic!("runner capability unsupported"),
+                CapabilityTypeName::Config => panic!("config capability unsupported"),
                 CapabilityTypeName::Resolver => panic!("resolver capability unsupported"),
                 CapabilityTypeName::EventStream => panic!("event stream capability unsupported"),
                 CapabilityTypeName::Dictionary => panic!("dictionary capability unsupported"),

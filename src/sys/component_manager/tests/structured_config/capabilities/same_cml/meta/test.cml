@@ -1,0 +1,29 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "sys/testing/elf_test_runner.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        binary: "test/sc_capabilities_same_cml",
+    },
+    capabilities: [
+        {
+            config: "fuchsia.config.MyConfig",
+            type: "bool",
+            value: true,
+        },
+    ],
+    use: [
+        {
+            from: "self",
+            config_key: "my_flag",
+            config: "fuchsia.config.MyConfig",
+        },
+    ],
+    config: {
+        my_flag: { type: "bool" },
+    },
+}

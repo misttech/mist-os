@@ -59,6 +59,9 @@ pub enum Feature {
 
     // Restrict test types in facet. This helps us to only restrict this in-tree.
     RestrictTestTypeInFacet,
+
+    // Allows `config` capabilities to be used.
+    ConfigCapabilities,
 }
 
 impl FromStr for Feature {
@@ -73,6 +76,7 @@ impl FromStr for Feature {
                 Ok(Feature::EnableAllowNonHermeticPackagesFeature)
             }
             "restrict_test_type_in_facets" => Ok(Feature::RestrictTestTypeInFacet),
+            "config_capabilities" => Ok(Feature::ConfigCapabilities),
             _ => Err(format!("unrecognized feature \"{}\"", s)),
         }
     }
@@ -89,6 +93,7 @@ impl fmt::Display for Feature {
                 "enable_allow_non_hermetic_packages_feature"
             }
             Feature::RestrictTestTypeInFacet => "restrict_test_type_in_facets",
+            Feature::ConfigCapabilities => "config_capabilities",
         })
     }
 }

@@ -844,6 +844,14 @@ impl ComponentModelForAnalyzer {
                     (Err(err), route) => (Err(err.into()), vec![route], capability),
                 }
             }
+            UseDecl::Config(use_config_decl) => {
+                let capability = use_config_decl.source_name.clone();
+                match Self::route_capability_sync(RouteRequest::UseConfig(use_config_decl), target)
+                {
+                    (Ok(source), route) => (Ok(source), vec![route], capability),
+                    (Err(err), route) => (Err(err.into()), vec![route], capability),
+                }
+            }
         };
         match route_result {
             (Ok(source), routes, capability) => match self.check_use_source(&source) {

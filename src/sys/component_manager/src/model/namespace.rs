@@ -107,6 +107,10 @@ async fn add_use_decls(
             // The runner is not available in the namespace.
             continue;
         }
+        if let cm_rust::UseDecl::Config(_) = use_ {
+            // Configuration is not available in the namespace.
+            continue;
+        }
 
         let target_path =
             use_.path().ok_or_else(|| CreateNamespaceError::UseDeclWithoutPath(use_.clone()))?;
@@ -125,6 +129,9 @@ async fn add_use_decls(
             cm_rust::UseDecl::Runner(_) => {
                 std::process::abort();
             }
+            cm_rust::UseDecl::Config(_) => {
+                std::process::abort();
+            }
         };
         match use_ {
             cm_rust::UseDecl::Directory(_) | cm_rust::UseDecl::Storage(_) => {
@@ -136,6 +143,9 @@ async fn add_use_decls(
                 namespace.add_object(capability, target_path.as_ref())
             }
             cm_rust::UseDecl::Runner(_) => {
+                std::process::abort();
+            }
+            cm_rust::UseDecl::Config(_) => {
                 std::process::abort();
             }
         }?

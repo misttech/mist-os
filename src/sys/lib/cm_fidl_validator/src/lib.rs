@@ -258,6 +258,7 @@ struct ValidationContext<'a> {
     all_runners: HashSet<&'a str>,
     all_resolvers: HashSet<&'a str>,
     all_dictionaries: HashMap<&'a str, Option<&'a fdecl::Ref>>,
+    all_configs: HashSet<&'a str>,
     all_environment_names: HashSet<&'a str>,
     strong_dependencies: DirectedGraph<DependencyNode<'a>>,
     target_ids: IdMap<'a>,
@@ -585,6 +586,9 @@ impl<'a> ValidationContext<'a> {
             fdecl::Capability::Dictionary(dictionary) => {
                 self.validate_dictionary_decl(&dictionary);
             }
+            fdecl::Capability::Config(config) => {
+                self.validate_configuration_decl(&config);
+            }
             fdecl::CapabilityUnknown!() => self.errors.push(Error::UnknownCapability),
         }
     }
@@ -738,6 +742,20 @@ impl<'a> ValidationContext<'a> {
                     None,
                     DEPENDENCY_TYPE.as_ref(),
                     AVAILABILITY.as_ref(),
+                );
+            }
+            fdecl::Use::Config(u) => {
+                const DEPENDENCY_TYPE: Option<fdecl::DependencyType> =
+                    Some(fdecl::DependencyType::Strong);
+                let decl = DeclType::UseConfiguration;
+                self.validate_use_fields(
+                    decl,
+                    u.source.as_ref(),
+                    u.source_name.as_ref(),
+                    None,
+                    None,
+                    DEPENDENCY_TYPE.as_ref(),
+                    u.availability.as_ref(),
                 );
             }
             fdecl::UseUnknown!() => {
@@ -923,7 +941,7 @@ impl<'a> ValidationContext<'a> {
         if source_dictionary.is_some() {
             check_relative_path(source_dictionary, decl, "source_dictionary", &mut self.errors);
         }
-        if decl != DeclType::UseRunner {
+        if decl != DeclType::UseRunner && decl != DeclType::UseConfiguration {
             check_path(target_path, decl, "target_path", &mut self.errors);
         }
         check_use_availability(decl, availability, &mut self.errors);
@@ -1350,6 +1368,17 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::missing_field(decl, "source"));
             }
         };
+    }
+
+    fn validate_configuration_decl(&mut self, config: &'a fdecl::Configuration) {
+        let decl = DeclType::Configuration;
+        if check_name(config.name.as_ref(), decl, "name", &mut self.errors) {
+            let name = config.name.as_ref().unwrap();
+            if !self.all_capability_ids.insert(name) {
+                self.errors.push(Error::duplicate_field(decl, "name", name.as_str()));
+            }
+            self.all_configs.insert(name);
+        }
     }
 
     fn validate_environment_debug_registration(

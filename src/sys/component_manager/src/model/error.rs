@@ -158,6 +158,10 @@ pub enum StructuredConfigError {
     ConfigResolutionFailed(#[source] config_encoder::ResolutionError),
     #[error("couldn't create vmo: {_0}")]
     VmoCreateFailed(#[source] zx::Status),
+    #[error("Failed to match values for key: {}", key)]
+    ValueMismatch { key: String },
+    #[error("Failed to route structured config values: {_0}")]
+    RoutingError(#[from] RoutingError),
 }
 
 #[derive(Clone, Debug, Error)]

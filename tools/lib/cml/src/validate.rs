@@ -420,6 +420,12 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
         if capability.resolver.is_some() && capability.path.is_none() {
             return Err(Error::validate("\"path\" should be present with \"resolver\""));
         }
+        if capability.config.is_some() {
+            if !self.features.has(&Feature::ConfigCapabilities) {
+                return Err(Error::validate("config capabilities are not enabled"));
+            }
+        }
+
         if capability.dictionary.is_some() {
             if !self.features.has(&Feature::Dictionaries) {
                 return Err(Error::validate("dictionaries are not enabled"));
@@ -496,6 +502,14 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                 return Err(Error::validate(
                     "Dictionaries do not support \"event_stream\" capabilities",
                 ));
+            }
+        }
+        if let Some(config) = use_.config.as_ref() {
+            if use_.from == Some(UseFromRef::Self_) && !self.all_capability_names.contains(config) {
+                return Err(Error::validate(format!(
+                    "Using config capability {} from self, but capability does not exist",
+                    config
+                )));
             }
         }
 
@@ -2828,7 +2842,7 @@ mod tests {
             json!({
                 "use": [ { "path": "/svc/fuchsia.logger.Log" } ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\", \"runner\""
+            Err(Error::Validate { err, .. }) if &err == "`use` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"event_stream\", \"runner\", \"config\""
         ),
         test_cml_use_from_with_storage(
             json!({
@@ -2912,7 +2926,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `runner`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`"
+            Err(Error::Parse { err, .. }) if &err == "unknown field `resolver`, expected one of `service`, `protocol`, `directory`, `storage`, `event_stream`, `runner`, `config`, `from`, `path`, `rights`, `subdir`, `scope`, `filter`, `dependency`, `availability`, `config_key`"
         ),
 
         test_cml_use_disallows_nested_dirs_directory(
@@ -5062,7 +5076,7 @@ mod tests {
                     },
                 ]
             }),
-            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event_stream\", \"dictionary\""
+            Err(Error::Validate { err, .. }) if &err == "`capability` declaration is missing a capability keyword, one of: \"service\", \"protocol\", \"directory\", \"storage\", \"runner\", \"resolver\", \"event_stream\", \"dictionary\", \"config\""
         ),
         test_cml_resolver_missing_path(
             json!({
@@ -7232,5 +7246,20 @@ mod tests {
                 if decl_field.decl == DeclType::ExposeService && &decl_field.field == "source" && target_name == "fuchsia.logger.Log"
             )
         );
+    }
+
+    #[test]
+    fn test_cml_use_bad_config_from_self() {
+        let input = must_parse_cml!({
+        "capabilities": [
+            {
+                "config": "fuchsia.config.MyConfig",
+                "type": "bool",
+                "value": true,
+            },
+        ],
+            });
+
+        assert_matches!(compile(&input, CompileOptions::default()), Err(Error::Validate { .. }));
     }
 }

@@ -41,8 +41,9 @@ use {
         OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
         OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
         RegistrationSource, ResolverRegistration, RunnerRegistration, SourceName, StorageDecl,
-        StorageDirectorySource, UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
-        UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
+        StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl,
+        UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
+        UseStorageDecl,
     },
     cm_types::Name,
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio,
@@ -78,6 +79,7 @@ pub enum RouteRequest {
     UseService(UseServiceDecl),
     UseStorage(UseStorageDecl),
     UseRunner(UseRunnerDecl),
+    UseConfig(UseConfigurationDecl),
 
     // Route a capability from an OfferDecl.
     OfferDirectory(OfferDirectoryDecl),
@@ -98,6 +100,7 @@ impl From<UseDecl> for RouteRequest {
             UseDecl::Storage(decl) => Self::UseStorage(decl),
             UseDecl::EventStream(decl) => Self::UseEventStream(decl),
             UseDecl::Runner(decl) => Self::UseRunner(decl),
+            UseDecl::Config(decl) => Self::UseConfig(decl),
         }
     }
 }
@@ -161,6 +164,7 @@ impl RouteRequest {
             | UseEventStream(UseEventStreamDecl { availability, .. })
             | UseProtocol(UseProtocolDecl { availability, .. })
             | UseService(UseServiceDecl { availability, .. })
+            | UseConfig(UseConfigurationDecl { availability, .. })
             | UseStorage(UseStorageDecl { availability, .. }) => {
                 *availability == Availability::Optional
             }
@@ -226,6 +230,9 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::UseRunner(u) => {
                 write!(f, "runner `{}`", u.source_name)
+            }
+            Self::UseConfig(u) => {
+                write!(f, "config `{}`", u.source_name)
             }
             Self::StorageBackingDirectory(u) => {
                 write!(f, "storage backing directory `{}`", u.backing_dir)
@@ -332,6 +339,9 @@ where
         }
         RouteRequest::UseRunner(use_runner_decl) => {
             route_runner(use_runner_decl, target, mapper).await
+        }
+        RouteRequest::UseConfig(use_config_decl) => {
+            route_config(use_config_decl, target, mapper).await
         }
 
         // Route from a OfferDecl
@@ -1148,6 +1158,31 @@ where
             Ok(RouteSource::new(source))
         }
     }
+}
+
+/// Finds a Configuration capability that matches the given use.
+async fn route_config<C>(
+    use_decl: UseConfigurationDecl,
+    target: &Arc<C>,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    let allowed_sources =
+        AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
+    let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability().clone());
+    let source = router::route_from_use(
+        use_decl.into(),
+        target.clone(),
+        allowed_sources.build(),
+        &mut availability_visitor,
+        mapper,
+    )
+    .await?;
+
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
+    Ok(RouteSource::new(source))
 }
 
 /// Routes a Resolver capability from `target` to its source, starting from `registration_decl`.

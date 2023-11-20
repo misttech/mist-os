@@ -244,6 +244,20 @@ pub enum CapabilityTypeName {
     Resolver,
 }
 
+impl std::fmt::Display for CapabilityTypeName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let display_name = match &self {
+            CapabilityTypeName::Directory => "directory",
+            CapabilityTypeName::Protocol => "protocol",
+            CapabilityTypeName::Service => "service",
+            CapabilityTypeName::Storage => "storage",
+            CapabilityTypeName::Runner => "runner",
+            CapabilityTypeName::Resolver => "resolver",
+        };
+        write!(f, "{}", display_name)
+    }
+}
+
 impl Into<component_internal::AllowlistedCapability> for CapabilityTypeName {
     fn into(self) -> component_internal::AllowlistedCapability {
         match &self {

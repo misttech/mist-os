@@ -41,8 +41,8 @@ use {
 };
 
 pub use cm_types::{
-    AllowedOffers, Availability, DependencyType, Durability, Name, OnTerminate, ParseError, Path,
-    RelativePath, StartupMode, StorageId, Url,
+    AllowedOffers, Availability, ConfigType, DependencyType, Durability, Name, OnTerminate,
+    ParseError, Path, RelativePath, StartupMode, StorageId, Url,
 };
 use error::Location;
 
@@ -105,12 +105,15 @@ pub enum CapabilityId<'a> {
     UsedStorage(Path),
     // An event stream in a `use` declaration has a target path in the component's namespace.
     UsedEventStream(Path),
+    // A configuration in a `use` declaration has a target name that matches a config.
+    UsedConfiguration(&'a Name),
     UsedRunner(&'a Name),
     Storage(&'a Name),
     Runner(&'a Name),
     Resolver(&'a Name),
     EventStream(&'a Name),
     Dictionary(&'a Name),
+    Configuration(&'a Name),
 }
 
 /// Generates a `Vec<Name>` -> `Vec<CapabilityId>` conversion function.
@@ -144,11 +147,13 @@ impl<'a> CapabilityId<'a> {
             CapabilityId::UsedStorage(_) => "storage",
             CapabilityId::UsedEventStream(_) => "event_stream",
             CapabilityId::UsedRunner(_) => "runner",
+            CapabilityId::UsedConfiguration(_) => "config",
             CapabilityId::Storage(_) => "storage",
             CapabilityId::Runner(_) => "runner",
             CapabilityId::Resolver(_) => "resolver",
             CapabilityId::EventStream(_) => "event_stream",
             CapabilityId::Dictionary(_) => "dictionary",
+            CapabilityId::Configuration(_) => "config",
         }
     }
 
@@ -213,6 +218,11 @@ impl<'a> CapabilityId<'a> {
                     return Err(Error::validate("`use runner` should occur at most once."));
                 }
             }
+        } else if let Some(_) = use_.config() {
+            return match &use_.config_key {
+                None => Err(Error::validate("\"config_key\" should be present for `use config`.")),
+                Some(name) => Ok(vec![CapabilityId::UsedConfiguration(name)]),
+            };
         }
         // Unsupported capability type.
         let supported_keywords = use_
@@ -289,6 +299,12 @@ impl<'a> CapabilityId<'a> {
             )?));
         } else if let Some(n) = capability.dictionary() {
             return Ok(Self::dictionaries_from(Self::get_one_or_many_names(
+                n,
+                None,
+                capability.capability_type(),
+            )?));
+        } else if let Some(n) = capability.config() {
+            return Ok(Self::configurations_from(Self::get_one_or_many_names(
                 n,
                 None,
                 capability.capability_type(),
@@ -436,6 +452,7 @@ impl<'a> CapabilityId<'a> {
     capability_ids_from_names!(resolvers_from, CapabilityId::Resolver);
     capability_ids_from_names!(event_streams_from, CapabilityId::EventStream);
     capability_ids_from_names!(dictionaries_from, CapabilityId::Dictionary);
+    capability_ids_from_names!(configurations_from, CapabilityId::Configuration);
     capability_ids_from_paths!(used_services_from, CapabilityId::UsedService);
     capability_ids_from_paths!(used_protocols_from, CapabilityId::UsedProtocol);
 }
@@ -450,6 +467,8 @@ impl fmt::Display for CapabilityId<'_> {
             | CapabilityId::UsedRunner(n)
             | CapabilityId::Resolver(n)
             | CapabilityId::EventStream(n)
+            | CapabilityId::Configuration(n)
+            | CapabilityId::UsedConfiguration(n)
             | CapabilityId::Dictionary(n) => n.as_str(),
             CapabilityId::UsedService(p)
             | CapabilityId::UsedProtocol(p)
@@ -1400,6 +1419,7 @@ macro_rules! merge_from_capability_field {
                     ours.resolver(),
                     ours.runner(),
                     ours.event_stream(),
+                    ours.config(),
                 ] {
                     nonempty |= list.is_some();
                 }
@@ -1535,6 +1555,7 @@ where
     compute_capability_diff!(ours, theirs, runner);
     compute_capability_diff!(ours, theirs, event_stream);
     compute_capability_diff!(ours, theirs, dictionary);
+    compute_capability_diff!(ours, theirs, config);
 }
 
 impl Document {
@@ -2353,6 +2374,10 @@ pub struct Capability {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dictionary: Option<Name>,
 
+    /// The [name](#name) for this configuration capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<Name>,
+
     /// The path within the [outgoing directory][glossary.outgoing directory] of the component's
     /// program to source the capability.
     ///
@@ -2414,6 +2439,16 @@ pub struct Capability {
     ///     capability is used.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub storage_id: Option<StorageId>,
+
+    /// (`configuration only`) The type of configuration, one of:
+    /// - `bool`: This is a boolean configuration
+    #[serde(alias = "type", skip_serializing_if = "Option::is_none")]
+    pub config_type: Option<ConfigType>,
+
+    /// (`configuration only`) The value of the configuration.
+    /// If `config_type` is `bool`, the valid values are `true` and `false`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq, ReferenceDoc, Serialize)]
@@ -2569,6 +2604,10 @@ pub struct Use {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub runner: Option<Name>,
 
+    /// When using a configuration capability, the [name](#name) of a [configuration capability][doc-configuration].
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<Name>,
+
     /// The source of the capability. Defaults to `parent`.  One of:
     /// - `parent`: The component's parent.
     /// - `debug`: One of [`debug_capabilities`][fidl-environment-decl] in the
@@ -2634,6 +2673,11 @@ pub struct Use {
     /// This property is disallowed for runner capabilities, which are always `required`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub availability: Option<Availability>,
+
+    /// (`config` only) The configuration key in the component's `config` block that this capability
+    /// will set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config_key: Option<Name>,
 }
 
 /// Example:
@@ -3089,6 +3133,7 @@ pub trait CapabilityClause: Clone + PartialEq {
     fn resolver(&self) -> Option<OneOrMany<&Name>>;
     fn event_stream(&self) -> Option<OneOrMany<&Name>>;
     fn dictionary(&self) -> Option<OneOrMany<&Name>>;
+    fn config(&self) -> Option<OneOrMany<&Name>>;
     fn set_service(&mut self, o: Option<OneOrMany<Name>>);
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>);
     fn set_directory(&mut self, o: Option<OneOrMany<Name>>);
@@ -3097,6 +3142,7 @@ pub trait CapabilityClause: Clone + PartialEq {
     fn set_resolver(&mut self, o: Option<OneOrMany<Name>>);
     fn set_event_stream(&mut self, o: Option<OneOrMany<Name>>);
     fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>);
+    fn set_config(&mut self, o: Option<OneOrMany<Name>>);
 
     fn availability(&self) -> Option<Availability>;
     fn set_availability(&mut self, a: Option<Availability>);
@@ -3122,6 +3168,7 @@ pub trait CapabilityClause: Clone + PartialEq {
             self.directory(),
             self.storage(),
             self.runner(),
+            self.config(),
             self.resolver(),
             self.event_stream(),
             self.dictionary(),
@@ -3156,6 +3203,8 @@ pub trait CapabilityClause: Clone + PartialEq {
             self.set_event_stream(Some(names));
         } else if cap_type == "dictionary" {
             self.set_dictionary(Some(names));
+        } else if cap_type == "config" {
+            self.set_config(Some(names));
         } else {
             panic!("Unknown capability type {}", cap_type);
         }
@@ -3231,6 +3280,9 @@ impl CapabilityClause for Capability {
     fn dictionary(&self) -> Option<OneOrMany<&Name>> {
         self.dictionary.as_ref().map(|n| OneOrMany::One(n))
     }
+    fn config(&self) -> Option<OneOrMany<&Name>> {
+        self.config.as_ref().map(|n| OneOrMany::One(n))
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3257,6 +3309,10 @@ impl CapabilityClause for Capability {
         self.dictionary = always_one(o);
     }
 
+    fn set_config(&mut self, o: Option<OneOrMany<Name>>) {
+        self.config = always_one(o);
+    }
+
     fn availability(&self) -> Option<Availability> {
         None
     }
@@ -3279,6 +3335,8 @@ impl CapabilityClause for Capability {
             "event_stream"
         } else if self.dictionary.is_some() {
             "dictionary"
+        } else if self.config.is_some() {
+            "config"
         } else {
             panic!("Missing capability name")
         }
@@ -3296,6 +3354,7 @@ impl CapabilityClause for Capability {
             "resolver",
             "event_stream",
             "dictionary",
+            "config",
         ]
     }
     fn are_many_names_allowed(&self) -> bool {
@@ -3352,6 +3411,9 @@ impl CapabilityClause for DebugRegistration {
     fn dictionary(&self) -> Option<OneOrMany<&Name>> {
         None
     }
+    fn config(&self) -> Option<OneOrMany<&Name>> {
+        None
+    }
 
     fn set_service(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_protocol(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3363,6 +3425,7 @@ impl CapabilityClause for DebugRegistration {
     fn set_resolver(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_event_stream(&mut self, _o: Option<OneOrMany<Name>>) {}
     fn set_dictionary(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_config(&mut self, _o: Option<OneOrMany<Name>>) {}
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3446,6 +3509,9 @@ impl CapabilityClause for Use {
     fn dictionary(&self) -> Option<OneOrMany<&Name>> {
         None
     }
+    fn config(&self) -> Option<OneOrMany<&Name>> {
+        self.config.as_ref().map(|n| OneOrMany::One(n))
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3465,6 +3531,9 @@ impl CapabilityClause for Use {
         self.event_stream = o;
     }
     fn set_dictionary(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_config(&mut self, o: Option<OneOrMany<Name>>) {
+        self.config = always_one(o);
+    }
 
     fn availability(&self) -> Option<Availability> {
         self.availability
@@ -3486,6 +3555,8 @@ impl CapabilityClause for Use {
             "event_stream"
         } else if self.runner.is_some() {
             "runner"
+        } else if self.config.is_some() {
+            "config"
         } else {
             panic!("Missing capability name")
         }
@@ -3495,7 +3566,7 @@ impl CapabilityClause for Use {
         "use"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "storage", "event_stream", "runner"]
+        &["service", "protocol", "directory", "storage", "event_stream", "runner", "config"]
     }
     fn are_many_names_allowed(&self) -> bool {
         ["service", "protocol", "event_stream"].contains(&self.capability_type())
@@ -3574,6 +3645,9 @@ impl CapabilityClause for Expose {
     fn dictionary(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.dictionary)
     }
+    fn config(&self) -> Option<OneOrMany<&Name>> {
+        None
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3597,6 +3671,7 @@ impl CapabilityClause for Expose {
     fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
         self.dictionary = o;
     }
+    fn set_config(&mut self, _o: Option<OneOrMany<Name>>) {}
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3713,6 +3788,9 @@ impl CapabilityClause for Offer {
     fn dictionary(&self) -> Option<OneOrMany<&Name>> {
         option_one_or_many_as_ref(&self.dictionary)
     }
+    fn config(&self) -> Option<OneOrMany<&Name>> {
+        None
+    }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
         self.service = o;
@@ -3738,6 +3816,7 @@ impl CapabilityClause for Offer {
     fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
         self.dictionary = o;
     }
+    fn set_config(&mut self, _o: Option<OneOrMany<Name>>) {}
 
     fn availability(&self) -> Option<Availability> {
         self.availability
@@ -4265,6 +4344,8 @@ mod tests {
             scope: None,
             directory: None,
             storage: None,
+            config: None,
+            config_key: None,
             from: None,
             path: None,
             rights: None,

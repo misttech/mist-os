@@ -13,9 +13,9 @@ use {
         CapabilityDecl, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl, ExposeDecl,
         OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl,
         OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
-        RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseDecl,
-        UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl,
-        UseSource,
+        RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseConfigurationDecl,
+        UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl,
+        UseServiceDecl, UseSource,
     },
     cm_types::Name,
     futures::future::select_all,
@@ -440,12 +440,14 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
             | UseDecl::Protocol(UseProtocolDecl { source: UseSource::Child(name), .. })
             | UseDecl::Directory(UseDirectoryDecl { source: UseSource::Child(name), .. })
             | UseDecl::EventStream(UseEventStreamDecl { source: UseSource::Child(name), .. })
+            | UseDecl::Config(UseConfigurationDecl { source: UseSource::Child(name), .. })
             | UseDecl::Runner(UseRunnerDecl { source: UseSource::Child(name), .. }) => name,
             UseDecl::Service(_)
             | UseDecl::Protocol(_)
             | UseDecl::Directory(_)
             | UseDecl::Storage(_)
             | UseDecl::EventStream(_)
+            | UseDecl::Config(_)
             | UseDecl::Runner(_) => {
                 // capabilities which cannot or are not used from a child can be ignored.
                 continue;
@@ -460,7 +462,10 @@ fn get_dependencies_from_uses(instance: &impl Component) -> HashSet<(ComponentRe
                     continue;
                 }
             }
-            UseDecl::Storage(_) | UseDecl::EventStream(_) | UseDecl::Runner(_) => {
+            UseDecl::Storage(_)
+            | UseDecl::EventStream(_)
+            | UseDecl::Runner(_)
+            | UseDecl::Config(_) => {
                 // Any other capability type cannot be marked as weak, so we can proceed
             }
         }

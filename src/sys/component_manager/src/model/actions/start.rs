@@ -18,7 +18,10 @@ use {
     },
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
-    ::routing::{component_instance::ComponentInstanceInterface, policy::GlobalPolicyChecker},
+    ::routing::{
+        component_instance::ComponentInstanceInterface, error::RoutingError,
+        policy::GlobalPolicyChecker,
+    },
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
     config_encoder::ConfigFields,
@@ -33,6 +36,7 @@ use {
     futures::channel::oneshot,
     moniker::Moniker,
     sandbox::Capability,
+    std::string::ToString,
     std::sync::Arc,
     tracing::warn,
 };
@@ -268,6 +272,97 @@ async fn open_runner(
     return Ok(Some(RemoteRunner::new(client)));
 }
 
+fn get_config_field<'a>(
+    name: &str,
+    decl: &'a cm_rust::ComponentDecl,
+) -> Option<&'a cm_rust::UseConfigurationDecl> {
+    decl.uses.iter().find_map(|use_| match use_ {
+        cm_rust::UseDecl::Config(c) => (c.target_name == name).then_some(c),
+        _ => None,
+    })
+}
+
+// Make the structured configuration for a component. This will resolve any configuration
+// capabilities that the component has requested and use those values over the CVF file
+// provided by the resolver.
+async fn make_structured_config(
+    config: Option<ConfigFields>,
+    decl: &cm_rust::ComponentDecl,
+    component: &Arc<ComponentInstance>,
+) -> Result<Option<fmem::Data>, StartActionError> {
+    let Some(mut config) = config else {
+        return Ok(None);
+    };
+    for field in config.fields.iter_mut() {
+        let Some(use_config) = get_config_field(&field.key, decl) else {
+            continue;
+        };
+
+        let source = routing::route_capability(
+            RouteRequest::UseConfig(use_config.clone()),
+            component,
+            &mut routing::mapper::NoopRouteMapper,
+        )
+        .await
+        .map_err(|err| StartActionError::StructuredConfigError {
+            moniker: component.moniker.clone(),
+            err: err.into(),
+        })?;
+
+        let cap = match source.source {
+            routing::capability_source::CapabilitySource::Capability {
+                source_capability, ..
+            } => source_capability,
+            routing::capability_source::CapabilitySource::Component { capability, .. } => {
+                capability
+            }
+            o => {
+                return Err(StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: RoutingError::UnsupportedRouteSource {
+                        source_type: o.type_name().to_string(),
+                    }
+                    .into(),
+                })
+            }
+        };
+
+        let cap = match cap {
+            routing::capability_source::ComponentCapability::Config(c) => c,
+            c => {
+                return Err(StartActionError::StructuredConfigError {
+                    moniker: component.moniker.clone(),
+                    err: RoutingError::UnsupportedCapabilityType {
+                        type_name: c.type_name().into(),
+                    }
+                    .into(),
+                })
+            }
+        };
+
+        if std::mem::discriminant(&field.value) != std::mem::discriminant(&cap.value) {
+            return Err(StartActionError::StructuredConfigError {
+                moniker: component.moniker.clone(),
+                err: StructuredConfigError::ValueMismatch { key: field.key.clone() },
+            });
+        }
+        field.value = cap.value;
+    }
+
+    let (vmo, size) = (|| {
+        let encoded = config.encode_as_fidl_struct();
+        let size = encoded.len() as u64;
+        let vmo = Vmo::create(size)?;
+        vmo.write(&encoded, 0)?;
+        Ok((vmo, size))
+    })()
+    .map_err(|s| StartActionError::StructuredConfigError {
+        err: StructuredConfigError::VmoCreateFailed(s),
+        moniker: component.moniker.clone(),
+    })?;
+    Ok(Some(fmem::Data::Buffer(fmem::Buffer { vmo, size })))
+}
+
 /// Returns a configured Runtime for a component and the start info (without actually starting
 /// the component).
 async fn make_execution_runtime(
@@ -331,23 +426,7 @@ async fn make_execution_runtime(
         (None, None)
     };
 
-    let encoded_config = if let Some(config) = config {
-        let (vmo, size) = (|| {
-            let encoded = config.encode_as_fidl_struct();
-            let size = encoded.len() as u64;
-            let vmo = Vmo::create(size)?;
-            vmo.write(&encoded, 0)?;
-            Ok((vmo, size))
-        })()
-        .map_err(|s| StartActionError::StructuredConfigError {
-            err: StructuredConfigError::VmoCreateFailed(s),
-            moniker: component.moniker.clone(),
-        })?;
-        Some(fmem::Data::Buffer(fmem::Buffer { vmo, size }))
-    } else {
-        None
-    };
-
+    let encoded_config = make_structured_config(config, decl, component).await?;
     let resolved_state = component
         .lock_resolved_state()
         .await

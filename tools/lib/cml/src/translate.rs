@@ -417,6 +417,25 @@ fn translate_use(
                 source_dictionary,
                 ..Default::default()
             }));
+        } else if let Some(n) = &use_.config {
+            let (source, source_dictionary) =
+                extract_use_source(&options, use_, all_capability_names, all_children)?;
+            let target = match &use_.config_key {
+                None => {
+                    return Err(Error::validate(
+                        "\"use config\" must have \"config_key\" field set.",
+                    ))
+                }
+                Some(t) => t.clone(),
+            };
+            let availability = extract_use_availability(use_)?;
+            out_uses.push(fdecl::Use::Config(fdecl::UseConfiguration {
+                source: Some(source),
+                source_name: Some(n.clone().into()),
+                target_name: Some(target.into()),
+                availability: Some(availability),
+                ..Default::default()
+            }));
         } else {
             return Err(Error::internal(format!("no capability in use declaration")));
         };
@@ -1749,6 +1768,13 @@ pub fn translate_capabilities(
                 source_dictionary,
                 ..Default::default()
             }));
+        } else if let Some(c) = &capability.config {
+            let value = configuration_to_value(&capability.config_type, &capability.value)?;
+            out_capabilities.push(fdecl::Capability::Config(fdecl::Configuration {
+                name: Some(c.clone().into()),
+                value: Some(value),
+                ..Default::default()
+            }));
         } else {
             return Err(Error::internal(format!("no capability declaration recognized")));
         }
@@ -1839,6 +1865,30 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
         RootDictionaryRef::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
     };
     (root, Some(d.path.to_string()))
+}
+
+fn configuration_to_value(
+    config_type: &Option<cm::ConfigType>,
+    value: &Option<serde_json::Value>,
+) -> Result<fdecl::ConfigValue, Error> {
+    let Some(config_type) = config_type.as_ref() else {
+        return Err(Error::InvalidArgs("Configuration field must have 'type' set".into()));
+    };
+    let Some(value) = value.as_ref() else {
+        return Err(Error::InvalidArgs("Configuration field must have 'value' set".into()));
+    };
+
+    match config_type {
+        cm::ConfigType::Bool => {
+            let serde_json::Value::Bool(b) = value else {
+                return Err(Error::InvalidArgs(format!(
+                    "Boolean config value must be a boolean, field is: '{}'",
+                    value
+                )));
+            };
+            Ok(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(*b)))
+        }
+    }
 }
 
 #[cfg(test)]
@@ -2685,7 +2735,7 @@ mod tests {
         },
 
         test_compile_use => {
-            features = FeatureSet::from(vec![Feature::Dictionaries]),
+            features = FeatureSet::from(vec![Feature::Dictionaries, Feature::ConfigCapabilities]),
             input = json!({
                 "use": [
                     {
@@ -2716,9 +2766,15 @@ mod tests {
                         "scope": ["#logger", "#modular"],
                         "path": "/event_stream/another",
                     },
-                    { "runner": "usain", "from": "parent", }
+                    { "runner": "usain", "from": "parent", },
+                    { "config": "fuchsia.config.Config",  "config_key" : "my_config", "from" : "self" }
                 ],
                 "capabilities": [
+                    {
+                        "config": "fuchsia.config.Config",
+                        "type": "bool",
+                        "value": true,
+                    },
                     {
                         "storage": "data-storage",
                         "from": "parent",
@@ -2879,6 +2935,13 @@ mod tests {
                         source_name: Some("usain".to_string()),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef{})),
                         ..Default::default()
+                    }),
+                    fdecl::Use::Config(fdecl::UseConfiguration {
+                        source_name: Some("fuchsia.config.Config".to_string()),
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        target_name: Some("my_config".to_string()),
+                        availability: Some(fdecl::Availability::Required),
+                        ..Default::default()
                     })
                 ]),
                 collections:Some(vec![
@@ -2889,6 +2952,11 @@ mod tests {
                     },
                 ]),
                 capabilities: Some(vec![
+                    fdecl::Capability::Config(fdecl::Configuration {
+                        name: Some("fuchsia.config.Config".to_string()),
+                        value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                        ..Default::default()
+                    }),
                     fdecl::Capability::Storage(fdecl::Storage {
                         name: Some("data-storage".to_string()),
                         source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
@@ -4680,6 +4748,42 @@ mod tests {
                         stop_timeout_ms: None,
                         ..Default::default()
                     },
+                ]),
+                ..default_component_decl()
+            },
+        },
+
+
+        test_compile_configuration_capability => {
+            features = FeatureSet::from(vec![Feature::ConfigCapabilities]),
+            input = json!({
+                "capabilities": [
+                    {
+                        "config": "fuchsia.config.true",
+                        "type": "bool",
+                        "value": true,
+                    },
+                    {
+                        "config": "fuchsia.config.false",
+                        "type": "bool",
+                        "value": false,
+                    },
+                ],
+            }),
+            output = fdecl::Component {
+                capabilities: Some(vec![
+                    fdecl::Capability::Config (
+                        fdecl::Configuration {
+                            name: Some("fuchsia.config.true".to_string()),
+                            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
+                            ..Default::default()
+                        }),
+                    fdecl::Capability::Config (
+                        fdecl::Configuration {
+                            name: Some("fuchsia.config.false".to_string()),
+                            value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(false))),
+                            ..Default::default()
+                        }),
                 ]),
                 ..default_component_decl()
             },

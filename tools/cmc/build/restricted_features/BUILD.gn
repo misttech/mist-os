@@ -17,6 +17,11 @@ group("dictionaries") {
   visibility = []
 }
 
+# The allowlist of components that can use config capabilities in CML.
+group("config_capabilities") {
+  visibility = [ "//src/sys/component_manager/tests/*" ]
+}
+
 # The allowlist of components that can use the "allow_long_names" feature in CML.
 group("allow_long_names") {
   visibility = [
