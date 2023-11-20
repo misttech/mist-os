@@ -61,6 +61,10 @@ class DebuggedProcess : public ProcessHandleObserver {
   const ProcessHandle& process_handle() const { return *process_handle_; }
   ProcessHandle& process_handle() { return *process_handle_; }
 
+  // TODO(brettw) remove this and have all callers use thread_handle().
+  NativeProcessHandle& handle() { return process_handle_->GetNativeHandle(); }
+  const NativeProcessHandle& handle() const { return process_handle_->GetNativeHandle(); }
+
   const ModuleList& module_list() const { return module_list_; }
 
   // The object is not usable if |Init| is not called or fails.
@@ -242,6 +246,13 @@ class DebuggedProcess : public ProcessHandleObserver {
   // when it tries to kill this process in order to determine whether the ZX_ERR_BAD_ACCESS is
   // expected (limbo handles do not have ZX_RIGHT_DESTROY right) or it is an actual error.
   bool from_limbo_ = false;
+
+#if defined(__linux__)
+  // On Linux we need to manually set a breakpoint in the loader to observe module loads (Fuchsia
+  // uses a process property to signal the loader to do it for us).
+  uint64_t dl_debug_addr_ = 0;
+  std::unique_ptr<Breakpoint> loader_breakpoint_;
+#endif
 
   FXL_DISALLOW_COPY_AND_ASSIGN(DebuggedProcess);
 };

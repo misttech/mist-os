@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "src/developer/debug/debug_agent/align.h"
+#include "src/developer/debug/debug_agent/breakpoint.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
 #include "src/developer/debug/debug_agent/elf_utils.h"
@@ -29,6 +30,10 @@
 #include "src/developer/debug/shared/platform_message_loop.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/lib/fxl/strings/string_printf.h"
+
+#if defined(__linux__)
+#include "src/developer/debug/debug_agent/linux_utils.h"
+#endif
 
 namespace debug_agent {
 
@@ -131,6 +136,33 @@ debug::Status DebuggedProcess::Init(DebuggedProcessCreateInfo create_info) {
 
   // Update module list.
   module_list_.Update(process_handle());
+
+#if defined(__linux__)
+  dl_debug_addr_ = linux::GetLdSoDebugAddress(koid());
+  if (dl_debug_addr_) {
+    DEBUG_LOG(Process) << "Got ld.so debug address = " << std::hex << dl_debug_addr_;
+    if (uint64_t bp_addr = linux::GetLdSoBreakpointAddress(koid())) {
+      DEBUG_LOG(Process) << "Got ld.so breakpoint address = " << std::hex << bp_addr;
+      loader_breakpoint_ = std::make_unique<Breakpoint>(debug_agent_, true);
+      if (auto err = loader_breakpoint_->SetSettings("Internal shared library load breakpoint",
+                                                     koid(), bp_addr);
+          err.has_error()) {
+        DEBUG_LOG(Process) << LogPreamble(this)
+                           << "Could not set shared library load breakpoint: " << err.message();
+        // Continue even in the error case: we can continue with most things working even if the
+        // loader breakpoint fails for some reason.
+      }
+    } else {
+      DEBUG_LOG(Process) << LogPreamble(this)
+                         << "Could not set shared library load breakpoint address.";
+    }
+  } else {
+    DEBUG_LOG(Process) << LogPreamble(this) << "Can't get ld.so debug address.";
+  }
+
+  // Linux doesn't give thread notifications for the initial thread, so grab it now.
+  PopulateCurrentThreads();
+#endif
 
   return debug::Status();
 }
@@ -238,7 +270,10 @@ bool DebuggedProcess::HandleLoaderBreakpoint(uint64_t address) {
     return false;
 
   if (module_list_.Update(process_handle())) {
+    DEBUG_LOG(Process) << "Got loader breakpoint with new module, suspending and sending list.";
     SuspendAndSendModules();
+  } else {
+    DEBUG_LOG(Process) << "Got loader breakpoint but no module list change, continuing.";
   }
   return true;
 }
@@ -514,7 +549,19 @@ void DebuggedProcess::OnProcessStarting(std::unique_ptr<ProcessHandle> new_proce
   // This is called only on Linux when we observe a fork. Fuchsia new processes are detected by
   // the job.
 #if defined(__linux__)
-  // TODO(brettw) implement this.
+  // The new process will be a copy of the current one, including all software breakpoints
+  // installed in this one. In response to this notification, we will either resume and detach from
+  // the forked process (in which case we better not leave those software breakpoint instructions
+  // in), or we will continue with debugging it and breakpoint system will reinstall the breakpoints
+  // (in which case it will get incorrect "old data" under the breakpoint unless we put the data
+  // back now).
+  //
+  // Either way, undo all software breakpoints in the new process that referred to our current one.
+  for (const auto& [addr, sw_bp] : software_breakpoints_) {
+    sw_bp->UninstallFromMemorySpace(*new_process_handle);
+  }
+
+  debug_agent_->OnProcessStart(std::move(new_process_handle));
 #endif
 }
 
@@ -567,6 +614,7 @@ void DebuggedProcess::InjectThreadForTest(std::unique_ptr<DebuggedThread> thread
 
 std::vector<debug_ipc::ProcessThreadId> DebuggedProcess::ClientSuspendAllThreads(
     zx_koid_t except_thread) {
+  DEBUG_LOG(Process) << "DebuggedProcess::ClientSuspendAllThreads";
   // Also suspend new threads.
   suspend_new_threads_ = true;
 
@@ -618,8 +666,8 @@ void DebuggedProcess::SetStderr(OwnedStdioHandle handle) {
 }
 
 void DebuggedProcess::OnStdout(bool close) {
-  FX_DCHECK(stdout_ && stdout_->IsValid());
   if (close) {
+    // Note: in the "close" case, the stdout_ object will already be internally reset.
     DEBUG_LOG(Process) << LogPreamble(this) << "stdout closed.";
     stdout_.reset();
     return;
@@ -633,8 +681,8 @@ void DebuggedProcess::OnStdout(bool close) {
 }
 
 void DebuggedProcess::OnStderr(bool close) {
-  FX_DCHECK(stderr_ && stderr_->IsValid());
   if (close) {
+    // Note: in the "close" case, the stderr_ object will already be internally reset.
     DEBUG_LOG(Process) << LogPreamble(this) << "stderr closed.";
     stderr_.reset();
     return;

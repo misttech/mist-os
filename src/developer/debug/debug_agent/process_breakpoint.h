@@ -130,6 +130,12 @@ class ProcessBreakpoint {
   // See the comments of |EndStepOver| for more details.
   virtual void StepOverCleanup(DebuggedThread* thread) = 0;
 
+  // Uninstalls this breakpoint from the given process' memory space. This process handle can be a
+  // different process than the |process_| associated with this object. This is used to clean up
+  // breakpoints after a Posix fork() call (since the installed breakpoints will be copied with
+  // everything else, and we want to treat the processes independently).
+  virtual debug::Status UninstallFromMemorySpace(ProcessHandle& process) { return debug::Status(); }
+
   virtual debug::Status Update() = 0;
 
  protected:

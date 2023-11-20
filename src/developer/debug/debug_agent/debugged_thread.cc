@@ -113,6 +113,10 @@ void DebuggedThread::OnException(std::unique_ptr<ExceptionHandle> exception_hand
   exception.exception = thread_handle_->GetExceptionRecord();
   exception.timestamp = GetNowTimestamp();
 
+  // TODO(fxbug.dev/136510) clean up the single-step queue here (currently only handled in the
+  // HandleSingleStep() function to advance the single-step queue when the stepped-over instruction
+  // crashes rather than issues a single-step exception.
+
   switch (type) {
     case debug_ipc::ExceptionType::kSingleStep:
       return HandleSingleStep(&exception, *regs);
@@ -172,6 +176,11 @@ void DebuggedThread::ResumeFromException() {
 void DebuggedThread::HandleSingleStep(debug_ipc::NotifyException* exception,
                                       const GeneralRegisters& regs) {
   if (current_breakpoint_) {
+    // TODO(fxbug.dev/136510) this single-step cleanup needs to be unconditionally executed for any
+    // exception on the thread (not just here in the "single step" handler) because the thread could
+    // crash on the instruction being stepped over and then the step over queue will never be
+    // cleaned up.
+
     DEBUG_LOG(Thread) << ThreadPreamble(this) << "Ending single stepped over 0x" << std::hex
                       << current_breakpoint_->address();
     // Getting here means that the thread is done stepping over a breakpoint.
@@ -530,6 +539,19 @@ DebuggedThread::OnStop DebuggedThread::UpdateForSoftwareBreakpoint(
   }
 
   if (SoftwareBreakpoint* found_bp = process_->FindSoftwareBreakpoint(breakpoint_address)) {
+#if defined(__linux__)
+    // OnLinux, the loader breakpoint is a software breakpoint we inserted. Special-case this.
+    if (found_bp->IsInternalLdSoBreakpoint()) {
+      if (process_->HandleLoaderBreakpoint(breakpoint_address)) {
+        // |HandleLoaderBreakpoint| may suspend the task and it's safe for us to always resume.
+        DEBUG_LOG(Thread) << ThreadPreamble(this)
+                          << "Hardcoded loader breakpoint, internally resuming.";
+        current_breakpoint_ = found_bp;
+        return OnStop::kResume;
+      }
+      return OnStop::kNotify;
+    }
+#endif
     LogHitBreakpoint(FROM_HERE, this, found_bp, breakpoint_address);
 
     // When hitting a breakpoint, we need to check if indeed this exception should apply to this

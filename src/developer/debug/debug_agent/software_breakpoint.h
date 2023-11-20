@@ -34,6 +34,7 @@ class SoftwareBreakpoint : public ProcessBreakpoint {
   void EndStepOver(DebuggedThread* thread) override;
   void ExecuteStepOver(DebuggedThread* thread) override;
   void StepOverCleanup(DebuggedThread* thread) override;
+  debug::Status UninstallFromMemorySpace(ProcessHandle& process) override;
 
   const DebuggedThread* currently_stepping_over_thread() const {
     return currently_stepping_over_thread_.get();
@@ -44,6 +45,9 @@ class SoftwareBreakpoint : public ProcessBreakpoint {
   //
   // Exposed mostly for testing purposes (see process_breakpoint_unittest.cc).
   std::vector<zx_koid_t> CurrentlySuspendedThreads() const;
+
+  // Returns true if any of the individual breakpoints are marked as is_internal_ld_so().
+  bool IsInternalLdSoBreakpoint() const;
 
  private:
   // ProcessBreakpoint overrides.

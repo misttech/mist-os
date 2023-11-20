@@ -89,6 +89,15 @@ debug::Status SoftwareBreakpoint::Install() {
 }
 
 debug::Status SoftwareBreakpoint::Uninstall() {
+  auto status = UninstallFromMemorySpace(process_->process_handle());
+  installed_ = false;
+  return status;
+}
+
+// This must use the specified process handle and not mark the breakpoint as uninstalled. This is
+// used both by Uninstall() for the normal case, as well as uninstalling breakpoints for forked
+// processes (which will be a different process than we're recorded as being installed into).
+debug::Status SoftwareBreakpoint::UninstallFromMemorySpace(ProcessHandle& process_handle) {
   if (!installed_)
     return debug::Status();  // Not installed.
 
@@ -98,8 +107,8 @@ debug::Status SoftwareBreakpoint::Uninstall() {
   // breakpoint instruction before doing any writes.
   arch::BreakInstructionType current_contents = 0;
   size_t actual = 0;
-  debug::Status status = process_->process_handle().ReadMemory(
-      address(), &current_contents, arch::kBreakInstructionSize, &actual);
+  debug::Status status =
+      process_handle.ReadMemory(address(), &current_contents, arch::kBreakInstructionSize, &actual);
   if (status.has_error() || actual != arch::kBreakInstructionSize)
     return debug::Status();  // Probably unmapped, safe to ignore.
 
@@ -108,13 +117,12 @@ debug::Status SoftwareBreakpoint::Uninstall() {
     return debug::Status();  // Replaced with something else, ignore.
   }
 
-  status = process_->process_handle().WriteMemory(address(), &previous_data_,
-                                                  arch::kBreakInstructionSize, &actual);
+  status =
+      process_handle.WriteMemory(address(), &previous_data_, arch::kBreakInstructionSize, &actual);
   if (status.has_error() || actual != arch::kBreakInstructionSize) {
     LOGS(Warn) << "Unable to remove breakpoint at 0x" << std::hex << address();
   }
 
-  installed_ = false;
   return debug::Status();
 }
 
@@ -241,6 +249,14 @@ std::vector<zx_koid_t> SoftwareBreakpoint::CurrentlySuspendedThreads() const {
 
   std::sort(koids.begin(), koids.end());
   return koids;
+}
+
+bool SoftwareBreakpoint::IsInternalLdSoBreakpoint() const {
+  for (const Breakpoint* bp : breakpoints()) {
+    if (bp->is_internal_ld_so())
+      return true;
+  }
+  return false;
 }
 
 }  // namespace debug_agent

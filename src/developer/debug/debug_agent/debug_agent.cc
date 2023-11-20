@@ -318,6 +318,7 @@ void DebugAgent::OnDetach(const debug_ipc::DetachRequest& request, debug_ipc::De
 
 void DebugAgent::OnPause(const debug_ipc::PauseRequest& request, debug_ipc::PauseReply* reply) {
   std::vector<debug_ipc::ProcessThreadId> paused;
+  DEBUG_LOG(Agent) << "Got Pause request";
 
   if (request.ids.empty()) {
     // Pause everything.
@@ -629,12 +630,19 @@ debug::Status DebugAgent::AddDebuggedProcess(DebuggedProcessCreateInfo&& create_
   *new_process = nullptr;
 
   auto proc = std::make_unique<DebuggedProcess>(this);
-  if (auto status = proc->Init(std::move(create_info)); status.has_error())
-    return status;
 
-  auto process_id = proc->koid();
+  // Need to register the process before calling DebuggedProcess::Init() because Init() can
+  // do things like make breakpoints that call back into this class.
+  auto process_id = create_info.handle->GetKoid();
   *new_process = proc.get();
   procs_[process_id] = std::move(proc);
+
+  if (auto status = (*new_process)->Init(std::move(create_info)); status.has_error()) {
+    // Undo registration.
+    procs_.erase(process_id);
+    *new_process = nullptr;
+    return status;
+  }
   return debug::Status();
 }
 
@@ -815,7 +823,13 @@ void DebugAgent::OnProcessStart(std::unique_ptr<ProcessHandle> process_handle) {
              })) {
     type = debug_ipc::NotifyProcessStarting::Type::kAttach;
   } else {
+#ifdef __linux__
+    // For now, unconditionally attach to all forked processes on Linux.
+    // TODO(brettw) This should be revisited when we get better frontend UI for dealing with forks.
+    type = debug_ipc::NotifyProcessStarting::Type::kAttach;
+#else
     return;
+#endif
   }
 
   DEBUG_LOG(Process) << "Process starting, koid: " << process_handle->GetKoid();

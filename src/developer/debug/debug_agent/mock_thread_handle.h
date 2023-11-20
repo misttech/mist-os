@@ -5,8 +5,6 @@
 #ifndef SRC_DEVELOPER_DEBUG_DEBUG_AGENT_MOCK_THREAD_HANDLE_H_
 #define SRC_DEVELOPER_DEBUG_DEBUG_AGENT_MOCK_THREAD_HANDLE_H_
 
-#include <zircon/syscalls/object.h>
-
 #include <map>
 
 #include "src/developer/debug/debug_agent/thread_handle.h"

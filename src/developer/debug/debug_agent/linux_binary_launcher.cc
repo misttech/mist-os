@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <zircon/errors.h>
 
+#include "src/developer/debug/debug_agent/linux_process_handle.h"
 #include "src/developer/debug/debug_agent/linux_task.h"
 #include "src/developer/debug/debug_agent/linux_utils.h"
 #include "src/developer/debug/debug_agent/posix/dir_reader_linux.h"
@@ -221,9 +222,7 @@ debug::Status LinuxBinaryLauncher::Setup(const std::vector<std::string>& argv) {
 StdioHandles LinuxBinaryLauncher::ReleaseStdioHandles() { return std::move(stdio_handles_); }
 
 std::unique_ptr<ProcessHandle> LinuxBinaryLauncher::GetProcess() const {
-  // TODO(brettw) implement this:
-  // return std::make_unique<LinuxProcessHandle>(task_);
-  return nullptr;
+  return std::make_unique<LinuxProcessHandle>(task_);
 }
 
 debug::Status LinuxBinaryLauncher::Start() {

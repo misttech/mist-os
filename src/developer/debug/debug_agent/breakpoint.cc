@@ -104,7 +104,8 @@ void LogSetSettings(debug::FileLineFunction location, const Breakpoint* bp) {
 
 }  // namespace
 
-Breakpoint::Breakpoint(ProcessDelegate* process_delegate) : process_delegate_(process_delegate) {}
+Breakpoint::Breakpoint(ProcessDelegate* process_delegate, bool is_internal_ld_so)
+    : process_delegate_(process_delegate), is_internal_ld_so_(is_internal_ld_so) {}
 
 Breakpoint::~Breakpoint() {
   DEBUG_LOG(Breakpoint) << Preamble(this) << "Deleting.";
