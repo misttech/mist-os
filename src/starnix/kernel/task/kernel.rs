@@ -51,7 +51,7 @@ use std::{
     },
 };
 
-declare_lock_levels![KernelIpTables: OrderedRwLock<IpTables>];
+declare_lock_levels![KernelIpTables];
 use self::lock_levels::KernelIpTables;
 
 /// The shared, mutable state for the entire Starnix kernel.

@@ -49,7 +49,7 @@ use starnix_uapi::{
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
-declare_lock_levels![BpfMapEntries: OrderedMutex<BTreeMap<Vec<u8>, Vec<u8>>>];
+declare_lock_levels![BpfMapEntries];
 use self::lock_levels::BpfMapEntries;
 
 /// The default selinux context to use for each BPF object.

@@ -6,8 +6,7 @@
 //!
 //! To use these tools:
 //! 1. A lock level must be defined for each type of lock. This is done using
-//! `lock_level!(LockLevel, State)` where `LockA` is a name of the level and
-//! `State` is some state that requires a lock to access itself or some of its fields.
+//! `lock_level!(LockLevel)` where `LockA` is a name of the level.
 //! 2. Then a relation `LockedAfter` between these levels must be described,
 //! forming a graph. This graph must be acyclic, since a cycle would indicate
 //! a potential deadlock.
@@ -35,8 +34,8 @@
 //!    b: Mutex<u32>,
 //! }
 //!
-//! lock_level!(LockA, HoldsLocks);
-//! lock_level!(LockB, HoldsLocks);
+//! lock_level!(LockA);
+//! lock_level!(LockB);
 //!
 //! impl LockFor<LockA> for HoldsLocks {
 //!    type Data = u8;
@@ -67,8 +66,8 @@
 //! // Create a new lock session with the "root" lock level (empty tuple).
 //! let mut locked = Unlocked::new();
 //! // Access locked state.
-//! let (a, mut locked_a) = locked.lock_and::<LockA>(&state);
-//! let b = locked_a.lock::<LockB>(&state);
+//! let (a, mut locked_a) = locked.lock_and::<LockA, _>(&state);
+//! let b = locked_a.lock::<LockB, _>(&state);
 //! ```
 //!
 //! The [impl_lock_after] macro provides implementations of [LockAfter] for
@@ -78,8 +77,8 @@
 //! accidental lock ordering inversion introduced while defining the graph.
 //! This won't compile:
 //! ```compile_fail
-//! lock_level!(LockA, ());
-//! lock_level!(LockB, ());
+//! lock_level!(LockA);
+//! lock_level!(LockB);
 //!
 //! impl_lock_after(LockA => LockB);
 //! impl_lock_after(LockB => LockA);
@@ -99,8 +98,8 @@
 //! #    b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(LockB, HoldsLocks);
-//! # lock_level!(LockB, HoldsLocks);
+//! # lock_level!(LockA);
+//! # lock_level!(LockB);
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #    type Data = u8;
@@ -129,9 +128,9 @@
 //! let mut locked = Unlocked::new();
 //!
 //! // Locking B without A is fine, but locking A after B is not.
-//! let (b, mut locked_b) = locked.lock_and::<LockB>(&state);
+//! let (b, mut locked_b) = locked.lock_and::<LockB, _>(&state);
 //! // compile error: LockB does not implement LockBefore<LockA>
-//! let a = locked_b.lock::<LockA>(&state);
+//! let a = locked_b.lock::<LockA, _>(&state);
 //! ```
 //!
 //! Even if the lock guard goes out of scope, the new `Locked` instance returned
@@ -148,8 +147,8 @@
 //! #     b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(LockA, HoldsLocks);
-//! # lock_level!(LockB, HoldsLocks);
+//! # lock_level!(LockA);
+//! # lock_level!(LockB);
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #     type Data = u8;
@@ -177,11 +176,11 @@
 //! let state = HoldsLocks::default();
 //! let mut locked = Unlocked::new();
 //!
-//! let (b, mut locked_b) = locked.lock_and::<LockB>();
+//! let (b, mut locked_b) = locked.lock_and::<LockB, _>();
 //! drop(b);
-//! let b = locked_b.lock::<LockB>(&state);
+//! let b = locked_b.lock::<LockB, _>(&state);
 //! // Won't work; `locked` is mutably borrowed by `locked_b`.
-//! let a = locked.lock::<LockA>(&state);
+//! let a = locked.lock::<LockA, _>(&state);
 //! ```
 
 pub mod lock;
@@ -191,7 +190,7 @@ use core::marker::PhantomData;
 
 pub use crate::{
     lock::{LockFor, RwLockFor},
-    relation::{LockBefore, LockLevel},
+    relation::LockBefore,
 };
 
 /// Enforcement mechanism for lock ordering.
@@ -203,18 +202,14 @@ pub use crate::{
 /// (with a different lock level) that mutably borrows from the original
 /// instance. This means the original instance can't be used to acquire
 /// new locks until the new instance leaves scope.
-pub struct Locked<'a, L: LockLevel>(PhantomData<&'a L>);
+pub struct Locked<'a, L>(PhantomData<&'a L>);
 
 /// "Highest" lock level
 ///
 /// The lock level for the thing returned by `Locked::new`. Users of this crate
 /// should implement `LockAfter<Unlocked>` for the root of any lock ordering
 /// trees.
-pub struct Unlocked;
-
-impl LockLevel for Unlocked {
-    type Source = ();
-}
+pub enum Unlocked {}
 
 impl Unlocked {
     /// Entry point for locked access.
@@ -228,36 +223,30 @@ impl Unlocked {
 // It's important that the lifetime on `Locked` here be anonymous. That means
 // that the lifetimes in the returned `Locked` objects below are inferred to
 // be the lifetimes of the references to self (mutable or immutable).
-impl<L: LockLevel> Locked<'_, L> {
+impl<L> Locked<'_, L> {
     /// Acquire the given lock.
     ///
     /// This requires that `M` can be locked after `L`.
-    pub fn lock<'a, M>(
-        &'a mut self,
-        source: &'a M::Source,
-    ) -> <<M as LockLevel>::Source as LockFor<M>>::Guard<'a>
+    pub fn lock<'a, M, S>(&'a mut self, source: &'a S) -> S::Guard<'a>
     where
-        M: LockLevel + 'a,
-        M::Source: LockFor<M>,
+        M: 'a,
+        S: LockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _) = self.lock_and::<M>(source);
+        let (data, _) = self.lock_and::<M, S>(source);
         data
     }
 
     /// Acquire the given lock and a new locked context.
     ///
     /// This requires that `M` can be locked after `L`.
-    pub fn lock_and<'a, M>(
-        &'a mut self,
-        source: &'a M::Source,
-    ) -> (<<M as LockLevel>::Source as LockFor<M>>::Guard<'a>, Locked<'a, M>)
+    pub fn lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::Guard<'a>, Locked<'a, M>)
     where
-        M: LockLevel + 'a,
-        M::Source: LockFor<M>,
+        M: 'a,
+        S: LockFor<M>,
         L: LockBefore<M>,
     {
-        let data = <M as LockLevel>::Source::lock(source);
+        let data = S::lock(source);
         (data, Locked::<'a, M>(PhantomData::default()))
     }
 
@@ -265,16 +254,13 @@ impl<L: LockLevel> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn read_lock_and<'a, M>(
-        &'a mut self,
-        source: &'a M::Source,
-    ) -> (<<M as LockLevel>::Source as RwLockFor<M>>::ReadGuard<'a>, Locked<'a, M>)
+    pub fn read_lock_and<'a, M, S>(&'a mut self, source: &'a S) -> (S::ReadGuard<'a>, Locked<'a, M>)
     where
-        M: LockLevel + 'a,
-        M::Source: RwLockFor<M>,
+        M: 'a,
+        S: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let data = <M as LockLevel>::Source::read_lock(source);
+        let data = S::read_lock(source);
         (data, Locked::<'a, M>(PhantomData::default()))
     }
 
@@ -282,16 +268,13 @@ impl<L: LockLevel> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn read_lock<'a, M>(
-        &'a mut self,
-        source: &'a M::Source,
-    ) -> <<M as LockLevel>::Source as RwLockFor<M>>::ReadGuard<'a>
+    pub fn read_lock<'a, M, S>(&'a mut self, source: &'a S) -> S::ReadGuard<'a>
     where
-        M: LockLevel + 'a,
-        M::Source: RwLockFor<M>,
+        M: 'a,
+        S: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _) = self.read_lock_and::<M>(source);
+        let (data, _) = self.read_lock_and::<M, S>(source);
         data
     }
 
@@ -299,16 +282,16 @@ impl<L: LockLevel> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn write_lock_and<'a, M>(
+    pub fn write_lock_and<'a, M, S>(
         &'a mut self,
-        source: &'a M::Source,
-    ) -> (<<M as LockLevel>::Source as RwLockFor<M>>::WriteGuard<'a>, Locked<'a, M>)
+        source: &'a S,
+    ) -> (S::WriteGuard<'a>, Locked<'a, M>)
     where
-        M: LockLevel + 'a,
-        M::Source: RwLockFor<M>,
+        M: 'a,
+        S: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let data = <M as LockLevel>::Source::write_lock(source);
+        let data = S::write_lock(source);
         (data, Locked::<'a, M>(PhantomData::default()))
     }
 
@@ -316,16 +299,13 @@ impl<L: LockLevel> Locked<'_, L> {
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
     /// be locked after `L`.
-    pub fn write_lock<'a, M>(
-        &'a mut self,
-        source: &'a M::Source,
-    ) -> <<M as LockLevel>::Source as RwLockFor<M>>::WriteGuard<'a>
+    pub fn write_lock<'a, M, S>(&'a mut self, source: &'a S) -> S::WriteGuard<'a>
     where
-        M: LockLevel + 'a,
-        M::Source: RwLockFor<M>,
+        M: 'a,
+        S: RwLockFor<M>,
         L: LockBefore<M>,
     {
-        let (data, _) = self.write_lock_and::<M>(source);
+        let (data, _) = self.write_lock_and::<M, S>(source);
         data
     }
 
@@ -336,7 +316,7 @@ impl<L: LockLevel> Locked<'_, L> {
     /// also be acquired without `M` being held.
     pub fn cast_locked<'a, M>(&'a mut self) -> Locked<'a, M>
     where
-        M: LockLevel + 'a,
+        M: 'a,
         L: LockBefore<M>,
     {
         Locked::<'a, M>(PhantomData::default())
@@ -358,8 +338,8 @@ mod test {
             b: Mutex<u32>,
         }
 
-        lock_level!(LockA, HoldsLocks);
-        lock_level!(LockB, HoldsLocks);
+        lock_level!(LockA);
+        lock_level!(LockB);
 
         impl LockFor<LockA> for HoldsLocks {
             type Data = u8;
@@ -390,8 +370,8 @@ mod test {
         // Create a new lock session with the "root" lock level (empty tuple).
         let mut locked = Unlocked::new();
         // Access locked state.
-        let (_a, mut locked_a) = locked.lock_and::<LockA>(&state);
-        let _b = locked_a.lock::<LockB>(&state);
+        let (_a, mut locked_a) = locked.lock_and::<LockA, _>(&state);
+        let _b = locked_a.lock::<LockB, _>(&state);
     }
 
     mod lock_levels {
@@ -400,16 +380,16 @@ mod test {
 
         extern crate self as lock_sequence;
 
-        use crate::{impl_lock_after, lock_level, relation::LockAfter, test::Data, Unlocked};
+        use crate::{impl_lock_after, lock_level, relation::LockAfter, Unlocked};
 
-        lock_level!(A, Data);
-        lock_level!(B, Data);
-        lock_level!(C, Data);
-        lock_level!(D, Data);
-        lock_level!(E, Data);
-        lock_level!(F, std::sync::Mutex<u8>);
-        lock_level!(G, Data);
-        lock_level!(H, std::sync::Mutex<u8>);
+        lock_level!(A);
+        lock_level!(B);
+        lock_level!(C);
+        lock_level!(D);
+        lock_level!(E);
+        lock_level!(F);
+        lock_level!(G);
+        lock_level!(H);
 
         impl LockAfter<Unlocked> for A {}
         impl_lock_after!(A => B);
@@ -421,7 +401,10 @@ mod test {
         impl_lock_after!(G => H);
     }
 
-    use crate::{lock::LockFor, lock::RwLockFor, Unlocked};
+    use crate::{
+        lock::{LockFor, RwLockFor},
+        Unlocked,
+    };
     use lock_levels::{A, B, C, D, E, F, G, H};
 
     /// Data type with multiple locked fields.
@@ -512,10 +495,10 @@ mod test {
         let data = Data::default();
 
         let mut w = Unlocked::new();
-        let (_a, mut wa) = w.lock_and::<A>(&data);
-        let (_c, _wc) = wa.lock_and::<C>(&data);
+        let (_a, mut wa) = w.lock_and::<A, _>(&data);
+        let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This won't compile!
-        // let _b = _wc.lock::<B>(&data);
+        // let _b = _wc.lock::<B, _>(&data);
     }
 
     #[test]
@@ -524,9 +507,9 @@ mod test {
 
         let mut w = Unlocked::new();
         let mut wa = w.cast_locked::<A>();
-        let (_c, _wc) = wa.lock_and::<C>(&data);
+        let (_c, _wc) = wa.lock_and::<C, _>(&data);
         // This should not compile:
-        // let _b = w.lock::<B>(&data);
+        // let _b = w.lock::<B, _>(&data);
     }
 
     #[test]
@@ -537,7 +520,7 @@ mod test {
         let u = &data.u;
 
         // Prove that `u` does not prevent locked state from being accessed.
-        let a = locked.lock::<A>(&data);
+        let a = locked.lock::<A, _>(&data);
 
         assert_eq!(u, &34);
         assert_eq!(&*a, &15);
@@ -548,8 +531,8 @@ mod test {
         let data = Data { e: Mutex::new(Mutex::new(1)), ..Data::default() };
 
         let mut locked = Unlocked::new();
-        let (e, mut next_locked) = locked.lock_and::<E>(&data);
-        let v = next_locked.lock::<F>(&e);
+        let (e, mut next_locked) = locked.lock_and::<E, _>(&data);
+        let v = next_locked.lock::<F, _>(&*e);
         assert_eq!(*v, 1);
     }
 
@@ -559,10 +542,10 @@ mod test {
 
         let mut locked = Unlocked::new();
         {
-            let mut d = locked.write_lock::<D>(&data);
+            let mut d = locked.write_lock::<D, _>(&data);
             *d = 10;
         }
-        let d = locked.read_lock::<D>(&data);
+        let d = locked.read_lock::<D, _>(&data);
         assert_eq!(*d, 10);
     }
 
@@ -571,8 +554,8 @@ mod test {
         let data = Data { g: Mutex::new(vec![Mutex::new(0), Mutex::new(1)]), ..Data::default() };
 
         let mut locked = Unlocked::new();
-        let (g, mut next_locked) = locked.lock_and::<G>(&data);
-        let v = next_locked.lock::<H>(&g[1]);
+        let (g, mut next_locked) = locked.lock_and::<G, _>(&data);
+        let v = next_locked.lock::<H, _>(&g[1]);
         assert_eq!(*v, 1);
     }
 }

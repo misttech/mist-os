@@ -86,11 +86,6 @@
 //! code. This works not just with the graph above, but with any graph that
 //! includes a cycle.
 
-/// Lock level type trait. `Source` is the lock that corresponds to this level.
-pub trait LockLevel {
-    type Source;
-}
-
 /// Marker trait that indicates that `Self` can be locked after `A`.
 ///
 /// This should be implemented for lock types to specify that, in the lock
@@ -115,11 +110,8 @@ impl<B: LockAfter<A>, A> LockBefore<B> for A {}
 // Define a lock level that corresponds to some state that can be locked.
 #[macro_export]
 macro_rules! lock_level {
-    ($A:ident, $B:ty) => {
+    ($A:ident) => {
         pub enum $A {}
-        impl lock_sequence::LockLevel for $A {
-            type Source = $B;
-        }
     };
 }
 
@@ -146,9 +138,9 @@ mod test {
 
     extern crate self as lock_sequence;
 
-    lock_level!(A, FakeLocked);
-    lock_level!(B, FakeLocked);
-    lock_level!(C, FakeLocked);
+    lock_level!(A);
+    lock_level!(B);
+    lock_level!(C);
 
     impl_lock_after!(A => B);
     impl_lock_after!(B => C);
@@ -184,11 +176,11 @@ mod test {
 
         let mut locked = Unlocked::new();
 
-        let (a, mut locked) = locked.lock_and::<A>(&state);
+        let (a, mut locked) = locked.lock_and::<A, _>(&state);
         assert_eq!(*a, A_DATA);
         // Show that A: LockBefore<B> and B: LockBefore<C> => A: LockBefore<C>.
         // Otherwise this wouldn't compile:
-        let c = locked.lock::<C>(&state);
+        let c = locked.lock::<C, _>(&state);
         assert_eq!(*c, C_DATA);
     }
 }

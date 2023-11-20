@@ -68,24 +68,24 @@ pub fn ordered_lock<'a, T>(
 /// A wrapper for mutex that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this mutex.
-pub struct OrderedMutex<T, L: LockLevel<Source = Self>> {
+pub struct OrderedMutex<T, L> {
     mutex: Mutex<T>,
     _phantom: PhantomData<L>,
 }
 
-impl<T: Default, L: LockLevel<Source = Self>> Default for OrderedMutex<T, L> {
+impl<T: Default, L> Default for OrderedMutex<T, L> {
     fn default() -> Self {
         Self { mutex: Default::default(), _phantom: Default::default() }
     }
 }
 
-impl<T: Default + fmt::Debug, L: LockLevel<Source = Self>> fmt::Debug for OrderedMutex<T, L> {
+impl<T: Default + fmt::Debug, L> fmt::Debug for OrderedMutex<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedMutex({:?}, {})", self.mutex, any::type_name::<L>())
     }
 }
 
-impl<T, L: LockLevel<Source = Self>> LockFor<L> for OrderedMutex<T, L> {
+impl<T, L> LockFor<L> for OrderedMutex<T, L> {
     type Data = T;
     type Guard<'a> = MutexGuard<'a, T> where T: 'a, L: 'a;
     fn lock(&self) -> Self::Guard<'_> {
@@ -93,7 +93,7 @@ impl<T, L: LockLevel<Source = Self>> LockFor<L> for OrderedMutex<T, L> {
     }
 }
 
-impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
+impl<T, L> OrderedMutex<T, L> {
     #[cfg(test)]
     pub fn new(t: T) -> Self {
         Self { mutex: Mutex::new(t), _phantom: Default::default() }
@@ -101,7 +101,7 @@ impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
 
     pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'_, P>) -> <Self as LockFor<L>>::Guard<'a>
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.lock(self)
     }
@@ -112,7 +112,7 @@ impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
         locked: &'a mut Locked<'_, P>,
     ) -> (<Self as LockFor<L>>::Guard<'a>, Locked<'a, L>)
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.lock_and(self)
     }
@@ -121,24 +121,24 @@ impl<T, L: LockLevel<Source = Self>> OrderedMutex<T, L> {
 /// A wrapper for an RwLock that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this RwLock.
-pub struct OrderedRwLock<T, L: LockLevel<Source = Self>> {
+pub struct OrderedRwLock<T, L> {
     rwlock: RwLock<T>,
     _phantom: PhantomData<L>,
 }
 
-impl<T: Default, L: LockLevel<Source = Self>> Default for OrderedRwLock<T, L> {
+impl<T: Default, L> Default for OrderedRwLock<T, L> {
     fn default() -> Self {
         Self { rwlock: Default::default(), _phantom: Default::default() }
     }
 }
 
-impl<T: Default + fmt::Debug, L: LockLevel<Source = Self>> fmt::Debug for OrderedRwLock<T, L> {
+impl<T: Default + fmt::Debug, L> fmt::Debug for OrderedRwLock<T, L> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "OrderedRwLock({:?}, {})", self.rwlock, any::type_name::<L>())
     }
 }
 
-impl<T, L: LockLevel<Source = Self>> RwLockFor<L> for OrderedRwLock<T, L> {
+impl<T, L> RwLockFor<L> for OrderedRwLock<T, L> {
     type Data = T;
     type ReadGuard<'a> = RwLockReadGuard<'a, T> where T: 'a, L: 'a;
     type WriteGuard<'a> = RwLockWriteGuard<'a, T> where T: 'a, L: 'a;
@@ -150,7 +150,7 @@ impl<T, L: LockLevel<Source = Self>> RwLockFor<L> for OrderedRwLock<T, L> {
     }
 }
 
-impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
+impl<T, L> OrderedRwLock<T, L> {
     pub fn new(t: T) -> Self {
         Self { rwlock: RwLock::new(t), _phantom: Default::default() }
     }
@@ -160,7 +160,7 @@ impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
         locked: &'a mut Locked<'_, P>,
     ) -> <Self as RwLockFor<L>>::ReadGuard<'a>
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.read_lock(self)
     }
@@ -170,7 +170,7 @@ impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
         locked: &'a mut Locked<'_, P>,
     ) -> <Self as RwLockFor<L>>::WriteGuard<'a>
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.write_lock(self)
     }
@@ -180,7 +180,7 @@ impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
         locked: &'a mut Locked<'_, P>,
     ) -> (<Self as RwLockFor<L>>::ReadGuard<'a>, Locked<'a, L>)
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.read_lock_and(self)
     }
@@ -190,27 +190,25 @@ impl<T, L: LockLevel<Source = Self>> OrderedRwLock<T, L> {
         locked: &'a mut Locked<'_, P>,
     ) -> (<Self as RwLockFor<L>>::WriteGuard<'a>, Locked<'a, L>)
     where
-        P: LockBefore<L> + LockLevel,
+        P: LockBefore<L>,
     {
         locked.write_lock_and(self)
     }
 }
 
-/// A helper macro to define a module containing the decalaration of lock levels
-/// and their associated OrderedMutex/OrderedRwLock.
+/// A helper macro to define a module containing the decalaration of lock levels.
 /// Example:
 /// ```
-/// declare_lock_levels![LevelA: OrderedMutex<A>, LevelB: OrderedRwLock<B>];
+/// declare_lock_levels![LevelA, LevelB];
 /// use self::lock_levels::{LevelA, LevelB};
 /// ```
 /// Note that this macro doesn't add any ordering between the declared levels.
 #[macro_export]
 macro_rules! declare_lock_levels {
-    ( $( $A:ident: $B:ident<$C:ty> ),* ) => {
+    ( $( $A:ident ),* ) => {
         pub mod lock_levels {
-            use super::*;
             use lock_sequence::lock_level;
-            $(lock_level!($A, $B<$C, $A>);)*
+            $(lock_level!($A);)*
         }
     };
 }
@@ -237,12 +235,7 @@ mod test {
         }
     }
 
-    declare_lock_levels![A: OrderedMutex<u8>,
-                        B: OrderedMutex<u16>,
-                        C: OrderedMutex<u32>,
-                        D: OrderedRwLock<u8>,
-                        E: OrderedRwLock<u16>,
-                        F: OrderedRwLock<u32>];
+    declare_lock_levels![A, B, C, D, E, F];
     use lock_levels::{A, B, C, D, E, F};
 
     mod lock_ordering {
