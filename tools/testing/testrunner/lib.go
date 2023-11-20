@@ -677,6 +677,17 @@ func runTestOnce(
 		if len(result.OutputFiles) > 0 {
 			result.OutputDir = outDir
 		}
+	} else {
+		// TODO(b/311443213): Some tests rely on testparser to add tags to test case results.
+		// Remove this hack once tags are properly handled by `ffx test`.
+		cases := testparser.Parse(stdoutForParsing.Bytes())
+		caseToTags := make(map[string][]build.TestTag)
+		for _, tc := range cases {
+			caseToTags[tc.DisplayName] = tc.Tags
+		}
+		for i, tc := range result.Cases {
+			result.Cases[i].Tags = caseToTags[tc.DisplayName]
+		}
 	}
 	if result.StartTime.IsZero() {
 		result.StartTime = startTime
