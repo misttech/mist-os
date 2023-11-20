@@ -153,6 +153,8 @@ func (f *FFXTool) runFFXCmd(ctx context.Context, args ...string) error {
 	if err != nil {
 		return err
 	}
+	logger.Infof(ctx, "running: %s %q", path, args)
+
 	// prepend a config flag for finding subtools that are compiled separately
 	// in the same directory as ffx itself.
 	args = append([]string{"--isolate-dir", f.isolateDir, "--config", fmt.Sprintf("ffx.subtool-search-paths=%s", filepath.Dir(path))}, args...)
