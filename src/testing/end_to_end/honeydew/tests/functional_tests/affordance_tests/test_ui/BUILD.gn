@@ -40,3 +40,16 @@ if (is_host) {
   # TODO(b/296269354): Add SL4F based emulator tests after updating builders to
   # target "workbench"
 }
+
+group("packages") {
+  testonly = true
+  public_deps = [ "//src/ui/examples:flatland-examples" ]
+}
+
+group("test_ui") {
+  testonly = true
+  public_deps = [
+    ":packages",
+    ":tests($host_toolchain)",
+  ]
+}

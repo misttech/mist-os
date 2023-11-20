@@ -22,3 +22,16 @@ if (is_host) {
     public_deps = [ ":session_test_fc($host_toolchain)" ]
   }
 }
+
+group("packages") {
+  testonly = true
+  public_deps = [ "//src/ui/examples:flatland-examples" ]
+}
+
+group("test_session") {
+  testonly = true
+  deps = [
+    ":packages",
+    ":tests($host_toolchain)",
+  ]
+}
