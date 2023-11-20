@@ -48,7 +48,7 @@ class Decoder final {
     return zx::handle(body_.handles().data()[handle_index_++].handle);
   }
 
-  void CloseUnknownHandlesInEnvelope(const fidl_envelope_v2_t* envelope) {
+  void CloseUnknownHandlesInEnvelope(const fidl_envelope_t* envelope) {
     EnvelopeUnknownDataInfoResult info = EnvelopeUnknownDataInfo(envelope);
     for (uint32_t i = 0; i < info.num_handles; i++) {
       ClaimUnknownHandle();
@@ -56,7 +56,7 @@ class Decoder final {
   }
 #endif
 
-  size_t EnvelopeValueOffset(const fidl_envelope_v2_t* envelope) const {
+  size_t EnvelopeValueOffset(const fidl_envelope_t* envelope) const {
     if ((envelope->flags & FIDL_ENVELOPE_FLAGS_INLINING_MASK) != 0) {
       return GetOffset(&envelope->inline_value);
     }
@@ -70,7 +70,7 @@ class Decoder final {
     uint16_t flags;
   };
 
-  EnvelopeUnknownDataInfoResult EnvelopeUnknownDataInfo(const fidl_envelope_v2_t* envelope) const {
+  EnvelopeUnknownDataInfoResult EnvelopeUnknownDataInfo(const fidl_envelope_t* envelope) const {
     const auto* unknown_data_envelope =
         reinterpret_cast<const fidl_envelope_v2_unknown_data_t*>(envelope);
 

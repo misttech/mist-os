@@ -2758,7 +2758,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::UnionPay
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::UnionPayload>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -2837,7 +2837,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -2940,7 +2940,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -2995,7 +2995,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayAnonComposedWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3052,7 +3052,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3131,7 +3131,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_OnAnonComposedWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3188,7 +3188,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_TwoWayNamedComposedWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3245,7 +3245,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::Composed
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::ComposedProtocol_OnNamedComposedWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3302,7 +3302,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayLocalWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3359,7 +3359,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_OnLocalWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3440,7 +3440,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3542,7 +3542,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3596,7 +3596,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_TwoWayAnonWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3653,7 +3653,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocolOnAnonRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -3731,7 +3731,7 @@ struct CodingTraits<std::unique_ptr<::test::protocollayoutssamelibrary::MainProt
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::protocollayoutssamelibrary::MainProtocol_OnAnonWithError_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

@@ -6989,7 +6989,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::EmptyTable, ::fidl
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -6998,7 +6998,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::EmptyTable, ::fidl
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
       switch (i) {
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7022,7 +7022,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::EmptyTable, ::fidl
       DecodeFn<IsRecursive> decode_fn = nullptr;
       switch(i) {
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7067,7 +7067,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SimpleTable, ::fid
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7088,7 +7088,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SimpleTable, ::fid
           encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7124,7 +7124,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SimpleTable, ::fid
           decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7169,7 +7169,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::OlderSimpleTable, 
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7184,7 +7184,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::OlderSimpleTable, 
           encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7214,7 +7214,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::OlderSimpleTable, 
           decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7259,7 +7259,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::NewerSimpleTable, 
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7286,7 +7286,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::NewerSimpleTable, 
           encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7328,7 +7328,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::NewerSimpleTable, 
           decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7373,7 +7373,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ReverseOrdinalTabl
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7400,7 +7400,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ReverseOrdinalTabl
           encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7442,7 +7442,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ReverseOrdinalTabl
           decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7487,7 +7487,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::TableWithAttribute
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7502,7 +7502,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::TableWithAttribute
           encode_fn = ::fidl::internal::MakeEncodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7532,7 +7532,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::TableWithAttribute
           decode_fn = ::fidl::internal::MakeDecodeFn<int64_t, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7577,7 +7577,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ExtensionTable, ::
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -7586,7 +7586,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ExtensionTable, ::
       ::fidl::internal::EncodeFn<IsRecursive> encode_fn = nullptr;
       switch (i) {
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -7610,7 +7610,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::ExtensionTable, ::
       DecodeFn<IsRecursive> decode_fn = nullptr;
       switch(i) {
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };
@@ -7655,7 +7655,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SixtyFourOrdinalTa
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       
       size_t encode_inline_size = 0;
@@ -8048,7 +8048,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SixtyFourOrdinalTa
           encode_fn = ::fidl::internal::MakeEncodeFn<::test_table::wire::ExtensionTable, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -8456,7 +8456,7 @@ struct ::fidl::internal::WireCodingTraits<::test_table::wire::SixtyFourOrdinalTa
           decode_fn = ::fidl::internal::MakeDecodeFn<::test_table::wire::ExtensionTable, fidl::internal::WireCodingConstraintEmpty, IsRecursive>();
           break;
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };

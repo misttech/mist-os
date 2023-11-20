@@ -487,7 +487,7 @@ struct CodingTraits<std::unique_ptr<::test::handlesintypes::UnionWithHandle>> {
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::handlesintypes::UnionWithHandle>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -637,7 +637,7 @@ struct CodingTraits<std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>>
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::handlesintypes::EmptyResourceUnion>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

@@ -19,7 +19,7 @@ const CodingConfig kNullCodingConfig = {
 };
 
 void WireDecodeUnknownEnvelope(WireDecoder* decoder, WirePosition position) {
-  const fidl_envelope_v2_t* envelope = position.As<fidl_envelope_v2_t>();
+  const fidl_envelope_t* envelope = position.As<fidl_envelope_t>();
   if (envelope->flags == 0) {
     if (envelope->num_bytes % FIDL_ALIGNMENT != 0) {
       decoder->SetError(kCodingErrorInvalidNumBytesSpecifiedInEnvelope);

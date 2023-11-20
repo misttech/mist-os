@@ -19,21 +19,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUn
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -47,33 +47,33 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUn
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::Tag {
@@ -87,33 +87,33 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWay
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayTableResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayTableResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::Tag {
@@ -127,21 +127,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWay
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest::Tag {
@@ -155,21 +155,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUni
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::Tag {
@@ -183,21 +183,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUni
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolStrictEventTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::Tag {
@@ -211,21 +211,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventU
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::Tag {
@@ -239,21 +239,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventU
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsProtocolFlexibleEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsProtocolFlexibleEventTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::Tag {
@@ -267,21 +267,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoW
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -295,21 +295,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoW
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest::Tag {
@@ -323,21 +323,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEven
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::Tag {
@@ -351,21 +351,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEven
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::Tag {
@@ -379,21 +379,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEv
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::Tag {
@@ -407,21 +407,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEv
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarProtocolFlexibleEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarProtocolFlexibleEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::Tag {
@@ -435,21 +435,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTw
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -463,21 +463,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTw
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest::Tag {
@@ -491,21 +491,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEv
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::Tag {
@@ -519,21 +519,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEv
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedProtocolStrictEventTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedProtocolStrictEventTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedProtocolStrictEventTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::Tag {
@@ -547,21 +547,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTw
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -575,33 +575,33 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTw
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::Tag {
@@ -615,33 +615,33 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexible
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::Tag {
@@ -655,21 +655,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexible
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::Tag {
@@ -683,21 +683,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStri
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -711,21 +711,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStri
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::Tag {
@@ -739,21 +739,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolSt
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::Which() const -> ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::Tag {
@@ -767,21 +767,21 @@ auto ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolSt
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_unknowninteractions::wire::UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 bool ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteractionsProtocolStrictTwoWayTableResponse>::HasUnknownData() const {

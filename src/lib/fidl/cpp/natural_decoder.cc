@@ -16,8 +16,8 @@ NaturalDecoder::NaturalDecoder(fidl::EncodedMessage message,
 NaturalDecoder::~NaturalDecoder() = default;
 
 void NaturalDecoder::DecodeUnknownEnvelopeOptional(size_t offset) {
-  static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
-  const fidl_envelope_v2_t* envelope = GetPtr<fidl_envelope_v2_t>(offset);
+  static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
+  const fidl_envelope_t* envelope = GetPtr<fidl_envelope_t>(offset);
   if (FidlIsZeroEnvelope(envelope)) {
     return;
   }
@@ -25,8 +25,8 @@ void NaturalDecoder::DecodeUnknownEnvelopeOptional(size_t offset) {
 }
 
 void NaturalDecoder::DecodeUnknownEnvelopeRequired(size_t offset) {
-  static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
-  const fidl_envelope_v2_t* envelope = GetPtr<fidl_envelope_v2_t>(offset);
+  static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
+  const fidl_envelope_t* envelope = GetPtr<fidl_envelope_t>(offset);
   if (unlikely(FidlIsZeroEnvelope(envelope))) {
     SetError(kCodingErrorInvalidUnionTag);
     return;
@@ -34,7 +34,7 @@ void NaturalDecoder::DecodeUnknownEnvelopeRequired(size_t offset) {
   DecodeUnknownEnvelope(envelope);
 }
 
-void NaturalDecoder::DecodeUnknownEnvelope(const fidl_envelope_v2_t* envelope) {
+void NaturalDecoder::DecodeUnknownEnvelope(const fidl_envelope_t* envelope) {
   if (envelope->flags == 0) {
     if (envelope->num_bytes % FIDL_ALIGNMENT != 0) {
       SetError(kCodingErrorInvalidNumBytesSpecifiedInEnvelope);

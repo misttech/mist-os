@@ -28,7 +28,7 @@ struct ::fidl::internal::WireOrdinal<FakeUnknownMethod> {
 
 template <>
 struct ::fidl::TypeTraits<::fidl::WireResponse<FakeUnknownMethod>> {
-  static constexpr uint32_t kPrimarySize = sizeof(fidl_xunion_v2_t);
+  static constexpr uint32_t kPrimarySize = sizeof(fidl_union_t);
   static constexpr uint32_t kMaxOutOfLine = 0;
 };
 
@@ -384,11 +384,11 @@ class InlineValue : public std::array<uint8_t, 4> {
 
 // Make an array representing a message with a transaction header and body.
 template <typename FidlMethod>
-std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> MakeMessage(
+std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_union_t)> MakeMessage(
     zx_txid_t txid, fidl::MessageDynamicFlags dynamic_flags, ResultUnionTag result_union_tag,
     InlineValue inline_value) {
   using Traits = typename ::fidl::TypeTraits<::fidl::WireResponse<FidlMethod>>;
-  static_assert(sizeof(fidl_xunion_v2_t) == Traits::kPrimarySize);
+  static_assert(sizeof(fidl_union_t) == Traits::kPrimarySize);
   static_assert(Traits::kMaxOutOfLine == 0);
   fidl_message_header_t header{
       .txid = txid,
@@ -397,7 +397,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> Ma
       .magic_number = kFidlWireFormatMagicNumberInitial,
       .ordinal = fidl::internal::WireOrdinal<FidlMethod>::value,
   };
-  fidl_xunion_v2_t body{
+  fidl_union_t body{
       .tag = static_cast<std::underlying_type_t<ResultUnionTag>>(result_union_tag),
       .envelope =
           {
@@ -406,9 +406,9 @@ std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> Ma
           },
   };
   std::memcpy(body.envelope.inline_value, inline_value.data(), sizeof(body.envelope.inline_value));
-  std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> result;
+  std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_union_t)> result;
   std::memcpy(result.data(), &header, sizeof(fidl_message_header_t));
-  std::memcpy(result.data() + sizeof(fidl_message_header_t), &body, sizeof(fidl_xunion_v2_t));
+  std::memcpy(result.data() + sizeof(fidl_message_header_t), &body, sizeof(fidl_union_t));
   return result;
 }
 
@@ -416,7 +416,7 @@ std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> Ma
 // This version is for tests which don't care about the txid or want a zero
 // txid (e.g. one way interactions).
 template <typename FidlMethod>
-std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_xunion_v2_t)> MakeMessage(
+std::array<uint8_t, sizeof(fidl_message_header_t) + sizeof(fidl_union_t)> MakeMessage(
     fidl::MessageDynamicFlags dynamic_flags, ResultUnionTag result_union_tag,
     InlineValue inline_value) {
   return MakeMessage<FidlMethod>(0, dynamic_flags, result_union_tag, inline_value);

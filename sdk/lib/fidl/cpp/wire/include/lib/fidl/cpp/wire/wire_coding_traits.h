@@ -552,7 +552,7 @@ struct WireTableCodingTraitsBase {
       return PreworkResult::kEarlyExit;
     }
 
-    if (unlikely(!encoder->Alloc(sizeof(fidl_envelope_v2_t) * vec->count, out_vector_position))) {
+    if (unlikely(!encoder->Alloc(sizeof(fidl_envelope_t) * vec->count, out_vector_position))) {
       return PreworkResult::kEarlyExit;
     }
     return PreworkResult::kSuccess;
@@ -570,7 +570,7 @@ struct WireTableCodingTraitsBase {
       decoder->SetError(kCodingErrorAllocationSizeExceeds32Bits);
       return PreworkResult::kEarlyExit;
     }
-    if (unlikely(!decoder->Alloc(sizeof(fidl_envelope_v2_t) * vec->count, out_vector_position))) {
+    if (unlikely(!decoder->Alloc(sizeof(fidl_envelope_t) * vec->count, out_vector_position))) {
       return PreworkResult::kEarlyExit;
     }
     vec->data = out_vector_position->As<void>();
@@ -600,7 +600,7 @@ void WireDecodeUnknownEnvelope(WireDecoder* decoder, WirePosition position);
 
 template <bool IsRecursive>
 void WireEncodeEnvelope(size_t inline_size, EncodeFn<IsRecursive> encode_fn, WireEncoder* encoder,
-                        fidl_envelope_v2_t* value, WirePosition position,
+                        fidl_envelope_t* value, WirePosition position,
                         RecursionDepth<IsRecursive> recursion_depth) {
   const size_t length_before = encoder->CurrentLength();
   const size_t handles_before = encoder->CurrentHandleCount();
@@ -608,7 +608,7 @@ void WireEncodeEnvelope(size_t inline_size, EncodeFn<IsRecursive> encode_fn, Wir
   if (inline_size <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
     if (!encode_fn || (value->flags & FIDL_ENVELOPE_FLAGS_INLINING_MASK) == 0) {
       // Unset or unknown envelope.
-      *position.As<fidl_envelope_v2_t>() = {};
+      *position.As<fidl_envelope_t>() = {};
       return;
     }
 
@@ -617,7 +617,7 @@ void WireEncodeEnvelope(size_t inline_size, EncodeFn<IsRecursive> encode_fn, Wir
 
     encode_fn(encoder, value->inline_value, position, recursion_depth);
 
-    fidl_envelope_v2_t* envelope = position.As<fidl_envelope_v2_t>();
+    fidl_envelope_t* envelope = position.As<fidl_envelope_t>();
     envelope->num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
     envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
     return;
@@ -625,7 +625,7 @@ void WireEncodeEnvelope(size_t inline_size, EncodeFn<IsRecursive> encode_fn, Wir
 
   if (!encode_fn || *reinterpret_cast<void**>(value) == nullptr) {
     // Unset or unknown envelope.
-    *position.As<fidl_envelope_v2_t>() = {};
+    *position.As<fidl_envelope_t>() = {};
     return;
   }
 
@@ -635,7 +635,7 @@ void WireEncodeEnvelope(size_t inline_size, EncodeFn<IsRecursive> encode_fn, Wir
   }
   encode_fn(encoder, *reinterpret_cast<void**>(value), body, recursion_depth);
 
-  fidl_envelope_v2_t* envelope = position.As<fidl_envelope_v2_t>();
+  fidl_envelope_t* envelope = position.As<fidl_envelope_t>();
   envelope->num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
   envelope->num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
   envelope->flags = 0;
@@ -649,7 +649,7 @@ void WireDecodeEnvelope(size_t inline_size, DecodeFn<IsRecursive> decode_fn, Wir
   const size_t length_before = decoder->CurrentLength();
   const size_t handles_before = decoder->CurrentHandleCount();
 
-  fidl_envelope_v2_t envelope = *position.As<fidl_envelope_v2_t>();
+  fidl_envelope_t envelope = *position.As<fidl_envelope_t>();
   if (inline_size <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
     if (unlikely(envelope.flags != FIDL_ENVELOPE_FLAGS_INLINING_MASK)) {
       decoder->SetError(kCodingErrorInvalidInlineBit);
@@ -734,7 +734,7 @@ template <bool IsRecursive>
 void WireDecodeOptionalEnvelope(size_t inline_size, DecodeFn<IsRecursive> decode_fn,
                                 WireDecoder* decoder, WirePosition position,
                                 RecursionDepth<IsRecursive> recursion_depth) {
-  static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+  static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
   if (unlikely(*position.As<uint64_t>() == 0)) {
     return;
   }

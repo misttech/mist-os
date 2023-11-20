@@ -129,7 +129,7 @@ static inline bool FidlAddOutOfLine(uint32_t offset, uint32_t size, uint32_t* ou
   return true;
 }
 
-inline bool FidlIsZeroEnvelope(const fidl_envelope_v2_t* envelope) {
+inline bool FidlIsZeroEnvelope(const fidl_envelope_t* envelope) {
   static_assert(sizeof(*envelope) == sizeof(uint64_t), "");
   uint64_t uval;
   memcpy(&uval, envelope, sizeof(*envelope));

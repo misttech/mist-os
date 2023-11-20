@@ -284,9 +284,9 @@ void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, s
   switch (Which()) {
     case ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result::Tag::kResponse: {
       if (::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ResponseAsStruct_Response>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -298,7 +298,7 @@ void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, s
         &response_,
         encoder->Alloc(::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ResponseAsStruct_Response, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -307,9 +307,9 @@ void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, s
     }
     case ::test::protocols::WithErrorSyntax_ResponseAsStruct_Result::Tag::kErr: {
       if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -321,7 +321,7 @@ void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, s
         &err_,
         encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -334,7 +334,7 @@ void WithErrorSyntax_ResponseAsStruct_Result::Encode(::fidl::Encoder* encoder, s
 }
 
 void WithErrorSyntax_ResponseAsStruct_Result::Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ResponseAsStruct_Result* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -517,9 +517,9 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, s
   switch (Which()) {
     case ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result::Tag::kResponse: {
       if (::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -531,7 +531,7 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, s
         &response_,
         encoder->Alloc(::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Response, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -540,9 +540,9 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, s
     }
     case ::test::protocols::WithErrorSyntax_ErrorAsPrimitive_Result::Tag::kErr: {
       if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -554,7 +554,7 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, s
         &err_,
         encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -567,7 +567,7 @@ void WithErrorSyntax_ErrorAsPrimitive_Result::Encode(::fidl::Encoder* encoder, s
 }
 
 void WithErrorSyntax_ErrorAsPrimitive_Result::Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsPrimitive_Result* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -752,9 +752,9 @@ void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t
   switch (Which()) {
     case ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result::Tag::kResponse: {
       if (::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ErrorAsEnum_Response>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -766,7 +766,7 @@ void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t
         &response_,
         encoder->Alloc(::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_ErrorAsEnum_Response, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -775,9 +775,9 @@ void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t
     }
     case ::test::protocols::WithErrorSyntax_ErrorAsEnum_Result::Tag::kErr: {
       if (::fidl::EncodingInlineSize<::test::protocols::ErrorEnum>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -789,7 +789,7 @@ void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t
         &err_,
         encoder->Alloc(::fidl::EncodingInlineSize<::test::protocols::ErrorEnum, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -802,7 +802,7 @@ void WithErrorSyntax_ErrorAsEnum_Result::Encode(::fidl::Encoder* encoder, size_t
 }
 
 void WithErrorSyntax_ErrorAsEnum_Result::Decode(::fidl::Decoder* _decoder, WithErrorSyntax_ErrorAsEnum_Result* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -999,9 +999,9 @@ void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, siz
   switch (Which()) {
     case ::test::protocols::WithErrorSyntax_HandleInResult_Result::Tag::kResponse: {
       if (::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_HandleInResult_Response>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &response_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -1013,7 +1013,7 @@ void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, siz
         &response_,
         encoder->Alloc(::fidl::EncodingInlineSize<::test::protocols::WithErrorSyntax_HandleInResult_Response, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -1022,9 +1022,9 @@ void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, siz
     }
     case ::test::protocols::WithErrorSyntax_HandleInResult_Result::Tag::kErr: {
       if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &err_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -1036,7 +1036,7 @@ void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, siz
         &err_,
         encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -1049,7 +1049,7 @@ void WithErrorSyntax_HandleInResult_Result::Encode(::fidl::Encoder* encoder, siz
 }
 
 void WithErrorSyntax_HandleInResult_Result::Decode(::fidl::Decoder* _decoder, WithErrorSyntax_HandleInResult_Result* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -2109,9 +2109,9 @@ void TheUnion::Encode(::fidl::Encoder* encoder, size_t offset,
   switch (Which()) {
     case ::test::protocols::TheUnion::Tag::kV: {
       if (::fidl::EncodingInlineSize<uint32_t>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &v_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &v_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -2123,7 +2123,7 @@ void TheUnion::Encode(::fidl::Encoder* encoder, size_t offset,
         &v_,
         encoder->Alloc(::fidl::EncodingInlineSize<uint32_t, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -2131,7 +2131,7 @@ void TheUnion::Encode(::fidl::Encoder* encoder, size_t offset,
       break;
     }
     case ::test::protocols::TheUnion::Tag::kUnknown: {
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
     }
@@ -2141,7 +2141,7 @@ void TheUnion::Encode(::fidl::Encoder* encoder, size_t offset,
 }
 
 void TheUnion::Decode(::fidl::Decoder* _decoder, TheUnion* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&

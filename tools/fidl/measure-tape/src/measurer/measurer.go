@@ -271,7 +271,7 @@ func (m *Measurer) createUnionMeasuringTape(decl fidlgen.Union) (*MeasuringTape,
 		isFlexible:     decl.Strictness == fidlgen.IsFlexible,
 		hasHandles:     decl.TypeShapeV2.MaxHandles != 0,
 		hasOutOfLine:   true,
-		inlineNumBytes: 16, // sizeof(fidl_xunion_v2_t)
+		inlineNumBytes: 16, // sizeof(fidl_union_t)
 	}, nil
 }
 

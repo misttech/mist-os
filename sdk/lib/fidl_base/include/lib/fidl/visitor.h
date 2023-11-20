@@ -89,10 +89,10 @@ class Visitor {
   // HandlePointer is ([const] zx_handle_t)*
   using HandlePointer = Ptr<zx_handle_t>;
 
-  // EnvelopeType is fidl_envelope_v2_t
-  using EnvelopeType = fidl_envelope_v2_t;
+  // EnvelopeType is fidl_envelope_t
+  using EnvelopeType = fidl_envelope_t;
 
-  // EnvelopePointer is ([const] fidl_envelope_v2_t)*
+  // EnvelopePointer is ([const] fidl_envelope_t)*
   using EnvelopePointer = Ptr<EnvelopeType>;
 
   // CountPointer is ([const] uint64_t)*
@@ -167,10 +167,10 @@ class Visitor {
 
   // Called when the walker leaves an envelope.
   //
-  // |in_envelope| is a fidl_envelope_v2_t structure containing the original
+  // |in_envelope| is a fidl_envelope_t structure containing the original
   // input envelope. This should be used for reading because it won't have been
   // clobbered by other calls.
-  // |out_envelope| is a fidl_envelope_v2_t* pointing to the actual envelope
+  // |out_envelope| is a fidl_envelope_t* pointing to the actual envelope
   // backed by the message bytes. This should be used for writing but not reading.
   // |prev_checkpoint| is the checkpoint object returned in the EnterEnvelope call().
   Status LeaveEnvelope(EnvelopeType in_envelope, EnvelopePointer out_envelope,
@@ -184,10 +184,10 @@ class Visitor {
   // be computed by counting the increase in out of line bytes when the envelope is inlined
   // since there are no new out of line objects.
   //
-  // |in_envelope| is a fidl_envelope_v2_t structure containing the original
+  // |in_envelope| is a fidl_envelope_t structure containing the original
   // input envelope. This should be used for reading because it won't have been
   // clobbered by other calls.
-  // |out_envelope| is a fidl_envelope_v2_t* pointing to the actual envelope
+  // |out_envelope| is a fidl_envelope_t* pointing to the actual envelope
   // backed by the message bytes. This should be used for writing but not reading.
   // |prev_checkpoint| is the checkpoint object returned in the EnterEnvelope call().
   Status LeaveInlinedEnvelope(EnvelopeType in_envelope, EnvelopePointer out_envelope,
@@ -199,10 +199,10 @@ class Visitor {
   // This takes the place of the continued walk of the internal object that would take place
   // if they type was known.
   //
-  // |envelope_copy| is a fidl_envelope_v2_t structure containing the original
+  // |envelope_copy| is a fidl_envelope_t structure containing the original
   // input envelope. This should be used for reading because it won't have been
   // clobbered by other calls.
-  // |envelope_ptr| is a fidl_envelope_v2_t* pointing to the actual envelope
+  // |envelope_ptr| is a fidl_envelope_t* pointing to the actual envelope
   // backed by the message bytes. This is used for converting to an internal
   // unknown representation. |is_resource| indicates whether the type containing
   // this envelope is a resource type.

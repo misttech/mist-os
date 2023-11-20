@@ -302,7 +302,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
     {{- range .Members }}
     case {{ .TagName }}: {
       if (::fidl::EncodingInlineSize<{{ .Type }}>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &{{ .StorageName }}, offset + offsetof(fidl_xunion_v2_t, envelope)
+        ::fidl::Encode(encoder, &{{ .StorageName }}, offset + offsetof(fidl_union_t, envelope)
         {{- if .HandleInformation -}}
             , ::fidl::HandleInformation{
               .object_type = {{ .HandleInformation.ObjectType }},
@@ -311,7 +311,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
         {{- end -}});
 
         {{/* Call GetPtr after Encode because the buffer may move. */ -}}
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -330,7 +330,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
     {{- end -}}
       );
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -341,9 +341,9 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
     {{- if .IsFlexible }}
     case {{ .TagUnknown }}: {
       {{- if .IsResourceType }}
-      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
+      ::fidl::EncodeUnknownData(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));
       {{- else }}
-      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_xunion_v2_t, envelope));
+      ::fidl::EncodeUnknownBytes(encoder, &unknown_data_, offset + offsetof(fidl_union_t, envelope));
       {{- end }}
       *encoder->GetPtr<uint64_t>(offset) = tag_;
       break;
@@ -355,7 +355,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* encoder, size_t offset,
 }
 
 void {{ .Name }}::Decode(::fidl::Decoder* _decoder, {{ .Name }}* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -518,7 +518,7 @@ struct CodingTraits<std::unique_ptr<{{ . }}>> {
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<{{ . }}>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

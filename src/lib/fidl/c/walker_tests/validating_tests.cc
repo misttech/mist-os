@@ -158,12 +158,11 @@ TEST(Walker, validate_v2_walker_recursive_struct_max_out_of_line_depth) {
 #ifdef __Fuchsia__
 TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_exceeded) {
   // 1 table + 31 non-null pointers + 1 null pointer = 33 out of line elements.
-  uint8_t message[sizeof(fidl_vector_t) + sizeof(fidl_envelope_v2_t) + sizeof(uintptr_t) * 32];
+  uint8_t message[sizeof(fidl_vector_t) + sizeof(fidl_envelope_t) + sizeof(uintptr_t) * 32];
   fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(message);
-  fidl_envelope_v2_t* envelope =
-      reinterpret_cast<fidl_envelope_v2_t*>(message + sizeof(fidl_vector_t));
+  fidl_envelope_t* envelope = reinterpret_cast<fidl_envelope_t*>(message + sizeof(fidl_vector_t));
   uintptr_t* opt_structs =
-      reinterpret_cast<uintptr_t*>(message + sizeof(fidl_vector_t) + sizeof(fidl_envelope_v2_t));
+      reinterpret_cast<uintptr_t*>(message + sizeof(fidl_vector_t) + sizeof(fidl_envelope_t));
   vec->count = 1;
   vec->data = reinterpret_cast<void*>(FIDL_ALLOC_PRESENT);
   envelope->num_bytes = 256;
@@ -184,12 +183,11 @@ TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_exceeded) {
 // TODO(fxbug.dev/52382): Move this test to GIDL.
 TEST(Walker, validate_v2_walker_table_max_out_of_line_depth_matched) {
   // 1 table + 30 non-null pointers + 1 null pointer = 32 out of line elements.
-  uint8_t message[sizeof(fidl_vector_t) + sizeof(fidl_envelope_v2_t) + sizeof(uintptr_t) * 31];
+  uint8_t message[sizeof(fidl_vector_t) + sizeof(fidl_envelope_t) + sizeof(uintptr_t) * 31];
   fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(message);
-  fidl_envelope_v2_t* envelope =
-      reinterpret_cast<fidl_envelope_v2_t*>(message + sizeof(fidl_vector_t));
+  fidl_envelope_t* envelope = reinterpret_cast<fidl_envelope_t*>(message + sizeof(fidl_vector_t));
   uintptr_t* opt_structs =
-      reinterpret_cast<uintptr_t*>(message + sizeof(fidl_vector_t) + sizeof(fidl_envelope_v2_t));
+      reinterpret_cast<uintptr_t*>(message + sizeof(fidl_vector_t) + sizeof(fidl_envelope_t));
   vec->count = 1;
   vec->data = reinterpret_cast<void*>(FIDL_ALLOC_PRESENT);
   envelope->num_bytes = 248;
@@ -456,9 +454,8 @@ TEST(Xunions, validate_v2_valid_empty_nullable_xunion) {
   SampleNullableXUnionV2Struct message = {};
 
   const char* error = nullptr;
-  auto status =
-      internal__fidl_validate__v2__may_break(&fidl_test_coding_SampleNullableXUnionStructTable,
-                                             &message, sizeof(fidl_xunion_v2_t), 0, &error);
+  auto status = internal__fidl_validate__v2__may_break(
+      &fidl_test_coding_SampleNullableXUnionStructTable, &message, sizeof(fidl_union_t), 0, &error);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_NULL(error, "%s", error);
 }
@@ -467,8 +464,8 @@ TEST(Xunions, validate_v2_empty_nonnullable_xunion) {
   SampleXUnionV2Struct message = {};
 
   const char* error = nullptr;
-  auto status = internal__fidl_validate__v2__may_break(
-      &fidl_test_coding_SampleXUnionStructTable, &message, sizeof(fidl_xunion_v2_t), 0, &error);
+  auto status = internal__fidl_validate__v2__may_break(&fidl_test_coding_SampleXUnionStructTable,
+                                                       &message, sizeof(fidl_union_t), 0, &error);
   EXPECT_EQ(status, ZX_ERR_INVALID_ARGS);
   EXPECT_NOT_NULL(error);
   EXPECT_STREQ(error, "non-nullable xunion is absent");
@@ -479,9 +476,8 @@ TEST(Xunions, validate_v2_empty_nullable_xunion_nonzero_ordinal) {
   message.opt_xu.header.tag = kSampleXUnionIntStructOrdinal;
 
   const char* error = nullptr;
-  auto status =
-      internal__fidl_validate__v2__may_break(&fidl_test_coding_SampleNullableXUnionStructTable,
-                                             &message, sizeof(fidl_xunion_v2_t), 0, &error);
+  auto status = internal__fidl_validate__v2__may_break(
+      &fidl_test_coding_SampleNullableXUnionStructTable, &message, sizeof(fidl_union_t), 0, &error);
   EXPECT_EQ(status, ZX_ERR_INVALID_ARGS);
   EXPECT_NOT_NULL(error);
   EXPECT_STREQ(error, "empty xunion must have zero as ordinal");
@@ -489,7 +485,7 @@ TEST(Xunions, validate_v2_empty_nullable_xunion_nonzero_ordinal) {
 
 TEST(Xunions, validate_v2_nonempty_xunion_zero_ordinal) {
   SampleXUnionV2Struct message = {};
-  message.xu.header.envelope = (fidl_envelope_v2_t){.num_bytes = 8, .num_handles = 0};
+  message.xu.header.envelope = (fidl_envelope_t){.num_bytes = 8, .num_handles = 0};
 
   const char* error = nullptr;
   auto status = internal__fidl_validate__v2__may_break(
@@ -501,7 +497,7 @@ TEST(Xunions, validate_v2_nonempty_xunion_zero_ordinal) {
 
 TEST(Xunions, validate_v2_nonempty_nullable_xunion_zero_ordinal) {
   SampleNullableXUnionV2Struct message = {};
-  message.opt_xu.header.envelope = (fidl_envelope_v2_t){.num_bytes = 8, .num_handles = 0};
+  message.opt_xu.header.envelope = (fidl_envelope_t){.num_bytes = 8, .num_handles = 0};
 
   const char* error = nullptr;
   auto status = internal__fidl_validate__v2__may_break(

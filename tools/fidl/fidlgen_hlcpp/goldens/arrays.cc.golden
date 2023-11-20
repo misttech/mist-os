@@ -118,17 +118,17 @@ void TableSmallArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
-  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_v2_t));
+  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_t));
   if (field_presence_.IsSet<0>()) {
     const size_t length_before = _encoder->CurrentLength();
     const size_t handles_before = _encoder->CurrentHandleCount();
 
-    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_v2_t);
+    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_t);
 
     if (::fidl::EncodingInlineSize<::std::array<uint32_t, 2>>(_encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
       ::fidl::Encode(_encoder, &a_value_.value, envelope_base);
 
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
     } else {
@@ -137,7 +137,7 @@ void TableSmallArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
           &a_value_.value,
           _encoder->Alloc(::fidl::EncodingInlineSize<::std::array<uint32_t, 2>, ::fidl::Encoder>(_encoder)));
 
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_bytes = static_cast<uint32_t>(_encoder->CurrentLength() - length_before);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = 0;
@@ -156,8 +156,8 @@ void TableSmallArray::Decode(::fidl::Decoder* _decoder, TableSmallArray* _value,
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
   if (count >= 1) {
-    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_v2_t);
-    fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_t);
+    fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
     if (*reinterpret_cast<const void* const*>(envelope) != nullptr) {
       ::fidl::Decode(_decoder, _value->mutable_a(),
                      _decoder->EnvelopeValueOffset(envelope));
@@ -239,17 +239,17 @@ void TableLargeArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
-  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_v2_t));
+  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_t));
   if (field_presence_.IsSet<0>()) {
     const size_t length_before = _encoder->CurrentLength();
     const size_t handles_before = _encoder->CurrentHandleCount();
 
-    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_v2_t);
+    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_t);
 
     if (::fidl::EncodingInlineSize<::std::array<uint32_t, 100>>(_encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
       ::fidl::Encode(_encoder, &a_value_.value, envelope_base);
 
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
     } else {
@@ -258,7 +258,7 @@ void TableLargeArray::Encode(::fidl::Encoder* _encoder, size_t _offset,
           &a_value_.value,
           _encoder->Alloc(::fidl::EncodingInlineSize<::std::array<uint32_t, 100>, ::fidl::Encoder>(_encoder)));
 
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_bytes = static_cast<uint32_t>(_encoder->CurrentLength() - length_before);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = 0;
@@ -277,8 +277,8 @@ void TableLargeArray::Decode(::fidl::Decoder* _decoder, TableLargeArray* _value,
   base = _decoder->GetOffset(encoded->data);
   count = encoded->count;
   if (count >= 1) {
-    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_v2_t);
-    fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+    size_t envelope_base = base + (1 - 1) * sizeof(fidl_envelope_t);
+    fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
     if (*reinterpret_cast<const void* const*>(envelope) != nullptr) {
       ::fidl::Decode(_decoder, _value->mutable_a(),
                      _decoder->EnvelopeValueOffset(envelope));
@@ -359,9 +359,9 @@ void UnionSmallArray::Encode(::fidl::Encoder* encoder, size_t offset,
   switch (Which()) {
     case ::test::arrays::UnionSmallArray::Tag::kA: {
       if (::fidl::EncodingInlineSize<::std::array<uint32_t, 2>>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &a_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &a_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -373,7 +373,7 @@ void UnionSmallArray::Encode(::fidl::Encoder* encoder, size_t offset,
           &a_,
           encoder->Alloc(::fidl::EncodingInlineSize<::std::array<uint32_t, 2>, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -386,7 +386,7 @@ void UnionSmallArray::Encode(::fidl::Encoder* encoder, size_t offset,
 }
 
 void UnionSmallArray::Decode(::fidl::Decoder* _decoder, UnionSmallArray* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&
@@ -509,9 +509,9 @@ void UnionLargeArray::Encode(::fidl::Encoder* encoder, size_t offset,
   switch (Which()) {
     case ::test::arrays::UnionLargeArray::Tag::kA: {
       if (::fidl::EncodingInlineSize<::std::array<uint32_t, 100>>(encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
-        ::fidl::Encode(encoder, &a_, offset + offsetof(fidl_xunion_v2_t, envelope));
+        ::fidl::Encode(encoder, &a_, offset + offsetof(fidl_union_t, envelope));
 
-        fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+        fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
         xunion->tag = tag_;
         xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
         xunion->envelope.flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
@@ -523,7 +523,7 @@ void UnionLargeArray::Encode(::fidl::Encoder* encoder, size_t offset,
           &a_,
           encoder->Alloc(::fidl::EncodingInlineSize<::std::array<uint32_t, 100>, ::fidl::Encoder>(encoder)));
 
-      fidl_xunion_v2_t* xunion = encoder->GetPtr<fidl_xunion_v2_t>(offset);
+      fidl_union_t* xunion = encoder->GetPtr<fidl_union_t>(offset);
       xunion->tag = tag_;
       xunion->envelope.num_bytes = static_cast<uint32_t>(encoder->CurrentLength() - length_before);
       xunion->envelope.num_handles = static_cast<uint16_t>(encoder->CurrentHandleCount() - handles_before);
@@ -536,7 +536,7 @@ void UnionLargeArray::Encode(::fidl::Encoder* encoder, size_t offset,
 }
 
 void UnionLargeArray::Decode(::fidl::Decoder* _decoder, UnionLargeArray* value, size_t offset) {
-  fidl_xunion_v2_t* xunion = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+  fidl_union_t* xunion = _decoder->GetPtr<fidl_union_t>(offset);
 
   if (xunion->envelope.num_bytes == 0 &&
       xunion->envelope.num_handles == 0 &&

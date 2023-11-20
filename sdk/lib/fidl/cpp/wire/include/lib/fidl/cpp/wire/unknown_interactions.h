@@ -60,7 +60,7 @@ inline bool CanHandleEvent(Openness openness, UnknownMethodType method_type) {
 // |OutgoingMessage| to send the unknown interaction response to the client.
 struct UnknownMethodReply {
   fidl_message_header_t header;
-  fidl_xunion_v2_t body;
+  fidl_union_t body;
 
   // Build an UnknownMethodReply for the given |method_oridnal|. The
   // transaction ID is left as 0, and should be filled in by

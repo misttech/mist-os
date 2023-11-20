@@ -172,13 +172,13 @@ void {{ .Name }}::Encode(::fidl::Encoder* _encoder, size_t _offset,
   size_t max_ordinal = MaxOrdinal();
   ::fidl::EncodeVectorPointer(_encoder, max_ordinal, _offset);
   if (max_ordinal == 0) return;
-  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_v2_t));
+  [[maybe_unused]] size_t base = _encoder->Alloc(max_ordinal * sizeof(fidl_envelope_t));
   {{- range .Members }}
   if ({{ .FieldPresenceIsSet }}) {
     const size_t length_before = _encoder->CurrentLength();
     const size_t handles_before = _encoder->CurrentHandleCount();
 
-    size_t envelope_base = base + ({{ .Ordinal }} - 1) * sizeof(fidl_envelope_v2_t);
+    size_t envelope_base = base + ({{ .Ordinal }} - 1) * sizeof(fidl_envelope_t);
 
     if (::fidl::EncodingInlineSize<{{ .Type }}>(_encoder) <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
       ::fidl::Encode(_encoder, &{{ .FieldDataName }}.value, envelope_base
@@ -190,7 +190,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* _encoder, size_t _offset,
       {{- end -}});
 
       {{/* Call GetPtr after Encode because the buffer may move. */ -}}
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = FIDL_ENVELOPE_FLAGS_INLINING_MASK;
     } else {
@@ -207,7 +207,7 @@ void {{ .Name }}::Encode(::fidl::Encoder* _encoder, size_t _offset,
         );
 
       {{/* Call GetPtr after Encode because the buffer may move. */ -}}
-      fidl_envelope_v2_t* envelope = _encoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      fidl_envelope_t* envelope = _encoder->GetPtr<fidl_envelope_t>(envelope_base);
       envelope->num_bytes = static_cast<uint32_t>(_encoder->CurrentLength() - length_before);
       envelope->num_handles = static_cast<uint16_t>(_encoder->CurrentHandleCount() - handles_before);
       envelope->flags = 0;
@@ -229,8 +229,8 @@ void {{ .Name }}::Decode(::fidl::Decoder* _decoder, {{ .Name }}* _value, size_t 
 
   {{- range .Members }}
   if (count >= {{ .Ordinal }}) {
-    size_t envelope_base = base + ({{ .Ordinal }} - 1) * sizeof(fidl_envelope_v2_t);
-    fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+    size_t envelope_base = base + ({{ .Ordinal }} - 1) * sizeof(fidl_envelope_t);
+    fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
     if (*reinterpret_cast<const void* const*>(envelope) != nullptr) {
       ::fidl::Decode(_decoder, _value->mutable_{{ .Name }}(),
         _decoder->EnvelopeValueOffset(envelope));
@@ -250,8 +250,8 @@ void {{ .Name }}::Decode(::fidl::Decoder* _decoder, {{ .Name }}* _value, size_t 
         continue;
       }
 
-      size_t envelope_base = base + (ordinal - 1) * sizeof(fidl_envelope_v2_t);
-      fidl_envelope_v2_t* envelope = _decoder->GetPtr<fidl_envelope_v2_t>(envelope_base);
+      size_t envelope_base = base + (ordinal - 1) * sizeof(fidl_envelope_t);
+      fidl_envelope_t* envelope = _decoder->GetPtr<fidl_envelope_t>(envelope_base);
       _decoder->CloseUnknownHandlesInEnvelope(envelope);
     }
   }

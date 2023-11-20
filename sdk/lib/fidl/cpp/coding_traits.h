@@ -266,7 +266,7 @@ void EncodeUnknownBytesContents(EncoderImpl* encoder, std::vector<uint8_t>* valu
 
 template <class EncoderImpl>
 void EncodeUnknownBytes(EncoderImpl* encoder, std::vector<uint8_t>* value, size_t envelope_offset) {
-  fidl_envelope_v2_t* envelope = encoder->template GetPtr<fidl_envelope_v2_t>(envelope_offset);
+  fidl_envelope_t* envelope = encoder->template GetPtr<fidl_envelope_t>(envelope_offset);
 
   if (value->size() <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
     std::copy(value->begin(), value->end(), envelope->inline_value);
@@ -301,7 +301,7 @@ void EncodeUnknownDataContents(EncoderImpl* encoder, UnknownData* value, size_t 
 
 template <class EncoderImpl>
 void EncodeUnknownData(EncoderImpl* encoder, UnknownData* value, size_t envelope_offset) {
-  fidl_envelope_v2_t* envelope = encoder->template GetPtr<fidl_envelope_v2_t>(envelope_offset);
+  fidl_envelope_t* envelope = encoder->template GetPtr<fidl_envelope_t>(envelope_offset);
 
   if (value->bytes.size() <= FIDL_ENVELOPE_INLINING_SIZE_THRESHOLD) {
     memcpy(envelope->inline_value, value->bytes.data(), value->bytes.size());

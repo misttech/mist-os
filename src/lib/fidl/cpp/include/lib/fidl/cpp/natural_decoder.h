@@ -162,7 +162,7 @@ class NaturalDecoder final {
   const char* error() const { return error_; }
 
  private:
-  void DecodeUnknownEnvelope(const fidl_envelope_v2_t* envelope);
+  void DecodeUnknownEnvelope(const fidl_envelope_t* envelope);
 
   const fidl::internal::CodingConfig* coding_config() const {
     return body_.transport_vtable()->encoding_configuration;

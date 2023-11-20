@@ -9,15 +9,15 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 void ::test_union::wire::PizzaOrPasta::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(PizzaOrPasta) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(PizzaOrPasta, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(PizzaOrPasta, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(PizzaOrPasta) == sizeof(fidl_union_t));
+  static_assert(offsetof(PizzaOrPasta, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(PizzaOrPasta, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::ExplicitPizzaOrPasta::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ExplicitPizzaOrPasta) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ExplicitPizzaOrPasta, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ExplicitPizzaOrPasta, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ExplicitPizzaOrPasta) == sizeof(fidl_union_t));
+  static_assert(offsetof(ExplicitPizzaOrPasta, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ExplicitPizzaOrPasta, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::FlexiblePizzaOrPasta::Which() const -> ::test_union::wire::FlexiblePizzaOrPasta::Tag {
@@ -32,21 +32,21 @@ auto ::test_union::wire::FlexiblePizzaOrPasta::Which() const -> ::test_union::wi
 }
 
 void ::test_union::wire::FlexiblePizzaOrPasta::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(FlexiblePizzaOrPasta) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(FlexiblePizzaOrPasta, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(FlexiblePizzaOrPasta, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(FlexiblePizzaOrPasta) == sizeof(fidl_union_t));
+  static_assert(offsetof(FlexiblePizzaOrPasta, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(FlexiblePizzaOrPasta, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::StrictPizzaOrPasta::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(StrictPizzaOrPasta) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(StrictPizzaOrPasta, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(StrictPizzaOrPasta, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(StrictPizzaOrPasta) == sizeof(fidl_union_t));
+  static_assert(offsetof(StrictPizzaOrPasta, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(StrictPizzaOrPasta, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::Union::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(Union) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(Union, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(Union, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(Union) == sizeof(fidl_union_t));
+  static_assert(offsetof(Union, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(Union, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::FlexibleUnion::Which() const -> ::test_union::wire::FlexibleUnion::Tag {
@@ -62,33 +62,33 @@ auto ::test_union::wire::FlexibleUnion::Which() const -> ::test_union::wire::Fle
 }
 
 void ::test_union::wire::FlexibleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(FlexibleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(FlexibleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(FlexibleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(FlexibleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(FlexibleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(FlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::StrictUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(StrictUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(StrictUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(StrictUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(StrictUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(StrictUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(StrictUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::FieldCollision::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(FieldCollision) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(FieldCollision, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(FieldCollision, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(FieldCollision) == sizeof(fidl_union_t));
+  static_assert(offsetof(FieldCollision, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(FieldCollision, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::ExplicitUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ExplicitUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ExplicitUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ExplicitUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ExplicitUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(ExplicitUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ExplicitUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::ReverseOrdinalUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ReverseOrdinalUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ReverseOrdinalUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ReverseOrdinalUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ReverseOrdinalUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(ReverseOrdinalUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ReverseOrdinalUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::FlexibleFoo::Which() const -> ::test_union::wire::FlexibleFoo::Tag {
@@ -103,15 +103,15 @@ auto ::test_union::wire::FlexibleFoo::Which() const -> ::test_union::wire::Flexi
 }
 
 void ::test_union::wire::FlexibleFoo::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(FlexibleFoo) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(FlexibleFoo, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(FlexibleFoo, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(FlexibleFoo) == sizeof(fidl_union_t));
+  static_assert(offsetof(FlexibleFoo, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(FlexibleFoo, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::StrictFoo::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(StrictFoo) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(StrictFoo, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(StrictFoo, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(StrictFoo) == sizeof(fidl_union_t));
+  static_assert(offsetof(StrictFoo, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(StrictFoo, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::ExplicitFoo::Which() const -> ::test_union::wire::ExplicitFoo::Tag {
@@ -126,15 +126,15 @@ auto ::test_union::wire::ExplicitFoo::Which() const -> ::test_union::wire::Expli
 }
 
 void ::test_union::wire::ExplicitFoo::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ExplicitFoo) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ExplicitFoo, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ExplicitFoo, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ExplicitFoo) == sizeof(fidl_union_t));
+  static_assert(offsetof(ExplicitFoo, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ExplicitFoo, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::ExplicitStrictFoo::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ExplicitStrictFoo) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ExplicitStrictFoo, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ExplicitStrictFoo, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ExplicitStrictFoo) == sizeof(fidl_union_t));
+  static_assert(offsetof(ExplicitStrictFoo, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ExplicitStrictFoo, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::OlderSimpleUnion::Which() const -> ::test_union::wire::OlderSimpleUnion::Tag {
@@ -149,9 +149,9 @@ auto ::test_union::wire::OlderSimpleUnion::Which() const -> ::test_union::wire::
 }
 
 void ::test_union::wire::OlderSimpleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(OlderSimpleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(OlderSimpleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(OlderSimpleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(OlderSimpleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(OlderSimpleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(OlderSimpleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::NewerSimpleUnion::Which() const -> ::test_union::wire::NewerSimpleUnion::Tag {
@@ -167,15 +167,15 @@ auto ::test_union::wire::NewerSimpleUnion::Which() const -> ::test_union::wire::
 }
 
 void ::test_union::wire::NewerSimpleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(NewerSimpleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(NewerSimpleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(NewerSimpleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(NewerSimpleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(NewerSimpleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(NewerSimpleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::StrictSimpleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(StrictSimpleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(StrictSimpleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(StrictSimpleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(StrictSimpleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(StrictSimpleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(StrictSimpleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::UnionContainingEmptyStruct::Which() const -> ::test_union::wire::UnionContainingEmptyStruct::Tag {
@@ -189,15 +189,15 @@ auto ::test_union::wire::UnionContainingEmptyStruct::Which() const -> ::test_uni
 }
 
 void ::test_union::wire::UnionContainingEmptyStruct::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnionContainingEmptyStruct) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnionContainingEmptyStruct, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnionContainingEmptyStruct, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnionContainingEmptyStruct) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnionContainingEmptyStruct, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnionContainingEmptyStruct, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_union::wire::StrictBoundedUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(StrictBoundedUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(StrictBoundedUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(StrictBoundedUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(StrictBoundedUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(StrictBoundedUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(StrictBoundedUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::ExplicitFlexibleUnion::Which() const -> ::test_union::wire::ExplicitFlexibleUnion::Tag {
@@ -212,9 +212,9 @@ auto ::test_union::wire::ExplicitFlexibleUnion::Which() const -> ::test_union::w
 }
 
 void ::test_union::wire::ExplicitFlexibleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(ExplicitFlexibleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(ExplicitFlexibleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(ExplicitFlexibleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(ExplicitFlexibleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(ExplicitFlexibleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(ExplicitFlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::UnionWithAttributes::Which() const -> ::test_union::wire::UnionWithAttributes::Tag {
@@ -228,9 +228,9 @@ auto ::test_union::wire::UnionWithAttributes::Which() const -> ::test_union::wir
 }
 
 void ::test_union::wire::UnionWithAttributes::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnionWithAttributes) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnionWithAttributes, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnionWithAttributes, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnionWithAttributes) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnionWithAttributes, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnionWithAttributes, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::EmptyFlexibleUnion::Which() const -> ::test_union::wire::EmptyFlexibleUnion::Tag {
@@ -239,9 +239,9 @@ auto ::test_union::wire::EmptyFlexibleUnion::Which() const -> ::test_union::wire
 }
 
 void ::test_union::wire::EmptyFlexibleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(EmptyFlexibleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(EmptyFlexibleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(EmptyFlexibleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(EmptyFlexibleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(EmptyFlexibleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(EmptyFlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_union::wire::OnlyReservedFlexibleUnion::Which() const -> ::test_union::wire::OnlyReservedFlexibleUnion::Tag {
@@ -250,9 +250,9 @@ auto ::test_union::wire::OnlyReservedFlexibleUnion::Which() const -> ::test_unio
 }
 
 void ::test_union::wire::OnlyReservedFlexibleUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(OnlyReservedFlexibleUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(OnlyReservedFlexibleUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(OnlyReservedFlexibleUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(OnlyReservedFlexibleUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(OnlyReservedFlexibleUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(OnlyReservedFlexibleUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 #pragma clang diagnostic pop

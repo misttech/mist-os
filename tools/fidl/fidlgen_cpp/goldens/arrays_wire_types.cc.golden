@@ -9,15 +9,15 @@
 #pragma clang diagnostic ignored "-Wshadow"
 
 void ::test_arrays::wire::UnionSmallArray::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnionSmallArray) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnionSmallArray, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnionSmallArray, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnionSmallArray) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnionSmallArray, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnionSmallArray, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_arrays::wire::UnionLargeArray::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnionLargeArray) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnionLargeArray, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnionLargeArray, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnionLargeArray) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnionLargeArray, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnionLargeArray, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 bool ::fidl::WireTableFrame<::test_arrays::wire::TableSmallArray>::HasUnknownData() const {

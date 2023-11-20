@@ -242,9 +242,9 @@ typedef struct {
   // Flags describing the state of the envelope.
   // A value of 1 indicates that the value of the envelope is inlined.
   uint16_t flags;
-} fidl_envelope_v2_t;
+} fidl_envelope_t;
 
-static_assert(sizeof(fidl_envelope_v2_t) == 8, "");
+static_assert(sizeof(fidl_envelope_t) == 8, "");
 
 // Bit 0 in flags indicates if the object is inlined in the envelope.
 #define FIDL_ENVELOPE_FLAGS_INLINING_MASK 0x01
@@ -254,7 +254,7 @@ static_assert(sizeof(fidl_envelope_v2_t) == 8, "");
 
 // |fidl_envelope_v2_unknown_data_t| is the decoded, representation of an unknown envelope for
 // the v2 wire format for C-family bindings.
-// In addition to what is in |fidl_envelope_v2_t|, |fidl_envelope_v2_unknown_data_t| also provides
+// In addition to what is in |fidl_envelope_t|, |fidl_envelope_v2_unknown_data_t| also provides
 // an |offset| field which makes it possible to locate the inner object using data stored only
 // within the confines of the 8-byte |fidl_envelope_v2_unknown_data_t|.
 typedef struct {
@@ -396,10 +396,10 @@ enum {
 
 typedef struct {
   fidl_xunion_tag_t tag;
-  fidl_envelope_v2_t envelope;
-} fidl_xunion_v2_t;
+  fidl_envelope_t envelope;
+} fidl_union_t;
 
-static_assert(sizeof(fidl_xunion_v2_t) == 16, "");
+static_assert(sizeof(fidl_union_t) == 16, "");
 
 // Messages.
 

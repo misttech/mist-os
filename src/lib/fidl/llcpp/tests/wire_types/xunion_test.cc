@@ -115,7 +115,7 @@ TEST(MoveUnion, NoDoubleDestructPayload) {
   // Initialize the union such that the handle |h| within the |MoveOnlyStruct|
   // payload overlaps with the eventpair.
   zx_handle_t h = canary_b.release();
-  static_assert(sizeof(llcpp_test::wire::TestUnion) == sizeof(fidl_xunion_v2_t));
+  static_assert(sizeof(llcpp_test::wire::TestUnion) == sizeof(fidl_union_t));
   uint8_t dangerous_buffer[sizeof(llcpp_test::wire::TestUnion)] = {};
   memcpy(&dangerous_buffer[4], &h, sizeof(h));
   {

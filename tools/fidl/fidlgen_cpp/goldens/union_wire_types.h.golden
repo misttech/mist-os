@@ -2544,11 +2544,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::PizzaOrPasta, Cons
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::PizzaOrPasta* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -2597,7 +2597,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::PizzaOrPasta, Cons
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -2669,11 +2669,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitPizzaOrPas
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitPizzaOrPasta* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -2722,7 +2722,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitPizzaOrPas
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -2794,11 +2794,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexiblePizzaOrPas
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::FlexiblePizzaOrPasta* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -2847,7 +2847,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexiblePizzaOrPas
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -2919,11 +2919,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictPizzaOrPasta
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictPizzaOrPasta* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -2972,7 +2972,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictPizzaOrPasta
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3044,11 +3044,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Union, Constraint,
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::Union* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3103,7 +3103,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::Union, Constraint,
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3181,11 +3181,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexibleUnion, Con
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::FlexibleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3240,7 +3240,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexibleUnion, Con
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3318,11 +3318,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictUnion, Const
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3377,7 +3377,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictUnion, Const
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3455,11 +3455,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FieldCollision, Co
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::FieldCollision* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3502,7 +3502,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FieldCollision, Co
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3568,11 +3568,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitUnion, Con
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3621,7 +3621,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitUnion, Con
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3693,11 +3693,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ReverseOrdinalUnio
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ReverseOrdinalUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3746,7 +3746,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ReverseOrdinalUnio
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3818,11 +3818,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexibleFoo, Const
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::FlexibleFoo* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3871,7 +3871,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::FlexibleFoo, Const
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -3943,11 +3943,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictFoo, Constra
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictFoo* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -3996,7 +3996,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictFoo, Constra
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4068,11 +4068,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFoo, Const
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitFoo* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4121,7 +4121,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFoo, Const
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4193,11 +4193,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitStrictFoo,
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitStrictFoo* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4246,7 +4246,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitStrictFoo,
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4318,11 +4318,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::OlderSimpleUnion, 
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::OlderSimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4371,7 +4371,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::OlderSimpleUnion, 
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4443,11 +4443,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::NewerSimpleUnion, 
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::NewerSimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4502,7 +4502,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::NewerSimpleUnion, 
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4580,11 +4580,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleUnion,
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictSimpleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4639,7 +4639,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictSimpleUnion,
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4717,11 +4717,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionContainingEmp
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::UnionContainingEmptyStruct* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4764,7 +4764,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionContainingEmp
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4830,11 +4830,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::StrictBoundedUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4877,7 +4877,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::StrictBoundedUnion
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -4943,11 +4943,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUn
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::ExplicitFlexibleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -4996,7 +4996,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::ExplicitFlexibleUn
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -5068,11 +5068,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionWithAttribute
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::UnionWithAttributes* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -5115,7 +5115,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::UnionWithAttribute
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -5181,11 +5181,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::EmptyFlexibleUnion
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::EmptyFlexibleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -5222,7 +5222,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::EmptyFlexibleUnion
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }
@@ -5282,11 +5282,11 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::OnlyReservedFlexib
   static constexpr bool is_memcpy_compatible = false;
 
   static void Encode(internal::WireEncoder* encoder, ::test_union::wire::OnlyReservedFlexibleUnion* value, ::fidl::internal::WirePosition position, RecursionDepth<IsRecursive> recursion_depth) {
-    fidl_xunion_v2_t* u = reinterpret_cast<fidl_xunion_v2_t*>(value);
+    fidl_union_t* u = reinterpret_cast<fidl_union_t*>(value);
 
     if (unlikely(u->tag == 0)) {
       if constexpr (Constraint::is_optional) {
-        *position.As<fidl_xunion_v2_t>() = {};
+        *position.As<fidl_union_t>() = {};
         return;
       }
       encoder->SetError(kCodingErrorInvalidUnionTag);
@@ -5323,7 +5323,7 @@ struct ::fidl::internal::WireCodingTraits<::test_union::wire::OnlyReservedFlexib
         decoder->SetError(kCodingErrorInvalidUnionTag);
         return;
       }
-      static_assert(sizeof(fidl_envelope_v2_t) == sizeof(uint64_t));
+      static_assert(sizeof(fidl_envelope_t) == sizeof(uint64_t));
       if (*(position + sizeof(fidl_xunion_tag_t)).As<uint64_t>() != 0) {
         decoder->SetError(kCodingErrorZeroTagButNonZeroEnvelope);
       }

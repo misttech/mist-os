@@ -19,33 +19,33 @@ auto ::test_protocollayouts::wire::LocalUnionPayload::Which() const -> ::test_pr
 }
 
 void ::test_protocollayouts::wire::LocalUnionPayload::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(LocalUnionPayload) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(LocalUnionPayload, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(LocalUnionPayload, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(LocalUnionPayload) == sizeof(fidl_union_t));
+  static_assert(offsetof(LocalUnionPayload, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(LocalUnionPayload, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolTwoWayImportWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolTwoWayImportWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolTwoWayImportWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolTwoWayImportWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolOnImportWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnImportWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolOnImportWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolOnImportWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolOnImportWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolOnImportWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolOnImportWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolTwoWayLocalWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolTwoWayLocalWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolTwoWayLocalWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolTwoWayLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolOnLocalWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnLocalWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolOnLocalWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolOnLocalWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Which() const -> ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Tag {
@@ -59,9 +59,9 @@ auto ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::Which() const 
 }
 
 void ::test_protocollayouts::wire::MainProtocolTwoWayAnonRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolTwoWayAnonRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolTwoWayAnonRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolTwoWayAnonRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolTwoWayAnonRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolTwoWayAnonRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolTwoWayAnonRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Which() const -> ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Tag {
@@ -75,15 +75,15 @@ auto ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::Whic
 }
 
 void ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResponse::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolTwoWayAnonWithErrorResponse) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResponse, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResponse, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolTwoWayAnonWithErrorResponse) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResponse, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResponse, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolTwoWayAnonWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolTwoWayAnonWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolTwoWayAnonWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolTwoWayAnonWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 auto ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Which() const -> ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Tag {
@@ -97,15 +97,15 @@ auto ::test_protocollayouts::wire::MainProtocolOnAnonRequest::Which() const -> :
 }
 
 void ::test_protocollayouts::wire::MainProtocolOnAnonRequest::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnAnonRequest) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolOnAnonRequest, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolOnAnonRequest, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolOnAnonRequest) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolOnAnonRequest, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolOnAnonRequest, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 void ::test_protocollayouts::wire::MainProtocolOnAnonWithErrorResult::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(MainProtocolOnAnonWithErrorResult) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(MainProtocolOnAnonWithErrorResult) == sizeof(fidl_union_t));
+  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(MainProtocolOnAnonWithErrorResult, envelope_) == offsetof(fidl_union_t, envelope));
 }
 
 bool ::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload>::HasUnknownData() const {

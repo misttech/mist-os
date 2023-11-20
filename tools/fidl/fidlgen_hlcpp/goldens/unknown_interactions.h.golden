@@ -13933,7 +13933,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14038,7 +14038,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14122,7 +14122,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14179,7 +14179,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14233,7 +14233,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14314,7 +14314,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14398,7 +14398,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWay_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14482,7 +14482,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFields_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14539,7 +14539,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14593,7 +14593,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14674,7 +14674,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTable_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14758,7 +14758,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14844,7 +14844,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14903,7 +14903,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -14957,7 +14957,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15040,7 +15040,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15126,7 +15126,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolStrictEventUnionRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15231,7 +15231,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15315,7 +15315,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15372,7 +15372,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15426,7 +15426,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15507,7 +15507,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_StrictEventTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15591,7 +15591,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocolFlexibleEventUnionRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15696,7 +15696,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15780,7 +15780,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15837,7 +15837,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15891,7 +15891,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -15972,7 +15972,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsProtocol_FlexibleEventTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16056,7 +16056,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16161,7 +16161,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16245,7 +16245,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16302,7 +16302,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16356,7 +16356,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16437,7 +16437,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16521,7 +16521,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolStrictEventUnionRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16626,7 +16626,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16710,7 +16710,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16767,7 +16767,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16821,7 +16821,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16902,7 +16902,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_StrictEventTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -16986,7 +16986,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocolFlexibleEventUnionRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17091,7 +17091,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17175,7 +17175,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17232,7 +17232,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17286,7 +17286,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17367,7 +17367,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarProtocol_FlexibleEventTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17451,7 +17451,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17556,7 +17556,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17640,7 +17640,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17697,7 +17697,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17751,7 +17751,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17832,7 +17832,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -17916,7 +17916,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocolStrictEventUnionRequest>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18021,7 +18021,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18105,7 +18105,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18162,7 +18162,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18216,7 +18216,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18297,7 +18297,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedProtocol_StrictEventTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18381,7 +18381,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18486,7 +18486,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18570,7 +18570,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18627,7 +18627,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18681,7 +18681,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18762,7 +18762,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18846,7 +18846,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWay_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18930,7 +18930,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -18987,7 +18987,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19041,7 +19041,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19122,7 +19122,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19206,7 +19206,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19292,7 +19292,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19351,7 +19351,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19405,7 +19405,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19488,7 +19488,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19574,7 +19574,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19679,7 +19679,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19763,7 +19763,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19820,7 +19820,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19874,7 +19874,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -19955,7 +19955,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20039,7 +20039,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20144,7 +20144,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20228,7 +20228,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20285,7 +20285,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Response>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20339,7 +20339,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;
@@ -20420,7 +20420,7 @@ struct CodingTraits<std::unique_ptr<::test::unknowninteractions::UnknownInteract
   }
 
   static void Decode(Decoder* _decoder, std::unique_ptr<::test::unknowninteractions::UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result>* value, size_t offset) {
-    fidl_xunion_v2_t* encoded = _decoder->GetPtr<fidl_xunion_v2_t>(offset);
+    fidl_union_t* encoded = _decoder->GetPtr<fidl_union_t>(offset);
     if (encoded->tag == 0) {
       value->reset(nullptr);
       return;

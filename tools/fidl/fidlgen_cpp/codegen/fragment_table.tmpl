@@ -400,7 +400,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
     }
 
     fidl_vector_t* vec = reinterpret_cast<fidl_vector_t*>(value);
-    fidl_envelope_v2_t* envelopes = static_cast<fidl_envelope_v2_t*>(vec->data);
+    fidl_envelope_t* envelopes = static_cast<fidl_envelope_t*>(vec->data);
     for (size_t i = 0; i < vec->count; i++) {
       {{/* Two switches here, so they are translated to lookup tables. */}}
       size_t encode_inline_size = 0;
@@ -419,7 +419,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
           break;
         {{- end }}
       }
-      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_v2_t);
+      WirePosition envelope_position = vector_position + i * sizeof(fidl_envelope_t);
       WireEncodeEnvelope(encode_inline_size, encode_fn, encoder, &envelopes[i], envelope_position, inner_depth);
     }
   }
@@ -453,7 +453,7 @@ struct ::fidl::internal::WireCodingTraits<{{ . }}, ::fidl::internal::WireCodingC
           break;
         {{- end }}
       }
-      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_v2_t), inner_depth);
+      ::fidl::internal::WireDecodeOptionalEnvelope(decode_inline_size, decode_fn, decoder, vector_position + i * sizeof(fidl_envelope_t), inner_depth);
     }
   }
 };

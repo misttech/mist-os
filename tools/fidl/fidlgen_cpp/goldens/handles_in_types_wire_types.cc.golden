@@ -47,9 +47,9 @@ auto ::test_handlesintypes::wire::UnionWithHandle::Which() const -> ::test_handl
 }
 
 void ::test_handlesintypes::wire::UnionWithHandle::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(UnionWithHandle) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(UnionWithHandle, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(UnionWithHandle, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(UnionWithHandle) == sizeof(fidl_union_t));
+  static_assert(offsetof(UnionWithHandle, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(UnionWithHandle, envelope_) == offsetof(fidl_union_t, envelope));
 }
 ::test_handlesintypes::wire::UnionWithHandle::~UnionWithHandle() {
   switch (ordinal_) {
@@ -93,9 +93,9 @@ auto ::test_handlesintypes::wire::EmptyResourceUnion::Which() const -> ::test_ha
 }
 
 void ::test_handlesintypes::wire::EmptyResourceUnion::SizeAndOffsetAssertionHelper() {
-  static_assert(sizeof(EmptyResourceUnion) == sizeof(fidl_xunion_v2_t));
-  static_assert(offsetof(EmptyResourceUnion, ordinal_) == offsetof(fidl_xunion_v2_t, tag));
-  static_assert(offsetof(EmptyResourceUnion, envelope_) == offsetof(fidl_xunion_v2_t, envelope));
+  static_assert(sizeof(EmptyResourceUnion) == sizeof(fidl_union_t));
+  static_assert(offsetof(EmptyResourceUnion, ordinal_) == offsetof(fidl_union_t, tag));
+  static_assert(offsetof(EmptyResourceUnion, envelope_) == offsetof(fidl_union_t, envelope));
 }
 ::test_handlesintypes::wire::EmptyResourceUnion::~EmptyResourceUnion() {
   switch (ordinal_) {
