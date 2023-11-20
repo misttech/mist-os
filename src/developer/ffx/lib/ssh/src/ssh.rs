@@ -18,6 +18,11 @@ static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
     "-o",
     "ServerAliveCountMax=10",
     "-o",
+    // Emulators start listening instantly, even though there is no sshd to talk
+    // to. And sometimes (?) they don't ever establish the connection. Give an
+    // emulator enough time to spin up, but timeout so we'll retry if need be.
+    "ConnectTimeout=20",
+    "-o",
     "LogLevel=ERROR",
 ];
 
