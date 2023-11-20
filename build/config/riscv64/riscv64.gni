@@ -150,16 +150,12 @@ riscv_profiles = {
 
 # This is the profile matching Fuchsia's policy for riscv64 user code.
 # `-march` strings are generated from this.
-fuchsia_riscv_profile = riscv_profiles.rva20
+fuchsia_riscv_profile = riscv_profiles.rva22
 
 # This list is also added into the `-march` string (less redundancies).
 # These are features that, even if they aren't actually supported by the
 # hardware, are guaranteed harmless to use.
-fuchsia_riscv_implicit_features = [
-  # The HINT class of instructions is always a safe NOP if it's not
-  # understood according to a given extension.
-  "zihintpause",
-]
+fuchsia_riscv_implicit_features = []
 
 # This is the basic machine ABI that's standard for fuchsia-riscv64 user code.
 # This sets the `-mabi` string.

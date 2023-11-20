@@ -23,21 +23,6 @@ if (toolchain_base_environment == "kernel") {
       "zifencei",
     ]
 
-    # We always use the `pause` instruction even though it's optional in the
-    # RVA20U64 profile. It's a HINT instruction so it's treated as a NOP by
-    # CPUs that don't support it.
-    _features += [ "zihintpause" ]
-
-    # Depending on hardware, we may need to use cache maintenance, prefetching,
-    # and zeroing instructions.
-    # NOTE: remove when switching entire build to RVA22, since these will be
-    # also part of that list.
-    _features += [
-      "zicbom",
-      "zicbop",
-      "zicboz",
-    ]
-
     foreach(feature, _features) {
       _march += "_$feature"
     }
