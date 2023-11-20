@@ -16,7 +16,7 @@ namespace storage {
 enum class OperationType {
   kRead,
   kWrite,
-  kTrim,  // Unimplemented.
+  kTrim,
   kWriteFua,
   kWritePreflushAndFua,
   kMaxValue = kWritePreflushAndFua,  // For FuzzedDataProvider

@@ -360,7 +360,7 @@ zx_status_t SdmmcBlockDevice::Flush() {
 }
 
 zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition partition) {
-  // TODO(bradenkell): Add discard support for SD.
+  // TODO(b/312236221): Add discard support for SD.
   if (is_sd_) {
     return ZX_ERR_NOT_SUPPORTED;
   }
