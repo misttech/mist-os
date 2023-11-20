@@ -4,7 +4,6 @@
 
 use {
     anyhow::{Error, Result},
-    fidl::endpoints::{create_endpoints, ServerEnd},
     fidl_fuchsia_inspect::InspectSinkMarker,
     fidl_fuchsia_intl::PropertyProviderMarker,
     fidl_fuchsia_intl_test::*,
@@ -17,9 +16,8 @@ use {
         Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
     },
     futures::{StreamExt, TryStreamExt},
-    std::sync::Arc,
     tracing::*,
-    vfs::{directory::entry::DirectoryEntry, file::vmo::read_only, pseudo_directory},
+    vfs::{file::vmo::read_only, pseudo_directory},
 };
 
 #[fuchsia::main]
@@ -139,21 +137,14 @@ async fn serve_config_data(handles: LocalComponentHandles) -> Result<(), Error> 
         },
     };
     let mut fs = ServiceFs::new();
-    fs.add_remote("config", spawn_vfs(config_data_dir));
+    fs.add_remote(
+        "config",
+        vfs::directory::spawn_directory_with_options(
+            config_data_dir,
+            vfs::directory::DirectoryOptions::new(fio::RW_STAR_DIR),
+        ),
+    );
     fs.serve_connection(handles.outgoing_dir).expect("failed to serve config-data");
     fs.collect::<()>().await;
     Ok(())
-}
-
-// Returns a `DirectoryProxy` that serves the directory entry `dir`.
-fn spawn_vfs(dir: Arc<dyn DirectoryEntry>) -> fio::DirectoryProxy {
-    let (client_end, server_end) = create_endpoints::<fio::DirectoryMarker>();
-    let scope = vfs::execution_scope::ExecutionScope::new();
-    dir.open(
-        scope,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        vfs::path::Path::dot(),
-        ServerEnd::new(server_end.into_channel()),
-    );
-    client_end.into_proxy().unwrap()
 }
