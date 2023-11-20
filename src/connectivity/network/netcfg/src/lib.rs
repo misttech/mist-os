@@ -1909,7 +1909,7 @@ impl<'a> NetCfg<'a> {
         let info =
             device_instance.get_device_info().await.context("error getting device info and MAC")?;
 
-        let DeviceInfo { mac, device_class: _, topological_path } = &info;
+        let DeviceInfo { mac, device_class, topological_path } = &info;
 
         let mac = mac.ok_or_else(|| {
             warn!("devices without mac address not supported yet");
@@ -1926,9 +1926,9 @@ impl<'a> NetCfg<'a> {
         .into();
         let interface_name = if stable_name {
             match self.persisted_interface_config.generate_stable_name(
-                topological_path.into(),
-                mac,
-                interface_type,
+                &topological_path,
+                &mac,
+                *device_class,
             ) {
                 Ok(name) => name.to_string(),
                 Err(interface::NameGenerationError::FileUpdateError { name, err }) => {

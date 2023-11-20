@@ -11,7 +11,7 @@ use {
     std::{fs, io, path},
 };
 
-use crate::{devices, DeviceClass};
+use crate::DeviceClass;
 
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
@@ -73,15 +73,15 @@ impl Config {
     // it's handled the same way as a sdio device.
     fn generate_identifier(
         &self,
-        topological_path: std::borrow::Cow<'_, str>,
-        mac_address: fidl_fuchsia_net_ext::MacAddress,
+        topological_path: &str,
+        mac_address: &fidl_fuchsia_net_ext::MacAddress,
     ) -> PersistentIdentifier {
         match get_bus_type_for_topological_path(&topological_path) {
             // Use the MacAddress as an identifier for the device if the
             // BusType is currently not in the known list.
-            Ok(BusType::USB) | Err(_) => PersistentIdentifier::MacAddress(mac_address),
+            Ok(BusType::USB) | Err(_) => PersistentIdentifier::MacAddress(*mac_address),
             Ok(BusType::PCI) | Ok(BusType::SDIO) => {
-                PersistentIdentifier::TopologicalPath(topological_path.into_owned())
+                PersistentIdentifier::TopologicalPath(topological_path.to_string())
             }
         }
     }
@@ -98,40 +98,11 @@ impl Config {
 
     // TODO(fxbug.dev/135159): Refactor this once 'default' configuration
     // is defined and passed in from `lib.rs` as a naming fallback.
-    fn generate_name(
-        &self,
-        persistent_id: &PersistentIdentifier,
-        interface_type: crate::InterfaceType,
-    ) -> Result<String, NameGenerationError> {
+    fn generate_name(&self, info: &DeviceInfoRef<'_>) -> Result<String, NameGenerationError> {
         let naming_rule = NamingRule {
             matchers: HashSet::new(),
             naming_scheme: vec![NameCompositionRule::Default],
         };
-
-        // Reverse convert to the `fhwnet::DeviceClass` to fit the type needed
-        // by `devices::DeviceInfo`.
-        let device_class = match interface_type {
-            crate::InterfaceType::Ethernet => fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
-            crate::InterfaceType::Wlan => fidl_fuchsia_hardware_network::DeviceClass::Wlan,
-        };
-
-        let info = match persistent_id {
-            PersistentIdentifier::MacAddress(mac) => devices::DeviceInfo {
-                mac: Some(*mac),
-                // Topological path is not important for this type's default
-                // naming convention.
-                topological_path: "".to_string(),
-                device_class,
-            },
-            PersistentIdentifier::TopologicalPath(ref topological_path) => devices::DeviceInfo {
-                topological_path: topological_path.to_string(),
-                // MAC is not important for this type's default
-                // naming convention.
-                mac: None,
-                device_class,
-            },
-        };
-
         naming_rule.generate_name(&self.interfaces, &info)
     }
 }
@@ -150,14 +121,14 @@ fn name_matches_interface_type(name: &str, interface_type: &crate::InterfaceType
 // For example, a MAC of `[0x1, 0x1, 0x1, 0x1, 0x1, 0x9]` with offset 0
 // becomes `9`.
 fn get_mac_identifier_from_octets(
-    octets: [u8; 6],
+    octets: &[u8; 6],
     interface_type: crate::InterfaceType,
     offset: u8,
 ) -> Result<u8, anyhow::Error> {
     if offset == u8::MAX {
         return Err(anyhow::format_err!(
-            "could not find unique identifier for mac={}, interface_type={:?}",
-            fidl_fuchsia_net_ext::MacAddress { octets: octets },
+            "could not find unique identifier for mac={:?}, interface_type={:?}",
+            octets,
             interface_type
         ));
     }
@@ -305,12 +276,13 @@ impl<'a> FileBackedConfig<'a> {
     /// Returns a stable interface name for the specified interface.
     pub(crate) fn generate_stable_name(
         &mut self,
-        topological_path: std::borrow::Cow<'_, str>,
-        mac_address: fidl_fuchsia_net_ext::MacAddress,
-        interface_type: crate::InterfaceType,
+        topological_path: &str,
+        mac: &fidl_fuchsia_net_ext::MacAddress,
+        device_class: fidl_fuchsia_hardware_network::DeviceClass,
     ) -> Result<&str, NameGenerationError> {
-        let persistent_id = self.config.generate_identifier(topological_path, mac_address);
-
+        let persistent_id = self.config.generate_identifier(topological_path, mac);
+        let info = DeviceInfoRef { topological_path, mac, device_class };
+        let interface_type: crate::InterfaceType = device_class.into();
         if let Some(index) = self.config.lookup_by_identifier(&persistent_id) {
             let InterfaceConfig { name, .. } = &self.config.interfaces[index];
             if name_matches_interface_type(&name, &interface_type) {
@@ -322,7 +294,7 @@ impl<'a> FileBackedConfig<'a> {
             // name. Remove and generate a new name.
             let _interface_config = self.config.interfaces.remove(index);
         }
-        let generated_name = self.config.generate_name(&persistent_id, interface_type)?;
+        let generated_name = self.config.generate_name(&info)?;
         let () = self.config.interfaces.push(InterfaceConfig {
             id: persistent_id,
             name: generated_name,
@@ -445,19 +417,19 @@ pub enum MatchingRule {
 }
 
 impl MatchingRule {
-    fn does_interface_match(&self, info: &devices::DeviceInfo) -> Result<bool, anyhow::Error> {
+    fn does_interface_match(&self, info: &DeviceInfoRef<'_>) -> Result<bool, anyhow::Error> {
         match &self {
             MatchingRule::BusTypes(type_list) => {
                 // Match the interface if the interface under comparison
                 // matches any of the types included in the list.
-                let bus_type = get_bus_type_for_topological_path(&info.topological_path)?;
+                let bus_type = get_bus_type_for_topological_path(info.topological_path)?;
                 Ok(type_list.contains(&bus_type))
             }
             MatchingRule::TopologicalPath(pattern) => {
                 // Match the interface if the provided pattern finds any
                 // matches in the interface under comparison's
                 // topological path.
-                Ok(pattern.matches(&info.topological_path))
+                Ok(pattern.matches(info.topological_path))
             }
             MatchingRule::DeviceClasses(class_list) => {
                 // Match the interface if the interface under comparison
@@ -495,34 +467,25 @@ impl DynamicNameCompositionRule {
 }
 
 impl DynamicNameCompositionRule {
-    fn get_name(
-        &self,
-        info: &devices::DeviceInfo,
-        attempt_num: u8,
-    ) -> Result<String, anyhow::Error> {
+    fn get_name(&self, info: &DeviceInfoRef<'_>, attempt_num: u8) -> Result<String, anyhow::Error> {
         match *self {
             DynamicNameCompositionRule::BusPath => {
-                get_normalized_bus_path_for_topo_path(&info.topological_path)
+                get_normalized_bus_path_for_topo_path(info.topological_path)
             }
             DynamicNameCompositionRule::BusType => {
-                get_bus_type_for_topological_path(&info.topological_path).map(|t| t.to_string())
+                get_bus_type_for_topological_path(info.topological_path).map(|t| t.to_string())
             }
             DynamicNameCompositionRule::DeviceClass => Ok(match info.device_class.into() {
                 crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
             }
             .to_string()),
-            DynamicNameCompositionRule::NormalizedMac => info
-                .mac
-                .map(|mac| {
-                    let mac_identifier = get_mac_identifier_from_octets(
-                        mac.octets,
-                        info.device_class.into(),
-                        attempt_num,
-                    )?;
-                    Ok(format!("{mac_identifier:x}"))
-                })
-                .unwrap_or(Ok("".to_string())),
+            DynamicNameCompositionRule::NormalizedMac => {
+                let fidl_fuchsia_net_ext::MacAddress { octets } = info.mac;
+                let mac_identifier =
+                    get_mac_identifier_from_octets(octets, info.device_class.into(), attempt_num)?;
+                Ok(format!("{mac_identifier:x}"))
+            }
         }
     }
 }
@@ -559,7 +522,7 @@ impl NamingRule {
     fn generate_name(
         &self,
         interfaces: &[InterfaceConfig],
-        info: &devices::DeviceInfo,
+        info: &DeviceInfoRef<'_>,
     ) -> Result<String, NameGenerationError> {
         // When a bus type cannot be found for a path, use the USB
         // default naming policy which uses a MAC address.
@@ -634,7 +597,7 @@ impl NamingRule {
     }
 
     // An interface must align with all specified `MatchingRule`s.
-    fn does_interface_match(&self, info: &devices::DeviceInfo) -> bool {
+    fn does_interface_match(&self, info: &DeviceInfoRef<'_>) -> bool {
         self.matchers.iter().all(|rule| rule.does_interface_match(info).unwrap_or_default())
     }
 }
@@ -645,7 +608,7 @@ impl NamingRule {
 fn generate_name_from_naming_rules(
     naming_rules: &[NamingRule],
     interfaces: &[InterfaceConfig],
-    info: &devices::DeviceInfo,
+    info: &DeviceInfoRef<'_>,
 ) -> Result<String, NameGenerationError> {
     // TODO(fxbug.dev/136397): Consider adding an option to the rules to allow
     // fallback rules when name generation fails.
@@ -690,6 +653,16 @@ pub struct ProvisioningRule {
     pub provisioning: ProvisioningAction,
 }
 
+// A ref version of `devices::DeviceInfo` to avoid the need to clone data
+// unnecessarily. Devices without MAC are not supported yet, see
+// `add_new_device` in `lib.rs`. This makes mac into a required field for
+// ease of use.
+struct DeviceInfoRef<'a> {
+    device_class: fidl_fuchsia_hardware_network::DeviceClass,
+    mac: &'a fidl_fuchsia_net_ext::MacAddress,
+    topological_path: &'a str,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -698,6 +671,16 @@ mod tests {
     use test_case::test_case;
 
     use fidl_fuchsia_hardware_network as fhwnet;
+
+    // This is a lossy conversion between `InterfaceType` and `DeviceClass`
+    // that allows tests to use a `devices::DeviceInfo` struct instead of
+    // handling the fields individually.
+    fn device_class_from_interface_type(ty: crate::InterfaceType) -> fhwnet::DeviceClass {
+        match ty {
+            crate::InterfaceType::Ethernet => fhwnet::DeviceClass::Ethernet,
+            crate::InterfaceType::Wlan => fhwnet::DeviceClass::Wlan,
+        }
+    }
 
     // usb interfaces
     #[test_case(
@@ -766,12 +749,12 @@ mod tests {
         want_name: &'static str,
     ) {
         let config = Config { interfaces: vec![] };
-        let persistent_id = config.generate_identifier(
-            topological_path.into(),
-            fidl_fuchsia_net_ext::MacAddress { octets: mac },
-        );
         let name = config
-            .generate_name(&persistent_id, interface_type)
+            .generate_name(&DeviceInfoRef {
+                device_class: device_class_from_interface_type(interface_type),
+                mac: &fidl_fuchsia_net_ext::MacAddress { octets: mac },
+                topological_path,
+            })
             .expect("failed to generate the name");
         assert_eq!(name, want_name);
     }
@@ -853,9 +836,9 @@ mod tests {
 
             let name = interface_config
                 .generate_stable_name(
-                    topological_path.into(),
-                    fidl_fuchsia_net_ext::MacAddress { octets: mac },
-                    interface_type,
+                    topological_path,
+                    &fidl_fuchsia_net_ext::MacAddress { octets: mac },
+                    device_class_from_interface_type(interface_type),
                 )
                 .expect("failed to get the interface name");
             assert_eq!(name, want_name);
@@ -888,14 +871,18 @@ mod tests {
         for n in 0u8..255u8 {
             let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
 
-            let persistent_id = config
-                .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
+            let persistent_id =
+                config.generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
 
             if let Some(index) = config.lookup_by_identifier(&persistent_id) {
                 assert_eq!(config.interfaces[index].name, format!("{}{:x}", "wlanx", n));
             } else {
                 let name = config
-                    .generate_name(&persistent_id, crate::InterfaceType::Wlan)
+                    .generate_name(&DeviceInfoRef {
+                        device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
+                        mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                        topological_path: topo_usb,
+                    })
                     .expect("failed to generate the name");
                 assert_eq!(name, format!("{}{:x}", "wlanx", n));
                 config.interfaces.push(InterfaceConfig {
@@ -906,9 +893,13 @@ mod tests {
             }
         }
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
-        let persistent_id = config
-            .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
-        assert!(config.generate_name(&persistent_id, crate::InterfaceType::Wlan).is_err());
+        assert!(config
+            .generate_name(&DeviceInfoRef {
+                device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
+                mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                topological_path: topo_usb
+            })
+            .is_err());
     }
 
     #[test]
@@ -927,13 +918,13 @@ mod tests {
         let mut config = Config { interfaces: vec![] };
         for n in 0u8..255u8 {
             let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
-            let persistent_id = config
-                .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
+            let persistent_id =
+                config.generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
 
-            let info = devices::DeviceInfo {
+            let info = DeviceInfoRef {
                 device_class: fhwnet::DeviceClass::Ethernet,
-                mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
-                topological_path: topo_usb.into(),
+                mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                topological_path: topo_usb,
             };
 
             let name = naming_rule
@@ -951,12 +942,16 @@ mod tests {
         }
 
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
-        let info = devices::DeviceInfo {
-            device_class: fhwnet::DeviceClass::Ethernet,
-            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
-            topological_path: topo_usb.into(),
-        };
-        assert!(naming_rule.generate_name(&config.interfaces, &info).is_err());
+        assert!(naming_rule
+            .generate_name(
+                &config.interfaces,
+                &DeviceInfoRef {
+                    device_class: fhwnet::DeviceClass::Ethernet,
+                    mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                    topological_path: topo_usb
+                }
+            )
+            .is_err());
     }
 
     #[test]
@@ -1115,12 +1110,11 @@ mod tests {
         expected_bus_type: BusType,
         want_match: bool,
     ) {
-        let device_info = devices::DeviceInfo {
-            topological_path: topological_path.to_owned(),
+        let device_info = DeviceInfoRef {
+            topological_path: topological_path,
             // `device_class` and `mac` have no effect on `BusType`
             // matching, so we use arbitrary values.
-            device_class: fhwnet::DeviceClass::Virtual,
-            mac: Default::default(),
+            ..default_device_info()
         };
 
         // Verify the `BusType` determined from the device's
@@ -1136,12 +1130,11 @@ mod tests {
 
     #[test]
     fn test_interface_matching_by_bus_type_unsupported() {
-        let device_info = devices::DeviceInfo {
+        let device_info = DeviceInfoRef {
+            topological_path: "/dev/sys/unsupported-bus/ethernet",
             // `device_class` and `mac` have no effect on `BusType`
             // matching, so we use arbitrary values.
-            device_class: fhwnet::DeviceClass::Virtual,
-            mac: Default::default(),
-            topological_path: String::from("/dev/sys/unsupported-bus/ethernet"),
+            ..default_device_info()
         };
 
         // Verify the `BusType` determined from the device's topological
@@ -1177,12 +1170,11 @@ mod tests {
         glob_str: &'static str,
         want_match: bool,
     ) {
-        let device_info = devices::DeviceInfo {
-            topological_path: topological_path.to_owned(),
+        let device_info = DeviceInfoRef {
+            topological_path,
             // `device_class` and `mac` have no effect on `TopologicalPath`
             // matching, so we use arbitrary values.
-            device_class: fhwnet::DeviceClass::Virtual,
-            mac: Default::default(),
+            ..default_device_info()
         };
 
         // Create a matching rule for the provided glob expression.
@@ -1234,12 +1226,12 @@ mod tests {
         "ap_no_match"
     )]
     fn test_interface_matching_by_device_class(
-        device_class_input: fhwnet::DeviceClass,
+        device_class: fhwnet::DeviceClass,
         device_classes: Vec<DeviceClass>,
         expected_device_class: DeviceClass,
         want_match: bool,
     ) {
-        let device_info = device_info_from_device_class(device_class_input);
+        let device_info = DeviceInfoRef { device_class, ..default_device_info() };
 
         // Verify the `DeviceClass` determined from the device info.
         let device_class: DeviceClass = device_info.device_class.into();
@@ -1261,10 +1253,10 @@ mod tests {
         device_class: fhwnet::DeviceClass,
         topological_path: &'static str,
     ) {
-        let device_info = devices::DeviceInfo {
+        let device_info = DeviceInfoRef {
             device_class,
-            mac: None,
-            topological_path: topological_path.to_owned(),
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            topological_path,
         };
 
         // Create a matching rule that should match any interface.
@@ -1279,31 +1271,31 @@ mod tests {
     }
 
     #[test_case(
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])],
         false;
         "false_single_rule"
     )]
     #[test_case(
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Wlan]), MatchingRule::Any(true)],
         false;
         "false_one_rule_of_multiple"
     )]
     #[test_case(
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::Any(true)],
         true;
         "true_single_rule"
     )]
     #[test_case(
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         vec![MatchingRule::DeviceClasses(vec![DeviceClass::Ethernet]), MatchingRule::Any(true)],
         true;
         "true_multiple_rules"
     )]
     fn test_does_interface_match(
-        info: devices::DeviceInfo,
+        info: DeviceInfoRef<'_>,
         matching_rules: Vec<MatchingRule>,
         want_match: bool,
     ) {
@@ -1312,37 +1304,13 @@ mod tests {
         assert_eq!(naming_rule.does_interface_match(&info), want_match);
     }
 
-    // Arbitrary values for devices::DeviceInfo for cases where DeviceInfo has
+    // Arbitrary values for DeviceInfoRef for cases where DeviceInfo has
     // no impact on the test.
-    fn default_device_info() -> devices::DeviceInfo {
-        devices::DeviceInfo {
+    fn default_device_info() -> DeviceInfoRef<'static> {
+        DeviceInfoRef {
             device_class: fhwnet::DeviceClass::Ethernet,
-            mac: None,
-            topological_path: "".to_owned(),
-        }
-    }
-
-    fn device_info_from_octets(octets: [u8; 6]) -> devices::DeviceInfo {
-        devices::DeviceInfo {
-            device_class: fhwnet::DeviceClass::Ethernet,
-            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
-            topological_path: "".to_owned(),
-        }
-    }
-
-    fn device_info_from_device_class(device_class: fhwnet::DeviceClass) -> devices::DeviceInfo {
-        devices::DeviceInfo { device_class, mac: None, topological_path: "".to_owned() }
-    }
-
-    fn new_device_info(
-        device_class: fhwnet::DeviceClass,
-        octets: [u8; 6],
-        topo_path: &str,
-    ) -> devices::DeviceInfo {
-        devices::DeviceInfo {
-            device_class,
-            mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
-            topological_path: topo_path.to_owned(),
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            topological_path: "",
         }
     }
 
@@ -1364,7 +1332,10 @@ mod tests {
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac }],
-        device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x1]),
+        DeviceInfoRef {
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            ..default_device_info()
+        },
         "1";
         "normalized_mac"
     )]
@@ -1373,19 +1344,22 @@ mod tests {
             NameCompositionRule::Static { value: String::from("eth") },
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
-        device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x9]),
+        DeviceInfoRef {
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x9] },
+            ..default_device_info()
+        },
         "eth9";
         "normalized_mac_with_static"
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         "eth";
         "eth_device_class"
     )]
     #[test_case(
         vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
-        device_info_from_device_class(fhwnet::DeviceClass::Wlan),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Wlan, ..default_device_info() },
         "wlan";
         "wlan_device_class"
     )]
@@ -1394,7 +1368,7 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
             NameCompositionRule::Static { value: String::from("x") },
         ],
-        device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
         "ethx";
         "device_class_with_static"
     )]
@@ -1404,11 +1378,11 @@ mod tests {
             NameCompositionRule::Static { value: String::from("x") },
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
-        new_device_info(
-            fhwnet::DeviceClass::Wlan,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x8],
-            "",
-        ),
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Wlan,
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x8] },
+            ..default_device_info()
+        },
         "wlanx8";
         "device_class_with_static_with_normalized_mac"
     )]
@@ -1418,11 +1392,11 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
-        new_device_info(
-            fhwnet::DeviceClass::Ethernet,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
-            "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
-        ),
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
+            ..default_device_info()
+        },
         "ethp0014";
         "device_class_with_pci_bus_type_with_bus_path"
     )]
@@ -1432,37 +1406,37 @@ mod tests {
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
             NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
-        new_device_info(
-            fhwnet::DeviceClass::Ethernet,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
-            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-        ),
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+            ..default_device_info()
+        },
         "ethu0014";
         "device_class_with_usb_bus_type_with_bus_path"
     )]
     #[test_case(
         vec![NameCompositionRule::Default],
-        new_device_info(
-            fhwnet::DeviceClass::Ethernet,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
-            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
-        ),
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+            ..default_device_info()
+        },
         "ethx1";
         "default_usb"
     )]
     #[test_case(
         vec![NameCompositionRule::Default],
-        new_device_info(
-            fhwnet::DeviceClass::Ethernet,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
-            "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
-        ),
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
+            ..default_device_info()
+        },
         "eths05006";
         "default_sdio"
     )]
     fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,
-        info: devices::DeviceInfo,
+        info: DeviceInfoRef<'_>,
         expected_name: &'static str,
     ) {
         let naming_rule = NamingRule { matchers: HashSet::new(), naming_scheme: composition_rules };
@@ -1508,12 +1482,12 @@ mod tests {
 
         for n in 0u8..255u8 {
             let octets = [0x01, 0x01, 0x01, 0x01, 0x01, n];
-            let persistent_id = config
-                .generate_identifier(topo_usb.into(), fidl_fuchsia_net_ext::MacAddress { octets });
-            let info = devices::DeviceInfo {
+            let persistent_id =
+                config.generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
+            let info = DeviceInfoRef {
                 device_class: fhwnet::DeviceClass::Ethernet,
-                mac: Some(fidl_fuchsia_net_ext::MacAddress { octets }),
-                topological_path: topo_usb.into(),
+                mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                topological_path: topo_usb,
             };
 
             let name = naming_rule
@@ -1534,11 +1508,11 @@ mod tests {
     fn test_generate_name_from_naming_rules(match_first_rule: bool, expected_name: &'static str) {
         // Use an Ethernet device that is determined to have a USB bus type
         // from the topological path.
-        let info = new_device_info(
-            fhwnet::DeviceClass::Ethernet,
-            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
-            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet"
-        );
+        let info = DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet"
+        };
         let name = generate_name_from_naming_rules(
             &[
                 NamingRule {
@@ -1568,7 +1542,11 @@ mod tests {
         // Create a `DeviceInfo` that has a device class, but has an empty
         // topological path. This should prohibit the `BusType`
         // dynamic `NameCompositionRule`s.
-        let info = device_info_from_device_class(fhwnet::DeviceClass::Ethernet);
+        let info = DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            topological_path: "",
+            ..default_device_info()
+        };
 
         // Both names should fail to be generated since the `BusType` relies on
         // the topological path. The GenerationError should be surfaced.
