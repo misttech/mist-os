@@ -108,6 +108,18 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 [["--run-disabled"], ["--min-severity-logs", "TRACE"]],
                 [],
             ),
+            (
+                "with full moniker in logs",
+                ["--show-full-moniker-in-logs"],
+                [["--show-full-moniker-in-logs"]],
+                [],
+            ),
+            (
+                "without full moniker in logs",
+                ["--no-show-full-moniker-in-logs"],
+                [],
+                ["--show-full-moniker-in-logs"],
+            ),
         ]
     )
     async def test_test_execution_component(

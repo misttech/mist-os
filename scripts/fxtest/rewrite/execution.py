@@ -113,6 +113,8 @@ class TestExecution:
                 extra_args += ["--test-filter", test_filter]
             if self._flags.also_run_disabled_tests:
                 extra_args += ["--run-disabled"]
+            if self._flags.show_full_moniker_in_logs:
+                extra_args += ["--show-full-moniker-in-logs"]
 
             return ["fx", "ffx", "test", "run"] + extra_args + [component_url]
         elif self._test.build.test.path:

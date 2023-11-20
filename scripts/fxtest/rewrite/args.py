@@ -43,6 +43,7 @@ class Flags:
     use_package_hash: bool
     restrict_logs: bool
     also_run_disabled_tests: bool
+    show_full_moniker_in_logs: bool
 
     output: bool
     simple: bool
@@ -279,6 +280,14 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         "--also-run-disabled-tests",
         action="store_true",
         help="If True, also run tests that are disabled by the test author. This only affects test components. Default is False.",
+        default=False,
+    )
+    execution.add_argument(
+        "--show-full-moniker-in-logs",
+        action=argparse.BooleanOptionalAction,
+        help="""If set, show the full moniker in log output for on-device tests.
+        Otherwise only the last segment of the moniker is displayed.
+        Default is False.""",
         default=False,
     )
 
