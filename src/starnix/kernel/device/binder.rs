@@ -78,7 +78,7 @@ use starnix_uapi::{
     BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
 use std::{
-    collections::{BTreeMap, HashSet, VecDeque},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
     sync::{Arc, Weak},
@@ -1515,12 +1515,12 @@ impl BinderObjectRef {
 /// the corresponding actions and remove any freed object from the owner process.
 #[derive(Default)]
 struct RefCountActions {
-    objects: HashSet<ArcKey<BinderObject>>,
+    objects: BTreeSet<ArcKey<BinderObject>>,
     drop_guard: DropGuard,
 }
 
 impl Deref for RefCountActions {
-    type Target = HashSet<ArcKey<BinderObject>>;
+    type Target = BTreeSet<ArcKey<BinderObject>>;
 
     fn deref(&self) -> &Self::Target {
         &self.objects
@@ -1545,7 +1545,7 @@ impl Releasable for RefCountActions {
 }
 
 impl RefCountActions {
-    fn iter(&self) -> std::collections::hash_set::Iter<'_, ArcKey<BinderObject>> {
+    fn iter(&self) -> std::collections::btree_set::Iter<'_, ArcKey<BinderObject>> {
         self.objects.iter()
     }
 

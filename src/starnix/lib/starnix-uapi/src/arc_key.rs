@@ -5,6 +5,7 @@
 use ref_cast::RefCast;
 use std::{
     borrow::Borrow,
+    cmp::Ordering,
     hash::{Hash, Hasher},
     ops::Deref,
     sync::{Arc, Weak},
@@ -20,6 +21,16 @@ impl<T> PartialEq for ArcKey<T> {
     }
 }
 impl<T> Eq for ArcKey<T> {}
+impl<T> PartialOrd for ArcKey<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T> Ord for ArcKey<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Arc::as_ptr(&self.0).cmp(&Arc::as_ptr(&other.0))
+    }
+}
 impl<T> Hash for ArcKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Arc::as_ptr(&self.0).hash(state);
@@ -56,6 +67,16 @@ impl<T> PartialEq for WeakKey<T> {
     }
 }
 impl<T> Eq for WeakKey<T> {}
+impl<T> PartialOrd for WeakKey<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl<T> Ord for WeakKey<T> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        Weak::as_ptr(&self.0).cmp(&Weak::as_ptr(&other.0))
+    }
+}
 impl<T> Hash for WeakKey<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         Weak::as_ptr(&self.0).hash(state);
