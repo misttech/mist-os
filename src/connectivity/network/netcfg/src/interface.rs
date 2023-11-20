@@ -4,6 +4,7 @@
 
 use {
     anyhow::Context as _,
+    either::Either,
     serde::{Deserialize, Deserializer, Serialize},
     std::collections::HashSet,
     std::io::{Seek, SeekFrom},
@@ -45,42 +46,10 @@ impl Config {
         serde_json::from_reader(reader).map_err(Into::into)
     }
 
-    fn generate_identifier(
-        &self,
-        topological_path: std::borrow::Cow<'_, str>,
-        mac_address: fidl_fuchsia_net_ext::MacAddress,
-    ) -> PersistentIdentifier {
-        match get_bus_type_for_topological_path(&topological_path) {
-            Ok(BusType::USB) => PersistentIdentifier::MacAddress(mac_address),
-            Ok(BusType::PCI) => {
-                PersistentIdentifier::TopologicalPath(topological_path.into_owned())
-            }
-            Ok(BusType::SDIO) => {
-                PersistentIdentifier::TopologicalPath(topological_path.into_owned())
-            }
-            // Use the MacAddress as an identifier for the device if the
-            // BusType is currently not in the known list.
-            Err(_) => PersistentIdentifier::MacAddress(mac_address),
-        }
-    }
-
-    fn lookup_by_identifier(&self, persistent_id: &PersistentIdentifier) -> Option<usize> {
-        self.interfaces.iter().enumerate().find_map(|(i, interface)| {
-            if &interface.id == persistent_id {
-                Some(i)
-            } else {
-                None
-            }
-        })
-    }
-
-    // TODO(fxbug.dev/135159): Remove this function when its behavior can
-    // be specified by default naming configuration
     // We use MAC addresses to identify USB devices; USB devices are those devices whose
     // topological path contains "/usb/". We use topological paths to identify on-board
     // devices; on-board devices are those devices whose topological path does not
-    // contain "/usb". Topological paths of
-    // both device types are expected to
+    // contain "/usb". Topological paths of both device types are expected to
     // contain "/PCI0"; devices whose topological path does not contain "/PCI0" are
     // identified by their MAC address.
     //
@@ -102,68 +71,68 @@ impl Config {
     // "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet"
     // Though it is not a sdio device, it has the vid:pid:did info following "/platform/",
     // it's handled the same way as a sdio device.
-    fn generate_name_from_mac(
+    fn generate_identifier(
         &self,
-        octets: [u8; 6],
-        interface_type: crate::InterfaceType,
-    ) -> Result<String, anyhow::Error> {
-        let prefix = format!(
-            "{}{}",
-            match interface_type {
-                crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
-                crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
-            },
-            "x"
-        );
-
-        let mut offset = 0u8;
-        loop {
-            let candidate = get_mac_identifier_from_octets(octets, interface_type, offset)?;
-
-            if self.interfaces.iter().any(|interface| {
-                interface.name.starts_with(&prefix)
-                    && u8::from_str_radix(&interface.name[prefix.len()..], 16) == Ok(candidate)
-            }) {
-                // if the candidate is used, try the next one
-                offset += 1;
-                continue;
+        topological_path: std::borrow::Cow<'_, str>,
+        mac_address: fidl_fuchsia_net_ext::MacAddress,
+    ) -> PersistentIdentifier {
+        match get_bus_type_for_topological_path(&topological_path) {
+            // Use the MacAddress as an identifier for the device if the
+            // BusType is currently not in the known list.
+            Ok(BusType::USB) | Err(_) => PersistentIdentifier::MacAddress(mac_address),
+            Ok(BusType::PCI) | Ok(BusType::SDIO) => {
+                PersistentIdentifier::TopologicalPath(topological_path.into_owned())
             }
-            return Ok(format!("{prefix}{candidate:x}"));
         }
     }
 
-    // TODO(fxbug.dev/135159): Remove this function when its behavior can
-    // be specified by default naming configuration
-    fn generate_name_from_topological_path(
-        &self,
-        topological_path: &str,
-        interface_type: crate::InterfaceType,
-    ) -> Result<String, anyhow::Error> {
-        let interface_type = match interface_type {
-            crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
-            crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
-        };
-        let bus_type = get_bus_type_for_topological_path(topological_path)?.to_string();
-        let bus_path = get_normalized_bus_path_for_topo_path(topological_path)?;
-
-        let name = format!("{}{}{}", interface_type, bus_type, bus_path);
-
-        Ok(name)
+    fn lookup_by_identifier(&self, persistent_id: &PersistentIdentifier) -> Option<usize> {
+        self.interfaces.iter().enumerate().find_map(|(i, interface)| {
+            if &interface.id == persistent_id {
+                Some(i)
+            } else {
+                None
+            }
+        })
     }
 
+    // TODO(fxbug.dev/135159): Refactor this once 'default' configuration
+    // is defined and passed in from `lib.rs` as a naming fallback.
     fn generate_name(
         &self,
         persistent_id: &PersistentIdentifier,
         interface_type: crate::InterfaceType,
-    ) -> Result<String, anyhow::Error> {
-        match persistent_id {
-            PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress { octets }) => {
-                self.generate_name_from_mac(*octets, interface_type)
-            }
-            PersistentIdentifier::TopologicalPath(ref topological_path) => {
-                self.generate_name_from_topological_path(&topological_path, interface_type)
-            }
-        }
+    ) -> Result<String, NameGenerationError> {
+        let naming_rule = NamingRule {
+            matchers: HashSet::new(),
+            naming_scheme: vec![NameCompositionRule::Default],
+        };
+
+        // Reverse convert to the `fhwnet::DeviceClass` to fit the type needed
+        // by `devices::DeviceInfo`.
+        let device_class = match interface_type {
+            crate::InterfaceType::Ethernet => fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
+            crate::InterfaceType::Wlan => fidl_fuchsia_hardware_network::DeviceClass::Wlan,
+        };
+
+        let info = match persistent_id {
+            PersistentIdentifier::MacAddress(mac) => devices::DeviceInfo {
+                mac: Some(*mac),
+                // Topological path is not important for this type's default
+                // naming convention.
+                topological_path: "".to_string(),
+                device_class,
+            },
+            PersistentIdentifier::TopologicalPath(ref topological_path) => devices::DeviceInfo {
+                topological_path: topological_path.to_string(),
+                // MAC is not important for this type's default
+                // naming convention.
+                mac: None,
+                device_class,
+            },
+        };
+
+        naming_rule.generate_name(&self.interfaces, &info)
     }
 }
 
@@ -339,7 +308,7 @@ impl<'a> FileBackedConfig<'a> {
         topological_path: std::borrow::Cow<'_, str>,
         mac_address: fidl_fuchsia_net_ext::MacAddress,
         interface_type: crate::InterfaceType,
-    ) -> Result<&str, NameGenerationError<'_>> {
+    ) -> Result<&str, NameGenerationError> {
         let persistent_id = self.config.generate_identifier(topological_path, mac_address);
 
         if let Some(index) = self.config.lookup_by_identifier(&persistent_id) {
@@ -353,10 +322,7 @@ impl<'a> FileBackedConfig<'a> {
             // name. Remove and generate a new name.
             let _interface_config = self.config.interfaces.remove(index);
         }
-        let generated_name = self
-            .config
-            .generate_name(&persistent_id, interface_type)
-            .map_err(NameGenerationError::GenerationError)?;
+        let generated_name = self.config.generate_name(&persistent_id, interface_type)?;
         let () = self.config.interfaces.push(InterfaceConfig {
             id: persistent_id,
             name: generated_name,
@@ -364,7 +330,7 @@ impl<'a> FileBackedConfig<'a> {
         });
         let interface_config = &self.config.interfaces[self.config.interfaces.len() - 1];
         let () = self.store().map_err(|err| NameGenerationError::FileUpdateError {
-            name: &interface_config.name,
+            name: interface_config.name.to_owned(),
             err,
         })?;
         Ok(&interface_config.name)
@@ -388,10 +354,10 @@ impl<'a> FileBackedConfig<'a> {
 
 /// An error observed when generating a new name.
 #[derive(Debug)]
-pub enum NameGenerationError<'a> {
+pub enum NameGenerationError {
     GenerationError(anyhow::Error),
     AlreadyExistsError(anyhow::Error),
-    FileUpdateError { name: &'a str, err: anyhow::Error },
+    FileUpdateError { name: String, err: anyhow::Error },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
@@ -400,6 +366,28 @@ pub enum BusType {
     USB,
     PCI,
     SDIO,
+}
+
+impl BusType {
+    // Retrieve the list of composition rules that comprise the default name
+    // for the interface based on BusType.
+    // Example names for the following default rules:
+    // * USB device: "ethx5"
+    // * PCI/SDIO device: "wlans5009"
+    fn get_default_name_composition_rules(&self) -> Vec<NameCompositionRule> {
+        match *self {
+            BusType::USB => vec![
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+                NameCompositionRule::Static { value: String::from("x") },
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
+            ],
+            BusType::PCI | BusType::SDIO => vec![
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
+            ],
+        }
+    }
 }
 
 impl std::fmt::Display for BusType {
@@ -487,7 +475,7 @@ impl MatchingRule {
 // TODO(fxbug.dev/135106): Create dynamic naming rules
 // A naming rule that uses device information to produce a component of
 // the interface's name.
-#[derive(Debug, Eq, Hash, PartialEq, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum DynamicNameCompositionRule {
     BusPath,
@@ -499,7 +487,7 @@ pub enum DynamicNameCompositionRule {
 
 impl DynamicNameCompositionRule {
     // `true` when a rule can be re-tried to produce a different name.
-    fn rule_supports_retry(&self) -> bool {
+    fn supports_retry(&self) -> bool {
         match *self {
             DynamicNameCompositionRule::BusPath
             | DynamicNameCompositionRule::BusType
@@ -545,11 +533,14 @@ impl DynamicNameCompositionRule {
 // A rule that dictates a component of an interface's name. An interface's name
 // is determined by extracting the name of each rule, in order, and
 // concatenating the results.
-#[derive(Debug, Deserialize, PartialEq)]
-#[serde(deny_unknown_fields, rename_all = "lowercase")]
+#[derive(Clone, Debug, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "lowercase", tag = "type")]
 pub enum NameCompositionRule {
-    Static(String),
-    Dynamic(DynamicNameCompositionRule),
+    Static { value: String },
+    Dynamic { rule: DynamicNameCompositionRule },
+    // The default name composition rules based on the device's BusType.
+    // Defined in `BusType::get_default_name_composition_rules`.
+    Default,
 }
 
 /// A rule that dictates how interfaces that align with the property matching
@@ -562,7 +553,6 @@ pub struct NamingRule {
     /// must apply for the naming scheme to take effect.
     #[allow(unused)]
     pub matchers: HashSet<MatchingRule>,
-    // TODO(fxbug.dev/135106): Add dynamic naming rules
     /// The rules to apply to the interface to produce the interface's name.
     pub naming_scheme: Vec<NameCompositionRule>,
 }
@@ -571,31 +561,60 @@ impl NamingRule {
     // An interface's name is determined by extracting the name of each rule,
     // in order, and concatenating the results. Returns an error if the
     // interface name cannot be generated.
-    #[allow(unused)]
     fn generate_name(
         &self,
         interfaces: &[InterfaceConfig],
         info: &devices::DeviceInfo,
-    ) -> Result<String, NameGenerationError<'_>> {
+    ) -> Result<String, NameGenerationError> {
+        // When a bus type cannot be found for a path, use the USB
+        // default naming policy which uses a MAC address.
+        let bus_type =
+            get_bus_type_for_topological_path(&info.topological_path).unwrap_or(BusType::USB);
+
+        // Expand any `Default` rules into the `Static` and `Dynamic` rules in a single vector.
+        // If this was being consumed once, we could avoid the call to `collect`. However, since we
+        // want to use it twice, we need to convert it to a form where the items can be itererated
+        // over without consuming them.
+        let expanded_rules = self
+            .naming_scheme
+            .iter()
+            .map(|rule| {
+                if let NameCompositionRule::Default = rule {
+                    Either::Right(bus_type.get_default_name_composition_rules().into_iter())
+                } else {
+                    Either::Left(std::iter::once(rule.clone()))
+                }
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
         // Determine whether any rules present support retrying for a unique name.
-        let should_reattempt_on_conflict = self.naming_scheme.iter().any(|rule| match rule {
-            NameCompositionRule::Dynamic(dynamic_rule) => dynamic_rule.rule_supports_retry(),
-            _ => false,
+        let should_reattempt_on_conflict = expanded_rules.iter().any(|rule| {
+            if let NameCompositionRule::Dynamic { rule } = rule {
+                rule.supports_retry()
+            } else {
+                false
+            }
         });
 
         let mut attempt_num = 0u8;
         loop {
-            let name = self
-                .naming_scheme
+            let name = expanded_rules
                 .iter()
                 .map(|rule| match rule {
-                    NameCompositionRule::Static(s) => Ok(s.clone()),
+                    NameCompositionRule::Static { value } => Ok(value.clone()),
                     // Dynamic rules require the knowledge of `DeviceInfo` properties.
-                    NameCompositionRule::Dynamic(rule) => rule
+                    NameCompositionRule::Dynamic { rule } => rule
                         .get_name(info, attempt_num)
                         .map_err(NameGenerationError::GenerationError),
+                    NameCompositionRule::Default => {
+                        unreachable!(
+                            "Default naming rules should have been pre-expanded. \
+                             Nested default rules are not supported."
+                        );
+                    }
                 })
-                .collect::<Result<String, NameGenerationError<'_>>>()?;
+                .collect::<Result<String, NameGenerationError>>()?;
 
             if interfaces.iter().any(|interface| interface.name == name) {
                 if should_reattempt_on_conflict {
@@ -878,8 +897,8 @@ mod tests {
         let naming_rule = NamingRule {
             matchers: HashSet::new(),
             naming_scheme: vec![
-                NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
-                NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
+                NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
             ],
         };
 
@@ -1273,52 +1292,52 @@ mod tests {
     }
 
     #[test_case(
-        vec![NameCompositionRule::Static(String::from("x"))],
+        vec![NameCompositionRule::Static { value: String::from("x") }],
         default_device_info(),
         "x";
         "single_static"
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Static(String::from("eth")),
-            NameCompositionRule::Static(String::from("x")),
-            NameCompositionRule::Static(String::from("100")),
+            NameCompositionRule::Static { value: String::from("eth") },
+            NameCompositionRule::Static { value: String::from("x") },
+            NameCompositionRule::Static { value: String::from("100") },
         ],
         default_device_info(),
         "ethx100";
         "multiple_static"
     )]
     #[test_case(
-        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac)],
+        vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac }],
         device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x1]),
         "1";
         "normalized_mac"
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Static(String::from("eth")),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+            NameCompositionRule::Static { value: String::from("eth") },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
         device_info_from_octets([0x1, 0x1, 0x1, 0x1, 0x1, 0x9]),
         "eth9";
         "normalized_mac_with_static"
     )]
     #[test_case(
-        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass)],
+        vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
         device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
         "eth";
         "eth_device_class"
     )]
     #[test_case(
-        vec![NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass)],
+        vec![NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass }],
         device_info_from_device_class(fhwnet::DeviceClass::Wlan),
         "wlan";
         "wlan_device_class"
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
-            NameCompositionRule::Static(String::from("x")),
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+            NameCompositionRule::Static { value: String::from("x") },
         ],
         device_info_from_device_class(fhwnet::DeviceClass::Ethernet),
         "ethx";
@@ -1326,9 +1345,9 @@ mod tests {
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
-            NameCompositionRule::Static(String::from("x")),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::NormalizedMac),
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+            NameCompositionRule::Static { value: String::from("x") },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::NormalizedMac },
         ],
         new_device_info(
             fhwnet::DeviceClass::Wlan,
@@ -1340,9 +1359,9 @@ mod tests {
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusPath),
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
         new_device_info(
             fhwnet::DeviceClass::Ethernet,
@@ -1354,9 +1373,9 @@ mod tests {
     )]
     #[test_case(
         vec![
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::DeviceClass),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusType),
-            NameCompositionRule::Dynamic(DynamicNameCompositionRule::BusPath),
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::DeviceClass },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusType },
+            NameCompositionRule::Dynamic { rule: DynamicNameCompositionRule::BusPath },
         ],
         new_device_info(
             fhwnet::DeviceClass::Ethernet,
@@ -1365,6 +1384,26 @@ mod tests {
         ),
         "ethu0014";
         "device_class_with_usb_bus_type_with_bus_path"
+    )]
+    #[test_case(
+        vec![NameCompositionRule::Default],
+        new_device_info(
+            fhwnet::DeviceClass::Ethernet,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
+            "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/004/004/ifc-000/ax88179/ethernet",
+        ),
+        "ethx1";
+        "default_usb"
+    )]
+    #[test_case(
+        vec![NameCompositionRule::Default],
+        new_device_info(
+            fhwnet::DeviceClass::Ethernet,
+            [0x1, 0x1, 0x1, 0x1, 0x1, 0x1],
+            "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy",
+        ),
+        "eths05006";
+        "default_sdio"
     )]
     fn test_naming_rules(
         composition_rules: Vec<NameCompositionRule>,
@@ -1388,7 +1427,7 @@ mod tests {
 
         let naming_rule = NamingRule {
             matchers: HashSet::new(),
-            naming_scheme: vec![NameCompositionRule::Static(shared_interface_name)],
+            naming_scheme: vec![NameCompositionRule::Static { value: shared_interface_name }],
         };
 
         let name = naming_rule.generate_name(&interfaces, &default_device_info());
@@ -1404,9 +1443,9 @@ mod tests {
 
         let naming_rule = NamingRule {
             matchers: HashSet::new(),
-            naming_scheme: vec![NameCompositionRule::Dynamic(
-                DynamicNameCompositionRule::NormalizedMac,
-            )],
+            naming_scheme: vec![NameCompositionRule::Dynamic {
+                rule: DynamicNameCompositionRule::NormalizedMac,
+            }],
         };
 
         // test cases for 256 usb interfaces
