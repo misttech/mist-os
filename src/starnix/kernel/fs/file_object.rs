@@ -863,13 +863,7 @@ fn check_offset(current_task: &CurrentTask, offset: usize) -> Result<(), Errno> 
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct FileObjectId(usize);
-
-impl FileObjectId {
-    fn new(id: *const FileObject) -> Self {
-        Self(id as usize)
-    }
-}
+pub struct FileObjectId(u64);
 
 /// A session with a file object.
 ///
@@ -881,6 +875,9 @@ pub struct FileObject {
     /// Weak reference to the `FileHandle` of this `FileObject`. This allows to retrieve the
     /// `FileHandle` from a `FileObject`.
     pub weak_handle: WeakFileHandle,
+
+    /// A unique identifier for this file object.
+    pub id: FileObjectId,
 
     ops: Box<dyn FileOps>,
 
@@ -936,8 +933,11 @@ impl FileObject {
             None
         };
         let fs = name.entry.node.fs();
+        let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
+        let id = FileObjectId(kernel.next_file_object_id.next());
         let file = FileHandle::new_cyclic(|weak_handle| Self {
             weak_handle: weak_handle.clone(),
+            id,
             name,
             fs,
             ops,
@@ -948,13 +948,6 @@ impl FileObject {
         });
         file.notify(InotifyMask::OPEN);
         Ok(file)
-    }
-
-    /// A unique identifier for this file object.
-    ///
-    /// Identifiers can be reused after the file object has been dropped.
-    pub fn id(&self) -> FileObjectId {
-        FileObjectId::new(self as *const FileObject)
     }
 
     /// The FsNode from which this FileObject was created.

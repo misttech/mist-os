@@ -189,6 +189,9 @@ pub struct Kernel {
     pub next_peer_group_id: AtomicU64Counter,
     pub next_namespace_id: AtomicU64Counter,
 
+    /// Unique IDs for file objects.
+    pub next_file_object_id: AtomicU64Counter,
+
     /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
     pub next_inotify_cookie: AtomicU32Counter,
 
@@ -310,6 +313,7 @@ impl Kernel {
             next_peer_group_id: AtomicU64Counter::new(1),
             next_namespace_id: AtomicU64Counter::new(1),
             next_inotify_cookie: AtomicU32Counter::new(1),
+            next_file_object_id: Default::default(),
             inotify_limits: InotifyLimits {
                 max_queued_events: AtomicI32::new(16384),
                 max_user_instances: AtomicI32::new(128),

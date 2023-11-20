@@ -234,7 +234,7 @@ pub enum RecordLockOwner {
 impl RecordLockOwner {
     fn new(current_task: &CurrentTask, cmd: RecordLockCommand, file: &FileObject) -> Self {
         if cmd.is_ofd() {
-            RecordLockOwner::FileObject(file.id())
+            RecordLockOwner::FileObject(file.id)
         } else {
             RecordLockOwner::FdTable(current_task.files.id())
         }

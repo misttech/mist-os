@@ -1079,7 +1079,7 @@ impl FsNode {
             // `file` will no longer upgrade to an `FileHandle`.
             flock_info.retain(|_| true);
         }
-        self.record_lock_release(RecordLockOwner::FileObject(file.id()));
+        self.record_lock_release(RecordLockOwner::FileObject(file.id));
     }
 
     pub fn record_lock(
