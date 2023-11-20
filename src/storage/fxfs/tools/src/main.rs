@@ -211,7 +211,9 @@ async fn main() -> Result<(), Error> {
                     let vol = ops::open_volume(&fs, crypt.clone()).await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmargs.path)).await?;
                     fs.close().await?;
-                    ops::fsck(&fs, args.verbose).await
+                    let result = ops::fsck(&fs, args.verbose).await?;
+                    println!("{:?}", result);
+                    Ok(())
                 }
                 ImageSubCommand::Get(getargs) => {
                     let device = DeviceHolder::new(FileBackedDevice::new(
@@ -237,7 +239,8 @@ async fn main() -> Result<(), Error> {
                     std::fs::File::open(&putargs.src)?.read_to_end(&mut data)?;
                     ops::put(&fs, &vol, &Path::new(&putargs.dst), data).await?;
                     fs.close().await?;
-                    ops::fsck(&fs, args.verbose).await
+                    let _ = ops::fsck(&fs, args.verbose).await?;
+                    Ok(())
                 }
                 ImageSubCommand::Format(_) => {
                     let device = DeviceHolder::new(FileBackedDevice::new(
@@ -258,7 +261,8 @@ async fn main() -> Result<(), Error> {
                         verbose: args.verbose,
                         ..Default::default()
                     };
-                    fsck::fsck_with_options(fs.deref().clone(), &options).await
+                    fsck::fsck_with_options(fs.deref().clone(), &options).await?;
+                    Ok(())
                 }
                 ImageSubCommand::Ls(lsargs) => {
                     let device = DeviceHolder::new(FileBackedDevice::new(
@@ -280,7 +284,8 @@ async fn main() -> Result<(), Error> {
                     let vol = ops::open_volume(&fs, crypt.clone()).await?;
                     ops::mkdir(&fs, &vol, &Path::new(&mkdirargs.path)).await?;
                     fs.close().await?;
-                    ops::fsck(&fs, args.verbose).await
+                    ops::fsck(&fs, args.verbose).await?;
+                    Ok(())
                 }
                 ImageSubCommand::Rmdir(rmdirargs) => {
                     let device = DeviceHolder::new(FileBackedDevice::new(
@@ -291,7 +296,8 @@ async fn main() -> Result<(), Error> {
                     let vol = ops::open_volume(&fs, crypt.clone()).await?;
                     ops::unlink(&fs, &vol, &Path::new(&rmdirargs.path)).await?;
                     fs.close().await?;
-                    ops::fsck(&fs, args.verbose).await
+                    ops::fsck(&fs, args.verbose).await?;
+                    Ok(())
                 }
             }
         }

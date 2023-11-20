@@ -343,7 +343,9 @@ impl Component {
         if let Some(fs_container) = fs_container {
             let _ = fs_container.close().await;
         }
-        res
+        // TODO(b/311550633): Stash ok res in inspect.
+        tracing::info!("handle_check for fs: {:?}", res?);
+        Ok(())
     }
 
     async fn handle_admin_requests(&self, mut stream: AdminRequestStream) -> Result<(), Error> {

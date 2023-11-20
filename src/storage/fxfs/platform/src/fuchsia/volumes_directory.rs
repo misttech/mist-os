@@ -539,7 +539,10 @@ impl VolumesDirectory {
         } else {
             None
         };
-        fsck::fsck_volume(fs.as_ref(), store_id, crypt).await
+        let result = fsck::fsck_volume(fs.as_ref(), store_id, crypt).await?;
+        // TODO(b/311550633): Stash result in inspect.
+        tracing::info!(%store_id, "{:?}", result);
+        Ok(())
     }
 
     async fn handle_set_limit(self: &Arc<Self>, store_id: u64, bytes: u64) -> Result<(), Error> {

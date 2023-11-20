@@ -6,7 +6,7 @@ use {
     crate::{
         fsck::{
             errors::{FsckError, FsckFatal, FsckWarning},
-            Fsck,
+            FragmentationStats, Fsck, FsckResult,
         },
         lsm_tree::types::{Item, ItemRef, LayerIterator, MutableLayer},
         object_handle::INVALID_OBJECT_ID,
@@ -762,12 +762,15 @@ impl<'a> ScannedStore<'a> {
 async fn scan_extents_and_directory_children<'a>(
     store: &ObjectStore,
     scanned: &mut ScannedStore<'a>,
+    result: &mut FsckResult,
 ) -> Result<(), Error> {
     let bs = store.block_size();
     let layer_set = store.tree().layer_set();
     let mut merger = layer_set.merger();
     let mut iter = merger.seek(Bound::Unbounded).await?;
     let mut allocated_bytes = 0;
+    let mut extent_count = 0;
+    let mut previous_object_id = INVALID_OBJECT_ID;
     while let Some(itemref) = iter.get() {
         match itemref {
             ItemRef {
@@ -784,11 +787,28 @@ async fn scan_extents_and_directory_children<'a>(
                 ..
             } => {
                 let device_offset = if let ExtentValue::Some { device_offset, .. } = extent {
-                    allocated_bytes += range.length().unwrap_or(0);
+                    let size = range.length().unwrap_or(0);
+                    allocated_bytes += size;
+
+                    if previous_object_id != *object_id {
+                        if previous_object_id != INVALID_OBJECT_ID {
+                            result.fragmentation.extent_count
+                                [FragmentationStats::get_histogram_bucket_for_count(
+                                    extent_count,
+                                )] += 1;
+                        }
+                        extent_count = 0;
+                        previous_object_id = *object_id;
+                    }
+                    result.fragmentation.extent_size
+                        [FragmentationStats::get_histogram_bucket_for_size(size)] += 1;
+                    extent_count += 1;
+
                     Some(*device_offset)
                 } else {
                     None
                 };
+
                 scanned.process_extent(*object_id, *attribute_id, range, device_offset, bs).await?
             }
             ItemRef {
@@ -799,6 +819,10 @@ async fn scan_extents_and_directory_children<'a>(
             _ => {}
         }
         iter.advance().await?;
+    }
+    if extent_count != 0 && previous_object_id != INVALID_OBJECT_ID {
+        result.fragmentation.extent_count
+            [FragmentationStats::get_histogram_bucket_for_count(extent_count)] += 1;
     }
     scanned.fsck.verbose(format!(
         "Store {} has {} bytes allocated",
@@ -877,6 +901,7 @@ pub(super) async fn scan_store(
     fsck: &Fsck<'_>,
     store: &ObjectStore,
     root_objects: impl AsRef<[u64]>,
+    result: &mut FsckResult,
 ) -> Result<(), Error> {
     let store_id = store.store_object_id();
 
@@ -963,7 +988,7 @@ pub(super) async fn scan_store(
         fsck.assert(iter.advance().await, FsckFatal::MalformedGraveyard)?;
     }
 
-    scan_extents_and_directory_children(store, &mut scanned).await?;
+    scan_extents_and_directory_children(store, &mut scanned, result).await?;
 
     // At this point, we've provided all of the inputs to |scanned|.
 

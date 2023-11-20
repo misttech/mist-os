@@ -136,7 +136,7 @@ pub async fn unlink(
 }
 
 // Used to fsck after mutating operations.
-pub async fn fsck(fs: &OpenFxFilesystem, verbose: bool) -> Result<(), Error> {
+pub async fn fsck(fs: &OpenFxFilesystem, verbose: bool) -> Result<fsck::FsckResult, Error> {
     // Re-open the filesystem to ensure it's locked.
     fsck::fsck_with_options(
         fs.deref().clone(),
