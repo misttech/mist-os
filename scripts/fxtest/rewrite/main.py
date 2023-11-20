@@ -189,6 +189,8 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             mode = selection.SelectionMode.HOST
         elif flags.device:
             mode = selection.SelectionMode.DEVICE
+        elif flags.exact:
+            mode = selection.SelectionMode.EXACT
         selections = await selection.select_tests(
             tests,
             flags.selection,

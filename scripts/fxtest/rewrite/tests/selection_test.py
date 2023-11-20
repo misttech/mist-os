@@ -259,6 +259,21 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertTrue(device_selected.has_device_test())
 
+    async def test_select_all_fails_on_exact(self):
+        """Test that empty selection fails if EXACT mode is used"""
+        tests = [
+            self._make_package_test("src/tests", "foo", "bar"),
+            self._make_host_test("src/tests2", "baz"),
+        ]
+
+        try:
+            selections = await selection.select_tests(
+                tests, [], mode=selection.SelectionMode.EXACT
+            )
+            self.assertTrue(False, f"Expected a SelectionError: {selections}")
+        except selection.SelectionError:
+            pass
+
     async def test_prefix_matches(self):
         """Test that selecting prefixes of tests results in a perfect match."""
 
@@ -312,6 +327,116 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(host_fuzzy.best_score["host_x64/binary_test"], 1)
         self.assertEqual(host_fuzzy.fuzzy_distance_threshold, 3)
+
+    async def test_exact_does_not_match(self):
+        """Test that fuzzy matching catches common issues."""
+
+        tests = [
+            self._make_package_test("src/tests", "foo-pkg", "bar-test"),
+            self._make_host_test("src/other-tests", "binary_test"),
+        ]
+
+        host_exact = await selection.select_tests(
+            tests, ["binaryytest"], mode=selection.SelectionMode.EXACT
+        )
+        self.assertEqual(0, len(host_exact.selected))
+        self.assertEqual(
+            host_exact.best_score["host_x64/binary_test"],
+            selection.NO_MATCH_DISTANCE,
+        )
+
+    async def test_exact_matches(self):
+        """Test that EXACT matching mode works correctly"""
+
+        tests = [
+            self._make_package_test("src/tests", "foo-pkg", "bar-test"),
+            self._make_host_test("src/other-tests", "binary_test"),
+        ]
+
+        # Don't match package or component in exact mode
+        device_exact = await selection.select_tests(
+            tests, ["foo-pkg"], mode=selection.SelectionMode.EXACT
+        )
+        self.assertEqual(0, len(device_exact.selected))
+        self.assertEqual(
+            device_exact.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.NO_MATCH_DISTANCE,
+        )
+        device_exact = await selection.select_tests(
+            tests, ["bar-test"], mode=selection.SelectionMode.EXACT
+        )
+        self.assertEqual(0, len(device_exact.selected))
+        self.assertEqual(
+            device_exact.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.NO_MATCH_DISTANCE,
+        )
+
+        # Package matches in fuzzy mode
+        device_fuzzy = await selection.select_tests(
+            tests, ["foo-pkg"], mode=selection.SelectionMode.ANY
+        )
+        self.assertEqual(1, len(device_fuzzy.selected))
+        self.assertEqual(
+            device_fuzzy.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+        device_fuzzy = await selection.select_tests(
+            tests, ["bar-test"], mode=selection.SelectionMode.ANY
+        )
+        self.assertEqual(1, len(device_fuzzy.selected))
+        self.assertEqual(
+            device_fuzzy.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
+        # Only match full name in exact mode
+        device_exact = await selection.select_tests(
+            tests,
+            ["fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"],
+            mode=selection.SelectionMode.EXACT,
+        )
+        self.assertEqual(1, len(device_exact.selected))
+        self.assertEqual(
+            device_exact.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
+        # Support exact package and component matching
+        package_exact = await selection.select_tests(
+            tests,
+            ["--package", "foo-pkg"],
+            mode=selection.SelectionMode.EXACT,
+        )
+        self.assertEqual(1, len(package_exact.selected))
+        self.assertEqual(
+            package_exact.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
+
+        component_exact = await selection.select_tests(
+            tests,
+            ["--component", "bar-test"],
+            mode=selection.SelectionMode.EXACT,
+        )
+        self.assertEqual(1, len(component_exact.selected))
+        self.assertEqual(
+            component_exact.best_score[
+                "fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"
+            ],
+            selection.PERFECT_MATCH_DISTANCE,
+        )
 
     async def test_perfect_match_omits_approximate_match(self):
         """Test that fuzzy matching is not used if there is a perfect match."""

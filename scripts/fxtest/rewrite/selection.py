@@ -34,6 +34,7 @@ class SelectionMode(Enum):
     ANY = 0
     HOST = 1
     DEVICE = 2
+    EXACT = 3
 
 
 # Default threshold for matching.
@@ -68,8 +69,8 @@ async def select_tests(
         recorder (EventRecorder, optional): If set, record match duration events.
 
     Raises:
-        RuntimeError: _description_
-        SelectionError: _description_
+        RuntimeError: If the required dldist script is not found
+        SelectionError: If the selections were invalid
 
     Returns:
         TestSelections: Description of the selection process outcome.
@@ -98,6 +99,10 @@ async def select_tests(
         return filtered_entry_scores
 
     if not selection:
+        if mode == SelectionMode.EXACT:
+            raise SelectionError(
+                "A selection is required when --exact is specified"
+            )
         # If no selection text is specified, select all tests and
         # report them all as perfect matches.
         return selection_types.TestSelections(
@@ -172,19 +177,29 @@ async def select_tests(
                     lambda: NO_MATCH_DISTANCE
                 )
                 tests = []
-                tasks = (
-                    [label.distances(n, recorder, id) for n in group.names]
-                    + [name.distances(n, recorder, id) for n in group.names]
-                    + [
-                        component.distances(n, recorder, id)
-                        for n in group.names
+                if mode != SelectionMode.EXACT:
+                    tasks = (
+                        [label.distances(n, recorder, id) for n in group.names]
+                        + [name.distances(n, recorder, id) for n in group.names]
+                        + [
+                            component.distances(n, recorder, id)
+                            for n in group.names
+                        ]
+                        + [
+                            package.distances(n, recorder, id)
+                            for n in group.names
+                        ]
+                        + [
+                            trailing_path.distances(n, recorder, id)
+                            for n in group.names
+                        ]
+                    )
+                else:
+                    # In exact mode, don't match names against
+                    # anything but the name field itself.
+                    tasks = [
+                        name.distances(n, recorder, id) for n in group.names
                     ]
-                    + [package.distances(n, recorder, id) for n in group.names]
-                    + [
-                        trailing_path.distances(n, recorder, id)
-                        for n in group.names
-                    ]
-                )
                 results: typing.List[
                     typing.List[_TestDistance]
                 ] = await asyncio.gather(*tasks)
@@ -224,6 +239,13 @@ async def select_tests(
                 # The final score for a match group is the worst match
                 # out of the above sets of scores.
                 final_score = match_distances[entry]
+
+                if (
+                    mode == SelectionMode.EXACT
+                    and final_score != PERFECT_MATCH_DISTANCE
+                ):
+                    # Allow only exact matches in exact match mode.
+                    final_score = NO_MATCH_DISTANCE
 
                 # Perform bookkeeping for debug output.
                 best_matches[entry.info.name] = min(

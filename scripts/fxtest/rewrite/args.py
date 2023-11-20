@@ -25,6 +25,7 @@ class Flags:
 
     host: bool
     device: bool
+    exact: bool
     selection: typing.List[str]
     fuzzy: int
     show_suggestions: bool
@@ -73,6 +74,10 @@ class Flags:
             raise FlagError("--count must be a positive number")
         if self.suggestion_count < 0:
             raise FlagError("--suggestion-count must be non-negative")
+        if self.exact and (self.device or self.host):
+            raise FlagError(
+                "--exact cannot be combined with --host or --device"
+            )
 
         if not termout.is_valid() and self.status:
             raise FlagError(
@@ -142,6 +147,13 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         action="store_true",
         default=False,
         help="Only run device tests. The opposite of `--host`",
+    )
+    selection.add_argument(
+        "--exact",
+        action="store_true",
+        default=False,
+        help="""Only match tests whose name exactly matches the selection.
+        Cannot be specified along with --host or --device.""",
     )
     selection.add_argument(
         "-p",
