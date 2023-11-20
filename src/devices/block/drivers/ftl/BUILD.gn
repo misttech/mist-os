@@ -64,7 +64,7 @@ source_set("common") {
     "//sdk/lib/fdio",
     "//sdk/lib/fit-promise",
     "//sdk/lib/zbi-format",
-    "//src/devices/block/lib/common",
+    "//src/devices/block/lib/common:common-dfv1",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/storage/lib/ftl",

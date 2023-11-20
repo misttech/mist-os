@@ -53,7 +53,7 @@ source_set("block_lib") {
   sources = [ "block.cc" ]
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-    "//src/devices/block/lib/common",
+    "//src/devices/block/lib/common:common-dfv1",
     "//src/devices/bus/lib/virtio",
     "//src/lib/ddktl",
     "//src/lib/listnode",

@@ -20,7 +20,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "controller.h"
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 
 namespace ahci {
 

@@ -37,7 +37,7 @@ source_set("shared") {
   configs += [ "//build/config:all_source" ]
   deps = [
     ":ufs_bind",
-    "//src/devices/block/lib/common",
+    "//src/devices/block/lib/common:common-dfv1",
     "//src/devices/lib/driver",
     "//src/devices/lib/mmio",
     "//src/lib/ddk",

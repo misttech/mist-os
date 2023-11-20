@@ -25,7 +25,7 @@
 #include "lib/inspect/cpp/vmo/types.h"
 #include "nand_driver.h"
 #include "src/devices/block/drivers/ftl/metrics.h"
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 
 namespace {
 

@@ -22,7 +22,7 @@
 #include <fbl/auto_lock.h>
 #include <pretty/hexdump.h>
 
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 #include "src/devices/bus/lib/virtio/trace.h"
 
 #define LOCAL_TRACE 0

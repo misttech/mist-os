@@ -16,7 +16,7 @@
 #include "src/devices/block/drivers/nvme/commands/identify.h"
 #include "src/devices/block/drivers/nvme/nvme.h"
 #include "src/devices/block/drivers/nvme/queue-pair.h"
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 
 namespace nvme {
 

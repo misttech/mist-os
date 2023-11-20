@@ -32,7 +32,7 @@
 #include <safemath/checked_math.h>
 
 #include "lib/ddk/driver.h"
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
 #include "zircon/errors.h"
 #include "zircon/status.h"

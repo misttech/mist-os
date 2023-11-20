@@ -2,22 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 
 #include <zxtest/zxtest.h>
 
 namespace block {
 
-class CommonTest : public zxtest::Test {
- public:
-  void SetUp() override { fdf::Logger::SetGlobalInstance(&logger_); }
-
- private:
-  fdf::Logger logger_{"common-test", FUCHSIA_LOG_DEBUG, zx::socket{},
-                      fidl::WireClient<fuchsia_logger::LogSink>()};
-};
-
-TEST_F(CommonTest, CheckIoRangeTest) {
+TEST(CommonTest, CheckIoRangeTest) {
   block_read_write rw;
 
   rw = {
@@ -69,7 +60,7 @@ TEST_F(CommonTest, CheckIoRangeTest) {
   EXPECT_OK(CheckIoRange(rw, 100));
 }
 
-TEST_F(CommonTest, CheckIoRangeMaxTransferTest) {
+TEST(CommonTest, CheckIoRangeMaxTransferTest) {
   block_trim trim;
 
   trim = {
@@ -91,7 +82,7 @@ TEST_F(CommonTest, CheckIoRangeMaxTransferTest) {
   EXPECT_OK(CheckIoRange(trim, 100, 25));
 }
 
-TEST_F(CommonTest, CheckFlushValidTest) {
+TEST(CommonTest, CheckFlushValidTest) {
   block_read_write rw;
 
   rw = {

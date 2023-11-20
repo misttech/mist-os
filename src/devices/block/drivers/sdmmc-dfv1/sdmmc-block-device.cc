@@ -21,7 +21,7 @@
 
 #include "sdmmc-partition-device.h"
 #include "sdmmc-rpmb-device.h"
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 
 namespace {
 

@@ -28,7 +28,7 @@ fuchsia_driver("ramdisk-driver") {
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.ramdisk:fuchsia.hardware.ramdisk_cpp",
     "//sdk/lib/zbi-format",
-    "//src/devices/block/lib/common",
+    "//src/devices/block/lib/common:common-dfv1",
     "//src/devices/lib/dev-operation",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

@@ -21,7 +21,7 @@
 
 #include <fbl/auto_lock.h>
 
-#include "src/devices/block/lib/common/include/common.h"
+#include "src/devices/block/lib/common/include/common-dfv1.h"
 #include "zircon/errors.h"
 
 namespace ramdisk {

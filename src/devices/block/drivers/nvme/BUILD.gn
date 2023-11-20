@@ -29,7 +29,7 @@ group("tests") {
 common_deps = [
   ":nvme_bind",
   "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
-  "//src/devices/block/lib/common",
+  "//src/devices/block/lib/common:common-dfv1",
   "//src/devices/lib/driver",
   "//src/devices/lib/mmio",
   "//src/devices/pci/lib/device-protocol-pci",
