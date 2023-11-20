@@ -8,7 +8,6 @@
 ffx_subtool_fidl_allowlist = [
   # ffx component
   "//sdk/fidl/fuchsia.component.internal:fuchsia.component.internal",
-  "//sdk/fidl/fuchsia.dash:fuchsia.dash",
 
   # Used by ffx
   "//src/developer/ffx/fidl:fuchsia.developer.ffx",
