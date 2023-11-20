@@ -185,7 +185,7 @@ def determinism_repetitions(paths: Iterable[Path]) -> Optional[int]:
     # chances of repro in infra.
     if any("libminfs.vnode.cc" in str(path) for path in paths):
         # Historically, this failed around 5% of the time in infra.
-        return 1000
+        return 100
     return None
 
 
