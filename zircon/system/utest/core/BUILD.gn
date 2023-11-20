@@ -9,6 +9,7 @@ import("//build/testing/bootfs_test.gni")
 import("//build/testing/kernel_zbi_test.gni")
 import("//build/testing/zbi_test.gni")
 import("//build/testing/zbi_test_executable.gni")
+import("//build/toolchain/rbe.gni")
 import("//zircon/kernel/params.gni")
 
 # Each subdirectory just provides an eponymous source_set().
@@ -218,6 +219,10 @@ if (is_fuchsia) {
         toolchain_variant.tags + [ "thinlto" ] - [ "thinlto" ] !=
         toolchain_variant.tags) {
       pool = "//build/config:highmem($default_toolchain)"
+      if (link_rbe_enable) {
+        # OOM on RBE workers
+        configs += [ "//build/config:no_remote_link" ]
+      }
     }
   }
 
