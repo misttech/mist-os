@@ -186,26 +186,19 @@ struct WaitCancelerTimer {
     inner: HandleWaitCanceler,
 }
 
-pub struct WaitCancelerOneVmo {
-    pub handle: Weak<zx::Vmo>,
-    pub canceler: HandleWaitCanceler,
-}
-
-const WAIT_CANCELER_VMOS_COMMON_SIZE: usize = 1;
-
-struct WaitCancelerVmos {
-    // Commonly just one VMO, sometimes more than one
-    cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; WAIT_CANCELER_VMOS_COMMON_SIZE]>,
+struct WaitCancelerVmo {
+    vmo: Weak<zx::Vmo>,
+    inner: HandleWaitCanceler,
 }
 
 enum WaitCancelerInner {
     Zxio(WaitCancelerZxio),
     Timer(WaitCancelerTimer),
     Queue(WaitCancelerQueue),
-    Vmos(WaitCancelerVmos),
+    Vmo(WaitCancelerVmo),
 }
 
-const MAX_INNER_CANCELLERS: usize = 2;
+const WAIT_CANCELER_COMMON_SIZE: usize = 2;
 
 /// Return values for wait_async methods.
 ///
@@ -214,7 +207,7 @@ const MAX_INNER_CANCELLERS: usize = 2;
 /// Does not implement `Clone` or `Copy` so that only a single canceler exists
 /// per wait.
 pub struct WaitCanceler {
-    cancellers: smallvec::SmallVec<[WaitCancelerInner; MAX_INNER_CANCELLERS]>,
+    cancellers: smallvec::SmallVec<[WaitCancelerInner; WAIT_CANCELER_COMMON_SIZE]>,
 }
 
 impl WaitCanceler {
@@ -234,20 +227,33 @@ impl WaitCanceler {
         Self::new_inner(WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }))
     }
 
-    pub fn new_vmos(
-        cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; WAIT_CANCELER_VMOS_COMMON_SIZE]>,
-    ) -> Self {
-        Self::new_inner(WaitCancelerInner::Vmos(WaitCancelerVmos { cancelers }))
+    pub fn new_vmo(vmo: Weak<zx::Vmo>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }))
     }
 
-    pub fn merge(Self { mut cancellers }: Self, Self { cancellers: mut other }: Self) -> Self {
-        // Increase `MAX_INNER_CANCELLERS` if needed, or remove this assert and
-        // allow the smallvec to allocate.
+    /// Equivalent to `merge_unbounded`, except that it enforces that the resulting vector of
+    /// cancellers is small enough to avoid being separately allocated on the heap.
+    ///
+    /// If possible, use this function instead of `merge_unbounded`, because it gives us better
+    /// tools to keep this code path optimized.
+    pub fn merge(self, other: Self) -> Self {
+        // Increase `WAIT_CANCELER_COMMON_SIZE` if needed, or remove this assert and allow the
+        // smallvec to allocate.
         assert!(
-            cancellers.len() + other.len() <= MAX_INNER_CANCELLERS,
-            "WaitCanceler only supports {} inner cancellers",
-            MAX_INNER_CANCELLERS
+            self.cancellers.len() + other.cancellers.len() <= WAIT_CANCELER_COMMON_SIZE,
+            "WaitCanceler::merge disallows more than {} cancellers, found {} + {}",
+            WAIT_CANCELER_COMMON_SIZE,
+            self.cancellers.len(),
+            other.cancellers.len()
         );
+        WaitCanceler::merge_unbounded(self, other)
+    }
+
+    /// Creates a new `WaitCanceler` that is equivalent to canceling both its arguments.
+    pub fn merge_unbounded(
+        Self { mut cancellers }: Self,
+        Self { cancellers: mut other }: Self,
+    ) -> Self {
         cancellers.append(&mut other);
         WaitCanceler { cancellers }
     }
@@ -257,7 +263,7 @@ impl WaitCanceler {
     /// Takes `self` by value since a wait can only be canceled once.
     pub fn cancel(self) {
         let Self { cancellers } = self;
-        for canceller in cancellers {
+        for canceller in cancellers.into_iter().rev() {
             match canceller {
                 WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }) => {
                     let Some(zxio) = zxio.upgrade() else { return };
@@ -291,13 +297,9 @@ impl WaitCanceler {
                         }
                     };
                 }
-                WaitCancelerInner::Vmos(WaitCancelerVmos { mut cancelers }) => {
-                    for i in (0..cancelers.len()).rev() {
-                        let canceler = cancelers.remove(i);
-                        if let Some(handle) = canceler.handle.upgrade() {
-                            canceler.canceler.cancel(handle.as_handle_ref());
-                        }
-                    }
+                WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }) => {
+                    let Some(vmo) = vmo.upgrade() else { return };
+                    inner.cancel(vmo.as_handle_ref());
                 }
             }
         }

@@ -13,7 +13,7 @@ use crate::{
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
-        WaitCanceler, WaitCancelerOneVmo, Waiter,
+        WaitCanceler, Waiter,
     },
 };
 use fidl::HandleBased;
@@ -250,7 +250,7 @@ impl FileOps for SyncFile {
 
         let count = Arc::<AtomicUsizeCounter>::new(0.into());
 
-        let mut cancelers: smallvec::SmallVec<[WaitCancelerOneVmo; 1]> = smallvec::smallvec![];
+        let mut canceler = WaitCanceler::new_noop();
 
         for sync_point in &self.fence.sync_points {
             let signal_handler = SignalHandler {
@@ -284,10 +284,10 @@ impl FileOps for SyncFile {
             if sync_point.handle.wait_handle(Self::SIGNAL, zx::Time::ZERO)
                 == Err(zx::Status::TIMED_OUT)
             {
-                cancelers.push(WaitCancelerOneVmo {
-                    handle: Arc::downgrade(&sync_point.handle),
-                    canceler: canceler_result,
-                });
+                canceler = WaitCanceler::merge_unbounded(
+                    canceler,
+                    WaitCanceler::new_vmo(Arc::downgrade(&sync_point.handle), canceler_result),
+                );
             } else {
                 canceler_result.cancel(sync_point.handle.as_handle_ref());
 
@@ -295,7 +295,7 @@ impl FileOps for SyncFile {
             }
         }
 
-        Some(WaitCanceler::new_vmos(cancelers))
+        Some(canceler)
     }
 
     fn query_events(
