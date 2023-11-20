@@ -7,7 +7,18 @@
 #include <lib/zx/process.h>
 #include <zircon/processargs.h>
 
+#include <string>
+
 namespace ld::testing {
+
+elfldltl::Soname<> GetVdsoSoname() {
+  static const std::string soname_str = []() {
+    // TODO(fxbug.dev/136360): Decode the Vdso name from its VMO.
+    return std::string{"libzircon.so"};
+  }();
+  static const elfldltl::Soname<> soname{soname_str};
+  return soname;
+}
 
 zx::unowned_vmo GetVdsoVmo() {
   static const zx::vmo vdso{zx_take_startup_handle(PA_HND(PA_VMO_VDSO, 0))};

@@ -16,33 +16,20 @@
 namespace ld::testing {
 
 constexpr std::string_view kLibprefix = LD_STARTUP_TEST_LIBPREFIX;
-constexpr auto kVdsoName = elfldltl::Soname<>{"libzircon.so"};
 constexpr auto kLinkerName = ld::abi::Abi<>::kSoname;
-constexpr size_t kDefaultStackSize = 4096;
-
-zx::vmo LdRemoteProcessTests::GetTestVmo(std::string_view path) {
-  zx::vmo vmo;
-  auto get_vmo = [&]() { ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(path)); };
-  get_vmo();
-  return vmo;
-}
-
 class LdRemoteProcessTests::MockLoader {
  public:
   MOCK_METHOD(zx::vmo, LoadObject, (std::string));
 
   void ExpectLoadObject(std::string_view name) {
     const std::string path = std::filesystem::path("test") / "lib" / kLibprefix / name;
-    EXPECT_CALL(*this, LoadObject(std::string{name})).WillOnce(::testing::Return(GetTestVmo(path)));
+    EXPECT_CALL(*this, LoadObject(std::string{name}))
+        .WillOnce(::testing::Return(elfldltl::testing::GetTestLibVmo(path)));
   }
 
  private:
   ::testing::InSequence sequence_guard_;
 };
-
-void LdRemoteProcessTests::SetUp() {
-  GTEST_SKIP() << "TODO(fxb/134320): Skip until relocation and loader is implemented.";
-}
 
 LdRemoteProcessTests::LdRemoteProcessTests() = default;
 
@@ -72,7 +59,7 @@ void LdRemoteProcessTests::Needed(std::initializer_list<std::string_view> names)
   for (std::string_view name : names) {
     // The linker and vdso should not be included in any `Needed` list for a
     // test, because load requests for them bypass the loader.
-    ASSERT_TRUE(name != kLinkerName.str() && name != kVdsoName.c_str())
+    ASSERT_TRUE(name != kLinkerName.str() && name != GetVdsoSoname().str())
         << std::string{name} + " should not be included in Needed list.";
     mock_loader_->ExpectLoadObject(name);
   }
@@ -83,40 +70,55 @@ void LdRemoteProcessTests::Load(std::string_view executable_name) {
 
   auto diag = elfldltl::testing::ExpectOkDiagnostics();
 
-  const std::string executable_path =
-      std::filesystem::path("test") / "bin" / kLibprefix / executable_name;
-  zx::vmo vmo;
-  ASSERT_NO_FATAL_FAILURE(vmo = elfldltl::testing::GetTestLibVmo(executable_path));
+  const std::string executable_path = std::filesystem::path("test") / "bin" / executable_name;
 
-  auto exec = std::make_unique<RemoteModule>(abi::Abi<>::kExecutableName);
-  auto exec_info = exec->Decode(diag, std::move(vmo));
-  ASSERT_TRUE(exec_info);
-  set_stack_size(exec_info->stack_size);
+  zx::vmo vmo = elfldltl::testing::GetTestLibVmo(executable_path);
 
-  auto get_dep_vmo = [this](const elfldltl::Soname<>& soname) -> zx::vmo {
-    // Executables may depend on the stub linker and vdso implicitly, so fetch
-    // these VMO directly without going through the mock loader.
-    if (soname == kVdsoName) {
-      zx::vmo vmo;
-      GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo);
-      return vmo;
+  zx::vmo vdso_vmo;
+  zx_status_t status = GetVdsoVmo()->duplicate(ZX_RIGHT_SAME_RIGHTS, &vdso_vmo);
+  EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  zx::vmo stub_ld_vmo;
+  stub_ld_vmo = elfldltl::testing::GetTestLibVmo("ld-stub.so");
+
+  auto get_dep_vmo = [this, vdso_name = GetVdsoSoname(), &vdso_vmo,
+                      &stub_ld_vmo](const elfldltl::Soname<>& soname) -> zx::vmo {
+    // Executables may depend on the stub linker and vdso implicitly, so return
+    // pre-fetched VMOs, asserting that these deps are requested once at most.
+    if (soname == vdso_name) {
+      EXPECT_TRUE(vdso_vmo) << vdso_name << " for passive ABI should not be looked up twice.";
+      return std::exchange(vdso_vmo, {});
     }
     if (soname == kLinkerName) {
-      return GetTestVmo("ld-stub.so");
+      EXPECT_TRUE(stub_ld_vmo) << kLinkerName << " for passive ABI should not be looked up twice.";
+      return std::exchange(stub_ld_vmo, {});
     }
     return mock_loader_->LoadObject(std::string{soname.str()});
   };
 
-  auto modules = RemoteModule::LinkModules(diag, std::move(exec), exec_info->needed, get_dep_vmo);
-  EXPECT_TRUE(!modules.is_empty());
+  auto decode_result = RemoteModule::DecodeModules(diag, std::move(vmo), get_dep_vmo);
+  EXPECT_TRUE(decode_result);
+  set_stack_size(decode_result->main_exec.stack_size);
+
+  auto& modules = decode_result->modules;
+  ASSERT_FALSE(modules.is_empty());
+  EXPECT_TRUE(RemoteModule::AllocateModules(diag, modules, root_vmar().borrow()));
+  EXPECT_TRUE(RemoteModule::RelocateModules(diag, modules));
+  EXPECT_TRUE(RemoteModule::LoadModules(diag, modules));
+  RemoteModule::CommitModules(modules);
+
+  // The executable will always be the first module, retrieve it to set the
+  // loaded entry point.
+  set_entry(decode_result->main_exec.relative_entry + modules.front().load_bias());
+
+  // Locate the loaded VDSO to set the vdso base pointer for the test.
+  auto loaded_vdso = std::find(modules.begin(), modules.end(), GetVdsoSoname());
+  ASSERT_TRUE(loaded_vdso != modules.end());
+  set_vdso_base(loaded_vdso->module().vaddr_start());
 }
 
 int64_t LdRemoteProcessTests::Run() {
-  // Since the LdRemoteProcessTests fixture does not yet implement a bootstrap
-  // channel from which to calculate a stack size, make sure some value gets
-  // passed in for allocating the stack.
-  auto stack_size = stack_size_ ? *stack_size_ : kDefaultStackSize;
-  return LdLoadZirconProcessTestsBase::Run(nullptr, stack_size, thread_, entry_, vdso_base_,
+  return LdLoadZirconProcessTestsBase::Run(nullptr, stack_size_, thread_, entry_, vdso_base_,
                                            root_vmar());
 }
 
