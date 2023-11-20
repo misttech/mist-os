@@ -324,6 +324,10 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
         info.time_modify =
             zx::Time::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
     }
+    if attrs.has.change_time {
+        info.time_status_change =
+            zx::Time::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+    }
 }
 
 fn get_mode(attrs: &zxio_node_attributes_t) -> Result<FileMode, Errno> {
@@ -712,8 +716,9 @@ impl FsNodeOps for RemoteNode {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime and atime, we should refresh
-        // with the corresponding values.
+        let update_timestamps = self.filesystem_manages_timestamps(&node);
+        // TODO(fxbug.dev/294318193): when Fxfs supports tracking atime, we should refresh with the
+        // corresponding value.
         let attrs = self
             .zxio
             .attr_get(zxio_node_attr_has_t {
@@ -721,7 +726,8 @@ impl FsNodeOps for RemoteNode {
                 storage_size: true,
                 link_count: true,
                 // If the filesystem can manage timestamps, update `info` with those timestamps.
-                modification_time: self.filesystem_manages_timestamps(&node),
+                modification_time: update_timestamps,
+                change_time: update_timestamps,
                 ..Default::default()
             })
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -744,6 +750,7 @@ impl FsNodeOps for RemoteNode {
         // Omit updating creation_time. By definition, there shouldn't be a change in creation_time.
         let mutable_node_attributes = zxio_node_attributes_t {
             modification_time: info.time_modify.into_nanos() as u64,
+            access_time: info.time_access.into_nanos() as u64,
             mode: info.mode.bits(),
             uid: info.uid,
             gid: info.gid,
@@ -2401,7 +2408,7 @@ mod test {
     }
 
     #[::fuchsia::test]
-    async fn test_time_modify_managed_by_fs() {
+    async fn test_write_updates_mtime_ctime() {
         let fixture = TestFixture::new().await;
         let (server, client) = zx::Channel::create();
         fixture
@@ -2428,33 +2435,41 @@ mod test {
                 .create_node(&current_task, b"file", MODE, DeviceType::NONE)
                 .expect("create_node failed");
             let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
-            // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+            // Call `refresh_info(..)` to refresh ctime and mtime with the time managed by the
             // underlying filesystem
-            let time_before_write = child
-                .entry
-                .node
-                .refresh_info(&current_task)
-                .expect("refresh info failed")
-                .time_modify;
+            let (ctime_before_write, mtime_before_write) = {
+                let info =
+                    child.entry.node.refresh_info(&current_task).expect("refresh info failed");
+                (info.time_status_change, info.time_modify)
+            };
+
+            // Writing to a file should update ctime and mtime
             let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
             let written = file
                 .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
                 .expect("write failed");
             assert_eq!(written, write_bytes.len());
 
-            let last_modified_on_starnix = child.entry.node.info().time_modify;
             // As Fxfs, the underlying filesystem in this test, can manage file timestamps,
-            // we should not see an update in mtime without first refreshing the node.
-            assert_eq!(last_modified_on_starnix, time_before_write);
+            // we should not see an update in mtime and ctime without first refreshing the node with
+            // the metadata from Fxfs.
+            let (ctime_after_write_no_refresh, mtime_after_write_no_refresh) = {
+                let info = child.entry.node.info();
+                (info.time_status_change, info.time_modify)
+            };
+            assert_eq!(ctime_after_write_no_refresh, ctime_before_write);
+            assert_eq!(mtime_after_write_no_refresh, mtime_before_write);
 
-            // Get mtime from filesystem
-            let last_modified = child
-                .entry
-                .node
-                .refresh_info(&current_task)
-                .expect("refresh info failed")
-                .time_modify;
-            assert!(last_modified > time_before_write);
+            // Refresh information, we should see `info` with mtime and ctime from the remote
+            // filesystem (assume this is true if the new timestamp values are greater than the ones
+            // without the refresh).
+            let (ctime_after_write_refresh, mtime_after_write_refresh) = {
+                let info =
+                    child.entry.node.refresh_info(&current_task).expect("refresh info failed");
+                (info.time_status_change, info.time_modify)
+            };
+            assert_eq!(ctime_after_write_refresh, mtime_after_write_refresh);
+            assert!(ctime_after_write_refresh > ctime_after_write_no_refresh);
         })
         .await;
 

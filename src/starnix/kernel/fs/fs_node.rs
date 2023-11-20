@@ -1519,12 +1519,13 @@ impl FsNode {
         mutator(&mut new_info)?;
         let mut has = zxio_node_attr_has_t { ..Default::default() };
         has.modification_time = info.time_modify != new_info.time_modify;
+        has.access_time = info.time_access != new_info.time_access;
         has.mode = info.mode != new_info.mode;
         has.uid = info.uid != new_info.uid;
         has.gid = info.gid != new_info.gid;
         has.rdev = info.rdev != new_info.rdev;
         // Call `update_attributes(..)` to persist the changes for the following fields.
-        if has.modification_time || has.mode || has.uid || has.gid || has.rdev {
+        if has.modification_time || has.access_time || has.mode || has.uid || has.gid || has.rdev {
             self.ops().update_attributes(&new_info, has)?;
         }
         *info = new_info;
@@ -1829,25 +1830,21 @@ impl FsNode {
 
     /// Update the ctime and mtime of a file to now.
     pub fn update_ctime_mtime(&self) {
-        let now = utc::utc_now();
         if self.ops().filesystem_manages_timestamps(self) {
-            // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime, we don't have to update
-            // node info with ctime
-            self.update_info(|info| {
-                info.time_status_change = now;
-            })
-        } else {
-            self.update_info(|info| {
-                info.time_status_change = now;
-                info.time_modify = now;
-            });
+            return;
         }
+        self.update_info(|info| {
+            let now = utc::utc_now();
+            info.time_status_change = now;
+            info.time_modify = now;
+        });
     }
 
     /// Update the ctime of a file to now.
     pub fn update_ctime(&self) {
-        // TODO(fxbug.dev/294318193): when Fxfs supports tracking ctime, we don't have to update
-        // node info with ctime
+        if self.ops().filesystem_manages_timestamps(self) {
+            return;
+        }
         self.update_info(|info| {
             let now = utc::utc_now();
             info.time_status_change = now;
