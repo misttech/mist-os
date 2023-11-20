@@ -14,9 +14,9 @@
 
 #include <array>
 
-#include "sdmmc-root-device.h"
-
 namespace sdmmc {
+
+class SdmmcRootDevice;
 
 // SdmmcDevice wraps a ddk::SdmmcProtocolClient to provide helper methods to the SD/MMC and SDIO
 // core drivers. It is assumed that the underlying SDMMC protocol driver can handle calls from
@@ -26,8 +26,7 @@ namespace sdmmc {
 // required.
 class SdmmcDevice {
  public:
-  explicit SdmmcDevice(SdmmcRootDevice* root_device, zx_device_t* parent)
-      : root_device_(root_device), host_(parent) {}
+  explicit SdmmcDevice(SdmmcRootDevice* root_device) : root_device_(root_device) {}
 
   // For testing using Banjo.
   explicit SdmmcDevice(const ddk::SdmmcProtocolClient& host) : host_(host) {}
@@ -124,7 +123,7 @@ class SdmmcDevice {
 
   bool using_fidl_ = false;
   const SdmmcRootDevice* const root_device_ = nullptr;
-  const ddk::SdmmcProtocolClient host_;
+  ddk::SdmmcProtocolClient host_;
   // The FIDL client to communicate with Sdmmc device.
   fdf::WireSharedClient<fuchsia_hardware_sdmmc::Sdmmc> client_;
 

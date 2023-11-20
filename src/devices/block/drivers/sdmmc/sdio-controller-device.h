@@ -7,6 +7,8 @@
 
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/sdio/c/banjo.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/thread_annotations.h>
@@ -16,7 +18,6 @@
 #include <atomic>
 #include <memory>
 
-#include <ddktl/device.h>
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
@@ -27,27 +28,25 @@
 
 namespace sdmmc {
 
-class SdioControllerDevice;
-using SdioControllerDeviceType = ddk::Device<SdioControllerDevice, ddk::Unbindable>;
+class SdmmcRootDevice;
 
-class SdioControllerDevice : public SdioControllerDeviceType,
-                             public ddk::InBandInterruptProtocol<SdioControllerDevice> {
+class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerDevice> {
  public:
-  SdioControllerDevice(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc)
-      : SdioControllerDeviceType(parent), sdmmc_(std::move(sdmmc)) {
+  static constexpr char kDeviceName[] = "sdmmc-sdio";
+
+  SdioControllerDevice(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc)
+      : parent_(parent), sdmmc_(std::move(sdmmc)) {
     for (size_t i = 0; i < funcs_.size(); i++) {
       funcs_[i] = {};
     }
   }
+  ~SdioControllerDevice() { StopSdioIrqThread(); }
 
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc, bool use_fidl,
-                            std::unique_ptr<SdioControllerDevice>* out_dev);
+  static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
+                            bool use_fidl, std::unique_ptr<SdioControllerDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdioControllerDevice fails to probe (i.e., no eligible
   // device present).
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
-
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
 
   zx_status_t Probe(const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata);
   zx_status_t AddDevice();
@@ -75,6 +74,12 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   zx_status_t SdioPerformTuning();
 
   void InBandInterruptCallback();
+
+  // Called by children of this device.
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& sdio_controller_node() {
+    return sdio_controller_node_;
+  }
+  SdmmcRootDevice* parent() { return parent_; }
 
   // Visible for testing.
   zx_status_t Init(bool use_fidl = false) TA_EXCL(lock_) {
@@ -155,6 +160,7 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   sync_completion_t irq_signal_;
 
   fbl::Mutex lock_;
+  SdmmcRootDevice* const parent_;
   std::unique_ptr<SdmmcDevice> sdmmc_;
   std::atomic<bool> dead_ = false;
   std::array<zx::interrupt, SDIO_MAX_FUNCS> sdio_irqs_;
@@ -168,6 +174,13 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   inspect::UintProperty rx_errors_;
 
   async_dispatcher_t* dispatcher_ = nullptr;
+
+  std::optional<inspect::ComponentInspector> exposed_inspector_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> sdio_controller_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  std::array<std::unique_ptr<SdioFunctionDevice>, SDIO_MAX_FUNCS> child_sdio_function_devices_ = {};
 };
 
 }  // namespace sdmmc

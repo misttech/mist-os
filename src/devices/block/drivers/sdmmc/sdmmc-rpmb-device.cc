@@ -6,73 +6,79 @@
 
 #include <lib/fdf/dispatcher.h>
 
+#include <bind/fuchsia/hardware/rpmb/cpp/bind.h>
+
 #include "sdmmc-block-device.h"
+#include "sdmmc-root-device.h"
 #include "sdmmc-types.h"
 
 namespace sdmmc {
 
-zx_status_t RpmbDevice::Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
-                               const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
-                               const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd) {
-  auto device = std::make_unique<RpmbDevice>(parent, sdmmc, cid, ext_csd);
+RpmbDevice::RpmbDevice(SdmmcBlockDevice* sdmmc_parent,
+                       const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
+                       const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd)
+    : sdmmc_parent_(sdmmc_parent),
+      cid_(cid),
+      rpmb_size_(ext_csd[MMC_EXT_CSD_RPMB_SIZE_MULT]),
+      reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {
+  const std::string path_from_parent = std::string(sdmmc_parent_->parent()->driver_name()) + "/" +
+                                       std::string(sdmmc_parent_->block_name()) + "/";
+  compat_server_.emplace(
+      sdmmc_parent_->parent()->driver_incoming(), sdmmc_parent_->parent()->driver_outgoing(),
+      sdmmc_parent_->parent()->driver_node_name(), kDeviceName, path_from_parent);
+}
 
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
+zx_status_t RpmbDevice::AddDevice() {
+  {
+    fuchsia_hardware_rpmb::Service::InstanceHandler handler({
+        .device = fit::bind_member<&RpmbDevice::Serve>(this),
+    });
+    auto result =
+        sdmmc_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_rpmb::Service>(
+            std::move(handler));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add RPMB service: %s", result.status_string());
+      return result.status_value();
+    }
   }
 
-  std::array offers = {
-      fuchsia_hardware_rpmb::Service::Name,
-  };
-
-  device->outgoing_server_end_ = std::move(endpoints->server);
-  auto status = device->DdkAdd(ddk::DeviceAddArgs("rpmb")
-                                   .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                                   .set_fidl_service_offers(offers)
-                                   .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to add RPMB partition device: %d", status);
-    return status;
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.status_value();
   }
 
-  [[maybe_unused]] auto* placeholder1 = device.release();
+  controller_.Bind(std::move(controller_endpoints->client));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_rpmb::SERVICE,
+                                    bind_fuchsia_hardware_rpmb::SERVICE_ZIRCONTRANSPORT);
+
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_->CreateOffers(arena);
+  offers.push_back(
+      fdf::MakeOffer<fuchsia_hardware_rpmb::Service>(arena, component::kDefaultInstance));
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, kDeviceName)
+                        .offers(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result =
+      sdmmc_parent_->block_node()->AddChild(args, std::move(controller_endpoints->server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child partition device: %s", result.status_string());
+    return result.status();
+  }
   return ZX_OK;
 }
 
-void RpmbDevice::DdkInit(ddk::InitTxn txn) {
-  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
-  ZX_ASSERT(fdf_dispatcher);
-  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
-  outgoing_ = component::OutgoingDirectory(dispatcher);
-
-  fuchsia_hardware_rpmb::Service::InstanceHandler handler({
-      .device = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
-  });
-  auto result = outgoing_->AddService<fuchsia_hardware_rpmb::Service>(std::move(handler));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
-  }
-
-  result = outgoing_->Serve(std::move(outgoing_server_end_));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
-  }
-
-  txn.Reply(ZX_OK);
-}
-
-void RpmbDevice::DdkRelease() { delete this; }
-
-void RpmbDevice::DdkUnbind(ddk::UnbindTxn txn) {
-  auto result = outgoing_->RemoveService<fuchsia_hardware_rpmb::Service>();
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to remove service from the outgoing directory");
-  }
-  txn.Reply();
+void RpmbDevice::Serve(fidl::ServerEnd<fuchsia_hardware_rpmb::Rpmb> request) {
+  fidl::BindServer(sdmmc_parent_->parent()->driver_async_dispatcher(), std::move(request), this);
 }
 
 void RpmbDevice::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {

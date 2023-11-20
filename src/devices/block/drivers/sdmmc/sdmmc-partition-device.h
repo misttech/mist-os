@@ -7,11 +7,11 @@
 
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
 #include <fuchsia/hardware/block/partition/cpp/banjo.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <zircon/types.h>
 
 #include <cinttypes>
-
-#include <ddktl/device.h>
 
 #include "sdmmc-types.h"
 
@@ -19,25 +19,13 @@ namespace sdmmc {
 
 class SdmmcBlockDevice;
 
-class PartitionDevice;
-using PartitionDeviceType = ddk::Device<PartitionDevice, ddk::GetProtocolable>;
-
-class PartitionDevice : public PartitionDeviceType,
-                        public ddk::BlockImplProtocol<PartitionDevice, ddk::base_protocol>,
+class PartitionDevice : public ddk::BlockImplProtocol<PartitionDevice>,
                         public ddk::BlockPartitionProtocol<PartitionDevice> {
  public:
-  PartitionDevice(zx_device_t* parent, SdmmcBlockDevice* sdmmc_parent,
-                  const block_info_t& block_info, EmmcPartition partition)
-      : PartitionDeviceType(parent),
-        sdmmc_parent_(sdmmc_parent),
-        block_info_(block_info),
-        partition_(partition) {}
+  PartitionDevice(SdmmcBlockDevice* sdmmc_parent, const block_info_t& block_info,
+                  EmmcPartition partition);
 
   zx_status_t AddDevice();
-
-  void DdkRelease() { delete this; }
-
-  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
   void BlockImplQuery(block_info_t* info_out, size_t* block_op_size_out);
   void BlockImplQueue(block_op_t* btxn, block_impl_queue_callback completion_cb, void* cookie);
@@ -49,6 +37,13 @@ class PartitionDevice : public PartitionDeviceType,
   SdmmcBlockDevice* const sdmmc_parent_;
   const block_info_t block_info_;
   const EmmcPartition partition_;
+
+  std::string partition_name_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  compat::BanjoServer block_impl_server_{ZX_PROTOCOL_BLOCK_IMPL, this, &block_impl_protocol_ops_};
+  std::optional<compat::BanjoServer> block_partition_server_;
+  std::optional<compat::DeviceServer> compat_server_;
 };
 
 }  // namespace sdmmc

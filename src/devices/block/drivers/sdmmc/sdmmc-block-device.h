@@ -7,11 +7,13 @@
 
 #include <fidl/fuchsia.hardware.sdmmc/cpp/wire.h>
 #include <fuchsia/hardware/block/driver/cpp/banjo.h>
-#include <lib/ddk/trace/event.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fzl/vmo-mapper.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/block.h>
 #include <lib/sdmmc/hw.h>
+#include <lib/trace/event.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <threads.h>
 #include <zircon/types.h>
@@ -23,15 +25,17 @@
 #include <memory>
 #include <semaphore>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/auto_lock.h>
 #include <fbl/condition_variable.h>
 
 #include "sdmmc-device.h"
+#include "sdmmc-partition-device.h"
+#include "sdmmc-rpmb-device.h"
 #include "sdmmc-types.h"
 
 namespace sdmmc {
+
+class SdmmcRootDevice;
 
 // This class serves two purposes:
 // 1. Maintain metadata for IO while the IO is in progress: When using Banjo, this is a hard
@@ -64,14 +68,14 @@ class ReadWriteMetadata {
 
       zx_status_t status = zx::vmo::create(block_size, 0, &entries_[i].packed_command_header_vmo);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to create packed command header vmo: %s",
-               zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to create packed command header vmo: %s",
+                zx_status_get_string(status));
         return status;
       }
 
       status = entries_[i].packed_command_header_mapper.Map(entries_[i].packed_command_header_vmo);
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to map packed command header vmo: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to map packed command header vmo: %s", zx_status_get_string(status));
         return status;
       }
 
@@ -105,19 +109,19 @@ class ReadWriteMetadata {
   int entry_index_ = 0;
 };
 
-class SdmmcBlockDevice;
-using SdmmcBlockDeviceType = ddk::Device<SdmmcBlockDevice, ddk::Unbindable, ddk::Suspendable>;
-
-class SdmmcBlockDevice : public SdmmcBlockDeviceType {
+class SdmmcBlockDevice {
  public:
-  SdmmcBlockDevice(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc)
-      : SdmmcBlockDeviceType(parent), sdmmc_(std::move(sdmmc)) {
+  SdmmcBlockDevice(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc)
+      : parent_(parent), sdmmc_(std::move(sdmmc)) {
     block_info_.max_transfer_size = static_cast<uint32_t>(sdmmc_->host_info().max_transfer_size);
   }
-  ~SdmmcBlockDevice() { txn_list_.CompleteAll(ZX_ERR_INTERNAL); }
+  ~SdmmcBlockDevice() {
+    StopWorkerThread();
+    txn_list_.CompleteAll(ZX_ERR_INTERNAL);
+  }
 
-  static zx_status_t Create(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc, bool use_fidl,
-                            std::unique_ptr<SdmmcBlockDevice>* out_dev);
+  static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
+                            bool use_fidl, std::unique_ptr<SdmmcBlockDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdmmcBlockDevice fails to probe (i.e., no eligible device
   // present).
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
@@ -131,16 +135,12 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
 
   zx_status_t AddDevice() TA_EXCL(lock_);
 
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkRelease() {
-    StopWorkerThread();
-    delete this;
-  }
-
   // Called by children of this device.
   void Queue(BlockOperation txn) TA_EXCL(lock_);
   void RpmbQueue(RpmbRequestInfo info) TA_EXCL(lock_);
+  fidl::WireSyncClient<fuchsia_driver_framework::Node>& block_node() { return block_node_; }
+  std::string_view block_name() const { return block_name_; }
+  SdmmcRootDevice* parent() { return parent_; }
 
   // Visible for testing.
   zx_status_t Init(bool use_fidl = false) { return sdmmc_->Init(use_fidl); }
@@ -186,6 +186,7 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
   bool MmcSupportsHs400();
   void MmcSetInspectProperties();
 
+  SdmmcRootDevice* const parent_;
   std::unique_ptr<SdmmcDevice> sdmmc_;  // Only accessed by ProbeSd, ProbeMmc, and WorkerThread.
 
   sdmmc_bus_width_t bus_width_;
@@ -235,6 +236,15 @@ class SdmmcBlockDevice : public SdmmcBlockDeviceType {
     inspect::UintProperty max_packed_writes_effective_;  // Set once by the init thread.
     inspect::BoolProperty using_fidl_;                   // Set once by the init thread.
   } properties_;
+
+  std::optional<inspect::ComponentInspector> exposed_inspector_;
+
+  std::string_view block_name_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> block_node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  std::vector<std::unique_ptr<PartitionDevice>> child_partition_devices_;
+  std::unique_ptr<RpmbDevice> child_rpmb_device_;
 };
 
 }  // namespace sdmmc

@@ -8,7 +8,7 @@
 #include <fuchsia/hardware/sdio/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
 #include <lib/sdio/hw.h>
 #include <lib/zx/time.h>
 #include <stdio.h>
@@ -16,6 +16,8 @@
 #include <string.h>
 
 #include <pretty/hexdump.h>
+
+#include "sdmmc-root-device.h"
 
 namespace {
 
@@ -59,7 +61,7 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcReq> BanjoToFidlReq(const sdmmc_re
       zx_status_t status = zx_handle_duplicate(banjo_req.buffers_list[i].buffer.vmo,
                                                ZX_RIGHT_SAME_RIGHTS, dup.reset_and_get_address());
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
+        FDF_LOG(ERROR, "Failed to duplicate vmo: %s", zx_status_get_string(status));
         return zx::error(status);
       }
       wire_req.buffers[i].type = fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle;
@@ -100,34 +102,42 @@ zx_status_t SdmmcDevice::Init(bool use_fidl) {
 
   if (use_fidl && root_device_ != nullptr) {
     auto client_end =
-        root_device_->DdkConnectRuntimeProtocol<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
-    if (!client_end.is_ok()) {
-      using_fidl_ = false;
-    } else {
-      client_ = fdf::WireSharedClient(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
-
-      fdf::Arena arena('SDMC');
-      auto result = client_.sync().buffer(arena)->HostInfo();
-      using_fidl_ = result.ok();
+        root_device_->driver_incoming()->Connect<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
+    if (client_end.is_error() || !client_end->is_valid()) {
+      FDF_LOG(ERROR, "Failed to connect to FIDL SDMMC protocol: %s", client_end.status_string());
+      return client_end.status_value();
     }
+    client_ = fdf::WireSharedClient(std::move(*client_end), fdf::Dispatcher::GetCurrent()->get());
 
-    if (!using_fidl_) {
-      zxlogf(ERROR, "Failed to get FIDL SDMMC protocol.");
+    fdf::Arena arena('SDMC');
+    auto result = client_.sync().buffer(arena)->HostInfo();
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "Failed to get HostInfo using FIDL SDMMC protocol: %s",
+              result.status_string());
+      return result.status();
+    }
+  } else {
+    auto host = compat::ConnectBanjo<ddk::SdmmcProtocolClient>(root_device_->driver_incoming());
+    if (!host.is_ok()) {
+      FDF_LOG(ERROR, "Failed to connect to Banjo SDMMC protocol: %s", host.status_string());
+      return host.status_value();
+    }
+    host_ = *host;
+
+    if (!host_.is_valid()) {
+      FDF_LOG(ERROR, "Failed to get valid Banjo SDMMC protocol.");
       return ZX_ERR_NOT_SUPPORTED;
     }
-  } else if (!host_.is_valid()) {
-    zxlogf(ERROR, "Failed to get Banjo SDMMC protocol.");
-    return ZX_ERR_NOT_SUPPORTED;
   }
 
   zx_status_t status = HostInfo(&host_info_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to get host info: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "failed to get host info: %s", zx_status_get_string(status));
     return status;
   }
 
-  zxlogf(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "", UseDma() ? 1 : 0,
-         (host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0, host_info().max_transfer_size);
+  FDF_LOG(DEBUG, "host caps dma %d 8-bit bus %d max_transfer_size %" PRIu64 "", UseDma() ? 1 : 0,
+          (host_info().caps & SDMMC_HOST_CAP_BUS_WIDTH_8) ? 1 : 0, host_info().max_transfer_size);
 
   // Reset the card.
   HwReset();
@@ -136,7 +146,7 @@ zx_status_t SdmmcDevice::Init(bool use_fidl) {
   // the idle state.
   status = SdmmcGoIdle();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "SDMMC_GO_IDLE_STATE failed: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "SDMMC_GO_IDLE_STATE failed: %s", zx_status_get_string(status));
     return status;
   }
   return ZX_OK;
@@ -279,7 +289,7 @@ void SdmmcDevice::SdmmcIoRequestWithRetries(std::vector<sdmmc_req_t> reqs,
       .Then([this, reqs = std::move(reqs), callback = std::move(callback), retries, last_retry](
                 fdf::WireUnownedResult<fuchsia_hardware_sdmmc::Sdmmc::Request>& result) mutable {
         if (!result.ok()) {
-          zxlogf(ERROR, "Request request failed: %s", result.status_string());
+          FDF_LOG(ERROR, "Request request failed: %s", result.status_string());
           return callback(result.status(), retries);  // Not retrying if FIDL error.
         }
 
@@ -349,12 +359,12 @@ zx_status_t SdmmcDevice::SdSendIfCond() {
   uint32_t response[4];
   zx_status_t st = Request(req, response);
   if (st != ZX_OK) {
-    zxlogf(DEBUG, "SD_SEND_IF_COND failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_SEND_IF_COND failed, retcode = %d", st);
     return st;
   }
   if ((response[0] & 0xfff) != arg) {
     // The card should have replied with the pattern that we sent.
-    zxlogf(DEBUG, "SDMMC_SEND_IF_COND got bad reply = %" PRIu32 "", response[0]);
+    FDF_LOG(DEBUG, "SDMMC_SEND_IF_COND got bad reply = %" PRIu32 "", response[0]);
     return ZX_ERR_BAD_STATE;
   } else {
     return ZX_OK;
@@ -370,7 +380,7 @@ zx_status_t SdmmcDevice::SdSendRelativeAddr(uint16_t* card_status) {
   uint32_t response[4];
   zx_status_t st = Request(req, response);
   if (st != ZX_OK) {
-    zxlogf(DEBUG, "SD_SEND_RELATIVE_ADDR failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_SEND_RELATIVE_ADDR failed, retcode = %d", st);
     return st;
   }
 
@@ -438,17 +448,17 @@ zx_status_t SdmmcDevice::SdSwitchUhsVoltage(uint32_t ocr) {
 
   uint32_t unused_response[4];
   if ((st = Request(req, unused_response)) != ZX_OK) {
-    zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
 
   if ((st = SetBusFreq(0)) != ZX_OK) {
-    zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
 
   if ((st = SetSignalVoltage(SDMMC_VOLTAGE_V180)) != ZX_OK) {
-    zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
 
@@ -456,7 +466,7 @@ zx_status_t SdmmcDevice::SdSwitchUhsVoltage(uint32_t ocr) {
   zx::nanosleep(zx::deadline_after(kVoltageStabilizationTime));
 
   if ((st = SetBusFreq(kInitializationFrequencyHz)) != ZX_OK) {
-    zxlogf(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SD_VOLTAGE_SWITCH failed, retcode = %d", st);
     return st;
   }
 
@@ -518,7 +528,7 @@ zx_status_t SdmmcDevice::SdioIoRwDirect(bool write, uint32_t fn_idx, uint32_t re
   zx_status_t st = Request(req, response);
   if (st != ZX_OK) {
     // Let the platform driver handle logging of this error.
-    zxlogf(DEBUG, "SDIO_IO_RW_DIRECT failed, retcode = %d", st);
+    FDF_LOG(DEBUG, "SDIO_IO_RW_DIRECT failed, retcode = %d", st);
     return st;
   }
   if (read_byte) {
@@ -570,7 +580,7 @@ zx_status_t SdmmcDevice::SdioIoRwExtended(uint32_t caps, bool write, uint8_t fn_
   uint32_t response[4] = {};
   zx_status_t st = Request(&req, response);
   if (st != ZX_OK) {
-    zxlogf(ERROR, "SDIO_IO_RW_DIRECT_EXTENDED failed, retcode = %d", st);
+    FDF_LOG(ERROR, "SDIO_IO_RW_DIRECT_EXTENDED failed, retcode = %d", st);
     return st;
   }
   return ZX_OK;
@@ -669,8 +679,8 @@ zx_status_t SdmmcDevice::MmcSendExtCsd(std::array<uint8_t, MMC_EXT_CSD_SIZE>& ex
     return st;
   }
 
-  if (zxlog_level_enabled(TRACE)) {
-    zxlogf(TRACE, "EXT_CSD:");
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_TRACE) {
+    FDF_LOG(TRACE, "EXT_CSD:");
     hexdump8_ex(ext_csd.data(), ext_csd.size(), 0);
   }
 
@@ -706,7 +716,7 @@ zx_status_t SdmmcDevice::HostInfo(sdmmc_host_info_t* info) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->HostInfo();
   if (!result.ok()) {
-    zxlogf(ERROR, "HostInfo request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "HostInfo request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -743,7 +753,7 @@ zx_status_t SdmmcDevice::SetSignalVoltage(sdmmc_voltage_t voltage) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->SetSignalVoltage(wire_voltage);
   if (!result.ok()) {
-    zxlogf(ERROR, "SetSignalVoltage request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "SetSignalVoltage request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -777,7 +787,7 @@ zx_status_t SdmmcDevice::SetBusWidth(sdmmc_bus_width_t bus_width) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->SetBusWidth(wire_bus_width);
   if (!result.ok()) {
-    zxlogf(ERROR, "SetBusWidth request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "SetBusWidth request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -795,7 +805,7 @@ zx_status_t SdmmcDevice::SetBusFreq(uint32_t bus_freq) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->SetBusFreq(bus_freq);
   if (!result.ok()) {
-    zxlogf(ERROR, "SetBusFreq request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "SetBusFreq request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -847,7 +857,7 @@ zx_status_t SdmmcDevice::SetTiming(sdmmc_timing_t timing) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->SetTiming(wire_timing);
   if (!result.ok()) {
-    zxlogf(ERROR, "SetTiming request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "SetTiming request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -865,7 +875,7 @@ zx_status_t SdmmcDevice::HwReset() {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->HwReset();
   if (!result.ok()) {
-    zxlogf(ERROR, "HwReset request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "HwReset request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -883,7 +893,7 @@ zx_status_t SdmmcDevice::PerformTuning(uint32_t cmd_idx) {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->PerformTuning(cmd_idx);
   if (!result.ok()) {
-    zxlogf(ERROR, "PerformTuning request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "PerformTuning request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -911,7 +921,7 @@ void SdmmcDevice::AckInBandInterrupt() {
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->AckInBandInterrupt();
   if (!result.ok()) {
-    zxlogf(ERROR, "AckInBandInterrupt request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "AckInBandInterrupt request failed: %s", result.status_string());
   }
 }
 
@@ -925,7 +935,7 @@ zx_status_t SdmmcDevice::RegisterVmo(uint32_t vmo_id, uint8_t client_id, zx::vmo
   auto result = client_.sync().buffer(arena)->RegisterVmo(vmo_id, client_id, std::move(vmo), offset,
                                                           size, vmo_rights);
   if (!result.ok()) {
-    zxlogf(ERROR, "RegisterVmo request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "RegisterVmo request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -943,7 +953,7 @@ zx_status_t SdmmcDevice::UnregisterVmo(uint32_t vmo_id, uint8_t client_id, zx::v
   fdf::Arena arena('SDMC');
   auto result = client_.sync().buffer(arena)->UnregisterVmo(vmo_id, client_id);
   if (!result.ok()) {
-    zxlogf(ERROR, "UnregisterVmo request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "UnregisterVmo request failed: %s", result.status_string());
     return result.status();
   }
 
@@ -968,7 +978,7 @@ zx_status_t SdmmcDevice::Request(const sdmmc_req_t* req, uint32_t out_response[4
 
   auto result = client_.sync().buffer(arena)->Request(*wire_req_vector);
   if (!result.ok()) {
-    zxlogf(ERROR, "Request request failed: %s", result.status_string());
+    FDF_LOG(ERROR, "Request request failed: %s", result.status_string());
     return result.status();
   }
 

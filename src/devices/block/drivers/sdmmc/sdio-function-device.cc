@@ -5,77 +5,99 @@
 #include "sdio-function-device.h"
 
 #include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
+#include <lib/driver/compat/cpp/compat.h>
 
+#include <bind/fuchsia/hardware/sdio/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "sdio-controller-device.h"
+#include "sdmmc-root-device.h"
 
 namespace sdmmc {
 
 using fuchsia_hardware_sdio::wire::SdioHwInfo;
 
-zx_status_t SdioFunctionDevice::Create(zx_device_t* parent, SdioControllerDevice* sdio_parent,
+SdioFunctionDevice::SdioFunctionDevice(SdioControllerDevice* sdio_parent, uint32_t func)
+    : function_(static_cast<uint8_t>(func)), sdio_parent_(sdio_parent) {
+  sdio_function_name_ = "sdmmc-sdio-" + std::to_string(func);
+
+  const std::string path_from_parent = std::string(sdio_parent_->parent()->driver_name()) + "/" +
+                                       std::string(sdio_parent_->kDeviceName) + "/";
+  compat::DeviceServer::BanjoConfig banjo_config;
+  banjo_config.callbacks[ZX_PROTOCOL_SDIO] = sdio_server_.callback();
+  compat_server_.emplace(
+      sdio_parent_->parent()->driver_incoming(), sdio_parent_->parent()->driver_outgoing(),
+      sdio_parent_->parent()->driver_node_name(), sdio_function_name_, path_from_parent,
+      compat::ForwardMetadata::None(), std::move(banjo_config));
+}
+
+zx_status_t SdioFunctionDevice::Create(SdioControllerDevice* sdio_parent, uint32_t func,
                                        std::unique_ptr<SdioFunctionDevice>* out_dev) {
   fbl::AllocChecker ac;
-  out_dev->reset(new (&ac) SdioFunctionDevice(parent, sdio_parent));
+  out_dev->reset(new (&ac) SdioFunctionDevice(sdio_parent, func));
   if (!ac.check()) {
-    zxlogf(ERROR, "failed to allocate device memory");
+    FDF_LOG(ERROR, "failed to allocate device memory");
     return ZX_ERR_NO_MEMORY;
   }
 
   return ZX_OK;
 }
 
-zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info, uint32_t func) {
-  constexpr size_t kNameBufferSize = sizeof("sdmmc-sdio-") + 1;
-
-  zx_device_prop_t props[] = {
-      {BIND_SDIO_VID, 0, hw_info.manufacturer_id},
-      {BIND_SDIO_PID, 0, hw_info.product_id},
-      {BIND_SDIO_FUNCTION, 0, func},
-  };
-  auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (endpoints.is_error()) {
-    return endpoints.status_value();
+zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
+  {
+    fuchsia_hardware_sdio::Service::InstanceHandler handler({
+        .device = fit::bind_member<&SdioFunctionDevice::Serve>(this),
+    });
+    auto result =
+        sdio_parent_->parent()->driver_outgoing()->AddService<fuchsia_hardware_sdio::Service>(
+            std::move(handler), sdio_function_name_);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add SDIO service: %s", result.status_string());
+      return result.status_value();
+    }
   }
 
-  auto result = outgoing_dir_.AddService<fuchsia_hardware_sdio::Service>(
-      fuchsia_hardware_sdio::Service::InstanceHandler(
-          {.device = [this](fidl::ServerEnd<fuchsia_hardware_sdio::Device> request) mutable {
-            Bind(std::move(request));
-          }}));
-
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to AddService: %s", result.status_string());
-    return result.error_value();
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.status_value();
   }
 
-  result = outgoing_dir_.Serve(std::move(endpoints->server));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to service the outgoing directory: %s", result.status_string());
-    return result.error_value();
+  controller_.Bind(std::move(controller_endpoints->client));
+
+  fidl::Arena arena;
+
+  fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 5);
+  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_SDIO);
+  properties[1] = fdf::MakeProperty(arena, BIND_SDIO_VID, hw_info.manufacturer_id);
+  properties[2] = fdf::MakeProperty(arena, BIND_SDIO_PID, hw_info.product_id);
+  properties[3] = fdf::MakeProperty(arena, BIND_SDIO_FUNCTION, function_);
+  properties[4] = fdf::MakeProperty(arena, bind_fuchsia_hardware_sdio::SERVICE,
+                                    bind_fuchsia_hardware_sdio::SERVICE_ZIRCONTRANSPORT);
+
+  std::vector<fuchsia_component_decl::wire::Offer> offers = compat_server_->CreateOffers(arena);
+  offers.push_back(fdf::MakeOffer<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
+
+  const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
+                        .name(arena, sdio_function_name_)
+                        .offers(arena, std::move(offers))
+                        .properties(properties)
+                        .Build();
+
+  auto result = sdio_parent_->sdio_controller_node()->AddChild(
+      args, std::move(controller_endpoints->server), {});
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child sdio function device: %s", result.status_string());
+    return result.status();
   }
 
-  std::array service_offers = {
-      fuchsia_hardware_sdio::Service::Name,
-  };
+  return ZX_OK;
+}
 
-  char name[kNameBufferSize];
-  snprintf(name, sizeof(name), "sdmmc-sdio-%u", func);
-  zx_status_t st = DdkAdd(ddk::DeviceAddArgs(name)
-                              .set_proto_id(ZX_PROTOCOL_SDIO)
-                              .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                              .set_props(props)
-                              .set_fidl_service_offers(service_offers)
-                              .set_outgoing_dir(endpoints->client.TakeChannel()));
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "Failed to add sdio device, retcode = %d", st);
-  }
-
-  function_ = static_cast<uint8_t>(func);
-
-  return st;
+void SdioFunctionDevice::Serve(fidl::ServerEnd<fuchsia_hardware_sdio::Device> request) {
+  fidl::BindServer(sdio_parent_->parent()->driver_async_dispatcher(), std::move(request), this);
 }
 
 zx_status_t SdioFunctionDevice::SdioGetDevHwInfo(sdio_hw_info_t* out_hw_info) {
@@ -193,8 +215,8 @@ void SdioFunctionDevice::DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::S
   auto fidl_buffers = request->txn.buffers;
   // TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.
   if (fidl_buffers.count() > fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer) {
-    zxlogf(ERROR, "Txn can only accept %u buffers req has %zu buffers",
-           fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer, request->txn.buffers.count());
+    FDF_LOG(ERROR, "Txn can only accept %u buffers req has %zu buffers",
+            fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer, request->txn.buffers.count());
     completer.ReplyError(ZX_ERR_INTERNAL);
   }
   // TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.

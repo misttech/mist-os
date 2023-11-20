@@ -5,9 +5,8 @@
 #include "sdmmc-root-device.h"
 
 #include <inttypes.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
 
 #include <memory>
 
@@ -18,36 +17,82 @@
 
 namespace sdmmc {
 
-zx_status_t SdmmcRootDevice::Bind(void* ctx, zx_device_t* parent) {
-  fbl::AllocChecker ac;
-  std::unique_ptr<SdmmcRootDevice> dev(new (&ac) SdmmcRootDevice(parent));
+zx::result<> SdmmcRootDevice::Start() {
+  parent_node_.Bind(std::move(node()));
 
-  if (!ac.check()) {
-    zxlogf(ERROR, "Failed to allocate device");
-    return ZX_ERR_NO_MEMORY;
-  }
-  zx_status_t st = dev->DdkAdd(ddk::DeviceAddArgs("sdmmc")
-                                   .set_flags(DEVICE_ADD_NON_BINDABLE)
-                                   .forward_metadata(parent, DEVICE_METADATA_GPT_INFO));
-  if (st != ZX_OK) {
-    return st;
+  fidl::Arena arena;
+  fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> sdmmc_metadata;
+  {
+    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
+    if (result.is_error() || !result->is_valid()) {
+      FDF_LOG(ERROR, "Failed to connect to compat service: %s", result.status_string());
+      return result.take_error();
+    }
+    auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
+
+    fidl::WireResult metadata = parent_compat->GetMetadata();
+    if (!metadata.ok()) {
+      FDF_LOG(ERROR, "Call to GetMetadata failed: %s", metadata.status_string());
+      return zx::error(metadata.status());
+    }
+    if (metadata->is_error()) {
+      FDF_LOG(ERROR, "Failed to GetMetadata: %s", zx_status_get_string(metadata->error_value()));
+      return metadata->take_error();
+    }
+
+    zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata, arena);
+    if (parsed_metadata.is_error()) {
+      FDF_LOG(ERROR, "Failed to ParseMetadata: %s",
+              zx_status_get_string(parsed_metadata.error_value()));
+      return parsed_metadata.take_error();
+    }
+    sdmmc_metadata = *parsed_metadata;
   }
 
-  [[maybe_unused]] auto* placeholder = dev.release();
-  return st;
+  zx::result controller_endpoints =
+      fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
+  if (!controller_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create controller endpoints: %s",
+            controller_endpoints.status_string());
+    return controller_endpoints.take_error();
+  }
+
+  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
+  if (!node_endpoints.is_ok()) {
+    FDF_LOG(ERROR, "Failed to create node endpoints: %s", node_endpoints.status_string());
+    return node_endpoints.take_error();
+  }
+
+  controller_.Bind(std::move(controller_endpoints->client));
+  root_node_.Bind(std::move(node_endpoints->client));
+
+  const auto args =
+      fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena).name(arena, name()).Build();
+
+  auto result = parent_node_->AddChild(args, std::move(controller_endpoints->server),
+                                       std::move(node_endpoints->server));
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());
+    return zx::error(result.status());
+  }
+
+  zx_status_t status = Init(sdmmc_metadata);
+  if (status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok();
 }
 
-// TODO(hanbinyoon): Simplify further using templated lambda come C++20.
 // Returns nullptr if device was successfully added. Returns the SdmmcDevice if the probe failed
 // (i.e., no eligible device present).
 template <class DeviceType>
-static zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
-    const std::string& name, zx_device_t* zxdev, std::unique_ptr<SdmmcDevice> sdmmc,
+zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
+    const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
   std::unique_ptr<DeviceType> device;
   if (zx_status_t st =
-          DeviceType::Create(zxdev, std::move(sdmmc), metadata.use_fidl(), &device) != ZX_OK) {
-    zxlogf(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
+          DeviceType::Create(this, std::move(sdmmc), metadata.use_fidl(), &device) != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
     return zx::error(st);
   }
 
@@ -59,19 +104,51 @@ static zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(
     return zx::error(st);
   }
 
-  [[maybe_unused]] auto* placeholder = device.release();
+  child_device_ = std::move(device);
   return zx::ok(nullptr);
 }
 
 zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
-SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
+SdmmcRootDevice::ParseMetadata(
+    const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector,
+    fidl::AnyArena& allocator) {
+  std::vector<uint8_t> sdmmc_metadata_bytes;  // Storage for fidl::ObjectView returned by lambda.
+  zx::result decoded =
+      [&]() -> zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> {
+    for (const auto& metadata : metadata_vector) {
+      if (metadata.type == DEVICE_METADATA_SDMMC) {
+        size_t size;
+        auto status = metadata.data.get_prop_content_size(&size);
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to get_prop_content_size: %s", zx_status_get_string(status));
+          return zx::error(status);
+        }
+
+        sdmmc_metadata_bytes.resize(size);
+        status = metadata.data.read(sdmmc_metadata_bytes.data(), 0, size);
+        if (status != ZX_OK) {
+          FDF_LOG(ERROR, "Failed to read metadata: %s", zx_status_get_string(status));
+          return zx::error(status);
+        }
+
+        auto result = fidl::InplaceUnpersist<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
+            cpp20::span(sdmmc_metadata_bytes));
+        if (result.is_error()) {
+          FDF_LOG(ERROR, "Failed to unpersist metadata: %s",
+                  result.error_value().FormatDescription().c_str());
+          return zx::error(result.error_value().status());
+        }
+        return zx::ok(*result);
+      }
+    }
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }();
+
   constexpr uint32_t kMaxCommandPacking = 16;
 
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
-      parent(), DEVICE_METADATA_SDMMC);
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
-      zxlogf(INFO, "No metadata provided");
+      FDF_LOG(INFO, "No metadata provided");
       return zx::ok(fidl::ObjectView(allocator,
                                      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
                                          .enable_trim(true)
@@ -81,7 +158,7 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
                                          .use_fidl(false)
                                          .Build()));
     } else {
-      zxlogf(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+      FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
       return decoded.take_error();
     }
   }
@@ -99,53 +176,39 @@ SdmmcRootDevice::GetMetadata(fidl::AnyArena& allocator) {
           .Build()));
 }
 
-void SdmmcRootDevice::DdkInit(ddk::InitTxn txn) {
-  auto sdmmc = std::make_unique<SdmmcDevice>(this, parent());
-
-  fidl::Arena arena;
-  const zx::result metadata = GetMetadata(arena);
-  if (metadata.is_error()) {
-    return txn.Reply(metadata.status_value());
-  }
+zx_status_t SdmmcRootDevice::Init(
+    fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) {
+  auto sdmmc = std::make_unique<SdmmcDevice>(this);
 
   // Probe for SDIO first, then SD/MMC.
   zx::result<std::unique_ptr<SdmmcDevice>> result =
-      MaybeAddDevice<SdioControllerDevice>("sdio", zxdev(), std::move(sdmmc), **metadata);
+      MaybeAddDevice<SdioControllerDevice>("sdio", std::move(sdmmc), *metadata);
   if (result.is_error()) {
-    return txn.Reply(result.status_value());
+    return result.status_value();
   } else if (*result == nullptr) {
-    return txn.Reply(ZX_OK);
+    return ZX_OK;
   }
-  result = MaybeAddDevice<SdmmcBlockDevice>("block", zxdev(), std::move(*result), **metadata);
+  result = MaybeAddDevice<SdmmcBlockDevice>("block", std::move(*result), *metadata);
   if (result.is_error()) {
-    return txn.Reply(result.status_value());
+    return result.status_value();
   } else if (*result == nullptr) {
-    return txn.Reply(ZX_OK);
+    return ZX_OK;
   }
 
   if (metadata->removable()) {
     // This controller is connected to a removable card slot, and no card was inserted. Indicate
     // success so that our device remains available.
     // TODO(fxbug.dev/130283): Enable detection of card insert/removal after initialization.
-    zxlogf(INFO, "failed to probe removable device");
-    return txn.Reply(ZX_OK);
+    FDF_LOG(INFO, "failed to probe removable device");
+    return ZX_OK;
   }
 
   // Failure to probe a hardwired device is unexpected. Reply with an error code so that our device
   // gets removed.
-  zxlogf(ERROR, "failed to probe irremovable device");
-  return txn.Reply(ZX_ERR_NOT_FOUND);
+  FDF_LOG(ERROR, "failed to probe irremovable device");
+  return ZX_ERR_NOT_FOUND;
 }
-
-void SdmmcRootDevice::DdkRelease() { delete this; }
 
 }  // namespace sdmmc
 
-static constexpr zx_driver_ops_t sdmmc_driver_ops = []() -> zx_driver_ops_t {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = sdmmc::SdmmcRootDevice::Bind;
-  return ops;
-}();
-
-ZIRCON_DRIVER(sdmmc, sdmmc_driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(sdmmc::SdmmcRootDevice);

@@ -8,54 +8,44 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/compat/cpp/compat.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/sdmmc/hw.h>
 
 #include <array>
 #include <cinttypes>
 #include <optional>
 
-#include <ddktl/device.h>
-
 namespace sdmmc {
 
 class SdmmcBlockDevice;
 
-class RpmbDevice;
-using RpmbDeviceType = ddk::Device<RpmbDevice, ddk::Messageable<fuchsia_hardware_rpmb::Rpmb>::Mixin,
-                                   ddk::Initializable, ddk::Unbindable>;
-
-class RpmbDevice : public RpmbDeviceType {
+class RpmbDevice : public fidl::WireServer<fuchsia_hardware_rpmb::Rpmb> {
  public:
-  static zx_status_t Create(zx_device_t* parent, SdmmcBlockDevice* sdmmc,
-                            const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
-                            const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd);
+  static constexpr char kDeviceName[] = "rpmb";
+
   // sdmmc_parent is owned by the SDMMC root device when the RpmbDevice object is created. Ownership
   // is transferred to devmgr shortly after, meaning it will outlive this object due to the
   // parent/child device relationship.
-  RpmbDevice(zx_device_t* parent, SdmmcBlockDevice* sdmmc_parent,
-             const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
-             const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd)
-      : RpmbDeviceType(parent),
-        sdmmc_parent_(sdmmc_parent),
-        cid_(cid),
-        rpmb_size_(ext_csd[MMC_EXT_CSD_RPMB_SIZE_MULT]),
-        reliable_write_sector_count_(ext_csd[MMC_EXT_CSD_REL_WR_SEC_C]) {}
+  RpmbDevice(SdmmcBlockDevice* sdmmc_parent, const std::array<uint8_t, SDMMC_CID_SIZE>& cid,
+             const std::array<uint8_t, MMC_EXT_CSD_SIZE>& ext_csd);
 
-  void DdkInit(ddk::InitTxn txn);
-  void DdkRelease();
-  void DdkUnbind(ddk::UnbindTxn txn);
+  zx_status_t AddDevice();
 
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void Request(RequestRequestView request, RequestCompleter::Sync& completer) override;
 
  private:
+  void Serve(fidl::ServerEnd<fuchsia_hardware_rpmb::Rpmb> request);
+
   SdmmcBlockDevice* const sdmmc_parent_;
   const std::array<uint8_t, SDMMC_CID_SIZE> cid_;
   const uint8_t rpmb_size_;
   const uint8_t reliable_write_sector_count_;
-  std::optional<component::OutgoingDirectory> outgoing_;
-  fidl::ServerEnd<fuchsia_io::Directory> outgoing_server_end_;
-  fidl::ServerBindingGroup<fuchsia_hardware_rpmb::Rpmb> bindings_;
+
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  std::optional<compat::DeviceServer> compat_server_;
 };
 
 }  // namespace sdmmc
