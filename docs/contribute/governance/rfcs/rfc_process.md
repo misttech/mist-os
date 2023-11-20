@@ -23,8 +23,8 @@ be used to evolve the project roadmap and the system architecture.
 
 ## Motivation
 
-Currently, the Fuchsia project does not have a formal process for making
-project-wide, technical decisions. At our current scale, this informality
+Before the RFC process, the Fuchsia project did not have a formal process for
+making project-wide, technical decisions. At our current scale, this informality
 results in different people having different, sometimes inconsistent, viewpoints
 on where the project is going and how the system is put together. By
 establishing a consistent and transparent path for making project-wide,
@@ -215,10 +215,6 @@ The act of uploading the CL is sufficient to get a facilitator assigned to
 your RFC. FEC monitors new RFC CLs as the
 signal to identify the right facilitator for the new RFC.
 
-*Exit criteria*: CL containing your RFC is created.
-
-#### Step 3: Iterate {#iterate}
-
 Once you have created a CL containing the first draft of your RFC, you are ready
 to iterate on your idea with the appropriate stakeholders. Hopefully you will
 have already discovered most the appropriate stakeholders as part of socializing
@@ -243,35 +239,43 @@ A stakeholder may 'opt out' and ask to be removed, or may delegate their review
 (for example, to another expert in the relevant area). FEC may request that a
 stakeholder be removed or moved from "reviewer" to "consulted".
 
-If the discussion is too complex for the code review tool, consider scheduling a
-meeting with the relevant stakeholders to have a more efficient discussion.
-After the meeting, you must post a summary of the meeting in a comment on the CL
-so that people who were not at the meeting can understand what was discussed
-during the meeting.
+If the discussion is too complex for the code review tool or is taking longer
+than you would like, consider scheduling a meeting with the relevant
+stakeholders to have a more efficient discussion.  After the meeting, you must
+post a summary of the meeting in a comment on the CL so that people who were not
+at the meeting can understand what was discussed during the meeting.
 
-If the discussion becomes contentious, please escalate to one of the RFC
-Editors. The Eng Council can help move the discussion forward, for example by
-providing additional structure to the discussion or moving the discussion to
-another forum. Regardless of how the discussion proceeds, the results of any
-off-CL discussion must be captured in the CL, often by posting a summary of the
-discussion as a CL comment.
+If you run into any issues or delays during the discussion, please let your
+faciliator know. Below are some common issues that arise during these
+discussions:
+
+ * The discussion becomes contentious or non-productive. Often a face-to-face
+   meeting can get the discussion back on track more efficiently than text-based
+   communication.
+ * A stakeholder is overly nit-picky (fillibuster) or stalls the discussion
+   (non-responsive). Sometimes the stakeholder dislikes the proposal but does
+   not have a solid technical argument and resorts, perhaps unconciously, to
+   these delaying tatics.
+ * You receive many comments, suggests, and pushback from many people and are
+   unsure which comments are from relevant stakeholders(s). Often much of this
+   feedback is irrelevant to the core issue and will not block the RFC being
+   accepted.
+ * The discussion is simply taking too long to converge.
+
+If the discussion becomes contentious or if you have difficulty getting feedback
+from a stakeholder, please let your faciliator know.  Your faciliator can help
+move the discussion forward, for example by providing additional structure to
+the discussion or moving the discussion to another forum, such as a synchronous
+meeting or an [engineering
+review](/docs/contribute/governance/eng_council.md#eng-review). Regardless of
+how the discussion proceeds, the results of any off-CL discussion must be
+captured in the CL, often by posting a summary of the discussion as a CL
+comment.
 
 Feedback may include comments from people who are not stakeholders. The author
 should respond to these comments if relevant, but settling them is not
-necessarily required to move to the last call stage. If the comments point to a
-disagreement about who is a stakeholder, FEC can help resolve this.
-
-At FEC's discretion, RFCs that would benefit from more socialization should be
-scheduled for an [engineering
-review](/docs/contribute/governance/eng_council.md#eng-review) meeting. Some
-triggers leading to scheduling an engineering review are:
-
- * Difficulty to identify relevant stakeholders(s). It might be the case than an
-   RFC receives many comments, suggestions, push back, and that the author(s)
-   are unclear how to act on this feedback, and which represents core feedback
-   which is potentially a blocker to the RFC being accepted, vs auxiliary
-   feedback which may be curiosity, future plans, etc.
- * Difficulty for RFC author(s) and stakeholder(s) to converge on open items.
+necessarily required to move to the *Last Call* stage. If the comments point to
+a disagreement about who is a stakeholder, FEC can help resolve this.
 
 If you wish to withdraw your RFC, you can mark the CL containing the RFC as
 abandoned. You, or someone else, can always resurrect your RFC later if
@@ -294,13 +298,14 @@ effectively in the CL.
 *Exit criteria:* All stakeholders identified and approved by Eng Council; feedback
 solicited and incorporated.
 
-#### Step 4: Last call {#last-call}
+#### Step 3: Last call {#last-call}
 
-Once the iterations on the RFC are converging, the author must email
-eng-council@fuchsia.dev requesting them to move the RFC's status to last call.
-An Eng Council member will send an email to all stakeholders and
-eng-council-discuss@fuchsia.dev to solicit any final feedback before moving to
-the decision step. The RFC will be open for feedback for the next 7 calendar days.
+Once the discussion on the RFC is converging, the author must ask their
+facilitator to move the RFC's status to Last Call.  The faciliator will mark
+the RFC as being in Last Call in the tracker, which generates automatic email
+to eng-council-discuss@fuchsia.dev, and will comment on the CL to solicit any
+final feedback before moving to the decision step. The RFC will be open for
+feedback for the next 7 calendar days.
 
 Typically, reviewers sign off with a +1 and the facilitator will sign off with a
 +2. Consulted stakeholders may also sign off with a +1 or +2 if they wish to
@@ -324,7 +329,7 @@ accept your RFC.
 
 *Exit criteria:* Feedback provided by all stakeholders; all feedback addressed.
 
-#### Step 5: Submit
+#### Step 4: Submit
 
 If the project decides to accept your RFC, a member of the Eng Council will
 comment on your CL stating that the RFC is accepted and will assign the RFC a
@@ -341,10 +346,10 @@ for the rejection and will assign the RFC a number. Rejected RFCs are valuable
 engineering artifacts. The Eng Council will work with the RFC Authors to land
 a version of the RFC that is marked as rejected and incorporates the rationale.
 
-If the Eng Council identifies one or many unresolved open items, the RFC may be
-moved back to the [iterate](#iterate) step. The Eng Council will ask of the
-author(s) to resolve the open items identified with the relevant stakeholders
-before another request to review the RFC will be granted.
+Rarely, if the Eng Council identifies one or many unresolved open items, the
+RFC may be moved back to the [draft](#draft) stage. The Eng Council will ask of
+the author(s) to resolve the open items identified with the relevant
+stakeholders before another request to review the RFC will be granted.
 
 You should upload a new patchset of your RFC with the assigned number, both in
 the title of the RFC and in the filename. If your RFC is approved and requires
@@ -358,6 +363,31 @@ project!*
 
 *Exit criteria:* RFC number assigned; any applicable rationale, tradeoffs and
 Eng Council feedback incorporated; RFC merged.
+
+#### On Hold
+
+If you are not currently interested in moving your RFC forward, for example
+because your priorities have shifted or because the problem the RFC was aiming
+to solve is no longer as salient, you can move your RFC to the *On Hold* state.
+When an RFC is On Hold, stakeholders are not expected to provide feedback and
+the FEC will not actively facilitate progress.
+
+If there is no visible progress on the CL for your RFC in a month, the RFC bot
+will send an email to you and your facilitator to prompt a discussion about
+whether to move your RFC to the On Hold state or how to move your RFC forward.
+Ideally, if you are encountering difficulities or delays, you would have
+escalated this situation to your faciliator before this point, but this
+conversation is also a good time to surface those issues.
+
+You can move your RFC out of the On Hold state at any time by contacting your
+faciliator and letting them know that you plan to resume work on your RFC. If
+you would like a new faciliator, contact any member of the FEC and they can
+assign you a new facilaitor. At this point, your RFC will move back to the
+[draft](#draft) stage.
+
+*Exit criteria:* RFC Author states their intention to resume active work on
+their RFC; Faciliator comments on the CL for the RFC indicating that the RFC is
+no longer on hold.
 
 ### How decisions are made
 
