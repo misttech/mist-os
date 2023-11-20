@@ -55,6 +55,14 @@ def _scrutiny_validation(
         pb_out_dir,
         scrutiny_config.base_packages,
     )
+    deps.append(_verify_pre_signing(
+        ctx,
+        label_name,
+        ffx_invocation,
+        ffx_tool,
+        pb_out_dir,
+        scrutiny_config.pre_signing_policy,
+    ))
     if not is_recovery:
         deps += _verify_route_sources(
             ctx,
@@ -326,6 +334,40 @@ def _verify_base_packages(
         progress_message = "Verify Static pkgs for %s" % label_name,
     )
     return [stamp_file, tmp_dir]
+
+def _verify_pre_signing(
+        ctx,
+        label_name,
+        ffx_invocation,
+        ffx_tool,
+        pb_out_dir,
+        pre_signing_policy_file):
+    stamp_file = ctx.actions.declare_file(label_name + "_pre_signing.stamp")
+    ffx_isolate_dir = ctx.actions.declare_directory(label_name + "_pre_signing.ffx")
+    _ffx_invocation = []
+    _ffx_invocation.extend(ffx_invocation)
+    _ffx_invocation += [
+        "--stamp",
+        stamp_file.path,
+        "pre-signing",
+        "--product-bundle",
+        pb_out_dir.path,
+        "--policy",
+        pre_signing_policy_file.path,
+    ]
+    script_lines = [
+        "set -e",
+        " ".join(_ffx_invocation),
+    ]
+    inputs = [ffx_tool, pb_out_dir, pre_signing_policy_file]
+    ctx.actions.run_shell(
+        inputs = inputs,
+        outputs = [stamp_file, ffx_isolate_dir],
+        env = {"FFX_ISOLATE_DIR": ffx_isolate_dir.path},
+        command = "\n".join(script_lines),
+        progress_message = "Verify pre-signing checks for %s" % label_name,
+    )
+    return stamp_file
 
 def _verify_structured_config(
         ctx,
