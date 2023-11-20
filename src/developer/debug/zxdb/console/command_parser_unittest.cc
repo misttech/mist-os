@@ -73,10 +73,10 @@ TEST(CommandParser, ParserBasic) {
   Command output;
 
   // Verb-only command.
-  Err err = ParseCommand("run", &output);
+  Err err = ParseCommand("pause", &output);
   EXPECT_FALSE(err.has_error());
   EXPECT_TRUE(output.nouns().empty());
-  EXPECT_EQ(Verb::kRun, output.verb());
+  EXPECT_EQ(Verb::kPause, output.verb());
 
   // Noun-only command.
   err = ParseCommand("process", &output);
@@ -95,29 +95,29 @@ TEST(CommandParser, ParserBasic) {
   EXPECT_EQ(Verb::kNone, output.verb());
 
   // Noun-verb command.
-  err = ParseCommand("process run", &output);
+  err = ParseCommand("process pause", &output);
   EXPECT_FALSE(err.has_error());
   EXPECT_EQ(1u, output.nouns().size());
   EXPECT_TRUE(output.HasNoun(Noun::kProcess));
   EXPECT_EQ(Command::kNoIndex, output.GetNounIndex(Noun::kProcess));
-  EXPECT_EQ(Verb::kRun, output.verb());
+  EXPECT_EQ(Verb::kPause, output.verb());
 
   // Noun-index-verb command.
-  err = ParseCommand("process 2 run", &output);
+  err = ParseCommand("process 2 pause", &output);
   EXPECT_FALSE(err.has_error());
   EXPECT_EQ(1u, output.nouns().size());
   EXPECT_TRUE(output.HasNoun(Noun::kProcess));
   EXPECT_EQ(2, output.GetNounIndex(Noun::kProcess));
-  EXPECT_EQ(Verb::kRun, output.verb());
+  EXPECT_EQ(Verb::kPause, output.verb());
 
-  err = ParseCommand("process 2 thread 1 run", &output);
+  err = ParseCommand("process 2 thread 1 pause", &output);
   EXPECT_FALSE(err.has_error());
   EXPECT_EQ(2u, output.nouns().size());
   EXPECT_TRUE(output.HasNoun(Noun::kProcess));
   EXPECT_EQ(2, output.GetNounIndex(Noun::kProcess));
   EXPECT_TRUE(output.HasNoun(Noun::kThread));
   EXPECT_EQ(1, output.GetNounIndex(Noun::kThread));
-  EXPECT_EQ(Verb::kRun, output.verb());
+  EXPECT_EQ(Verb::kPause, output.verb());
 }
 
 TEST(CommandParser, ParserBasicErrors) {
@@ -132,7 +132,7 @@ TEST(CommandParser, ParserBasicErrors) {
   EXPECT_TRUE(err.has_error());
   EXPECT_EQ("The string \"zzyzx\" is not a valid verb.", err.msg());
 
-  err = ParseCommand("process 1 process run", &output);
+  err = ParseCommand("process 1 process pause", &output);
   EXPECT_TRUE(err.has_error());
   EXPECT_EQ("Noun \"process\" specified twice.", err.msg());
 }
@@ -307,11 +307,11 @@ TEST(CommandParser, Completions) {
   // Ending in a space gives everything.
   comp = GetCommandCompletions("process ", FillCommandContextCallback());
   EXPECT_TRUE(CompletionContains(comp, "process quit"));
-  EXPECT_TRUE(CompletionContains(comp, "process run"));
+  EXPECT_TRUE(CompletionContains(comp, "process pause"));
 
   // No input should give everything
   comp = GetCommandCompletions("", FillCommandContextCallback());
-  EXPECT_TRUE(CompletionContains(comp, "run"));
+  EXPECT_TRUE(CompletionContains(comp, "pause"));
   EXPECT_TRUE(CompletionContains(comp, "quit"));
 
   // Verb with no argument prefix

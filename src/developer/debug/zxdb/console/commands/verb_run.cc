@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "src/developer/debug/shared/platform.h"
 #include "src/developer/debug/shared/zx_status.h"
 #include "src/developer/debug/zxdb/client/remote_api.h"
 #include "src/developer/debug/zxdb/client/session.h"
@@ -23,45 +24,49 @@ namespace zxdb {
 
 namespace {
 
-const char kRunShortHelp[] = "run / r: Run the program.";
+const char kRunShortHelp[] = "run / r: Run the program. (Linux-only)";
 const char kRunHelp[] =
     R"(run [ <binary path> <program args>* ]
 
   Alias: "r"
 
-  Run the binary available in debug_agent's namespace.
+  Run the given binary with the given arguments. This command is supported only
+  when debugging programs running on Linux.
 
-Why "run" is usually wrong
+Why "run" is not supported on Fuchsia
 
-  "run" can only run the binary available in debug_agent's namespace, which
-  only include the debug_agent itself and binaries from the bootfs. It's almost
-  certain that the program you are interested cannot be launched via "run".
+  On Fuchsia, programs run in namespaces defined by their components. There is
+  "default" namespace in which to run a raw binary, which means there is no
+  sensible way to implement the "run" command.
 
   Instead, consider
 
-    * Use "run-test" to run a test.
-    * Use "run-component" to run a component, although it's also usually wrong.
     * Create a filter by "attach <process name>/<component url>/etc." and start
       your program outside of the debugger.
+    * Use "ffx component start --debug" to start a component with the debugger
+      attached.
+    * Use "run-test" to run a test.
 
 Examples
 
-  run /boot/bin/ps
-  run /boot/bin/crasher log_fatal
+  run /bin/ps
+  run /bin/echo Hello.
 )";
 
 void RunVerbRun(const Command& cmd, fxl::RefPtr<CommandContext> cmd_context) {
+  debug::Platform platform = cmd_context->GetConsoleContext()->session()->platform();
+  if (platform != debug::Platform::kLinux) {
+    std::string message = "Run is supported only for Linux targets. Current target is ";
+    message += debug::PlatformToString(platform);
+    message += ". See \"help run\".";
+    cmd_context->ReportError(Err(message));
+    return;
+  }
+
   // Only a process can be run.
   Err err = cmd.ValidateNouns({Noun::kProcess});
   if (err.has_error())
     return cmd_context->ReportError(err);
-
-  // Output warning about this possibly not working.
-  OutputBuffer warning(Syntax::kWarning, GetExclamation());
-  warning.Append(
-      " Run won't work for many processes and components. "
-      "See \"help run\".\n");
-  cmd_context->Output(warning);
 
   // May need to create a new target.
   auto err_or_target = GetRunnableTarget(cmd_context->GetConsoleContext(), cmd);

@@ -309,8 +309,8 @@ bool Parser::DoNounState() {
 }
 
 // Consume optional following index if it's an index selector. For example, it
-// could be "process 2 run" (with index) or "process run" (without) or "filter * rm" (with
-// wildcard).
+// could be "process 2 pause" (with index) or "process pause" (without) or
+// "filter * rm" (with wildcard).
 bool Parser::DoNounIndexState() {
   if (!at_end() && IsWildcardToken(token_str())) {
     command_->SetNoun(noun_, Command::kWildcard);

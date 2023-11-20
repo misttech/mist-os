@@ -379,9 +379,9 @@ const char kProcessHelp[] =
 
   With an ID following it ("process 3"), selects that process context as the
   current active context. This context will apply by default for subsequent
-  commands (like "run").
+  commands (like "pause").
 
-  With an ID and another command following it ("process 3 run"), modifies the
+  With an ID and another command following it ("process 3 pause"), modifies the
   process context for that command only. This allows running, pausing, etc.
   processes regardless of which is the active one.
 
@@ -395,9 +395,9 @@ Examples
   process 2
       Sets process context 2 as the active one.
 
-  pr 2 r
-  process 2 run
-      Runs process context 2, regardless of the active one.
+  pr 2 pa
+  process 2 pause
+      Pauses process context 2, regardless of the active one.
 )";
 
 // Returns true if processing should stop (either a thread command or an error), false to continue
