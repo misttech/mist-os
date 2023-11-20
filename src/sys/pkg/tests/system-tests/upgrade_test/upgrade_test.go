@@ -356,7 +356,8 @@ func initializeDevice(
 		if err != nil {
 			return nil, fmt.Errorf("failed to check if up to date during initialization: %w", err)
 		}
-		if upToDate {
+
+		if !c.installerConfig.NeedsInitialization() && upToDate {
 			logger.Infof(ctx, "device already up to date")
 		} else {
 			if c.useFlash {

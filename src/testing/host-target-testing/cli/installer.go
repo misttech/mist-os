@@ -145,6 +145,13 @@ func (c *InstallerConfig) OmahaTool(ctx context.Context, device *device.Client) 
 	return omahaTool, nil
 }
 
+func (c *InstallerConfig) NeedsInitialization() bool {
+	// The omaha-client needs the device to be flashed or paved since the
+	// tests start a fake omaha server and inject's the address into a
+	// custom vbmeta.
+	return c.installerMode == Omaha
+}
+
 // ConfigureBuild configures a build for the updater.
 func (c *InstallerConfig) ConfigureBuild(ctx context.Context, device *device.Client, build artifacts.Build) (artifacts.Build, error) {
 	switch c.installerMode {
