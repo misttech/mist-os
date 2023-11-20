@@ -5,10 +5,10 @@
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/config/zircon/levels.gni")
 import("//build/test.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/testing/bootfs_test.gni")
-import("//build/testing/kernel_zbi_test.gni")
-import("//build/testing/zbi_test.gni")
-import("//build/testing/zbi_test_executable.gni")
 import("//build/toolchain/rbe.gni")
 import("//zircon/kernel/params.gni")
 

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/product_assembly_configuration.gni")
-import("//build/testing/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
 import("//src/sys/core/build/core.gni")
 
 # Core realm definition to be used only instances of cuckoo_kernel_zbi_test()

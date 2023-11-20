@@ -4,7 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
-import("//build/testing/zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/zbi/zbi_input.gni")
 import("//zircon/kernel/kernel_package.gni")
 import("//zircon/kernel/lib/code-patching/code-patching.gni")

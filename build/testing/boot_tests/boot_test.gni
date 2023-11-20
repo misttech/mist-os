@@ -262,7 +262,7 @@ template("boot_test") {
     sources = [ image_manifest ]
     outputs = [ rebased_image_manifest ]
 
-    script = "//build/testing/rebase_metadata_paths.py"
+    script = "//build/testing/boot_tests/rebase_metadata_paths.py"
     args = [
       "--root-build-dir",
       ".",

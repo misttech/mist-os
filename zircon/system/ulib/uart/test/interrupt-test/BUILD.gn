@@ -4,9 +4,9 @@
 
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
-import("//build/testing/kernel_zbi_test.gni")
-import("//build/testing/zbi_test.gni")
-import("//build/testing/zbi_test_executable.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test_executable.gni")
 
 group("interrupt-test") {
   testonly = true

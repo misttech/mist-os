@@ -4,9 +4,9 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/testing/environments.gni")
-import("//build/testing/kernel_zbi_test.gni")
-import("//build/testing/zbi_test_executable.gni")
 import("../libc.gni")
 
 # We want to run these tests on every kind of hardware as well as emulators.

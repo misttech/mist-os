@@ -2,8 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/testing/kernel_zbi_test.gni")
-import("//build/testing/zbi_test_executable.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test_executable.gni")
 import("//build/toolchain/variant_tags.gni")
 import(
     "//src/tests/early-boot-coverage/host-test/coverage_verification_test.gni")

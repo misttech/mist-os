@@ -4,7 +4,7 @@
 
 import("//build/go/go_library.gni")
 import("//build/go/go_test.gni")
-import("//build/testing/zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test.gni")
 import("//zircon/kernel/phys/zbi_executable.gni")
 
 group("polling-input-test") {
