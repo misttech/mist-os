@@ -915,6 +915,10 @@
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondFailure/*",
                 "Inotify.EpollNoDeadlock",
 
+                // These tests hang.
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",
+                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
+
                 // This hangs on debug builds.
                 //
                 // See https://fxbug.dev/135058.
