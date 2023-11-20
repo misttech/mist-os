@@ -325,7 +325,17 @@ impl FuseFs {
                     Options::default(),
                 )
                 .await?;
-            handle.write_timestamps(&mut transaction, ctime, mtime).await?;
+            handle
+                .update_attributes(
+                    &mut transaction,
+                    Some(&fio::MutableNodeAttributes {
+                        modification_time: mtime.map(|t| t.as_nanos()),
+                        access_time: atime.map(|t| t.as_nanos()),
+                        ..Default::default()
+                    }),
+                    ctime,
+                )
+                .await?;
             transaction.commit().await?;
 
             // Truncate the file size if size attribute needs to be set.

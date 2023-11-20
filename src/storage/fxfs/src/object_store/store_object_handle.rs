@@ -316,32 +316,6 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         self.store().device().flush().await
     }
 
-    pub async fn write_timestamps<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
-        crtime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) -> Result<(), Error> {
-        if let (None, None) = (crtime.as_ref(), mtime.as_ref()) {
-            return Ok(());
-        }
-        let mut mutation = self.txn_get_object_mutation(transaction).await?;
-        if let ObjectValue::Object { ref mut attributes, .. } = mutation.item.value {
-            if let Some(time) = crtime {
-                attributes.creation_time = time;
-            }
-            if let Some(time) = mtime {
-                attributes.modification_time = time;
-            }
-        } else {
-            bail!(
-                anyhow!(FxfsError::Inconsistent).context("write_timestamps: Expected object value")
-            );
-        };
-        transaction.add(self.store().store_object_id(), Mutation::ObjectStore(mutation));
-        Ok(())
-    }
-
     pub async fn update_allocated_size(
         &self,
         transaction: &mut Transaction<'_>,

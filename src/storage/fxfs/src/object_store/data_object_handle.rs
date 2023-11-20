@@ -809,15 +809,6 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         Ok(ranges)
     }
 
-    pub async fn write_timestamps<'a>(
-        &'a self,
-        transaction: &mut Transaction<'a>,
-        crtime: Option<Timestamp>,
-        mtime: Option<Timestamp>,
-    ) -> Result<(), Error> {
-        self.handle.write_timestamps(transaction, crtime, mtime).await
-    }
-
     pub async fn update_attributes<'a>(
         &self,
         transaction: &mut Transaction<'a>,
@@ -2517,17 +2508,15 @@ mod tests {
         const MTIME: Timestamp = Timestamp::from_nanos(5678);
         const CTIME: Timestamp = Timestamp::from_nanos(8765);
 
-        // ObjectProperties can be updated through `write_timestamps` and `update_attributes`.
+        // ObjectProperties can be updated through `update_attributes`.
         // `get_properties` should reflect the latest changes.
         let mut transaction = object.new_transaction().await.expect("new_transaction failed");
-        object
-            .write_timestamps(&mut transaction, Some(CRTIME), Some(MTIME))
-            .await
-            .expect("update_timestamps failed");
         object
             .update_attributes(
                 &mut transaction,
                 Some(&fio::MutableNodeAttributes {
+                    creation_time: Some(CRTIME.as_nanos()),
+                    modification_time: Some(MTIME.as_nanos()),
                     mode: Some(111),
                     gid: Some(222),
                     ..Default::default()
@@ -2535,7 +2524,7 @@ mod tests {
                 None,
             )
             .await
-            .expect("update_timestamps failed");
+            .expect("update_attributes failed");
         const MTIME_NEW: Timestamp = Timestamp::from_nanos(12345678);
         object
             .update_attributes(

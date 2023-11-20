@@ -726,10 +726,18 @@ impl PagedObjectHandle {
                 inner.dirty_crtime.begin_flush(false),
             )
         };
+
+        let attributes = fio::MutableNodeAttributes {
+            creation_time: crtime.map(|t| t.as_nanos()),
+            modification_time: mtime.map(|t| t.as_nanos()),
+            ..Default::default()
+        };
+        // Shrinking the file should also update `change_time` (it'd be the same value as the
+        // modification time).
         self.handle
-            .write_timestamps(&mut transaction, crtime, mtime)
+            .update_attributes(&mut transaction, Some(&attributes), mtime)
             .await
-            .context("write_timestamps failed")?;
+            .context("update_attributes failed")?;
         transaction.commit().await.context("Failed to commit transaction")?;
         self.inner.lock().unwrap().end_flush();
 
@@ -2140,6 +2148,54 @@ mod tests {
             write_attributes.immutable_attributes.change_time,
             sync_attributes.immutable_attributes.change_time,
         );
+
+        close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_shrink_and_flush_updates_ctime() {
+        let fixture = TestFixture::new_unencrypted().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            FILE_NAME,
+        )
+        .await;
+
+        let initial_file_size = zx::system_get_page_size() as usize * 10;
+        file::write(&file, vec![5u8; initial_file_size]).await.unwrap();
+        file.sync().await.unwrap().map_err(zx::ok).unwrap();
+
+        let (starting_mtime, starting_ctime) = {
+            let attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+            (
+                attributes.mutable_attributes.modification_time,
+                attributes.immutable_attributes.change_time,
+            )
+        };
+
+        // Shrink the file size.
+        file.resize(0).await.expect("FIDL call failed").expect("resize failed");
+        // Check that the change in timestamps are preserved with flush.
+        file.sync().await.unwrap().unwrap();
+
+        let (synced_mtime, synced_ctime) = {
+            let attributes = get_attributes_checked(&file, fio::NodeAttributesQuery::all()).await;
+            (
+                attributes.mutable_attributes.modification_time,
+                attributes.immutable_attributes.change_time,
+            )
+        };
+
+        assert!(starting_ctime < synced_ctime);
+        assert!(starting_mtime < synced_mtime);
+        assert_eq!(synced_ctime, synced_mtime);
 
         close_file_checked(file).await;
         fixture.close().await;
