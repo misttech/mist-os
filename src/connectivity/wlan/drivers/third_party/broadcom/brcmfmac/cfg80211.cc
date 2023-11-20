@@ -742,7 +742,7 @@ static void brcmf_signal_scan_end(struct net_device* ndev, uint64_t txn_id,
               arena.status_string());
     return;
   }
-  fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd scan_end;
+  fuchsia_wlan_fullmac_wire::WlanFullmacScanEnd scan_end = {};
   scan_end.txn_id = txn_id;
   scan_end.code = scan_result_code;
   std::shared_lock<std::shared_mutex> guard(ndev->if_proto_lock);
@@ -1831,7 +1831,7 @@ void brcmf_return_assoc_result(struct net_device* ndev,
   struct brcmf_if* ifp = ndev_to_if(ndev);
   struct brcmf_cfg80211_info* cfg = ifp->drvr->config;
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm conf;
+  fuchsia_wlan_fullmac_wire::WlanFullmacConnectConfirm conf = {};
   conf.result_code = status_code;
   if (conf.result_code == fuchsia_wlan_ieee80211_wire::StatusCode::kSuccess &&
       cfg->conn_info.resp_ie_len > 0) {
@@ -1870,7 +1870,7 @@ void brcmf_return_roam_result(struct net_device* ndev, const uint8_t* target_bss
     return;
   }
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacRoamConfirm conf;
+  fuchsia_wlan_fullmac_wire::WlanFullmacRoamConfirm conf = {};
   conf.result_code = result_code;
   memcpy(conf.target_bssid.data(), target_bssid, ETH_ALEN);
   conf.selected_bss.ies = {};
@@ -2417,7 +2417,7 @@ static void cfg80211_signal_ind(net_device* ndev) {
 
   // Send signal report indication only if client is in connected state
   if (brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTED, &ifp->vif->sme_state)) {
-    fuchsia_wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind;
+    fuchsia_wlan_fullmac_wire::WlanFullmacSignalReportIndication signal_ind = {};
     int8_t rssi, snr;
     if (brcmf_get_rssi_snr(ndev, &rssi, &snr) == ZX_OK) {
       signal_ind.rssi_dbm = rssi;
@@ -2731,7 +2731,7 @@ void brcmf_cfg80211_handle_eapol_frame(struct brcmf_if* ifp, const void* data, s
     return;
   }
   uint8_t* data_bytes = const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(data));
-  fuchsia_wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind;
+  fuchsia_wlan_fullmac_wire::WlanFullmacEapolIndication eapol_ind = {};
   // IEEE Std. 802.1X-2010, 11.3, Figure 11-1
   memcpy(eapol_ind.dst_addr.data(), data_bytes, ETH_ALEN);
   memcpy(eapol_ind.src_addr.data(), data_bytes + 6, ETH_ALEN);
@@ -4171,7 +4171,7 @@ void brcmf_if_del_keys_req(net_device* ndev,
 static void brcmf_send_eapol_confirm(
     net_device* ndev, const fuchsia_wlan_fullmac_wire::WlanFullmacImplEapolTxRequest* req,
     zx_status_t result) {
-  fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm confirm;
+  fuchsia_wlan_fullmac_wire::WlanFullmacEapolConfirm confirm = {};
   confirm.result_code = result == ZX_OK
                             ? fuchsia_wlan_fullmac_wire::WlanEapolResult::kSuccess
                             : fuchsia_wlan_fullmac_wire::WlanEapolResult::kTransmissionFailure;
@@ -5218,7 +5218,7 @@ void brcmf_if_wmm_status_req(net_device* ndev) {
   zx_status_t status = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
   edcf_acparam_t ac_params[AC_COUNT];
-  fuchsia_wlan_common_wire::WlanWmmParameters resp;
+  fuchsia_wlan_common_wire::WlanWmmParameters resp = {};
   uint32_t wme_bss_disable;
   brcmf_if* ifp = ndev_to_if(ndev);
 
@@ -5448,7 +5448,7 @@ zx_status_t brcmf_notify_channel_switch(struct brcmf_if* ifp, const struct brcmf
 
   uint16_t chanspec = 0;
   uint8_t ctl_chan;
-  fuchsia_wlan_fullmac_wire::WlanFullmacChannelSwitchInfo info;
+  fuchsia_wlan_fullmac_wire::WlanFullmacChannelSwitchInfo info = {};
   zx_status_t err = ZX_OK;
   struct brcmf_cfg80211_info* cfg = nullptr;
   struct wireless_dev* wdev = nullptr;
@@ -5507,7 +5507,7 @@ static zx_status_t brcmf_notify_start_auth(struct brcmf_if* ifp, const struct br
   zx_status_t err = ZX_OK;
   bcme_status_t fw_err = BCME_OK;
 
-  fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind;
+  fuchsia_wlan_fullmac_wire::WlanFullmacSaeHandshakeInd ind = {};
   brcmf_ext_auth* auth_start_evt = (brcmf_ext_auth*)data;
 
   if (!brcmf_test_bit(brcmf_vif_status_bit_t::CONNECTING, &ifp->vif->sme_state)) {
