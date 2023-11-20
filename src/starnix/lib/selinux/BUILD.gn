@@ -19,6 +19,7 @@ rustc_library("selinux") {
   ]
   sources = [
     "src/access_vector_cache.rs",
+    "src/has_permission.rs",
     "src/lib.rs",
     "src/security_server.rs",
   ]
