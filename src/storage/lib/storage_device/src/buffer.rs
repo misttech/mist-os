@@ -51,10 +51,6 @@ fn split_range(range: &Range<usize>, mid: usize) -> (Range<usize>, Range<usize>)
 // buffer, or which we directly connect to the block device, or which we read and write to in some
 // different way (involving changes to the block interface).
 
-// TODO(jfsulliv): Eventually we will want unmapped buffers, which is necessary in some cases
-// (e.g. the source VMO given to zx_pager_supply_pages cannot be mapped). This would most likely
-// be a new type.
-
 /// Buffer is a read-write buffer that can be used for I/O with the block device. They are created
 /// by a BufferAllocator, and automatically deallocate themselves when they go out of scope.
 ///

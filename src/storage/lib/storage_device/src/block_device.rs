@@ -27,10 +27,6 @@ const TRANSFER_VMO_SIZE: usize = 128 * 1024 * 1024;
 impl BlockDevice {
     /// Creates a new BlockDevice over |remote|.
     pub async fn new(remote: Box<dyn BlockClient>, read_only: bool) -> Result<Self, Error> {
-        // TODO(jfsulliv): Should we align buffers to the system page size as well? This will be
-        // necessary for splicing pages out of the transfer buffer, but that only improves
-        // performance for large data transfers, and we might simply attach separate VMOs to the
-        // block device in those cases.
         let buffer_source = BufferSource::new(TRANSFER_VMO_SIZE);
         let vmoid = remote.attach_vmo(buffer_source.vmo()).await?;
         let allocator = BufferAllocator::new(remote.block_size() as usize, buffer_source);

@@ -4,7 +4,8 @@
 
 use {
     crate::buffer::{round_down, round_up, Buffer},
-    futures::Future,
+    event_listener::{Event, EventListener},
+    futures::{Future, FutureExt as _},
     std::{
         collections::BTreeMap,
         ops::Range,
@@ -138,6 +139,7 @@ pub struct BufferAllocator {
     block_size: usize,
     source: BufferSource,
     inner: Mutex<Inner>,
+    event: Event,
 }
 
 // Returns the smallest order which is at least |size| bytes.
@@ -184,18 +186,32 @@ fn initial_free_lists(size: usize, block_size: usize) -> Vec<FreeList> {
 }
 
 /// A future which will resolve to an allocated [`Buffer`].
-pub struct BufferFuture<'a>(&'a BufferAllocator, usize);
+pub struct BufferFuture<'a> {
+    allocator: &'a BufferAllocator,
+    size: usize,
+    listener: Option<EventListener>,
+}
 
 impl<'a> Future for BufferFuture<'a> {
     type Output = Buffer<'a>;
 
-    fn poll(self: Pin<&mut Self>, _context: &mut Context<'_>) -> Poll<Self::Output> {
-        // TODO(b/299206422): Wait until a buffer is free, rather than asserting.
-        Poll::Ready(
-            self.0
-                .try_allocate_buffer(self.1)
-                .unwrap_or_else(|| panic!("Unable to allocate {} bytes", self.1)),
-        )
+    fn poll(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Self::Output> {
+        if let Some(listener) = self.listener.as_mut() {
+            futures::ready!(listener.poll_unpin(context));
+        }
+        // Loop because we need to deal with the case where `listener` is ready immediately upon
+        // creation, in which case we ought to retry the allocation.
+        loop {
+            match self.allocator.try_allocate_buffer(self.size) {
+                Ok(buffer) => return Poll::Ready(buffer),
+                Err(mut listener) => {
+                    if listener.poll_unpin(context).is_pending() {
+                        self.listener = Some(listener);
+                        return Poll::Pending;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -206,6 +222,7 @@ impl BufferAllocator {
             block_size,
             source,
             inner: Mutex::new(Inner { free_lists, allocation_map: BTreeMap::new() }),
+            event: Event::new(),
         }
     }
 
@@ -222,23 +239,23 @@ impl BufferAllocator {
         self.source
     }
 
-    /// Allocates a Buffer with capacity for |size| bytes. Panics if the allocation cannot be
-    /// satisfied.
+    /// Allocates a Buffer with capacity for |size| bytes. Panics if the allocation exceeds the pool
+    /// size.  Blocks until there are enough bytes available to satisfy the request.
     ///
     /// The allocated buffer will be block-aligned and the padding up to block alignment can also
     /// be used by the buffer.
     ///
     /// Allocation is O(lg(N) + M), where N = size and M = number of allocations.
     pub fn allocate_buffer(&self, size: usize) -> BufferFuture<'_> {
-        BufferFuture(self, size)
+        BufferFuture { allocator: self, size, listener: None }
     }
 
-    /// Like |allocate_buffer|, but returns None if the allocation cannot be satisfied.
-    pub fn try_allocate_buffer(&self, size: usize) -> Option<Buffer<'_>> {
+    /// Like |allocate_buffer|, but returns an EventListener if the allocation cannot be satisfied.
+    /// The listener will signal when the caller should try again.
+    pub fn try_allocate_buffer(&self, size: usize) -> Result<Buffer<'_>, EventListener> {
         if size > self.source.size() {
             panic!("Allocation of {} bytes would exceed limit {}", size, self.source.size());
         }
-
         let mut inner = self.inner.lock().unwrap();
         let requested_order = order(size, self.block_size());
         assert!(requested_order < inner.free_lists.len());
@@ -247,7 +264,7 @@ impl BufferAllocator {
             let mut idx = requested_order;
             loop {
                 if idx >= inner.free_lists.len() {
-                    return None;
+                    return Err(self.event.listen());
                 }
                 if !inner.free_lists[idx].is_empty() {
                     break idx;
@@ -269,7 +286,7 @@ impl BufferAllocator {
         tracing::debug!(?range, bytes_used = self.size_for_order(order), "Allocated");
 
         // Safety is ensured by the allocator not double-allocating any regions.
-        Some(Buffer::new(unsafe { self.source.sub_slice(&range) }, range, &self))
+        Ok(Buffer::new(unsafe { self.source.sub_slice(&range) }, range, &self))
     }
 
     /// Deallocation is O(lg(N) + M), where N = size and M = number of allocations.
@@ -298,12 +315,13 @@ impl BufferAllocator {
             order += 1;
         }
 
-        let idx = match inner.free_lists[order].binary_search(&offset) {
-            Ok(_) => panic!("Unexpectedly found {} in free list {}", offset, order),
-            Err(idx) => idx,
-        };
-
+        let idx = inner.free_lists[order]
+            .binary_search(&offset)
+            .expect_err(&format!("Unexpectedly found {} in free list {}", offset, order));
         inner.free_lists[order].insert(idx, offset);
+
+        // Notify all stuck tasks.  This might be inefficient, but it's simple and correct.
+        self.event.notify(usize::MAX);
     }
 
     fn size_for_order(&self, order: usize) -> usize {
@@ -320,9 +338,12 @@ mod tests {
     use {
         crate::buffer_allocator::{order, BufferAllocator, BufferSource},
         fuchsia_async as fasync,
-        futures::future::join_all,
+        futures::{future::join_all, pin_mut},
         rand::{prelude::SliceRandom, thread_rng, Rng},
-        std::sync::Arc,
+        std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        },
     };
 
     #[fuchsia::test]
@@ -339,7 +360,7 @@ mod tests {
         for (expected_size, buf) in sizes.iter().zip(bufs.iter()) {
             assert_eq!(*expected_size, buf.len());
         }
-        assert!(allocator.try_allocate_buffer(2).is_none());
+        assert!(allocator.try_allocate_buffer(2).is_err());
     }
 
     #[fuchsia::test]
@@ -404,7 +425,7 @@ mod tests {
 
         {
             let mut buffers = vec![];
-            while let Some(buffer) = allocator.try_allocate_buffer(8192) {
+            while let Ok(buffer) = allocator.try_allocate_buffer(8192) {
                 buffers.push(buffer);
             }
         }
@@ -418,7 +439,7 @@ mod tests {
         let allocator = BufferAllocator::new(8192, source);
 
         let mut buffers = vec![];
-        while let Some(buffer) = allocator.try_allocate_buffer(8192) {
+        while let Ok(buffer) = allocator.try_allocate_buffer(8192) {
             buffers.push(buffer);
         }
         // Deallocate a single buffer, and reallocate a single one back.
@@ -454,7 +475,7 @@ mod tests {
                             let size: usize = rng.gen_range(
                                 bs * 2_usize.pow(order as u32)..bs * 2_usize.pow(order as u32 + 1),
                             );
-                            if let Some(mut buf) = allocator.try_allocate_buffer(size) {
+                            if let Ok(mut buf) = allocator.try_allocate_buffer(size) {
                                 let val = rng.gen::<u8>();
                                 buf.as_mut_slice().fill(val);
                                 for v in buf.as_slice() {
@@ -567,5 +588,45 @@ mod tests {
             assert_eq!(s3.as_slice(), vec![]);
             assert_eq!(s4.as_slice(), vec![0xbb; 2048]);
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_blocking_allocation() {
+        let source = BufferSource::new(1024 * 1024);
+        let allocator = Arc::new(BufferAllocator::new(512, source));
+
+        let buf1 = allocator.allocate_buffer(512 * 1024).await;
+        let buf2 = allocator.allocate_buffer(512 * 1024).await;
+        let bufs_dropped = Arc::new(AtomicBool::new(false));
+
+        // buf3_fut should block until both buf1 and buf2 are done.
+        let allocator_clone = allocator.clone();
+        let bufs_dropped_clone = bufs_dropped.clone();
+        let buf3_fut = async move {
+            allocator_clone.allocate_buffer(1024 * 1024).await;
+            assert!(bufs_dropped_clone.load(Ordering::Relaxed), "Allocation finished early");
+        };
+        pin_mut!(buf3_fut);
+
+        // Each of buf_futs should block until buf3_fut is done, and they should proceed in order.
+        let mut buf_futs = vec![];
+        for _ in 0..16 {
+            let allocator_clone = allocator.clone();
+            let bufs_dropped_clone = bufs_dropped.clone();
+            let fut = async move {
+                allocator_clone.allocate_buffer(64 * 1024).await;
+                // We can't say with certainty that buf3 proceeded first, nor can we ensure these
+                // allocations proceed in order, but we can make sure that at least buf1/buf2 were
+                // done (since they exhausted the pool).
+                assert!(bufs_dropped_clone.load(Ordering::Relaxed), "Allocation finished early");
+            };
+            buf_futs.push(fut);
+        }
+
+        futures::join!(buf3_fut, join_all(buf_futs), async move {
+            std::mem::drop(buf1);
+            std::mem::drop(buf2);
+            bufs_dropped.store(true, Ordering::Relaxed);
+        });
     }
 }
