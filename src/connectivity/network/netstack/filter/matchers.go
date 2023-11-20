@@ -7,9 +7,10 @@
 package filter
 
 import (
-	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
+	"fmt"
 
-	"gvisor.dev/gvisor/pkg/tcpip"
+	"fidl/fuchsia/hardware/network"
+
 	"gvisor.dev/gvisor/pkg/tcpip/header"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
 )
@@ -22,11 +23,7 @@ var _ stack.Matcher = (*filterDisabledNICMatcher)(nil)
 // All NICs are considered to have filtering disabled until explicitly
 // enabled.
 type filterDisabledNICMatcher struct {
-	mu struct {
-		sync.RWMutex
-		// nicNames are the NICs where the filter is enabled on.
-		nicNames map[string]tcpip.NICID
-	}
+	enabledNics *enabledNicsCache
 }
 
 // Name implements stack.Matcher.
@@ -36,26 +33,58 @@ func (*filterDisabledNICMatcher) Name() string {
 
 // Match implements stack.Matcher.
 func (d *filterDisabledNICMatcher) Match(hook stack.Hook, _ stack.PacketBufferPtr, inNicName, outNicName string) (matches bool, hotdrop bool) {
-	if inNicName != "" && d.nicDisabled(inNicName) {
+	if inNicName != "" && d.enabledNics.nicDisabled(inNicName) {
 		return true, false
 	}
-	if outNicName != "" && d.nicDisabled(outNicName) {
+	if outNicName != "" && d.enabledNics.nicDisabled(outNicName) {
 		return true, false
 	}
 	return false, false
 }
 
-func (d *filterDisabledNICMatcher) init() {
-	d.mu.Lock()
-	defer d.mu.Unlock()
-	d.mu.nicNames = make(map[string]tcpip.NICID)
+var _ stack.Matcher = (*deviceClassNICMatcher)(nil)
+
+type NICMatcherDirection uint32
+
+const (
+	_ NICMatcherDirection = iota
+	NICMatcherDirectionInput
+	NICMatcherDirectionOutput
+)
+
+// deviceClassNICMatcher is a stack.Matcher that matches on the device class
+// of an incoming or outgoing interface.
+type deviceClassNICMatcher struct {
+	// enabledNics keeps track of the enabled NIC cache that provides the
+	// matcher with the NIC's device class when available.
+	enabledNics *enabledNicsCache
+	// match is the device class the matcher matches on.
+	match network.DeviceClass
+	// direction controls if the input or output interface should be matched on.
+	direction NICMatcherDirection
 }
 
-func (d *filterDisabledNICMatcher) nicDisabled(name string) bool {
-	d.mu.RLock()
-	defer d.mu.RUnlock()
-	_, ok := d.mu.nicNames[name]
-	return !ok
+// Name implements stack.Matcher.
+func (*deviceClassNICMatcher) Name() string {
+	return "deviceClassNICMatcher"
+}
+
+// Match implements stack.Matcher.
+func (d *deviceClassNICMatcher) Match(_ stack.Hook, _ stack.PacketBufferPtr, inNicName, outNicName string) (matches bool, hotdrop bool) {
+	var nicName string
+	switch d := d.direction; d {
+	case NICMatcherDirectionInput:
+		nicName = inNicName
+	case NICMatcherDirectionOutput:
+		nicName = outNicName
+	default:
+		panic(fmt.Sprintf("invalid nic matcher direction %d", d))
+	}
+	if nicName != "" {
+		deviceClass := d.enabledNics.nicDeviceClass(nicName)
+		return (deviceClass != nil && *deviceClass == d.match), false
+	}
+	return false, false
 }
 
 // portMatcher matches port to some range.

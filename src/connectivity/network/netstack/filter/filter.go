@@ -13,6 +13,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/fidlconv"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/sync"
 
+	"fidl/fuchsia/hardware/network"
 	filter "fidl/fuchsia/net/filter/deprecated"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -22,14 +23,77 @@ import (
 
 const tag = "filter"
 
+type cachedNicInfo struct {
+	nicid tcpip.NICID
+	// deviceClass caches the NIC's device class, if it has one. Only interfaces
+	// backed by netdevice have a defined class.
+	deviceClass *network.DeviceClass
+}
+
+type enabledNicsCache struct {
+	mu struct {
+		sync.RWMutex
+		// enabledNics are the nics for which filtering is enabled. Contains
+		// cached information from the NIC upon enablement.
+		enabledNics map[string]cachedNicInfo
+	}
+}
+
+func (c *enabledNicsCache) init() {
+	c.mu.Lock()
+	c.mu.enabledNics = make(map[string]cachedNicInfo)
+	c.mu.Unlock()
+}
+
+func (c *enabledNicsCache) nicDisabled(name string) bool {
+	c.mu.RLock()
+	_, ok := c.mu.enabledNics[name]
+	c.mu.RUnlock()
+	return !ok
+}
+
+func (c *enabledNicsCache) add(name string, info cachedNicInfo) {
+	c.mu.Lock()
+	c.mu.enabledNics[name] = info
+	c.mu.Unlock()
+}
+
+func (c *enabledNicsCache) remove(name string) {
+	c.mu.Lock()
+	delete(c.mu.enabledNics, name)
+	c.mu.Unlock()
+}
+
+// nicDeviceClass returns the cached device class for nic named name, if the
+// provided nic has enabled filtering on it _and_ it has a device class.
+func (d *enabledNicsCache) nicDeviceClass(name string) *network.DeviceClass {
+	d.mu.RLock()
+	var deviceClass *network.DeviceClass
+	cached, ok := d.mu.enabledNics[name]
+	if ok {
+		deviceClass = cached.deviceClass
+	}
+	d.mu.RUnlock()
+	return deviceClass
+}
+
+// NicInfoProvider provides nic information for caching in the filtering engine.
+type NicInfoProvider interface {
+	// GetNicInfo returns the NIC name and device class (if available).
+	// If nicid doesn't exist, GetNicInfo returns "", nil.
+	GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass)
+}
+
 type Filter struct {
-	stack             *stack.Stack
+	stack           *stack.Stack
+	nicInfoProvider NicInfoProvider
+
 	defaultV4Table    stack.Table
 	defaultV6Table    stack.Table
 	defaultV4NATTable stack.Table
 	defaultV6NATTable stack.Table
 
-	filterDisabledNICMatcher filterDisabledNICMatcher
+	enabledNics enabledNicsCache
 
 	mu struct {
 		sync.RWMutex
@@ -46,7 +110,7 @@ type Filter struct {
 	}
 }
 
-func New(s *stack.Stack) *Filter {
+func New(s *stack.Stack, nicInfoProvider NicInfoProvider) *Filter {
 	defaultTables := stack.DefaultTables(s.Clock(), s.Rand())
 	defaultV4Table := defaultTables.GetTable(stack.FilterID, false /* ipv6 */)
 	defaultV6Table := defaultTables.GetTable(stack.FilterID, true /* ipv6 */)
@@ -55,12 +119,13 @@ func New(s *stack.Stack) *Filter {
 
 	f := &Filter{
 		stack:             s,
+		nicInfoProvider:   nicInfoProvider,
 		defaultV4Table:    defaultV4Table,
 		defaultV6Table:    defaultV6Table,
 		defaultV4NATTable: defaultV4NATTable,
 		defaultV6NATTable: defaultV6NATTable,
 	}
-	f.filterDisabledNICMatcher.init()
+	f.enabledNics.init()
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.mu.v4Table = defaultV4Table
@@ -71,13 +136,15 @@ func New(s *stack.Stack) *Filter {
 }
 
 func (f *Filter) enableInterface(id tcpip.NICID) filter.FilterEnableInterfaceResult {
-	name := f.stack.FindNICNameFromID(id)
+	name, deviceClass := f.nicInfoProvider.GetNicInfo(id)
 	if name == "" {
 		return filter.FilterEnableInterfaceResultWithErr(filter.EnableDisableInterfaceErrorNotFound)
 	}
-	f.filterDisabledNICMatcher.mu.Lock()
-	defer f.filterDisabledNICMatcher.mu.Unlock()
-	f.filterDisabledNICMatcher.mu.nicNames[name] = id
+
+	f.enabledNics.add(name, cachedNicInfo{
+		nicid:       id,
+		deviceClass: deviceClass,
+	})
 	return filter.FilterEnableInterfaceResultWithResponse(filter.FilterEnableInterfaceResponse{})
 }
 
@@ -86,9 +153,7 @@ func (f *Filter) disableInterface(id tcpip.NICID) filter.FilterDisableInterfaceR
 	if name == "" {
 		return filter.FilterDisableInterfaceResultWithErr(filter.EnableDisableInterfaceErrorNotFound)
 	}
-	f.filterDisabledNICMatcher.mu.Lock()
-	defer f.filterDisabledNICMatcher.mu.Unlock()
-	delete(f.filterDisabledNICMatcher.mu.nicNames, name)
+	f.enabledNics.remove(name)
 	return filter.FilterDisableInterfaceResultWithResponse(filter.FilterDisableInterfaceResponse{})
 }
 
@@ -97,11 +162,11 @@ func (f *Filter) RemovedNIC(id tcpip.NICID) {
 	defer f.mu.Unlock()
 
 	func() {
-		f.filterDisabledNICMatcher.mu.Lock()
-		defer f.filterDisabledNICMatcher.mu.Unlock()
-		for k, v := range f.filterDisabledNICMatcher.mu.nicNames {
-			if v == id {
-				delete(f.filterDisabledNICMatcher.mu.nicNames, k)
+		f.enabledNics.mu.Lock()
+		defer f.enabledNics.mu.Unlock()
+		for k, v := range f.enabledNics.mu.enabledNics {
+			if v.nicid == id {
+				delete(f.enabledNics.mu.enabledNics, k)
 				break
 			}
 		}
@@ -216,7 +281,7 @@ func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table s
 	}
 
 	allowPacketsForFilterDisbledNICs := stack.Rule{
-		Matchers: []stack.Matcher{&f.filterDisabledNICMatcher},
+		Matchers: []stack.Matcher{&filterDisabledNICMatcher{enabledNics: &f.enabledNics}},
 		Target:   &stack.AcceptTarget{},
 	}
 	v4InputRules := []stack.Rule{allowPacketsForFilterDisbledNICs}
@@ -325,6 +390,27 @@ func (f *Filter) parseRules(rules []filter.Rule) (v4Table stack.Table, v6Table s
 			return stack.Table{}, stack.Table{}, false
 		}
 
+		switch r.DeviceClass.Which() {
+		case filter.DeviceClassAny:
+		case filter.DeviceClassMatch:
+			var direction NICMatcherDirection
+			switch d := r.Direction; d {
+			case filter.DirectionIncoming:
+				direction = NICMatcherDirectionInput
+			case filter.DirectionOutgoing:
+				direction = NICMatcherDirectionOutput
+			default:
+				return stack.Table{}, stack.Table{}, false
+			}
+			matchers = append(matchers, &deviceClassNICMatcher{
+				enabledNics: &f.enabledNics,
+				match:       r.DeviceClass.Match,
+				direction:   direction,
+			})
+		default:
+			return stack.Table{}, stack.Table{}, false
+		}
+
 		var target stack.Target
 		switch r.Action {
 		case filter.ActionPass:
@@ -416,7 +502,7 @@ func (f *Filter) parseNATRules(natRules []filter.Nat) (v4Table stack.Table, v6Ta
 	}
 
 	allowPacketsForFilterDisbledNICs := stack.Rule{
-		Matchers: []stack.Matcher{&f.filterDisabledNICMatcher},
+		Matchers: []stack.Matcher{&filterDisabledNICMatcher{enabledNics: &f.enabledNics}},
 		Target:   &stack.AcceptTarget{},
 	}
 	v4PostroutingRules := []stack.Rule{allowPacketsForFilterDisbledNICs}

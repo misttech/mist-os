@@ -475,6 +475,7 @@ pub fn server_outgoing_drop_test(
             nic: 0,
             log: false,
             keep_state: false,
+            device_class: fnetfilter::DeviceClass::Any(fnetfilter::Empty {}),
         }]),
         expected_traffic,
     }
@@ -512,6 +513,7 @@ pub fn client_incoming_drop_test(
             nic: 0,
             log: false,
             keep_state: false,
+            device_class: fnetfilter::DeviceClass::Any(fnetfilter::Empty {}),
         }]),
         server_updates: None,
         expected_traffic,

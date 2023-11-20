@@ -33,7 +33,7 @@ func TestGetAndUpdateRules(t *testing.T) {
 			udp.NewProtocol,
 		},
 	})
-	fi := &filterImpl{filter: New(s)}
+	fi := &filterImpl{filter: newForTest(s)}
 
 	// 0. Prepare test rules.
 	trs1 := []filter.Rule{
@@ -44,6 +44,7 @@ func TestGetAndUpdateRules(t *testing.T) {
 			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress(util.Parse("10.0.0.0")), PrefixLen: 8},
 			SrcPortRange: filter.PortRange{Start: 100, End: 100},
 			Log:          true,
+			DeviceClass:  filter.DeviceClassWithAny(filter.Empty{}),
 		},
 	}
 	trs2 := []filter.Rule{
@@ -54,6 +55,7 @@ func TestGetAndUpdateRules(t *testing.T) {
 			SrcSubnet:    &net.Subnet{Addr: fidlconv.ToNetIpAddress(util.Parse("11.0.0.0")), PrefixLen: 8},
 			SrcPortRange: filter.PortRange{Start: 100, End: 100},
 			Log:          true,
+			DeviceClass:  filter.DeviceClassWithAny(filter.Empty{}),
 		},
 	}
 

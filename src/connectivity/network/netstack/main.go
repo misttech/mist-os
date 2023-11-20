@@ -461,7 +461,7 @@ func Main() {
 		}
 	}
 
-	f := filter.New(stk)
+	f := filter.New(stk, &filterNicInfoProvider{stack: stk})
 
 	interfaceEventChan := make(chan interfaceEvent)
 	interfacesWatcherChan := make(chan interfaceWatcherRequest)

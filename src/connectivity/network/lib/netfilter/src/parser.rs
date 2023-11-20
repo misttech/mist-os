@@ -303,6 +303,7 @@ fn parse_rule(pair: Pair<'_, Rule>) -> Result<filter::Rule, Error> {
         nic: 0, // TODO: Support NICID (currently always 0 (= any))
         log: log,
         keep_state: keep_state,
+        device_class: filter::DeviceClass::Any(filter::Empty {}),
     })
 }
 
@@ -455,6 +456,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -476,6 +478,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -498,6 +501,7 @@ mod test {
                     nic: 0,
                     log: false,
                     keep_state: false,
+                    device_class: filter::DeviceClass::Any(filter::Empty {}),
                 },
                 filter::Rule {
                     action: filter::Action::Drop,
@@ -512,6 +516,7 @@ mod test {
                     nic: 0,
                     log: false,
                     keep_state: false,
+                    device_class: filter::DeviceClass::Any(filter::Empty {}),
                 },
             ])
         );
@@ -537,6 +542,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -558,6 +564,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -579,6 +586,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -619,6 +627,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -643,6 +652,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -669,6 +679,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -695,6 +706,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -738,6 +750,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -759,6 +772,7 @@ mod test {
                 nic: 0,
                 log: true,
                 keep_state: false,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }
@@ -780,6 +794,7 @@ mod test {
                 nic: 0,
                 log: false,
                 keep_state: true,
+                device_class: filter::DeviceClass::Any(filter::Empty {}),
             }])
         );
     }

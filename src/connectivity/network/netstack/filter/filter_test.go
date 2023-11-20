@@ -9,6 +9,7 @@ package filter
 import (
 	"testing"
 
+	"fidl/fuchsia/hardware/network"
 	"fidl/fuchsia/net"
 	filter "fidl/fuchsia/net/filter/deprecated"
 
@@ -31,6 +32,25 @@ func maskAsAddr(s tcpip.Subnet) tcpip.Address {
 	return tcpip.AddrFromSlice(mask.AsSlice())
 }
 
+type testNicInfoProvider struct {
+	stack *stack.Stack
+}
+
+var _ NicInfoProvider = (*testNicInfoProvider)(nil)
+
+// GetNicInfo implements NicInfoProvider.
+func (p *testNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass) {
+	nicInfo, ok := p.stack.NICInfo()[nicid]
+	if !ok {
+		return "", nil
+	}
+	return nicInfo.Name, nil
+}
+
+func newForTest(s *stack.Stack) *Filter {
+	return New(s, &testNicInfoProvider{stack: s})
+}
+
 func TestFilterUpdates(t *testing.T) {
 	cmpOpts := []cmp.Option{
 		cmp.AllowUnexported(TCPSourcePortMatcher{}),
@@ -38,6 +58,8 @@ func TestFilterUpdates(t *testing.T) {
 		cmp.AllowUnexported(UDPSourcePortMatcher{}),
 		cmp.AllowUnexported(UDPDestinationPortMatcher{}),
 		cmp.AllowUnexported(portMatcher{}),
+		cmp.AllowUnexported(deviceClassNICMatcher{}),
+		cmpopts.IgnoreFields(deviceClassNICMatcher{}, "enabledNics"),
 		// We aren't testing NIC filtering here.
 		cmpopts.IgnoreUnexported(filterDisabledNICMatcher{}),
 	}
@@ -86,8 +108,11 @@ func TestFilterUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr2Prefix,
 	}.Subnet()
 
-	var emptyFilterDisabledNICMatcher filterDisabledNICMatcher
-	emptyFilterDisabledNICMatcher.init()
+	emptyFilterDisabledNICMatcher := func() filterDisabledNICMatcher {
+		var cache enabledNicsCache
+		cache.init()
+		return filterDisabledNICMatcher{enabledNics: &cache}
+	}()
 
 	defaultV4Table := func(defaultTables *stack.IPTables) stack.Table {
 		return defaultTables.GetTable(stack.FilterID, false /* ipv6 */)
@@ -125,12 +150,14 @@ func TestFilterUpdates(t *testing.T) {
 						Start: 3,
 						End:   4,
 					},
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:    filter.ActionDrop,
 					Direction: filter.DirectionOutgoing,
 					Proto:     filter.SocketProtocolIcmp,
 					// Port ranges are ignored for ICMP.
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:    filter.ActionPass,
@@ -144,12 +171,14 @@ func TestFilterUpdates(t *testing.T) {
 						Start: 11,
 						End:   12,
 					},
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:    filter.ActionPass,
 					Direction: filter.DirectionIncoming,
 					Proto:     filter.SocketProtocolIcmpv6,
 					// Port ranges are ignored for ICMPv6.
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result: filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{}),
@@ -307,6 +336,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: false,
 					DstSubnet:            nil,
 					DstSubnetInvertMatch: true,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:               filter.ActionDrop,
@@ -316,6 +346,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: false,
 					DstSubnet:            &ipv4Subnet2,
 					DstSubnetInvertMatch: true,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:               filter.ActionDrop,
@@ -325,6 +356,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: true,
 					DstSubnet:            nil,
 					DstSubnetInvertMatch: false,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:               filter.ActionPass,
@@ -334,6 +366,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: true,
 					DstSubnet:            &ipv6Subnet2,
 					DstSubnetInvertMatch: false,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:               filter.ActionDrop,
@@ -342,6 +375,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: false,
 					DstSubnet:            &ipv4Subnet2,
 					DstSubnetInvertMatch: true,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 				{
 					Action:               filter.ActionPass,
@@ -350,6 +384,7 @@ func TestFilterUpdates(t *testing.T) {
 					SrcSubnetInvertMatch: true,
 					DstSubnet:            &ipv6Subnet2,
 					DstSubnetInvertMatch: false,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result: filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{}),
@@ -503,9 +538,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv4 src with IPv6 dst",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					SrcSubnet: &ipv4Subnet1,
-					DstSubnet: &ipv6Subnet1,
+					Action:      filter.ActionDrop,
+					SrcSubnet:   &ipv4Subnet1,
+					DstSubnet:   &ipv6Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -516,9 +552,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv6 src with IPv4 dst",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					SrcSubnet: &ipv6Subnet1,
-					DstSubnet: &ipv4Subnet1,
+					Action:      filter.ActionDrop,
+					SrcSubnet:   &ipv6Subnet1,
+					DstSubnet:   &ipv4Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -529,9 +566,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv4 src with ICMPv6",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					Proto:     filter.SocketProtocolIcmpv6,
-					SrcSubnet: &ipv4Subnet1,
+					Action:      filter.ActionDrop,
+					Proto:       filter.SocketProtocolIcmpv6,
+					SrcSubnet:   &ipv4Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -542,9 +580,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv4 dst with ICMPv6",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					Proto:     filter.SocketProtocolIcmpv6,
-					DstSubnet: &ipv4Subnet1,
+					Action:      filter.ActionDrop,
+					Proto:       filter.SocketProtocolIcmpv6,
+					DstSubnet:   &ipv4Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -555,9 +594,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv6 src with ICMPv4",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					Proto:     filter.SocketProtocolIcmp,
-					SrcSubnet: &ipv6Subnet1,
+					Action:      filter.ActionDrop,
+					Proto:       filter.SocketProtocolIcmp,
+					SrcSubnet:   &ipv6Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -568,9 +608,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "IPv6 dst with ICMPv4",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					Proto:     filter.SocketProtocolIcmp,
-					DstSubnet: &ipv6Subnet1,
+					Action:      filter.ActionDrop,
+					Proto:       filter.SocketProtocolIcmp,
+					DstSubnet:   &ipv6Subnet1,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -581,8 +622,9 @@ func TestFilterUpdates(t *testing.T) {
 			name: "unrecognized proto",
 			rules: []filter.Rule{
 				{
-					Action: filter.ActionDrop,
-					Proto:  255,
+					Action:      filter.ActionDrop,
+					Proto:       255,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -593,8 +635,9 @@ func TestFilterUpdates(t *testing.T) {
 			name: "unrecognized action",
 			rules: []filter.Rule{
 				{
-					Action: 255,
-					Proto:  filter.SocketProtocolTcp,
+					Action:      255,
+					Proto:       filter.SocketProtocolTcp,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -605,9 +648,10 @@ func TestFilterUpdates(t *testing.T) {
 			name: "unrecognized direction",
 			rules: []filter.Rule{
 				{
-					Action:    filter.ActionDrop,
-					Direction: 255,
-					Proto:     filter.SocketProtocolTcp,
+					Action:      filter.ActionDrop,
+					Direction:   255,
+					Proto:       filter.SocketProtocolTcp,
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -629,6 +673,7 @@ func TestFilterUpdates(t *testing.T) {
 						Start: 3,
 						End:   4,
 					},
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -650,6 +695,7 @@ func TestFilterUpdates(t *testing.T) {
 						Start: 4,
 						End:   3,
 					},
+					DeviceClass: filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
@@ -669,11 +715,146 @@ func TestFilterUpdates(t *testing.T) {
 					DstSubnet:            &ipv6Subnet2,
 					DstSubnetInvertMatch: false,
 					KeepState:            true,
+					DeviceClass:          filter.DeviceClassWithAny(filter.Empty{}),
 				},
 			},
 			result:  filter.FilterUpdateRulesResultWithErr(filter.FilterUpdateRulesErrorBadRule),
 			v4Table: defaultV4Table,
 			v6Table: defaultV6Table,
+		},
+		{
+			name: "device class",
+			rules: []filter.Rule{
+				{
+					Action:      filter.ActionDrop,
+					Direction:   filter.DirectionOutgoing,
+					DeviceClass: filter.DeviceClassWithMatch(network.DeviceClassEthernet),
+				},
+				{
+					Action:      filter.ActionDrop,
+					Direction:   filter.DirectionIncoming,
+					DeviceClass: filter.DeviceClassWithMatch(network.DeviceClassWlan),
+				},
+			},
+			result: filter.FilterUpdateRulesResultWithResponse(filter.FilterUpdateRulesResponse{}),
+			v4Table: func(*stack.IPTables) stack.Table {
+				return stack.Table{
+					Rules: []stack.Rule{
+						// Initial Accept for non input/output hooks.
+						{
+							Target: &stack.AcceptTarget{},
+						},
+
+						// Input chain.
+						{
+							// Don't run filters on an interface with filters disabled.
+							Matchers: []stack.Matcher{
+								&emptyFilterDisabledNICMatcher,
+							},
+							Target: &stack.AcceptTarget{},
+						},
+						{
+							Matchers: []stack.Matcher{
+								&deviceClassNICMatcher{
+									match:     network.DeviceClassWlan,
+									direction: NICMatcherDirectionInput,
+								},
+							},
+							Target: &stack.DropTarget{},
+						},
+						{
+							Target: &stack.AcceptTarget{},
+						},
+
+						// Output chain.
+						{
+							// Don't run filters on an interface with filters disabled.
+							Matchers: []stack.Matcher{
+								&emptyFilterDisabledNICMatcher,
+							},
+							Target: &stack.AcceptTarget{},
+						},
+						{
+							Matchers: []stack.Matcher{
+								&deviceClassNICMatcher{
+									match:     network.DeviceClassEthernet,
+									direction: NICMatcherDirectionOutput,
+								},
+							},
+							Target: &stack.DropTarget{},
+						},
+						{
+							Target: &stack.AcceptTarget{},
+						},
+					},
+					BuiltinChains: [stack.NumHooks]int{
+						stack.Prerouting:  0,
+						stack.Input:       1,
+						stack.Forward:     0,
+						stack.Output:      4,
+						stack.Postrouting: 0,
+					},
+				}
+			},
+			v6Table: func(*stack.IPTables) stack.Table {
+				return stack.Table{
+					Rules: []stack.Rule{
+						// Initial Accept for non input/output hooks.
+						{
+							Target: &stack.AcceptTarget{},
+						},
+
+						// Input chain.
+						{
+							// Don't run filters on an interface with filters disabled.
+							Matchers: []stack.Matcher{
+								&emptyFilterDisabledNICMatcher,
+							},
+							Target: &stack.AcceptTarget{},
+						},
+						{
+							Matchers: []stack.Matcher{
+								&deviceClassNICMatcher{
+									match:     network.DeviceClassWlan,
+									direction: NICMatcherDirectionInput,
+								},
+							},
+							Target: &stack.DropTarget{},
+						},
+						{
+							Target: &stack.AcceptTarget{},
+						},
+
+						// Output chain.
+						{
+							// Don't run filters on an interface with filters disabled.
+							Matchers: []stack.Matcher{
+								&emptyFilterDisabledNICMatcher,
+							},
+							Target: &stack.AcceptTarget{},
+						},
+						{
+							Matchers: []stack.Matcher{
+								&deviceClassNICMatcher{
+									match:     network.DeviceClassEthernet,
+									direction: NICMatcherDirectionOutput,
+								},
+							},
+							Target: &stack.DropTarget{},
+						},
+						{
+							Target: &stack.AcceptTarget{},
+						},
+					},
+					BuiltinChains: [stack.NumHooks]int{
+						stack.Prerouting:  0,
+						stack.Input:       1,
+						stack.Forward:     0,
+						stack.Output:      4,
+						stack.Postrouting: 0,
+					},
+				}
+			},
 		},
 	}
 
@@ -688,7 +869,7 @@ func TestFilterUpdates(t *testing.T) {
 			expectedV4Table := test.v4Table(defaultTables)
 			expectedV6Table := test.v6Table(defaultTables)
 
-			f := New(s)
+			f := newForTest(s)
 			if got, want := f.updateRules(test.rules, 0), test.result; got != want {
 				t.Fatalf("got f.updateRules(_, 0) = %#v, want = %#v", got, want)
 			}
@@ -759,10 +940,10 @@ func TestFilterEnableInterface(t *testing.T) {
 				t.Fatalf("CreateNICWithOptions(%d, _, %#v)= %s", nicID, nicOpts, err)
 			}
 
-			f := New(s)
+			f := newForTest(s)
 			test.actions(f)
 
-			enabled := !f.filterDisabledNICMatcher.nicDisabled(nicName)
+			enabled := !f.enabledNics.nicDisabled(nicName)
 			if got, want := enabled, test.enabled; got != want {
 				t.Errorf("got enabled = %t, want = %t", got, want)
 			}
@@ -825,8 +1006,11 @@ func TestNATUpdates(t *testing.T) {
 		PrefixLen: ipv6Addr2Prefix,
 	}.Subnet()
 
-	var emptyFilterDisabledNICMatcher filterDisabledNICMatcher
-	emptyFilterDisabledNICMatcher.init()
+	emptyFilterDisabledNICMatcher := func() filterDisabledNICMatcher {
+		var cache enabledNicsCache
+		cache.init()
+		return filterDisabledNICMatcher{enabledNics: &cache}
+	}()
 
 	defaultV4Table := func(defaultTables *stack.IPTables) stack.Table {
 		return defaultTables.GetTable(stack.NATID, false /* ipv6 */)
@@ -1067,7 +1251,7 @@ func TestNATUpdates(t *testing.T) {
 			expectedV4Table := test.v4Table(defaultTables)
 			expectedV6Table := test.v6Table(defaultTables)
 
-			f := New(s)
+			f := newForTest(s)
 			if got, want := f.updateNATRules(test.rules, 0), test.result; got != want {
 				t.Fatalf("got f.updateNATRules(_, 0) = %#v, want = %#v", got, want)
 			}
@@ -1080,6 +1264,99 @@ func TestNATUpdates(t *testing.T) {
 			v6table := iptables.GetTable(stack.NATID, true /* ipv6 */)
 			if diff := cmp.Diff(v6table, expectedV6Table, cmpOpts...); diff != "" {
 				t.Errorf("IPv6 NAT table mispatch (-want +got):\n%s", diff)
+			}
+		})
+	}
+}
+
+func TestDeviceClassMatcher(t *testing.T) {
+	const (
+		nic0Name = "lo"
+		nic1Name = "eth1"
+		nic2Name = "eth2"
+	)
+	nic1Class := network.DeviceClassEthernet
+	nic2Class := network.DeviceClassWlan
+	var cache enabledNicsCache
+	cache.init()
+	cache.add(nic0Name, cachedNicInfo{})
+	cache.add(nic1Name, cachedNicInfo{
+		deviceClass: &nic1Class,
+	})
+	cache.add(nic2Name, cachedNicInfo{
+		deviceClass: &nic2Class,
+	})
+	tests := []struct {
+		name       string
+		direction  NICMatcherDirection
+		match      network.DeviceClass
+		inNicName  string
+		outNicName string
+		expect     bool
+	}{
+		{
+			name:       "no device class",
+			outNicName: nic0Name,
+			expect:     false,
+			direction:  NICMatcherDirectionInput,
+		},
+		{
+			name:      "no nics",
+			expect:    false,
+			direction: NICMatcherDirectionInput,
+		},
+		{
+			name:       "filtering disabled on device",
+			outNicName: "foo",
+			expect:     false,
+			direction:  NICMatcherDirectionInput,
+		},
+		{
+			name:      "matches input",
+			inNicName: nic1Name,
+			direction: NICMatcherDirectionInput,
+			match:     nic1Class,
+			expect:    true,
+		},
+		{
+			name:       "doesn't match input",
+			inNicName:  nic1Name,
+			outNicName: nic2Name,
+			direction:  NICMatcherDirectionInput,
+			match:      nic2Class,
+			expect:     false,
+		},
+		{
+			name:       "matches output",
+			outNicName: nic1Name,
+			direction:  NICMatcherDirectionOutput,
+			match:      nic1Class,
+			expect:     true,
+		},
+		{
+			name:       "doesn't match output",
+			inNicName:  nic1Name,
+			outNicName: nic2Name,
+			direction:  NICMatcherDirectionOutput,
+			match:      nic1Class,
+			expect:     false,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			matcher := deviceClassNICMatcher{
+				enabledNics: &cache,
+				match:       test.match,
+				direction:   test.direction,
+			}
+			var hook stack.Hook
+			var pb stack.PacketBufferPtr
+			matches, drop := matcher.Match(hook, pb, test.inNicName, test.outNicName)
+			if want, got := false, drop; want != got {
+				t.Errorf("got drop = %t, want %t", got, want)
+			}
+			if want, got := test.expect, matches; want != got {
+				t.Errorf("got matches = %t, want %t", got, want)
 			}
 		})
 	}

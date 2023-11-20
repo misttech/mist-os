@@ -19,6 +19,7 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dhcp"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/dns"
+	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/filter"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/link/bridge"
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/routes"
@@ -29,6 +30,7 @@ import (
 	"go.fuchsia.dev/fuchsia/src/connectivity/network/netstack/util"
 	syslog "go.fuchsia.dev/fuchsia/src/lib/syslog/go"
 
+	"fidl/fuchsia/hardware/network"
 	"fidl/fuchsia/net/interfaces/admin"
 
 	"gvisor.dev/gvisor/pkg/tcpip"
@@ -1621,4 +1623,24 @@ func networkProtocolToString(proto tcpip.NetworkProtocolNumber) string {
 	default:
 		return fmt.Sprintf("0x%x", proto)
 	}
+}
+
+type filterNicInfoProvider struct {
+	stack *stack.Stack
+}
+
+var _ filter.NicInfoProvider = (*filterNicInfoProvider)(nil)
+
+// GetNicInfo implements filter.NicInfoProvider.
+func (p *filterNicInfoProvider) GetNicInfo(nicid tcpip.NICID) (string, *network.DeviceClass) {
+	nicInfo, ok := p.stack.NICInfo()[nicid]
+	if !ok {
+		return "", nil
+	}
+	ifs := nicInfo.Context.(*ifState)
+	if ifs.controller == nil {
+		return nicInfo.Name, nil
+	}
+	deviceClass := ifs.controller.DeviceClass()
+	return nicInfo.Name, &deviceClass
 }

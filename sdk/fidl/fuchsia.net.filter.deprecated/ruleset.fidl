@@ -4,6 +4,7 @@
 library fuchsia.net.filter.deprecated;
 
 using fuchsia.net;
+using fuchsia.hardware.network;
 
 /// Direction is which way (Incoming or Outgoing) a packet is moving in the stack.
 type Direction = strict enum {
@@ -47,7 +48,19 @@ type Rule = struct {
     nic uint32;
     log bool;
     keep_state bool;
+    /// Matches on packets originating from or destined to interfaces with
+    /// `device_class`.
+    ///
+    /// If `Rule.direction` is `Direction.OUTGOING`, matches on the output
+    /// interface. If it is `Direction.INCOMING`, matches on the input
+    /// interface.
+    device_class strict union {
+        1: any Empty;
+        2: match fuchsia.hardware.network.DeviceClass;
+    };
 };
+
+type Empty = struct {};
 
 /// NAT is a rule for Source Network Address Translation.
 ///
