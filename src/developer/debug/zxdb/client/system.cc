@@ -531,7 +531,9 @@ void System::CancelAllThreadControllers() {
   }
 }
 
-void System::DidConnect(bool is_local) {
+void System::DidConnect(Where where) {
+  where_ = where;
+
   // Force reload the symbol mappings after connection. This needs to be done for every connection
   // since a new image could have been compiled and launched which will have a different build ID
   // file.
@@ -542,7 +544,21 @@ void System::DidConnect(bool is_local) {
 
   // When debugging locally, fall back to using symbols from the local modules themselves if not
   // found in the normal symbol locations.
-  GetSymbols()->set_enable_local_fallback(is_local);
+  GetSymbols()->set_enable_local_fallback(where == Where::kLocal);
+
+#if defined(__linux__)
+  if (where == Where::kLocal) {
+    std::string kLocalSystemSymbolPath("/usr/lib/debug/.build-id");
+
+    // Add the default location for local system symbols if it's not already there.
+    auto build_id_dirs = settings_.GetList(ClientSettings::System::kBuildIdDirs);
+    if (std::find(build_id_dirs.begin(), build_id_dirs.end(), kLocalSystemSymbolPath) ==
+        build_id_dirs.end()) {
+      build_id_dirs.push_back(kLocalSystemSymbolPath);
+      settings_.SetList(ClientSettings::System::kBuildIdDirs, build_id_dirs);
+    }
+  }
+#endif
 }
 
 void System::DidDisconnect() {

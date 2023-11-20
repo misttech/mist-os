@@ -36,6 +36,12 @@ class TargetImpl;
 // computer.
 class System : public ClientObject, public SettingStoreObserver {
  public:
+  enum class Where {
+    kNone,    // No connection.
+    kLocal,   // Connection is to the local system, file paths can be used directly.
+    kRemote,  // Remote connection to another computer.
+  };
+
   // Callback for requesting the process tree.
   using ProcessTreeCallback = fit::callback<void(const Err&, debug_ipc::ProcessTreeReply)>;
 
@@ -43,6 +49,9 @@ class System : public ClientObject, public SettingStoreObserver {
   ~System() override;
 
   fxl::WeakPtr<System> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
+
+  // Returns whether this connection is local or remote.
+  Where where() const { return where_; }
 
   void AddObserver(SystemObserver* observer) { observers_.AddObserver(observer); }
   void RemoveObserver(SystemObserver* observer) { observers_.RemoveObserver(observer); }
@@ -137,7 +146,7 @@ class System : public ClientObject, public SettingStoreObserver {
   // Notification that a connection has been made/terminated to a target system.
   //
   // The is_local flag will be set when the connection is just a loopback to the local computer.
-  void DidConnect(bool is_local);
+  void DidConnect(Where where);
   void DidDisconnect();
 
   // Returns the breakpoint implementation for the given ID, or null if the ID was not found in the
@@ -168,6 +177,8 @@ class System : public ClientObject, public SettingStoreObserver {
  private:
   void AddNewTarget(std::unique_ptr<TargetImpl> target);
   void AddSymbolServer(std::unique_ptr<SymbolServer> server);
+
+  Where where_ = Where::kNone;
 
   std::vector<std::unique_ptr<SymbolServer>> symbol_servers_;
   std::vector<std::unique_ptr<TargetImpl>> targets_;

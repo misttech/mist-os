@@ -74,7 +74,7 @@ class Session : public SettingStoreObserver {
 
   // Creates with a previously-allocated connection. The pointer must outlive this class. In this
   // mode, the stream can not be disconnected.
-  explicit Session(debug::StreamBuffer* stream);
+  explicit Session(debug::StreamBuffer* stream, System::Where where);
   virtual ~Session();
 
   fxl::WeakPtr<Session> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }

@@ -302,9 +302,10 @@ Session::Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, debug:
   ListenForSystemSettings();
 }
 
-Session::Session(debug::StreamBuffer* stream)
+Session::Session(debug::StreamBuffer* stream, System::Where where)
     : stream_(stream), system_(this), weak_factory_(this) {
   ListenForSystemSettings();
+  system_.DidConnect(where);
 }
 
 Session::~Session() = default;
@@ -781,10 +782,11 @@ Err Session::ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
 
   // Simple heuristic to tell if we're connected to the local system.
   // TODO As we extend local debugging support, this will need to get more complex and robust.
-  bool is_local_connection = pending->connection_info().host == "localhost";
+  System::Where where = pending->connection_info().host == "localhost" ? System::Where::kLocal
+                                                                       : System::Where::kRemote;
 
   // Connection succeeds.
-  system_.DidConnect(is_local_connection);
+  system_.DidConnect(where);
 
   // Query which processes the debug agent is already connected to.
   remote_api()->Status(
