@@ -301,6 +301,7 @@ group("package_deps") {
     "//src/starnix:benchmarks",
     "//src/tests/benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
+    "//third_party/sbase",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
