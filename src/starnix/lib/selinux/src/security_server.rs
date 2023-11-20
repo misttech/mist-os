@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{AccessVector, ObjectClass, SecurityContext, SecurityId};
+use crate::{
+    access_vector_cache::{Manager as AvcManager, Query, QueryMut},
+    AccessVector, ObjectClass, SecurityContext, SecurityId,
+};
 use starnix_lock::Mutex;
 use std::{collections::HashMap, sync::Arc};
 
@@ -34,16 +37,28 @@ pub struct SecurityServer {
     /// a hard-coded set of fake responses.
     mode: Mode,
 
+    /// Manager for any access vector cache layers that are shared between threads subject to access
+    /// control by this security server. This [`AvcManager`] is also responsible for constructing
+    /// thread-local caches for use by individual threads that subject to access control by this
+    /// security server.
+    avc_manager: AvcManager<SecurityServer>,
+
     /// The mutable state of the security server.
     state: Mutex<SecurityServerState>,
 }
 
 impl SecurityServer {
     pub fn new(mode: Mode) -> Arc<SecurityServer> {
-        // TODO(http://b/304732283): initialize the access vector cache.
+        let avc_manager = AvcManager::new();
         let state =
             Mutex::new(SecurityServerState { sids: HashMap::new(), binary_policy: Vec::new() });
-        Arc::new(SecurityServer { mode, state })
+        let security_server = Arc::new(SecurityServer { mode, avc_manager, state });
+
+        // TODO(http://b/304776236): Consider constructing shared owner of `AvcManager` and
+        // `SecurityServer` to eliminate weak reference.
+        security_server.as_ref().avc_manager.set_security_server(Arc::downgrade(&security_server));
+
+        security_server
     }
 
     /// Returns the security ID mapped to `security_context`, creating it if it does not exist.
@@ -99,6 +114,24 @@ impl SecurityServer {
             Mode::Fake => true,
             _ => false,
         }
+    }
+
+    /// Returns a newly constructed thread-local access vector cache that delegates cache misses to
+    /// any shared caches owned by `self.avc_manager`, which ultimately delegate to `self`. The
+    /// returned cache will be reset when this security server's policy is reset.
+    pub fn new_thread_local_avc(&self) -> impl QueryMut {
+        self.avc_manager.new_thread_local_cache()
+    }
+}
+
+impl Query for SecurityServer {
+    fn query(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessVector {
+        self.compute_access_vector(source_sid, target_sid, target_class)
     }
 }
 
