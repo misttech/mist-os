@@ -341,13 +341,13 @@ async fn create_container(
     let system_task = kernel.kthreads.system_task();
 
     // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(&kernel);
+    init_common_devices(system_task);
 
     mount_filesystems(system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
-    run_container_features(&kernel)?;
+    run_container_features(system_task)?;
 
     // If there is an init binary path, run it, optionally waiting for the
     // startup_file_path to be created. The task struct is still used

@@ -15,7 +15,7 @@ use crate::{
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
-    task::{CurrentTask, Kernel},
+    task::CurrentTask,
 };
 use fuchsia_zircon::{
     cprng_draw, {self as zx},
@@ -24,7 +24,6 @@ use starnix_uapi::{
     device_type::DeviceType, error, errors::Errno, file_mode::FileMode, open_flags::OpenFlags,
     user_address::UserAddress,
 };
-use std::sync::Arc;
 
 #[derive(Default)]
 pub struct DevNull;
@@ -243,9 +242,12 @@ impl FileOps for DevKmsg {
     }
 }
 
-pub fn mem_device_init(kernel: &Arc<Kernel>) {
+pub fn mem_device_init(system_task: &CurrentTask) {
+    let kernel = system_task.kernel();
+
     let mem_class = kernel.device_registry.add_class(b"mem", kernel.device_registry.virtual_bus());
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
             b"null",
@@ -256,6 +258,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevNull>,
     );
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
             b"zero",
@@ -266,6 +269,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevZero>,
     );
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
             b"full",
@@ -276,6 +280,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevFull>,
     );
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
             b"random",
@@ -286,6 +291,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevRandom>,
     );
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
             b"urandom",
@@ -296,6 +302,7 @@ pub fn mem_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevRandom>,
     );
     kernel.add_and_register_device(
+        system_task,
         KObjectDeviceAttribute::new(
             mem_class,
             b"kmsg",

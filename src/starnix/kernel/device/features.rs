@@ -7,7 +7,7 @@ use crate::{
         framebuffer::fb_device_init, input::init_input_devices,
         perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
     },
-    task::Kernel,
+    task::{CurrentTask, Kernel},
 };
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
@@ -105,15 +105,17 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
     Ok(features)
 }
 
-/// Runs all the features that are enabled in `kernel`.
-pub fn run_container_features(kernel: &Arc<Kernel>) -> Result<(), Error> {
+/// Runs all the features that are enabled in `system_task.kernel()`.
+pub fn run_container_features(system_task: &CurrentTask) -> Result<(), Error> {
+    let kernel = system_task.kernel();
+
     let mut enabled_profiling = false;
     if kernel.features.framebuffer {
-        fb_device_init(kernel);
-        init_input_devices(kernel);
+        fb_device_init(system_task);
+        init_input_devices(system_task);
     }
     if kernel.features.magma {
-        magma_device_init(kernel);
+        magma_device_init(system_task);
     }
     if kernel.features.perfetto.is_some() {
         let socket_path =

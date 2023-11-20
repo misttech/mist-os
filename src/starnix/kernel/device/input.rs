@@ -13,7 +13,7 @@ use crate::{
     logging::{log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
-    task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, TOUCH_INPUT_MINOR},
@@ -859,7 +859,9 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
     }
 }
 
-pub fn init_input_devices(kernel: &Arc<Kernel>) {
+pub fn init_input_devices(system_task: &CurrentTask) {
+    let kernel = system_task.kernel();
+
     let input_class =
         kernel.device_registry.add_class(b"input", kernel.device_registry.virtual_bus());
     let touch_attr = KObjectDeviceAttribute::new(
@@ -869,7 +871,7 @@ pub fn init_input_devices(kernel: &Arc<Kernel>) {
         DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR),
         DeviceMode::Char,
     );
-    kernel.add_and_register_device(touch_attr, create_touch_device);
+    kernel.add_and_register_device(system_task, touch_attr, create_touch_device);
 
     let keyboard_attr = KObjectDeviceAttribute::new(
         input_class,
@@ -878,7 +880,7 @@ pub fn init_input_devices(kernel: &Arc<Kernel>) {
         DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR),
         DeviceMode::Char,
     );
-    kernel.add_and_register_device(keyboard_attr, create_keyboard_device);
+    kernel.add_and_register_device(system_task, keyboard_attr, create_keyboard_device);
 }
 
 #[cfg(test)]

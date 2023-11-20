@@ -341,9 +341,13 @@ impl Kernel {
     /// Add a device in the hierarchy tree.
     ///
     /// If it's a Block device, the device will be added under "block" class.
-    pub fn add_device(self: &Arc<Self>, dev_attr: KObjectDeviceAttribute) {
+    pub fn add_device(
+        self: &Arc<Self>,
+        current_task: &CurrentTask,
+        dev_attr: KObjectDeviceAttribute,
+    ) {
         self.device_registry.add_device(dev_attr.clone());
-        match devtmpfs_create_device(self, dev_attr.device.clone()) {
+        match devtmpfs_create_device(current_task, dev_attr.device.clone()) {
             Ok(_) => (),
             Err(err) => {
                 log_error!("Cannot add block device {:?} in devtmpfs ({:?})", dev_attr.device, err)
@@ -354,6 +358,7 @@ impl Kernel {
     /// Add a device in the hierarchy tree and register its DeviceOps.
     pub fn add_and_register_device(
         self: &Arc<Self>,
+        current_task: &CurrentTask,
         dev_attr: KObjectDeviceAttribute,
         dev_ops: impl DeviceOps,
     ) {
@@ -374,7 +379,7 @@ impl Kernel {
             Ok(_) => (),
             Err(err) => log_error!("Cannot register device {:?} ({:?})", dev_attr.device, err),
         }
-        self.add_device(dev_attr);
+        self.add_device(current_task, dev_attr);
     }
 
     /// Opens a device file (driver) identified by `dev`.

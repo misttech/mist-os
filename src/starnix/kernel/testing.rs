@@ -89,7 +89,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         OwnedRefByRef::new(Task::create_system_task(&kernel, fs).expect("create system task"));
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
-    init_common_devices(&kernel);
+    init_common_devices(kernel.kthreads.system_task());
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

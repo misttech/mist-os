@@ -75,6 +75,22 @@ impl DynamicThreadSpawner {
         receiver.map_err(|_| errno!(EINTR))
     }
 
+    /// Run the given closure on a thread and block to get the result.
+    ///
+    /// This method will use an idle thread in the pool if one is available, otherwise it will
+    /// start a new thread.
+    pub fn spawn_and_get_result_sync<R, F>(&self, f: F) -> Result<R, Errno>
+    where
+        R: Send + 'static,
+        F: FnOnce(&CurrentTask) -> R + Send + 'static,
+    {
+        let (sender, receiver) = sync_channel::<R>(1);
+        self.spawn(move |current_task| {
+            let _ = sender.send(f(current_task));
+        });
+        receiver.recv().map_err(|_| errno!(EINTR))
+    }
+
     /// Run the given closure on a thread.
     ///
     /// This method will use an idle thread in the pool if one is available, otherwise it will

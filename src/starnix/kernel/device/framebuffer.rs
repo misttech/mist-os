@@ -281,7 +281,9 @@ impl FileOps for Arc<Framebuffer> {
     }
 }
 
-pub fn fb_device_init(kernel: &Arc<Kernel>) {
+pub fn fb_device_init(system_task: &CurrentTask) {
+    let kernel = system_task.kernel();
+
     let graphics_class =
         kernel.device_registry.add_class(b"graphics", kernel.device_registry.virtual_bus());
     let fb_attr = KObjectDeviceAttribute::new(
@@ -291,5 +293,5 @@ pub fn fb_device_init(kernel: &Arc<Kernel>) {
         DeviceType::FB0,
         DeviceMode::Char,
     );
-    kernel.add_and_register_device(fb_attr, kernel.framebuffer.clone());
+    kernel.add_and_register_device(system_task, fb_attr, kernel.framebuffer.clone());
 }

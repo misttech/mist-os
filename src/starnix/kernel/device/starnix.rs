@@ -5,11 +5,9 @@
 use crate::{
     device::{magma::MagmaFile, DeviceMode},
     fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
-    task::{CurrentTask, Kernel},
+    task::CurrentTask,
 };
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
-
-use std::sync::Arc;
 
 fn create_magma_device(
     current_task: &CurrentTask,
@@ -20,7 +18,9 @@ fn create_magma_device(
     MagmaFile::new_file(current_task, id, node, flags)
 }
 
-pub fn magma_device_init(kernel: &Arc<Kernel>) {
+pub fn magma_device_init(current_task: &CurrentTask) {
+    let kernel = current_task.kernel();
+
     let starnix_class =
         kernel.device_registry.add_class(b"starnix", kernel.device_registry.virtual_bus());
 
@@ -29,11 +29,14 @@ pub fn magma_device_init(kernel: &Arc<Kernel>) {
         .register_dyn_chrdev(create_magma_device)
         .expect("magma device register failed.");
 
-    kernel.add_device(KObjectDeviceAttribute::new(
-        starnix_class,
-        b"magma0",
-        b"magma0",
-        magma_type,
-        DeviceMode::Char,
-    ));
+    kernel.add_device(
+        current_task,
+        KObjectDeviceAttribute::new(
+            starnix_class,
+            b"magma0",
+            b"magma0",
+            magma_type,
+            DeviceMode::Char,
+        ),
+    );
 }

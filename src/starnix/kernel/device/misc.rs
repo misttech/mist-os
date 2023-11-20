@@ -8,16 +8,16 @@ use crate::{
         simple_device_ops, uinput::create_uinput_device, DeviceMode,
     },
     fs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
-    task::Kernel,
+    task::CurrentTask,
 };
 use starnix_uapi::device_type::DeviceType;
 
-use std::sync::Arc;
-
-pub fn misc_device_init(kernel: &Arc<Kernel>) {
+pub fn misc_device_init(current_task: &CurrentTask) {
+    let kernel = current_task.kernel();
     let misc_class =
         kernel.device_registry.add_class(b"misc", kernel.device_registry.virtual_bus());
     kernel.add_and_register_device(
+        current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
             b"hwrng",
@@ -28,6 +28,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevRandom>,
     );
     kernel.add_and_register_device(
+        current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
             b"fuse",
@@ -38,6 +39,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
         simple_device_ops::<DevFuse>,
     );
     kernel.add_and_register_device(
+        current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
             b"device-mapper",
@@ -48,6 +50,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
         create_unknown_device,
     );
     kernel.add_and_register_device(
+        current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
             b"loop-control",
@@ -58,6 +61,7 @@ pub fn misc_device_init(kernel: &Arc<Kernel>) {
         create_loop_control_device,
     );
     kernel.add_and_register_device(
+        current_task,
         KObjectDeviceAttribute::new(
             misc_class,
             b"uinput",

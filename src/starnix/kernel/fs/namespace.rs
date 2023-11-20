@@ -676,8 +676,6 @@ impl FileSystemCreator for Arc<Kernel> {
         Ok(match fs_type {
             b"binder" => BinderFs::new_fs(self, options)?,
             b"bpf" => BpfFs::new_fs(self, options)?,
-            b"devpts" => dev_pts_fs(self, options).clone(),
-            b"devtmpfs" => dev_tmp_fs(self).clone(),
             b"remotefs" => crate::execution::create_remotefs_filesystem(
                 self,
                 self.container_data_dir
@@ -715,6 +713,8 @@ impl FileSystemCreator for CurrentTask {
 
         match fs_type {
             b"fuse" => new_fuse_fs(self, options),
+            b"devpts" => Ok(dev_pts_fs(self, options).clone()),
+            b"devtmpfs" => Ok(dev_tmp_fs(self).clone()),
             b"ext4" => ExtFilesystem::new_fs(kernel, self, options),
             b"overlay" => OverlayFs::new_fs(self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
