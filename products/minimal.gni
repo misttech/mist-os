@@ -28,3 +28,9 @@ extra_bazel_assembly_targets =
 
 # Packages to be published to universe that do not go through assembly.
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
+
+# List all artifacts to upload to CIPD.
+cipd_assembly_artifact_targets = [
+  "//build/images:main_assembly",
+  "//products/minimal:board_assembly_artifacts",
+]

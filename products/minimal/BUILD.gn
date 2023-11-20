@@ -68,7 +68,10 @@ product_assembly_configuration("minimal") {
   product = {
     build_info = default_product_build_info
   }
-  deps = [ "//build/info:build_info_files" ]
+  deps = [
+    ":board_assembly_artifacts",
+    "//build/info:build_info_files",
+  ]
 }
 
 # LINT.ThenChange(//products/minimal/BUILD.bazel)
@@ -167,5 +170,25 @@ if (current_cpu == "riscv64") {
       "//build/images/fuchsia:fuchsia.bazel_legacy_aib",
       "//build/images/zedboot:zedboot.bazel_legacy_aib",
     ]
+  }
+}
+
+# The board input bundles that minimal products needs to ship
+generated_file("board_assembly_artifacts") {
+  deps = [
+    # Include all the board input bundles for this arch.
+    "//boards:boards",
+  ]
+  data_keys = [ "board_assembly_artifacts" ]
+  output_conversion = "json"
+  outputs = [ "${target_gen_dir}/board_assembly_artifacts.json" ]
+
+  metadata = {
+    assembly_inputs = [
+      {
+        path = rebase_path(outputs[0], root_build_dir)
+      },
+    ]
+    assembly_inputs_barrier = []
   }
 }
