@@ -578,6 +578,13 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 .send(Ok(nl80211_message_resp(resp)))
                 .context("Failed to send scan results")?;
         }
+        Nl80211Cmd::GetStation => {
+            info!("Nl80211Cmd::GetStation (skipping)");
+            // TODO(fxbug.dev/128604): Report packet counters and station info.
+            responder
+                .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                .context("Failed to send GetProtocolFeatures")?;
+        }
         Nl80211Cmd::GetProtocolFeatures => {
             info!("Nl80211Cmd::GetProtocolFeatures");
             responder
