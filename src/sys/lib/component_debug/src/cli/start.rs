@@ -22,7 +22,7 @@ pub async fn start_cmd<W: std::io::Write>(
     writeln!(writer, "Moniker: {}", moniker)?;
     writeln!(writer, "Starting component instance...")?;
 
-    start_instance(&lifecycle_controller, &moniker)
+    let _ = start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

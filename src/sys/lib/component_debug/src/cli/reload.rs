@@ -35,7 +35,7 @@ pub async fn reload_cmd<W: std::io::Write>(
 
     writeln!(writer, "Starting component instance...")?;
 
-    start_instance(&lifecycle_controller, &moniker)
+    let _ = start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

@@ -186,7 +186,7 @@ pub async fn run_cmd<W: std::io::Write>(
         .map_err(|e| format_resolve_error(&moniker, e))?;
 
     writeln!(writer, "Starting component instance...")?;
-    start_instance(&lifecycle_controller, &moniker)
+    let _ = start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 
