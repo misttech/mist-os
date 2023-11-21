@@ -13,13 +13,13 @@ use {
     async_trait::async_trait,
     cm_rust::{
         CapabilityDecl, CapabilityTypeName, ConfigurationDecl, DictionaryDecl, DirectoryDecl,
-        EventStreamDecl, ExposeDecl, ExposeDictionaryDecl, ExposeDirectoryDecl, ExposeProtocolDecl,
-        ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource, NameMapping,
-        OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl,
-        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
-        OfferStorageDecl, ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl,
-        StorageDecl, UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource,
-        UseStorageDecl,
+        EventStreamDecl, ExposeConfigurationDecl, ExposeDecl, ExposeDictionaryDecl,
+        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+        ExposeServiceDecl, ExposeSource, NameMapping, OfferConfigurationDecl, OfferDecl,
+        OfferDictionaryDecl, OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl,
+        OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl,
+        ProtocolDecl, RegistrationSource, ResolverDecl, RunnerDecl, ServiceDecl, StorageDecl,
+        UseDecl, UseDirectoryDecl, UseProtocolDecl, UseServiceDecl, UseSource, UseStorageDecl,
     },
     cm_types::{Name, Path},
     derivative::Derivative,
@@ -503,6 +503,7 @@ impl ComponentCapability {
                 ExposeDecl::Runner(_) => CapabilityTypeName::Runner,
                 ExposeDecl::Resolver(_) => CapabilityTypeName::Resolver,
                 ExposeDecl::Dictionary(_) => CapabilityTypeName::Dictionary,
+                ExposeDecl::Config(_) => CapabilityTypeName::Config,
             },
             ComponentCapability::Offer(offer) => match offer {
                 OfferDecl::Protocol(_) => CapabilityTypeName::Protocol,
@@ -513,6 +514,7 @@ impl ComponentCapability {
                 OfferDecl::Resolver(_) => CapabilityTypeName::Resolver,
                 OfferDecl::EventStream(_) => CapabilityTypeName::EventStream,
                 OfferDecl::Dictionary(_) => CapabilityTypeName::Dictionary,
+                OfferDecl::Config(_) => CapabilityTypeName::Config,
             },
             ComponentCapability::Protocol(_) => CapabilityTypeName::Protocol,
             ComponentCapability::Directory(_) => CapabilityTypeName::Directory,
@@ -572,6 +574,9 @@ impl ComponentCapability {
                 ExposeDecl::Runner(ExposeRunnerDecl { source_name, .. }) => Some(source_name),
                 ExposeDecl::Resolver(ExposeResolverDecl { source_name, .. }) => Some(source_name),
                 ExposeDecl::Service(ExposeServiceDecl { source_name, .. }) => Some(source_name),
+                ExposeDecl::Config(ExposeConfigurationDecl { source_name, .. }) => {
+                    Some(source_name)
+                }
                 ExposeDecl::Dictionary(ExposeDictionaryDecl { source_name, .. }) => {
                     Some(source_name)
                 }
@@ -583,6 +588,7 @@ impl ComponentCapability {
                 OfferDecl::Storage(OfferStorageDecl { source_name, .. }) => Some(source_name),
                 OfferDecl::Resolver(OfferResolverDecl { source_name, .. }) => Some(source_name),
                 OfferDecl::Service(OfferServiceDecl { source_name, .. }) => Some(source_name),
+                OfferDecl::Config(OfferConfigurationDecl { source_name, .. }) => Some(source_name),
                 OfferDecl::EventStream(OfferEventStreamDecl { source_name, .. }) => {
                     Some(source_name)
                 }

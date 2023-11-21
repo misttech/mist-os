@@ -594,6 +594,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
 - `runner`: (_optional `string or array of strings`_) When routing a runner, the [name](#name) of a [runner capability][doc-runners].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
 - `dictionary`: (_optional `string or array of strings`_) When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
+- `config`: (_optional `string or array of strings`_) When routing a config, the [name](#name) of a configuration capability.
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `self`: This component. Requires a corresponding
         [`capability`](#capabilities) declaration.
@@ -678,6 +679,7 @@ instance or a [child collection][doc-collections].
 - `resolver`: (_optional `string or array of strings`_) When routing a resolver, the [name](#name) of a [resolver capability][doc-resolvers].
 - `storage`: (_optional `string or array of strings`_) When routing a storage capability, the [name](#name) of a [storage capability][doc-storage].
 - `dictionary`: (_optional `string or array of strings`_) When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
+- `config`: (_optional `string or array of strings`_) When routing a config, the [name](#name) of a configuration capability.
 - `from`: (_`string or array of strings`_) `from`: The source of the capability, one of:
     - `parent`: The component's parent. This source can be used for all
         capability types.

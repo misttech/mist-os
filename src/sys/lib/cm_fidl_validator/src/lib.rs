@@ -1750,6 +1750,27 @@ impl<'a> ValidationContext<'a> {
                     }
                 }
             }
+            fdecl::Expose::Config(e) => {
+                let decl = DeclType::ExposeConfig;
+                self.validate_expose_fields(
+                    decl,
+                    AllowableIds::One,
+                    CollectionSource::Deny,
+                    e.source.as_ref(),
+                    e.source_name.as_ref(),
+                    None,
+                    e.target.as_ref(),
+                    e.target_name.as_ref(),
+                    e.availability.as_ref(),
+                    prev_target_ids,
+                );
+                // If the expose source is `self`, ensure we have a corresponding Config capability.
+                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&e.source, &e.source_name) {
+                    if !self.all_configs.contains(&name as &str) {
+                        self.errors.push(Error::invalid_capability(decl, "source", name));
+                    }
+                }
+            }
             _ => {
                 self.errors.push(Error::invalid_field(DeclType::Component, "expose"));
             }
@@ -2180,6 +2201,32 @@ impl<'a> ValidationContext<'a> {
                 // corresponding Dictionary.
                 if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
                     if !self.all_dictionaries.contains_key(&name as &str) {
+                        self.errors.push(Error::invalid_capability(decl, "source", name));
+                    }
+                }
+                self.add_strong_dep(
+                    o.source_name.as_ref(),
+                    DependencyNode::try_from_ref(o.source.as_ref()),
+                    DependencyNode::try_from_ref(o.target.as_ref()),
+                );
+            }
+            fdecl::Offer::Config(o) => {
+                let decl = DeclType::OfferConfig;
+                self.validate_offer_fields(
+                    decl,
+                    AllowableIds::One,
+                    CollectionSource::Deny,
+                    o.source.as_ref(),
+                    o.source_name.as_ref(),
+                    None,
+                    o.target.as_ref(),
+                    o.target_name.as_ref(),
+                    o.availability.as_ref(),
+                    offer_type,
+                );
+                // If the offer source is `self`, ensure we have a corresponding capability.
+                if let (Some(fdecl::Ref::Self_(_)), Some(ref name)) = (&o.source, &o.source_name) {
+                    if !self.all_configs.contains(&name as &str) {
                         self.errors.push(Error::invalid_capability(decl, "source", name));
                     }
                 }

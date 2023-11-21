@@ -387,6 +387,12 @@ impl<'a> CapabilityId<'a> {
                 alias,
                 clause.capability_type(),
             )?));
+        } else if let Some(n) = clause.config() {
+            return Ok(Self::configurations_from(Self::get_one_or_many_names(
+                n,
+                alias,
+                clause.capability_type(),
+            )?));
         }
 
         // Unsupported capability type.
@@ -2739,6 +2745,10 @@ pub struct Expose {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dictionary: Option<OneOrMany<Name>>,
 
+    /// When routing a config, the [name](#name) of a configuration capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<OneOrMany<Name>>,
+
     /// `from`: The source of the capability, one of:
     /// - `self`: This component. Requires a corresponding
     ///     [`capability`](#capabilities) declaration.
@@ -2809,6 +2819,7 @@ impl Expose {
             service: None,
             protocol: None,
             directory: None,
+            config: None,
             runner: None,
             resolver: None,
             dictionary: None,
@@ -2907,6 +2918,10 @@ pub struct Offer {
     /// When routing a dictionary, the [name](#name) of a [dictionary capability][doc-dictionaries].
     #[serde(skip_serializing_if = "Option::is_none")]
     pub dictionary: Option<OneOrMany<Name>>,
+
+    /// When routing a config, the [name](#name) of a configuration capability.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<OneOrMany<Name>>,
 
     /// `from`: The source of the capability, one of:
     /// - `parent`: The component's parent. This source can be used for all
@@ -3646,7 +3661,7 @@ impl CapabilityClause for Expose {
         option_one_or_many_as_ref(&self.dictionary)
     }
     fn config(&self) -> Option<OneOrMany<&Name>> {
-        None
+        option_one_or_many_as_ref(&self.config)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3671,7 +3686,9 @@ impl CapabilityClause for Expose {
     fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
         self.dictionary = o;
     }
-    fn set_config(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_config(&mut self, o: Option<OneOrMany<Name>>) {
+        self.config = o;
+    }
 
     fn availability(&self) -> Option<Availability> {
         None
@@ -3693,6 +3710,8 @@ impl CapabilityClause for Expose {
             "event_stream"
         } else if self.dictionary.is_some() {
             "dictionary"
+        } else if self.config.is_some() {
+            "config"
         } else {
             panic!("Missing capability name")
         }
@@ -3701,11 +3720,29 @@ impl CapabilityClause for Expose {
         "expose"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "runner", "resolver", "event_stream", "dictionary"]
+        &[
+            "service",
+            "protocol",
+            "directory",
+            "runner",
+            "resolver",
+            "event_stream",
+            "dictionary",
+            "config",
+        ]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["service", "protocol", "directory", "runner", "resolver", "event_stream", "dictionary"]
-            .contains(&self.capability_type())
+        [
+            "service",
+            "protocol",
+            "directory",
+            "runner",
+            "resolver",
+            "event_stream",
+            "dictionary",
+            "config",
+        ]
+        .contains(&self.capability_type())
     }
 }
 
@@ -3789,7 +3826,7 @@ impl CapabilityClause for Offer {
         option_one_or_many_as_ref(&self.dictionary)
     }
     fn config(&self) -> Option<OneOrMany<&Name>> {
-        None
+        option_one_or_many_as_ref(&self.config)
     }
 
     fn set_service(&mut self, o: Option<OneOrMany<Name>>) {
@@ -3816,7 +3853,9 @@ impl CapabilityClause for Offer {
     fn set_dictionary(&mut self, o: Option<OneOrMany<Name>>) {
         self.dictionary = o;
     }
-    fn set_config(&mut self, _o: Option<OneOrMany<Name>>) {}
+    fn set_config(&mut self, o: Option<OneOrMany<Name>>) {
+        self.config = o
+    }
 
     fn availability(&self) -> Option<Availability> {
         self.availability
@@ -3842,6 +3881,8 @@ impl CapabilityClause for Offer {
             "event_stream"
         } else if self.dictionary.is_some() {
             "dictionary"
+        } else if self.config.is_some() {
+            "config"
         } else {
             panic!("Missing capability name")
         }
@@ -3850,11 +3891,29 @@ impl CapabilityClause for Offer {
         "offer"
     }
     fn supported(&self) -> &[&'static str] {
-        &["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
+        &[
+            "service",
+            "protocol",
+            "directory",
+            "storage",
+            "runner",
+            "resolver",
+            "event_stream",
+            "config",
+        ]
     }
     fn are_many_names_allowed(&self) -> bool {
-        ["service", "protocol", "directory", "storage", "runner", "resolver", "event_stream"]
-            .contains(&self.capability_type())
+        [
+            "service",
+            "protocol",
+            "directory",
+            "storage",
+            "runner",
+            "resolver",
+            "event_stream",
+            "config",
+        ]
+        .contains(&self.capability_type())
     }
 }
 
@@ -4084,6 +4143,7 @@ impl Offer {
             r#as: None,
             service: None,
             directory: None,
+            config: None,
             runner: None,
             resolver: None,
             storage: None,
@@ -4324,6 +4384,7 @@ mod tests {
             runner: None,
             resolver: None,
             dictionary: None,
+            config: None,
             from: OneOrMany::One(OfferFromRef::Self_),
             to: OneOrMany::Many(vec![]),
             r#as: None,

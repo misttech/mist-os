@@ -11,11 +11,11 @@ use {
     async_trait::async_trait,
     cm_rust::{
         CapabilityDecl, ChildRef, CollectionDecl, DependencyType, EnvironmentDecl, ExposeDecl,
-        OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, OfferTarget,
-        RegistrationDeclCommon, RegistrationSource, StorageDirectorySource, UseConfigurationDecl,
-        UseDecl, UseDirectoryDecl, UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl,
-        UseServiceDecl, UseSource,
+        OfferConfigurationDecl, OfferDecl, OfferDictionaryDecl, OfferDirectoryDecl,
+        OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl, OfferSource,
+        OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
+        StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDirectoryDecl,
+        UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
     },
     cm_types::Name,
     futures::future::select_all,
@@ -529,6 +529,7 @@ fn get_dependency_from_offer(
             target,
             ..
         })
+        | OfferDecl::Config(OfferConfigurationDecl { source, target, .. })
         | OfferDecl::Runner(OfferRunnerDecl { source, target, .. })
         | OfferDecl::Resolver(OfferResolverDecl { source, target, .. })
         | OfferDecl::Dictionary(OfferDictionaryDecl {

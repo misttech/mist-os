@@ -595,6 +595,30 @@ fn translate_expose(
                     ..Default::default()
                 }))
             }
+        } else if let Some(n) = expose.config() {
+            let (source, source_dictionary) = extract_single_expose_source(options, expose, None)?;
+            let source_names = n.into_iter();
+            let target_names = all_target_capability_names(expose, expose)
+                .ok_or_else(|| Error::internal("no capability"))?;
+            for (source_name, target_name) in source_names.into_iter().zip(target_names.into_iter())
+            {
+                let (source, availability) = derive_source_and_availability(
+                    expose.availability.as_ref(),
+                    source.clone(),
+                    expose.source_availability.as_ref(),
+                    all_capability_names,
+                    all_children,
+                    all_collections,
+                );
+                out_exposes.push(fdecl::Expose::Config(fdecl::ExposeConfiguration {
+                    source: Some(source.clone()),
+                    source_name: Some(source_name.clone().into()),
+                    target: Some(target.clone()),
+                    target_name: Some(target_name.clone().into()),
+                    availability: Some(availability),
+                    ..Default::default()
+                }))
+            }
         } else {
             return Err(Error::internal(format!("expose: must specify a known capability")));
         }
@@ -961,6 +985,33 @@ fn translate_offer(
                     dependency_type: Some(
                         offer.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
                     ),
+                    availability: Some(availability),
+                    ..Default::default()
+                }));
+            }
+        } else if let Some(n) = offer.config() {
+            let entries = extract_offer_sources_and_targets(
+                options,
+                offer,
+                n,
+                all_capability_names,
+                all_children,
+                all_collections,
+            )?;
+            for (source, source_dictionary, source_name, target, target_name) in entries {
+                let (source, availability) = derive_source_and_availability(
+                    offer.availability.as_ref(),
+                    source,
+                    offer.source_availability.as_ref(),
+                    all_capability_names,
+                    all_children,
+                    all_collections,
+                );
+                out_offers.push(fdecl::Offer::Config(fdecl::OfferConfiguration {
+                    source: Some(source),
+                    source_name: Some(source_name.into()),
+                    target: Some(target),
+                    target_name: Some(target_name.into()),
                     availability: Some(availability),
                     ..Default::default()
                 }));
@@ -1619,6 +1670,8 @@ where
         } else if let Some(n) = in_obj.event_stream() {
             Some(n)
         } else if let Some(n) = in_obj.dictionary() {
+            Some(n)
+        } else if let Some(n) = in_obj.config() {
             Some(n)
         } else {
             None

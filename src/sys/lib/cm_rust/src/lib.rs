@@ -429,6 +429,7 @@ pub enum OfferDecl {
     Resolver(OfferResolverDecl),
     EventStream(OfferEventStreamDecl),
     Dictionary(OfferDictionaryDecl),
+    Config(OfferConfigurationDecl),
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -565,6 +566,18 @@ pub struct OfferDictionaryDecl {
     pub availability: Availability,
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::OfferConfiguration")]
+pub struct OfferConfigurationDecl {
+    pub source: OfferSource,
+    pub source_name: Name,
+    pub target: OfferTarget,
+    pub target_name: Name,
+    #[fidl_decl(default)]
+    pub availability: Availability,
+}
+
 impl SourceName for OfferDecl {
     fn source_name(&self) -> &Name {
         match &self {
@@ -576,6 +589,7 @@ impl SourceName for OfferDecl {
             OfferDecl::Resolver(o) => o.source_name(),
             OfferDecl::EventStream(o) => o.source_name(),
             OfferDecl::Dictionary(o) => o.source_name(),
+            OfferDecl::Config(o) => o.source_name(),
         }
     }
 }
@@ -617,6 +631,7 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Resolver(o) => o.target_name(),
             OfferDecl::EventStream(o) => o.target_name(),
             OfferDecl::Dictionary(o) => o.target_name(),
+            OfferDecl::Config(o) => o.target_name(),
         }
     }
 
@@ -630,6 +645,7 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Resolver(o) => o.target(),
             OfferDecl::EventStream(o) => o.target(),
             OfferDecl::Dictionary(o) => o.target(),
+            OfferDecl::Config(o) => o.target(),
         }
     }
 
@@ -643,6 +659,7 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Resolver(o) => o.source(),
             OfferDecl::EventStream(o) => o.source(),
             OfferDecl::Dictionary(o) => o.source(),
+            OfferDecl::Config(o) => o.source(),
         }
     }
 
@@ -656,6 +673,7 @@ impl OfferDeclCommon for OfferDecl {
             OfferDecl::Resolver(o) => o.availability(),
             OfferDecl::EventStream(o) => o.availability(),
             OfferDecl::Dictionary(o) => o.availability(),
+            OfferDecl::Config(o) => o.availability(),
         }
     }
 }
@@ -698,6 +716,7 @@ pub enum ExposeDecl {
     Runner(ExposeRunnerDecl),
     Resolver(ExposeResolverDecl),
     Dictionary(ExposeDictionaryDecl),
+    Config(ExposeConfigurationDecl),
 }
 
 impl SourceName for ExposeDecl {
@@ -709,6 +728,7 @@ impl SourceName for ExposeDecl {
             Self::Runner(e) => e.source_name(),
             Self::Resolver(e) => e.source_name(),
             Self::Dictionary(e) => e.source_name(),
+            Self::Config(e) => e.source_name(),
         }
     }
 }
@@ -722,6 +742,7 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Runner(e) => e.source(),
             Self::Resolver(e) => e.source(),
             Self::Dictionary(e) => e.source(),
+            Self::Config(e) => e.source(),
         }
     }
 
@@ -733,6 +754,7 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Runner(e) => e.target(),
             Self::Resolver(e) => e.target(),
             Self::Dictionary(e) => e.target(),
+            Self::Config(e) => e.target(),
         }
     }
 
@@ -744,6 +766,7 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Runner(e) => e.target_name(),
             Self::Resolver(e) => e.target_name(),
             Self::Dictionary(e) => e.target_name(),
+            Self::Config(e) => e.target_name(),
         }
     }
 
@@ -755,6 +778,7 @@ impl ExposeDeclCommon for ExposeDecl {
             Self::Runner(e) => e.availability(),
             Self::Resolver(e) => e.availability(),
             Self::Dictionary(e) => e.availability(),
+            Self::Config(e) => e.availability(),
         }
     }
 }
@@ -839,6 +863,18 @@ pub struct ExposeDictionaryDecl {
     pub source: ExposeSource,
     pub source_name: Name,
     pub source_dictionary: Option<PathBuf>,
+    pub target: ExposeTarget,
+    pub target_name: Name,
+    #[fidl_decl(default)]
+    pub availability: Availability,
+}
+
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
+#[derive(FidlDecl, ExposeDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::ExposeConfiguration")]
+pub struct ExposeConfigurationDecl {
+    pub source: ExposeSource,
+    pub source_name: Name,
     pub target: ExposeTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -1753,6 +1789,7 @@ impl From<&OfferDecl> for CapabilityTypeName {
             OfferDecl::Resolver(_) => Self::Resolver,
             OfferDecl::EventStream(_) => Self::EventStream,
             OfferDecl::Dictionary(_) => Self::Dictionary,
+            OfferDecl::Config(_) => Self::Config,
         }
     }
 }
@@ -1766,6 +1803,7 @@ impl From<&ExposeDecl> for CapabilityTypeName {
             ExposeDecl::Runner(_) => Self::Runner,
             ExposeDecl::Resolver(_) => Self::Resolver,
             ExposeDecl::Dictionary(_) => Self::Dictionary,
+            ExposeDecl::Config(_) => Self::Config,
         }
     }
 }

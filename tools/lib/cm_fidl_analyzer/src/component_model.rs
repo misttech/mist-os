@@ -637,6 +637,11 @@ impl ComponentModelForAnalyzer {
                 let route_request = RouteRequest::OfferResolver(offer_decl);
                 (capability, route_request)
             }
+            OfferDecl::Config(offer_decl) => {
+                let capability = offer_decl.source_name.clone();
+                let route_request = RouteRequest::OfferConfig(offer_decl);
+                (capability, route_request)
+            }
             OfferDecl::Dictionary(_offer_decl) => {
                 // TODO(fxbug.dev/301674053): Support this.
                 return vec![];

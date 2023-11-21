@@ -21,6 +21,8 @@ type Offer = flexible union {
     8: event_stream OfferEventStream;
     @available(added=HEAD)
     7: dictionary OfferDictionary;
+    @available(added=HEAD)
+    9: config OfferConfiguration;
 };
 
 /// Describes the type of dependency implied by the capability.
@@ -433,4 +435,33 @@ type OfferDictionary = table {
     /// The `same_as_target` value causes this offer's availability to match the
     /// availability set in the target.
     6: availability Availability;
+};
+
+/// Declares a configuration capability offered by a component to one of its children,
+/// which may have been offered by the component's containing realm, the
+/// component itself, or one of its other children.
+@available(added=HEAD)
+type OfferConfiguration = table {
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `parent`, `self`, `child`, or `void`.
+    /// If set to `void`, then the target must offer or use the capability with
+    /// `OPTIONAL` or `TRANSITIONAL` availability.
+    1: source Ref;
+
+    /// (Required) Name identifying the configuration being offered.
+    2: source_name name;
+
+    /// (Required) Reference to the target. Must be `child`, or `collection`.
+    3: target Ref;
+
+    /// (Required) The name by which the capability is being offered.
+    4: target_name name;
+
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// If set to `required`, the target may use or offer the capability with
+    /// either `required` or `optional` availability. If set to `optional`, the
+    /// target must use or offer the capability with `optional` availability.
+    /// The `same_as_target` value causes this offer's availability to match the
+    /// availability set in the target.
+    5: availability Availability;
 };

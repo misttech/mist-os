@@ -18,6 +18,8 @@ type Expose = flexible union {
     6: event_stream ExposeEventStream;
     @available(added=HEAD)
     7: dictionary ExposeDictionary;
+    @available(added=HEAD)
+    8: config ExposeConfiguration;
 };
 
 /// Declares a service exposed to a component's containing realm, such as a
@@ -268,6 +270,31 @@ type ExposeDictionary = table {
 
     /// (Required) The destination to which the dictionary is exposed: either the
     /// component's realm or the framework.
+    3: target Ref;
+
+    /// (Required) The name by which the capability is being exposed.
+    4: target_name name;
+
+    /// (Optional, defaults to `REQUIRED`) The availability of this capability.
+    /// See [`Availability`].
+    5: availability Availability;
+};
+
+/// Declares a configuration capability exposed to a component's containing realm, such as
+/// a capability exposed by the component or one of its children at runtime.
+@available(added=HEAD)
+type ExposeConfiguration = table {
+    /// (Required) The provider of the capability relative to the component
+    /// itself. Must be `self` or `child`, or `void`. If set to `void`, then the
+    /// target must expose, offer, or use the capability with `OPTIONAL` or
+    /// `TRANSITIONAL` availability.
+    1: source Ref;
+
+    /// (Required) Name identifying the configuration, by which it was presented to
+    /// this component.
+    2: source_name name;
+
+    /// (Required) The destination to which the capability is exposed.
     3: target Ref;
 
     /// (Required) The name by which the capability is being exposed.

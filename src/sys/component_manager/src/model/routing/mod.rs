@@ -158,10 +158,10 @@ pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Opt
         cm_rust::ExposeDecl::Protocol(_)
         | cm_rust::ExposeDecl::Service(_)
         | cm_rust::ExposeDecl::Directory(_) => Some(exposes.into()),
-        cm_rust::ExposeDecl::Runner(_) | cm_rust::ExposeDecl::Resolver(_) => {
-            // Runners and resolvers do not add directory entries.
-            None
-        }
+        // These do not add directory entries.
+        cm_rust::ExposeDecl::Runner(_)
+        | cm_rust::ExposeDecl::Resolver(_)
+        | cm_rust::ExposeDecl::Config(_) => None,
         cm_rust::ExposeDecl::Dictionary(_) => {
             // TODO(fxbug.dev/301674053): Support this.
             None

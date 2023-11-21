@@ -36,10 +36,11 @@ use {
         walk_state::WalkState,
     },
     cm_rust::{
-        Availability, CapabilityTypeName, ExposeDecl, ExposeDeclCommon, ExposeDirectoryDecl,
-        ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl, ExposeServiceDecl, ExposeSource,
-        OfferDirectoryDecl, OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl,
-        OfferRunnerDecl, OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
+        Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
+        ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
+        ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDirectoryDecl,
+        OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl,
+        OfferServiceDecl, OfferSource, OfferStorageDecl, RegistrationDeclCommon,
         RegistrationSource, ResolverRegistration, RunnerRegistration, SourceName, StorageDecl,
         StorageDirectorySource, UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl,
         UseEventStreamDecl, UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource,
@@ -65,6 +66,7 @@ pub enum RouteRequest {
     ExposeService(RouteBundle<ExposeServiceDecl>),
     ExposeRunner(ExposeRunnerDecl),
     ExposeResolver(ExposeResolverDecl),
+    ExposeConfig(ExposeConfigurationDecl),
 
     // Route a capability from a realm's environment.
     Resolver(ResolverRegistration),
@@ -89,6 +91,7 @@ pub enum RouteRequest {
     OfferStorage(OfferStorageDecl),
     OfferRunner(OfferRunnerDecl),
     OfferResolver(OfferResolverDecl),
+    OfferConfig(OfferConfigurationDecl),
 }
 
 impl From<UseDecl> for RouteRequest {
@@ -146,6 +149,10 @@ impl From<Vec<&ExposeDecl>> for RouteRequest {
                 assert!(exposes.len() == 1, "multiple exposes");
                 Self::ExposeResolver(e.clone())
             }
+            ExposeDecl::Config(e) => {
+                assert!(exposes.len() == 1, "multiple exposes");
+                Self::ExposeConfig(e.clone())
+            }
             ExposeDecl::Dictionary(_) => {
                 todo!("fxbug.dev/301674053: implement dictionary routing");
             }
@@ -176,6 +183,7 @@ impl RouteRequest {
             | ExposeService(_)
             | ExposeRunner(_)
             | ExposeResolver(_)
+            | ExposeConfig(_)
             | Resolver(_)
             | StorageBackingDirectory(_)
             | UseRunner(_) => false,
@@ -183,6 +191,7 @@ impl RouteRequest {
             OfferDirectory(OfferDirectoryDecl { availability, .. })
             | OfferEventStream(OfferEventStreamDecl { availability, .. })
             | OfferProtocol(OfferProtocolDecl { availability, .. })
+            | OfferConfig(OfferConfigurationDecl { availability, .. })
             | OfferStorage(OfferStorageDecl { availability, .. }) => {
                 *availability == Availability::Optional
             }
@@ -209,6 +218,9 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::ExposeResolver(e) => {
                 write!(f, "resolver `{}`", e.target_name)
+            }
+            Self::ExposeConfig(e) => {
+                write!(f, "config `{}`", e.target_name)
             }
             Self::Resolver(r) => {
                 write!(f, "resolver `{}`", r.resolver)
@@ -257,6 +269,9 @@ impl std::fmt::Display for RouteRequest {
             }
             Self::OfferRunner(o) => {
                 write!(f, "runner `{}`", o.target_name)
+            }
+            Self::OfferConfig(o) => {
+                write!(f, "config `{}`", o.target_name)
             }
         }
     }
@@ -310,6 +325,9 @@ where
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
             route_resolver_from_expose(expose_resolver_decl, target, mapper).await
+        }
+        RouteRequest::ExposeConfig(expose_config_decl) => {
+            route_config_from_expose(expose_config_decl, target, mapper).await
         }
 
         // Route a resolver or runner from an environment
@@ -366,6 +384,7 @@ where
         RouteRequest::OfferResolver(offer_resolver_decl) => {
             route_resolver_from_offer(offer_resolver_decl, target, mapper).await
         }
+        RouteRequest::OfferConfig(offer) => route_config_from_offer(offer, target, mapper).await,
     }
 }
 
@@ -530,6 +549,27 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Resolver).builtin().component();
+    let source = router::route_from_offer(
+        RouteBundle::from_offer(offer_decl.into()),
+        target.clone(),
+        allowed_sources.build(),
+        &mut NoopVisitor::new(),
+        mapper,
+    )
+    .await?;
+    Ok(RouteSource::new(source))
+}
+
+async fn route_config_from_offer<C>(
+    offer_decl: OfferConfigurationDecl,
+    target: &Arc<C>,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    let allowed_sources =
+        AllowedSourcesBuilder::new(CapabilityTypeName::Config).builtin().component();
     let source = router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
@@ -723,6 +763,29 @@ where
         .namespace()
         .component()
         .capability();
+    let source = router::route_from_expose(
+        RouteBundle::from_expose(expose_decl.into()),
+        target.clone(),
+        allowed_sources.build(),
+        &mut NoopVisitor::new(),
+        mapper,
+    )
+    .await?;
+
+    target.policy_checker().can_route_capability(&source, target.moniker())?;
+    Ok(RouteSource::new(source))
+}
+
+async fn route_config_from_expose<C>(
+    expose_decl: ExposeConfigurationDecl,
+    target: &Arc<C>,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<RouteSource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
+    let allowed_sources =
+        AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
     let source = router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
