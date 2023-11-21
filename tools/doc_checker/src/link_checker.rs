@@ -44,7 +44,7 @@ const DISALLOWED_ALT_IMAGE_TEXT: [&str; 1] = [""];
 // TODO(fxbug.dev/113039): disallow "drawing, "image" for alt text";
 
 /// List of active repos under fuchsia.googlesource.com which can be linked to.
-const VALID_PROJECTS: [&str; 19] = [
+const VALID_PROJECTS: [&str; 20] = [
     "", // root page of all projects
     "cobalt",
     "drivers", // This is a family of projects.
@@ -63,6 +63,7 @@ const VALID_PROJECTS: [&str; 19] = [
     "vscode-language-fidl",
     "workstation",
     "samples",
+    "shac-project",
     "sdk-samples", // This is a family of projects, there are sub-repos below this path.
 ];
 
