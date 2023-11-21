@@ -1,0 +1,37 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//src/sys/core/build/core_shard.gni")
+
+rustc_binary("stressor_bin") {
+  output_name = "stressor"
+  edition = "2021"
+  deps = [
+    "//src/lib/fuchsia",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:tracing",
+  ]
+  sources = [ "src/main.rs" ]
+}
+
+fuchsia_component("stressor_component") {
+  component_name = "storage_stressor"
+  deps = [ ":stressor_bin" ]
+  manifest = "meta/stressor.cml"
+}
+
+fuchsia_package("stressor_package") {
+  package_name = "storage_stressor"
+  deps = [ ":stressor_component" ]
+}
+
+group("stressor") {
+  deps = [ ":stressor_package" ]
+}
+
+core_shard("core_shard") {
+  shard_file = "meta/stressor.core_shard.cml"
+}
