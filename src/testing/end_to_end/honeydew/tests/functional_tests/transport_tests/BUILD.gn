@@ -12,3 +12,8 @@ if (is_host) {
     ]
   }
 }
+
+group("packages") {
+  testonly = true
+  public_deps = [ "test_ffx:packages" ]
+}

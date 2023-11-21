@@ -385,6 +385,43 @@ class FfxCliTests(unittest.TestCase):
             timeout=10,
         )
 
+    @mock.patch.object(
+        ffx.subprocess,
+        "check_call",
+        return_value=None,
+        autospec=True,
+    )
+    def test_ffx_run_test_component(self, mock_subprocess_check_call) -> None:
+        """Test case for ffx.run()"""
+        self.assertEqual(
+            self.ffx_obj.run_test_component(
+                "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
+                ffx_test_args=["--foo", "bar"],
+                test_component_args=["baz", "--x", "2"],
+                capture_output=False,
+            ),
+            "",
+        )
+        mock_subprocess_check_call.assert_called_with(
+            [
+                "ffx",
+                "-t",
+                "fuchsia-emulator",
+                "--config",
+                "{}",
+                "test",
+                "run",
+                "fuchsia-pkg://fuchsia.com/testing#meta/test.cm",
+                "--foo",
+                "bar",
+                "--",
+                "baz",
+                "--x",
+                "2",
+            ],
+            timeout=10,
+        )
+
     @parameterized.expand(
         [
             (

@@ -27,7 +27,7 @@ if (is_host) {
     environments = [ emu_env ]
   }
 
-  # Group containing all of the FFX transport functional test cases.
+  # Group containing all of the FFX transport functional test cases and their dependencies.
   group("tests") {
     testonly = true
     public_deps = [
@@ -35,4 +35,17 @@ if (is_host) {
       ":ffx_wait_for_rcs_disconnection_test_fc($host_toolchain)",
     ]
   }
+}
+
+group("packages") {
+  testonly = true
+  public_deps = [ "//examples/hello_world/rust:hermetic_tests" ]
+}
+
+group("test_ffx") {
+  testonly = true
+  public_deps = [
+    ":packages",
+    ":tests($host_toolchain)",
+  ]
 }

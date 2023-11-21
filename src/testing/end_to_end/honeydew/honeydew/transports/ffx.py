@@ -21,6 +21,7 @@ _FFX_CMDS: dict[str, list[str]] = {
     "TARGET_LIST": ["--machine", "json", "target", "list"],
     "TARGET_WAIT": ["target", "wait", "--timeout"],
     "TARGET_WAIT_DOWN": ["target", "wait", "--down", "--timeout"],
+    "TEST_RUN": ["test", "run"],
 }
 
 _TIMEOUTS: dict[str, float] = {
@@ -437,6 +438,60 @@ class FFX:
                     ) from err
 
             raise errors.FfxCommandError(f"`{ffx_cmd}` command failed") from err
+
+    def run_test_component(
+        self,
+        component_url: str,
+        ffx_test_args: list[str] | None = None,
+        test_component_args: list[str] | None = None,
+        timeout: float | None = _TIMEOUTS["FFX_CLI"],
+        capture_output: bool = True,
+    ) -> str:
+        """
+        Executes and returns the output of `ffx -t {target} test run {component_url}` with the
+        given options.
+
+        This results in an invocation:
+
+        ```
+        ffx -t {target} test {component_url} {ffx_test_args} -- {test_component_args}`.
+        ```
+
+        For example:
+
+        ```
+        ffx -t fuchsia-emulator test \\
+            fuchsia-pkg://fuchsia.com/my_benchmark#test.cm \\
+            --output_directory /tmp \\
+            -- /custom_artifacts/results.fuchsiaperf.json
+        ```
+
+        Args:
+            component_url: The URL of the test to run.
+            ffx_test_args: args to pass to `ffx test run`.
+            test_component_args: args to pass to the test component.
+            timeout: Timeout to wait for the ffx command to return.
+            capture_output: When True, the stdout/err from the command will be captured and
+                returned. When False, the output of the command will be streamed to stdout/err
+                accordingly and it won't be returned. Defaults to True.
+
+        Returns:
+            Output of `ffx -t {target} {cmd}` when capture_output is set to True, otherwise an
+            empty string.
+
+        Raises:
+            errors.DeviceNotConnectedError: If FFX fails to reach target.
+            subprocess.TimeoutExpired: In case of FFX command timeout.
+            errors.FfxCommandError: In case of other FFX command failure.
+        """
+        cmd: list[str] = _FFX_CMDS["TEST_RUN"][:]
+        cmd.append(component_url)
+        if ffx_test_args:
+            cmd += ffx_test_args
+        if test_component_args:
+            cmd.append("--")
+            cmd += test_component_args
+        return self.run(cmd, timeout=timeout, capture_output=capture_output)
 
     def wait_for_rcs_connection(
         self, timeout: float = _TIMEOUTS["TARGET_RCS_CONNECTION_WAIT"]

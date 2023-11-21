@@ -90,6 +90,14 @@ class FFXTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         assert isinstance(self.device, transports_capable.FFXCapableDevice)
         self.device.ffx.wait_for_rcs_connection()
 
+    def test_ffx_run_test_component(self) -> None:
+        """Test case for FFX.run_test_component()."""
+        assert isinstance(self.device, transports_capable.FFXCapableDevice)
+        output: str = self.device.ffx.run_test_component(
+            "fuchsia-pkg://fuchsia.com/hello-world-rust-tests#meta/hello-world-rust-tests.cm",
+        )
+        asserts.assert_in("PASSED", output)
+
 
 if __name__ == "__main__":
     test_runner.main()

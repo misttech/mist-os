@@ -17,6 +17,7 @@ group("packages") {
   public_deps = [
     ":sl4f_packages",
     "affordance_tests:packages",
+    "transport_tests:packages",
   ]
 }
 
@@ -144,7 +145,7 @@ group("stable_emulator_sl4f_packages") {
 
 group("stable_emulator_packages") {
   testonly = true
-  public_deps = []
+  public_deps = [ "transport_tests/test_ffx:packages" ]
 }
 
 group("stable_vim3_sl4f_packages") {
