@@ -7,12 +7,27 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/environments.gni")
+import("//sdk/ctf/build/ctf.gni")
 
+# The canonical "all tests" target.
 group("tests") {
   testonly = true
-  deps = [ ":timekeeper_integration" ]
+  deps = [
+    ":ctf-tests",
+    ":timekeeper_integration",
+  ]
 }
 
+# CTF archive deps only.
+group("ctf-tests") {
+  testonly = true
+  deps = [
+    ":faketime-integration_archive",
+    ":timekeeper-integration_archive",
+  ]
+}
+
+# Other test-only targets.
 group("timekeeper_integration") {
   testonly = true
   deps = [
@@ -142,7 +157,8 @@ fuchsia_component("timekeeper_integration_test") {
 }
 
 # Package - test suite
-fuchsia_package("timekeeper-integration") {
+ctf_fuchsia_package("timekeeper-integration") {
+  package_name = "timekeeper-integration"
   testonly = true
   deps = [
     ":timekeeper_integration_test",
@@ -151,7 +167,7 @@ fuchsia_package("timekeeper-integration") {
 }
 
 # The TTRF-based timekeeper integration test.
-fuchsia_component("timekeeper-integration-test-root-component") {
+fuchsia_test_component("timekeeper-integration-test-root-component") {
   testonly = true
   manifest = "meta/timekeeper-test-root.cml"
 }
@@ -215,7 +231,8 @@ fuchsia_component("faketime_integration_test") {
 }
 
 # Package - test suite
-fuchsia_package("faketime-integration") {
+ctf_fuchsia_package("faketime-integration") {
+  package_name = "faketime-integration"
   testonly = true
   deps = [
     ":faketime_integration_test",
@@ -224,7 +241,7 @@ fuchsia_package("faketime-integration") {
 }
 
 # The TTRF-based faketime integration test.
-fuchsia_component("faketime-integration-test-root-component") {
+fuchsia_test_component("faketime-integration-test-root-component") {
   testonly = true
   manifest = "meta/faketime-test-root.cml"
 }

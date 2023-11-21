@@ -63,5 +63,15 @@
     "archive_gn_label": "//src/sys/pkg/tests/pkgdir:pkgdir-tests_archive_copy",
     "archive_name": "pkgdir-tests",
     "package_name": "pkgdir-tests"
+  },
+  {
+    "archive_gn_label": "//src/sys/time/timekeeper_integration:faketime-integration_archive_copy",
+    "archive_name": "faketime-integration",
+    "package_name": "faketime-integration"
+  },
+  {
+    "archive_gn_label": "//src/sys/time/timekeeper_integration:timekeeper-integration_archive_copy",
+    "archive_name": "timekeeper-integration",
+    "package_name": "timekeeper-integration"
   }
 ]

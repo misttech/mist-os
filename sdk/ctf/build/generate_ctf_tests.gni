@@ -12,7 +12,7 @@
 # If you're unsure what package name to use, run this command and see which
 # missing template name causes the build to fail:
 #
-#   fx set core.x64 //sdk/ctf:check_test_templates && fx build
+#   fx set core.x64 --with //sdk/ctf:check_test_templates && fx build
 #
 # The template must take a single `test_info` scope as input which has the
 # following attributes:
@@ -115,6 +115,28 @@ template("generate_fuchsia-intl-tests") {
     subpackages = [
       test_info.target_label,
       "//sdk/ctf/tests/fidl/fuchsia.intl/testing/realm-factory",
+    ]
+  }
+}
+
+template("generate_timekeeper-integration") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/sys/time/timekeeper_integration:timekeeper-integration-test-root-component"
+    subpackages = [
+      test_info.target_label,
+      "//src/sys/time/testing/realm-proxy:pkg",
+    ]
+  }
+}
+
+template("generate_faketime-integration") {
+  forward_variables_from(invoker, [ "test_info" ])
+  fuchsia_package_with_test(target_name) {
+    test_component = "//src/sys/time/timekeeper_integration:faketime-integration-test-root-component"
+    subpackages = [
+      test_info.target_label,
+      "//src/sys/time/testing/realm-proxy:pkg",
     ]
   }
 }
