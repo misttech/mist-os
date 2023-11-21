@@ -22,6 +22,7 @@ impl_handle_based!(Resource);
 
 sys::zx_info_kmem_stats_t!(MemStats);
 sys::zx_info_kmem_stats_extended_t!(MemStatsExtended);
+sys::zx_info_kmem_stats_compression_t!(MemStatsCompression);
 sys::zx_info_cpu_stats_t!(PerCpuStats);
 sys::zx_info_resource_t!(ResourceInfo);
 
@@ -91,6 +92,43 @@ impl From<sys::zx_info_kmem_stats_extended_t> for MemStatsExtended {
     }
 }
 
+impl From<sys::zx_info_kmem_stats_compression_t> for MemStatsCompression {
+    fn from(info: sys::zx_info_kmem_stats_compression_t) -> MemStatsCompression {
+        let sys::zx_info_kmem_stats_compression_t {
+            uncompressed_storage_bytes,
+            compressed_storage_bytes,
+            compressed_fragmentation_bytes,
+            compression_time,
+            decompression_time,
+            total_page_compression_attempts,
+            failed_page_compression_attempts,
+            total_page_decompressions,
+            compressed_page_evictions,
+            eager_page_compressions,
+            memory_pressure_page_compressions,
+            critical_memory_page_compressions,
+            pages_decompressed_unit_ns,
+            pages_decompressed_within_log_time,
+        } = info;
+        MemStatsCompression {
+            uncompressed_storage_bytes,
+            compressed_storage_bytes,
+            compressed_fragmentation_bytes,
+            compression_time,
+            decompression_time,
+            total_page_compression_attempts,
+            failed_page_compression_attempts,
+            total_page_decompressions,
+            compressed_page_evictions,
+            eager_page_compressions,
+            memory_pressure_page_compressions,
+            critical_memory_page_compressions,
+            pages_decompressed_unit_ns,
+            pages_decompressed_within_log_time,
+        }
+    }
+}
+
 impl From<sys::zx_info_cpu_stats_t> for PerCpuStats {
     fn from(info: sys::zx_info_cpu_stats_t) -> PerCpuStats {
         let sys::zx_info_cpu_stats_t {
@@ -147,6 +185,11 @@ unsafe impl ObjectQuery for MemStats {
 unsafe impl ObjectQuery for MemStatsExtended {
     const TOPIC: Topic = Topic::KMEM_STATS_EXTENDED;
     type InfoTy = MemStatsExtended;
+}
+
+unsafe impl ObjectQuery for MemStatsCompression {
+    const TOPIC: Topic = Topic::KMEM_STATS_COMPRESSION;
+    type InfoTy = MemStatsCompression;
 }
 
 unsafe impl ObjectQuery for PerCpuStats {
@@ -252,6 +295,18 @@ impl Resource {
         object_get_info::<MemStatsExtended>(self.as_handle_ref(), std::slice::from_mut(&mut info))
             .map(|_| info)
     }
+
+    /// Wraps the
+    /// [zx_object_get_info](https://fuchsia.dev/fuchsia-src/reference/syscalls/object_get_info.md)
+    /// syscall for the ZX_INFO_KMEM_STATS_COMPRESSION topic.
+    pub fn mem_stats_compression(&self) -> Result<MemStatsCompression, Status> {
+        let mut info = MemStatsCompression::default();
+        object_get_info::<MemStatsCompression>(
+            self.as_handle_ref(),
+            std::slice::from_mut(&mut info),
+        )
+        .map(|_| info)
+    }
 }
 
 #[cfg(test)]
@@ -283,5 +338,11 @@ mod tests {
     fn mem_stats_extended() {
         let invalid_resource = Resource::from(Handle::invalid());
         assert_eq!(invalid_resource.mem_stats_extended(), Err(Status::BAD_HANDLE));
+    }
+
+    #[test]
+    fn mem_stats_compression() {
+        let invalid_resource = Resource::from(Handle::invalid());
+        assert_eq!(invalid_resource.mem_stats_compression(), Err(Status::BAD_HANDLE));
     }
 }

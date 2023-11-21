@@ -38,6 +38,26 @@ type MemoryStatsExtended = table {
    14: other_bytes uint64;
 };
 
+// Similarly, this table mirrors zx_info_kmem_stats_compression_t.
+// See zircon/system/public/zircon/syscalls/object.h for more details.
+@available(added=16)
+type MemoryStatsCompression = table {
+    1: uncompressed_storage_bytes uint64;
+    2: compressed_storage_bytes uint64;
+    3: compressed_fragmentation_bytes uint64;
+    4: compression_time zx.Duration;
+    5: decompression_time zx.Duration;
+    6: total_page_compression_attempts uint64;
+    7: failed_page_compression_attempts uint64;
+    8: total_page_decompressions uint64;
+    9: compressed_page_evictions uint64;
+   10: eager_page_compressions uint64;
+   11: memory_pressure_page_compressions uint64;
+   12: critical_memory_page_compressions uint64;
+   13: pages_decompressed_unit_ns uint64;
+   14: pages_decompressed_within_log_time array<uint64, 8>;
+};
+
 // Similarly, this table mirrors zx_info_cpu_stats_t.
 // See zircon/system/public/zircon/syscalls/object.h for more details.
 type PerCpuStats = table {
@@ -81,6 +101,9 @@ closed protocol Stats {
     strict GetMemoryStatsExtended() -> (struct {
         stats MemoryStatsExtended;
     });
+
+    @available(added=16)
+    strict GetMemoryStatsCompression() -> (MemoryStatsCompression);
 
     strict GetCpuStats() -> (struct {
         stats CpuStats;

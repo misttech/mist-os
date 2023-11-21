@@ -1509,6 +1509,8 @@ multiconst!(zx_object_info_topic_t, [
     ZX_INFO_GUEST_STATS                = 29; // zx_info_guest_stats_t[1]
     ZX_INFO_TASK_RUNTIME               = info_topic(30, 1); // zx_info_task_runtime_t[1]
     ZX_INFO_KMEM_STATS_EXTENDED        = 31; // zx_info_kmem_stats_extended_t[1]
+    ZX_INFO_VCPU                       = 32; // zx_info_vcpu_t[1]
+    ZX_INFO_KMEM_STATS_COMPRESSION     = 33; // zx_info_kmem_stats_compression_t[1]
 ]);
 
 // This macro takes struct-like syntax and creates another macro that can be used to create
@@ -1736,6 +1738,29 @@ struct_decl_macro! {
 }
 
 zx_info_kmem_stats_extended_t!(zx_info_kmem_stats_extended_t);
+
+struct_decl_macro! {
+    #[repr(C)]
+    #[derive(Default, Debug, Copy, Clone, Eq, PartialEq)]
+    pub struct <zx_info_kmem_stats_compression_t> {
+        pub uncompressed_storage_bytes: u64,
+        pub compressed_storage_bytes: u64,
+        pub compressed_fragmentation_bytes: u64,
+        pub compression_time: zx_duration_t,
+        pub decompression_time: zx_duration_t,
+        pub total_page_compression_attempts: u64,
+        pub failed_page_compression_attempts: u64,
+        pub total_page_decompressions: u64,
+        pub compressed_page_evictions: u64,
+        pub eager_page_compressions: u64,
+        pub memory_pressure_page_compressions: u64,
+        pub critical_memory_page_compressions: u64,
+        pub pages_decompressed_unit_ns: u64,
+        pub pages_decompressed_within_log_time: [u64; 8],
+    }
+}
+
+zx_info_kmem_stats_compression_t!(zx_info_kmem_stats_compression_t);
 
 struct_decl_macro! {
     #[repr(C)]

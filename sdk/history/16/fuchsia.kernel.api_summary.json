@@ -344,6 +344,94 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.compressed_fragmentation_bytes",
+        "ordinal": "3",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.compressed_page_evictions",
+        "ordinal": "9",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.compressed_storage_bytes",
+        "ordinal": "2",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.compression_time",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.critical_memory_page_compressions",
+        "ordinal": "12",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.decompression_time",
+        "ordinal": "5",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.eager_page_compressions",
+        "ordinal": "10",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.failed_page_compression_attempts",
+        "ordinal": "7",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.memory_pressure_page_compressions",
+        "ordinal": "11",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.pages_decompressed_unit_ns",
+        "ordinal": "13",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.pages_decompressed_within_log_time",
+        "ordinal": "14",
+        "type": "array<uint64,8>"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.total_page_compression_attempts",
+        "ordinal": "6",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.total_page_decompressions",
+        "ordinal": "8",
+        "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.kernel/MemoryStatsCompression.uncompressed_storage_bytes",
+        "ordinal": "1",
+        "type": "uint64"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.kernel/MemoryStatsCompression"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.kernel/MemoryStatsExtended.free_bytes",
         "ordinal": "2",
         "type": "uint64"
@@ -662,6 +750,14 @@
         "ordinal": "7522831701532479604",
         "direction": "two_way",
         "response": "fuchsia.kernel/StatsGetMemoryStatsResponse"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.kernel/Stats.GetMemoryStatsCompression",
+        "strictness": "strict",
+        "ordinal": "6073677601739617585",
+        "direction": "two_way",
+        "response": "fuchsia.kernel/MemoryStatsCompression"
     },
     {
         "kind": "protocol/member",

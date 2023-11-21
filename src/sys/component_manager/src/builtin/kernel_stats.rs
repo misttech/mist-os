@@ -69,6 +69,51 @@ impl KernelStats {
                     };
                     responder.send(&stats)?;
                 }
+                fkernel::StatsRequest::GetMemoryStatsCompression { responder } => {
+                    let mem_stats_compression = &self.resource.mem_stats_compression()?;
+                    let stats = fkernel::MemoryStatsCompression {
+                        uncompressed_storage_bytes: Some(
+                            mem_stats_compression.uncompressed_storage_bytes,
+                        ),
+                        compressed_storage_bytes: Some(
+                            mem_stats_compression.compressed_storage_bytes,
+                        ),
+                        compressed_fragmentation_bytes: Some(
+                            mem_stats_compression.compressed_fragmentation_bytes,
+                        ),
+                        compression_time: Some(mem_stats_compression.compression_time),
+                        decompression_time: Some(mem_stats_compression.decompression_time),
+                        total_page_compression_attempts: Some(
+                            mem_stats_compression.total_page_compression_attempts,
+                        ),
+                        failed_page_compression_attempts: Some(
+                            mem_stats_compression.failed_page_compression_attempts,
+                        ),
+                        total_page_decompressions: Some(
+                            mem_stats_compression.total_page_decompressions,
+                        ),
+                        compressed_page_evictions: Some(
+                            mem_stats_compression.compressed_page_evictions,
+                        ),
+                        eager_page_compressions: Some(
+                            mem_stats_compression.eager_page_compressions,
+                        ),
+                        memory_pressure_page_compressions: Some(
+                            mem_stats_compression.memory_pressure_page_compressions,
+                        ),
+                        critical_memory_page_compressions: Some(
+                            mem_stats_compression.critical_memory_page_compressions,
+                        ),
+                        pages_decompressed_unit_ns: Some(
+                            mem_stats_compression.pages_decompressed_unit_ns,
+                        ),
+                        pages_decompressed_within_log_time: Some(
+                            mem_stats_compression.pages_decompressed_within_log_time,
+                        ),
+                        ..Default::default()
+                    };
+                    responder.send(&stats)?;
+                }
                 fkernel::StatsRequest::GetCpuStats { responder } => {
                     let cpu_stats = &self.resource.cpu_stats()?;
                     let mut per_cpu_stats: Vec<fkernel::PerCpuStats> =
