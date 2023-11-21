@@ -57,7 +57,7 @@ class Network : public fuchsia::netemul::network::Network {
 
  private:
   ClosedCallback closed_callback_;
-  std::shared_ptr<impl::NetworkBus> bus_;
+  std::unique_ptr<impl::NetworkBus> bus_;
   // Pointer to parent context. Not owned.
   NetworkContext* parent_;
   std::string name_;
