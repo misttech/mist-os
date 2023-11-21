@@ -188,6 +188,8 @@ template("fuchsia_package") {
       package_manifest = "$package_out_dir/package_manifest.json"
     }
 
+    main_target_deps = []
+
     # Generate the "meta/package" file
     meta_package_target = "${target_name}_meta_package"
     generate_meta_package(meta_package_target) {
@@ -329,6 +331,7 @@ template("fuchsia_package") {
         package_manifest = _files.package_manifest
         deps = [ ":$_package_build_target" ]
       }
+      main_target_deps += [ ":$_validate_config_target" ]
     }
 
     _is_driver_package =
@@ -434,11 +437,7 @@ template("fuchsia_package") {
                                "visibility",
                              ])
       public_deps = [ ":$_package_build_target" ]
-      deps = []
-      if (_validate_structured_config) {
-        deps += [ ":$_validate_config_target" ]
-      }
-
+      deps = main_target_deps
       if (_is_driver_package) {
         metadata = {
           # Allow exclusion of driver packages by assembly
