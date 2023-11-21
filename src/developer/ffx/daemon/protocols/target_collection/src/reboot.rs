@@ -10,11 +10,11 @@ use ffx_daemon_target::{
     target::Target,
     zedboot::{reboot, reboot_to_bootloader, reboot_to_recovery},
 };
-use ffx_fastboot::common::fastboot::{
-    ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
+use ffx_fastboot::common::{
+    fastboot::{ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind},
+    fastboot_interface::RebootEvent,
 };
-use ffx_fastboot::common::fastboot_interface::RebootEvent;
-use ffx_ssh::ssh::get_ssh_key_paths;
+use ffx_ssh::ssh::build_ssh_command;
 use fidl::{endpoints::DiscoverableProtocolMarker as _, Error};
 use fidl_fuchsia_developer_ffx::{TargetRebootError, TargetRebootResponder, TargetRebootState};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -23,14 +23,17 @@ use fidl_fuchsia_io::OpenFlags;
 use fidl_fuchsia_sys2 as fsys;
 use fuchsia_async::TimeoutExt;
 use futures::TryFutureExt;
-use std::net::{IpAddr, SocketAddr};
-use std::process::Command;
-use std::rc::Rc;
-use std::rc::Weak;
-use std::sync::Arc;
-use std::time::Duration;
-use tokio::sync::mpsc;
-use tokio::sync::mpsc::{Receiver, Sender};
+use std::{
+    net::SocketAddr,
+    process::Command,
+    rc::{Rc, Weak},
+    sync::Arc,
+    time::Duration,
+};
+use tokio::sync::{
+    mpsc,
+    mpsc::{Receiver, Sender},
+};
 
 // TODO(125639): Remove when Power Manager stabilizes
 /// Configuration flag which enables using `dm` over ssh to reboot the target
@@ -308,34 +311,11 @@ pub(crate) fn handle_fidl_connection_err(e: Error, responder: TargetRebootRespon
     Ok(())
 }
 
-// TODO(125639): Remove this block
-
-static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
-    // We do not want multiplexing
-    "-o",
-    "ControlPath none",
-    "-o",
-    "ControlMaster no",
-    "-o",
-    "ExitOnForwardFailure yes",
-    "-o",
-    "StreamLocalBindUnlink yes",
-    "-o",
-    "CheckHostIP=no",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-    "-o",
-    "LogLevel=ERROR",
-];
-
 #[tracing::instrument]
 async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Result<()> {
     let t = target.upgrade().ok_or(anyhow!("Could not upgrade Target to build ssh command"))?;
     let addr = t.ssh_address().ok_or(anyhow!("Could not get ssh address for target"))?;
-    let keys = get_ssh_key_paths().await?;
-    let mut cmd = build_ssh_command(addr.into(), keys, state);
+    let mut cmd = build_ssh_command_local(addr.into(), state).await?;
     tracing::debug!("About to run command on target to reboot: {:?}", cmd);
     let ssh = cmd.spawn()?;
     let output = ssh.wait_with_output()?;
@@ -360,44 +340,16 @@ async fn run_ssh_command(target: Weak<Target>, state: TargetRebootState) -> Resu
 }
 
 #[tracing::instrument]
-fn build_ssh_command(
+async fn build_ssh_command_local(
     addr: TargetAddr,
-    keys: Vec<String>,
     desired_state: TargetRebootState,
-) -> Command {
-    let mut ssh_cmd = Command::new("ssh");
-
-    for arg in DEFAULT_SSH_OPTIONS {
-        ssh_cmd.arg(arg);
-    }
-
-    match addr.ip() {
-        IpAddr::V4(_) => {
-            ssh_cmd.arg("-o");
-            ssh_cmd.arg("AddressFamily inet");
-        }
-        IpAddr::V6(_) => {
-            ssh_cmd.arg("-o");
-            ssh_cmd.arg("AddressFamily inet6");
-        }
-    }
-
-    for k in keys {
-        ssh_cmd.arg("-i").arg(k);
-    }
-
-    // Port and host
-    ssh_cmd.arg("-p").arg(format!("{}", addr.port())).arg(format!("{}", addr));
-
+) -> Result<Command> {
     let device_command = match desired_state {
-        TargetRebootState::Bootloader => "dm reboot-bootloader",
-        TargetRebootState::Recovery => "dm reboot-recovery",
-        TargetRebootState::Product => "dm reboot",
+        TargetRebootState::Bootloader => vec!["dm", "reboot-bootloader"],
+        TargetRebootState::Recovery => vec!["dm", "reboot-recovery"],
+        TargetRebootState::Product => vec!["dm", "reboot"],
     };
-
-    ssh_cmd.arg(device_command);
-
-    ssh_cmd
+    Ok(build_ssh_command(addr.into(), device_command).await?)
 }
 
 // END BLOCK

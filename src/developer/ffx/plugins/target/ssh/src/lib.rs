@@ -6,35 +6,13 @@ use addr::TargetAddr;
 use anyhow::Result;
 use async_trait::async_trait;
 use ffx_config::environment::EnvironmentKind;
-use ffx_ssh::ssh::get_ssh_key_paths;
+use ffx_ssh::ssh::{build_ssh_command, build_ssh_command_with_config_file};
 use ffx_target_ssh_args::SshCommand;
 use fho::{FfxContext, FfxMain, FfxTool, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{TargetAddrInfo, TargetIpPort, TargetProxy};
 use fidl_fuchsia_net::{IpAddress, Ipv4Address};
-use std::net::IpAddr;
-use std::process::Command;
-use std::time::Duration;
+use std::{path::PathBuf, process::Command, time::Duration};
 use timeout::timeout;
-
-static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
-    // We do not want multiplexing
-    "-o",
-    "ControlPath none",
-    "-o",
-    "ControlMaster no",
-    "-o",
-    "ExitOnForwardFailure yes",
-    "-o",
-    "StreamLocalBindUnlink yes",
-    "-o",
-    "CheckHostIP=no",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-    "-o",
-    "LogLevel=ERROR",
-];
 
 #[derive(FfxTool)]
 pub struct SshTool {
@@ -55,8 +33,7 @@ impl FfxMain for SshTool {
             .user_message("Failed to get target ssh address")?;
 
         let addr = get_addr(&addr_info)?;
-        let keys = get_ssh_key_paths().await?;
-        let mut ssh_cmd = build_ssh_command(self.cmd, addr, keys)
+        let mut ssh_cmd = make_ssh_command(self.cmd, addr)
             .await
             .bug_context("Building command to ssh to target")?;
 
@@ -119,45 +96,17 @@ fn get_addr(addr_info: &TargetAddrInfo) -> fho::Result<TargetAddr> {
     )
 }
 
-async fn build_ssh_command(
-    cmd: SshCommand,
-    addr: TargetAddr,
-    keys: Vec<String>,
-) -> Result<Command> {
-    let mut ssh_cmd = Command::new("ssh");
-
-    match cmd.sshconfig {
-        Some(f) => {
-            ssh_cmd.arg("-F").arg(f);
-        }
-        None => {
-            for arg in DEFAULT_SSH_OPTIONS {
-                ssh_cmd.arg(arg);
-            }
-            match addr.ip() {
-                IpAddr::V4(_) => {
-                    ssh_cmd.arg("-o");
-                    ssh_cmd.arg("AddressFamily inet");
-                }
-                IpAddr::V6(_) => {
-                    ssh_cmd.arg("-o");
-                    ssh_cmd.arg("AddressFamily inet6");
-                }
-            }
-        }
+async fn make_ssh_command(cmd: SshCommand, addr: TargetAddr) -> Result<Command> {
+    let ssh_cmd = if let Some(config_file) = cmd.sshconfig {
+        build_ssh_command_with_config_file(
+            &PathBuf::from(config_file),
+            addr.into(),
+            cmd.command.iter().map(|s| s.as_str()).collect(),
+        )
+        .await?
+    } else {
+        build_ssh_command(addr.into(), cmd.command.iter().map(|s| s.as_str()).collect()).await?
     };
-
-    for k in keys {
-        ssh_cmd.arg("-i").arg(k);
-    }
-
-    // Port and host
-    ssh_cmd.arg("-p").arg(format!("{}", addr.port())).arg(format!("{}", addr));
-
-    // User passed commands to run on the target
-    for arg in cmd.command {
-        ssh_cmd.arg(arg);
-    }
 
     Ok(ssh_cmd)
 }
@@ -165,29 +114,35 @@ async fn build_ssh_command(
 #[cfg(test)]
 mod test {
     use super::*;
-    use ffx_config::environment::test_init;
+    use ffx_config::{environment::test_init, ConfigLevel};
     use pretty_assertions::assert_eq;
-    use std::str::FromStr;
+    use serde_json::json;
+    use std::{fs, str::FromStr};
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_address_family() -> Result<()> {
-        let _env = test_init().await?;
-        let keys = vec!["/tmp/path2".to_string(), "/tmp/path1".to_string()];
+        let test_env = test_init().await?;
+        let keys = [
+            test_env.isolate_root.path().join("path2"),
+            test_env.isolate_root.path().join("path1"),
+        ];
+        for k in &keys {
+            fs::write(k, "")?;
+        }
+        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(&keys)).await?;
         let addr = TargetAddr::from_str("127.0.0.1:34522")?;
         let cmd = SshCommand { sshconfig: None, command: vec![] };
-        let ssh_cmd = build_ssh_command(cmd, addr, keys).await?;
+        let ssh_cmd = make_ssh_command(cmd, addr).await?;
         assert_eq!(ssh_cmd.get_program(), "ssh");
         assert_eq!(
             ssh_cmd.get_args().collect::<Vec<_>>(),
             vec![
+                "-F",
+                "none",
                 "-o",
-                "ControlPath none",
+                "ControlPath=none",
                 "-o",
-                "ControlMaster no",
-                "-o",
-                "ExitOnForwardFailure yes",
-                "-o",
-                "StreamLocalBindUnlink yes",
+                "ControlMaster=no",
                 "-o",
                 "CheckHostIP=no",
                 "-o",
@@ -195,13 +150,23 @@ mod test {
                 "-o",
                 "UserKnownHostsFile=/dev/null",
                 "-o",
-                "LogLevel=ERROR",
+                "ServerAliveInterval=1",
                 "-o",
-                "AddressFamily inet",
+                "ServerAliveCountMax=10",
+                "-o",
+                "ConnectTimeout=20",
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "-o",
+                "StreamLocalBindUnlink=yes",
+                "-o",
+                "LogLevel=ERROR",
                 "-i",
-                "/tmp/path2",
+                &keys[0].to_string_lossy(),
                 "-i",
-                "/tmp/path1",
+                &keys[1].to_string_lossy(),
+                "-o",
+                "AddressFamily=inet",
                 "-p",
                 "34522",
                 format!("{}", addr).as_str(),
@@ -212,27 +177,34 @@ mod test {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_custom_config_file() -> Result<()> {
-        let _env = test_init().await?;
-        let keys = vec!["/tmp/path2".to_string(), "/tmp/path1".to_string()];
+        let test_env = test_init().await?;
+        let keys = [
+            test_env.isolate_root.path().join("path2"),
+            test_env.isolate_root.path().join("path1"),
+        ];
+        for k in &keys {
+            fs::write(k, "")?;
+        }
+        test_env.context.query("ssh.priv").level(Some(ConfigLevel::User)).set(json!(keys)).await?;
         let addr = TargetAddr::from_str("[fe80::1%1]:22")?;
         let cmd = SshCommand {
             sshconfig: Some("/foo/bar/baz.conf".to_string()),
             command: vec!["echo".to_string(), "'foo'".to_string()],
         };
-        let ssh_cmd = build_ssh_command(cmd, addr, keys).await?;
+        let ssh_cmd = make_ssh_command(cmd, addr).await?;
         assert_eq!(ssh_cmd.get_program(), "ssh");
         assert_eq!(
-            ssh_cmd.get_args().collect::<Vec<_>>(),
+            ssh_cmd.get_args().map(|a| a.to_str().unwrap()).collect::<Vec<&str>>(),
             vec![
                 "-F",
                 "/foo/bar/baz.conf",
                 "-i",
-                "/tmp/path2",
+                &keys[0].to_string_lossy(),
                 "-i",
-                "/tmp/path1",
+                &keys[1].to_string_lossy(),
                 "-p",
                 "22",
-                format!("{}", addr).as_str(),
+                "fe80::1%1",
                 "echo",
                 "'foo'",
             ]
