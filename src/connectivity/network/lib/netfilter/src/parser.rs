@@ -849,6 +849,28 @@ mod test {
     }
 
     #[test]
+    fn test_rule_with_device_class_and_dst_range() {
+        assert_eq!(
+            parse_str_to_rules("pass in proto tcp devclass ap to range 1:2;"),
+            Ok(vec![filter::Rule {
+                action: filter::Action::Pass,
+                direction: filter::Direction::Incoming,
+                proto: filter::SocketProtocol::Tcp,
+                src_subnet: None,
+                src_subnet_invert_match: false,
+                src_port_range: filter::PortRange { start: 0, end: 0 },
+                dst_subnet: None,
+                dst_subnet_invert_match: false,
+                dst_port_range: filter::PortRange { start: 1, end: 2 },
+                nic: 0,
+                log: false,
+                keep_state: false,
+                device_class: filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
+            }])
+        );
+    }
+
+    #[test]
     fn test_nat_rule_from_v4_subnet() {
         assert_eq!(
             parse_str_to_nat_rules("nat from 1.2.3.0/24 -> from 192.168.1.1;"),
