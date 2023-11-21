@@ -29,9 +29,8 @@ pub async fn create_realm(
     Option<FakeClockController>,
 )> {
     tracing::debug!("create_realm: options: {:?}, fake_utc_clock={:?}", options, fake_utc_clock);
-    // TODO: b/306213772 - Figure out how to use all these return values.
     let (nested_timekeeper, push_source_puppet, rtc_updates, metric_proxy, fake_clock_controller) =
-        NestedTimekeeper::new_with_rtc_options(
+        NestedTimekeeper::new(
             Arc::new(fake_utc_clock),
             options.rtc.map(|r| r.into()).unwrap_or(RtcOptions::None),
             !options.use_real_monotonic_clock.unwrap_or(false),

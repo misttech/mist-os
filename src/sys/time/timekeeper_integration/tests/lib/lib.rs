@@ -62,28 +62,19 @@ impl Into<RealmInstance> for NestedTimekeeper {
 }
 
 impl NestedTimekeeper {
+    /// Creates a new [NestedTimekeeper].
+    ///
     /// Launches an instance of timekeeper maintaining the provided |clock| in a nested
-    /// environment. If |initial_rtc_time| is provided, then the environment contains a fake RTC
+    /// environment.
+    ///
+    /// If |initial_rtc_time| is provided, then the environment contains a fake RTC
     /// device that reports the time as |initial_rtc_time|.
-    /// If use_fake_clock is true, also launches a fake clock service.
+    ///
+    /// If use_fake_clock is true, also launches a fake monotonic clock service.
+    ///
     /// Returns a `NestedTimekeeper`, handles to the PushSource and RTC it obtains updates from,
     /// Cobalt debug querier, and a fake clock control handle if use_fake_clock is true.
     pub async fn new(
-        clock: Arc<zx::Clock>,
-        initial_rtc_time: Option<zx::Time>,
-        use_fake_clock: bool,
-    ) -> (
-        Self,
-        Arc<PushSourcePuppet>,
-        RtcUpdates,
-        MetricEventLoggerQuerierProxy,
-        Option<FakeClockController>,
-    ) {
-        NestedTimekeeper::new_with_rtc_options(clock, initial_rtc_time.into(), use_fake_clock).await
-    }
-
-    /// Similar to [new], but accepts [RtcOptions] instead of `initial_rtc_time`.
-    pub async fn new_with_rtc_options(
         clock: Arc<zx::Clock>,
         rtc_options: RtcOptions,
         use_fake_clock: bool,

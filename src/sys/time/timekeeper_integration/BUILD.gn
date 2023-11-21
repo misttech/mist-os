@@ -18,6 +18,7 @@ group("timekeeper_integration") {
   deps = [
     ":faketime-integration-test-root",
     ":timekeeper-integration-test-root",
+    ":timekeeper_integration_lib",
     "//src/cobalt/bin/testing/mock_cobalt",
   ]
 }
