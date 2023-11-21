@@ -21,10 +21,12 @@ mod repo_publish;
 
 pub use crate::{
     args::{
-        PackageArchiveCreateCommand, PackageArchiveExtractCommand, PackageBuildCommand,
-        RepoCreateCommand, RepoPMListCommand, RepoPublishCommand,
+        PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
+        PackageBuildCommand, RepoCreateCommand, RepoPMListCommand, RepoPublishCommand,
     },
-    package_archive::{cmd_package_archive_create, cmd_package_archive_extract},
+    package_archive::{
+        cmd_package_archive_add, cmd_package_archive_create, cmd_package_archive_extract,
+    },
     package_build::cmd_package_build,
     repo_create::cmd_repo_create,
     repo_publish::{cmd_repo_package_manifest_list, cmd_repo_publish},

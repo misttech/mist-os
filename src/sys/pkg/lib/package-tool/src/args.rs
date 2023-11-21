@@ -52,6 +52,31 @@ pub struct PackageArchiveExtractCommand {
     pub archive: PathBuf,
 }
 
+#[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
+/// add a file (<file_to_add>) to an existing package archive (<archive>), overwriting the archive
+#[argh(subcommand, name = "add")]
+pub struct PackageArchiveAddCommand {
+    /// package archive
+    #[argh(option, short = 'a')]
+    pub archive: PathBuf,
+
+    /// file to add to the package archive
+    #[argh(option, short = 'f')]
+    pub file_to_add: PathBuf,
+
+    /// the destination path in the archive for <file_to_add>
+    #[argh(option, short = 'p')]
+    pub path_of_file_in_archive: PathBuf,
+
+    /// the name of the resulting archive. Can be the same as <archive> to overwrite <archive>
+    #[argh(option, short = 'o')]
+    pub output: PathBuf,
+
+    /// if false, refuses to overwrite files in <archive> named by <path_of_file_in_archive>
+    #[argh(option, short = 'w', default = "true")]
+    pub overwrite: bool,
+}
+
 /// Builds a package.
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "build")]

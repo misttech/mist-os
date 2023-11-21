@@ -9,10 +9,10 @@ use {
     anyhow::Result,
     argh::FromArgs,
     package_tool::{
-        cmd_package_archive_create, cmd_package_archive_extract, cmd_package_build,
-        cmd_repo_create, cmd_repo_package_manifest_list, cmd_repo_publish,
-        PackageArchiveCreateCommand, PackageArchiveExtractCommand, PackageBuildCommand,
-        RepoCreateCommand, RepoPMListCommand, RepoPublishCommand,
+        cmd_package_archive_add, cmd_package_archive_create, cmd_package_archive_extract,
+        cmd_package_build, cmd_repo_create, cmd_repo_package_manifest_list, cmd_repo_publish,
+        PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
+        PackageBuildCommand, RepoCreateCommand, RepoPMListCommand, RepoPublishCommand,
     },
 };
 
@@ -56,6 +56,7 @@ struct PackageArchiveCommand {
 #[derive(FromArgs)]
 #[argh(subcommand)]
 enum PackageArchiveSubCommands {
+    Add(PackageArchiveAddCommand),
     Create(PackageArchiveCreateCommand),
     Extract(PackageArchiveExtractCommand),
 }
@@ -83,6 +84,7 @@ async fn main() -> Result<()> {
     match cmd.subcommands {
         SubCommands::Package(cmd) => match cmd.subcommands {
             PackageSubCommands::Archive(cmd) => match cmd.subcommands {
+                PackageArchiveSubCommands::Add(cmd) => cmd_package_archive_add(cmd).await,
                 PackageArchiveSubCommands::Create(cmd) => cmd_package_archive_create(cmd).await,
                 PackageArchiveSubCommands::Extract(cmd) => cmd_package_archive_extract(cmd).await,
             },

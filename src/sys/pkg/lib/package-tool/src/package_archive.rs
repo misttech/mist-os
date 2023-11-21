@@ -4,13 +4,18 @@
 
 use {
     crate::{
-        args::{PackageArchiveCreateCommand, PackageArchiveExtractCommand},
+        args::{
+            PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
+        },
         to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME,
     },
+    anyhow::anyhow,
     anyhow::{Context as _, Result},
     camino::Utf8Path,
+    fuchsia_pkg::PackageBuilder,
     fuchsia_pkg::{PackageManifest, SubpackageInfo},
     std::{collections::BTreeSet, fs::File},
+    tempfile::TempDir,
 };
 
 pub async fn cmd_package_archive_create(cmd: PackageArchiveCreateCommand) -> Result<()> {
@@ -114,6 +119,53 @@ pub async fn cmd_package_archive_extract(cmd: PackageArchiveExtractCommand) -> R
     Ok(())
 }
 
+pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()> {
+    // Extract the archive
+    let tmp = TempDir::new()?;
+    let root =
+        Utf8Path::from_path(tmp.path()).ok_or_else(|| anyhow!("couldn't create utf-8 path"))?;
+    let extract_dir = root.join("extract");
+
+    cmd_package_archive_extract(PackageArchiveExtractCommand {
+        out: extract_dir.clone(),
+        repository: None,
+        blobs_json: true,
+        archive: cmd.archive.clone().into(),
+    })
+    .await?;
+
+    // Add the file, either in the meta.far or the content blobs
+    let pkg_builder_outdir = TempDir::new()?;
+    let original_pkg_manifest =
+        PackageManifest::try_load_from(extract_dir.join(PACKAGE_MANIFEST_NAME))?;
+    let mut pkg_builder =
+        PackageBuilder::from_manifest(original_pkg_manifest, pkg_builder_outdir.path())?;
+    pkg_builder.overwrite_files(cmd.overwrite);
+
+    let path_of_file_in_archive = cmd
+        .path_of_file_in_archive
+        .to_str()
+        .ok_or_else(|| anyhow!("couldn't create str from archive file path"))?;
+    let file_to_add =
+        cmd.file_to_add.to_str().ok_or_else(|| anyhow!("couldn't create str from file path"))?;
+
+    if cmd.path_of_file_in_archive.starts_with("meta/") {
+        pkg_builder.add_file_to_far(path_of_file_in_archive, file_to_add)?;
+    } else {
+        pkg_builder.add_file_as_blob(path_of_file_in_archive, file_to_add)?;
+    }
+
+    // Serialize the archive to the output path
+    let build_tmpdir = TempDir::new()?;
+    let new_pkg_manifest =
+        pkg_builder.build(build_tmpdir.path(), build_tmpdir.path().join("meta.far"))?;
+    let new_archive = File::create(&cmd.output)
+        .with_context(|| format!("creating new package archive file {}", cmd.output.display()))?;
+    let () = new_pkg_manifest.archive(extract_dir, new_archive).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -133,8 +185,16 @@ mod tests {
     const LIB_CONTENTS: &[u8] = b"lib";
 
     const META_FAR_HASH: &str = "f1a91cbbd41fef65416522a9de7e1d8be0f962ec6371cb747a403cff03d656e6";
+    const MODIFIED_META_FAR_HASH: &str =
+        "c1f005cbf6e7d71cf1014c2ab8a493b55640ef169aa2b94f211cd0588236f989";
+    const META_FAR_HASH_WITH_MODIFIED_BIN: &str =
+        "9084b9e928d29b97e39a1f8f155c7e1ec1aa005cf43fe9a6b958b160d3741a3e";
     const BIN_HASH: &str = "5d202ed772f4de29ecd7bc9a3f20278cd69ae160e36ba8b434512ca45003c7a3";
+    const MODIFIED_BIN_HASH: &str =
+        "8b9dd6886ff377a19d8716a30a0659897fba5cbdfb43649bf93317fcb6fdb18c";
     const LIB_HASH: &str = "65f1e8f09fdc18cbcfc8f2a472480643761478595e891138de8055442dcc3233";
+    const ADDED_FILE_HASH: &str =
+        "8b9dd6886ff377a19d8716a30a0659897fba5cbdfb43649bf93317fcb6fdb18c";
 
     struct Package {
         manifest_path: Utf8PathBuf,
@@ -341,6 +401,160 @@ mod tests {
         );
 
         assert_eq!(extract_contents, BTreeMap::new());
+    }
+
+    /// Returns the path of the directory into which we extracted the modified far
+    async fn test_archive_add_inner(
+        tmp: &TempDir,
+        path_to_add: Utf8PathBuf,
+        contents_to_add: &str,
+        overwrite: bool,
+    ) -> Result<Utf8PathBuf, anyhow::Error> {
+        //let tmp = TempDir::new().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+        let host_path_to_add = root.join(path_to_add.clone());
+
+        let pkg_dir = root.join("pkg");
+        let package = create_package(&pkg_dir);
+
+        // Write the archive.
+        let archive_path = root.join("archive.far");
+        cmd_package_archive_create(PackageArchiveCreateCommand {
+            out: archive_path.clone().into(),
+            root_dir: pkg_dir.to_owned(),
+            package_manifest: package.manifest_path.clone(),
+            depfile: None,
+        })
+        .await
+        .unwrap();
+
+        // Read the generated archive file.
+        let mut archive = Utf8Reader::new(File::open(&archive_path).unwrap()).unwrap();
+
+        assert_eq!(
+            read_archive(&mut archive),
+            BTreeMap::from([
+                ("meta.far".to_string(), package.meta_far_contents.clone()),
+                (BIN_HASH.to_string(), BIN_CONTENTS.to_vec()),
+                (LIB_HASH.to_string(), LIB_CONTENTS.to_vec()),
+            ]),
+        );
+
+        // Add a file to the archive
+        std::fs::write(&host_path_to_add, contents_to_add)
+            .context(format!("writing contents to file: {}", host_path_to_add))
+            .unwrap();
+
+        cmd_package_archive_add(PackageArchiveAddCommand {
+            archive: archive_path.clone().into(),
+            file_to_add: host_path_to_add.clone().into(),
+            path_of_file_in_archive: path_to_add.clone().into(),
+            output: archive_path.clone().into(),
+            overwrite: overwrite,
+        })
+        .await?;
+
+        // Extract the archive.
+        let extract_dir = root.join("extract");
+        cmd_package_archive_extract(PackageArchiveExtractCommand {
+            out: extract_dir.clone(),
+            repository: None,
+            archive: archive_path.clone().into(),
+            blobs_json: true,
+        })
+        .await
+        .unwrap();
+
+        Ok(extract_dir)
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_add() {
+        let tmp = TempDir::new().unwrap();
+        let extract_dir =
+            test_archive_add_inner(&tmp, "add_test".into(), "test", false).await.unwrap();
+
+        let mut extract_contents = read_dir(&extract_dir);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &extract_contents.remove(&extract_dir.join(BLOBS_JSON_NAME)).unwrap(),
+            )
+            .unwrap(),
+            serde_json::json!([
+                    {
+                        "source_path": format!("blobs/{MODIFIED_META_FAR_HASH}"),
+                        "path": "meta/",
+                        "merkle": MODIFIED_META_FAR_HASH,
+                        "size": 16384,
+                    },
+                    {
+                        "source_path": format!("blobs/{ADDED_FILE_HASH}"),
+                        "path": "add_test",
+                        "merkle": ADDED_FILE_HASH,
+                        "size": 4,
+                    },
+                    {
+                        "source_path": format!("blobs/{BIN_HASH}"),
+                        "path": "bin",
+                        "merkle": BIN_HASH,
+                        "size": 3,
+                    },
+                    {
+                        "source_path": format!("blobs/{LIB_HASH}"),
+                        "path": "lib",
+                        "merkle": LIB_HASH,
+                        "size": 3,
+                    },
+                ]
+            )
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_add_overwrite_fails_when_flag_not_set() {
+        let tmp = TempDir::new().unwrap();
+        let res = test_archive_add_inner(&tmp, "bin".into(), "test", false).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err();
+        assert_eq!(
+            err.to_string(),
+            "Package 'some_pkg_name' already contains a file (as a blob) at: 'bin'"
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_add_overwrite_succeeds_when_flag_set() {
+        let tmp = TempDir::new().unwrap();
+        let extract_dir = test_archive_add_inner(&tmp, "bin".into(), "test", true).await.unwrap();
+
+        let mut extract_contents = read_dir(&extract_dir);
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &extract_contents.remove(&extract_dir.join(BLOBS_JSON_NAME)).unwrap(),
+            )
+            .unwrap(),
+            serde_json::json!([
+                    {
+                        "source_path": format!("blobs/{META_FAR_HASH_WITH_MODIFIED_BIN}"),
+                        "path": "meta/",
+                        "merkle": META_FAR_HASH_WITH_MODIFIED_BIN,
+                        "size": 16384,
+                    },
+                    {
+                        "source_path": format!("blobs/{MODIFIED_BIN_HASH}"),
+                        "path": "bin",
+                        "merkle": MODIFIED_BIN_HASH,
+                        "size": 4,
+                    },
+                    {
+                        "source_path": format!("blobs/{LIB_HASH}"),
+                        "path": "lib",
+                        "merkle": LIB_HASH,
+                        "size": 3,
+                    },
+                ]
+            )
+        );
     }
 
     #[fuchsia::test]
