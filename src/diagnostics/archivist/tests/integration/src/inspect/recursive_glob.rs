@@ -85,6 +85,9 @@ async fn read_components_subtree_with_recursive_glob() {
     assert_eq!(data_vec.len(), expected_monikers.len());
     let mut found_monikers = HashSet::new();
     for data in data_vec {
+        if data.payload.is_none() {
+            tracing::error!("UNEXPECTED EMPTY PAYLOAD: {data:?}");
+        }
         assert_data_tree!(data.payload.as_ref().unwrap(), root: {
             "fuchsia.inspect.Health": {
                 status: "OK",
