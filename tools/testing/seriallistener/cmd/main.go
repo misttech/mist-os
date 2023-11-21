@@ -67,6 +67,9 @@ func (s *socketReader) Read(p []byte) (int, error) {
 }
 
 func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	if socketPath == "" {
 		flag.Usage()
 		return fmt.Errorf("could not find socket in environment")
@@ -85,9 +88,6 @@ func execute(ctx context.Context, socketPath string, stdout io.Writer) error {
 	defer socket.Close()
 
 	socketTee := io.TeeReader(&socketReader{ctx, socket, 10 * time.Second}, stdout)
-
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
 
 	// Print out a log periodically to give an estimate of the timestamp at which
 	// logs are getting read from the socket.

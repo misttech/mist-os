@@ -757,9 +757,7 @@ func (ctx *fakeContext) Deadline() (time.Time, bool) {
 }
 
 func (ctx *fakeContext) Done() <-chan struct{} {
-	ch := make(chan struct{})
-	close(ch)
-	return ch
+	return make(chan struct{})
 }
 
 func (ctx *fakeContext) Err() error {

@@ -82,18 +82,31 @@ func ReadUntilMatch(ctx context.Context, reader io.Reader, toMatch ...[]byte) ([
 	// larger => less CPU overhead.
 	buf := make([]byte, 1024)
 	lastReadSize := 0
+	var match []byte
 	for ctx.Err() == nil {
-		var err error
-		lastReadSize, err = m.Read(buf)
-		if err == nil {
-			continue
-		}
-		if errors.Is(err, io.EOF) {
-			if match := m.Match(); match != nil {
+		readErr := make(chan error, 1)
+		go func() {
+			var err error
+			lastReadSize, err = m.Read(buf)
+			if errors.Is(err, io.EOF) {
+				match = m.Match()
+				if match != nil {
+					readErr <- nil
+					return
+				}
+			}
+			readErr <- err
+		}()
+		select {
+		case <-ctx.Done():
+			break
+		case err := <-readErr:
+			if err != nil {
+				return nil, err
+			} else if match != nil {
 				return match, nil
 			}
 		}
-		return nil, err
 	}
 
 	// If we time out, it is helpful to see the last bytes processed.
