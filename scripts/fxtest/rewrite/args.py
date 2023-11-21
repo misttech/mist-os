@@ -26,6 +26,8 @@ class Flags:
     host: bool
     device: bool
     exact: bool
+    e2e: bool
+    only_e2e: bool
     selection: typing.List[str]
     fuzzy: int
     show_suggestions: bool
@@ -84,6 +86,9 @@ class Flags:
             raise FlagError(
                 "Refusing to output interactive status to a non-TTY."
             )
+
+        if self.only_e2e:
+            self.e2e = True
 
         if self.simple:
             self.style = False
@@ -155,6 +160,18 @@ def parse_args(cli_args: typing.List[str] | None = None) -> Flags:
         default=False,
         help="""Only match tests whose name exactly matches the selection.
         Cannot be specified along with --host or --device.""",
+    )
+    selection.add_argument(
+        "--e2e",
+        action=argparse.BooleanOptionalAction,
+        help="Run selected end to end tests. Default is to not run e2e tests.",
+        default=False,
+    )
+    selection.add_argument(
+        "--only-e2e",
+        action="store_true",
+        default=False,
+        help="Only run end to end tests. Implies --e2e.",
     )
     selection.add_argument(
         "-p",

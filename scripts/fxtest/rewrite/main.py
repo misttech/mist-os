@@ -191,6 +191,8 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             mode = selection.SelectionMode.DEVICE
         elif flags.exact:
             mode = selection.SelectionMode.EXACT
+        elif flags.only_e2e:
+            mode = selection.SelectionMode.E2E
         selections = await selection.select_tests(
             tests,
             flags.selection,
@@ -674,6 +676,14 @@ async def run_all_tests(
         )
         return False
 
+    device_environment: environment.DeviceEnvironment | None = None
+    if tests.has_e2e_test():
+        device_environment = (
+            await execution.get_device_environment_from_exec_env(
+                exec_env, recorder=recorder
+            )
+        )
+
     test_group = recorder.emit_test_group(len(tests.selected) * flags.count)
 
     @dataclass
@@ -710,6 +720,9 @@ async def run_all_tests(
                 exec_env,
                 flags,
                 run_suffix=None if flags.count == 1 else i + 1,
+                device_env=None
+                if not test.is_e2e_test()
+                else device_environment,
             )
             for i in range(flags.count)
         ]
@@ -729,7 +742,7 @@ async def run_all_tests(
     abort_all_tests_event = asyncio.Event()
     test_failure_observed: bool = False
 
-    async def test_executor():
+    async def test_executor() -> None:
         nonlocal test_failure_observed
         to_run: ExecEntry
         was_non_hermetic: bool = False
@@ -809,6 +822,9 @@ async def run_all_tests(
                 else:
                     status = event.TestSuiteStatus.PASSED
             except execution.TestCouldNotRun as e:
+                status = event.TestSuiteStatus.SKIPPED
+                message = str(e)
+            except execution.TestSkipped as e:
                 status = event.TestSuiteStatus.SKIPPED
                 message = str(e)
             except (execution.TestTimeout, execution.TestFailed) as e:

@@ -47,5 +47,20 @@
             "path": "host_x64/baz_test",
             "os": "linux"
         }
+    },
+    {
+        "environments": [
+            {
+                "dimensions": {
+                    "device_type": "AEMU"
+                }
+            }
+        ],
+        "test": {
+            "name": "host_x64/example_e2e_test",
+            "label": "//src/tests/end_to_end:example_e2e_test(//build/toolchain/host:x64)",
+            "path": "host_x64/example_e2e_test",
+            "os": "linux"
+        }
     }
 ]

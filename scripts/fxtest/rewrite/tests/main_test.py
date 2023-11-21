@@ -12,6 +12,7 @@ import unittest.mock as mock
 from parameterized import parameterized
 
 import args
+import environment
 import event
 import main
 import util.command
@@ -25,8 +26,10 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     """
 
     DEVICE_TESTS_IN_INPUT = 1
-    HOST_TESTS_IN_INPUT = 2
+    HOST_TESTS_IN_INPUT = 3
+    E2E_TESTS_IN_INPUT = 1
     TOTAL_TESTS_IN_INPUT = DEVICE_TESTS_IN_INPUT + HOST_TESTS_IN_INPUT
+    TOTAL_NON_E2E_TESTS_IN_INPUT = TOTAL_TESTS_IN_INPUT - E2E_TESTS_IN_INPUT
 
     def setUp(self) -> None:
         # Set up a Fake fuchsia directory.
@@ -94,11 +97,20 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             ),
             f"path was {self.test_data_path} for {__file__}",
         )
+        self.assertTrue(
+            os.path.isfile(os.path.join(self.test_data_path, "fx-ssh-path")),
+            f"path was {self.test_data_path} for {__file__}",
+        )
 
         with open(
             os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w"
         ) as f:
             f.write("out/default")
+
+        shutil.copy(
+            os.path.join(self.test_data_path, "fx-ssh-path"),
+            os.path.join(self.fuchsia_dir.name, ".fx-ssh-path"),
+        )
 
         self.out_dir = os.path.join(self.fuchsia_dir.name, "out/default")
         os.makedirs(self.out_dir)
@@ -113,6 +125,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
             )
+
+        self._mock_get_device_environment(
+            environment.DeviceEnvironment(
+                "localhost", "8080", "foo", "/foo.key"
+            )
+        )
 
         return super().setUp()
 
@@ -188,6 +206,22 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         return ret
 
+    def _mock_get_device_environment(
+        self, env: environment.DeviceEnvironment
+    ) -> mock.MagicMock:
+        # Device environments are created using async, so we need to return
+        # a future from the mock.
+        async def callable_ret():
+            return env
+
+        m = mock.MagicMock(return_value=callable_ret())
+        patch = mock.patch(
+            "main.execution.get_device_environment_from_exec_env", m
+        )
+        patch.start()
+        self.addCleanup(patch.stop)
+        return m
+
     def assertIsSubset(
         self, subset: typing.Set[typing.Any], full: typing.Set[typing.Any]
     ):
@@ -199,7 +233,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     def prettyFormatPrefixes(self, vals: typing.Set[typing.Any]) -> str:
         return "\n ".join(map(lambda x: " ".join(x), sorted(vals)))
 
-    async def test_dry_run(self):
+    async def test_dry_run(self) -> None:
         """Test a basic dry run of the command."""
         recorder = event.EventRecorder()
         ret = await main.async_main_wrapper(
@@ -219,7 +253,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             len(selection_event.selected), self.TOTAL_TESTS_IN_INPUT
         )
 
-    async def test_fuzzy_dry_run(self):
+    async def test_fuzzy_dry_run(self) -> None:
         """Test a dry run of the command for fuzzy matching"""
         recorder = event.EventRecorder()
         ret = await main.async_main_wrapper(
@@ -314,12 +348,12 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     )
     async def test_suggestions(
         self, _unused_name, extra_flags, expected_suggestion_count
-    ):
+    ) -> None:
         """Test that targets are suggested when there are no test matches."""
         mocked_commands = self._mock_run_commands_in_parallel("No matches")
         ret = await main.async_main_wrapper(
             args.parse_args(
-                ["--simple", "non_existant_test_does_not_match"] + extra_flags
+                ["--simple", "non_existent_test_does_not_match"] + extra_flags
             )
         )
         self.assertEqual(ret, 1)
@@ -331,7 +365,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                         "fx",
                         "search-tests",
                         f"--max-results={expected_suggestion_count}",
-                        "non_existant_test_does_not_match",
+                        "non_existent_test_does_not_match",
                         "--no-color",
                     ]
                 ],

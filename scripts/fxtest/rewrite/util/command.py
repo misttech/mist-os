@@ -181,7 +181,7 @@ class AsyncCommand:
             new_env = dict(os.environ.items())
             new_env.update(env)
             env = new_env
-            if cwd is not None:
+            if cwd is not None and "CWD" in env:
                 # CWD is already handled above, do not inherit.
                 env.pop("CWD")
 

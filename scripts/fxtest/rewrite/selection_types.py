@@ -85,12 +85,26 @@ class TestSelections:
     fuzzy_distance_threshold: int
 
     def has_device_test(self) -> bool:
-        """Determine if this set of test selections has any device tests.
+        """Determine if this set of test selections has any tests
+        that depend on a running Fuchsia device.
 
         Returns:
             bool: True if a test that requires a device is selected, False otherwise.
         """
-        return any([entry.is_device_test() for entry in self.selected])
+        return any(
+            [
+                entry.is_device_test() or entry.is_e2e_test()
+                for entry in self.selected
+            ]
+        )
+
+    def has_e2e_test(self) -> bool:
+        """Determine if this set of test selections has any host-driven device tests.
+
+        Returns:
+            bool: True if a host-driven device test is selected, False otherwise.
+        """
+        return any([entry.is_e2e_test() for entry in self.selected])
 
     def apply_flags(self, flags: args.Flags):
         """Mutate the set of selected tests based on flags.

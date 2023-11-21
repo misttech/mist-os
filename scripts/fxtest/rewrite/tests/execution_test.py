@@ -8,6 +8,7 @@ import subprocess
 import tempfile
 import typing
 import unittest
+import unittest.mock as mock
 
 from parameterized import parameterized
 
@@ -17,6 +18,7 @@ import event
 import execution
 import test_list_file
 import tests_json_file
+import util.command as command
 
 
 class TestExecution(unittest.IsolatedAsyncioTestCase):
@@ -275,6 +277,62 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 any([e.error is not None async for e in recorder.iter()])
             )
 
+    @parameterized.expand(
+        [
+            ("without --e2e enabled", ["--no-e2e"], execution.TestSkipped),
+            ("with --e2e enabled", ["--e2e"], execution.TestFailed),
+        ]
+    )
+    @mock.patch("execution.run_command", return_value=None)
+    async def test_test_execution_e2e(
+        self, _unused_name, extra_flags, expected_exception, command_mock
+    ):
+        """Test that execution of e2e depends on the --e2e flag"""
+
+        exec_env = environment.ExecutionEnvironment(
+            "/fuchsia", "/some_temp", None, "", ""
+        )
+
+        flags = args.parse_args(extra_flags)
+
+        test = execution.TestExecution(
+            test_list_file.Test(
+                tests_json_file.TestEntry(
+                    tests_json_file.TestSection(
+                        "foo", "//foo", "linux", path="ls"
+                    ),
+                    environments=[
+                        tests_json_file.EnvironmentEntry(
+                            dimensions=tests_json_file.DimensionsEntry(
+                                device_type="AEMU"
+                            )
+                        )
+                    ],
+                ),
+                test_list_file.TestListEntry("foo", [], execution=None),
+            ),
+            exec_env,
+            flags,
+        )
+
+        self.assertTrue(test._test.is_e2e_test())
+        self.assertFalse(test.is_hermetic())
+        env = test.environment()
+        assert env is not None
+        # TODO: Add environment checking when added.
+        self.assertDictEqual(env, {"CWD": "/some_temp"})
+        self.assertFalse(test.should_symbolize())
+
+        recorder = event.EventRecorder()
+        recorder.emit_init()
+
+        try:
+            await test.run(recorder, flags, event.GLOBAL_RUN_ID)
+            self.assertTrue(False, "No exception was raised")
+        except Exception as e:
+            self.assertIsInstance(e, expected_exception)
+        recorder.emit_end()
+
     async def test_test_execution_with_package_hash(self):
         """Ensure that test execution respects --use-package-hash"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -402,3 +460,114 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 make_test("baz_test"),
                 exec_env,
             )
+
+
+class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
+    def _make_command_output(
+        self, stdout: str, return_code: int = 0
+    ) -> command.CommandOutput:
+        return command.CommandOutput(stdout, "", return_code, 0.2, None)
+
+    def setUp(self) -> None:
+        self._temp_dir = tempfile.TemporaryDirectory()
+        self._env = environment.ExecutionEnvironment(
+            self._temp_dir.name, "", None, "", "", None
+        )
+        with open(os.path.join(self._temp_dir.name, ".fx-ssh-path"), "w") as f:
+            f.write("/foo/path")
+        return super().setUp()
+
+    def tearDown(self) -> None:
+        self._temp_dir.cleanup()
+        return super().tearDown()
+
+    @mock.patch("execution.run_command")
+    async def test_get_device_environment_success(
+        self, command_patch: mock.AsyncMock
+    ):
+        command_patch.side_effect = [
+            self._make_command_output("127.0.0.1:6000"),
+            self._make_command_output("foo-bar"),
+        ]
+        device_env = await execution.get_device_environment_from_exec_env(
+            self._env
+        )
+        self.assertDictContainsSubset(
+            {
+                "address": "127.0.0.1",
+                "port": "6000",
+                "name": "foo-bar",
+                "private_key_path": "/foo/path",
+            },
+            vars(device_env),
+        )
+
+    @mock.patch("execution.run_command")
+    async def test_get_device_environment_ipv6(
+        self, command_patch: mock.AsyncMock
+    ):
+        command_patch.side_effect = [
+            self._make_command_output("[::1]:6000"),
+            self._make_command_output("foo-bar"),
+        ]
+        device_env = await execution.get_device_environment_from_exec_env(
+            self._env
+        )
+        self.assertDictContainsSubset(
+            {
+                "address": "[::1]",
+                "port": "6000",
+                "name": "foo-bar",
+                "private_key_path": "/foo/path",
+            },
+            vars(device_env),
+        )
+
+    @mock.patch("execution.run_command")
+    async def test_get_device_environment_ssh_error(
+        self, command_patch: mock.AsyncMock
+    ):
+        command_patch.side_effect = [
+            self._make_command_output("", return_code=1),
+        ]
+
+        try:
+            device_env = await execution.get_device_environment_from_exec_env(
+                self._env
+            )
+            self.assertTrue(False, f"Should have failed, got {device_env}")
+        except execution.DeviceConfigError as e:
+            self.assertRegex(str(e), "Failed to get the ssh address")
+
+    @mock.patch("execution.run_command")
+    async def test_get_device_environment_bad_ip_format(
+        self, command_patch: mock.AsyncMock
+    ):
+        command_patch.side_effect = [
+            self._make_command_output("foo"),
+        ]
+
+        try:
+            device_env = await execution.get_device_environment_from_exec_env(
+                self._env
+            )
+            self.assertTrue(False, f"Should have failed, got {device_env}")
+        except execution.DeviceConfigError as e:
+            self.assertRegex(str(e), "Could not parse")
+
+    @mock.patch("execution.run_command")
+    async def test_get_device_environment_no_target_name(
+        self, command_patch: mock.AsyncMock
+    ):
+        command_patch.side_effect = [
+            self._make_command_output("127.0.0.1:6000"),
+            self._make_command_output("", return_code=1),
+        ]
+
+        try:
+            device_env = await execution.get_device_environment_from_exec_env(
+                self._env
+            )
+            self.assertTrue(False, f"Should have failed, got {device_env}")
+        except execution.DeviceConfigError as e:
+            self.assertRegex(str(e), "Failed to get the target name")

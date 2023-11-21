@@ -132,3 +132,20 @@ class ExecutionEnvironment:
 
     def __hash__(self) -> int:
         return hash(self.fuchsia_dir)
+
+
+@dataclass
+class DeviceEnvironment:
+    """Environment for connecting to a Fuchsia Device"""
+
+    # IP address of the device
+    address: str
+
+    # SSH port for the device
+    port: str
+
+    # Name of the device
+    name: str
+
+    # Path to the private key used to SSH to the device
+    private_key_path: str

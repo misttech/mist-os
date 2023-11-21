@@ -4,6 +4,7 @@
 
 import os
 import re
+import tempfile
 import typing
 
 import args
@@ -23,6 +24,10 @@ class TestCouldNotRun(TestExecutionError):
     """The test could not be run at all."""
 
 
+class TestSkipped(TestExecutionError):
+    """The test was skipped for some non-error reason"""
+
+
 class TestFailed(TestExecutionError):
     """The test ran, but returned a failure error code."""
 
@@ -40,6 +45,7 @@ class TestExecution:
         exec_env: environment.ExecutionEnvironment,
         flags: args.Flags,
         run_suffix: int | None = None,
+        device_env: environment.DeviceEnvironment | None = None,
     ):
         """Initialize the test execution wrapper.
 
@@ -47,12 +53,18 @@ class TestExecution:
             test (test_list_file.Test): Test to run.
             exec_env (environment.ExecutionEnvironment): Execution environment.
             flags (args.Flags): Command flags.
-            run_suffix (int, optional): If set, this is the unique index of a single run of the referenced test.
+            run_suffix (int, optional): If set, this is the unique
+                index of a single run of the referenced test.
+            device_env (environment.DeviceEnvironment, optional):
+                If set, this contains information on how to connect to
+                a device. Otherwise if this is a host test it may not
+                connect to a device.
         """
         self._test = test
         self._exec_env = exec_env
         self._flags = flags
         self._run_suffix = run_suffix
+        self._device_env = device_env
 
     def name(self) -> str:
         """Get the name of the test.
@@ -160,12 +172,24 @@ class TestExecution:
             typing.Optional[typing.Dict[str, str]]: Environment for
                 the test, or None if no environment is needed.
         """
-        if self._test.build.test.path:
-            return {
-                "CWD": self._exec_env.out_dir,
-            }
-        else:
-            return None
+        env = {}
+        if self._test.build.test.path or self._test.is_e2e_test():
+            env.update(
+                {
+                    "CWD": self._exec_env.out_dir,
+                }
+            )
+
+        if self._test.is_e2e_test() and self._device_env is not None:
+            env.update(
+                {
+                    "FUCHSIA_DEVICE_ADDR": self._device_env.address,
+                    "FUCHSIA_SSH_PORT": self._device_env.port,
+                    "FUCHSIA_SSH_KEY": self._device_env.private_key_path,
+                    "FUCHSIA_NODENAME": self._device_env.name,
+                }
+            )
+        return None if not env else env
 
     def should_symbolize(self) -> bool:
         """Determine if we should symbolize the output of this test.
@@ -193,23 +217,34 @@ class TestExecution:
         Raises:
             TestFailed: If the test reported failure.
             TestTimeout: If the test timed out.
+            TestSkipped: If the test should not run.
 
         Returns:
             command.CommandOutput: The output of executing this command.
         """
+        if self._test.is_e2e_test() and not flags.e2e:
+            raise TestSkipped("Skipping optional end to end test")
+
         symbolize = self.should_symbolize()
         command = self.command_line()
-        env = self.environment()
+        env = self.environment() or {}
 
-        output = await run_command(
-            *command,
-            recorder=recorder,
-            parent=parent,
-            print_verbatim=flags.output,
-            symbolize=symbolize,
-            env=env,
-            timeout=timeout,
-        )
+        with tempfile.TemporaryDirectory() as outdir:
+            # TODO(b/295340900): Use a passed output directory
+            env.update(
+                {
+                    "FUCHSIA_TEST_OUTDIR": outdir,
+                }
+            )
+            output = await run_command(
+                *command,
+                recorder=recorder,
+                parent=parent,
+                print_verbatim=flags.output,
+                symbolize=symbolize,
+                env=env,
+                timeout=timeout,
+            )
 
         if not output:
             raise TestFailed("Failed to run the test command")
@@ -297,11 +332,47 @@ def extract_package_name_from_url(url: str) -> str | None:
     return match.group(1)
 
 
+class DeviceConfigError(Exception):
+    """There was an error reading the device configuration"""
+
+
+async def get_device_environment_from_exec_env(
+    exec_env: environment.ExecutionEnvironment,
+    recorder: event.EventRecorder | None = None,
+) -> environment.DeviceEnvironment:
+    ssh_output = await run_command(
+        "fx", "ffx", "target", "get-ssh-address", recorder=recorder
+    )
+    if not ssh_output or ssh_output.return_code != 0:
+        raise DeviceConfigError("Failed to get the ssh address of the target")
+
+    last_colon_index = ssh_output.stdout.rfind(":")
+    if last_colon_index == -1:
+        raise DeviceConfigError(f"Could not parse: {ssh_output.stdout}")
+    ip = ssh_output.stdout[0:last_colon_index].strip()
+    port = ssh_output.stdout[last_colon_index + 1 :].strip()
+
+    target_output = await run_command(
+        "fx", "ffx", "target", "default", "get", recorder=recorder
+    )
+    if not target_output or target_output.return_code != 0:
+        raise DeviceConfigError("Failed to get the target name")
+    target_name = target_output.stdout.strip()
+
+    with open(os.path.join(exec_env.fuchsia_dir, ".fx-ssh-path")) as f:
+        lines = f.readlines()
+        ssh_path = lines[0].strip()
+
+    return environment.DeviceEnvironment(
+        address=ip, port=port, name=target_name, private_key_path=ssh_path
+    )
+
+
 async def run_command(
     name: str,
     *args: str,
-    recorder: typing.Optional[event.EventRecorder] = None,
-    parent: typing.Optional[event.Id] = None,
+    recorder: event.EventRecorder | None = None,
+    parent: event.Id | None = None,
     print_verbatim: bool = False,
     symbolize: bool = False,
     env: typing.Dict[str, str] | None = None,

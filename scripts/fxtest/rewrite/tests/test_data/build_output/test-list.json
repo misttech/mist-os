@@ -30,6 +30,13 @@
                 "//src/sys:baz_test(//build/toolchain/host:x64)"
             ],
             "tags": []
+        },
+        {
+            "name": "host_x64/example_e2e_test",
+            "labels": [
+                "//src/tests/end_to_end:example_e2e_test(//build/toolchain/host:x64)"
+            ],
+            "tags": []
         }
     ]
 }

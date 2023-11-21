@@ -34,7 +34,9 @@ class SelectionMode(Enum):
     ANY = 0
     HOST = 1
     DEVICE = 2
+    # TODO(b/312271472): Refactor exact matches to be a separate argument
     EXACT = 3
+    E2E = 4
 
 
 # Default threshold for matching.
@@ -91,6 +93,13 @@ async def select_tests(
             if not test.is_device_test()
         }
         entries = list(filter(Test.is_device_test, entries))
+    elif mode == SelectionMode.E2E:
+        filtered_entry_scores = {
+            test.info.name: NO_MATCH_DISTANCE
+            for test in entries
+            if not test.is_e2e_test()
+        }
+        entries = list(filter(Test.is_e2e_test, entries))
 
     def make_final_scores(
         partial: typing.Dict[str, int]

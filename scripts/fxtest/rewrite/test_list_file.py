@@ -152,6 +152,22 @@ class Test:
         """
         return self.info.name
 
+    def is_e2e_test(self) -> bool:
+        """Determine if this test is an E2E test.
+
+        E2E tests run on the host system (Linux) and also have a device_type
+        set in their environments.
+
+        Returns:
+            bool: True only if the test is an E2E test.
+        """
+        return self.build.test.os.lower() == "linux" and any(
+            [
+                env.dimensions.device_type is not None
+                for env in self.build.environments or []
+            ]
+        )
+
     @classmethod
     def join_test_descriptions(
         cls: typing.Type[typing.Self],
