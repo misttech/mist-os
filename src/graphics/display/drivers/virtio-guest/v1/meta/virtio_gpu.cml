@@ -11,7 +11,7 @@
         runner: "driver",
         bind: "meta/bind/virtio_gpu_bind_v1.bindbc",
         colocate: "false",
-        compat: "driver/virtio_gpu.so",
+        compat: "driver/virtio_gpu_v1.so",
     },
     use: [
         { service: "fuchsia.hardware.pci.Service" },
