@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Result};
+use anyhow::Result;
 use async_lock::RwLock;
-use fidl_fuchsia_developer_remotecontrol as rcs;
-use fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt;
 use fuchsia_async as fasync;
 use fuchsia_repo::server::ConnectionStream;
-use futures::{channel::mpsc::UnboundedSender, StreamExt as _};
+use futures::{channel::mpsc::UnboundedSender, Stream, StreamExt as _};
 use protocols::prelude::*;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Duration};
 
 const TUNNEL_CONNECT_ATTEMPTS: usize = 5;
 const TUNNEL_CONNECT_RETRY_TIMEOUT: Duration = Duration::from_secs(5);
+const TUNNEL_LISTEN_BACKLOG: u16 = 5;
+const RCS_SOCKET_PROVIDER_TIMEOUT: Duration = Duration::from_secs(5);
 
 // TODO(fxbug/127781) Change to pub(crate) once repo library moves to this crate.
 /// Manage all the repository tunnels.
@@ -86,7 +86,7 @@ async fn create_tunnel_stream(
     cx: &Context,
     target_nodename: &str,
     tunnel_addr: SocketAddr,
-) -> Result<rcs::ForwardCallbackRequestStream> {
+) -> Result<impl Stream<Item = (SocketAddr, rcs::port_forward::ForwardedSocket)>> {
     let rc = cx.open_remote_control(Some(target_nodename.to_string())).await?;
 
     for attempt in 0..TUNNEL_CONNECT_ATTEMPTS {
@@ -96,31 +96,24 @@ async fn create_tunnel_stream(
             target_nodename
         );
 
-        let (tunnel_client, tunnel_server) = fidl::endpoints::create_endpoints();
+        let result = rcs::port_forward::reverse_port(
+            &rc,
+            tunnel_addr,
+            RCS_SOCKET_PROVIDER_TIMEOUT,
+            TUNNEL_LISTEN_BACKLOG,
+        )
+        .await;
 
-        match rc.reverse_tcp(&SocketAddressExt(tunnel_addr).into(), tunnel_client).await? {
-            Ok(()) => {
-                let tunnel_stream = tunnel_server.into_stream().with_context(|| {
-                    format!("getting tunnel stream for target {:?}", target_nodename)
-                })?;
-
-                return Ok(tunnel_stream);
-            }
-            Err(rcs::TunnelError::ConnectFailed) => {
+        match result {
+            Ok(result) => return Ok(result),
+            Err(e) => {
                 tracing::warn!(
-                    "failed to bind repository tunnel port on target {:?}",
+                    "failed to bind repository tunnel port on target {:?} ({e:?})",
                     target_nodename
                 );
 
                 // Another process is using the port. Sleep and retry.
                 fasync::Timer::new(TUNNEL_CONNECT_RETRY_TIMEOUT).await;
-            }
-            Err(err) => {
-                return Err(anyhow::anyhow!(
-                    "failed to create repository tunnel for target {:?}: {:?}",
-                    target_nodename,
-                    err
-                ));
             }
         }
     }
@@ -131,24 +124,17 @@ async fn create_tunnel_stream(
 #[tracing::instrument(skip(tunnel_stream, server_sink))]
 async fn run_tunnel_protocol(
     target_nodename: &str,
-    tunnel_stream: rcs::ForwardCallbackRequestStream,
+    tunnel_stream: impl Stream<Item = (SocketAddr, rcs::port_forward::ForwardedSocket)>,
     server_sink: UnboundedSender<Result<ConnectionStream>>,
 ) {
     let result = tunnel_stream
-        .map(|request| match request {
-            Ok(rcs::ForwardCallbackRequest::Forward { socket, addr, .. }) => {
-                let addr = SocketAddressExt::from(addr);
-                tracing::info!(
-                    "tunneling connection from target {:?} to {}",
-                    target_nodename,
-                    addr
-                );
+        .map(|(addr, socket)| {
+            tracing::info!("tunneling connection from target {:?} to {}", target_nodename, addr);
+            let (socket, keep_alive) = socket.split();
 
-                Ok(fasync::Socket::from_socket(socket)
-                    .map(|socket| ConnectionStream::Socket(socket))
-                    .map_err(Into::into))
-            }
-            Err(e) => Ok(Err(anyhow::Error::from(e))),
+            Ok(fasync::Socket::from_socket(socket)
+                .map(|socket| ConnectionStream::Socket(socket, keep_alive))
+                .map_err(Into::into))
         })
         .forward(server_sink)
         .await;

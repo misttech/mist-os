@@ -43,6 +43,7 @@ rustc_library("fuchsia-repo") {
     deps += [
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
+      "//src/developer/ffx/lib/rcs:lib",
       "//src/lib/fuchsia-fs",
       "//src/lib/gcs",
       "//src/lib/http-sse:http_sse",

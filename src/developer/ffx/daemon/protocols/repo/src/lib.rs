@@ -1348,6 +1348,7 @@ mod tests {
             EngineRequest as RewriteEngineRequest, RuleIteratorRequest,
         },
         fidl_fuchsia_pkg_rewrite_ext::Rule,
+        fidl_fuchsia_posix_socket as fsock,
         fuchsia_repo::{manager::RepositoryManager, server::RepositoryServer},
         futures::TryStreamExt,
         pretty_assertions::assert_eq,
@@ -1696,6 +1697,58 @@ mod tests {
         EditTransactionCommit,
     }
 
+    async fn test_stream_socket(mut stream: fsock::StreamSocketRequestStream) {
+        let mut bound = false;
+        let mut listening = false;
+        let mut describe_endpoint = None;
+        while let Some(Ok(request)) = stream.next().await {
+            match request {
+                fsock::StreamSocketRequest::Bind { addr: _, responder } => {
+                    assert!(!bound, "bound socket twice");
+                    bound = true;
+                    responder.send(Ok(())).unwrap();
+                }
+                fsock::StreamSocketRequest::Describe { responder } => {
+                    assert!(describe_endpoint.is_none());
+                    let (socket, endpoint) = fidl::Socket::create_stream();
+                    describe_endpoint = Some(endpoint);
+                    responder
+                        .send(fsock::StreamSocketDescribeResponse {
+                            socket: Some(socket),
+                            ..Default::default()
+                        })
+                        .unwrap()
+                }
+                fsock::StreamSocketRequest::Listen { backlog: _, responder } => {
+                    assert!(bound, "listened to unbound socket");
+                    assert!(!listening, "listened to socket twice");
+                    listening = true;
+                    responder.send(Ok(())).unwrap();
+                }
+                other => panic!("Unexpected request: {other:?}"),
+            }
+        }
+    }
+
+    async fn test_socket_provider(channel: fidl::Channel) {
+        let channel = fidl::endpoints::ServerEnd::<fsock::ProviderMarker>::from(channel);
+        let mut stream = channel.into_stream().unwrap();
+
+        while let Some(Ok(request)) = stream.next().await {
+            match request {
+                fsock::ProviderRequest::StreamSocket { domain: _, proto, responder } => {
+                    assert_eq!(fsock::StreamSocketProtocol::Tcp, proto);
+                    let (client, stream) =
+                        fidl::endpoints::create_request_stream::<fsock::StreamSocketMarker>()
+                            .unwrap();
+                    fuchsia_async::Task::spawn(test_stream_socket(stream)).detach();
+                    responder.send(Ok(client)).unwrap();
+                }
+                other => panic!("Unexpected request: {other:?}"),
+            }
+        }
+    }
+
     struct FakeRcs {
         events: Arc<Mutex<Vec<RcsEvent>>>,
     }
@@ -1710,10 +1763,19 @@ mod tests {
 
                 match (req, target.as_deref()) {
                     (
-                        rcs::RemoteControlRequest::ReverseTcp { responder, .. },
+                        rcs::RemoteControlRequest::OpenCapability {
+                            moniker: _,
+                            capability_set: _,
+                            server_channel,
+                            flags: _,
+                            capability_name,
+                            responder,
+                        },
                         Some(TARGET_NODENAME),
                     ) => {
+                        assert_eq!("svc/fuchsia.posix.socket.Provider", capability_name);
                         events_closure.lock().unwrap().push(RcsEvent::ReverseTcp);
+                        fasync::Task::spawn(test_socket_provider(server_channel)).detach();
                         responder.send(Ok(())).unwrap()
                     }
                     (req, target) => {
@@ -3393,10 +3455,7 @@ mod tests {
                 );
 
                 // Registering a repository should create a tunnel.
-                assert_eq!(
-                    fake_rcs.take_events(),
-                    vec![RcsEvent::ReverseTcp, RcsEvent::ReverseTcp]
-                );
+                assert_eq!(fake_rcs.take_events(), vec![RcsEvent::ReverseTcp]);
 
                 // Expect SSH flow untouched.
                 assert_vec_empty!(repo.borrow().take_events(PkgctlCommandType::RepoAdd));
