@@ -665,7 +665,7 @@ fn generate_name_from_naming_rules(
 /// interface enumeration, such as starting a DHCP client and assigning
 /// an IP to the interface. Provisioning actions work to support
 /// Internet connectivity.
-#[derive(Debug, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
 pub enum ProvisioningAction {
     /// Netcfg will provision the interface
@@ -698,6 +698,38 @@ struct DeviceInfoRef<'a> {
     device_class: fidl_fuchsia_hardware_network::DeviceClass,
     mac: &'a fidl_fuchsia_net_ext::MacAddress,
     topological_path: &'a str,
+}
+
+impl ProvisioningRule {
+    // An interface must align with all specified `MatchingRule`s.
+    fn does_interface_match(&self, info: &DeviceInfoRef<'_>, interface_name: &str) -> bool {
+        self.matchers
+            .iter()
+            .all(|rule| rule.does_interface_match(info, interface_name).unwrap_or_default())
+    }
+}
+
+// Find the first `ProvisioningRule` that matches the device and get
+// the associated `ProvisioningAction`
+#[allow(unused)]
+fn find_provisioning_action_from_provisioning_rules(
+    provisioning_rules: &[ProvisioningRule],
+    info: &DeviceInfoRef<'_>,
+    interface_name: &str,
+) -> ProvisioningAction {
+    provisioning_rules
+        .iter()
+        .find_map(|rule| {
+            if rule.does_interface_match(&info, &interface_name) {
+                Some(rule.provisioning)
+            } else {
+                None
+            }
+        })
+        .expect(
+            "There must always be at least one ProvisioningRule that \
+                 matches. The fallback rule should match any interface.",
+        )
 }
 
 #[cfg(test)]
@@ -1102,6 +1134,16 @@ mod tests {
         assert_eq!(persisted, expected_new_format);
     }
 
+    // Arbitrary values for devices::DeviceInfo for cases where DeviceInfo has
+    // no impact on the test.
+    fn default_device_info() -> DeviceInfoRef<'static> {
+        DeviceInfoRef {
+            device_class: fhwnet::DeviceClass::Ethernet,
+            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            topological_path: "",
+        }
+    }
+
     #[test_case(
         "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         vec![BusType::PCI],
@@ -1371,14 +1413,61 @@ mod tests {
         assert_eq!(naming_rule.does_interface_match(&info), want_match);
     }
 
-    // Arbitrary values for DeviceInfoRef for cases where DeviceInfo has
-    // no impact on the test.
-    fn default_device_info() -> DeviceInfoRef<'static> {
-        DeviceInfoRef {
-            device_class: fhwnet::DeviceClass::Ethernet,
-            mac: &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
-            topological_path: "",
-        }
+    #[test_case(
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        "",
+        vec![
+            ProvisioningMatchingRule::Common(
+                MatchingRule::DeviceClasses(vec![DeviceClass::Wlan])
+            )
+        ],
+        false;
+        "false_single_rule"
+    )]
+    #[test_case(
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Wlan, ..default_device_info() },
+        "wlanx5009",
+        vec![
+            ProvisioningMatchingRule::InterfaceName {
+                pattern: glob::Pattern::new("ethx*").unwrap()
+            },
+            ProvisioningMatchingRule::Common(MatchingRule::Any(true))
+        ],
+        false;
+        "false_one_rule_of_multiple"
+    )]
+    #[test_case(
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        "",
+        vec![ProvisioningMatchingRule::Common(MatchingRule::Any(true))],
+        true;
+        "true_single_rule"
+    )]
+    #[test_case(
+        DeviceInfoRef { device_class: fhwnet::DeviceClass::Ethernet, ..default_device_info() },
+        "wlanx5009",
+        vec![
+            ProvisioningMatchingRule::Common(
+                MatchingRule::DeviceClasses(vec![DeviceClass::Ethernet])
+            ),
+            ProvisioningMatchingRule::InterfaceName {
+                pattern: glob::Pattern::new("wlanx*").unwrap()
+            }
+        ],
+        true;
+        "true_multiple_rules"
+    )]
+    fn test_does_interface_match_provisioning_rule(
+        info: DeviceInfoRef<'_>,
+        interface_name: &str,
+        matching_rules: Vec<ProvisioningMatchingRule>,
+        want_match: bool,
+    ) {
+        let provisioning_rule = ProvisioningRule {
+            matchers: HashSet::from_iter(matching_rules),
+            provisioning: ProvisioningAction::Local,
+        };
+        assert_eq!(provisioning_rule.does_interface_match(&info, interface_name), want_match);
     }
 
     #[test_case(
@@ -1632,5 +1721,32 @@ mod tests {
             Err(NameGenerationError::GenerationError(e)) =>
                 e.to_string().contains("bus type")
         );
+    }
+
+    #[test_case(true, ProvisioningAction::Delegated; "matches_first_rule")]
+    #[test_case(false, ProvisioningAction::Local; "fallback_default")]
+    fn test_find_provisioning_action_from_provisioning_rules(
+        match_first_rule: bool,
+        expected: ProvisioningAction,
+    ) {
+        let provisioning_action = find_provisioning_action_from_provisioning_rules(
+            &[
+                ProvisioningRule {
+                    matchers: HashSet::from([ProvisioningMatchingRule::Common(MatchingRule::Any(
+                        match_first_rule,
+                    ))]),
+                    provisioning: ProvisioningAction::Delegated,
+                },
+                ProvisioningRule {
+                    matchers: HashSet::from([ProvisioningMatchingRule::InterfaceName {
+                        pattern: glob::Pattern::new("*").unwrap(),
+                    }]),
+                    provisioning: ProvisioningAction::Local,
+                },
+            ],
+            &default_device_info(),
+            "wlanx5009",
+        );
+        assert_eq!(provisioning_action, expected);
     }
 }
