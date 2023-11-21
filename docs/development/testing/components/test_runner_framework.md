@@ -200,13 +200,6 @@ fuchsia_test_package("my-test-pkg") {
 }
 ```
 
-To override the value specified in the test spec, pass the parallel option when
-invoking fx test:
-
-```posix-terminal
-fx test --parallel=5 <test_url>
-```
-
 ### Running test multiple times
 
 To run a test multiple times use:
