@@ -30,8 +30,10 @@ pub enum ArchivistConfig {
 #[serde(deny_unknown_fields)]
 pub struct SamplerConfig {
     /// The metrics configs to pass to sampler.
+    #[serde(default)]
     pub metrics_configs: Vec<Utf8PathBuf>,
     /// The fire configs to pass to sampler.
+    #[serde(default)]
     pub fire_configs: Vec<Utf8PathBuf>,
 }
 
