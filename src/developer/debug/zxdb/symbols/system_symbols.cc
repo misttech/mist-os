@@ -24,8 +24,8 @@ namespace {
 BuildIDIndex::Entry LoadLocalModuleSymbols(const std::string& name, const std::string& build_id) {
   BuildIDIndex::Entry result;
 
-  if (name.empty() || name[0] != '/')
-    return result;  // Only try local symbols when an absolute path is given.
+  if (name.empty())
+    return result;
 
   auto elf = elflib::ElfLib::Create(name);
   if (!elf)
