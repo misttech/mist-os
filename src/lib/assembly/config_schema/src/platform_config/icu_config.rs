@@ -61,6 +61,11 @@ pub struct ICUConfig {
     /// in the repos at `//third_party/icu/{default,stable,latest}`,
     #[serde(default)]
     pub revision: Revision,
+
+    /// A list of packages that should receive ICU tzdata in their config directory.
+    /// TODO(b/297214394): Remove this option once all components use tzdata_provider.
+    #[serde(default)]
+    pub legacy_tzdata_packages: Vec<String>,
 }
 
 #[cfg(test)]
@@ -76,13 +81,26 @@ mod tests {
         let tests = vec![
             TestCase {
                 input: r#"{ "revision": { "commit_id": "deadbeef" } }"#,
-                expected: ICUConfig { revision: Revision::CommitId("deadbeef".into()) },
+                expected: ICUConfig {
+                    revision: Revision::CommitId("deadbeef".into()),
+                    legacy_tzdata_packages: vec![],
+                },
             },
             TestCase {
                 input: r#"{ "revision": "stable" }"#,
-                expected: ICUConfig { revision: Revision::Stable },
+                expected: ICUConfig { revision: Revision::Stable, legacy_tzdata_packages: vec![] },
             },
-            TestCase { input: r#"{}"#, expected: ICUConfig { revision: Revision::Default } },
+            TestCase {
+                input: r#"{}"#,
+                expected: ICUConfig { revision: Revision::Default, legacy_tzdata_packages: vec![] },
+            },
+            TestCase {
+                input: r#"{ "legacy_tzdata_packages": [ "one", "two" ] }"#,
+                expected: ICUConfig {
+                    revision: Revision::Default,
+                    legacy_tzdata_packages: vec!["one".to_string(), "two".to_string()],
+                },
+            },
         ];
         for test in tests {
             let json = serde_json::from_str(test.input).unwrap();

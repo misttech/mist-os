@@ -8,6 +8,7 @@ import("//build/assembly/kernel_aib.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//src/lib/icu/tzdata/icu_tzres_source.gni")
 import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
@@ -3210,7 +3211,14 @@ assembly_resources_directory("resources") {
     "//src/security/policy/component_manager_policy_user.json5",
     "//src/security/policy/component_manager_policy_userdebug.json5",
     "//src/sys/component_manager/configs/bootfs_config.json5",
+
+    # ICU resources.
+    "${icu_tzres_path}/metaZones.res",
+    "${icu_tzres_path}/timezoneTypes.res",
+    "${icu_tzres_path}/zoneinfo64.res",
+    "${root_gen_dir}/src/lib/icu/tzdata/revision.txt",
   ]
+  deps = [ "//src/lib/icu/tzdata:revision" ]
 }
 
 # Enables in kernel compression of anonymous memory with some common configuration options.

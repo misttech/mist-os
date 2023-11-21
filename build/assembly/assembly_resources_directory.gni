@@ -33,6 +33,7 @@ template("assembly_resources_directory") {
   }
 
   copy(labels.dir) {
+    forward_variables_from(invoker, [ "deps" ])
     sources = invoker.sources
     outputs = [ "${files.dir}/{{source_file_part}}" ]
     public_deps = [ ":${labels.assembly_config}" ]

@@ -36,6 +36,7 @@ mod fonts;
 mod forensics;
 mod graphics;
 mod hwinfo;
+mod icu;
 mod identity;
 mod input_groups;
 mod intl;
@@ -266,6 +267,9 @@ fn configure_subsystems(
 
     hwinfo::HwinfoSubsystem::define_configuration(context, &config.product.info, builder)
         .context("Configuring the 'hwinfo' subsystem")?;
+
+    icu::IcuSubsystem::define_configuration(context, &config.platform.icu, builder)
+        .context("Configuring the 'icu' subsystem")?;
 
     identity::IdentitySubsystemConfig::define_configuration(
         context,
