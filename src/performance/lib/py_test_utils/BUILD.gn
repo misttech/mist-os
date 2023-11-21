@@ -4,16 +4,13 @@
 
 import("//build/python/python_library.gni")
 
-python_library("perf_publish") {
+python_library("perf_test_utils") {
   testonly = true
-  library_name = "perf_publish"
+  library_name = "perf_test_utils"
   sources = [
     "__init__.py",
-    "metrics_allowlist.py",
-    "publish.py",
-    "summarize.py",
+    "utils.py",
   ]
-  library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
 }
 
 group("tests") {

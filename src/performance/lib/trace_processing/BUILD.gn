@@ -17,6 +17,7 @@ python_library("trace_processing") {
     "trace_time.py",
     "trace_utils.py",
   ]
+  library_deps = [ "//src/performance/lib/py_test_utils:perf_test_utils" ]
 }
 
 group("tests") {

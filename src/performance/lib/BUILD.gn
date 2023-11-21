@@ -8,6 +8,7 @@ group("tests") {
     "fxt:tests",
     "perf_publish:tests",
     "perfmon:tests",
+    "py_test_utils:tests",
     "trace_processing:tests",
   ]
   if (current_cpu == "arm64" || current_cpu == "x64") {

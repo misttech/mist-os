@@ -12,6 +12,7 @@ from typing import Any, Iterable, Self, Union
 
 import perf_publish.metrics_allowlist as metrics_allowlist
 import perf_publish.summarize as summarize
+from perf_test_utils import utils
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -93,17 +94,7 @@ class CatapultConverter:
         self._fuchsia_expected_metric_names_dest_dir = (
             fuchsia_expected_metric_names_dest_dir
         )
-
-        # We expect the binary to be in a `runtime_deps` directory hosting the test cases in a
-        # parent directory.
-        cur_path: str = os.path.dirname(__file__)
-        while not os.path.isdir(os.path.join(cur_path, "runtime_deps")):
-            cur_path = os.path.dirname(cur_path)
-            if cur_path == "/":
-                raise ValueError(
-                    "Couldn't find required runtime_deps directory"
-                )
-        self._runtime_deps_dir = os.path.join(cur_path, "runtime_deps")
+        self._runtime_deps_dir = utils.get_associated_runtime_deps_dir(__file__)
 
         self._upload_enabled: bool = True
         if master is None and bot is None:
