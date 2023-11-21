@@ -102,7 +102,7 @@ should implement the
 protocol, which serves the `Profile` and notifies of changes:
 
 ```fidl {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/fidl/fuchsia.intl/property_provider.fidl" indented_block="protocol PropertyProvider" exclude_regexp="(//.*)|(^$)" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/fidl/fuchsia.intl/property_provider.fidl" indented_block="closed protocol PropertyProvider" exclude_regexp="(//.*)|(^$)" %}
 ```
 
 This protocol offers a _read-only_ view of an internationalization profile.
