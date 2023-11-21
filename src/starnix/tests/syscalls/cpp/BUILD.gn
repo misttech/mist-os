@@ -110,6 +110,7 @@ test("syscalls_cpp_test_bin") {
     "mmap_test.cc",
     "mount_test.cc",
     "overlayfs_test.cc",
+    "pidfd_test.cc",
     "pipe_test.cc",
     "poll_test.cc",
     "prctl_test.cc",

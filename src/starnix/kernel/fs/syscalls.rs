@@ -1639,8 +1639,14 @@ pub fn sys_pidfd_open(
     if pid <= 0 {
         return error!(EINVAL);
     }
-    // Validate that the pid exists.
-    Task::from_weak(&current_task.get_task(pid))?;
+
+    // Validate that the pid exists and that it belongs to a thread group leader.
+    let task = current_task.get_task(pid);
+    let task = Task::from_weak(&task)?;
+    if !task.is_leader() {
+        return error!(EINVAL);
+    }
+
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
     let file = new_pidfd(current_task, pid, open_flags);

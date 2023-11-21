@@ -1505,6 +1505,10 @@ impl Task {
         self.id
     }
 
+    pub fn is_leader(&self) -> bool {
+        self.get_pid() == self.get_tid()
+    }
+
     pub fn read_argv(&self) -> Result<Vec<FsString>, Errno> {
         let (argv_start, argv_end) = {
             let mm_state = self.mm.state.read();
@@ -1578,7 +1582,7 @@ impl Task {
             set_zx_name(thread, name.as_bytes());
         }
         // If this is the thread group leader, use this name for the process too.
-        if self.get_pid() == self.get_tid() {
+        if self.is_leader() {
             set_zx_name(&self.thread_group.process, name.as_bytes());
         }
 
