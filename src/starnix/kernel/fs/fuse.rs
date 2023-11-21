@@ -15,7 +15,7 @@ use crate::{
     logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     syscalls::{SyscallArg, SyscallResult},
-    task::{CurrentTask, EventHandler, ExitStatus, Kernel, WaitCanceler, WaitQueue, Waiter},
+    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
 use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
@@ -26,7 +26,6 @@ use starnix_uapi::{
     file_mode::{Access, FileMode},
     off_t,
     open_flags::OpenFlags,
-    ownership::ReleasableByRef,
     statfs,
     time::time_from_timespec,
     uapi, FUSE_SUPER_MAGIC,
@@ -271,10 +270,6 @@ struct FuseFileObject {
     connection: Arc<FuseConnection>,
     /// The response to the open calls from the userspace process.
     open_out: uapi::fuse_open_out,
-
-    /// The current kernel. This is a temporary measure to access a task on close and flush.
-    // TODO(b/297439724): Remove this.
-    kernel: Arc<Kernel>,
 }
 
 impl FuseFileObject {
@@ -294,7 +289,7 @@ impl FileOps for FuseFileObject {
         };
         let mode = file.node().info().mode;
         if let Err(e) = self.connection.execute_operation(
-            &current_task,
+            current_task,
             node,
             FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
         ) {
@@ -302,30 +297,19 @@ impl FileOps for FuseFileObject {
         }
     }
 
-    fn flush(&self, file: &FileObject) {
+    fn flush(&self, file: &FileObject, current_task: &CurrentTask) {
         let node = if let Ok(node) = self.get_fuse_node(file) {
             node
         } else {
             log_error!("Unexpected file type");
             return;
         };
-        // TODO(b/297439724): This should receives a CurrentTask instead of relying on
-        // the system task.
-        match self.kernel.kthreads.workaround_for_b297439724_new_system_task() {
-            Ok(workaround_task) => {
-                if let Err(e) = self.connection.execute_operation(
-                    &workaround_task,
-                    node,
-                    FuseOperation::Flush(self.open_out),
-                ) {
-                    log_error!("Error when flushing fh: {e:?}");
-                }
-                workaround_task.thread_group.exit(ExitStatus::Exit(0));
-                workaround_task.release(());
-            }
-            Err(e) => {
-                log_error!("Error creating workaround task: {e:?}");
-            }
+        if let Err(e) = self.connection.execute_operation(
+            current_task,
+            node,
+            FuseOperation::Flush(self.open_out),
+        ) {
+            log_error!("Error when flushing fh: {e:?}");
         }
     }
 
@@ -622,11 +606,7 @@ impl FsNodeOps for Arc<FuseNode> {
         } else {
             return error!(EINVAL);
         };
-        Ok(Box::new(FuseFileObject {
-            connection: self.connection.clone(),
-            open_out,
-            kernel: current_task.kernel().clone(),
-        }))
+        Ok(Box::new(FuseFileObject { connection: self.connection.clone(), open_out }))
     }
 
     fn lookup(

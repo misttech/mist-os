@@ -3,20 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{FdNumber, FileHandle, RecordLockOwner},
-    task::{CurrentTask, Task},
+    fs::{FdNumber, FileHandle},
+    task::Task,
 };
 use bitflags::bitflags;
 use starnix_lock::Mutex;
 use starnix_uapi::{
-    errno, error,
-    errors::Errno,
-    open_flags::OpenFlags,
-    ownership::{OwnedRef, Releasable, ReleasableByRef},
-    resource_limits::Resource,
-    FD_CLOEXEC,
+    errno, error, errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef,
+    resource_limits::Resource, FD_CLOEXEC,
 };
-use std::ops::DerefMut;
+use std::sync::Arc;
 
 bitflags! {
     pub struct FdFlags: u32 {
@@ -52,8 +48,10 @@ pub struct FdTableEntry {
 
 impl Drop for FdTableEntry {
     fn drop(&mut self) {
-        self.file.name.entry.node.record_lock_release(RecordLockOwner::FdTable(self.fd_table_id));
-        self.file.flush();
+        let fs = self.file.name.entry.node.fs();
+        if let Some(kernel) = fs.kernel.upgrade() {
+            kernel.delayed_releaser.flush_file(&self.file, self.fd_table_id);
+        }
     }
 }
 
@@ -173,7 +171,7 @@ impl FdTableInner {
         FdTableId::new(&self.store.lock().entries as *const Vec<Option<FdTableEntry>>)
     }
 
-    fn unshare(&self) -> OwnedRef<FdTableInner> {
+    fn unshare(&self) -> Arc<FdTableInner> {
         let inner = {
             let new_store = self.store.lock().clone();
             FdTableInner { store: Mutex::new(new_store) }
@@ -184,21 +182,13 @@ impl FdTableInner {
                 entry.fd_table_id = id;
             }
         }
-        OwnedRef::new(inner)
-    }
-}
-
-impl Releasable for FdTableInner {
-    type Context<'a> = &'a CurrentTask;
-
-    fn release(self, _current_task: &CurrentTask) {
-        // Nothing to do until FdMap is Releasable. This will drop this object.
+        Arc::new(inner)
     }
 }
 
 #[derive(Debug, Default)]
 pub struct FdTable {
-    inner: Mutex<OwnedRef<FdTableInner>>,
+    inner: Mutex<Arc<FdTableInner>>,
 }
 
 pub enum TargetFdNumber {
@@ -222,13 +212,10 @@ impl FdTable {
         FdTable { inner }
     }
 
-    pub fn unshare(&self, current_task: &CurrentTask) {
-        let old_inner = {
-            let mut innner = self.inner.lock();
-            let new_inner = innner.unshare();
-            std::mem::replace(innner.deref_mut(), new_inner)
-        };
-        old_inner.release(current_task);
+    pub fn unshare(&self) {
+        let mut inner = self.inner.lock();
+        let new_inner = inner.unshare();
+        *inner = new_inner;
     }
 
     pub fn exec(&self) {
@@ -246,17 +233,11 @@ impl FdTable {
         file: FileHandle,
         flags: FdFlags,
     ) -> Result<(), Errno> {
-        profile_duration!("InsertFd");
-        let removed_entry;
-        {
-            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
-            let id = self.id();
-            let inner = self.inner.lock();
-            let mut state = inner.store.lock();
-            removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
-        }
-        // Drop the removed entry after we drop the table lock.
-        std::mem::drop(removed_entry);
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
+        let id = self.id();
+        let inner = self.inner.lock();
+        let mut state = inner.store.lock();
+        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
         Ok(())
     }
 
@@ -267,18 +248,12 @@ impl FdTable {
         flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
         profile_duration!("AddFd");
-        let fd;
-        let removed_entry;
-        {
-            let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
-            let id = self.id();
-            let inner = self.inner.lock();
-            let mut state = inner.store.lock();
-            fd = state.next_fd;
-            removed_entry = state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
-        }
-        // Drop the removed entry after we drop the table lock.
-        std::mem::drop(removed_entry);
+        let rlimit = task.thread_group.get_rlimit(Resource::NOFILE);
+        let id = self.id();
+        let inner = self.inner.lock();
+        let mut state = inner.store.lock();
+        let fd = state.next_fd;
+        state.insert_entry(fd, rlimit, FdTableEntry::new(file, id, flags))?;
         Ok(fd)
     }
 
@@ -384,17 +359,7 @@ impl FdTable {
         F: Fn(FdNumber, &mut FdFlags) -> bool,
     {
         profile_duration!("RetainFds");
-        let mut doomed = vec![];
-        self.inner.lock().store.lock().retain(|fd, entry| {
-            if f(*fd, &mut entry.flags) {
-                true
-            } else {
-                doomed.push(entry.file.clone());
-                false
-            }
-        });
-        // Avoid dropping the files until after we drop the table locks.
-        std::mem::drop(doomed);
+        self.inner.lock().store.lock().retain(|fd, entry| f(*fd, &mut entry.flags));
     }
 
     /// Returns a vector of all current file descriptors in the table.
@@ -414,11 +379,10 @@ impl FdTable {
 }
 
 impl ReleasableByRef for FdTable {
-    type Context<'a> = &'a CurrentTask;
+    type Context<'a> = ();
     /// Drop the fd table, closing any files opened exclusively by this table.
-    fn release(&self, current_task: &CurrentTask) {
-        let inner = OwnedRef::take(&mut self.inner.lock());
-        inner.release(current_task);
+    fn release(&self, _context: Self::Context<'_>) {
+        *self.inner.lock() = Default::default();
     }
 }
 
@@ -458,7 +422,7 @@ mod test {
         assert!(Arc::ptr_eq(&files.get(fd1).unwrap(), &file));
         assert_eq!(files.get(FdNumber::from_raw(fd1.raw() + 1)).map(|_| ()), error!(EBADF));
 
-        files.release(&current_task);
+        files.release(());
     }
 
     #[::fuchsia::test]
@@ -482,8 +446,8 @@ mod test {
         assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
         assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags(fd0).unwrap());
 
-        forked.release(&current_task);
-        files.release(&current_task);
+        forked.release(());
+        files.release(());
     }
 
     #[::fuchsia::test]
@@ -505,7 +469,7 @@ mod test {
         assert!(files.get(fd0).is_err());
         assert!(files.get(fd1).is_ok());
 
-        files.release(&current_task);
+        files.release(());
     }
 
     #[::fuchsia::test]
@@ -530,6 +494,6 @@ mod test {
         let another_fd = add(&current_task, &files, file).unwrap();
         assert_eq!(another_fd.raw(), 0);
 
-        files.release(&current_task);
+        files.release(());
     }
 }

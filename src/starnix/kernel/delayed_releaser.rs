@@ -2,17 +2,46 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{fs::FileObject, task::CurrentTask};
+use crate::{
+    fs::{FdTableId, FileHandle, FileObject},
+    task::CurrentTask,
+};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
 use std::{
     cell::RefCell,
     mem::MaybeUninit,
     ops::{Deref, DerefMut},
+    sync::Arc,
 };
 
 thread_local! {
     /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
-    static CLOSED_FILES: RefCell<Vec<ReleaseGuard<FileObject>>> = RefCell::new(vec![]);
+    static RELEASERS: RefCell<LocalReleasers> = RefCell::new(LocalReleasers::default());
+}
+
+#[derive(Debug, Default)]
+struct LocalReleasers {
+    closed_files: Vec<ReleaseGuard<FileObject>>,
+    flushed_files: Vec<(FileHandle, FdTableId)>,
+}
+
+impl LocalReleasers {
+    fn is_empty(&self) -> bool {
+        self.closed_files.is_empty() && self.flushed_files.is_empty()
+    }
+}
+
+impl Releasable for LocalReleasers {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, context: Self::Context<'_>) {
+        for file in self.closed_files {
+            file.release(context);
+        }
+        for (file, id) in self.flushed_files {
+            file.flush(context, id);
+        }
+    }
 }
 
 /// Service to handle delayed releases.
@@ -23,16 +52,20 @@ thread_local! {
 pub struct DelayedReleaser {}
 
 impl DelayedReleaser {
+    pub fn flush_file(&self, file: &FileHandle, id: FdTableId) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().flushed_files.push((Arc::clone(file), id));
+        });
+    }
+
     /// Run all current delayed releases for the current thread.
     pub fn apply(&self, current_task: &CurrentTask) {
         loop {
-            let files = CLOSED_FILES.with(|cell| std::mem::take(cell.borrow_mut().deref_mut()));
-            if files.is_empty() {
+            let releasers = RELEASERS.with(|cell| std::mem::take(cell.borrow_mut().deref_mut()));
+            if releasers.is_empty() {
                 return;
             }
-            for file in files {
-                file.release(current_task);
-            }
+            releasers.release(current_task);
         }
     }
 }
@@ -54,8 +87,8 @@ impl Drop for FileReleaser {
         // The `MaybeUninit` is initialize with a value and only ever extracted in this `drop` method, so
         // it is guaranteed that it is initialized at this point.
         let file_object = unsafe { content.assume_init() };
-        CLOSED_FILES.with(|cell| {
-            cell.borrow_mut().push(file_object);
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().closed_files.push(file_object);
         });
     }
 }

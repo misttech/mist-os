@@ -321,9 +321,9 @@ impl FileOps for BinderConnection {
         error!(EOPNOTSUPP)
     }
 
-    fn flush(&self, _file: &FileObject) {
-        // The current task check is impractical here, skip it.
-        let Ok(binder_process) = self.driver.find_process(self.identifier) else { return };
+    fn flush(&self, _file: &FileObject, current_task: &CurrentTask) {
+        // Errors are not meaningful on flush.
+        let Ok(binder_process) = self.proc(current_task) else { return };
         release_after!(binder_process, (), { binder_process.kick_all_threads() });
     }
 }

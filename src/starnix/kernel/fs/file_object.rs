@@ -10,8 +10,9 @@ use crate::{
         fsverity::{
             FsVerityState, {self},
         },
-        DirentSink, FallocMode, FdEvents, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-        FileWriteGuardRef, FsNodeHandle, InotifyMask, NamespaceNode, RecordLockCommand,
+        DirentSink, FallocMode, FdEvents, FdTableId, FileSystemHandle, FileWriteGuard,
+        FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, InotifyMask, NamespaceNode,
+        RecordLockCommand, RecordLockOwner,
     },
     logging::{impossible_error, not_implemented},
     mm::{
@@ -115,7 +116,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
 
     /// Called every time close() is called on this file, even if the file is not ready to be
     /// released.
-    fn flush(&self, _file: &FileObject) {}
+    fn flush(&self, _file: &FileObject, _current_task: &CurrentTask) {}
 
     /// Returns whether the file has meaningful seek offsets. Returning `false` is only
     /// optimization and will makes `FileObject` never hold the offset lock when calling `read` and
@@ -739,8 +740,8 @@ macro_rules! delegate {
 impl FileOps for ProxyFileOps {
     delegate! {
         self.0;
-        fn close(&self, file: &FileObject, current_task: &CurrentTask,);
-        fn flush(&self, file: &FileObject);
+        fn close(&self, file: &FileObject, current_task: &CurrentTask);
+        fn flush(&self, file: &FileObject, current_task: &CurrentTask);
         fn read(
             &self,
             file: &FileObject,
@@ -1381,8 +1382,9 @@ impl FileObject {
         self.node().record_lock(current_task, self, cmd, flock)
     }
 
-    pub fn flush(&self) {
-        self.ops().flush(self)
+    pub fn flush(&self, current_task: &CurrentTask, id: FdTableId) {
+        self.name.entry.node.record_lock_release(RecordLockOwner::FdTable(id));
+        self.ops().flush(self, current_task)
     }
 
     // Notifies watchers on the current node and its parent about an event.

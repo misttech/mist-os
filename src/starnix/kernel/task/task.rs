@@ -1711,7 +1711,7 @@ impl ReleasableByRef for Task {
         self.thread_group.remove(self);
 
         // Release the fd table.
-        self.files.release(current_task);
+        self.files.release(());
 
         // Apply any delayed releasers left.
         current_task.trigger_delayed_releaser();
