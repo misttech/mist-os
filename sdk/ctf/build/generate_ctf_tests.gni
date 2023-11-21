@@ -151,7 +151,7 @@ template("generate_fuchsia-settings-tests") {
     test_component = "//sdk/ctf/tests/fidl/fuchsia.settings:test-root"
     subpackages = [
       test_info.target_label,
-      # These tests do not currently use a test realm factory.
+      "//sdk/ctf/tests/fidl/fuchsia.settings/testing/realm-factory",
     ]
   }
 }

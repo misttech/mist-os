@@ -19,6 +19,7 @@ fidl("fuchsia.stash") {
   # from the people listed in OWNERS.
   visibility = [
     "//sdk/ctf/tests/fidl/fuchsia.intl/*",
+    "//sdk/ctf/tests/fidl/fuchsia.settings/testing/realm-factory/*",
     "//src/connectivity/bluetooth/core/bt-gap/*",
     "//src/connectivity/bluetooth/testing/*",
     "//src/connectivity/bluetooth/tests/bt-manifest-integration-tests/*",

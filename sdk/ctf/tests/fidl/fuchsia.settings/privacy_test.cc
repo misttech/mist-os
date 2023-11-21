@@ -3,6 +3,8 @@
 // found in the LICENSE file.
 
 #include <fuchsia/settings/cpp/fidl.h>
+#include <fuchsia/settings/test/cpp/fidl.h>
+#include <fuchsia/testing/harness/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -14,7 +16,17 @@ namespace {
 
 class PrivacyTest : public zxtest::Test {
  protected:
-  void SetUp() override { EXPECT_EQ(ZX_OK, service->Connect(privacy.NewRequest())); }
+  void SetUp() override {
+    EXPECT_EQ(ZX_OK, service->Connect(realm_factory.NewRequest()));
+
+    fuchsia::settings::test::RealmOptions options;
+    fuchsia::settings::test::RealmFactory_CreateRealm_Result result1;
+    EXPECT_OK(realm_factory->CreateRealm(std::move(options), realm_proxy.NewRequest(), &result1));
+
+    fuchsia::testing::harness::RealmProxy_ConnectToNamedProtocol_Result result2;
+    EXPECT_OK(realm_proxy->ConnectToNamedProtocol("fuchsia.settings.Privacy",
+                                                  privacy.NewRequest().TakeChannel(), &result2));
+  }
 
   void TearDown() override {
     fuchsia::settings::PrivacySettings settings;
@@ -32,6 +44,8 @@ class PrivacyTest : public zxtest::Test {
   fuchsia::settings::PrivacySyncPtr privacy;
 
  private:
+  fuchsia::testing::harness::RealmProxySyncPtr realm_proxy;
+  fuchsia::settings::test::RealmFactorySyncPtr realm_factory;
   std::shared_ptr<sys::ServiceDirectory> service = sys::ServiceDirectory::CreateFromNamespace();
   bool init_user_data_sharing_consent = true;
 };

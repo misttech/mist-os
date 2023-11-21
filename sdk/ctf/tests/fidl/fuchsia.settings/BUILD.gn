@@ -10,6 +10,7 @@ executable("settings_test_bin") {
   sources = [ "privacy_test.cc" ]
 
   deps = [
+    "//sdk/ctf/tests/fidl/fuchsia.settings/testing/fidl:fuchsia.settings.test_hlcpp",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/lib/sys/cpp",
     "//sdk/testing/fidl:fidl_test_hlcpp",
@@ -39,7 +40,10 @@ fuchsia_test_component("test-root") {
 
 fuchsia_test_package("fuchsia-settings-tests-package") {
   test_components = [ ":test-root" ]
-  subpackages = [ ":fuchsia-settings-tests" ]
+  subpackages = [
+    ":fuchsia-settings-tests",
+    "testing/realm-factory",
+  ]
 }
 
 group("tests") {
