@@ -104,7 +104,7 @@ func ProcessSummaries(summaries []string, tags []*resultpb.StringPair, outputRoo
 			return nil, nil, err
 		}
 		testResults, testsSkipped := SummaryToResultSink(summary, tags, outputRoot)
-		requests = append(requests, CreateTestResultsRequests(testResults, 500)...)
+		requests = append(requests, CreateTestResultsRequests(testResults, 250)...)
 		allTestsSkipped = append(allTestsSkipped, testsSkipped...)
 	}
 
