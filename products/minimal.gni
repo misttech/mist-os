@@ -20,13 +20,11 @@ legacy_base_package_labels = [ "//src/developer/memory/buckets" ]
 #
 # This should be overridden by products which inherit from minimal.
 fuchsia_product_assembly_config_label = "//products/minimal"
-zedboot_product_assembly_config_label = "//products/zedboot:zedboot_with_fxfs"
+zedboot_product_assembly_config_label = "//products/zedboot"
 
 bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 extra_bazel_assembly_targets =
     [ "//build/bazel/assembly/assembly_outputs:verifications" ]
-
-fxfs_blob = true
 
 # Packages to be published to universe that do not go through assembly.
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
