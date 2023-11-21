@@ -309,45 +309,8 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_typesinprotocols::Protocol::EventResource> {
   using Request = ::test_typesinprotocols::Resource;
 };
-namespace test_typesinprotocols {
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
-
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_typesinprotocols
 
 template <>
 class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> final : public ::test_typesinprotocols::Basic {
@@ -355,8 +318,6 @@ class ::fidl::Response<::test_typesinprotocols::Protocol::TwoWayBasic> final : p
   using ::test_typesinprotocols::Basic::Basic;
   Response(::test_typesinprotocols::Basic v) : Basic(std::move(v)) {}
 };
-namespace test_typesinprotocols {
-}  // namespace test_typesinprotocols
 
 template <>
 class ::fidl::Result<::test_typesinprotocols::Protocol::TwoWayBasic> final : public ::fit::result<::fidl::Error, ::test_typesinprotocols::Basic> {
@@ -823,11 +784,8 @@ class ::fidl::internal::NaturalClientImpl<::test_typesinprotocols::Protocol> fin
 
   ::fit::result<::fidl::OneWayError> OneWayResource(::fidl::Request<::test_typesinprotocols::Protocol::OneWayResource> request) const;
 };
-namespace test_typesinprotocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_typesinprotocols
 
 #ifdef __Fuchsia__
 

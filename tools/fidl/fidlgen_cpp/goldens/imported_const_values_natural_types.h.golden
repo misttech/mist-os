@@ -29,8 +29,6 @@ constexpr ::test_dependent::MyBits kBitsMember = ::test_dependent::MyBits::kMemb
 
 constexpr ::test_dependent::MyEnum kEnumMember = ::test_dependent::MyEnum::kMember;
 
-extern "C" const fidl_type_t test_importedconstvalues_MyStructTable;
-
 class MyStruct {
  private:
   struct Storage_;
@@ -107,8 +105,6 @@ inline MyStruct& MyStruct::__reserved(uint8_t value) {
 
 }  // namespace test_importedconstvalues
 namespace fidl {
-
-extern "C" const fidl_type_t test_importedconstvalues_MyStructTable;
 
 template <>
 struct IsFidlType<::test_importedconstvalues::MyStruct> : public std::true_type {};

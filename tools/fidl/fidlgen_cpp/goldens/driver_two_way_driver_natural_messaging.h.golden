@@ -27,12 +27,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_drivertwoway::TwoWay::Add> {
   using ResultCallback =
       ::fit::callback<void(::fdf::Result<::test_drivertwoway::TwoWay::Add>&)>;
 };
-namespace test_drivertwoway {
-__LOCAL extern "C" const fidl_type_t test_drivertwoway_TwoWayAddRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_drivertwoway_TwoWayAddResponseTable;
 #ifdef __Fuchsia__
-}  // namespace test_drivertwoway
 
 template <>
 class ::fidl::Response<::test_drivertwoway::TwoWay::Add> final : public ::test_drivertwoway::TwoWayAddResponse {
@@ -40,8 +35,6 @@ class ::fidl::Response<::test_drivertwoway::TwoWay::Add> final : public ::test_d
   using ::test_drivertwoway::TwoWayAddResponse::TwoWayAddResponse;
   Response(::test_drivertwoway::TwoWayAddResponse v) : TwoWayAddResponse(std::move(v)) {}
 };
-namespace test_drivertwoway {
-}  // namespace test_drivertwoway
 
 template <>
 class ::fdf::Result<::test_drivertwoway::TwoWay::Add> final : public ::fit::result<::fidl::Error, ::test_drivertwoway::TwoWayAddResponse> {
@@ -58,10 +51,8 @@ class ::fidl::internal::NaturalClientImpl<::test_drivertwoway::TwoWay> final : p
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_drivertwoway::TwoWay::Add> Add(const ::fidl::Request<::test_drivertwoway::TwoWay::Add>& request) const;
 };
-namespace test_drivertwoway {
 
 #endif  // __Fuchsia__
-}  // namespace test_drivertwoway
 
 #ifdef __Fuchsia__
 

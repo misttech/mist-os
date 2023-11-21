@@ -33,8 +33,6 @@ namespace wire {
 
 struct DocCommentWithQuotes;
 
-extern "C" const fidl_type_t test_escaping_DocCommentWithQuotesTable;
-
 /// "pleaseescapethisdocommentproperly"
 struct DocCommentWithQuotes {
   uint8_t __reserved = {};

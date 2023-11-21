@@ -110,41 +110,21 @@ namespace test_bindingsdenylist {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyDart_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable;
-
 [[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyGo_Ordinal = 7311125300308839833lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyGo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestTable;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable;
 
 [[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal = 2184115815603862302lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyLibfuzzer_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
-
 [[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyRust_Ordinal = 3719805222870932662lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyRust_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
-
 [[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenySyzkaller_Ordinal = 2319043834522757514lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenySyzkaller_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable;
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 

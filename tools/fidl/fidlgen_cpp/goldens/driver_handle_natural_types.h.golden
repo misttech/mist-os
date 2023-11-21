@@ -36,8 +36,6 @@ class T;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_driverhandle_ClientEndWrapperTable;
-
 class ClientEndWrapper {
  private:
   struct Storage_;
@@ -88,8 +86,6 @@ class ClientEndWrapper {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_ServerEndWrapperTable;
 
 class ServerEndWrapper {
  private:
@@ -142,8 +138,6 @@ class ServerEndWrapper {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_driverhandle_TTable;
-
 class T {
  private:
   struct Storage_;
@@ -194,8 +188,6 @@ class T {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
 
 class HandlesInProtocolSendHandlesRequest {
  private:
@@ -315,8 +307,6 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_driverhandle_ClientEndWrapperTable;
-
 template <>
 struct IsResource<::test_driverhandle::ClientEndWrapper> : public std::true_type {};
 template <>
@@ -341,8 +331,6 @@ struct internal::NaturalCodingTraits<::test_driverhandle::ClientEndWrapper, ::fi
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_ServerEndWrapperTable;
 
 template <>
 struct IsResource<::test_driverhandle::ServerEndWrapper> : public std::true_type {};
@@ -369,8 +357,6 @@ struct internal::NaturalCodingTraits<::test_driverhandle::ServerEndWrapper, ::fi
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
-
 template <>
 struct IsResource<::test_driverhandle::HandlesInProtocolSendHandlesRequest> : public std::true_type {};
 template <>
@@ -395,8 +381,6 @@ struct internal::NaturalCodingTraits<::test_driverhandle::HandlesInProtocolSendH
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_TTable;
 
 template <>
 struct IsResource<::test_driverhandle::T> : public std::true_type {};

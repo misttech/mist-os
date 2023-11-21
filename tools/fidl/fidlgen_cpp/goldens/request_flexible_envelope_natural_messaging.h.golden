@@ -43,17 +43,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_requestflexibleenvelope::Prot
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>&)>;
 };
-namespace test_requestflexibleenvelope {
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_requestflexibleenvelope
 
 template <>
 class ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final : public ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse {
@@ -61,8 +52,6 @@ class ::fidl::Response<::test_requestflexibleenvelope::Protocol::RequestStrictRe
   using ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse::ProtocolRequestStrictResponseFlexibleResponse;
   Response(::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse v) : ProtocolRequestStrictResponseFlexibleResponse(std::move(v)) {}
 };
-namespace test_requestflexibleenvelope {
-}  // namespace test_requestflexibleenvelope
 
 template <>
 class ::fidl::Result<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible> final : public ::fit::result<::fidl::Error, ::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> {
@@ -97,11 +86,8 @@ class ::fidl::internal::NaturalClientImpl<::test_requestflexibleenvelope::Protoc
 
   ::fidl::internal::NaturalThenable<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict> RequestFlexibleResponseStrict(const ::fidl::Request<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>& request) const;
 };
-namespace test_requestflexibleenvelope {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_requestflexibleenvelope
 
 #ifdef __Fuchsia__
 

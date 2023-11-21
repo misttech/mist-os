@@ -141,7 +141,6 @@ class OnlyReservedFlexibleUnion;
 
 
 
-extern "C" const fidl_type_t test_union_EmptyTable;
 
 struct Empty {
 
@@ -156,7 +155,6 @@ struct Empty {
 
 
 
-extern "C" const fidl_type_t test_union_PizzaOrPastaTable;
 
 class PizzaOrPasta {
   public:
@@ -246,7 +244,6 @@ class PizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitPizzaOrPastaTable;
 
 class ExplicitPizzaOrPasta {
   public:
@@ -336,7 +333,6 @@ class ExplicitPizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_FlexiblePizzaOrPastaTable;
 
 class FlexiblePizzaOrPasta {
   public:
@@ -427,7 +423,6 @@ class FlexiblePizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_StrictPizzaOrPastaTable;
 
 class StrictPizzaOrPasta {
   public:
@@ -517,7 +512,6 @@ class StrictPizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_UnionTable;
 
 class Union {
   public:
@@ -628,7 +622,6 @@ class Union {
 
 
 
-extern "C" const fidl_type_t test_union_FlexibleUnionTable;
 
 class FlexibleUnion {
   public:
@@ -740,7 +733,6 @@ class FlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictUnionTable;
 
 class StrictUnion {
   public:
@@ -851,7 +843,6 @@ class StrictUnion {
 
 
 
-extern "C" const fidl_type_t test_union_FieldCollisionTable;
 
 class FieldCollision {
   public:
@@ -906,7 +897,6 @@ class FieldCollision {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitUnionTable;
 
 class ExplicitUnion {
   public:
@@ -989,7 +979,6 @@ class ExplicitUnion {
 
 
 
-extern "C" const fidl_type_t test_union_ReverseOrdinalUnionTable;
 
 class ReverseOrdinalUnion {
   public:
@@ -1065,7 +1054,6 @@ class ReverseOrdinalUnion {
 
 
 
-extern "C" const fidl_type_t test_union_FlexibleFooTable;
 
 class FlexibleFoo {
   public:
@@ -1149,7 +1137,6 @@ class FlexibleFoo {
 
 
 
-extern "C" const fidl_type_t test_union_StrictFooTable;
 
 class StrictFoo {
   public:
@@ -1232,7 +1219,6 @@ class StrictFoo {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitFooTable;
 
 class ExplicitFoo {
   public:
@@ -1316,7 +1302,6 @@ class ExplicitFoo {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitStrictFooTable;
 
 class ExplicitStrictFoo {
   public:
@@ -1399,7 +1384,6 @@ class ExplicitStrictFoo {
 
 
 
-extern "C" const fidl_type_t test_union_OlderSimpleUnionTable;
 
 class OlderSimpleUnion {
   public:
@@ -1483,7 +1467,6 @@ class OlderSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_NewerSimpleUnionTable;
 
 class NewerSimpleUnion {
   public:
@@ -1602,7 +1585,6 @@ class NewerSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 
 class StrictSimpleUnion {
   public:
@@ -1706,7 +1688,6 @@ class StrictSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
 class UnionContainingEmptyStruct {
   public:
@@ -1762,7 +1743,6 @@ class UnionContainingEmptyStruct {
 
 
 
-extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 
 class StrictBoundedUnion {
   public:
@@ -1824,7 +1804,6 @@ class StrictBoundedUnion {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
 class ExplicitFlexibleUnion {
   public:
@@ -1908,7 +1887,6 @@ class ExplicitFlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_UnionWithAttributesTable;
 
 class UnionWithAttributes {
   public:
@@ -1971,7 +1949,6 @@ class UnionWithAttributes {
 
 
 
-extern "C" const fidl_type_t test_union_EmptyFlexibleUnionTable;
 
 class EmptyFlexibleUnion {
   public:
@@ -2006,7 +1983,6 @@ class EmptyFlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_OnlyReservedFlexibleUnionTable;
 
 class OnlyReservedFlexibleUnion {
   public:
@@ -2044,7 +2020,6 @@ class OnlyReservedFlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_PizzaTable;
 
 struct Pizza {
 
@@ -2054,7 +2029,6 @@ struct Pizza {
 
 
 
-extern "C" const fidl_type_t test_union_PastaTable;
 
 struct Pasta {
 
@@ -2064,7 +2038,6 @@ struct Pasta {
 
 
 
-extern "C" const fidl_type_t test_union_NullableUnionStructTable;
 
 struct NullableUnionStruct {
 
@@ -2075,7 +2048,6 @@ struct NullableUnionStruct {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
 struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
 
@@ -2085,7 +2057,6 @@ struct TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
 struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
 
@@ -2095,7 +2066,6 @@ struct TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 
 struct StructWithNullableUnion {
 
@@ -2105,7 +2075,6 @@ struct StructWithNullableUnion {
 
 
 
-extern "C" const fidl_type_t test_union_UnionSandwichTable;
 
 struct UnionSandwich {
 

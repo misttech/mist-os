@@ -37,15 +37,11 @@ struct TwoWayAddRequest;
 
 struct TwoWayAddResponse;
 
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddRequestTable;
-
 struct TwoWayAddRequest {
   uint16_t addend1 = {};
 
   uint16_t addend2 = {};
 };
-
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddResponseTable;
 
 struct TwoWayAddResponse {
   uint16_t sum = {};

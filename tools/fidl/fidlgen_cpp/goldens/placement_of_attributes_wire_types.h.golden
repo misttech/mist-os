@@ -46,13 +46,9 @@ class ExampleUnion;
 
 using Alias = uint32_t;
 
-extern "C" const fidl_type_t test_placementofattributes_ExampleProtocolMethodRequestTable;
-
 struct ExampleProtocolMethodRequest {
   ::test_exampleusing::wire::Empty arg = {};
 };
-
-extern "C" const fidl_type_t test_placementofattributes_ExampleStructTable;
 
 struct ExampleStruct {
   uint32_t member = {};
@@ -92,8 +88,6 @@ struct ::fidl::WireTableFrame<::test_placementofattributes::wire::ExampleTable> 
 
 namespace test_placementofattributes {
 namespace wire {
-
-extern "C" const fidl_type_t test_placementofattributes_ExampleTableTable;
 
 class ExampleTable {
  public:
@@ -263,8 +257,6 @@ inline ::fidl::WireTableBuilder<::test_placementofattributes::wire::ExampleTable
 inline ::fidl::WireTableExternalBuilder<::test_placementofattributes::wire::ExampleTable> ExampleTable::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_placementofattributes::wire::ExampleTable>> frame) {
   return ::fidl::WireTableExternalBuilder<::test_placementofattributes::wire::ExampleTable>(std::move(frame));
 }
-
-extern "C" const fidl_type_t test_placementofattributes_ExampleUnionTable;
 
 class ExampleUnion {
  public:

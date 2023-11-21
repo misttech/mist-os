@@ -38,8 +38,6 @@ struct ExampleFooResponse;
 
 class ExampleFooResult;
 
-extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
-
 class ExampleFooResult {
  public:
   using Response = test_error::wire::ExampleFooResponse;
@@ -117,13 +115,9 @@ class ExampleFooResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
-
 struct ExampleFooRequest {
   ::fidl::StringView s = {};
 };
-
-extern "C" const fidl_type_t test_error_Example_foo_ResponseTable;
 
 struct ExampleFooResponse {
   int64_t y = {};

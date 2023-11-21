@@ -505,7 +505,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult;
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
 
@@ -515,7 +514,6 @@ struct UnknownInteractionsProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsProtocolStrictTwoWayErrResponse {
 
@@ -525,7 +523,6 @@ struct UnknownInteractionsProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
 
@@ -535,7 +532,6 @@ struct UnknownInteractionsProtocolStrictTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleTwoWayResponse {
 
@@ -545,7 +541,6 @@ struct UnknownInteractionsProtocolFlexibleTwoWayResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
 
@@ -555,7 +550,6 @@ struct UnknownInteractionsProtocolFlexibleTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleTwoWayErrResponse {
 
@@ -565,7 +559,6 @@ struct UnknownInteractionsProtocolFlexibleTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
 
@@ -575,7 +568,6 @@ struct UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
 
 struct UnknownInteractionsProtocolStrictEventFieldsRequest {
 
@@ -585,7 +577,6 @@ struct UnknownInteractionsProtocolStrictEventFieldsRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResponseTable;
 
 struct UnknownInteractionsProtocolStrictEventErrResponse {
 
@@ -595,7 +586,6 @@ struct UnknownInteractionsProtocolStrictEventErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResponseTable;
 
 struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
 
@@ -605,7 +595,6 @@ struct UnknownInteractionsProtocolStrictEventFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
 
 struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
 
@@ -615,7 +604,6 @@ struct UnknownInteractionsProtocolFlexibleEventFieldsRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleEventErrResponse {
 
@@ -625,7 +613,6 @@ struct UnknownInteractionsProtocolFlexibleEventErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResponseTable;
 
 struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
 
@@ -635,7 +622,6 @@ struct UnknownInteractionsProtocolFlexibleEventFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
 
@@ -645,7 +631,6 @@ struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {
 
@@ -655,7 +640,6 @@ struct UnknownInteractionsAjarProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
 
@@ -665,7 +649,6 @@ struct UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
 
 struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
 
@@ -675,7 +658,6 @@ struct UnknownInteractionsAjarProtocolStrictEventFieldsRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolStrictEventErrResponse {
 
@@ -685,7 +667,6 @@ struct UnknownInteractionsAjarProtocolStrictEventErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
 
@@ -695,7 +676,6 @@ struct UnknownInteractionsAjarProtocolStrictEventFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
 
 struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
 
@@ -705,7 +685,6 @@ struct UnknownInteractionsAjarProtocolFlexibleEventFieldsRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolFlexibleEventErrResponse {
 
@@ -715,7 +694,6 @@ struct UnknownInteractionsAjarProtocolFlexibleEventErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResponseTable;
 
 struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
 
@@ -725,7 +703,6 @@ struct UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
 
@@ -735,7 +712,6 @@ struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {
 
@@ -745,7 +721,6 @@ struct UnknownInteractionsClosedProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
 
@@ -755,7 +730,6 @@ struct UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
 
 struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
 
@@ -765,7 +739,6 @@ struct UnknownInteractionsClosedProtocolStrictEventFieldsRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResponseTable;
 
 struct UnknownInteractionsClosedProtocolStrictEventErrResponse {
 
@@ -775,7 +748,6 @@ struct UnknownInteractionsClosedProtocolStrictEventErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResponseTable;
 
 struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
 
@@ -785,7 +757,6 @@ struct UnknownInteractionsClosedProtocolStrictEventFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
 
@@ -795,7 +766,6 @@ struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {
 
@@ -805,7 +775,6 @@ struct UnknownInteractionsDriverProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
 
@@ -815,7 +784,6 @@ struct UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {
 
@@ -825,7 +793,6 @@ struct UnknownInteractionsDriverProtocolFlexibleTwoWayResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
 
@@ -835,7 +802,6 @@ struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {
 
@@ -845,7 +811,6 @@ struct UnknownInteractionsDriverProtocolFlexibleTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
 
@@ -855,7 +820,6 @@ struct UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
 
@@ -865,7 +829,6 @@ struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {
 
@@ -875,7 +838,6 @@ struct UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
 
@@ -885,7 +847,6 @@ struct UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
 
 struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
 
@@ -895,7 +856,6 @@ struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResponseTable;
 
 struct UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {
 
@@ -905,7 +865,6 @@ struct UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResponseTable;
 
 struct UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResponse {
 
@@ -949,7 +908,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsProtocolStrictTwoWayTableResponse {
 public:
@@ -1154,7 +1112,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsProtocolStrictTwoWayTableErrResponse {
 public:
@@ -1359,7 +1316,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayTableResponse {
 public:
@@ -1564,7 +1520,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayTableErrResponse {
 public:
@@ -1769,7 +1724,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
 
 class UnknownInteractionsProtocolStrictEventTableRequest {
 public:
@@ -1974,7 +1928,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventTableErr_ResponseTable;
 
 class UnknownInteractionsProtocolStrictEventTableErrResponse {
 public:
@@ -2179,7 +2132,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
 
 class UnknownInteractionsProtocolFlexibleEventTableRequest {
 public:
@@ -2384,7 +2336,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventTableErr_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleEventTableErrResponse {
 public:
@@ -2589,7 +2540,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayTableResponse {
 public:
@@ -2794,7 +2744,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayTableErrResponse {
 public:
@@ -2999,7 +2948,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
 
 class UnknownInteractionsAjarProtocolStrictEventTableRequest {
 public:
@@ -3204,7 +3152,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventTableErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictEventTableErrResponse {
 public:
@@ -3409,7 +3356,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventTableRequest {
 public:
@@ -3614,7 +3560,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventTableErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventTableErrResponse {
 public:
@@ -3819,7 +3764,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayTableResponse {
 public:
@@ -4024,7 +3968,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayTableErrResponse {
 public:
@@ -4229,7 +4172,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
 
 class UnknownInteractionsClosedProtocolStrictEventTableRequest {
 public:
@@ -4434,7 +4376,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventTableErr_ResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictEventTableErrResponse {
 public:
@@ -4639,7 +4580,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayTableResponse {
 public:
@@ -4844,7 +4784,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayTableErrResponse {
 public:
@@ -5049,7 +4988,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResponseTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResponse {
 public:
@@ -5254,7 +5192,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResponse {
 public:
@@ -5459,7 +5396,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponse {
 public:
@@ -5664,7 +5600,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResponse {
 public:
@@ -5869,7 +5804,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponse {
 public:
@@ -6074,7 +6008,6 @@ struct ::fidl::WireTableFrame<::test_unknowninteractions::wire::UnknownInteracti
 namespace test_unknowninteractions {
 namespace wire {
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResponseTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResponse {
 public:
@@ -6246,7 +6179,6 @@ inline ::fidl::WireTableExternalBuilder<::test_unknowninteractions::wire::Unknow
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsProtocolStrictTwoWayUnionResponse {
   public:
@@ -6302,7 +6234,6 @@ class UnknownInteractionsProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictTwoWayErrResult {
   public:
@@ -6379,7 +6310,6 @@ class UnknownInteractionsProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -6456,7 +6386,6 @@ class UnknownInteractionsProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -6512,7 +6441,6 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictTwoWayUnionErrResult {
   public:
@@ -6596,7 +6524,6 @@ class UnknownInteractionsProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictTwoWayTableErrResult {
   public:
@@ -6680,7 +6607,6 @@ class UnknownInteractionsProtocolStrictTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayResult {
   public:
@@ -6757,7 +6683,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
   public:
@@ -6834,7 +6759,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
   public:
@@ -6890,7 +6814,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
   public:
@@ -6974,7 +6897,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
   public:
@@ -7058,7 +6980,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
   public:
@@ -7156,7 +7077,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
   public:
@@ -7254,7 +7174,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
   public:
@@ -7310,7 +7229,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
   public:
@@ -7415,7 +7333,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
   public:
@@ -7520,7 +7437,6 @@ class UnknownInteractionsProtocolFlexibleTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
 
 class UnknownInteractionsProtocolStrictEventUnionRequest {
   public:
@@ -7576,7 +7492,6 @@ class UnknownInteractionsProtocolStrictEventUnionRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictEventErrResult {
   public:
@@ -7653,7 +7568,6 @@ class UnknownInteractionsProtocolStrictEventErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictEventFieldsErrResult {
   public:
@@ -7730,7 +7644,6 @@ class UnknownInteractionsProtocolStrictEventFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventUnionErr_ResponseTable;
 
 class UnknownInteractionsProtocolStrictEventUnionErrResponse {
   public:
@@ -7786,7 +7699,6 @@ class UnknownInteractionsProtocolStrictEventUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventUnionErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictEventUnionErrResult {
   public:
@@ -7870,7 +7782,6 @@ class UnknownInteractionsProtocolStrictEventUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventTableErr_ResultTable;
 
 class UnknownInteractionsProtocolStrictEventTableErrResult {
   public:
@@ -7954,7 +7865,6 @@ class UnknownInteractionsProtocolStrictEventTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
 
 class UnknownInteractionsProtocolFlexibleEventUnionRequest {
   public:
@@ -8010,7 +7920,6 @@ class UnknownInteractionsProtocolFlexibleEventUnionRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleEventErrResult {
   public:
@@ -8087,7 +7996,6 @@ class UnknownInteractionsProtocolFlexibleEventErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleEventFieldsErrResult {
   public:
@@ -8164,7 +8072,6 @@ class UnknownInteractionsProtocolFlexibleEventFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventUnionErr_ResponseTable;
 
 class UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
   public:
@@ -8220,7 +8127,6 @@ class UnknownInteractionsProtocolFlexibleEventUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventUnionErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleEventUnionErrResult {
   public:
@@ -8304,7 +8210,6 @@ class UnknownInteractionsProtocolFlexibleEventUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventTableErr_ResultTable;
 
 class UnknownInteractionsProtocolFlexibleEventTableErrResult {
   public:
@@ -8388,7 +8293,6 @@ class UnknownInteractionsProtocolFlexibleEventTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
   public:
@@ -8444,7 +8348,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayErrResult {
   public:
@@ -8521,7 +8424,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -8598,7 +8500,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -8654,7 +8555,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult {
   public:
@@ -8738,7 +8638,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult {
   public:
@@ -8822,7 +8721,6 @@ class UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
 
 class UnknownInteractionsAjarProtocolStrictEventUnionRequest {
   public:
@@ -8878,7 +8776,6 @@ class UnknownInteractionsAjarProtocolStrictEventUnionRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictEventErrResult {
   public:
@@ -8955,7 +8852,6 @@ class UnknownInteractionsAjarProtocolStrictEventErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictEventFieldsErrResult {
   public:
@@ -9032,7 +8928,6 @@ class UnknownInteractionsAjarProtocolStrictEventFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventUnionErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
   public:
@@ -9088,7 +8983,6 @@ class UnknownInteractionsAjarProtocolStrictEventUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventUnionErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictEventUnionErrResult {
   public:
@@ -9172,7 +9066,6 @@ class UnknownInteractionsAjarProtocolStrictEventUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventTableErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolStrictEventTableErrResult {
   public:
@@ -9256,7 +9149,6 @@ class UnknownInteractionsAjarProtocolStrictEventTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
   public:
@@ -9312,7 +9204,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventErrResult {
   public:
@@ -9389,7 +9280,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult {
   public:
@@ -9466,7 +9356,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_ResponseTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
   public:
@@ -9522,7 +9411,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult {
   public:
@@ -9606,7 +9494,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventTableErr_ResultTable;
 
 class UnknownInteractionsAjarProtocolFlexibleEventTableErrResult {
   public:
@@ -9690,7 +9577,6 @@ class UnknownInteractionsAjarProtocolFlexibleEventTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
   public:
@@ -9746,7 +9632,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayErrResult {
   public:
@@ -9823,7 +9708,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -9900,7 +9784,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -9956,7 +9839,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult {
   public:
@@ -10040,7 +9922,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult {
   public:
@@ -10124,7 +10005,6 @@ class UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
 
 class UnknownInteractionsClosedProtocolStrictEventUnionRequest {
   public:
@@ -10180,7 +10060,6 @@ class UnknownInteractionsClosedProtocolStrictEventUnionRequest {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictEventErrResult {
   public:
@@ -10257,7 +10136,6 @@ class UnknownInteractionsClosedProtocolStrictEventErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictEventFieldsErrResult {
   public:
@@ -10334,7 +10212,6 @@ class UnknownInteractionsClosedProtocolStrictEventFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventUnionErr_ResponseTable;
 
 class UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
   public:
@@ -10390,7 +10267,6 @@ class UnknownInteractionsClosedProtocolStrictEventUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventUnionErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictEventUnionErrResult {
   public:
@@ -10474,7 +10350,6 @@ class UnknownInteractionsClosedProtocolStrictEventUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventTableErr_ResultTable;
 
 class UnknownInteractionsClosedProtocolStrictEventTableErrResult {
   public:
@@ -10558,7 +10433,6 @@ class UnknownInteractionsClosedProtocolStrictEventTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
   public:
@@ -10614,7 +10488,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayErrResult {
   public:
@@ -10691,7 +10564,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -10768,7 +10640,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -10824,7 +10695,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult {
   public:
@@ -10908,7 +10778,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult {
   public:
@@ -10992,7 +10861,6 @@ class UnknownInteractionsDriverProtocolStrictTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
   public:
@@ -11069,7 +10937,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
   public:
@@ -11146,7 +11013,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResponseTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
   public:
@@ -11202,7 +11068,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
   public:
@@ -11286,7 +11151,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
   public:
@@ -11370,7 +11234,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
   public:
@@ -11468,7 +11331,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
   public:
@@ -11566,7 +11428,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
   public:
@@ -11622,7 +11483,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
   public:
@@ -11727,7 +11587,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
   public:
@@ -11832,7 +11691,6 @@ class UnknownInteractionsDriverProtocolFlexibleTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
   public:
@@ -11888,7 +11746,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
   public:
@@ -11965,7 +11822,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -12042,7 +11898,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -12098,7 +11953,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult {
   public:
@@ -12182,7 +12036,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult {
   public:
@@ -12266,7 +12119,6 @@ class UnknownInteractionsAjarDriverProtocolStrictTwoWayTableErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
   public:
@@ -12322,7 +12174,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
   public:
@@ -12399,7 +12250,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
   public:
@@ -12476,7 +12326,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResponseTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
   public:
@@ -12532,7 +12381,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResponse {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult {
   public:
@@ -12616,7 +12464,6 @@ class UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionErrResult {
 
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 class UnknownInteractionsClosedDriverProtocolStrictTwoWayTableErrResult {
   public:

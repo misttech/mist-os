@@ -15,10 +15,6 @@ namespace test_nullable {
 [[maybe_unused]] constexpr uint64_t kSimpleProtocol_Add_Ordinal = 9142761280038437494lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kSimpleProtocol_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
-
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_nullable
 

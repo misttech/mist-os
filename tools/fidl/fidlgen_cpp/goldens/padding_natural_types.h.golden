@@ -54,8 +54,6 @@ class Padding4ByteAlignmentLength12;
 
 class Padding2ByteAlignmentLength6;
 
-extern "C" const fidl_type_t test_padding_Padding1ByteEndTable;
-
 class Padding1ByteEnd {
  private:
   struct Storage_;
@@ -131,8 +129,6 @@ class Padding1ByteEnd {
       .mask = 0xff00,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding2ByteEndTable;
 
 class Padding2ByteEnd {
  private:
@@ -210,8 +206,6 @@ class Padding2ByteEnd {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding3ByteEndTable;
-
 class Padding3ByteEnd {
  private:
   struct Storage_;
@@ -288,8 +282,6 @@ class Padding3ByteEnd {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding4ByteEndTable;
-
 class Padding4ByteEnd {
  private:
   struct Storage_;
@@ -365,8 +357,6 @@ class Padding4ByteEnd {
       .mask = 0xffffffff00000000,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding5ByteEndTable;
 
 class Padding5ByteEnd {
  private:
@@ -459,8 +449,6 @@ class Padding5ByteEnd {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding6ByteEndTable;
-
 class Padding6ByteEnd {
  private:
   struct Storage_;
@@ -536,8 +524,6 @@ class Padding6ByteEnd {
       .mask = 0xffffffffffff0000,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding7ByteEndTable;
 
 class Padding7ByteEnd {
  private:
@@ -615,8 +601,6 @@ class Padding7ByteEnd {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding1ByteMiddleTable;
-
 class Padding1ByteMiddle {
  private:
   struct Storage_;
@@ -692,8 +676,6 @@ class Padding1ByteMiddle {
       .mask = 0xff00,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding2ByteMiddleTable;
 
 class Padding2ByteMiddle {
  private:
@@ -771,8 +753,6 @@ class Padding2ByteMiddle {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding3ByteMiddleTable;
-
 class Padding3ByteMiddle {
  private:
   struct Storage_;
@@ -849,8 +829,6 @@ class Padding3ByteMiddle {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding4ByteMiddleTable;
-
 class Padding4ByteMiddle {
  private:
   struct Storage_;
@@ -926,8 +904,6 @@ class Padding4ByteMiddle {
       .mask = 0xffffffff00000000,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding5ByteMiddleTable;
 
 class Padding5ByteMiddle {
  private:
@@ -1020,8 +996,6 @@ class Padding5ByteMiddle {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding6ByteMiddleTable;
-
 class Padding6ByteMiddle {
  private:
   struct Storage_;
@@ -1098,8 +1072,6 @@ class Padding6ByteMiddle {
   });
 };
 
-extern "C" const fidl_type_t test_padding_Padding7ByteMiddleTable;
-
 class Padding7ByteMiddle {
  private:
   struct Storage_;
@@ -1175,8 +1147,6 @@ class Padding7ByteMiddle {
       .mask = 0xffffffffffffff00,
   });
 };
-
-extern "C" const fidl_type_t test_padding_Padding4ByteAlignmentLength12Table;
 
 class Padding4ByteAlignmentLength12 {
  private:
@@ -1287,8 +1257,6 @@ class Padding4ByteAlignmentLength12 {
                                                        .mask = 0xffff0000,
                                                    });
 };
-
-extern "C" const fidl_type_t test_padding_Padding2ByteAlignmentLength6Table;
 
 class Padding2ByteAlignmentLength6 {
  private:
@@ -1786,8 +1754,6 @@ inline Padding2ByteAlignmentLength6& Padding2ByteAlignmentLength6::c(uint8_t val
 }  // namespace test_padding
 namespace fidl {
 
-extern "C" const fidl_type_t test_padding_Padding1ByteEndTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding1ByteEnd> : public std::true_type {};
 
@@ -1806,8 +1772,6 @@ struct IsStruct<::test_padding::Padding1ByteEnd> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding1ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteEnd, 4> {};
-
-extern "C" const fidl_type_t test_padding_Padding2ByteEndTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding2ByteEnd> : public std::true_type {};
@@ -1828,8 +1792,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding2ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteEnd, 8> {};
 
-extern "C" const fidl_type_t test_padding_Padding3ByteEndTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding3ByteEnd> : public std::true_type {};
 
@@ -1848,8 +1810,6 @@ struct IsStruct<::test_padding::Padding3ByteEnd> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding3ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteEnd, 8> {};
-
-extern "C" const fidl_type_t test_padding_Padding4ByteEndTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding4ByteEnd> : public std::true_type {};
@@ -1870,8 +1830,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteEnd, 16> {};
 
-extern "C" const fidl_type_t test_padding_Padding5ByteEndTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding5ByteEnd> : public std::true_type {};
 
@@ -1890,8 +1848,6 @@ struct IsStruct<::test_padding::Padding5ByteEnd> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding5ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteEnd, 16> {};
-
-extern "C" const fidl_type_t test_padding_Padding6ByteEndTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding6ByteEnd> : public std::true_type {};
@@ -1912,8 +1868,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding6ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteEnd, 16> {};
 
-extern "C" const fidl_type_t test_padding_Padding7ByteEndTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding7ByteEnd> : public std::true_type {};
 
@@ -1932,8 +1886,6 @@ struct IsStruct<::test_padding::Padding7ByteEnd> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding7ByteEnd, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteEnd, 16> {};
-
-extern "C" const fidl_type_t test_padding_Padding1ByteMiddleTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding1ByteMiddle> : public std::true_type {};
@@ -1954,8 +1906,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding1ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding1ByteMiddle, 4> {};
 
-extern "C" const fidl_type_t test_padding_Padding2ByteMiddleTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding2ByteMiddle> : public std::true_type {};
 
@@ -1974,8 +1924,6 @@ struct IsStruct<::test_padding::Padding2ByteMiddle> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding2ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding2ByteMiddle, 8> {};
-
-extern "C" const fidl_type_t test_padding_Padding3ByteMiddleTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding3ByteMiddle> : public std::true_type {};
@@ -1996,8 +1944,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding3ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding3ByteMiddle, 8> {};
 
-extern "C" const fidl_type_t test_padding_Padding4ByteMiddleTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding4ByteMiddle> : public std::true_type {};
 
@@ -2016,8 +1962,6 @@ struct IsStruct<::test_padding::Padding4ByteMiddle> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteMiddle, 16> {};
-
-extern "C" const fidl_type_t test_padding_Padding5ByteMiddleTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding5ByteMiddle> : public std::true_type {};
@@ -2038,8 +1982,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding5ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding5ByteMiddle, 16> {};
 
-extern "C" const fidl_type_t test_padding_Padding6ByteMiddleTable;
-
 template <>
 struct IsFidlType<::test_padding::Padding6ByteMiddle> : public std::true_type {};
 
@@ -2058,8 +2000,6 @@ struct IsStruct<::test_padding::Padding6ByteMiddle> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding6ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding6ByteMiddle, 16> {};
-
-extern "C" const fidl_type_t test_padding_Padding7ByteMiddleTable;
 
 template <>
 struct IsFidlType<::test_padding::Padding7ByteMiddle> : public std::true_type {};
@@ -2080,8 +2020,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding7ByteMiddle, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding7ByteMiddle, 16> {};
 
-extern "C" const fidl_type_t test_padding_Padding4ByteAlignmentLength12Table;
-
 template <>
 struct IsFidlType<::test_padding::Padding4ByteAlignmentLength12> : public std::true_type {};
 
@@ -2100,8 +2038,6 @@ struct IsStruct<::test_padding::Padding4ByteAlignmentLength12> : public std::tru
 template <>
 struct internal::NaturalCodingTraits<::test_padding::Padding4ByteAlignmentLength12, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_padding::Padding4ByteAlignmentLength12, 12> {};
-
-extern "C" const fidl_type_t test_padding_Padding2ByteAlignmentLength6Table;
 
 template <>
 struct IsFidlType<::test_padding::Padding2ByteAlignmentLength6> : public std::true_type {};

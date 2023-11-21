@@ -29,8 +29,6 @@ class Payload;
 
 class OneWaySendRequest;
 
-extern "C" const fidl_type_t test_driveroneway_PayloadTable;
-
 class Payload {
  private:
   struct Storage_;
@@ -87,8 +85,6 @@ class Payload {
       &Storage_::value, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
 
 class OneWaySendRequest {
  private:
@@ -184,8 +180,6 @@ inline OneWaySendRequest& OneWaySendRequest::payload(::test_driveroneway::Payloa
 }  // namespace test_driveroneway
 namespace fidl {
 
-extern "C" const fidl_type_t test_driveroneway_PayloadTable;
-
 template <>
 struct IsFidlType<::test_driveroneway::Payload> : public std::true_type {};
 
@@ -204,8 +198,6 @@ struct IsStruct<::test_driveroneway::Payload> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_driveroneway::Payload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_driveroneway::Payload, 4> {};
-
-extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
 
 template <>
 struct IsFidlType<::test_driveroneway::OneWaySendRequest> : public std::true_type {};

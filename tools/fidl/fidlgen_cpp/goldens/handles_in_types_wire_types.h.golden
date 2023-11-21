@@ -47,8 +47,6 @@ class EmptyResourceUnion;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
-
 struct EmptyResourceStruct {
   uint8_t __reserved = {};
 
@@ -93,8 +91,6 @@ struct ::fidl::WireTableFrame<::test_handlesintypes::wire::TableWithHandle> fina
 
 namespace test_handlesintypes {
 namespace wire {
-
-extern "C" const fidl_type_t test_handlesintypes_TableWithHandleTable;
 
 class TableWithHandle {
  public:
@@ -304,8 +300,6 @@ struct ::fidl::WireTableFrame<::test_handlesintypes::wire::EmptyResourceTable> f
 namespace test_handlesintypes {
 namespace wire {
 
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
-
 class EmptyResourceTable {
  public:
   EmptyResourceTable() = default;
@@ -430,8 +424,6 @@ inline ::fidl::WireTableExternalBuilder<::test_handlesintypes::wire::EmptyResour
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_UnionWithHandleTable;
-
 class UnionWithHandle {
  public:
   UnionWithHandle() : ordinal_(::test_handlesintypes::wire::UnionWithHandle::Ordinal::Invalid), envelope_{} {}
@@ -494,8 +486,6 @@ class UnionWithHandle {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
-
 class EmptyResourceUnion {
  public:
   EmptyResourceUnion() : ordinal_(::test_handlesintypes::wire::EmptyResourceUnion::Ordinal::Invalid), envelope_{} {}
@@ -537,8 +527,6 @@ class EmptyResourceUnion {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_HandlesInTypesTable;
 
 struct HandlesInTypes {
   ::zx::vmo normal_handle = {};

@@ -47,18 +47,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayFields_Ordinal = 369
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayUnion_Ordinal = 2455165891480464557lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -69,18 +63,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayTable_Ordinal = 8389
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayErr_Ordinal = 7862264614495172967lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -91,18 +79,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_Ordinal = 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayUnionErr_Ordinal = 4988571416540160202lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -113,18 +95,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictTwoWayTableErr_Ordinal = 5
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWay_Ordinal = 334879577560091516lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
 
 
 [[maybe_unused]]
@@ -135,18 +111,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayFields_Ordinal = 4
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayUnion_Ordinal = 4913460516188409782lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
 
 
 [[maybe_unused]]
@@ -157,18 +127,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayTable_Ordinal = 91
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayErr_Ordinal = 6999736795697216519lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -179,9 +143,6 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Ordinal = 2410151523245950935lu;
 
@@ -190,18 +151,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_Ordinal =
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleTwoWayTableErr_Ordinal = 7893309626427980786lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -220,18 +175,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictEventFields_Ordinal = 8896
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictEventUnion_Ordinal = 3919175221694221274lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
 
 
 [[maybe_unused]]
@@ -242,18 +191,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictEventTable_Ordinal = 27114
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictEventErr_Ordinal = 4437558874343717997lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -264,9 +207,6 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictEventFieldsErr_Ordinal = 8
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal = 4681887988605004475lu;
 
@@ -275,18 +215,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_StrictEventUnionErr_Ordinal = 46
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_StrictEventTableErr_Ordinal = 7827903484869638218lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -305,18 +239,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventFields_Ordinal = 36
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventFields_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventUnion_Ordinal = 2499446536152409191lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
 
 
 [[maybe_unused]]
@@ -327,18 +255,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventTable_Ordinal = 572
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventErr_Ordinal = 5465749747219019177lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -349,9 +271,6 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventFieldsErr_Ordinal =
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal = 906517230981154796lu;
 
@@ -360,18 +279,12 @@ constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventUnionErr_Ordinal = 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsProtocol_FlexibleEventTableErr_Ordinal = 5605294921124359491lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsProtocol_FlexibleEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventTableErr_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
@@ -4679,18 +4592,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayFields_Ordinal =
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_Ordinal = 5870221221557233361lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -4701,18 +4608,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayTable_Ordinal = 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayErr_Ordinal = 6577335136969723910lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -4723,9 +4624,6 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Ordinal = 3224530777258896533lu;
 
@@ -4734,18 +4632,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_Ordinal
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictTwoWayTableErr_Ordinal = 3515589146717969463lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -4764,18 +4656,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventFields_Ordinal = 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventUnion_Ordinal = 6303151946645602671lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
 
 
 [[maybe_unused]]
@@ -4786,18 +4672,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventTable_Ordinal = 6
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventErr_Ordinal = 8168400161206646253lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -4808,9 +4688,6 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_Ordinal
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal = 48232470144455723lu;
 
@@ -4819,18 +4696,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventUnionErr_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_StrictEventTableErr_Ordinal = 7812263497101509638lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -4849,18 +4720,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventFields_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventFields_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventUnion_Ordinal = 8950943792372972717lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
 
 
 [[maybe_unused]]
@@ -4871,18 +4736,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventTable_Ordinal =
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventErr_Ordinal = 5746044819880601020lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -4893,9 +4752,6 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordinal = 870945044986422912lu;
 
@@ -4904,18 +4760,12 @@ constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_Ordinal = 7956124159916849703lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarProtocol_FlexibleEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventTableErr_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 
@@ -7817,18 +7667,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayFields_Ordinal
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayUnion_Ordinal = 7544414847426850727lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -7839,18 +7683,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayTable_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayErr_Ordinal = 5738532966428790074lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -7861,9 +7699,6 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_Ordi
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Ordinal = 925029359463709824lu;
 
@@ -7872,18 +7707,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictTwoWayTableErr_Ordinal = 1260407702860823440lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -7902,18 +7731,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventFields_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventUnion_Ordinal = 4288682345454280036lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
 
 
 [[maybe_unused]]
@@ -7924,18 +7747,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventTable_Ordinal =
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventErr_Ordinal = 1346864022452572673lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -7946,9 +7763,6 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordinal = 7912657362107850804lu;
 
@@ -7957,18 +7771,12 @@ constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventUnionErr_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedProtocol_StrictEventTableErr_Ordinal = 5661281118329630458lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedProtocol_StrictEventTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventTableErr_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
 

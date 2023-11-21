@@ -158,7 +158,6 @@ class OnlyReservedFlexibleUnion;
 
 
 
-extern "C" const fidl_type_t test_union_PizzaTable;
 
 
 class Pizza {
@@ -227,7 +226,6 @@ class Pizza {
 
 
 
-extern "C" const fidl_type_t test_union_PastaTable;
 
 
 class Pasta {
@@ -298,7 +296,6 @@ class Pasta {
 
 
 
-extern "C" const fidl_type_t test_union_PizzaOrPastaTable;
 
 
 class PizzaOrPasta {
@@ -429,7 +426,6 @@ class PizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitPizzaOrPastaTable;
 
 
 class ExplicitPizzaOrPasta {
@@ -560,7 +556,6 @@ class ExplicitPizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_FlexiblePizzaOrPastaTable;
 
 
 class FlexiblePizzaOrPasta {
@@ -694,7 +689,6 @@ class FlexiblePizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_StrictPizzaOrPastaTable;
 
 
 class StrictPizzaOrPasta {
@@ -825,7 +819,6 @@ class StrictPizzaOrPasta {
 
 
 
-extern "C" const fidl_type_t test_union_UnionTable;
 
 
 class Union {
@@ -982,7 +975,6 @@ class Union {
 
 
 
-extern "C" const fidl_type_t test_union_FlexibleUnionTable;
 
 
 class FlexibleUnion {
@@ -1142,7 +1134,6 @@ class FlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictUnionTable;
 
 
 class StrictUnion {
@@ -1299,7 +1290,6 @@ class StrictUnion {
 
 
 
-extern "C" const fidl_type_t test_union_FieldCollisionTable;
 
 
 class FieldCollision {
@@ -1404,7 +1394,6 @@ class FieldCollision {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitUnionTable;
 
 
 class ExplicitUnion {
@@ -1535,7 +1524,6 @@ class ExplicitUnion {
 
 
 
-extern "C" const fidl_type_t test_union_ReverseOrdinalUnionTable;
 
 
 class ReverseOrdinalUnion {
@@ -1664,7 +1652,6 @@ class ReverseOrdinalUnion {
 
 
 
-extern "C" const fidl_type_t test_union_NullableUnionStructTable;
 
 
 class NullableUnionStruct {
@@ -1735,7 +1722,6 @@ class NullableUnionStruct {
 
 
 
-extern "C" const fidl_type_t test_union_FlexibleFooTable;
 
 
 class FlexibleFoo {
@@ -1869,7 +1855,6 @@ class FlexibleFoo {
 
 
 
-extern "C" const fidl_type_t test_union_StrictFooTable;
 
 
 class StrictFoo {
@@ -2000,7 +1985,6 @@ class StrictFoo {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitFooTable;
 
 
 class ExplicitFoo {
@@ -2134,7 +2118,6 @@ class ExplicitFoo {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitStrictFooTable;
 
 
 class ExplicitStrictFoo {
@@ -2265,7 +2248,6 @@ class ExplicitStrictFoo {
 
 
 
-extern "C" const fidl_type_t test_union_OlderSimpleUnionTable;
 
 
 class OlderSimpleUnion {
@@ -2399,7 +2381,6 @@ class OlderSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_NewerSimpleUnionTable;
 
 
 class NewerSimpleUnion {
@@ -2559,7 +2540,6 @@ class NewerSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
 
 
 class StrictSimpleUnion {
@@ -2714,7 +2694,6 @@ class StrictSimpleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_EmptyTable;
 
 
 class Empty {
@@ -2786,7 +2765,6 @@ class Empty {
 
 
 
-extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
 
 class UnionContainingEmptyStruct {
@@ -2894,7 +2872,6 @@ class UnionContainingEmptyStruct {
 
 
 
-extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
 
 
 class StrictBoundedUnion {
@@ -2997,7 +2974,6 @@ class StrictBoundedUnion {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
 
 
 class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
@@ -3066,7 +3042,6 @@ class TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
 
 class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
@@ -3138,7 +3113,6 @@ class TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponse {
 
 
 
-extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
 
 
 class StructWithNullableUnion {
@@ -3209,7 +3183,6 @@ class StructWithNullableUnion {
 
 
 
-extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
 
 class ExplicitFlexibleUnion {
@@ -3341,7 +3314,6 @@ class ExplicitFlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_UnionSandwichTable;
 
 
 class UnionSandwich {
@@ -3456,7 +3428,6 @@ class UnionSandwich {
 
 
 
-extern "C" const fidl_type_t test_union_UnionWithAttributesTable;
 
 
 class UnionWithAttributes {
@@ -3564,7 +3535,6 @@ class UnionWithAttributes {
 
 
 
-extern "C" const fidl_type_t test_union_EmptyFlexibleUnionTable;
 
 
 class EmptyFlexibleUnion {
@@ -3646,7 +3616,6 @@ class EmptyFlexibleUnion {
 
 
 
-extern "C" const fidl_type_t test_union_OnlyReservedFlexibleUnionTable;
 
 
 class OnlyReservedFlexibleUnion {
@@ -3999,8 +3968,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_PizzaTable;
-
   
   template <>
   struct IsFidlType<::test_union::Pizza> : public std::true_type {};
@@ -4023,8 +3990,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_union_PastaTable;
 
   
   template <>
@@ -4049,8 +4014,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_union_NullableUnionStructTable;
-
   
   template <>
   struct IsFidlType<::test_union::NullableUnionStruct> : public std::true_type {};
@@ -4073,8 +4036,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_union_EmptyTable;
 
   
   template <>
@@ -4099,8 +4060,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-
   
   template <>
   struct IsFidlType<::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> : public std::true_type {};
@@ -4123,8 +4082,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 
   
   template <>
@@ -4149,8 +4106,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_union_StructWithNullableUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::StructWithNullableUnion> : public std::true_type {};
@@ -4173,8 +4128,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_union_UnionSandwichTable;
 
   
   template <>
@@ -4201,8 +4154,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_PizzaOrPastaTable;
-
   
   template <>
   struct IsFidlType<::test_union::PizzaOrPasta> : public std::true_type {};
@@ -4225,8 +4176,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_ExplicitPizzaOrPastaTable;
 
   
   template <>
@@ -4251,8 +4200,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_FlexiblePizzaOrPastaTable;
-
   
   template <>
   struct IsFidlType<::test_union::FlexiblePizzaOrPasta> : public std::true_type {};
@@ -4275,8 +4222,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_StrictPizzaOrPastaTable;
 
   
   template <>
@@ -4301,8 +4246,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_UnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::Union> : public std::true_type {};
@@ -4325,8 +4268,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_FlexibleUnionTable;
 
   
   template <>
@@ -4351,8 +4292,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_StrictUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::StrictUnion> : public std::true_type {};
@@ -4375,8 +4314,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_FieldCollisionTable;
 
   
   template <>
@@ -4401,8 +4338,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_ExplicitUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::ExplicitUnion> : public std::true_type {};
@@ -4425,8 +4360,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_ReverseOrdinalUnionTable;
 
   
   template <>
@@ -4451,8 +4384,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_FlexibleFooTable;
-
   
   template <>
   struct IsFidlType<::test_union::FlexibleFoo> : public std::true_type {};
@@ -4475,8 +4406,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_StrictFooTable;
 
   
   template <>
@@ -4501,8 +4430,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_ExplicitFooTable;
-
   
   template <>
   struct IsFidlType<::test_union::ExplicitFoo> : public std::true_type {};
@@ -4525,8 +4452,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_ExplicitStrictFooTable;
 
   
   template <>
@@ -4551,8 +4476,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_OlderSimpleUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::OlderSimpleUnion> : public std::true_type {};
@@ -4575,8 +4498,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_NewerSimpleUnionTable;
 
   
   template <>
@@ -4601,8 +4522,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_StrictSimpleUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::StrictSimpleUnion> : public std::true_type {};
@@ -4625,8 +4544,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_UnionContainingEmptyStructTable;
 
   
   template <>
@@ -4651,8 +4568,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_StrictBoundedUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::StrictBoundedUnion> : public std::true_type {};
@@ -4675,8 +4590,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_ExplicitFlexibleUnionTable;
 
   
   template <>
@@ -4701,8 +4614,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_UnionWithAttributesTable;
-
   
   template <>
   struct IsFidlType<::test_union::UnionWithAttributes> : public std::true_type {};
@@ -4726,8 +4637,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_union_EmptyFlexibleUnionTable;
-
   
   template <>
   struct IsFidlType<::test_union::EmptyFlexibleUnion> : public std::true_type {};
@@ -4750,8 +4659,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_union_OnlyReservedFlexibleUnionTable;
 
   
   template <>

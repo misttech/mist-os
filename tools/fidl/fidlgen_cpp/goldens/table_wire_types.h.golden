@@ -101,7 +101,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::EmptyTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_EmptyTableTable;
 
 class EmptyTable {
 public:
@@ -261,7 +260,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::SimpleTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_SimpleTableTable;
 
 class SimpleTable {
 public:
@@ -567,7 +565,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::OlderSimpleTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_OlderSimpleTableTable;
 
 class OlderSimpleTable {
 public:
@@ -803,7 +800,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::NewerSimpleTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_NewerSimpleTableTable;
 
 class NewerSimpleTable {
 public:
@@ -1186,7 +1182,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::ReverseOrdinalTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_ReverseOrdinalTableTable;
 
 class ReverseOrdinalTable {
 public:
@@ -1567,7 +1562,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::TableWithAttributes> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_TableWithAttributesTable;
 
 class TableWithAttributes {
 public:
@@ -1797,7 +1791,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::ExtensionTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_ExtensionTableTable;
 
 class ExtensionTable {
 public:
@@ -2016,7 +2009,6 @@ struct ::fidl::WireTableFrame<::test_table::wire::SixtyFourOrdinalTable> final {
 namespace test_table {
 namespace wire {
 
-extern "C" const fidl_type_t test_table_SixtyFourOrdinalTableTable;
 
 class SixtyFourOrdinalTable {
 public:

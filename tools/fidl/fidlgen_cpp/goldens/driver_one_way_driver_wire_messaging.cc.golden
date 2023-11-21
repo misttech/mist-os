@@ -17,8 +17,6 @@ namespace test_driveroneway {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kOneWay_Send_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
-
 #ifdef __Fuchsia__
 }  // namespace test_driveroneway
 

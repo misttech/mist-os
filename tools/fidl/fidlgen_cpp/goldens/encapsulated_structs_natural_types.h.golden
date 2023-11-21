@@ -36,8 +36,6 @@ class NonInlineStructTestStruct;
 
 class TopLevelStruct;
 
-extern "C" const fidl_type_t test_encapsulatedstructs_Int8Int32Table;
-
 class Int8Int32 {
  private:
   struct Storage_;
@@ -113,8 +111,6 @@ class Int8Int32 {
       .mask = 0xffffff00,
   });
 };
-
-extern "C" const fidl_type_t test_encapsulatedstructs_Int16Int8Table;
 
 class Int16Int8 {
  private:
@@ -192,8 +188,6 @@ class Int16Int8 {
   });
 };
 
-extern "C" const fidl_type_t test_encapsulatedstructs_ArrayInt16Int8Table;
-
 class ArrayInt16Int8 {
  private:
   struct Storage_;
@@ -250,8 +244,6 @@ class ArrayInt16Int8 {
       &Storage_::arr, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_encapsulatedstructs_StructPaddingTestStructTable;
 
 class StructPaddingTestStruct {
  private:
@@ -343,8 +335,6 @@ class StructPaddingTestStruct {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_encapsulatedstructs_NonInlineStructTestStructTable;
-
 class NonInlineStructTestStruct {
  private:
   struct Storage_;
@@ -414,8 +404,6 @@ class NonInlineStructTestStruct {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_encapsulatedstructs_TopLevelStructTable;
 
 class TopLevelStruct {
  private:
@@ -621,8 +609,6 @@ inline TopLevelStruct& TopLevelStruct::b(::test_encapsulatedstructs::NonInlineSt
 }  // namespace test_encapsulatedstructs
 namespace fidl {
 
-extern "C" const fidl_type_t test_encapsulatedstructs_Int8Int32Table;
-
 template <>
 struct IsFidlType<::test_encapsulatedstructs::Int8Int32> : public std::true_type {};
 
@@ -641,8 +627,6 @@ struct IsStruct<::test_encapsulatedstructs::Int8Int32> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int8Int32, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int8Int32, 8> {};
-
-extern "C" const fidl_type_t test_encapsulatedstructs_Int16Int8Table;
 
 template <>
 struct IsFidlType<::test_encapsulatedstructs::Int16Int8> : public std::true_type {};
@@ -663,8 +647,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::Int16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::Int16Int8, 4> {};
 
-extern "C" const fidl_type_t test_encapsulatedstructs_ArrayInt16Int8Table;
-
 template <>
 struct IsFidlType<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_type {};
 
@@ -683,8 +665,6 @@ struct IsStruct<::test_encapsulatedstructs::ArrayInt16Int8> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::ArrayInt16Int8, 12> {};
-
-extern "C" const fidl_type_t test_encapsulatedstructs_StructPaddingTestStructTable;
 
 template <>
 struct IsFidlType<::test_encapsulatedstructs::StructPaddingTestStruct> : public std::true_type {};
@@ -706,8 +686,6 @@ struct internal::NaturalCodingTraits<::test_encapsulatedstructs::StructPaddingTe
     : public ::fidl::internal::NaturalStructCodingTraits<::test_encapsulatedstructs::StructPaddingTestStruct, 24> {};
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_encapsulatedstructs_NonInlineStructTestStructTable;
 
 template <>
 struct IsResource<::test_encapsulatedstructs::NonInlineStructTestStruct> : public std::true_type {};
@@ -733,8 +711,6 @@ struct internal::NaturalCodingTraits<::test_encapsulatedstructs::NonInlineStruct
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_encapsulatedstructs_TopLevelStructTable;
 
 template <>
 struct IsResource<::test_encapsulatedstructs::TopLevelStruct> : public std::true_type {};

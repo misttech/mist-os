@@ -28,8 +28,6 @@ class SuperFooRequest;
 
 class SuperFooResponse;
 
-extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
 class SuperFooRequest {
  private:
   struct Storage_;
@@ -86,8 +84,6 @@ class SuperFooRequest {
       &Storage_::s, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 
 class SuperFooResponse {
  private:
@@ -183,8 +179,6 @@ inline SuperFooResponse& SuperFooResponse::y(int64_t value) {
 }  // namespace test_inheritance
 namespace fidl {
 
-extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
 template <>
 struct IsFidlType<::test_inheritance::SuperFooRequest> : public std::true_type {};
 
@@ -203,8 +197,6 @@ struct IsStruct<::test_inheritance::SuperFooRequest> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_inheritance::SuperFooRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_inheritance::SuperFooRequest, 16> {};
-
-extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 
 template <>
 struct IsFidlType<::test_inheritance::SuperFooResponse> : public std::true_type {};

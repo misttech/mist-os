@@ -123,7 +123,6 @@ class ProtocolErrorResourceResult;
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_StructTable;
 
 struct Struct {
 
@@ -135,7 +134,6 @@ struct Struct {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
 
 struct ResourceStruct {
 
@@ -192,7 +190,6 @@ struct ::fidl::WireTableFrame<::test_typesinprotocols::wire::Table> final {
 namespace test_typesinprotocols {
 namespace wire {
 
-extern "C" const fidl_type_t test_typesinprotocols_TableTable;
 
 class Table {
 public:
@@ -349,7 +346,6 @@ struct ::fidl::WireTableFrame<::test_typesinprotocols::wire::ResourceTable> fina
 namespace test_typesinprotocols {
 namespace wire {
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTableTable;
 
 class ResourceTable {
 public:
@@ -476,7 +472,6 @@ inline ::fidl::WireTableExternalBuilder<::test_typesinprotocols::wire::ResourceT
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_UnionTable;
 
 class Union {
   public:
@@ -534,7 +529,6 @@ class Union {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceUnionTable;
 
 class ResourceUnion {
   public:
@@ -602,7 +596,6 @@ class ResourceUnion {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 
 class ProtocolErrorBasicResult {
   public:
@@ -685,7 +678,6 @@ class ProtocolErrorBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 
 class ProtocolErrorCompoundResult {
   public:
@@ -768,7 +760,6 @@ class ProtocolErrorCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 
 class ProtocolErrorArrayBasicResult {
   public:
@@ -851,7 +842,6 @@ class ProtocolErrorArrayBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 
 class ProtocolErrorArrayCompoundResult {
   public:
@@ -934,7 +924,6 @@ class ProtocolErrorArrayCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
 
 class ProtocolErrorVectorBasicResult {
   public:
@@ -1017,7 +1006,6 @@ class ProtocolErrorVectorBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 
 class ProtocolErrorVectorCompoundResult {
   public:
@@ -1100,7 +1088,6 @@ class ProtocolErrorVectorCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
 
 class ProtocolErrorVectorOptionalResult {
   public:
@@ -1183,7 +1170,6 @@ class ProtocolErrorVectorOptionalResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 
 class ProtocolErrorArrayVectorNestedResult {
   public:
@@ -1268,7 +1254,6 @@ class ProtocolErrorArrayVectorNestedResult {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
 class ProtocolErrorResourceResult {
   public:
@@ -1368,7 +1353,6 @@ class ProtocolErrorResourceResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
 struct Basic {
 
@@ -1400,7 +1384,6 @@ struct Basic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
 struct Compound {
 
@@ -1422,7 +1405,6 @@ struct Compound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 
 struct ArrayBasic {
 
@@ -1454,7 +1436,6 @@ struct ArrayBasic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
 struct ArrayCompound {
 
@@ -1476,7 +1457,6 @@ struct ArrayCompound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 
 struct VectorBasic {
 
@@ -1508,7 +1488,6 @@ struct VectorBasic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
 struct VectorCompound {
 
@@ -1530,7 +1509,6 @@ struct VectorCompound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
 struct VectorOptional {
 
@@ -1546,7 +1524,6 @@ struct VectorOptional {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
 struct ArrayVectorNested {
 
@@ -1564,7 +1541,6 @@ struct ArrayVectorNested {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
 struct Resource {
 

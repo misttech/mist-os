@@ -34,8 +34,6 @@ namespace wire {
 
 struct Foo;
 
-extern "C" const fidl_type_t test_structdefaultvalueenumlibraryreference_FooTable;
-
 struct Foo {
   ::test_dependent::wire::MyEnum field = {};
 };

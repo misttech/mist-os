@@ -57,13 +57,9 @@ class UnionMember;
 
 class SomeProtocolSomeMethodResult;
 
-extern "C" const fidl_type_t test_anonymous_TableDataTable;
-
 struct TableData {
   uint8_t data = {};
 };
-
-extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResponseTable;
 
 struct SomeProtocolSomeMethodResponse {
   using BitsMember = test_anonymous::wire::BitsMember;
@@ -108,8 +104,6 @@ struct ::fidl::WireTableFrame<::test_anonymous::wire::FunctionApplication> final
 
 namespace test_anonymous {
 namespace wire {
-
-extern "C" const fidl_type_t test_anonymous_FunctionApplicationTable;
 
 class FunctionApplication {
  public:
@@ -466,8 +460,6 @@ struct ::fidl::WireTableFrame<::test_anonymous::wire::TableMember> final {
 namespace test_anonymous {
 namespace wire {
 
-extern "C" const fidl_type_t test_anonymous_TableMemberTable;
-
 class TableMember {
  public:
   using TableData = test_anonymous::wire::TableData;
@@ -664,8 +656,6 @@ inline ::fidl::WireTableExternalBuilder<::test_anonymous::wire::TableMember> Tab
   return ::fidl::WireTableExternalBuilder<::test_anonymous::wire::TableMember>(std::move(frame));
 }
 
-extern "C" const fidl_type_t test_anonymous_ExpressionTable;
-
 class Expression {
  public:
   using FunctionApplication = test_anonymous::wire::FunctionApplication;
@@ -777,8 +767,6 @@ class Expression {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_anonymous_UnionMemberTable;
-
 class UnionMember {
  public:
   UnionMember() : ordinal_(::test_anonymous::wire::UnionMember::Ordinal::Invalid), envelope_{} {}
@@ -828,8 +816,6 @@ class UnionMember {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 
 class SomeProtocolSomeMethodResult {
  public:
@@ -903,8 +889,6 @@ class SomeProtocolSomeMethodResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_anonymous_OverrideTestTable;
-
 struct OverrideTest {
   using Op = test_anonymous::wire::Op;
 
@@ -914,8 +898,6 @@ struct OverrideTest {
 
   ::fidl::WireOptional<::test_anonymous::wire::Expression> right = {};
 };
-
-extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
 
 struct SomeProtocolSomeMethodRequest {
   using UnionMember = test_anonymous::wire::UnionMember;

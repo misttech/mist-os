@@ -79,28 +79,12 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithAndWithoutRequ
   using Request = ::test_protocols::WithAndWithoutRequestResponseOnWithResponseRequest;
 };
 
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> final {
  public:
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::WithAndWithoutRequestResponse::NoRequestEmptyResponse> final : public ::fit::result<::fidl::Error> {
@@ -173,11 +157,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::WithAndWithoutReques
 
   ::fit::result<::fidl::OneWayError> WithRequestNoResponse(const ::fidl::Request<::test_protocols::WithAndWithoutRequestResponse::WithRequestNoResponse>& request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -428,17 +409,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithErrorSyntax::H
       ::fit::callback<void(::fidl::Result<::test_protocols::WithErrorSyntax::HandleInResult>&)>;
 };
 
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::WithErrorSyntax::ResponseAsStruct> final : public ::fit::result<uint32_t, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> {
@@ -460,8 +431,6 @@ class ::fidl::internal::ResponseMessageConverter<::test_protocols::WithErrorSynt
     }
   }
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::WithErrorSyntax::ResponseAsStruct> final : public ::fit::result<::fidl::ErrorsIn<::test_protocols::WithErrorSyntax::ResponseAsStruct>, ::test_protocols::WithErrorSyntaxResponseAsStructResponse> {
@@ -574,11 +543,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::WithErrorSyntax> fin
 
   ::fidl::internal::NaturalThenable<::test_protocols::WithErrorSyntax::HandleInResult> HandleInResult() const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -803,23 +769,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::ChannelProtocol::M
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::ChannelProtocol::MutateSocket>&)>;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::ChannelProtocol::MethodB> final : public ::test_protocols::ChannelProtocolMethodBResponse {
@@ -827,8 +778,6 @@ class ::fidl::Response<::test_protocols::ChannelProtocol::MethodB> final : publi
   using ::test_protocols::ChannelProtocolMethodBResponse::ChannelProtocolMethodBResponse;
   Response(::test_protocols::ChannelProtocolMethodBResponse v) : ChannelProtocolMethodBResponse(std::move(v)) {}
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::ChannelProtocol::MethodB> final : public ::fit::result<::fidl::Error, ::test_protocols::ChannelProtocolMethodBResponse> {
@@ -881,11 +830,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::ChannelProtocol> fin
 
   ::fit::result<::fidl::OneWayError> MethodA(const ::fidl::Request<::test_protocols::ChannelProtocol::MethodA>& request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -1094,17 +1040,8 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::Transitional::Event> {
   using Request = ::test_protocols::TransitionalEventRequest;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_TransitionalRequestRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_TransitionalRequestResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_TransitionalOneWayRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::Transitional::Request> final : public ::test_protocols::TransitionalRequestResponse {
@@ -1112,8 +1049,6 @@ class ::fidl::Response<::test_protocols::Transitional::Request> final : public :
   using ::test_protocols::TransitionalRequestResponse::TransitionalRequestResponse;
   Response(::test_protocols::TransitionalRequestResponse v) : TransitionalRequestResponse(std::move(v)) {}
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::Transitional::Request> final : public ::fit::result<::fidl::Error, ::test_protocols::TransitionalRequestResponse> {
@@ -1132,11 +1067,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::Transitional> final 
 
   ::fit::result<::fidl::OneWayError> OneWay(const ::fidl::Request<::test_protocols::Transitional::OneWay>& request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -1581,17 +1513,8 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocols::HandleRightsProtocol::AnEvent> {
   using Request = ::test_protocols::HandleRightsProtocolAnEventRequest;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod> final : public ::test_protocols::HandleRightsProtocolResponseMethodResponse {
@@ -1599,8 +1522,6 @@ class ::fidl::Response<::test_protocols::HandleRightsProtocol::ResponseMethod> f
   using ::test_protocols::HandleRightsProtocolResponseMethodResponse::HandleRightsProtocolResponseMethodResponse;
   Response(::test_protocols::HandleRightsProtocolResponseMethodResponse v) : HandleRightsProtocolResponseMethodResponse(std::move(v)) {}
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::HandleRightsProtocol::ResponseMethod> final : public ::fit::result<::fidl::Error, ::test_protocols::HandleRightsProtocolResponseMethodResponse> {
@@ -1619,11 +1540,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::HandleRightsProtocol
 
   ::fit::result<::fidl::OneWayError> NoResponseMethod(::fidl::Request<::test_protocols::HandleRightsProtocol::NoResponseMethod> request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -1808,21 +1726,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::WithProtocolEnds::
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::WithProtocolEnds::StructContainingEnds>&)>;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds> final : public ::test_protocols::WithProtocolEndsClientEndsResponse {
@@ -1830,8 +1735,6 @@ class ::fidl::Response<::test_protocols::WithProtocolEnds::ClientEnds> final : p
   using ::test_protocols::WithProtocolEndsClientEndsResponse::WithProtocolEndsClientEndsResponse;
   Response(::test_protocols::WithProtocolEndsClientEndsResponse v) : WithProtocolEndsClientEndsResponse(std::move(v)) {}
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::WithProtocolEnds::ClientEnds> final : public ::fit::result<::fidl::Error, ::test_protocols::WithProtocolEndsClientEndsResponse> {
@@ -1884,11 +1787,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::WithProtocolEnds> fi
 
   ::fidl::internal::NaturalThenable<::test_protocols::WithProtocolEnds::StructContainingEnds> StructContainingEnds(::fidl::Request<::test_protocols::WithProtocolEnds::StructContainingEnds> request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -2064,11 +1964,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::ManyParameters::Fi
 
   using Completer = fidl::Completer<>;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_protocols::ManyParameters> final : public ::fidl::internal::NaturalClientBase {
@@ -2076,11 +1973,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::ManyParameters> fina
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> Fifteen(const ::fidl::Request<::test_protocols::ManyParameters::Fifteen>& request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 
@@ -2217,13 +2111,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocols::MethodWithUnion::U
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_protocols::MethodWithUnion::UnionMethod>&)>;
 };
-namespace test_protocols {
-__LOCAL extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod> final : public ::test_protocols::MethodWithUnionUnionMethodResponse {
@@ -2231,8 +2120,6 @@ class ::fidl::Response<::test_protocols::MethodWithUnion::UnionMethod> final : p
   using ::test_protocols::MethodWithUnionUnionMethodResponse::MethodWithUnionUnionMethodResponse;
   Response(::test_protocols::MethodWithUnionUnionMethodResponse v) : MethodWithUnionUnionMethodResponse(std::move(v)) {}
 };
-namespace test_protocols {
-}  // namespace test_protocols
 
 template <>
 class ::fidl::Result<::test_protocols::MethodWithUnion::UnionMethod> final : public ::fit::result<::fidl::Error, ::test_protocols::MethodWithUnionUnionMethodResponse> {
@@ -2249,11 +2136,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocols::MethodWithUnion> fin
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_protocols::MethodWithUnion::UnionMethod> UnionMethod(const ::fidl::Request<::test_protocols::MethodWithUnion::UnionMethod>& request) const;
 };
-namespace test_protocols {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocols
 
 #ifdef __Fuchsia__
 

@@ -40,103 +40,6 @@
   class UnknownInteractionsClosedProtocol;
     
 
-    
-    
-    
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_StrictEventTableErr_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventTableErr_ResultTable;
 }  // namespace test_unknowninteractions
 
 template<>
@@ -3270,8 +3173,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3297,8 +3198,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3324,8 +3223,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3351,8 +3248,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -3376,8 +3271,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3405,8 +3298,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -3424,8 +3315,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -3448,8 +3337,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3477,8 +3364,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3496,8 +3381,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3519,8 +3402,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3548,8 +3429,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3567,8 +3446,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3590,8 +3467,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3619,8 +3494,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3638,8 +3511,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3661,8 +3532,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3690,8 +3559,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3709,8 +3576,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3732,8 +3597,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3761,8 +3624,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3780,8 +3641,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3803,8 +3662,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3832,8 +3689,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -3851,8 +3706,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -3874,8 +3727,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3903,8 +3754,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3922,8 +3771,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWay_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3945,8 +3792,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3974,8 +3819,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3993,8 +3836,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFields_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4016,8 +3857,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4045,8 +3884,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4064,8 +3901,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnion_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4087,8 +3922,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4116,8 +3949,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4135,8 +3966,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTable_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4158,8 +3987,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4187,8 +4014,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4206,8 +4031,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4229,8 +4052,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4258,8 +4079,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4277,8 +4096,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4300,8 +4117,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4329,8 +4144,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4348,8 +4161,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4371,8 +4182,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4400,8 +4209,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4419,8 +4226,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4442,8 +4247,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEvent>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4469,8 +4272,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictEventFieldsRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -4497,8 +4298,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictEventUnionRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4525,8 +4324,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolStrictEventTableRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4553,8 +4350,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4581,8 +4376,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventFieldsErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4609,8 +4402,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventUnionErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4637,8 +4428,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::StrictEventTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_StrictEventTableErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4665,8 +4454,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEvent>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4692,8 +4479,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventFieldsRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -4720,8 +4505,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventUnionRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4748,8 +4531,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocolFlexibleEventTableRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4776,8 +4557,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4804,8 +4583,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventFieldsErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4832,8 +4609,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventUnionErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4860,8 +4635,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsProtocol::FlexibleEventTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsProtocol_FlexibleEventTableErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -7254,81 +7027,7 @@ class ::fidl::WireServer<::test_unknowninteractions::UnknownInteractionsProtocol
 
     
 
-    
-    
-    
-    
-    
-    
-    
-    }  // namespace fidl
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventTableErr_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventTableErr_ResultTable;
-}  // namespace test_unknowninteractions
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay> final { static constexpr uint64_t value = 956561744635167883lu; };
@@ -9449,8 +9148,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9476,8 +9173,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9503,8 +9198,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9530,8 +9223,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -9555,8 +9246,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9584,8 +9273,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -9603,8 +9290,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -9627,8 +9312,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9656,8 +9339,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9675,8 +9356,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9698,8 +9377,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9727,8 +9404,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9746,8 +9421,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9769,8 +9442,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9798,8 +9469,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9817,8 +9486,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9840,8 +9507,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9869,8 +9534,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9888,8 +9551,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9911,8 +9572,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9940,8 +9599,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9959,8 +9616,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9982,8 +9637,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -10011,8 +9664,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -10030,8 +9681,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -10053,8 +9702,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEvent>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -10080,8 +9727,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventFieldsRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -10108,8 +9753,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventUnionRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10136,8 +9779,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolStrictEventTableRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10164,8 +9805,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10192,8 +9831,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventFieldsErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10220,8 +9857,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventUnionErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10248,8 +9883,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::StrictEventTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_StrictEventTableErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10276,8 +9909,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEvent>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -10303,8 +9934,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventFieldsRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -10331,8 +9960,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventUnionRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10359,8 +9986,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocolFlexibleEventTableRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10387,8 +10012,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10415,8 +10038,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventFieldsErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10443,8 +10064,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventUnionErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -10471,8 +10090,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsAjarProtocol::FlexibleEventTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarProtocol_FlexibleEventTableErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -11812,56 +11429,7 @@ class ::fidl::WireServer<::test_unknowninteractions::UnknownInteractionsAjarProt
 
     
 
-    
-    
-    
-    
-    
-    }  // namespace fidl
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventTableErr_ResultTable;
-}  // namespace test_unknowninteractions
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay> final { static constexpr uint64_t value = 401526495318825508lu; };
@@ -13436,8 +13004,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13463,8 +13029,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13490,8 +13054,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -13515,8 +13077,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13544,8 +13104,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -13563,8 +13121,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -13587,8 +13143,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13616,8 +13170,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13635,8 +13187,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13658,8 +13208,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13687,8 +13235,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -13706,8 +13252,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -13729,8 +13273,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13758,8 +13300,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13777,8 +13317,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13800,8 +13338,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13829,8 +13365,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13848,8 +13382,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -13871,8 +13403,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13900,8 +13430,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -13919,8 +13447,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -13942,8 +13468,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -13971,8 +13495,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -13990,8 +13512,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -14013,8 +13533,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEvent>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -14040,8 +13558,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventFieldsRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -14068,8 +13584,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventUnionRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -14096,8 +13610,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocolStrictEventTableRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -14124,8 +13636,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -14152,8 +13662,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventFieldsErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -14180,8 +13688,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventUnionErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -14208,8 +13714,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_un
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_unknowninteractions::UnknownInteractionsClosedProtocol::StrictEventTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedProtocol_StrictEventTableErr_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));

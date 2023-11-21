@@ -35,15 +35,8 @@
 
 
 {{- define "Protocol:WireMessagingHeader" }}
-{{- $protocol := . }}
-{{ "" }}
-  {{- range .Methods }}
-    {{ EnsureCodingTableDecl .Request.WireCodingTable }}
-    {{ EnsureCodingTableDecl .Response.WireCodingTable }}
-  {{- end }}
-{{ "" }}
 
-{{- range .Methods }}
+{{ range .Methods }}
 {{- EnsureNamespace "" }}
 template<>
 struct {{ .WireOrdinal }} final { static constexpr uint64_t value = {{ .Ordinal }}lu; };
@@ -178,12 +171,6 @@ struct IsResource<{{ .WireTransactionalRequest }}> : public std::true_type {};
 
 template <>
 struct TypeTraits<{{ .WireTransactionalRequest }}> {
-  static constexpr const fidl_type_t* kType =
-  {{- if .RequestArgs }}
-    &{{ .Request.WireCodingTable }};
-  {{- else }}
-    nullptr;
-  {{- end }}
   static constexpr uint32_t kMaxNumHandles = {{ .Request.TypeShapeV2.MaxHandles }};
   static constexpr uint32_t kMaxDepth = {{ .Request.TypeShapeV2.Depth }};
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN({{ .Request.TypeShapeV2.InlineSize }} + sizeof(fidl_message_header_t));
@@ -230,12 +217,6 @@ struct IsResource<{{ .WireTransactionalEvent }}> : public std::true_type {};
 
 template <>
 struct TypeTraits<{{ .WireTransactionalEvent }}> {
-  static constexpr const fidl_type_t* kType =
-  {{- if .ResponseArgs }}
-    &{{ .Response.WireCodingTable }};
-  {{- else }}
-    nullptr;
-  {{- end }}
   static constexpr uint32_t kMaxNumHandles = {{ .Response.TypeShapeV2.MaxHandles }};
   static constexpr uint32_t kMaxDepth = {{ .Response.TypeShapeV2.Depth }};
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN({{ .Response.TypeShapeV2.InlineSize }} + sizeof(fidl_message_header_t));
@@ -276,12 +257,6 @@ struct IsResource<{{ .WireResponse }}> : public std::true_type {};
 
 template <>
 struct TypeTraits<{{ .WireTransactionalResponse }}> {
-  static constexpr const fidl_type_t* kType =
-  {{- if .ResponseArgs }}
-    &{{ .Response.WireCodingTable }};
-  {{- else }}
-    nullptr;
-  {{- end }}
   static constexpr bool kHasServerToClientBody = {{ if .ResponseArgs }}true{{ else }}false{{ end }};
   static constexpr uint32_t kMaxNumHandles = {{ .Response.TypeShapeV2.MaxHandles }};
   static constexpr uint32_t kMaxDepth = {{ .Response.TypeShapeV2.Depth }};
@@ -303,12 +278,6 @@ static_assert(offsetof({{ .WireTransactionalResponse }}, body) == sizeof(fidl_me
 {{- if .HasResponsePayload }}
 template <>
 struct TypeTraits<{{ .WireResponse }}> {
-  static constexpr const fidl_type_t* kType =
-  {{- if .ResponseArgs }}
-    &{{ .Response.WireCodingTable }};
-  {{- else }}
-    nullptr;
-  {{- end }}
   static constexpr bool kHasServerToClientBody = {{ if .ResponseArgs }}true{{ else }}false{{ end }};
   static constexpr uint32_t kMaxNumHandles = {{ .Response.TypeShapeV2.MaxHandles }};
   static constexpr uint32_t kMaxDepth = {{ .Response.TypeShapeV2.Depth }};
@@ -351,14 +320,6 @@ constexpr uint64_t {{ .OrdinalName.Name }} = {{ .Ordinal }}lu;
 {{ EnsureNamespace .DynamicFlagsName }}
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags {{ .DynamicFlagsName.Name }} = {{ .DynamicFlags }};
-{{- if .HasRequestPayload }}
-{{ EnsureNamespace .Request.WireCodingTable }}
-extern "C" const fidl_type_t {{ .Request.WireCodingTable.Name }};
-{{- end }}
-{{- if .HasResponsePayload }}
-{{ EnsureNamespace .Response.WireCodingTable }}
-extern "C" const fidl_type_t {{ .Response.WireCodingTable.Name }};
-{{- end }}
 {{- end }}
 
 {{- /* Client-calling functions do not apply to events. */}}
@@ -422,12 +383,5 @@ extern "C" const fidl_type_t {{ .Response.WireCodingTable.Name }};
 {{- define "Protocol:NaturalMessagingHeader" }}
   {{- range .Methods }}
     {{- template "Method:Types:NaturalMessagingHeader" . }}
-  {{- end }}
-
-  {{- /* This decouples the natural messaging header from the messaging header. */}}
-  {{- /* For example, we could transition one of them off of coding tables independently. */}}
-  {{- range .Methods }}
-    {{ EnsureCodingTableDecl .Request.WireCodingTable }}
-    {{ EnsureCodingTableDecl .Response.WireCodingTable }}
   {{- end }}
 {{- end }}

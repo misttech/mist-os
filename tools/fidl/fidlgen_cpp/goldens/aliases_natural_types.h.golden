@@ -49,8 +49,6 @@ using ReferenceMe = ::test_someotherlibrary::ReferenceMe;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_aliases_ExampleOfUseOfAliasesTable;
-
 class ExampleOfUseOfAliases {
  private:
   struct Storage_;
@@ -275,8 +273,6 @@ inline ExampleOfUseOfAliases& ExampleOfUseOfAliases::field_of_nullable_client_en
 namespace fidl {
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_aliases_ExampleOfUseOfAliasesTable;
 
 template <>
 struct IsResource<::test_aliases::ExampleOfUseOfAliases> : public std::true_type {};

@@ -36,8 +36,6 @@ class FlexibleFoo;
 
 class StrictFoo;
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_FlexibleFooTable;
-
 class FlexibleFoo {
  private:
   using Storage_ =
@@ -162,8 +160,6 @@ class FlexibleFoo {
   }
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_StrictFooTable;
-
 class StrictFoo {
  private:
   using Storage_ =
@@ -285,8 +281,6 @@ class StrictFoo {
   }
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
 class ProtocolRequestStrictResponseFlexibleRequest {
  private:
   struct Storage_;
@@ -343,8 +337,6 @@ class ProtocolRequestStrictResponseFlexibleRequest {
       &Storage_::s, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
 
 class ProtocolRequestStrictResponseFlexibleResponse {
  private:
@@ -403,8 +395,6 @@ class ProtocolRequestStrictResponseFlexibleResponse {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
 class ProtocolRequestFlexibleResponseStrictRequest {
  private:
   struct Storage_;
@@ -461,8 +451,6 @@ class ProtocolRequestFlexibleResponseStrictRequest {
       &Storage_::s, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 
 class ProtocolRequestFlexibleResponseStrictResponse {
  private:
@@ -592,8 +580,6 @@ inline ProtocolRequestFlexibleResponseStrictResponse& ProtocolRequestFlexibleRes
 }  // namespace test_requestflexibleenvelope
 namespace fidl {
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest> : public std::true_type {};
 
@@ -612,8 +598,6 @@ struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFle
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleRequest, 16> {};
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse> : public std::true_type {};
@@ -634,8 +618,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestStrictResponseFlexibleResponse, 16> {};
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest> : public std::true_type {};
 
@@ -654,8 +636,6 @@ struct IsStruct<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseS
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictRequest, 16> {};
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse> : public std::true_type {};
@@ -676,8 +656,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_requestflexibleenvelope::ProtocolRequestFlexibleResponseStrictResponse, 16> {};
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_FlexibleFooTable;
-
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_type {};
 
@@ -696,8 +674,6 @@ struct IsUnion<::test_requestflexibleenvelope::FlexibleFoo> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_requestflexibleenvelope::FlexibleFoo, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_requestflexibleenvelope::FlexibleFoo> {};
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_StrictFooTable;
 
 template <>
 struct IsFidlType<::test_requestflexibleenvelope::StrictFoo> : public std::true_type {};

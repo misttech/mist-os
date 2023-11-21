@@ -43,8 +43,6 @@ class Union;
 
 using Alias = ::fidl::StringView;
 
-extern "C" const fidl_type_t test_versions_StructTable;
-
 struct Struct {
   uint32_t x = {};
 };
@@ -83,8 +81,6 @@ struct ::fidl::WireTableFrame<::test_versions::wire::Table> final {
 
 namespace test_versions {
 namespace wire {
-
-extern "C" const fidl_type_t test_versions_TableTable;
 
 class Table {
  public:
@@ -254,8 +250,6 @@ inline ::fidl::WireTableBuilder<::test_versions::wire::Table> Table::Builder(::f
 inline ::fidl::WireTableExternalBuilder<::test_versions::wire::Table> Table::ExternalBuilder(::fidl::ObjectView<::fidl::WireTableFrame<::test_versions::wire::Table>> frame) {
   return ::fidl::WireTableExternalBuilder<::test_versions::wire::Table>(std::move(frame));
 }
-
-extern "C" const fidl_type_t test_versions_UnionTable;
 
 class Union {
  public:

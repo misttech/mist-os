@@ -38,8 +38,6 @@ struct ChildSecondRequest;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
-
 struct ParentFirstRequest {
   ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request = {};
 
@@ -49,8 +47,6 @@ struct ParentFirstRequest {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
 
 struct ChildSecondRequest {
   ::fidl::ServerEnd<::test_inheritancewithrecursivedecl::Parent> request = {};

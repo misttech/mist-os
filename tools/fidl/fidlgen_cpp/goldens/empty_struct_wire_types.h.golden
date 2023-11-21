@@ -42,31 +42,21 @@ struct EmptyProtocolSendAndReceiveRequest;
 
 struct EmptyProtocolSendAndReceiveResponse;
 
-extern "C" const fidl_type_t test_emptystruct_EmptyTable;
-
 struct Empty {
   uint8_t __reserved = {};
 };
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
 
 struct EmptyProtocolSendRequest {
   ::test_emptystruct::wire::Empty e = {};
 };
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
-
 struct EmptyProtocolReceiveRequest {
   ::test_emptystruct::wire::Empty e = {};
 };
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-
 struct EmptyProtocolSendAndReceiveRequest {
   ::test_emptystruct::wire::Empty e = {};
 };
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 
 struct EmptyProtocolSendAndReceiveResponse {
   ::test_emptystruct::wire::Empty e = {};

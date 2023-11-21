@@ -69,81 +69,55 @@ class DenyEachBindingOnlyDenyRustResult;
 
 class DenyEachBindingOnlyDenySyzkallerResult;
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyDartRequestTable;
-
 struct DenyEachBindingOnlyDenyDartRequest {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResponseTable;
 
 struct DenyEachBindingOnlyDenyDartResponse {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyGoRequestTable;
-
 struct DenyEachBindingOnlyDenyGoRequest {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResponseTable;
 
 struct DenyEachBindingOnlyDenyGoResponse {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyLibfuzzerRequestTable;
-
 struct DenyEachBindingOnlyDenyLibfuzzerRequest {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResponseTable;
 
 struct DenyEachBindingOnlyDenyLibfuzzerResponse {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenyRustRequestTable;
-
 struct DenyEachBindingOnlyDenyRustRequest {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResponseTable;
 
 struct DenyEachBindingOnlyDenyRustResponse {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBindingOnlyDenySyzkallerRequestTable;
-
 struct DenyEachBindingOnlyDenySyzkallerRequest {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResponseTable;
 
 struct DenyEachBindingOnlyDenySyzkallerResponse {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_MemberOnlyAppearsInImportingLibraryTable;
-
 struct MemberOnlyAppearsInImportingLibrary {
   bool a = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_OnlyAppearsInImportingLibraryTable;
 
 struct OnlyAppearsInImportingLibrary {
   using MemberOnlyAppearsInImportingLibrary = test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary;
 
   ::test_bindingsdenylist::wire::MemberOnlyAppearsInImportingLibrary member_only_appears_in_importing_library = {};
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_OnlyLlcppTable;
 
 class OnlyLlcpp {
  public:
@@ -193,8 +167,6 @@ class OnlyLlcpp {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyDart_ResultTable;
 
 class DenyEachBindingOnlyDenyDartResult {
  public:
@@ -267,8 +239,6 @@ class DenyEachBindingOnlyDenyDartResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyGo_ResultTable;
-
 class DenyEachBindingOnlyDenyGoResult {
  public:
   using Response = test_bindingsdenylist::wire::DenyEachBindingOnlyDenyGoResponse;
@@ -339,8 +309,6 @@ class DenyEachBindingOnlyDenyGoResult {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyLibfuzzer_ResultTable;
 
 class DenyEachBindingOnlyDenyLibfuzzerResult {
  public:
@@ -413,8 +381,6 @@ class DenyEachBindingOnlyDenyLibfuzzerResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenyRust_ResultTable;
-
 class DenyEachBindingOnlyDenyRustResult {
  public:
   using Response = test_bindingsdenylist::wire::DenyEachBindingOnlyDenyRustResponse;
@@ -485,8 +451,6 @@ class DenyEachBindingOnlyDenyRustResult {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_bindingsdenylist_DenyEachBinding_OnlyDenySyzkaller_ResultTable;
 
 class DenyEachBindingOnlyDenySyzkallerResult {
  public:

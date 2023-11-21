@@ -16,21 +16,13 @@ namespace test_emptystruct {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kEmptyProtocol_Send_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
-
 [[maybe_unused]] constexpr uint64_t kEmptyProtocol_Receive_Ordinal = 2301564782476583487lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kEmptyProtocol_Receive_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
-
 [[maybe_unused]] constexpr uint64_t kEmptyProtocol_SendAndReceive_Ordinal = 534401212734647530lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kEmptyProtocol_SendAndReceive_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_emptystruct
 

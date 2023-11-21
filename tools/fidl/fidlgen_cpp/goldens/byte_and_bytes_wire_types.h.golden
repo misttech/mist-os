@@ -33,8 +33,6 @@ namespace wire {
 
 struct ByteAndBytes;
 
-extern "C" const fidl_type_t test_byteandbytes_ByteAndBytesTable;
-
 struct ByteAndBytes {
   uint8_t single_byte = {};
 };

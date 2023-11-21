@@ -34,8 +34,6 @@ class UnionSmallArray;
 
 class UnionLargeArray;
 
-extern "C" const fidl_type_t test_arrays_StructSmallArrayTable;
-
 class StructSmallArray {
  private:
   struct Storage_;
@@ -92,8 +90,6 @@ class StructSmallArray {
       &Storage_::a, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_arrays_StructLargeArrayTable;
 
 class StructLargeArray {
  private:
@@ -152,8 +148,6 @@ class StructLargeArray {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_arrays_TableSmallArrayTable;
-
 class TableSmallArray {
  private:
   struct Storage_;
@@ -200,8 +194,6 @@ class TableSmallArray {
       1, &Storage_::a});
 };
 
-extern "C" const fidl_type_t test_arrays_TableLargeArrayTable;
-
 class TableLargeArray {
  private:
   struct Storage_;
@@ -247,8 +239,6 @@ class TableLargeArray {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, ::std::array<uint32_t, 100>, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_arrays_UnionSmallArrayTable;
 
 class UnionSmallArray {
  private:
@@ -344,8 +334,6 @@ class UnionSmallArray {
     }
   }
 };
-
-extern "C" const fidl_type_t test_arrays_UnionLargeArrayTable;
 
 class UnionLargeArray {
  private:
@@ -505,8 +493,6 @@ inline TableLargeArray& TableLargeArray::a(std::optional<::std::array<uint32_t, 
 }  // namespace test_arrays
 namespace fidl {
 
-extern "C" const fidl_type_t test_arrays_StructSmallArrayTable;
-
 template <>
 struct IsFidlType<::test_arrays::StructSmallArray> : public std::true_type {};
 
@@ -525,8 +511,6 @@ struct IsStruct<::test_arrays::StructSmallArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructSmallArray, 8> {};
-
-extern "C" const fidl_type_t test_arrays_StructLargeArrayTable;
 
 template <>
 struct IsFidlType<::test_arrays::StructLargeArray> : public std::true_type {};
@@ -547,8 +531,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_arrays::StructLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_arrays::StructLargeArray, 400> {};
 
-extern "C" const fidl_type_t test_arrays_TableSmallArrayTable;
-
 template <>
 struct IsFidlType<::test_arrays::TableSmallArray> : public std::true_type {};
 
@@ -566,8 +548,6 @@ struct IsTable<::test_arrays::TableSmallArray> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableSmallArray> {};
-
-extern "C" const fidl_type_t test_arrays_TableLargeArrayTable;
 
 template <>
 struct IsFidlType<::test_arrays::TableLargeArray> : public std::true_type {};
@@ -587,8 +567,6 @@ struct IsTable<::test_arrays::TableLargeArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::TableLargeArray, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_arrays::TableLargeArray> {};
 
-extern "C" const fidl_type_t test_arrays_UnionSmallArrayTable;
-
 template <>
 struct IsFidlType<::test_arrays::UnionSmallArray> : public std::true_type {};
 
@@ -607,8 +585,6 @@ struct IsUnion<::test_arrays::UnionSmallArray> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_arrays::UnionSmallArray, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_arrays::UnionSmallArray> {};
-
-extern "C" const fidl_type_t test_arrays_UnionLargeArrayTable;
 
 template <>
 struct IsFidlType<::test_arrays::UnionLargeArray> : public std::true_type {};

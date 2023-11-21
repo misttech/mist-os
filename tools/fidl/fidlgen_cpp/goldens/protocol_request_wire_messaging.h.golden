@@ -175,16 +175,6 @@ namespace fidl {
 #endif  // __Fuchsia__
 
 }  // namespace fidl
-namespace test_protocolrequest {
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
-
-}  // namespace test_protocolrequest
 
 template <>
 struct ::fidl::internal::WireOrdinal<::test_protocolrequest::Parent::GetChild> final {
@@ -589,8 +579,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChild>> {
-  static constexpr const fidl_type_t* kType =
-      nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -620,8 +608,6 @@ struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentGetChildResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
@@ -638,8 +624,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolre
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChild>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChild>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentGetChildResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
@@ -663,8 +647,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::GetChildRequest>> {
-  static constexpr const fidl_type_t* kType =
-      nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -694,8 +676,6 @@ struct IsResource<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildR
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentGetChildRequestResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
@@ -712,8 +692,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolre
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolrequest::Parent::GetChildRequest>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocolrequest::Parent::GetChildRequest>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentGetChildRequestResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
@@ -739,8 +717,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest:
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChild>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentTakeChildRequestTable;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -769,8 +745,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_protocolrequest:
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocolrequest::Parent::TakeChildRequest>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_protocolrequest::test_protocolrequest_ParentTakeChildRequestRequestTable;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));

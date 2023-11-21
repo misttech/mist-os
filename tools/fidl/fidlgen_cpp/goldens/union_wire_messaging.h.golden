@@ -27,9 +27,6 @@ namespace test_union {
 
 class TestProtocol;
 
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 }  // namespace test_union
 
 template <>
@@ -305,8 +302,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -331,8 +326,6 @@ struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHe
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_union::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -349,8 +342,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::Tes
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_union::test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -371,8 +362,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -397,8 +386,6 @@ struct IsFidlType<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnion
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_union::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -415,8 +402,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::Tes
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_union::test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;

@@ -105,11 +105,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_driverhandle::HandlesInProtoc
 
   using Completer = fidl::Completer<>;
 };
-namespace test_driverhandle {
-__LOCAL extern "C" const fidl_type_t test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_driverhandle
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_driverhandle::HandlesInProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -117,10 +113,8 @@ class ::fidl::internal::NaturalClientImpl<::test_driverhandle::HandlesInProtocol
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> SendHandles(::fidl::Request<::test_driverhandle::HandlesInProtocol::SendHandles> request) const;
 };
-namespace test_driverhandle {
 
 #endif  // __Fuchsia__
-}  // namespace test_driverhandle
 
 #ifdef __Fuchsia__
 

@@ -29,9 +29,6 @@ class Super;
 
 class Sub;
 
-__LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 }  // namespace test_inheritance
 
 template <>
@@ -202,8 +199,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Super::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -231,8 +226,6 @@ struct IsFidlType<::fidl::WireResponse<::test_inheritance::Super::Foo>> : public
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -249,8 +242,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritanc
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Super::Foo>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_inheritance::Super::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -672,8 +663,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritance::Sub::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -701,8 +690,6 @@ struct IsFidlType<::fidl::WireResponse<::test_inheritance::Sub::Foo>> : public s
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -719,8 +706,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritanc
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_inheritance::Sub::Foo>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_inheritance::Sub::Foo>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritance::test_inheritance_SuperFooResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;

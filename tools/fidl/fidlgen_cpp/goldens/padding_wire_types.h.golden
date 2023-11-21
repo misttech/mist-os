@@ -63,15 +63,11 @@ struct Padding4ByteAlignmentLength12;
 
 struct Padding2ByteAlignmentLength6;
 
-extern "C" const fidl_type_t test_padding_Padding1ByteEndTable;
-
 struct Padding1ByteEnd {
   uint16_t a = {};
 
   uint8_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding1ByteMiddleTable;
 
 struct Padding1ByteMiddle {
   uint8_t a = {};
@@ -79,15 +75,11 @@ struct Padding1ByteMiddle {
   uint16_t b = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding2ByteEndTable;
-
 struct Padding2ByteEnd {
   uint32_t a = {};
 
   uint16_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding3ByteEndTable;
 
 struct Padding3ByteEnd {
   uint32_t a = {};
@@ -95,15 +87,11 @@ struct Padding3ByteEnd {
   uint8_t b = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding4ByteEndTable;
-
 struct Padding4ByteEnd {
   uint64_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding5ByteEndTable;
 
 struct Padding5ByteEnd {
   uint64_t a = {};
@@ -113,15 +101,11 @@ struct Padding5ByteEnd {
   uint8_t c = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding6ByteEndTable;
-
 struct Padding6ByteEnd {
   uint64_t a = {};
 
   uint16_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding7ByteEndTable;
 
 struct Padding7ByteEnd {
   uint64_t a = {};
@@ -129,15 +113,11 @@ struct Padding7ByteEnd {
   uint8_t b = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding2ByteMiddleTable;
-
 struct Padding2ByteMiddle {
   uint16_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding3ByteMiddleTable;
 
 struct Padding3ByteMiddle {
   uint8_t a = {};
@@ -145,15 +125,11 @@ struct Padding3ByteMiddle {
   uint32_t b = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding4ByteMiddleTable;
-
 struct Padding4ByteMiddle {
   uint32_t a = {};
 
   uint64_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding5ByteMiddleTable;
 
 struct Padding5ByteMiddle {
   uint16_t a = {};
@@ -163,23 +139,17 @@ struct Padding5ByteMiddle {
   uint64_t c = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding6ByteMiddleTable;
-
 struct Padding6ByteMiddle {
   uint16_t a = {};
 
   uint64_t b = {};
 };
 
-extern "C" const fidl_type_t test_padding_Padding7ByteMiddleTable;
-
 struct Padding7ByteMiddle {
   uint8_t a = {};
 
   uint64_t b = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding4ByteAlignmentLength12Table;
 
 struct Padding4ByteAlignmentLength12 {
   uint32_t a = {};
@@ -190,8 +160,6 @@ struct Padding4ByteAlignmentLength12 {
 
   uint16_t d = {};
 };
-
-extern "C" const fidl_type_t test_padding_Padding2ByteAlignmentLength6Table;
 
 struct Padding2ByteAlignmentLength6 {
   uint8_t a = {};

@@ -32,13 +32,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_anonymous::SomeProtocol::Some
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod>&)>;
 };
-namespace test_anonymous {
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocolSomeMethodRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ResultTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_anonymous
 
 template <>
 class ::fidl::Response<::test_anonymous::SomeProtocol::SomeMethod> final : public ::fit::result<::test_anonymous::SomeProtocolSomeMethodError, ::test_anonymous::SomeProtocolSomeMethodResponse> {
@@ -60,8 +55,6 @@ class ::fidl::internal::ResponseMessageConverter<::test_anonymous::SomeProtocol:
     }
   }
 };
-namespace test_anonymous {
-}  // namespace test_anonymous
 
 template <>
 class ::fidl::Result<::test_anonymous::SomeProtocol::SomeMethod> final : public ::fit::result<::fidl::ErrorsIn<::test_anonymous::SomeProtocol::SomeMethod>, ::test_anonymous::SomeProtocolSomeMethodResponse> {
@@ -78,11 +71,8 @@ class ::fidl::internal::NaturalClientImpl<::test_anonymous::SomeProtocol> final 
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_anonymous::SomeProtocol::SomeMethod> SomeMethod(const ::fidl::Request<::test_anonymous::SomeProtocol::SomeMethod>& request) const;
 };
-namespace test_anonymous {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_anonymous
 
 #ifdef __Fuchsia__
 

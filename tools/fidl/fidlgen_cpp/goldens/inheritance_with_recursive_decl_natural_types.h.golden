@@ -30,8 +30,6 @@ class ChildSecondRequest;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
-
 class ParentFirstRequest {
  private:
   struct Storage_;
@@ -82,8 +80,6 @@ class ParentFirstRequest {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
 
 class ChildSecondRequest {
  private:
@@ -171,8 +167,6 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
-
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::ParentFirstRequest> : public std::true_type {};
 template <>
@@ -197,8 +191,6 @@ struct internal::NaturalCodingTraits<::test_inheritancewithrecursivedecl::Parent
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
 
 template <>
 struct IsResource<::test_inheritancewithrecursivedecl::ChildSecondRequest> : public std::true_type {};

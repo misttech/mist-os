@@ -183,17 +183,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocolrequest::Parent::Take
   using Completer = fidl::Completer<>;
 };
 
-namespace test_protocolrequest {
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_protocolrequest
 
 template <>
 class ::fidl::Response<::test_protocolrequest::Parent::GetChild> final : public ::test_protocolrequest::ParentGetChildResponse {
@@ -201,8 +191,6 @@ class ::fidl::Response<::test_protocolrequest::Parent::GetChild> final : public 
   using ::test_protocolrequest::ParentGetChildResponse::ParentGetChildResponse;
   Response(::test_protocolrequest::ParentGetChildResponse v) : ParentGetChildResponse(std::move(v)) {}
 };
-namespace test_protocolrequest {
-}  // namespace test_protocolrequest
 
 template <>
 class ::fidl::Result<::test_protocolrequest::Parent::GetChild> final : public ::fit::result<::fidl::Error, ::test_protocolrequest::ParentGetChildResponse> {
@@ -241,11 +229,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocolrequest::Parent> final 
 
   ::fit::result<::fidl::OneWayError> TakeChildRequest(::fidl::Request<::test_protocolrequest::Parent::TakeChildRequest> request) const;
 };
-namespace test_protocolrequest {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocolrequest
 
 #ifdef __Fuchsia__
 

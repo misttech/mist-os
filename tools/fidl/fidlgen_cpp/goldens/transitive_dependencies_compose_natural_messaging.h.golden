@@ -33,11 +33,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_transitivedependenciescompose
       ::fit::callback<void(::fidl::Result<::test_transitivedependenciescompose::Top::GetFoo>&)>;
 };
 
-namespace test_transitivedependenciescompose {
-__LOCAL extern "C" const fidl_type_t test_bottom_BottomGetFooResponseTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_transitivedependenciescompose
 
 template <>
 class ::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo> final : public ::test_bottom::BottomGetFooResponse {
@@ -45,8 +41,6 @@ class ::fidl::Response<::test_transitivedependenciescompose::Top::GetFoo> final 
   using ::test_bottom::BottomGetFooResponse::BottomGetFooResponse;
   Response(::test_bottom::BottomGetFooResponse v) : BottomGetFooResponse(std::move(v)) {}
 };
-namespace test_transitivedependenciescompose {
-}  // namespace test_transitivedependenciescompose
 
 template <>
 class ::fidl::Result<::test_transitivedependenciescompose::Top::GetFoo> final : public ::fit::result<::fidl::Error, ::test_bottom::BottomGetFooResponse> {
@@ -63,11 +57,8 @@ class ::fidl::internal::NaturalClientImpl<::test_transitivedependenciescompose::
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_transitivedependenciescompose::Top::GetFoo> GetFoo() const;
 };
-namespace test_transitivedependenciescompose {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_transitivedependenciescompose
 
 #ifdef __Fuchsia__
 

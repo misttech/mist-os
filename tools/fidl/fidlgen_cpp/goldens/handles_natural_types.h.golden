@@ -77,8 +77,6 @@ using AliasedRightsHandle = ::zx::vmo;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handles_HandlesTable;
-
 class Handles {
  private:
   struct Storage_;
@@ -626,8 +624,6 @@ class Handles {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handles_FdfHandlesTable;
-
 class FdfHandles {
  private:
   struct Storage_;
@@ -955,8 +951,6 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handles_HandlesTable;
-
 template <>
 struct IsResource<::test_handles::Handles> : public std::true_type {};
 template <>
@@ -981,8 +975,6 @@ struct internal::NaturalCodingTraits<::test_handles::Handles, ::fidl::internal::
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handles_FdfHandlesTable;
 
 template <>
 struct IsResource<::test_handles::FdfHandles> : public std::true_type {};

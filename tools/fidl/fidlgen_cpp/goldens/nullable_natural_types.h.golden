@@ -47,8 +47,6 @@ class StructWithNullableUnion;
 
 class SimpleUnion;
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableStringTable;
-
 class StructWithNullableString {
  private:
   struct Storage_;
@@ -105,8 +103,6 @@ class StructWithNullableString {
       &Storage_::val, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableVectorTable;
 
 class StructWithNullableVector {
  private:
@@ -167,8 +163,6 @@ class StructWithNullableVector {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableHandleTable;
-
 class StructWithNullableHandle {
  private:
   struct Storage_;
@@ -217,8 +211,6 @@ class StructWithNullableHandle {
 };
 
 #endif  // __Fuchsia__
-
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
 
 class SimpleProtocolAddRequest {
  private:
@@ -293,8 +285,6 @@ class SimpleProtocolAddRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
-
 class SimpleProtocolAddResponse {
  private:
   struct Storage_;
@@ -354,8 +344,6 @@ class SimpleProtocolAddResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableProtocolTable;
-
 class StructWithNullableProtocol {
  private:
   struct Storage_;
@@ -407,8 +395,6 @@ class StructWithNullableProtocol {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableRequestTable;
-
 class StructWithNullableRequest {
  private:
   struct Storage_;
@@ -457,8 +443,6 @@ class StructWithNullableRequest {
 };
 
 #endif  // __Fuchsia__
-
-extern "C" const fidl_type_t test_nullable_Int32WrapperTable;
 
 class Int32Wrapper {
  private:
@@ -517,8 +501,6 @@ class Int32Wrapper {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableStructTable;
-
 class StructWithNullableStruct {
  private:
   struct Storage_;
@@ -575,8 +557,6 @@ class StructWithNullableStruct {
       &Storage_::val, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_nullable_SimpleUnionTable;
 
 class SimpleUnion {
  private:
@@ -698,8 +678,6 @@ class SimpleUnion {
     }
   }
 };
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableUnionTable;
 
 class StructWithNullableUnion {
  private:
@@ -934,8 +912,6 @@ inline StructWithNullableUnion& StructWithNullableUnion::val(::fidl::Box<::test_
 }  // namespace test_nullable
 namespace fidl {
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableStringTable;
-
 template <>
 struct IsFidlType<::test_nullable::StructWithNullableString> : public std::true_type {};
 
@@ -954,8 +930,6 @@ struct IsStruct<::test_nullable::StructWithNullableString> : public std::true_ty
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableString, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableString, 16> {};
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableVectorTable;
 
 template <>
 struct IsFidlType<::test_nullable::StructWithNullableVector> : public std::true_type {};
@@ -977,8 +951,6 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableVector, 
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableVector, 16> {};
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableHandleTable;
 
 template <>
 struct IsResource<::test_nullable::StructWithNullableHandle> : public std::true_type {};
@@ -1003,8 +975,6 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableHandle, 
 
 #endif  // __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
-
 template <>
 struct IsFidlType<::test_nullable::SimpleProtocolAddRequest> : public std::true_type {};
 
@@ -1023,8 +993,6 @@ struct IsStruct<::test_nullable::SimpleProtocolAddRequest> : public std::true_ty
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::SimpleProtocolAddRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddRequest, 8> {};
-
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
 
 template <>
 struct IsFidlType<::test_nullable::SimpleProtocolAddResponse> : public std::true_type {};
@@ -1046,8 +1014,6 @@ struct internal::NaturalCodingTraits<::test_nullable::SimpleProtocolAddResponse,
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::SimpleProtocolAddResponse, 4> {};
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableProtocolTable;
 
 template <>
 struct IsResource<::test_nullable::StructWithNullableProtocol> : public std::true_type {};
@@ -1074,8 +1040,6 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableProtocol
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableRequestTable;
-
 template <>
 struct IsResource<::test_nullable::StructWithNullableRequest> : public std::true_type {};
 template <>
@@ -1099,8 +1063,6 @@ struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableRequest,
 
 #endif  // __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_Int32WrapperTable;
-
 template <>
 struct IsFidlType<::test_nullable::Int32Wrapper> : public std::true_type {};
 
@@ -1119,8 +1081,6 @@ struct IsStruct<::test_nullable::Int32Wrapper> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::Int32Wrapper, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::Int32Wrapper, 4> {};
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableStructTable;
 
 template <>
 struct IsFidlType<::test_nullable::StructWithNullableStruct> : public std::true_type {};
@@ -1141,8 +1101,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableStruct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableStruct, 8> {};
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableUnionTable;
-
 template <>
 struct IsFidlType<::test_nullable::StructWithNullableUnion> : public std::true_type {};
 
@@ -1161,8 +1119,6 @@ struct IsStruct<::test_nullable::StructWithNullableUnion> : public std::true_typ
 template <>
 struct internal::NaturalCodingTraits<::test_nullable::StructWithNullableUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_nullable::StructWithNullableUnion, 16> {};
-
-extern "C" const fidl_type_t test_nullable_SimpleUnionTable;
 
 template <>
 struct IsFidlType<::test_nullable::SimpleUnion> : public std::true_type {};

@@ -72,8 +72,6 @@ class MainProtocolOnAnonRequest;
 
 class MainProtocolOnAnonWithErrorResult;
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-
 class TablePayload {
  private:
   struct Storage_;
@@ -119,8 +117,6 @@ class TablePayload {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
 
 class UnionPayload {
  private:
@@ -217,8 +213,6 @@ class UnionPayload {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
-
 class ComposedProtocolOneWayAnonComposedRequest {
  private:
   struct Storage_;
@@ -264,8 +258,6 @@ class ComposedProtocolOneWayAnonComposedRequest {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
 
 class ComposedProtocolTwoWayAnonComposedRequest {
  private:
@@ -362,8 +354,6 @@ class ComposedProtocolTwoWayAnonComposedRequest {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-
 class ComposedProtocolTwoWayAnonComposedResponse {
  private:
   struct Storage_;
@@ -410,8 +400,6 @@ class ComposedProtocolTwoWayAnonComposedResponse {
       1, &Storage_::a});
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-
 class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
  private:
   struct Storage_;
@@ -457,8 +445,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
 
 class ComposedProtocolTwoWayAnonComposedWithErrorResponse {
  private:
@@ -554,8 +540,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResponse {
     }
   }
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
 
 class ComposedProtocolTwoWayAnonComposedWithErrorResult {
  private:
@@ -678,8 +662,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
-
 class ComposedProtocolOnAnonComposedRequest {
  private:
   using Storage_ =
@@ -775,8 +757,6 @@ class ComposedProtocolOnAnonComposedRequest {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable;
-
 class ComposedProtocolOnAnonComposedWithErrorResponse {
  private:
   struct Storage_;
@@ -822,8 +802,6 @@ class ComposedProtocolOnAnonComposedWithErrorResponse {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
 
 class ComposedProtocolOnAnonComposedWithErrorResult {
  private:
@@ -946,8 +924,6 @@ class ComposedProtocolOnAnonComposedWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-
 class ComposedProtocolTwoWayNamedComposedWithErrorResult {
  private:
   using Storage_ =
@@ -1068,8 +1044,6 @@ class ComposedProtocolTwoWayNamedComposedWithErrorResult {
     }
   }
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 
 class ComposedProtocolOnNamedComposedWithErrorResult {
  private:
@@ -1192,8 +1166,6 @@ class ComposedProtocolOnNamedComposedWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
-
 class MainProtocolTwoWayLocalWithErrorResult {
  private:
   using Storage_ =
@@ -1314,8 +1286,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
     }
   }
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
 
 class MainProtocolOnLocalWithErrorResult {
  private:
@@ -1438,8 +1408,6 @@ class MainProtocolOnLocalWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
-
 class MainProtocolOneWayAnonRequest {
  private:
   struct Storage_;
@@ -1485,8 +1453,6 @@ class MainProtocolOneWayAnonRequest {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
 
 class MainProtocolTwoWayAnonRequest {
  private:
@@ -1586,8 +1552,6 @@ class MainProtocolTwoWayAnonRequest {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-
 class MainProtocolTwoWayAnonResponse {
  private:
   struct Storage_;
@@ -1634,8 +1598,6 @@ class MainProtocolTwoWayAnonResponse {
       1, &Storage_::a});
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-
 class MainProtocolTwoWayAnonWithErrorRequest {
  private:
   struct Storage_;
@@ -1681,8 +1643,6 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 class MainProtocolTwoWayAnonWithErrorResponse {
  private:
@@ -1781,8 +1741,6 @@ class MainProtocolTwoWayAnonWithErrorResponse {
     }
   }
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 class MainProtocolTwoWayAnonWithErrorResult {
  private:
@@ -1905,8 +1863,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
-
 class MainProtocolOnAnonRequest {
  private:
   using Storage_ =
@@ -2005,8 +1961,6 @@ class MainProtocolOnAnonRequest {
   }
 };
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable;
-
 class MainProtocolOnAnonWithErrorResponse {
  private:
   struct Storage_;
@@ -2052,8 +2006,6 @@ class MainProtocolOnAnonWithErrorResponse {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::a});
 };
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 
 class MainProtocolOnAnonWithErrorResult {
  private:
@@ -2296,8 +2248,6 @@ inline MainProtocolOnAnonWithErrorResponse& MainProtocolOnAnonWithErrorResponse:
 }  // namespace test_protocollayoutssamelibrary
 namespace fidl {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::TablePayload> : public std::true_type {};
 
@@ -2315,8 +2265,6 @@ struct IsTable<::test_protocollayoutssamelibrary::TablePayload> : public std::tr
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::TablePayload, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::TablePayload> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest> : public std::true_type {};
@@ -2336,8 +2284,6 @@ struct IsTable<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComp
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOneWayAnonComposedRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> : public std::true_type {};
 
@@ -2355,8 +2301,6 @@ struct IsTable<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComp
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest> : public std::true_type {};
@@ -2376,8 +2320,6 @@ struct IsTable<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComp
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse> : public std::true_type {};
 
@@ -2395,8 +2337,6 @@ struct IsTable<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposed
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResponse> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> : public std::true_type {};
@@ -2416,8 +2356,6 @@ struct IsTable<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest>
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOneWayAnonRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse> : public std::true_type {};
 
@@ -2435,8 +2373,6 @@ struct IsTable<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonResponse> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
@@ -2456,8 +2392,6 @@ struct IsTable<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErro
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
 
@@ -2475,8 +2409,6 @@ struct IsTable<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorRes
 
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResponse> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::UnionPayload> : public std::true_type {};
@@ -2497,8 +2429,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::UnionPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::UnionPayload> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest> : public std::true_type {};
 
@@ -2517,8 +2447,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComp
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedRequest> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> : public std::true_type {};
@@ -2539,8 +2467,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResponse> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult> : public std::true_type {};
 
@@ -2559,8 +2485,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComp
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest> : public std::true_type {};
@@ -2581,8 +2505,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> : public std::true_type {};
 
@@ -2601,8 +2523,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposed
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnAnonComposedWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult> : public std::true_type {};
@@ -2623,8 +2543,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolTwoWayNamedComposedWithErrorResult> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> : public std::true_type {};
 
@@ -2643,8 +2561,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedCompose
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
@@ -2665,8 +2581,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayLocalWithErrorResult> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
 
@@ -2685,8 +2599,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorRe
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnLocalWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest> : public std::true_type {};
@@ -2707,8 +2619,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonRequest> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
 
@@ -2727,8 +2637,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErro
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResponse> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
@@ -2749,8 +2657,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolTwoWayAnonWithErrorResult> {};
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
-
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> : public std::true_type {};
 
@@ -2769,8 +2675,6 @@ struct IsUnion<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> : p
 template <>
 struct internal::NaturalCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocollayoutssamelibrary::MainProtocolOnAnonRequest> {};
-
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult> : public std::true_type {};

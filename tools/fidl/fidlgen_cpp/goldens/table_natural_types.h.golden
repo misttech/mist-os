@@ -38,8 +38,6 @@ class ExtensionTable;
 
 class SixtyFourOrdinalTable;
 
-extern "C" const fidl_type_t test_table_EmptyTableTable;
-
 class EmptyTable {
  private:
   struct Storage_;
@@ -75,8 +73,6 @@ class EmptyTable {
   friend struct ::fidl::internal::MemberVisitor<::test_table::EmptyTable>;
   static constexpr auto kMembers = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_table_SimpleTableTable;
 
 class SimpleTable {
  private:
@@ -134,8 +130,6 @@ class SimpleTable {
                                                    ::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{5, &Storage_::y});
 };
 
-extern "C" const fidl_type_t test_table_OlderSimpleTableTable;
-
 class OlderSimpleTable {
  private:
   struct Storage_;
@@ -181,8 +175,6 @@ class OlderSimpleTable {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::x});
 };
-
-extern "C" const fidl_type_t test_table_NewerSimpleTableTable;
 
 class NewerSimpleTable {
  private:
@@ -249,8 +241,6 @@ class NewerSimpleTable {
                                                    ::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{5, &Storage_::y}, ::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{6, &Storage_::z});
 };
 
-extern "C" const fidl_type_t test_table_ReverseOrdinalTableTable;
-
 class ReverseOrdinalTable {
  private:
   struct Storage_;
@@ -316,8 +306,6 @@ class ReverseOrdinalTable {
                                                    ::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{2, &Storage_::y}, ::fidl::internal::NaturalTableMember<Storage_, int64_t, fidl::internal::NaturalCodingConstraintEmpty>{3, &Storage_::x});
 };
 
-extern "C" const fidl_type_t test_table_TableWithAttributesTable;
-
 class TableWithAttributes {
  private:
   struct Storage_;
@@ -364,8 +352,6 @@ class TableWithAttributes {
       1, &Storage_::x});
 };
 
-extern "C" const fidl_type_t test_table_ExtensionTableTable;
-
 class ExtensionTable {
  private:
   struct Storage_;
@@ -401,8 +387,6 @@ class ExtensionTable {
   friend struct ::fidl::internal::MemberVisitor<::test_table::ExtensionTable>;
   static constexpr auto kMembers = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_table_SixtyFourOrdinalTableTable;
 
 class SixtyFourOrdinalTable {
  private:
@@ -1389,8 +1373,6 @@ inline SixtyFourOrdinalTable& SixtyFourOrdinalTable::v64(std::optional<::test_ta
 }  // namespace test_table
 namespace fidl {
 
-extern "C" const fidl_type_t test_table_EmptyTableTable;
-
 template <>
 struct IsFidlType<::test_table::EmptyTable> : public std::true_type {};
 
@@ -1408,8 +1390,6 @@ struct IsTable<::test_table::EmptyTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::EmptyTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::EmptyTable> {};
-
-extern "C" const fidl_type_t test_table_SimpleTableTable;
 
 template <>
 struct IsFidlType<::test_table::SimpleTable> : public std::true_type {};
@@ -1429,8 +1409,6 @@ struct IsTable<::test_table::SimpleTable> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_table::SimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::SimpleTable> {};
 
-extern "C" const fidl_type_t test_table_OlderSimpleTableTable;
-
 template <>
 struct IsFidlType<::test_table::OlderSimpleTable> : public std::true_type {};
 
@@ -1448,8 +1426,6 @@ struct IsTable<::test_table::OlderSimpleTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::OlderSimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::OlderSimpleTable> {};
-
-extern "C" const fidl_type_t test_table_NewerSimpleTableTable;
 
 template <>
 struct IsFidlType<::test_table::NewerSimpleTable> : public std::true_type {};
@@ -1469,8 +1445,6 @@ struct IsTable<::test_table::NewerSimpleTable> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_table::NewerSimpleTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::NewerSimpleTable> {};
 
-extern "C" const fidl_type_t test_table_ReverseOrdinalTableTable;
-
 template <>
 struct IsFidlType<::test_table::ReverseOrdinalTable> : public std::true_type {};
 
@@ -1488,8 +1462,6 @@ struct IsTable<::test_table::ReverseOrdinalTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::ReverseOrdinalTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::ReverseOrdinalTable> {};
-
-extern "C" const fidl_type_t test_table_TableWithAttributesTable;
 
 template <>
 struct IsFidlType<::test_table::TableWithAttributes> : public std::true_type {};
@@ -1509,8 +1481,6 @@ struct IsTable<::test_table::TableWithAttributes> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_table::TableWithAttributes, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::TableWithAttributes> {};
 
-extern "C" const fidl_type_t test_table_ExtensionTableTable;
-
 template <>
 struct IsFidlType<::test_table::ExtensionTable> : public std::true_type {};
 
@@ -1528,8 +1498,6 @@ struct IsTable<::test_table::ExtensionTable> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_table::ExtensionTable, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_table::ExtensionTable> {};
-
-extern "C" const fidl_type_t test_table_SixtyFourOrdinalTableTable;
 
 template <>
 struct IsFidlType<::test_table::SixtyFourOrdinalTable> : public std::true_type {};

@@ -24,8 +24,6 @@ namespace test_byteandbytes {
 
 class ByteAndBytes;
 
-extern "C" const fidl_type_t test_byteandbytes_ByteAndBytesTable;
-
 class ByteAndBytes {
  private:
   struct Storage_;
@@ -102,8 +100,6 @@ inline ByteAndBytes& ByteAndBytes::single_byte(uint8_t value) {
 
 }  // namespace test_byteandbytes
 namespace fidl {
-
-extern "C" const fidl_type_t test_byteandbytes_ByteAndBytesTable;
 
 template <>
 struct IsFidlType<::test_byteandbytes::ByteAndBytes> : public std::true_type {};

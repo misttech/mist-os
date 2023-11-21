@@ -40,13 +40,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_union::TestProtocol::Flexible
       ::fit::callback<void(::fidl::Result<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>&)>;
 };
 
-namespace test_union {
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_union
 
 template <>
 class ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse {
@@ -54,8 +48,6 @@ class ::fidl::Response<::test_union::TestProtocol::StrictUnionHenceResponseMayBe
   using ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse;
   Response(::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse v) : TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse(std::move(v)) {}
 };
-namespace test_union {
-}  // namespace test_union
 
 template <>
 class ::fidl::Result<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> final : public ::fit::result<::fidl::Error, ::test_union::TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponse> {
@@ -90,11 +82,8 @@ class ::fidl::internal::NaturalClientImpl<::test_union::TestProtocol> final : pu
 
   ::fidl::internal::NaturalThenable<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> FlexibleUnionHenceResponseMustBeHeapAllocated() const;
 };
-namespace test_union {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_union
 
 #ifdef __Fuchsia__
 

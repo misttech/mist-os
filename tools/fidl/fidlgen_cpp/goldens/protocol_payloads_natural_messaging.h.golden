@@ -178,39 +178,8 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocolpayloads::MainProtocol::OnAnonWithError> {
   using Request = ::test_protocolpayloads::MainProtocolOnAnonWithErrorResult;
 };
-namespace test_protocolpayloads {
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ImportStructPayloadTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocol_TwoWayComposedWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_imported_ComposedProtocol_OnComposedWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_LocalStructPayloadTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResultTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocolpayloads
 
 template <>
 class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed> final : public ::test_protocolpayloads_imported::ImportStructPayload {
@@ -218,8 +187,6 @@ class ::fidl::Response<::test_protocolpayloads::MainProtocol::TwoWayComposed> fi
   using ::test_protocolpayloads_imported::ImportStructPayload::ImportStructPayload;
   Response(::test_protocolpayloads_imported::ImportStructPayload v) : ImportStructPayload(std::move(v)) {}
 };
-namespace test_protocolpayloads {
-}  // namespace test_protocolpayloads
 
 template <>
 class ::fidl::Result<::test_protocolpayloads::MainProtocol::TwoWayComposed> final : public ::fit::result<::fidl::Error, ::test_protocolpayloads_imported::ImportStructPayload> {
@@ -426,11 +393,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocolpayloads::MainProtocol>
 
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocolpayloads::MainProtocol::OneWayAnon>& request) const;
 };
-namespace test_protocolpayloads {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocolpayloads
 
 #ifdef __Fuchsia__
 

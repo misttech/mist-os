@@ -99,31 +99,8 @@ template <>
 struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError> {
   using Request = ::test_protocollayoutssamelibrary::ComposedProtocolOnNamedComposedWithErrorResult;
 };
-namespace test_protocollayoutssamelibrary {
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_protocollayoutssamelibrary
 
 template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
@@ -131,8 +108,6 @@ class ::fidl::Response<::test_protocollayoutssamelibrary::ComposedProtocol::TwoW
   using ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse;
   Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
 };
-namespace test_protocollayoutssamelibrary {
-}  // namespace test_protocollayoutssamelibrary
 
 template <>
 class ::fidl::Result<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> final : public ::fit::result<::fidl::Error, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> {
@@ -235,11 +210,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Com
 
   ::fit::result<::fidl::OneWayError> OneWayNamedComposed(const ::fidl::Request<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>& request) const;
 };
-namespace test_protocollayoutssamelibrary {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocollayoutssamelibrary
 
 #ifdef __Fuchsia__
 
@@ -625,27 +597,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_protocollayoutssamelibrary::M
   using Request = ::test_protocollayoutssamelibrary::MainProtocolOnAnonWithErrorResult;
 };
 
-namespace test_protocollayoutssamelibrary {
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_protocollayoutssamelibrary
 
 template <>
 class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> final : public ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse {
@@ -653,8 +605,6 @@ class ::fidl::Response<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAn
   using ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse::ComposedProtocolTwoWayAnonComposedResponse;
   Response(::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse v) : ComposedProtocolTwoWayAnonComposedResponse(std::move(v)) {}
 };
-namespace test_protocollayoutssamelibrary {
-}  // namespace test_protocollayoutssamelibrary
 
 template <>
 class ::fidl::Result<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> final : public ::fit::result<::fidl::Error, ::test_protocollayoutssamelibrary::ComposedProtocolTwoWayAnonComposedResponse> {
@@ -861,11 +811,8 @@ class ::fidl::internal::NaturalClientImpl<::test_protocollayoutssamelibrary::Mai
 
   ::fit::result<::fidl::OneWayError> OneWayAnon(const ::fidl::Request<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>& request) const;
 };
-namespace test_protocollayoutssamelibrary {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_protocollayoutssamelibrary
 
 #ifdef __Fuchsia__
 

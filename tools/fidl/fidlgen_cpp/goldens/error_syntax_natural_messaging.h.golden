@@ -44,17 +44,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_errorsyntax::ExampleUseOfErro
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>&)>;
 };
-namespace test_errorsyntax {
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_errorsyntax
 
 template <>
 class ::fidl::Response<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> final : public ::fit::result<uint32_t, ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse> {
@@ -76,8 +67,6 @@ class ::fidl::internal::ResponseMessageConverter<::test_errorsyntax::ExampleUseO
     }
   }
 };
-namespace test_errorsyntax {
-}  // namespace test_errorsyntax
 
 template <>
 class ::fidl::Result<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail> final : public ::fit::result<::fidl::ErrorsIn<::test_errorsyntax::ExampleUseOfErrorSyntax::ComposedCallWhichMayFail>, ::test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResponse> {
@@ -126,11 +115,8 @@ class ::fidl::internal::NaturalClientImpl<::test_errorsyntax::ExampleUseOfErrorS
 
   ::fidl::internal::NaturalThenable<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail> CallWhichMayFail(const ::fidl::Request<::test_errorsyntax::ExampleUseOfErrorSyntax::CallWhichMayFail>& request) const;
 };
-namespace test_errorsyntax {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_errorsyntax
 
 #ifdef __Fuchsia__
 

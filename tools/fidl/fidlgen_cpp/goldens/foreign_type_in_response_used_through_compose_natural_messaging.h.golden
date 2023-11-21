@@ -33,11 +33,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_foreigntypeinresponseusedthro
       ::fit::callback<void(::fidl::Result<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo>&)>;
 };
 
-namespace test_foreigntypeinresponseusedthroughcompose {
-__LOCAL extern "C" const fidl_type_t test_middle_MiddleGetFooResponseTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 template <>
 class ::fidl::Response<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final : public ::test_middle::MiddleGetFooResponse {
@@ -45,8 +41,6 @@ class ::fidl::Response<::test_foreigntypeinresponseusedthroughcompose::Top::GetF
   using ::test_middle::MiddleGetFooResponse::MiddleGetFooResponse;
   Response(::test_middle::MiddleGetFooResponse v) : MiddleGetFooResponse(std::move(v)) {}
 };
-namespace test_foreigntypeinresponseusedthroughcompose {
-}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 template <>
 class ::fidl::Result<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> final : public ::fit::result<::fidl::Error, ::test_middle::MiddleGetFooResponse> {
@@ -63,11 +57,8 @@ class ::fidl::internal::NaturalClientImpl<::test_foreigntypeinresponseusedthroug
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_foreigntypeinresponseusedthroughcompose::Top::GetFoo> GetFoo() const;
 };
-namespace test_foreigntypeinresponseusedthroughcompose {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_foreigntypeinresponseusedthroughcompose
 
 #ifdef __Fuchsia__
 

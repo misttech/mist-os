@@ -16,17 +16,9 @@ namespace test_errorsyntax {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntaxComposedCallWhichMayFailRequestTable;
-
-extern "C" const fidl_type_t test_errorsyntax_parent_ParentUsesErrorSyntax_ComposedCallWhichMayFail_ResultTable;
-
 [[maybe_unused]] constexpr uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 3757408930698888354lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_errorsyntax
 

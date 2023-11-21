@@ -34,8 +34,6 @@ class ParentTakeChildRequestRequest;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
-
 class ParentGetChildResponse {
  private:
   struct Storage_;
@@ -86,8 +84,6 @@ class ParentGetChildResponse {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
 
 class ParentGetChildRequestResponse {
  private:
@@ -140,8 +136,6 @@ class ParentGetChildRequestResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
-
 class ParentTakeChildRequest {
  private:
   struct Storage_;
@@ -192,8 +186,6 @@ class ParentTakeChildRequest {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
 
 class ParentTakeChildRequestRequest {
  private:
@@ -313,8 +305,6 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
-
 template <>
 struct IsResource<::test_protocolrequest::ParentGetChildResponse> : public std::true_type {};
 template <>
@@ -339,8 +329,6 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildRespo
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
 
 template <>
 struct IsResource<::test_protocolrequest::ParentGetChildRequestResponse> : public std::true_type {};
@@ -367,8 +355,6 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentGetChildReque
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
-
 template <>
 struct IsResource<::test_protocolrequest::ParentTakeChildRequest> : public std::true_type {};
 template <>
@@ -393,8 +379,6 @@ struct internal::NaturalCodingTraits<::test_protocolrequest::ParentTakeChildRequ
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
 
 template <>
 struct IsResource<::test_protocolrequest::ParentTakeChildRequestRequest> : public std::true_type {};

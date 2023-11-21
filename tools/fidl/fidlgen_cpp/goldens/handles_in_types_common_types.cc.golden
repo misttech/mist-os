@@ -8,25 +8,21 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_handlesintypes {
-
-extern "C" const fidl_type_t test_handlesintypes_obj_typeTable;
-}  // namespace test_handlesintypes
-
 size_t fidl::internal::DisplayError<::test_handlesintypes::ObjType>::Format(
     const ::test_handlesintypes::ObjType& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 0u:
         return "NONE";
       case 3u:
         return "VMO";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_handlesintypes::test_handlesintypes_obj_typeTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.handlesintypes/obj_type", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
 
 #pragma clang diagnostic pop

@@ -34,8 +34,6 @@ class EmptyProtocolSendAndReceiveRequest;
 
 class EmptyProtocolSendAndReceiveResponse;
 
-extern "C" const fidl_type_t test_emptystruct_EmptyTable;
-
 class Empty {
  private:
   struct Storage_;
@@ -92,8 +90,6 @@ class Empty {
       &Storage_::__reserved, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
 
 class EmptyProtocolSendRequest {
  private:
@@ -152,8 +148,6 @@ class EmptyProtocolSendRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
-
 class EmptyProtocolReceiveRequest {
  private:
   struct Storage_;
@@ -211,8 +205,6 @@ class EmptyProtocolReceiveRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-
 class EmptyProtocolSendAndReceiveRequest {
  private:
   struct Storage_;
@@ -269,8 +261,6 @@ class EmptyProtocolSendAndReceiveRequest {
       &Storage_::e, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 
 class EmptyProtocolSendAndReceiveResponse {
  private:
@@ -417,8 +407,6 @@ inline EmptyProtocolSendAndReceiveResponse& EmptyProtocolSendAndReceiveResponse:
 }  // namespace test_emptystruct
 namespace fidl {
 
-extern "C" const fidl_type_t test_emptystruct_EmptyTable;
-
 template <>
 struct IsFidlType<::test_emptystruct::Empty> : public std::true_type {};
 
@@ -437,8 +425,6 @@ struct IsStruct<::test_emptystruct::Empty> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::Empty, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalEmptyStructCodingTraits<::test_emptystruct::Empty> {};
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
 
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendRequest> : public std::true_type {};
@@ -459,8 +445,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendRequest, 1> {};
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolReceiveRequest> : public std::true_type {};
 
@@ -480,8 +464,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolReceiveRequest, 1> {};
 
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public std::true_type {};
 
@@ -500,8 +482,6 @@ struct IsStruct<::test_emptystruct::EmptyProtocolSendAndReceiveRequest> : public
 template <>
 struct internal::NaturalCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_emptystruct::EmptyProtocolSendAndReceiveRequest, 1> {};
-
-extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 
 template <>
 struct IsFidlType<::test_emptystruct::EmptyProtocolSendAndReceiveResponse> : public std::true_type {};

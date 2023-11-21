@@ -179,7 +179,6 @@ class TheUnion;
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
 struct WithErrorSyntaxErrorAsPrimitiveResponse {
 
@@ -189,7 +188,6 @@ struct WithErrorSyntaxErrorAsPrimitiveResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 
 struct WithErrorSyntaxErrorAsEnumResponse {
 
@@ -201,7 +199,6 @@ struct WithErrorSyntaxErrorAsEnumResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
 
 struct WithErrorSyntaxHandleInResultResponse {
 
@@ -222,7 +219,6 @@ struct WithErrorSyntaxHandleInResultResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTable;
 
 struct ChannelProtocolTakeHandleRequest {
 
@@ -239,7 +235,6 @@ struct ChannelProtocolTakeHandleRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTable;
 
 struct ChannelProtocolMutateSocketRequest {
 
@@ -256,7 +251,6 @@ struct ChannelProtocolMutateSocketRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseTable;
 
 struct ChannelProtocolMutateSocketResponse {
 
@@ -278,7 +272,6 @@ struct ChannelProtocolMutateSocketResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
 
 struct HandleRightsProtocolNoResponseMethodRequest {
 
@@ -295,7 +288,6 @@ struct HandleRightsProtocolNoResponseMethodRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRequestTable;
 
 struct HandleRightsProtocolResponseMethodRequest {
 
@@ -312,7 +304,6 @@ struct HandleRightsProtocolResponseMethodRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodResponseTable;
 
 struct HandleRightsProtocolResponseMethodResponse {
 
@@ -329,7 +320,6 @@ struct HandleRightsProtocolResponseMethodResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTable;
 
 struct HandleRightsProtocolAnEventRequest {
 
@@ -347,7 +337,6 @@ struct HandleRightsProtocolAnEventRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTable;
 
 struct WithProtocolEndsClientEndsRequest {
 
@@ -364,7 +353,6 @@ struct WithProtocolEndsClientEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTable;
 
 struct WithProtocolEndsClientEndsResponse {
 
@@ -381,7 +369,6 @@ struct WithProtocolEndsClientEndsResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTable;
 
 struct WithProtocolEndsServerEndsRequest {
 
@@ -398,7 +385,6 @@ struct WithProtocolEndsServerEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTable;
 
 struct WithProtocolEndsServerEndsResponse {
 
@@ -419,7 +405,6 @@ struct WithProtocolEndsServerEndsResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
 
 class WithErrorSyntaxResponseAsStructResult {
   public:
@@ -503,7 +488,6 @@ class WithErrorSyntaxResponseAsStructResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
 
 class WithErrorSyntaxErrorAsPrimitiveResult {
   public:
@@ -580,7 +564,6 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
 
 class WithErrorSyntaxErrorAsEnumResult {
   public:
@@ -659,7 +642,6 @@ class WithErrorSyntaxErrorAsEnumResult {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
 class WithErrorSyntaxHandleInResultResult {
   public:
@@ -748,7 +730,6 @@ class WithErrorSyntaxHandleInResultResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_TheUnionTable;
 
 class TheUnion {
   public:
@@ -807,7 +788,6 @@ class TheUnion {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
 
 struct WithAndWithoutRequestResponseNoRequestWithResponseResponse {
 
@@ -817,7 +797,6 @@ struct WithAndWithoutRequestResponseNoRequestWithResponseResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
 
 struct WithAndWithoutRequestResponseWithRequestNoResponseRequest {
 
@@ -827,7 +806,6 @@ struct WithAndWithoutRequestResponseWithRequestNoResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
 
 struct WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
 
@@ -837,7 +815,6 @@ struct WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
 
 struct WithAndWithoutRequestResponseWithRequestWithResponseRequest {
 
@@ -847,7 +824,6 @@ struct WithAndWithoutRequestResponseWithRequestWithResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
 
 struct WithAndWithoutRequestResponseWithRequestWithResponseResponse {
 
@@ -857,7 +833,6 @@ struct WithAndWithoutRequestResponseWithRequestWithResponseResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
 
 struct WithAndWithoutRequestResponseOnWithResponseRequest {
 
@@ -867,7 +842,6 @@ struct WithAndWithoutRequestResponseOnWithResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable;
 
 struct WithErrorSyntaxResponseAsStructResponse {
 
@@ -884,7 +858,6 @@ struct WithErrorSyntaxResponseAsStructResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
 
 struct ChannelProtocolMethodARequest {
 
@@ -896,7 +869,6 @@ struct ChannelProtocolMethodARequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
 
 struct ChannelProtocolEventARequest {
 
@@ -908,7 +880,6 @@ struct ChannelProtocolEventARequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
 
 struct ChannelProtocolMethodBRequest {
 
@@ -920,7 +891,6 @@ struct ChannelProtocolMethodBRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
 
 struct ChannelProtocolMethodBResponse {
 
@@ -933,7 +903,6 @@ struct ChannelProtocolMethodBResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_SyscallProtocolMethodCRequestTable;
 
 struct SyscallProtocolMethodCRequest {
 
@@ -945,7 +914,6 @@ struct SyscallProtocolMethodCRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalRequestRequestTable;
 
 struct TransitionalRequestRequest {
 
@@ -955,7 +923,6 @@ struct TransitionalRequestRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalRequestResponseTable;
 
 struct TransitionalRequestResponse {
 
@@ -965,7 +932,6 @@ struct TransitionalRequestResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalOneWayRequestTable;
 
 struct TransitionalOneWayRequest {
 
@@ -975,7 +941,6 @@ struct TransitionalOneWayRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 
 struct TransitionalEventRequest {
 
@@ -991,7 +956,6 @@ struct TransitionalEventRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ProtocolEndsTable;
 
 struct ProtocolEnds {
 
@@ -1018,7 +982,6 @@ struct ProtocolEnds {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
 
 struct WithProtocolEndsStructContainingEndsRequest {
 
@@ -1035,7 +998,6 @@ struct WithProtocolEndsStructContainingEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
 
 struct WithProtocolEndsStructContainingEndsResponse {
 
@@ -1050,7 +1012,6 @@ struct WithProtocolEndsStructContainingEndsResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 
 struct ManyParametersFifteenRequest {
 
@@ -1088,7 +1049,6 @@ struct ManyParametersFifteenRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTable;
 
 struct MethodWithUnionUnionMethodRequest {
 
@@ -1098,7 +1058,6 @@ struct MethodWithUnionUnionMethodRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTable;
 
 struct MethodWithUnionUnionMethodResponse {
 

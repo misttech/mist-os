@@ -27,13 +27,6 @@ namespace test_requestflexibleenvelope {
 
 class Protocol;
 
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 }  // namespace test_requestflexibleenvelope
 
 template <>
@@ -329,8 +322,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -358,8 +349,6 @@ struct IsFidlType<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol:
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -376,8 +365,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_requestfle
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol::RequestStrictResponseFlexible>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -398,8 +385,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -427,8 +412,6 @@ struct IsFidlType<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol:
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -445,8 +428,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_requestfle
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_requestflexibleenvelope::Protocol::RequestFlexibleResponseStrict>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_requestflexibleenvelope::test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;

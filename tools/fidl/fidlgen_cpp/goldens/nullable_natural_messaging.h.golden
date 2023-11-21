@@ -32,13 +32,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_nullable::SimpleProtocol::Add
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_nullable::SimpleProtocol::Add>&)>;
 };
-namespace test_nullable {
-__LOCAL extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_nullable
 
 template <>
 class ::fidl::Response<::test_nullable::SimpleProtocol::Add> final : public ::test_nullable::SimpleProtocolAddResponse {
@@ -46,8 +41,6 @@ class ::fidl::Response<::test_nullable::SimpleProtocol::Add> final : public ::te
   using ::test_nullable::SimpleProtocolAddResponse::SimpleProtocolAddResponse;
   Response(::test_nullable::SimpleProtocolAddResponse v) : SimpleProtocolAddResponse(std::move(v)) {}
 };
-namespace test_nullable {
-}  // namespace test_nullable
 
 template <>
 class ::fidl::Result<::test_nullable::SimpleProtocol::Add> final : public ::fit::result<::fidl::Error, ::test_nullable::SimpleProtocolAddResponse> {
@@ -64,11 +57,8 @@ class ::fidl::internal::NaturalClientImpl<::test_nullable::SimpleProtocol> final
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_nullable::SimpleProtocol::Add> Add(const ::fidl::Request<::test_nullable::SimpleProtocol::Add>& request) const;
 };
-namespace test_nullable {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_nullable
 
 #ifdef __Fuchsia__
 

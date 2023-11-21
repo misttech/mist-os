@@ -29,8 +29,6 @@ class TwoWayAddRequest;
 
 class TwoWayAddResponse;
 
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddRequestTable;
-
 class TwoWayAddRequest {
  private:
   struct Storage_;
@@ -103,8 +101,6 @@ class TwoWayAddRequest {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint16_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::addend2, 2});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddResponseTable;
 
 class TwoWayAddResponse {
  private:
@@ -206,8 +202,6 @@ inline TwoWayAddResponse& TwoWayAddResponse::sum(uint16_t value) {
 }  // namespace test_drivertwoway
 namespace fidl {
 
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddRequestTable;
-
 template <>
 struct IsFidlType<::test_drivertwoway::TwoWayAddRequest> : public std::true_type {};
 
@@ -226,8 +220,6 @@ struct IsStruct<::test_drivertwoway::TwoWayAddRequest> : public std::true_type {
 template <>
 struct internal::NaturalCodingTraits<::test_drivertwoway::TwoWayAddRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_drivertwoway::TwoWayAddRequest, 4> {};
-
-extern "C" const fidl_type_t test_drivertwoway_TwoWayAddResponseTable;
 
 template <>
 struct IsFidlType<::test_drivertwoway::TwoWayAddResponse> : public std::true_type {};

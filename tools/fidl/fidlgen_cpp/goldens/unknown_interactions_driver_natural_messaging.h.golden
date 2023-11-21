@@ -168,46 +168,12 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using ResultCallback =
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>&)>;
 };
-
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 #ifdef __Fuchsia__
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> final {
  public:
 };
-namespace test_unknowninteractions {
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fdf::Result<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay> final : public ::fit::result<::fidl::Error> {
@@ -644,10 +610,8 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
-namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 
@@ -1036,30 +1000,12 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using ResultCallback =
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>&)>;
 };
-
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
 #ifdef __Fuchsia__
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> final {
  public:
 };
-namespace test_unknowninteractions {
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fdf::Result<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay> final : public ::fit::result<::fidl::Error> {
@@ -1262,10 +1208,8 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fit::result<::fidl::OneWayError> FlexibleOneWay() const;
 };
-namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 
@@ -1537,30 +1481,12 @@ struct ::fidl::internal::NaturalMethodTypes<::test_unknowninteractions::UnknownI
   using ResultCallback =
       ::fit::callback<void(::fdf::Result<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>&)>;
 };
-
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
 #ifdef __Fuchsia__
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fidl::Response<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> final {
  public:
 };
-namespace test_unknowninteractions {
-}  // namespace test_unknowninteractions
 
 template <>
 class ::fdf::Result<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay> final : public ::fit::result<::fidl::Error> {
@@ -1761,10 +1687,8 @@ class ::fidl::internal::NaturalClientImpl<::test_unknowninteractions::UnknownInt
 
   ::fit::result<::fidl::OneWayError> StrictOneWay() const;
 };
-namespace test_unknowninteractions {
 
 #endif  // __Fuchsia__
-}  // namespace test_unknowninteractions
 
 #ifdef __Fuchsia__
 

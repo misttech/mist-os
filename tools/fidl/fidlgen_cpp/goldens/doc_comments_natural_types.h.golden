@@ -37,8 +37,6 @@ class FlexibleUnion;
 /// const comment #3
 constexpr int32_t kC = 4u;
 
-extern "C" const fidl_type_t test_doccomments_StructTable;
-
 /// struct comment #1
 ///
 /// struct comment #3
@@ -110,8 +108,6 @@ class Struct {
       &Storage_::field, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_doccomments_StrictUnionTable;
 
 /// strict union comment #1
 ///
@@ -213,8 +209,6 @@ class StrictUnion {
     }
   }
 };
-
-extern "C" const fidl_type_t test_doccomments_FlexibleUnionTable;
 
 /// flexible union comment #1
 ///
@@ -320,8 +314,6 @@ class FlexibleUnion {
   }
 };
 
-extern "C" const fidl_type_t test_doccomments_TableTable;
-
 /// table comment #1
 ///
 /// table comment #3
@@ -416,8 +408,6 @@ inline Table& Table::field(std::optional<int32_t> value) {
 }  // namespace test_doccomments
 namespace fidl {
 
-extern "C" const fidl_type_t test_doccomments_StructTable;
-
 template <>
 struct IsFidlType<::test_doccomments::Struct> : public std::true_type {};
 
@@ -437,8 +427,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_doccomments::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_doccomments::Struct, 4> {};
 
-extern "C" const fidl_type_t test_doccomments_TableTable;
-
 template <>
 struct IsFidlType<::test_doccomments::Table> : public std::true_type {};
 
@@ -456,8 +444,6 @@ struct IsTable<::test_doccomments::Table> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_doccomments::Table> {};
-
-extern "C" const fidl_type_t test_doccomments_StrictUnionTable;
 
 template <>
 struct IsFidlType<::test_doccomments::StrictUnion> : public std::true_type {};
@@ -477,8 +463,6 @@ struct IsUnion<::test_doccomments::StrictUnion> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_doccomments::StrictUnion, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_doccomments::StrictUnion> {};
-
-extern "C" const fidl_type_t test_doccomments_FlexibleUnionTable;
 
 template <>
 struct IsFidlType<::test_doccomments::FlexibleUnion> : public std::true_type {};

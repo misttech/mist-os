@@ -36,13 +36,9 @@ struct SuperFooRequest;
 
 struct SuperFooResponse;
 
-extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
 struct SuperFooRequest {
   ::fidl::StringView s = {};
 };
-
-extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 
 struct SuperFooResponse {
   int64_t y = {};

@@ -44,8 +44,6 @@ class FlexibleFoo;
 
 class StrictFoo;
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_FlexibleFooTable;
-
 class FlexibleFoo {
  public:
   FlexibleFoo() : ordinal_(::test_requestflexibleenvelope::wire::FlexibleFoo::Ordinal::Invalid), envelope_{} {}
@@ -122,8 +120,6 @@ class FlexibleFoo {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_StrictFooTable;
-
 class StrictFoo {
  public:
   StrictFoo() : ordinal_(::test_requestflexibleenvelope::wire::StrictFoo::Ordinal::Invalid), envelope_{} {}
@@ -199,25 +195,17 @@ class StrictFoo {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
 struct ProtocolRequestStrictResponseFlexibleRequest {
   ::test_requestflexibleenvelope::wire::StrictFoo s = {};
 };
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
 
 struct ProtocolRequestStrictResponseFlexibleResponse {
   ::test_requestflexibleenvelope::wire::FlexibleFoo f = {};
 };
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
 struct ProtocolRequestFlexibleResponseStrictRequest {
   ::test_requestflexibleenvelope::wire::FlexibleFoo s = {};
 };
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 
 struct ProtocolRequestFlexibleResponseStrictResponse {
   ::test_requestflexibleenvelope::wire::StrictFoo f = {};

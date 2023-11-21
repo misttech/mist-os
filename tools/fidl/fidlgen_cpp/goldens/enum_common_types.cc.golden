@@ -8,56 +8,43 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_enum {
-
-extern "C" const fidl_type_t test_enum_MyStrictEnumTable;
-}  // namespace test_enum
-
 size_t fidl::internal::DisplayError<::test_enum::MyStrictEnum>::Format(
     const ::test_enum::MyStrictEnum& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 1u:
         return "FOO";
       case 2u:
         return "BAR";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_enum::test_enum_MyStrictEnumTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.enum/MyStrictEnum", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
-
-namespace test_enum {
-
-extern "C" const fidl_type_t test_enum_MyFlexibleEnumTable;
-}  // namespace test_enum
 
 size_t fidl::internal::DisplayError<::test_enum::MyFlexibleEnum>::Format(
     const ::test_enum::MyFlexibleEnum& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 1u:
         return "FOO";
       case 2u:
         return "BAR";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_enum::test_enum_MyFlexibleEnumTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.enum/MyFlexibleEnum", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
-
-namespace test_enum {
-
-extern "C" const fidl_type_t test_enum_MyFlexibleEnumWithCustomUnknownTable;
-}  // namespace test_enum
 
 size_t fidl::internal::DisplayError<::test_enum::MyFlexibleEnumWithCustomUnknown>::Format(
     const ::test_enum::MyFlexibleEnumWithCustomUnknown& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 1u:
         return "FOO";
@@ -66,28 +53,25 @@ size_t fidl::internal::DisplayError<::test_enum::MyFlexibleEnumWithCustomUnknown
       case 3u:
         return "CUSTOM_UNKNOWN";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_enum::test_enum_MyFlexibleEnumWithCustomUnknownTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.enum/MyFlexibleEnumWithCustomUnknown", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
-
-namespace test_enum {
-
-extern "C" const fidl_type_t test_enum_MyEmptyFlexibleEnumTable;
-}  // namespace test_enum
 
 size_t fidl::internal::DisplayError<::test_enum::MyEmptyFlexibleEnum>::Format(
     const ::test_enum::MyEmptyFlexibleEnum& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_enum::test_enum_MyEmptyFlexibleEnumTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.enum/MyEmptyFlexibleEnum", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
 
 #pragma clang diagnostic pop

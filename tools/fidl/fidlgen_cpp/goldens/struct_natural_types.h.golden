@@ -26,8 +26,6 @@ class Simple;
 
 class BasicStruct;
 
-extern "C" const fidl_type_t test_struct_SimpleTable;
-
 class Simple {
  private:
   struct Storage_;
@@ -100,8 +98,6 @@ class Simple {
                                                    ::fidl::internal::NaturalStructMember<Storage_, bool, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::f2, 1});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_struct_BasicStructTable;
 
 class BasicStruct {
  private:
@@ -228,8 +224,6 @@ inline BasicStruct& BasicStruct::y(::std::string value) {
 }  // namespace test_struct
 namespace fidl {
 
-extern "C" const fidl_type_t test_struct_SimpleTable;
-
 template <>
 struct IsFidlType<::test_struct::Simple> : public std::true_type {};
 
@@ -248,8 +242,6 @@ struct IsStruct<::test_struct::Simple> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_struct::Simple, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_struct::Simple, 2> {};
-
-extern "C" const fidl_type_t test_struct_BasicStructTable;
 
 template <>
 struct IsFidlType<::test_struct::BasicStruct> : public std::true_type {};

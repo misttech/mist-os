@@ -14,7 +14,6 @@ struct {{ .Name }};
 {{ if .IsResourceType }}
 {{- IfdefFuchsia -}}
 {{- end }}
-extern "C" const fidl_type_t {{ .CodingTableType.Name }};
 {{ .Docs }}
 struct {{ .Name }} {
 {{- range .AnonymousChildren }}

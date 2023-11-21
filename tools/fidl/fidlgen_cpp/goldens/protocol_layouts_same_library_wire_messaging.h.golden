@@ -36,37 +36,6 @@
   class MainProtocol;
     
 
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 }  // namespace test_protocollayoutssamelibrary
 
 template<>
@@ -1036,8 +1005,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1066,8 +1033,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1098,8 +1063,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1117,8 +1080,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1140,8 +1101,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1172,8 +1131,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1191,8 +1148,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1214,8 +1169,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1242,8 +1195,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1270,8 +1221,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1300,8 +1249,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1332,8 +1279,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1351,8 +1296,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1374,8 +1317,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1406,8 +1347,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::Compos
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1425,8 +1364,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -1448,8 +1385,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -1476,8 +1411,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -2292,57 +2225,7 @@ class ::fidl::WireServer<::test_protocollayoutssamelibrary::ComposedProtocol> : 
 
     
 
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    }  // namespace fidl
-namespace test_protocollayoutssamelibrary {
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
-}  // namespace test_protocollayoutssamelibrary
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed> final { static constexpr uint64_t value = 7960710870216447007lu; };
@@ -4231,8 +4114,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4261,8 +4142,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4293,8 +4172,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4312,8 +4189,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4335,8 +4210,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4367,8 +4240,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4386,8 +4257,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4409,8 +4278,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4437,8 +4304,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4465,8 +4330,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4495,8 +4358,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4527,8 +4388,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4546,8 +4405,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4569,8 +4426,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4601,8 +4456,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4620,8 +4473,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4643,8 +4494,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4671,8 +4520,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposedWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4699,8 +4546,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4729,8 +4574,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4761,8 +4604,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4780,8 +4621,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4803,8 +4642,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_TablePayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4835,8 +4672,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4854,8 +4689,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4877,8 +4710,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_UnionPayloadTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4905,8 +4736,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocalWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4933,8 +4762,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4963,8 +4790,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -4995,8 +4820,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5014,8 +4837,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5037,8 +4858,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -5069,8 +4888,6 @@ struct IsFidlType<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainPr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5088,8 +4905,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocolla
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5111,8 +4926,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));
@@ -5139,8 +4952,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_pr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonWithError>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_protocollayoutssamelibrary::test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));

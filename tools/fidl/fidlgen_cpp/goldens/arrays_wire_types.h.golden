@@ -78,8 +78,6 @@ struct ::fidl::WireTableFrame<::test_arrays::wire::TableSmallArray> final {
 namespace test_arrays {
 namespace wire {
 
-extern "C" const fidl_type_t test_arrays_TableSmallArrayTable;
-
 class TableSmallArray {
  public:
   TableSmallArray() = default;
@@ -310,8 +308,6 @@ struct ::fidl::WireTableFrame<::test_arrays::wire::TableLargeArray> final {
 namespace test_arrays {
 namespace wire {
 
-extern "C" const fidl_type_t test_arrays_TableLargeArrayTable;
-
 class TableLargeArray {
  public:
   TableLargeArray() = default;
@@ -507,8 +503,6 @@ inline ::fidl::WireTableExternalBuilder<::test_arrays::wire::TableLargeArray> Ta
   return ::fidl::WireTableExternalBuilder<::test_arrays::wire::TableLargeArray>(std::move(frame));
 }
 
-extern "C" const fidl_type_t test_arrays_UnionSmallArrayTable;
-
 class UnionSmallArray {
  public:
   UnionSmallArray() : ordinal_(::test_arrays::wire::UnionSmallArray::Ordinal::Invalid), envelope_{} {}
@@ -563,8 +557,6 @@ class UnionSmallArray {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_arrays_UnionLargeArrayTable;
 
 class UnionLargeArray {
  public:
@@ -621,13 +613,9 @@ class UnionLargeArray {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_arrays_StructSmallArrayTable;
-
 struct StructSmallArray {
   ::fidl::Array<uint32_t, 2> a = {};
 };
-
-extern "C" const fidl_type_t test_arrays_StructLargeArrayTable;
 
 struct StructLargeArray {
   ::fidl::Array<uint32_t, 100> a = {};

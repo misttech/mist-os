@@ -16,17 +16,9 @@ namespace test_requestflexibleenvelope {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kProtocol_RequestStrictResponseFlexible_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleRequestTable;
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestStrictResponseFlexibleResponseTable;
-
 [[maybe_unused]] constexpr uint64_t kProtocol_RequestFlexibleResponseStrict_Ordinal = 5191655763393883319lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kProtocol_RequestFlexibleResponseStrict_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictRequestTable;
-
-extern "C" const fidl_type_t test_requestflexibleenvelope_ProtocolRequestFlexibleResponseStrictResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_requestflexibleenvelope
 

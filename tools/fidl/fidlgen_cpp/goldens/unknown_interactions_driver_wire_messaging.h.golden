@@ -40,57 +40,6 @@
   class UnknownInteractionsClosedDriverProtocol;
     
 
-    
-    
-    
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 }  // namespace test_unknowninteractions
 
 template<>
@@ -2230,8 +2179,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2257,8 +2204,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2284,8 +2229,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2311,8 +2254,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -2336,8 +2277,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2365,8 +2304,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -2384,8 +2321,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -2408,8 +2343,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2437,8 +2370,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2456,8 +2387,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2479,8 +2408,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2508,8 +2435,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2527,8 +2452,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2550,8 +2473,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2579,8 +2500,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2598,8 +2517,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2621,8 +2538,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2650,8 +2565,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2669,8 +2582,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2692,8 +2603,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2721,8 +2630,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2740,8 +2647,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -2763,8 +2668,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2792,8 +2695,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -2811,8 +2712,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -2834,8 +2733,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2863,8 +2760,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2882,8 +2777,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2905,8 +2798,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -2934,8 +2825,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2953,8 +2842,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -2976,8 +2863,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3005,8 +2890,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3024,8 +2907,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3047,8 +2928,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3076,8 +2955,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -3095,8 +2972,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -3118,8 +2993,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3147,8 +3020,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3166,8 +3037,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3189,8 +3058,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3218,8 +3085,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3237,8 +3102,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3260,8 +3123,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3289,8 +3150,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3308,8 +3167,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3331,8 +3188,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3360,8 +3215,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -3379,8 +3232,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsDriverProtocol::FlexibleTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5036,35 +4887,7 @@ class ::fdf::WireServer<::test_unknowninteractions::UnknownInteractionsDriverPro
 
     
 
-    
-    
-    
-    
-    
-    
-    
-    }  // namespace fidl
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
-}  // namespace test_unknowninteractions
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay> final { static constexpr uint64_t value = 200845620698173917lu; };
@@ -6191,8 +6014,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6218,8 +6039,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::FlexibleOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6245,8 +6064,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6272,8 +6089,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -6297,8 +6112,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6326,8 +6139,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -6345,8 +6156,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -6369,8 +6178,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6398,8 +6205,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6417,8 +6222,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6440,8 +6243,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6469,8 +6270,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -6488,8 +6287,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -6511,8 +6308,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6540,8 +6335,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6559,8 +6352,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6582,8 +6373,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6611,8 +6400,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6630,8 +6417,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -6653,8 +6438,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6682,8 +6465,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -6701,8 +6482,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -6724,8 +6503,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -6753,8 +6530,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -6772,8 +6547,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsAjarDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -7680,33 +7453,7 @@ class ::fdf::WireServer<::test_unknowninteractions::UnknownInteractionsAjarDrive
 
     
 
-    
-    
-    
-    
-    
-    }  // namespace fidl
-namespace test_unknowninteractions {
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-    
-    
-__LOCAL extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
-}  // namespace test_unknowninteractions
+}  // namespace fidl
 
 template<>
 struct ::fidl::internal::WireOrdinal<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay> final { static constexpr uint64_t value = 9111839835597799810lu; };
@@ -8784,8 +8531,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictOneWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -8811,8 +8556,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -8838,8 +8581,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalResponse<::test
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWay>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr bool kHasServerToClientBody = false;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -8863,8 +8604,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -8892,8 +8631,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -8911,8 +8648,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFields>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -8935,8 +8670,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -8964,8 +8697,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -8983,8 +8714,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnion>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9006,8 +8735,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9035,8 +8762,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9054,8 +8779,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTable>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9077,8 +8800,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9106,8 +8827,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9125,8 +8844,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9148,8 +8865,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9177,8 +8892,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9196,8 +8909,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayFieldsErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -9219,8 +8930,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9248,8 +8957,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9267,8 +8974,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayUnionErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -9290,8 +8995,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -9319,8 +9022,6 @@ struct IsFidlType<::fidl::WireResponse<::test_unknowninteractions::UnknownIntera
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -9338,8 +9039,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknownint
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_unknowninteractions::UnknownInteractionsClosedDriverProtocol::StrictTwoWayTableErr>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_unknowninteractions::test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;

@@ -47,8 +47,6 @@ class StrictUnion;
 
 class FlexibleUnion;
 
-extern "C" const fidl_type_t test_doccomments_StructTable;
-
 /// struct comment #1
 ///
 /// struct comment #3
@@ -93,8 +91,6 @@ struct ::fidl::WireTableFrame<::test_doccomments::wire::Table> final {
 
 namespace test_doccomments {
 namespace wire {
-
-extern "C" const fidl_type_t test_doccomments_TableTable;
 
 /// table comment #1
 ///
@@ -277,8 +273,6 @@ inline ::fidl::WireTableExternalBuilder<::test_doccomments::wire::Table> Table::
   return ::fidl::WireTableExternalBuilder<::test_doccomments::wire::Table>(std::move(frame));
 }
 
-extern "C" const fidl_type_t test_doccomments_StrictUnionTable;
-
 /// strict union comment #1
 ///
 /// strict union comment #3
@@ -339,8 +333,6 @@ class StrictUnion {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_doccomments_FlexibleUnionTable;
 
 /// flexible union comment #1
 ///

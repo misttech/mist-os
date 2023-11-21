@@ -32,96 +32,6 @@
   class Protocol;
     
 
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
-    
-    
-    
-    
-    
-__LOCAL extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
-    
-    
 }  // namespace test_typesinprotocols
 
 template<>
@@ -3679,8 +3589,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_BasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(80 + sizeof(fidl_message_header_t));
@@ -3721,8 +3629,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_BasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(80 + sizeof(fidl_message_header_t));
@@ -3765,8 +3671,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_BasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3784,8 +3688,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_BasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -3819,8 +3721,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -3848,8 +3748,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorB
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3867,8 +3765,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -3890,8 +3786,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_BasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(80 + sizeof(fidl_message_header_t));
@@ -3918,8 +3812,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_CompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(72 + sizeof(fidl_message_header_t));
@@ -3955,8 +3847,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_CompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(72 + sizeof(fidl_message_header_t));
@@ -3994,8 +3884,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_CompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4013,8 +3901,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_CompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4043,8 +3929,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4072,8 +3956,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorC
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4091,8 +3973,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4114,8 +3994,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_CompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(72 + sizeof(fidl_message_header_t));
@@ -4142,8 +4020,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(384 + sizeof(fidl_message_header_t));
@@ -4184,8 +4060,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(384 + sizeof(fidl_message_header_t));
@@ -4228,8 +4102,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayBasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4247,8 +4119,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayBasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4282,8 +4152,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4311,8 +4179,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4330,8 +4196,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4353,8 +4217,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(384 + sizeof(fidl_message_header_t));
@@ -4381,8 +4243,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(328 + sizeof(fidl_message_header_t));
@@ -4418,8 +4278,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(328 + sizeof(fidl_message_header_t));
@@ -4457,8 +4315,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayCompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4476,8 +4332,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayCompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
@@ -4506,8 +4360,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4535,8 +4387,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4554,8 +4404,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4577,8 +4425,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(328 + sizeof(fidl_message_header_t));
@@ -4605,8 +4451,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(192 + sizeof(fidl_message_header_t));
@@ -4647,8 +4491,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(192 + sizeof(fidl_message_header_t));
@@ -4691,8 +4533,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorBasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4710,8 +4550,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorBasicTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4745,8 +4583,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4774,8 +4610,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4793,8 +4627,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -4816,8 +4648,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorBasic>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorBasicTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(192 + sizeof(fidl_message_header_t));
@@ -4844,8 +4674,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(112 + sizeof(fidl_message_header_t));
@@ -4881,8 +4709,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(112 + sizeof(fidl_message_header_t));
@@ -4920,8 +4746,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorCompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4939,8 +4763,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorCompoundTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -4969,8 +4791,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -4998,8 +4818,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5017,8 +4835,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5040,8 +4856,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorCompound>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorCompoundTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(112 + sizeof(fidl_message_header_t));
@@ -5068,8 +4882,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorOptionalTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(64 + sizeof(fidl_message_header_t));
@@ -5102,8 +4914,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorOptionalTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(64 + sizeof(fidl_message_header_t));
@@ -5138,8 +4948,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorOptionalTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5157,8 +4965,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayVectorOptional>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorOptionalTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5184,8 +4990,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -5213,8 +5017,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorV
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5232,8 +5034,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5255,8 +5055,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventVectorOptional>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_VectorOptionalTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(64 + sizeof(fidl_message_header_t));
@@ -5283,8 +5081,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayVectorNestedTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(144 + sizeof(fidl_message_header_t));
@@ -5317,8 +5113,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayVectorNestedTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(144 + sizeof(fidl_message_header_t));
@@ -5353,8 +5147,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayVectorNestedTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5372,8 +5164,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayVectorNestedTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5399,8 +5189,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -5428,8 +5216,6 @@ struct IsFidlType<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorA
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5447,8 +5233,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5470,8 +5254,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_ty
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventArrayVectorNested>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ArrayVectorNestedTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(144 + sizeof(fidl_message_header_t));
@@ -5500,8 +5282,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_typesinprotocols
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::OneWayResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ResourceTable;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(456 + sizeof(fidl_message_header_t));
@@ -5559,8 +5339,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_typesinprotocols
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::TwoWayResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ResourceTable;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(456 + sizeof(fidl_message_header_t));
@@ -5623,8 +5401,6 @@ struct IsResource<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWay
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ResourceTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5642,8 +5418,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::TwoWayResource>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::TwoWayResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ResourceTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
@@ -5695,8 +5469,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_typesinprotocols::Protocol::ErrorResource>> {
-  static constexpr const fidl_type_t* kType =
-    nullptr;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(0 + sizeof(fidl_message_header_t));
@@ -5729,8 +5501,6 @@ struct IsResource<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorR
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorResource_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5748,8 +5518,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinpro
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_typesinprotocols::Protocol::ErrorResource>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_typesinprotocols::Protocol::ErrorResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_Protocol_ErrorResource_ResultTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 3;
@@ -5776,8 +5544,6 @@ struct IsResource<::fidl::internal::TransactionalEvent<::test_typesinprotocols::
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_typesinprotocols::Protocol::EventResource>> {
-  static constexpr const fidl_type_t* kType =
-    &::test_typesinprotocols::test_typesinprotocols_ResourceTable;
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(456 + sizeof(fidl_message_header_t));

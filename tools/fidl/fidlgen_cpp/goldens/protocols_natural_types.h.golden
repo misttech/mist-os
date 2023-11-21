@@ -172,7 +172,6 @@ class TheUnion;
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
 
 
 class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
@@ -241,7 +240,6 @@ class WithAndWithoutRequestResponseNoRequestWithResponseResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
 
 
 class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
@@ -310,7 +308,6 @@ class WithAndWithoutRequestResponseWithRequestNoResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
 
 
 class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
@@ -379,7 +376,6 @@ class WithAndWithoutRequestResponseWithRequestEmptyResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
 
 
 class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
@@ -448,7 +444,6 @@ class WithAndWithoutRequestResponseWithRequestWithResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
 
 
 class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
@@ -517,7 +512,6 @@ class WithAndWithoutRequestResponseWithRequestWithResponseResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
 
 
 class WithAndWithoutRequestResponseOnWithResponseRequest {
@@ -592,7 +586,6 @@ class WithAndWithoutRequestResponseOnWithResponseRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable;
 
 
 class WithErrorSyntaxResponseAsStructResponse {
@@ -702,7 +695,6 @@ class WithErrorSyntaxResponseAsStructResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
 
 
 class WithErrorSyntaxResponseAsStructResult {
@@ -831,7 +823,6 @@ class WithErrorSyntaxResponseAsStructResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
 
 
 class WithErrorSyntaxErrorAsPrimitiveResponse {
@@ -903,7 +894,6 @@ class WithErrorSyntaxErrorAsPrimitiveResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
 
 
 class WithErrorSyntaxErrorAsPrimitiveResult {
@@ -1032,7 +1022,6 @@ class WithErrorSyntaxErrorAsPrimitiveResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 
 
 class WithErrorSyntaxErrorAsEnumResponse {
@@ -1104,7 +1093,6 @@ class WithErrorSyntaxErrorAsEnumResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
 
 
 class WithErrorSyntaxErrorAsEnumResult {
@@ -1235,7 +1223,6 @@ class WithErrorSyntaxErrorAsEnumResult {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
 
 
 class WithErrorSyntaxHandleInResultResponse {
@@ -1301,7 +1288,6 @@ class WithErrorSyntaxHandleInResultResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
 
 class WithErrorSyntaxHandleInResultResult {
@@ -1421,7 +1407,6 @@ class WithErrorSyntaxHandleInResultResult {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
 
 
 class ChannelProtocolMethodARequest {
@@ -1510,7 +1495,6 @@ class ChannelProtocolMethodARequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
 
 
 class ChannelProtocolEventARequest {
@@ -1599,7 +1583,6 @@ class ChannelProtocolEventARequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
 
 
 class ChannelProtocolMethodBRequest {
@@ -1688,7 +1671,6 @@ class ChannelProtocolMethodBRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
 
 
 class ChannelProtocolMethodBResponse {
@@ -1760,7 +1742,6 @@ class ChannelProtocolMethodBResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTable;
 
 
 class ChannelProtocolTakeHandleRequest {
@@ -1824,7 +1805,6 @@ class ChannelProtocolTakeHandleRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTable;
 
 
 class ChannelProtocolMutateSocketRequest {
@@ -1888,7 +1868,6 @@ class ChannelProtocolMutateSocketRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseTable;
 
 
 class ChannelProtocolMutateSocketResponse {
@@ -1953,7 +1932,6 @@ class ChannelProtocolMutateSocketResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_SyscallProtocolMethodCRequestTable;
 
 
 class SyscallProtocolMethodCRequest {
@@ -2042,7 +2020,6 @@ class SyscallProtocolMethodCRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalRequestRequestTable;
 
 
 class TransitionalRequestRequest {
@@ -2112,7 +2089,6 @@ class TransitionalRequestRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalRequestResponseTable;
 
 
 class TransitionalRequestResponse {
@@ -2182,7 +2158,6 @@ class TransitionalRequestResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalOneWayRequestTable;
 
 
 class TransitionalOneWayRequest {
@@ -2252,7 +2227,6 @@ class TransitionalOneWayRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 
 
 class TransitionalEventRequest {
@@ -2333,7 +2307,6 @@ class TransitionalEventRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
 
 
 class HandleRightsProtocolNoResponseMethodRequest {
@@ -2397,7 +2370,6 @@ class HandleRightsProtocolNoResponseMethodRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRequestTable;
 
 
 class HandleRightsProtocolResponseMethodRequest {
@@ -2461,7 +2433,6 @@ class HandleRightsProtocolResponseMethodRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodResponseTable;
 
 
 class HandleRightsProtocolResponseMethodResponse {
@@ -2525,7 +2496,6 @@ class HandleRightsProtocolResponseMethodResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTable;
 
 
 class HandleRightsProtocolAnEventRequest {
@@ -2592,7 +2562,6 @@ class HandleRightsProtocolAnEventRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_ProtocolEndsTable;
 
 
 class ProtocolEnds {
@@ -2710,7 +2679,6 @@ class ProtocolEnds {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTable;
 
 
 class WithProtocolEndsClientEndsRequest {
@@ -2774,7 +2742,6 @@ class WithProtocolEndsClientEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTable;
 
 
 class WithProtocolEndsClientEndsResponse {
@@ -2838,7 +2805,6 @@ class WithProtocolEndsClientEndsResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTable;
 
 
 class WithProtocolEndsServerEndsRequest {
@@ -2902,7 +2868,6 @@ class WithProtocolEndsServerEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTable;
 
 
 class WithProtocolEndsServerEndsResponse {
@@ -2966,7 +2931,6 @@ class WithProtocolEndsServerEndsResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
 
 
 class WithProtocolEndsStructContainingEndsRequest {
@@ -3030,7 +2994,6 @@ class WithProtocolEndsStructContainingEndsRequest {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
 
 
 class WithProtocolEndsStructContainingEndsResponse {
@@ -3095,7 +3058,6 @@ class WithProtocolEndsStructContainingEndsResponse {
 
 
 
-extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 
 
 class ManyParametersFifteenRequest {
@@ -3436,7 +3398,6 @@ class ManyParametersFifteenRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_TheUnionTable;
 
 
 class TheUnion {
@@ -3542,7 +3503,6 @@ class TheUnion {
 
 
 
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTable;
 
 
 class MethodWithUnionUnionMethodRequest {
@@ -3611,7 +3571,6 @@ class MethodWithUnionUnionMethodRequest {
 
 
 
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTable;
 
 
 class MethodWithUnionUnionMethodResponse {
@@ -4794,8 +4753,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseNoRequestWithResponseResponse> : public std::true_type {};
@@ -4818,8 +4775,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
 
   
   template <>
@@ -4844,8 +4799,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestEmptyResponseRequest> : public std::true_type {};
@@ -4868,8 +4821,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
 
   
   template <>
@@ -4894,8 +4845,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithAndWithoutRequestResponseWithRequestWithResponseResponse> : public std::true_type {};
@@ -4918,8 +4867,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
 
   
   template <>
@@ -4944,8 +4891,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResponseTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructResponse> : public std::true_type {};
@@ -4969,8 +4914,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResponseTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResponse> : public std::true_type {};
@@ -4993,8 +4936,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResponseTable;
 
   
   template <>
@@ -5020,8 +4961,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResponseTable;
 
   
   template <>
@@ -5051,8 +4990,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolMethodARequest> : public std::true_type {};
@@ -5075,8 +5012,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
 
   
   template <>
@@ -5101,8 +5036,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::ChannelProtocolMethodBRequest> : public std::true_type {};
@@ -5125,8 +5058,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
 
   
   template <>
@@ -5152,8 +5083,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTable;
 
   
   template <>
@@ -5185,8 +5114,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::ChannelProtocolMutateSocketRequest> : public std::true_type {};
@@ -5217,8 +5144,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseTable;
-
   
   template <>
   struct IsResource<::test_protocols::ChannelProtocolMutateSocketResponse> : public std::true_type {};
@@ -5247,8 +5172,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_SyscallProtocolMethodCRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::SyscallProtocolMethodCRequest> : public std::true_type {};
@@ -5271,8 +5194,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_TransitionalRequestRequestTable;
 
   
   template <>
@@ -5297,8 +5218,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_TransitionalRequestResponseTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::TransitionalRequestResponse> : public std::true_type {};
@@ -5322,8 +5241,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_TransitionalOneWayRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::TransitionalOneWayRequest> : public std::true_type {};
@@ -5346,8 +5263,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 
   
   template <>
@@ -5373,8 +5288,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
 
   
   template <>
@@ -5406,8 +5319,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolResponseMethodRequest> : public std::true_type {};
@@ -5437,8 +5348,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodResponseTable;
 
   
   template <>
@@ -5470,8 +5379,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::HandleRightsProtocolAnEventRequest> : public std::true_type {};
@@ -5501,8 +5408,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_ProtocolEndsTable;
 
   
   template <>
@@ -5534,8 +5439,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsClientEndsRequest> : public std::true_type {};
@@ -5565,8 +5468,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTable;
 
   
   template <>
@@ -5598,8 +5499,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsServerEndsRequest> : public std::true_type {};
@@ -5629,8 +5528,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTable;
 
   
   template <>
@@ -5662,8 +5559,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
-
   
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsStructContainingEndsRequest> : public std::true_type {};
@@ -5694,8 +5589,6 @@ namespace fidl {
 #ifdef __Fuchsia__
 
 
-  extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
-
   
   template <>
   struct IsResource<::test_protocols::WithProtocolEndsStructContainingEndsResponse> : public std::true_type {};
@@ -5724,8 +5617,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::ManyParametersFifteenRequest> : public std::true_type {};
@@ -5749,8 +5640,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::MethodWithUnionUnionMethodRequest> : public std::true_type {};
@@ -5773,8 +5662,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTable;
 
   
   template <>
@@ -5801,8 +5688,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxResponseAsStructResult> : public std::true_type {};
@@ -5826,8 +5711,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_protocols::WithErrorSyntaxErrorAsPrimitiveResult> : public std::true_type {};
@@ -5850,8 +5733,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
 
   
   template <>
@@ -5877,8 +5758,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 
   
   template <>
@@ -5907,8 +5786,6 @@ namespace fidl {
 #endif  // __Fuchsia__
 
   
-
-  extern "C" const fidl_type_t test_protocols_TheUnionTable;
 
   
   template <>

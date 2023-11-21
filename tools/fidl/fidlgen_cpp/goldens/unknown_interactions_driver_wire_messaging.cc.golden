@@ -49,18 +49,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayFields_Ordinal
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayUnion_Ordinal = 1451514501977162287lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -71,18 +65,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayTable_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayErr_Ordinal = 8222960355260037542lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -93,18 +81,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_Ordi
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_Ordinal = 3066880266580913088lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayUnionErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -115,18 +97,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_StrictTwoWayTableErr_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_StrictTwoWayTableErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWay_Ordinal = 2929398860738426482lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWay_ResultTable;
 
 
 [[maybe_unused]]
@@ -137,18 +113,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayFields_Ordin
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFields_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_Ordinal = 8216450897182897849lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnion_ResultTable;
 
 
 [[maybe_unused]]
@@ -159,18 +129,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayTable_Ordina
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTable_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayErr_Ordinal = 5583489590753947170lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -181,9 +145,6 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_Or
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Ordinal = 6235121653537390575lu;
 
@@ -192,18 +153,12 @@ constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_Ord
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_Ordinal = 940887795361350656lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsDriverProtocol_FlexibleTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -2433,18 +2388,12 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFields_Ord
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnion_Ordinal = 8952307689721713673lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -2455,18 +2404,12 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTable_Ordi
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_Ordinal = 7057260423103547829lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -2477,9 +2420,6 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_Ordinal = 2319476129312263555lu;
 
@@ -2488,18 +2428,12 @@ constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_O
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_Ordinal = 6883106306697493305lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsAjarDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions
@@ -3749,18 +3683,12 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFields_O
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFields_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayFieldsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnion_Ordinal = 7235351480214368636lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnion_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayUnionResponseTable;
 
 
 [[maybe_unused]]
@@ -3771,18 +3699,12 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTable_Or
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTable_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocolStrictTwoWayTableResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_Ordinal = 4350840352076287137lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayErr_ResultTable;
 
 
 [[maybe_unused]]
@@ -3793,9 +3715,6 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsEr
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayFieldsErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_Ordinal = 4598950031783776653lu;
 
@@ -3804,18 +3723,12 @@ constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayUnionErr_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Ordinal = 1456858375973362525lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kUnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_unknowninteractions_UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_ResultTable;
 
 #ifdef __Fuchsia__
 }  // namespace test_unknowninteractions

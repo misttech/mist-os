@@ -29,11 +29,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_placementofattributes::Exampl
 
   using Completer = fidl::Completer<>;
 };
-namespace test_placementofattributes {
-__LOCAL extern "C" const fidl_type_t test_placementofattributes_ExampleProtocolMethodRequestTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_placementofattributes
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleProtocol> final : public ::fidl::internal::NaturalClientBase {
@@ -41,11 +38,8 @@ class ::fidl::internal::NaturalClientImpl<::test_placementofattributes::ExampleP
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> Method(const ::fidl::Request<::test_placementofattributes::ExampleProtocol::Method>& request) const;
 };
-namespace test_placementofattributes {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_placementofattributes
 
 #ifdef __Fuchsia__
 

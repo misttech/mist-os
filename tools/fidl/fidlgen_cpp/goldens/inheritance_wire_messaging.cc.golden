@@ -15,10 +15,6 @@ namespace test_inheritance {
 [[maybe_unused]] constexpr uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
-extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_inheritance
 
@@ -220,10 +216,6 @@ namespace test_inheritance {
 [[maybe_unused]] constexpr uint64_t ksub_foo_Ordinal = 7540745593380780216lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
-extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_inheritance
 

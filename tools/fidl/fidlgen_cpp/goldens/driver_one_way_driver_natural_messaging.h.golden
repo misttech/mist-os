@@ -23,11 +23,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_driveroneway::OneWay::Send> {
 
   using Completer = fidl::Completer<>;
 };
-namespace test_driveroneway {
-__LOCAL extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_driveroneway
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : public ::fidl::internal::NaturalClientBase {
@@ -35,10 +31,8 @@ class ::fidl::internal::NaturalClientImpl<::test_driveroneway::OneWay> final : p
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> Send(const ::fidl::Request<::test_driveroneway::OneWay::Send>& request) const;
 };
-namespace test_driveroneway {
 
 #endif  // __Fuchsia__
-}  // namespace test_driveroneway
 
 #ifdef __Fuchsia__
 

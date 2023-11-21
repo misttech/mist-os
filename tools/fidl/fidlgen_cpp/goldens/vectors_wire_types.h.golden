@@ -33,8 +33,6 @@ namespace wire {
 
 struct ExampleUseOfVectors;
 
-extern "C" const fidl_type_t test_vectors_ExampleUseOfVectorsTable;
-
 struct ExampleUseOfVectors {
   ::fidl::VectorView<uint8_t> vector_of_uint8 = {};
 

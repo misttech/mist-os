@@ -151,7 +151,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::TablePayl
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_TablePayloadTable;
 
 class TablePayload {
 public:
@@ -356,7 +355,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedP
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOneWayAnonComposedRequestTable;
 
 class ComposedProtocolOneWayAnonComposedRequest {
 public:
@@ -561,7 +559,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedP
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedResponseTable;
 
 class ComposedProtocolTwoWayAnonComposedResponse {
 public:
@@ -766,7 +763,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedP
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedWithErrorRequestTable;
 
 class ComposedProtocolTwoWayAnonComposedWithErrorRequest {
 public:
@@ -971,7 +967,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::ComposedP
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResponseTable;
 
 class ComposedProtocolOnAnonComposedWithErrorResponse {
 public:
@@ -1176,7 +1171,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProto
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOneWayAnonRequestTable;
 
 class MainProtocolOneWayAnonRequest {
 public:
@@ -1381,7 +1375,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProto
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonResponseTable;
 
 class MainProtocolTwoWayAnonResponse {
 public:
@@ -1586,7 +1579,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProto
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonWithErrorRequestTable;
 
 class MainProtocolTwoWayAnonWithErrorRequest {
 public:
@@ -1791,7 +1783,6 @@ struct ::fidl::WireTableFrame<::test_protocollayoutssamelibrary::wire::MainProto
 namespace test_protocollayoutssamelibrary {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResponseTable;
 
 class MainProtocolOnAnonWithErrorResponse {
 public:
@@ -1963,7 +1954,6 @@ inline ::fidl::WireTableExternalBuilder<::test_protocollayoutssamelibrary::wire:
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_UnionPayloadTable;
 
 class UnionPayload {
   public:
@@ -2018,7 +2008,6 @@ class UnionPayload {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolTwoWayAnonComposedRequestTable;
 
 class ComposedProtocolTwoWayAnonComposedRequest {
   public:
@@ -2073,7 +2062,6 @@ class ComposedProtocolTwoWayAnonComposedRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResponseTable;
 
 class ComposedProtocolTwoWayAnonComposedWithErrorResponse {
   public:
@@ -2128,7 +2116,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResponse {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayAnonComposedWithError_ResultTable;
 
 class ComposedProtocolTwoWayAnonComposedWithErrorResult {
   public:
@@ -2212,7 +2199,6 @@ class ComposedProtocolTwoWayAnonComposedWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocolOnAnonComposedRequestTable;
 
 class ComposedProtocolOnAnonComposedRequest {
   public:
@@ -2267,7 +2253,6 @@ class ComposedProtocolOnAnonComposedRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnAnonComposedWithError_ResultTable;
 
 class ComposedProtocolOnAnonComposedWithErrorResult {
   public:
@@ -2351,7 +2336,6 @@ class ComposedProtocolOnAnonComposedWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_TwoWayNamedComposedWithError_ResultTable;
 
 class ComposedProtocolTwoWayNamedComposedWithErrorResult {
   public:
@@ -2434,7 +2418,6 @@ class ComposedProtocolTwoWayNamedComposedWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_ComposedProtocol_OnNamedComposedWithError_ResultTable;
 
 class ComposedProtocolOnNamedComposedWithErrorResult {
   public:
@@ -2517,7 +2500,6 @@ class ComposedProtocolOnNamedComposedWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayLocalWithError_ResultTable;
 
 class MainProtocolTwoWayLocalWithErrorResult {
   public:
@@ -2600,7 +2582,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnLocalWithError_ResultTable;
 
 class MainProtocolOnLocalWithErrorResult {
   public:
@@ -2683,7 +2664,6 @@ class MainProtocolOnLocalWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolTwoWayAnonRequestTable;
 
 class MainProtocolTwoWayAnonRequest {
   public:
@@ -2739,7 +2719,6 @@ class MainProtocolTwoWayAnonRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 class MainProtocolTwoWayAnonWithErrorResponse {
   public:
@@ -2795,7 +2774,6 @@ class MainProtocolTwoWayAnonWithErrorResponse {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 class MainProtocolTwoWayAnonWithErrorResult {
   public:
@@ -2879,7 +2857,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocolOnAnonRequestTable;
 
 class MainProtocolOnAnonRequest {
   public:
@@ -2935,7 +2912,6 @@ class MainProtocolOnAnonRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayoutssamelibrary_MainProtocol_OnAnonWithError_ResultTable;
 
 class MainProtocolOnAnonWithErrorResult {
   public:

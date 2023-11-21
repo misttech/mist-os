@@ -15,10 +15,6 @@ namespace test_error {
 [[maybe_unused]] constexpr uint64_t kExample_foo_Ordinal = 1107623248440401476lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kExample_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
-
-extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_error
 

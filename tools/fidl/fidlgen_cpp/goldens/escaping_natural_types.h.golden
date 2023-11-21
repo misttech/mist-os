@@ -42,8 +42,6 @@ extern const char* kDollar;
 
 extern const char* kDollarBrace;
 
-extern "C" const fidl_type_t test_escaping_DocCommentWithQuotesTable;
-
 /// "pleaseescapethisdocommentproperly"
 class DocCommentWithQuotes {
  private:
@@ -121,8 +119,6 @@ inline DocCommentWithQuotes& DocCommentWithQuotes::__reserved(uint8_t value) {
 
 }  // namespace test_escaping
 namespace fidl {
-
-extern "C" const fidl_type_t test_escaping_DocCommentWithQuotesTable;
 
 template <>
 struct IsFidlType<::test_escaping::DocCommentWithQuotes> : public std::true_type {};

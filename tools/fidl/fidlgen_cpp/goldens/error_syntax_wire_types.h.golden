@@ -39,8 +39,6 @@ struct ExampleUseOfErrorSyntaxCallWhichMayFailResponse;
 
 class ExampleUseOfErrorSyntaxCallWhichMayFailResult;
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
-
 class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
  public:
   using Response = test_errorsyntax::wire::ExampleUseOfErrorSyntaxCallWhichMayFailResponse;
@@ -118,13 +116,9 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
-
 struct ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
   ::fidl::StringView s = {};
 };
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable;
 
 struct ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
   int64_t value = {};

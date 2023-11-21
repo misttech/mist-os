@@ -35,15 +35,11 @@ struct Simple;
 
 struct BasicStruct;
 
-extern "C" const fidl_type_t test_struct_SimpleTable;
-
 struct Simple {
   uint8_t f1 = {};
 
   bool f2 = {};
 };
-
-extern "C" const fidl_type_t test_struct_BasicStructTable;
 
 struct BasicStruct {
   uint32_t x = {};

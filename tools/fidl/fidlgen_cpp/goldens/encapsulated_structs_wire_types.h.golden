@@ -44,15 +44,11 @@ struct NonInlineStructTestStruct;
 
 struct TopLevelStruct;
 
-extern "C" const fidl_type_t test_encapsulatedstructs_Int16Int8Table;
-
 struct Int16Int8 {
   int16_t a = {};
 
   int8_t b = {};
 };
-
-extern "C" const fidl_type_t test_encapsulatedstructs_Int8Int32Table;
 
 struct Int8Int32 {
   int8_t a = {};
@@ -60,13 +56,9 @@ struct Int8Int32 {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_encapsulatedstructs_ArrayInt16Int8Table;
-
 struct ArrayInt16Int8 {
   ::fidl::Array<::test_encapsulatedstructs::wire::Int16Int8, 3> arr = {};
 };
-
-extern "C" const fidl_type_t test_encapsulatedstructs_StructPaddingTestStructTable;
 
 struct StructPaddingTestStruct {
   ::test_encapsulatedstructs::wire::Int16Int8 trailing = {};
@@ -77,8 +69,6 @@ struct StructPaddingTestStruct {
 };
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_encapsulatedstructs_NonInlineStructTestStructTable;
 
 struct NonInlineStructTestStruct {
   ::fidl::ObjectView<::test_encapsulatedstructs::wire::Int16Int8> element = {};
@@ -91,8 +81,6 @@ struct NonInlineStructTestStruct {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_encapsulatedstructs_TopLevelStructTable;
 
 struct TopLevelStruct {
   ::test_encapsulatedstructs::wire::StructPaddingTestStruct a = {};

@@ -135,7 +135,6 @@ class ProtocolErrorResourceResult;
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_StructTable;
 
 
 class Struct {
@@ -206,7 +205,6 @@ class Struct {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_TableTable;
 
 
 class Table {
@@ -251,7 +249,6 @@ class Table {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_UnionTable;
 
 
 class Union {
@@ -359,7 +356,6 @@ class Union {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
 
 
 class ResourceStruct {
@@ -425,7 +421,6 @@ class ResourceStruct {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTableTable;
 
 
 class ResourceTable {
@@ -466,7 +461,6 @@ class ResourceTable {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceUnionTable;
 
 
 class ResourceUnion {
@@ -560,7 +554,6 @@ class ResourceUnion {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
 
 class Basic {
@@ -846,7 +839,6 @@ class Basic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
 
 class Compound {
@@ -1028,7 +1020,6 @@ class Compound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 
 
 class ArrayBasic {
@@ -1320,7 +1311,6 @@ class ArrayBasic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
 
 class ArrayCompound {
@@ -1502,7 +1492,6 @@ class ArrayCompound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 
 
 class VectorBasic {
@@ -1769,7 +1758,6 @@ class VectorBasic {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
 
 class VectorCompound {
@@ -1946,7 +1934,6 @@ class VectorCompound {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
 
 class VectorOptional {
@@ -2069,7 +2056,6 @@ class VectorOptional {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
 
 class ArrayVectorNested {
@@ -2198,7 +2184,6 @@ class ArrayVectorNested {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
 
 class Resource {
@@ -2736,7 +2721,6 @@ class Resource {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
 
 
 class ProtocolErrorBasicResult {
@@ -2867,7 +2851,6 @@ class ProtocolErrorBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 
 
 class ProtocolErrorCompoundResult {
@@ -2998,7 +2981,6 @@ class ProtocolErrorCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
 
 
 class ProtocolErrorArrayBasicResult {
@@ -3129,7 +3111,6 @@ class ProtocolErrorArrayBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 
 
 class ProtocolErrorArrayCompoundResult {
@@ -3260,7 +3241,6 @@ class ProtocolErrorArrayCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
 
 
 class ProtocolErrorVectorBasicResult {
@@ -3391,7 +3371,6 @@ class ProtocolErrorVectorBasicResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 
 
 class ProtocolErrorVectorCompoundResult {
@@ -3522,7 +3501,6 @@ class ProtocolErrorVectorCompoundResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
 
 
 class ProtocolErrorVectorOptionalResult {
@@ -3653,7 +3631,6 @@ class ProtocolErrorVectorOptionalResult {
 
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 
 
 class ProtocolErrorArrayVectorNestedResult {
@@ -3786,7 +3763,6 @@ class ProtocolErrorArrayVectorNestedResult {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
 
 class ProtocolErrorResourceResult {
@@ -4755,8 +4731,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_StructTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::Struct> : public std::true_type {};
@@ -4781,8 +4755,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_typesinprotocols_ResourceStructTable;
 
   
   template <>
@@ -4812,8 +4784,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::Basic> : public std::true_type {};
@@ -4836,8 +4806,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
   
   template <>
@@ -4862,8 +4830,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::ArrayBasic> : public std::true_type {};
@@ -4886,8 +4852,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
   
   template <>
@@ -4912,8 +4876,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::VectorBasic> : public std::true_type {};
@@ -4936,8 +4898,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
   
   template <>
@@ -4962,8 +4922,6 @@ namespace fidl {
   
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::VectorOptional> : public std::true_type {};
@@ -4986,8 +4944,6 @@ namespace fidl {
 
   
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
   
   template <>
@@ -5013,8 +4969,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
   
   template <>
@@ -5045,8 +4999,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_TableTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::Table> : public std::true_type {};
@@ -5072,8 +5024,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_typesinprotocols_ResourceTableTable;
 
   
   template <>
@@ -5105,8 +5055,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_UnionTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::Union> : public std::true_type {};
@@ -5131,8 +5079,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_typesinprotocols_ResourceUnionTable;
 
   
   template <>
@@ -5162,8 +5108,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::ProtocolErrorBasicResult> : public std::true_type {};
@@ -5186,8 +5130,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
 
   
   template <>
@@ -5212,8 +5154,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::ProtocolErrorArrayBasicResult> : public std::true_type {};
@@ -5236,8 +5176,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
 
   
   template <>
@@ -5262,8 +5200,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorBasicResult> : public std::true_type {};
@@ -5286,8 +5222,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
 
   
   template <>
@@ -5312,8 +5246,6 @@ namespace fidl {
 
   
 
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
-
   
   template <>
   struct IsFidlType<::test_typesinprotocols::ProtocolErrorVectorOptionalResult> : public std::true_type {};
@@ -5336,8 +5268,6 @@ namespace fidl {
 
 
   
-
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
 
   
   template <>
@@ -5363,8 +5293,6 @@ namespace fidl {
   
 #ifdef __Fuchsia__
 
-
-  extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
 
   
   template <>

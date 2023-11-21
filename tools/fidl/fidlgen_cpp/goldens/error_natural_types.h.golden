@@ -30,8 +30,6 @@ class ExampleFooResponse;
 
 class ExampleFooResult;
 
-extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
-
 class ExampleFooRequest {
  private:
   struct Storage_;
@@ -89,8 +87,6 @@ class ExampleFooRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_error_Example_foo_ResponseTable;
-
 class ExampleFooResponse {
  private:
   struct Storage_;
@@ -147,8 +143,6 @@ class ExampleFooResponse {
       &Storage_::y, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 
 class ExampleFooResult {
  private:
@@ -308,8 +302,6 @@ inline ExampleFooResponse& ExampleFooResponse::y(int64_t value) {
 }  // namespace test_error
 namespace fidl {
 
-extern "C" const fidl_type_t test_error_ExampleFooRequestTable;
-
 template <>
 struct IsFidlType<::test_error::ExampleFooRequest> : public std::true_type {};
 
@@ -329,8 +321,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooRequest, 16> {};
 
-extern "C" const fidl_type_t test_error_Example_foo_ResponseTable;
-
 template <>
 struct IsFidlType<::test_error::ExampleFooResponse> : public std::true_type {};
 
@@ -349,8 +339,6 @@ struct IsStruct<::test_error::ExampleFooResponse> : public std::true_type {};
 template <>
 struct internal::NaturalCodingTraits<::test_error::ExampleFooResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_error::ExampleFooResponse, 8> {};
-
-extern "C" const fidl_type_t test_error_Example_foo_ResultTable;
 
 template <>
 struct IsFidlType<::test_error::ExampleFooResult> : public std::true_type {};

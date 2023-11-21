@@ -61,8 +61,6 @@ class MainProtocolTwoWayImportWithErrorResult;
 
 class MainProtocolOnImportWithErrorResult;
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
-
 class MainProtocolTwoWayLocalWithErrorResult {
  public:
   MainProtocolTwoWayLocalWithErrorResult() : ordinal_(::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult::Ordinal::Invalid), envelope_{} {}
@@ -138,8 +136,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
-
 class MainProtocolOnLocalWithErrorResult {
  public:
   MainProtocolOnLocalWithErrorResult() : ordinal_(::test_protocolpayloads::wire::MainProtocolOnLocalWithErrorResult::Ordinal::Invalid), envelope_{} {}
@@ -214,8 +210,6 @@ class MainProtocolOnLocalWithErrorResult {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 class MainProtocolTwoWayAnonWithErrorResult {
  public:
@@ -294,8 +288,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResultTable;
-
 class MainProtocolOnAnonWithErrorResult {
  public:
   using Response = test_protocolpayloads::wire::MainProtocolOnAnonWithErrorResponse;
@@ -373,8 +365,6 @@ class MainProtocolOnAnonWithErrorResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
-
 class MainProtocolTwoWayImportWithErrorResult {
  public:
   MainProtocolTwoWayImportWithErrorResult() : ordinal_(::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult::Ordinal::Invalid), envelope_{} {}
@@ -443,8 +433,6 @@ class MainProtocolTwoWayImportWithErrorResult {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
 
 class MainProtocolOnImportWithErrorResult {
  public:
@@ -515,15 +503,11 @@ class MainProtocolOnImportWithErrorResult {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_LocalStructPayloadTable;
-
 struct LocalStructPayload {
   uint32_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
 
 struct MainProtocolOneWayAnonRequest {
   uint32_t a = {};
@@ -531,15 +515,11 @@ struct MainProtocolOneWayAnonRequest {
   uint32_t b = {};
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRequestTable;
-
 struct MainProtocolTwoWayAnonRequest {
   uint32_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
 
 struct MainProtocolTwoWayAnonResponse {
   uint32_t a = {};
@@ -547,15 +527,11 @@ struct MainProtocolTwoWayAnonResponse {
   uint32_t b = {};
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable;
-
 struct MainProtocolTwoWayAnonWithErrorRequest {
   uint32_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 struct MainProtocolTwoWayAnonWithErrorResponse {
   uint32_t a = {};
@@ -563,15 +539,11 @@ struct MainProtocolTwoWayAnonWithErrorResponse {
   uint32_t b = {};
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
-
 struct MainProtocolOnAnonRequest {
   uint32_t a = {};
 
   uint32_t b = {};
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable;
 
 struct MainProtocolOnAnonWithErrorResponse {
   uint32_t a = {};

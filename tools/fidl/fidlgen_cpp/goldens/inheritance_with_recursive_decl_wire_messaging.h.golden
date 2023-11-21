@@ -29,8 +29,6 @@ class Parent;
 
 class Child;
 
-__LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
-
 }  // namespace test_inheritancewithrecursivedecl
 
 template <>
@@ -136,8 +134,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Parent::First>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritancewithrecursivedecl::test_inheritancewithrecursivedecl_ParentFirstRequestTable;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -321,10 +317,6 @@ namespace fidl {
 #endif  // __Fuchsia__
 
 }  // namespace fidl
-namespace test_inheritancewithrecursivedecl {
-__LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
-
-}  // namespace test_inheritancewithrecursivedecl
 
 template <>
 struct ::fidl::internal::WireOrdinal<::test_inheritancewithrecursivedecl::Child::First> final {
@@ -487,8 +479,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::First>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritancewithrecursivedecl::test_inheritancewithrecursivedecl_ParentFirstRequestTable;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));
@@ -517,8 +507,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_inheritancewithr
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_inheritancewithrecursivedecl::Child::Second>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_inheritancewithrecursivedecl::test_inheritancewithrecursivedecl_ChildSecondRequestTable;
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));

@@ -40,8 +40,6 @@ class UnionSize24Alignment8;
 
 class UnionSize36Alignment4;
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize8Alignment4Table;
-
 class UnionSize8Alignment4 {
  private:
   using Storage_ =
@@ -136,8 +134,6 @@ class UnionSize8Alignment4 {
     }
   }
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize8Alignment4Table;
 
 class SandwichUnionSize8Alignment4 {
  private:
@@ -234,8 +230,6 @@ class SandwichUnionSize8Alignment4 {
                                                    });
 };
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize12Alignment4Table;
-
 class UnionSize12Alignment4 {
  private:
   using Storage_ =
@@ -330,8 +324,6 @@ class UnionSize12Alignment4 {
     }
   }
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize12Alignment4Table;
 
 class SandwichUnionSize12Alignment4 {
  private:
@@ -428,8 +420,6 @@ class SandwichUnionSize12Alignment4 {
                                                    });
 };
 
-extern "C" const fidl_type_t test_unionsandwich_StructSize16Alignment8Table;
-
 class StructSize16Alignment8 {
  private:
   struct Storage_;
@@ -502,8 +492,6 @@ class StructSize16Alignment8 {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint64_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::f2, 8});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_unionsandwich_UnionSize24Alignment8Table;
 
 class UnionSize24Alignment8 {
  private:
@@ -600,8 +588,6 @@ class UnionSize24Alignment8 {
   }
 };
 
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize24Alignment8Table;
-
 class SandwichUnionSize24Alignment8 {
  private:
   struct Storage_;
@@ -697,8 +683,6 @@ class SandwichUnionSize24Alignment8 {
                                                    });
 };
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize36Alignment4Table;
-
 class UnionSize36Alignment4 {
  private:
   using Storage_ =
@@ -793,8 +777,6 @@ class UnionSize36Alignment4 {
     }
   }
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize36Alignment4Table;
 
 class SandwichUnionSize36Alignment4 {
  private:
@@ -1033,8 +1015,6 @@ inline SandwichUnionSize36Alignment4& SandwichUnionSize36Alignment4::after(uint3
 }  // namespace test_unionsandwich
 namespace fidl {
 
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize8Alignment4Table;
-
 template <>
 struct IsFidlType<::test_unionsandwich::SandwichUnionSize8Alignment4> : public std::true_type {};
 
@@ -1053,8 +1033,6 @@ struct IsStruct<::test_unionsandwich::SandwichUnionSize8Alignment4> : public std
 template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::SandwichUnionSize8Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize8Alignment4, 32> {};
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize12Alignment4Table;
 
 template <>
 struct IsFidlType<::test_unionsandwich::SandwichUnionSize12Alignment4> : public std::true_type {};
@@ -1075,8 +1053,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::SandwichUnionSize12Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize12Alignment4, 32> {};
 
-extern "C" const fidl_type_t test_unionsandwich_StructSize16Alignment8Table;
-
 template <>
 struct IsFidlType<::test_unionsandwich::StructSize16Alignment8> : public std::true_type {};
 
@@ -1095,8 +1071,6 @@ struct IsStruct<::test_unionsandwich::StructSize16Alignment8> : public std::true
 template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::StructSize16Alignment8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::StructSize16Alignment8, 16> {};
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize24Alignment8Table;
 
 template <>
 struct IsFidlType<::test_unionsandwich::SandwichUnionSize24Alignment8> : public std::true_type {};
@@ -1117,8 +1091,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::SandwichUnionSize24Alignment8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize24Alignment8, 32> {};
 
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize36Alignment4Table;
-
 template <>
 struct IsFidlType<::test_unionsandwich::SandwichUnionSize36Alignment4> : public std::true_type {};
 
@@ -1137,8 +1109,6 @@ struct IsStruct<::test_unionsandwich::SandwichUnionSize36Alignment4> : public st
 template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::SandwichUnionSize36Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_unionsandwich::SandwichUnionSize36Alignment4, 32> {};
-
-extern "C" const fidl_type_t test_unionsandwich_UnionSize8Alignment4Table;
 
 template <>
 struct IsFidlType<::test_unionsandwich::UnionSize8Alignment4> : public std::true_type {};
@@ -1159,8 +1129,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::UnionSize8Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unionsandwich::UnionSize8Alignment4> {};
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize12Alignment4Table;
-
 template <>
 struct IsFidlType<::test_unionsandwich::UnionSize12Alignment4> : public std::true_type {};
 
@@ -1180,8 +1148,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::UnionSize12Alignment4, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unionsandwich::UnionSize12Alignment4> {};
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize24Alignment8Table;
-
 template <>
 struct IsFidlType<::test_unionsandwich::UnionSize24Alignment8> : public std::true_type {};
 
@@ -1200,8 +1166,6 @@ struct IsUnion<::test_unionsandwich::UnionSize24Alignment8> : public std::true_t
 template <>
 struct internal::NaturalCodingTraits<::test_unionsandwich::UnionSize24Alignment8, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_unionsandwich::UnionSize24Alignment8> {};
-
-extern "C" const fidl_type_t test_unionsandwich_UnionSize36Alignment4Table;
 
 template <>
 struct IsFidlType<::test_unionsandwich::UnionSize36Alignment4> : public std::true_type {};

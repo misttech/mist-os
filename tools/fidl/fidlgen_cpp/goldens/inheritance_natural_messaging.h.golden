@@ -32,13 +32,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritance::Super::Foo> {
   using ResultCallback =
       ::fit::callback<void(::fidl::Result<::test_inheritance::Super::Foo>&)>;
 };
-namespace test_inheritance {
-__LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_inheritance_SuperFooResponseTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_inheritance
 
 template <>
 class ::fidl::Response<::test_inheritance::Super::Foo> final : public ::test_inheritance::SuperFooResponse {
@@ -46,8 +41,6 @@ class ::fidl::Response<::test_inheritance::Super::Foo> final : public ::test_inh
   using ::test_inheritance::SuperFooResponse::SuperFooResponse;
   Response(::test_inheritance::SuperFooResponse v) : SuperFooResponse(std::move(v)) {}
 };
-namespace test_inheritance {
-}  // namespace test_inheritance
 
 template <>
 class ::fidl::Result<::test_inheritance::Super::Foo> final : public ::fit::result<::fidl::Error, ::test_inheritance::SuperFooResponse> {
@@ -64,11 +57,8 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritance::Super> final : pub
   using NaturalClientBase::NaturalClientBase;
   ::fidl::internal::NaturalThenable<::test_inheritance::Super::Foo> Foo(const ::fidl::Request<::test_inheritance::Super::Foo>& request) const;
 };
-namespace test_inheritance {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_inheritance
 
 #ifdef __Fuchsia__
 

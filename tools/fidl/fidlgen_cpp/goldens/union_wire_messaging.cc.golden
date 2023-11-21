@@ -16,13 +16,9 @@ namespace test_union {
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-extern "C" const fidl_type_t test_union_TestProtocolStrictUnionHenceResponseMayBeStackAllocatedResponseTable;
-
 [[maybe_unused]] constexpr uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal = 7588545459451501794lu;
 
 [[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-extern "C" const fidl_type_t test_union_TestProtocolFlexibleUnionHenceResponseMustBeHeapAllocatedResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_union
 

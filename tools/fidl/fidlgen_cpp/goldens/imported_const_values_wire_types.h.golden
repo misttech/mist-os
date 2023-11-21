@@ -34,8 +34,6 @@ namespace wire {
 
 struct MyStruct;
 
-extern "C" const fidl_type_t test_importedconstvalues_MyStructTable;
-
 struct MyStruct {
   uint8_t __reserved = {};
 };

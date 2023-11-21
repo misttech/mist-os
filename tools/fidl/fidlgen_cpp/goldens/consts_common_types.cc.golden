@@ -8,25 +8,21 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_consts {
-
-extern "C" const fidl_type_t test_consts_EnumTypeTable;
-}  // namespace test_consts
-
 size_t fidl::internal::DisplayError<::test_consts::EnumType>::Format(
     const ::test_consts::EnumType& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<int32_t>(value)) {
       case 1u:
         return "VALUE";
       case 2u:
         return "true";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<int32_t>(value), name, &::test_consts::test_consts_EnumTypeTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.consts/EnumType", member_name, static_cast<int32_t>(value));
+  return std::min(written, capacity - 1);
 }
 
 #pragma clang diagnostic pop

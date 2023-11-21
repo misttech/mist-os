@@ -53,8 +53,6 @@ class MainProtocolTwoWayImportWithErrorResult;
 
 class MainProtocolOnImportWithErrorResult;
 
-extern "C" const fidl_type_t test_protocolpayloads_LocalStructPayloadTable;
-
 class LocalStructPayload {
  private:
   struct Storage_;
@@ -127,8 +125,6 @@ class LocalStructPayload {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 4});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
 
 class MainProtocolTwoWayLocalWithErrorResult {
  private:
@@ -251,8 +247,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
-
 class MainProtocolOnLocalWithErrorResult {
  private:
   using Storage_ =
@@ -374,8 +368,6 @@ class MainProtocolOnLocalWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
-
 class MainProtocolOneWayAnonRequest {
  private:
   struct Storage_;
@@ -448,8 +440,6 @@ class MainProtocolOneWayAnonRequest {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 4});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRequestTable;
 
 class MainProtocolTwoWayAnonRequest {
  private:
@@ -524,8 +514,6 @@ class MainProtocolTwoWayAnonRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
-
 class MainProtocolTwoWayAnonResponse {
  private:
   struct Storage_;
@@ -598,8 +586,6 @@ class MainProtocolTwoWayAnonResponse {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 4});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable;
 
 class MainProtocolTwoWayAnonWithErrorRequest {
  private:
@@ -674,8 +660,6 @@ class MainProtocolTwoWayAnonWithErrorRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable;
-
 class MainProtocolTwoWayAnonWithErrorResponse {
  private:
   struct Storage_;
@@ -748,8 +732,6 @@ class MainProtocolTwoWayAnonWithErrorResponse {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 4});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 class MainProtocolTwoWayAnonWithErrorResult {
  private:
@@ -872,8 +854,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
-
 class MainProtocolOnAnonRequest {
  private:
   struct Storage_;
@@ -947,8 +927,6 @@ class MainProtocolOnAnonRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable;
-
 class MainProtocolOnAnonWithErrorResponse {
  private:
   struct Storage_;
@@ -1021,8 +999,6 @@ class MainProtocolOnAnonWithErrorResponse {
                                                    ::fidl::internal::NaturalStructMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{&Storage_::b, 4});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResultTable;
 
 class MainProtocolOnAnonWithErrorResult {
  private:
@@ -1145,8 +1121,6 @@ class MainProtocolOnAnonWithErrorResult {
   }
 };
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
-
 class MainProtocolTwoWayImportWithErrorResult {
  private:
   using Storage_ =
@@ -1267,8 +1241,6 @@ class MainProtocolTwoWayImportWithErrorResult {
     }
   }
 };
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
 
 class MainProtocolOnImportWithErrorResult {
  private:
@@ -1578,8 +1550,6 @@ inline MainProtocolOnAnonWithErrorResponse& MainProtocolOnAnonWithErrorResponse:
 }  // namespace test_protocolpayloads
 namespace fidl {
 
-extern "C" const fidl_type_t test_protocolpayloads_LocalStructPayloadTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::LocalStructPayload> : public std::true_type {};
 
@@ -1598,8 +1568,6 @@ struct IsStruct<::test_protocolpayloads::LocalStructPayload> : public std::true_
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::LocalStructPayload, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::LocalStructPayload, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOneWayAnonRequestTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOneWayAnonRequest> : public std::true_type {};
@@ -1620,8 +1588,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOneWayAnonRequest, 8> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonRequestTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public std::true_type {};
 
@@ -1640,8 +1606,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonRequest> : public
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonRequest, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonResponseTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonResponse> : public std::true_type {};
@@ -1662,8 +1626,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonResponse, 8> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolTwoWayAnonWithErrorRequestTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest> : public std::true_type {};
 
@@ -1682,8 +1644,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest>
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorRequest, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse> : public std::true_type {};
@@ -1704,8 +1664,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResponse, 8> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocolOnAnonRequestTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std::true_type {};
 
@@ -1724,8 +1682,6 @@ struct IsStruct<::test_protocolpayloads::MainProtocolOnAnonRequest> : public std
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonRequest, 8> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResponseTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse> : public std::true_type {};
@@ -1746,8 +1702,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResponse, 8> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayLocalWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> : public std::true_type {};
 
@@ -1766,8 +1720,6 @@ struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> 
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayLocalWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnLocalWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult> : public std::true_type {};
@@ -1788,8 +1740,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolOnLocalWithErrorResult> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayAnonWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> : public std::true_type {};
 
@@ -1808,8 +1758,6 @@ struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> :
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayAnonWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnAnonWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult> : public std::true_type {};
@@ -1830,8 +1778,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolOnAnonWithErrorResult> {};
 
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_TwoWayImportWithError_ResultTable;
-
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> : public std::true_type {};
 
@@ -1850,8 +1796,6 @@ struct IsUnion<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult>
 template <>
 struct internal::NaturalCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalUnionCodingTraits<::test_protocolpayloads::MainProtocolTwoWayImportWithErrorResult> {};
-
-extern "C" const fidl_type_t test_protocolpayloads_MainProtocol_OnImportWithError_ResultTable;
 
 template <>
 struct IsFidlType<::test_protocolpayloads::MainProtocolOnImportWithErrorResult> : public std::true_type {};

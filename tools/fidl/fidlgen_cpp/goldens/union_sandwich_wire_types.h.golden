@@ -49,8 +49,6 @@ class UnionSize24Alignment8;
 
 class UnionSize36Alignment4;
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize8Alignment4Table;
-
 class UnionSize8Alignment4 {
  public:
   UnionSize8Alignment4() : ordinal_(::test_unionsandwich::wire::UnionSize8Alignment4::Ordinal::Invalid), envelope_{} {}
@@ -99,8 +97,6 @@ class UnionSize8Alignment4 {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_unionsandwich_UnionSize12Alignment4Table;
 
 class UnionSize12Alignment4 {
  public:
@@ -157,8 +153,6 @@ class UnionSize12Alignment4 {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_unionsandwich_UnionSize24Alignment8Table;
-
 class UnionSize24Alignment8 {
  public:
   UnionSize24Alignment8() : ordinal_(::test_unionsandwich::wire::UnionSize24Alignment8::Ordinal::Invalid), envelope_{} {}
@@ -213,8 +207,6 @@ class UnionSize24Alignment8 {
   FIDL_ALIGNDECL
   ::fidl::UntypedEnvelope envelope_;
 };
-
-extern "C" const fidl_type_t test_unionsandwich_UnionSize36Alignment4Table;
 
 class UnionSize36Alignment4 {
  public:
@@ -271,8 +263,6 @@ class UnionSize36Alignment4 {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize8Alignment4Table;
-
 struct SandwichUnionSize8Alignment4 {
   uint32_t before = {};
 
@@ -280,8 +270,6 @@ struct SandwichUnionSize8Alignment4 {
 
   uint32_t after = {};
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize12Alignment4Table;
 
 struct SandwichUnionSize12Alignment4 {
   uint32_t before = {};
@@ -291,15 +279,11 @@ struct SandwichUnionSize12Alignment4 {
   int32_t after = {};
 };
 
-extern "C" const fidl_type_t test_unionsandwich_StructSize16Alignment8Table;
-
 struct StructSize16Alignment8 {
   uint64_t f1 = {};
 
   uint64_t f2 = {};
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize24Alignment8Table;
 
 struct SandwichUnionSize24Alignment8 {
   uint32_t before = {};
@@ -308,8 +292,6 @@ struct SandwichUnionSize24Alignment8 {
 
   uint32_t after = {};
 };
-
-extern "C" const fidl_type_t test_unionsandwich_SandwichUnionSize36Alignment4Table;
 
 struct SandwichUnionSize36Alignment4 {
   uint32_t before = {};

@@ -58,8 +58,6 @@ using ReferenceMe = ::test_someotherlibrary::wire::ReferenceMe;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_aliases_ExampleOfUseOfAliasesTable;
-
 struct ExampleOfUseOfAliases {
   uint32_t field_of_u32 = {};
 

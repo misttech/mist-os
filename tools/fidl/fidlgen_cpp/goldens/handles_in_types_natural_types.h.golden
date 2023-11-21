@@ -38,8 +38,6 @@ class EmptyResourceUnion;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_TableWithHandleTable;
-
 class TableWithHandle {
  private:
   struct Storage_;
@@ -80,8 +78,6 @@ class TableWithHandle {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_UnionWithHandleTable;
 
 class UnionWithHandle {
  private:
@@ -169,8 +165,6 @@ class UnionWithHandle {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_HandlesInTypesTable;
 
 class HandlesInTypes {
  private:
@@ -306,8 +300,6 @@ class HandlesInTypes {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
-
 class EmptyResourceStruct {
  private:
   struct Storage_;
@@ -359,8 +351,6 @@ class EmptyResourceStruct {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
-
 class EmptyResourceTable {
  private:
   struct Storage_;
@@ -391,8 +381,6 @@ class EmptyResourceTable {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
 
 class EmptyResourceUnion {
  private:
@@ -540,8 +528,6 @@ namespace fidl {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_HandlesInTypesTable;
-
 template <>
 struct IsResource<::test_handlesintypes::HandlesInTypes> : public std::true_type {};
 template <>
@@ -566,8 +552,6 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::HandlesInTypes, ::fi
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceStructTable;
 
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceStruct> : public std::true_type {};
@@ -594,8 +578,6 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceStruct,
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_TableWithHandleTable;
-
 template <>
 struct IsResource<::test_handlesintypes::TableWithHandle> : public std::true_type {};
 template <>
@@ -619,8 +601,6 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::TableWithHandle, ::f
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceTableTable;
 
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceTable> : public std::true_type {};
@@ -646,8 +626,6 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::EmptyResourceTable, 
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_handlesintypes_UnionWithHandleTable;
-
 template <>
 struct IsResource<::test_handlesintypes::UnionWithHandle> : public std::true_type {};
 template <>
@@ -672,8 +650,6 @@ struct internal::NaturalCodingTraits<::test_handlesintypes::UnionWithHandle, ::f
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_handlesintypes_EmptyResourceUnionTable;
 
 template <>
 struct IsResource<::test_handlesintypes::EmptyResourceUnion> : public std::true_type {};

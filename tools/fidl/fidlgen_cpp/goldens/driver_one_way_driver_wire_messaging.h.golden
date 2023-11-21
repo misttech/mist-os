@@ -27,8 +27,6 @@ namespace test_driveroneway {
 
 class OneWay;
 
-__LOCAL extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
-
 }  // namespace test_driveroneway
 
 template <>
@@ -129,8 +127,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driveroneway::OneWay::Send>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_driveroneway::test_driveroneway_OneWaySendRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(4 + sizeof(fidl_message_header_t));

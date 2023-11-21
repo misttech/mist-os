@@ -39,18 +39,12 @@ constexpr uint64_t kWithAndWithoutRequestResponse_NoRequestWithResponse_Ordinal 
 constexpr ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_NoRequestWithResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseNoRequestWithResponseResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithAndWithoutRequestResponse_WithRequestNoResponse_Ordinal = 7326057319832554103lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_WithRequestNoResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestNoResponseRequestTable;
 
 
 [[maybe_unused]]
@@ -61,21 +55,12 @@ constexpr uint64_t kWithAndWithoutRequestResponse_WithRequestEmptyResponse_Ordin
 constexpr ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_WithRequestEmptyResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestEmptyResponseRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithAndWithoutRequestResponse_WithRequestWithResponse_Ordinal = 6417226585456833969lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_WithRequestWithResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseWithRequestWithResponseResponseTable;
 
 
 [[maybe_unused]]
@@ -92,9 +77,6 @@ constexpr uint64_t kWithAndWithoutRequestResponse_OnWithResponse_Ordinal = 58115
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithAndWithoutRequestResponse_OnWithResponse_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithAndWithoutRequestResponseOnWithResponseRequestTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -1137,18 +1119,12 @@ constexpr uint64_t kWithErrorSyntax_ResponseAsStruct_Ordinal = 26824856843074113
 constexpr ::fidl::MessageDynamicFlags kWithErrorSyntax_ResponseAsStruct_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ResponseAsStruct_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithErrorSyntax_ErrorAsPrimitive_Ordinal = 6930994461233198567lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithErrorSyntax_ErrorAsPrimitive_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsPrimitive_ResultTable;
 
 
 [[maybe_unused]]
@@ -1159,18 +1135,12 @@ constexpr uint64_t kWithErrorSyntax_ErrorAsEnum_Ordinal = 5491891352371277635lu;
 constexpr ::fidl::MessageDynamicFlags kWithErrorSyntax_ErrorAsEnum_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_ErrorAsEnum_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithErrorSyntax_HandleInResult_Ordinal = 1371676333068455103lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithErrorSyntax_HandleInResult_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithErrorSyntax_HandleInResult_ResultTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -2008,18 +1978,12 @@ constexpr uint64_t kChannelProtocol_MethodA_Ordinal = 3155008840945527714lu;
 constexpr ::fidl::MessageDynamicFlags kChannelProtocol_MethodA_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodARequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kChannelProtocol_EventA_Ordinal = 2220452875311597006lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kChannelProtocol_EventA_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_ChannelProtocolEventARequestTable;
 
 
 [[maybe_unused]]
@@ -2030,12 +1994,6 @@ constexpr uint64_t kChannelProtocol_MethodB_Ordinal = 8903004957800778182lu;
 constexpr ::fidl::MessageDynamicFlags kChannelProtocol_MethodB_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMethodBResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kChannelProtocol_TakeHandle_Ordinal = 591935489944717925lu;
 
@@ -2044,21 +2002,12 @@ constexpr uint64_t kChannelProtocol_TakeHandle_Ordinal = 591935489944717925lu;
 constexpr ::fidl::MessageDynamicFlags kChannelProtocol_TakeHandle_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_ChannelProtocolTakeHandleRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kChannelProtocol_MutateSocket_Ordinal = 7411742788430590287lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kChannelProtocol_MutateSocket_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_ChannelProtocolMutateSocketResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -2793,12 +2742,6 @@ constexpr uint64_t kTransitional_Request_Ordinal = 5849263021838298888lu;
 constexpr ::fidl::MessageDynamicFlags kTransitional_Request_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalRequestRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_TransitionalRequestResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kTransitional_OneWay_Ordinal = 4336658926562441191lu;
 
@@ -2807,18 +2750,12 @@ constexpr uint64_t kTransitional_OneWay_Ordinal = 4336658926562441191lu;
 constexpr ::fidl::MessageDynamicFlags kTransitional_OneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_TransitionalOneWayRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kTransitional_Event_Ordinal = 8507647465196374081lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kTransitional_Event_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_TransitionalEventRequestTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -3469,9 +3406,6 @@ constexpr uint64_t kHandleRightsProtocol_NoResponseMethod_Ordinal = 115504464951
 constexpr ::fidl::MessageDynamicFlags kHandleRightsProtocol_NoResponseMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolNoResponseMethodRequestTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kHandleRightsProtocol_ResponseMethod_Ordinal = 5956276128041940295lu;
 
@@ -3480,21 +3414,12 @@ constexpr uint64_t kHandleRightsProtocol_ResponseMethod_Ordinal = 59562761280419
 constexpr ::fidl::MessageDynamicFlags kHandleRightsProtocol_ResponseMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolResponseMethodResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kHandleRightsProtocol_AnEvent_Ordinal = 476727631355490611lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kHandleRightsProtocol_AnEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_HandleRightsProtocolAnEventRequestTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -3915,12 +3840,6 @@ constexpr uint64_t kWithProtocolEnds_ClientEnds_Ordinal = 5870448041025163330lu;
 constexpr ::fidl::MessageDynamicFlags kWithProtocolEnds_ClientEnds_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsClientEndsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithProtocolEnds_ServerEnds_Ordinal = 8115535094437022259lu;
 
@@ -3929,24 +3848,12 @@ constexpr uint64_t kWithProtocolEnds_ServerEnds_Ordinal = 8115535094437022259lu;
 constexpr ::fidl::MessageDynamicFlags kWithProtocolEnds_ServerEnds_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsServerEndsResponseTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kWithProtocolEnds_StructContainingEnds_Ordinal = 4076866772260025813lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kWithProtocolEnds_StructContainingEnds_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_WithProtocolEndsStructContainingEndsResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -4523,9 +4430,6 @@ constexpr uint64_t kManyParameters_Fifteen_Ordinal = 6423043252952467815lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kManyParameters_Fifteen_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_ManyParametersFifteenRequestTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 
@@ -4692,12 +4596,6 @@ constexpr uint64_t kMethodWithUnion_UnionMethod_Ordinal = 4124874338266649112lu;
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kMethodWithUnion_UnionMethod_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodRequestTable;
-
-
-extern "C" const fidl_type_t test_protocols_MethodWithUnionUnionMethodResponseTable;
 #ifdef __Fuchsia__
 }  // namespace test_protocols
 

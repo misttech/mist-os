@@ -8,14 +8,9 @@
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wshadow"
 
-namespace test_anonymous {
-
-extern "C" const fidl_type_t test_anonymous_OpTable;
-}  // namespace test_anonymous
-
 size_t fidl::internal::DisplayError<::test_anonymous::Op>::Format(
     const ::test_anonymous::Op& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 1u:
         return "ADD";
@@ -24,32 +19,29 @@ size_t fidl::internal::DisplayError<::test_anonymous::Op>::Format(
       case 3u:
         return "DIV";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_anonymous::test_anonymous_OpTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.anonymous/Op", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
-
-namespace test_anonymous {
-
-extern "C" const fidl_type_t test_anonymous_SomeProtocol_SomeMethod_ErrorTable;
-}  // namespace test_anonymous
 
 size_t fidl::internal::DisplayError<::test_anonymous::SomeProtocolSomeMethodError>::Format(
     const ::test_anonymous::SomeProtocolSomeMethodError& value, char* destination, size_t capacity) {
-  const char* name = [&]() -> const char* {
+  const char* member_name = [&]() -> const char* {
     switch (static_cast<uint32_t>(value)) {
       case 1u:
         return "ERROR_ONE";
       case 2u:
         return "ERROR_TWO";
       default:
-        return nullptr;
+        return "[UNKNOWN]";
     }
   }();
-  return ::fidl::internal::FormatApplicationError(
-      static_cast<uint32_t>(value), name, &::test_anonymous::test_anonymous_SomeProtocol_SomeMethod_ErrorTable, destination, capacity);
+  size_t written = std::snprintf(destination, capacity, "%s.%s (value: %u)",
+                                 "test.anonymous/SomeProtocol_SomeMethod_Error", member_name, static_cast<uint32_t>(value));
+  return std::min(written, capacity - 1);
 }
 
 #pragma clang diagnostic pop

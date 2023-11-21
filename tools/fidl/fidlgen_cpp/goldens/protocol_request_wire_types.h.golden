@@ -42,8 +42,6 @@ struct ParentTakeChildRequestRequest;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildResponseTable;
-
 struct ParentGetChildResponse {
   ::fidl::ClientEnd<::test_protocolrequest::Child> c = {};
 
@@ -53,8 +51,6 @@ struct ParentGetChildResponse {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentGetChildRequestResponseTable;
 
 struct ParentGetChildRequestResponse {
   ::fidl::ServerEnd<::test_protocolrequest::Child> r = {};
@@ -66,8 +62,6 @@ struct ParentGetChildRequestResponse {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestTable;
-
 struct ParentTakeChildRequest {
   ::fidl::ClientEnd<::test_protocolrequest::Child> c = {};
 
@@ -77,8 +71,6 @@ struct ParentTakeChildRequest {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_protocolrequest_ParentTakeChildRequestRequestTable;
 
 struct ParentTakeChildRequestRequest {
   ::fidl::ServerEnd<::test_protocolrequest::Child> r = {};

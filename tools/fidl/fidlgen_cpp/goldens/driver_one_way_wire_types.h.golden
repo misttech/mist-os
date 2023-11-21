@@ -37,13 +37,9 @@ struct Payload;
 
 struct OneWaySendRequest;
 
-extern "C" const fidl_type_t test_driveroneway_PayloadTable;
-
 struct Payload {
   uint32_t value = {};
 };
-
-extern "C" const fidl_type_t test_driveroneway_OneWaySendRequestTable;
 
 struct OneWaySendRequest {
   ::test_driveroneway::wire::Payload payload = {};

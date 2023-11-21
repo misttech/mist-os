@@ -44,8 +44,6 @@ class T;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_driverhandle_ClientEndWrapperTable;
-
 struct ClientEndWrapper {
   ::fdf::ClientEnd<::test_driverhandle::DriverProtocol> value = {};
 
@@ -55,8 +53,6 @@ struct ClientEndWrapper {
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_ServerEndWrapperTable;
 
 struct ServerEndWrapper {
   ::fdf::ServerEnd<::test_driverhandle::DriverProtocol> value = {};
@@ -103,8 +99,6 @@ struct ::fidl::WireTableFrame<::test_driverhandle::wire::T> final {
 
 namespace test_driverhandle {
 namespace wire {
-
-extern "C" const fidl_type_t test_driverhandle_TTable;
 
 class T {
  public:
@@ -328,8 +322,6 @@ inline ::fidl::WireTableExternalBuilder<::test_driverhandle::wire::T> T::Externa
 #endif  // __Fuchsia__
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
 
 struct HandlesInProtocolSendHandlesRequest {
   using T = test_driverhandle::wire::T;

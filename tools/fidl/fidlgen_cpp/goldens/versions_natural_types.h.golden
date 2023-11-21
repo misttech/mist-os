@@ -36,8 +36,6 @@ constexpr uint32_t kConst = 0u;
 
 constexpr bool kAddedAtHead = true;
 
-extern "C" const fidl_type_t test_versions_StructTable;
-
 class Struct {
  private:
   struct Storage_;
@@ -95,8 +93,6 @@ class Struct {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_versions_TableTable;
-
 class Table {
  private:
   struct Storage_;
@@ -142,8 +138,6 @@ class Table {
   static constexpr auto kMembers = std::make_tuple(::fidl::internal::NaturalTableMember<Storage_, uint32_t, fidl::internal::NaturalCodingConstraintEmpty>{
       1, &Storage_::x});
 };
-
-extern "C" const fidl_type_t test_versions_UnionTable;
 
 class Union {
  private:
@@ -276,8 +270,6 @@ inline Table& Table::x(std::optional<uint32_t> value) {
 }  // namespace test_versions
 namespace fidl {
 
-extern "C" const fidl_type_t test_versions_StructTable;
-
 template <>
 struct IsFidlType<::test_versions::Struct> : public std::true_type {};
 
@@ -297,8 +289,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_versions::Struct, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_versions::Struct, 4> {};
 
-extern "C" const fidl_type_t test_versions_TableTable;
-
 template <>
 struct IsFidlType<::test_versions::Table> : public std::true_type {};
 
@@ -316,8 +306,6 @@ struct IsTable<::test_versions::Table> : public std::true_type {};
 
 template <>
 struct internal::NaturalCodingTraits<::test_versions::Table, ::fidl::internal::NaturalCodingConstraintEmpty> : public ::fidl::internal::NaturalTableCodingTraits<::test_versions::Table> {};
-
-extern "C" const fidl_type_t test_versions_UnionTable;
 
 template <>
 struct IsFidlType<::test_versions::Union> : public std::true_type {};

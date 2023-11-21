@@ -125,7 +125,6 @@ struct ::fidl::WireTableFrame<::test_protocollayouts::wire::LocalTablePayload> f
 namespace test_protocollayouts {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayouts_LocalTablePayloadTable;
 
 class LocalTablePayload {
 public:
@@ -330,7 +329,6 @@ struct ::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOneWayAn
 namespace test_protocollayouts {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocolOneWayAnonRequestTable;
 
 class MainProtocolOneWayAnonRequest {
 public:
@@ -535,7 +533,6 @@ struct ::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAn
 namespace test_protocollayouts {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonResponseTable;
 
 class MainProtocolTwoWayAnonResponse {
 public:
@@ -740,7 +737,6 @@ struct ::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolTwoWayAn
 namespace test_protocollayouts {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonWithErrorRequestTable;
 
 class MainProtocolTwoWayAnonWithErrorRequest {
 public:
@@ -945,7 +941,6 @@ struct ::fidl::WireTableFrame<::test_protocollayouts::wire::MainProtocolOnAnonWi
 namespace test_protocollayouts {
 namespace wire {
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnAnonWithError_ResponseTable;
 
 class MainProtocolOnAnonWithErrorResponse {
 public:
@@ -1117,7 +1112,6 @@ inline ::fidl::WireTableExternalBuilder<::test_protocollayouts::wire::MainProtoc
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_LocalUnionPayloadTable;
 
 class LocalUnionPayload {
   public:
@@ -1173,7 +1167,6 @@ class LocalUnionPayload {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayImportWithError_ResultTable;
 
 class MainProtocolTwoWayImportWithErrorResult {
   public:
@@ -1256,7 +1249,6 @@ class MainProtocolTwoWayImportWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnImportWithError_ResultTable;
 
 class MainProtocolOnImportWithErrorResult {
   public:
@@ -1339,7 +1331,6 @@ class MainProtocolOnImportWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayLocalWithError_ResultTable;
 
 class MainProtocolTwoWayLocalWithErrorResult {
   public:
@@ -1422,7 +1413,6 @@ class MainProtocolTwoWayLocalWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnLocalWithError_ResultTable;
 
 class MainProtocolOnLocalWithErrorResult {
   public:
@@ -1505,7 +1495,6 @@ class MainProtocolOnLocalWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocolTwoWayAnonRequestTable;
 
 class MainProtocolTwoWayAnonRequest {
   public:
@@ -1561,7 +1550,6 @@ class MainProtocolTwoWayAnonRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResponseTable;
 
 class MainProtocolTwoWayAnonWithErrorResponse {
   public:
@@ -1617,7 +1605,6 @@ class MainProtocolTwoWayAnonWithErrorResponse {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_TwoWayAnonWithError_ResultTable;
 
 class MainProtocolTwoWayAnonWithErrorResult {
   public:
@@ -1701,7 +1688,6 @@ class MainProtocolTwoWayAnonWithErrorResult {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocolOnAnonRequestTable;
 
 class MainProtocolOnAnonRequest {
   public:
@@ -1757,7 +1743,6 @@ class MainProtocolOnAnonRequest {
 
 
 
-extern "C" const fidl_type_t test_protocollayouts_MainProtocol_OnAnonWithError_ResultTable;
 
 class MainProtocolOnAnonWithErrorResult {
   public:

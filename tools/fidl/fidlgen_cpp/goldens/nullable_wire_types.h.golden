@@ -57,8 +57,6 @@ class SimpleUnion;
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableHandleTable;
-
 struct StructWithNullableHandle {
   ::zx::vmo val = {};
 
@@ -67,15 +65,11 @@ struct StructWithNullableHandle {
 
 #endif  // __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddResponseTable;
-
 struct SimpleProtocolAddResponse {
   int32_t sum = {};
 };
 
 #ifdef __Fuchsia__
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableProtocolTable;
 
 struct StructWithNullableProtocol {
   ::fidl::ClientEnd<::test_nullable::SimpleProtocol> val = {};
@@ -87,8 +81,6 @@ struct StructWithNullableProtocol {
 
 #ifdef __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableRequestTable;
-
 struct StructWithNullableRequest {
   ::fidl::ServerEnd<::test_nullable::SimpleProtocol> val = {};
 
@@ -97,13 +89,9 @@ struct StructWithNullableRequest {
 
 #endif  // __Fuchsia__
 
-extern "C" const fidl_type_t test_nullable_Int32WrapperTable;
-
 struct Int32Wrapper {
   int32_t val = {};
 };
-
-extern "C" const fidl_type_t test_nullable_SimpleUnionTable;
 
 class SimpleUnion {
  public:
@@ -174,19 +162,13 @@ class SimpleUnion {
   ::fidl::UntypedEnvelope envelope_;
 };
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableStringTable;
-
 struct StructWithNullableString {
   ::fidl::StringView val = {};
 };
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableVectorTable;
-
 struct StructWithNullableVector {
   ::fidl::VectorView<int32_t> val = {};
 };
-
-extern "C" const fidl_type_t test_nullable_SimpleProtocolAddRequestTable;
 
 struct SimpleProtocolAddRequest {
   int32_t a = {};
@@ -194,13 +176,9 @@ struct SimpleProtocolAddRequest {
   int32_t b = {};
 };
 
-extern "C" const fidl_type_t test_nullable_StructWithNullableStructTable;
-
 struct StructWithNullableStruct {
   ::fidl::ObjectView<::test_nullable::wire::Int32Wrapper> val = {};
 };
-
-extern "C" const fidl_type_t test_nullable_StructWithNullableUnionTable;
 
 struct StructWithNullableUnion {
   ::fidl::WireOptional<::test_nullable::wire::SimpleUnion> val = {};

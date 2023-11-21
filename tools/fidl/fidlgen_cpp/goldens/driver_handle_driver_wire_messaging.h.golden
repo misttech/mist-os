@@ -133,10 +133,6 @@ namespace fidl {
 #endif  // __Fuchsia__
 
 }  // namespace fidl
-namespace test_driverhandle {
-__LOCAL extern "C" const fidl_type_t test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
-
-}  // namespace test_driverhandle
 
 template <>
 struct ::fidl::internal::WireOrdinal<::test_driverhandle::HandlesInProtocol::SendHandles> final {
@@ -241,8 +237,6 @@ struct IsResource<::fidl::internal::TransactionalRequest<::test_driverhandle::Ha
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_driverhandle::test_driverhandle_HandlesInProtocolSendHandlesRequestTable;
   static constexpr uint32_t kMaxNumHandles = 2;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(16 + sizeof(fidl_message_header_t));

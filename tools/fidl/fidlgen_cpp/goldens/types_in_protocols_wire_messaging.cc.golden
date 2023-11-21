@@ -23,21 +23,12 @@ constexpr uint64_t kProtocol_OneWayBasic_Ordinal = 8948968077914418681lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayBasic_Ordinal = 2331618702752598159lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
 
 [[maybe_unused]]
@@ -48,18 +39,12 @@ constexpr uint64_t kProtocol_ErrorBasic_Ordinal = 5016634351643393939lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorBasic_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventBasic_Ordinal = 5892309624949902400lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_BasicTable;
 
 
 [[maybe_unused]]
@@ -70,21 +55,12 @@ constexpr uint64_t kProtocol_OneWayCompound_Ordinal = 3153289648860022476lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayCompound_Ordinal = 8787219719097524529lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
 
 [[maybe_unused]]
@@ -95,18 +71,12 @@ constexpr uint64_t kProtocol_ErrorCompound_Ordinal = 2990809657626249085lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorCompound_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventCompound_Ordinal = 7024581948727571669lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_CompoundTable;
 
 
 [[maybe_unused]]
@@ -117,21 +87,12 @@ constexpr uint64_t kProtocol_OneWayArrayBasic_Ordinal = 7125516817014311449lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayArrayBasic_Ordinal = 5309034178175279380lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 
 
 [[maybe_unused]]
@@ -142,18 +103,12 @@ constexpr uint64_t kProtocol_ErrorArrayBasic_Ordinal = 1084731895342694265lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayBasic_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventArrayBasic_Ordinal = 5888282827283820590lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventArrayBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayBasicTable;
 
 
 [[maybe_unused]]
@@ -164,21 +119,12 @@ constexpr uint64_t kProtocol_OneWayArrayCompound_Ordinal = 5064659223443251357lu
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayArrayCompound_Ordinal = 849744466051983995lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
 
 [[maybe_unused]]
@@ -189,18 +135,12 @@ constexpr uint64_t kProtocol_ErrorArrayCompound_Ordinal = 5919277476782807556lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayCompound_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventArrayCompound_Ordinal = 2189769767733851157lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventArrayCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayCompoundTable;
 
 
 [[maybe_unused]]
@@ -211,21 +151,12 @@ constexpr uint64_t kProtocol_OneWayVectorBasic_Ordinal = 5733220720079947351lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayVectorBasic_Ordinal = 8674156353091415668lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 
 
 [[maybe_unused]]
@@ -236,18 +167,12 @@ constexpr uint64_t kProtocol_ErrorVectorBasic_Ordinal = 875941614196965234lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorBasic_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventVectorBasic_Ordinal = 4583890770109526006lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventVectorBasic_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorBasicTable;
 
 
 [[maybe_unused]]
@@ -258,21 +183,12 @@ constexpr uint64_t kProtocol_OneWayVectorCompound_Ordinal = 1853985797298830992l
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayVectorCompound_Ordinal = 3968024057912959924lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
 
 [[maybe_unused]]
@@ -283,18 +199,12 @@ constexpr uint64_t kProtocol_ErrorVectorCompound_Ordinal = 8506780203315865989lu
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorCompound_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventVectorCompound_Ordinal = 6026375226599919603lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventVectorCompound_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorCompoundTable;
 
 
 [[maybe_unused]]
@@ -305,21 +215,12 @@ constexpr uint64_t kProtocol_OneWayVectorOptional_Ordinal = 1530215841195476271l
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayVectorOptional_Ordinal = 1030024737742222323lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
 
 [[maybe_unused]]
@@ -330,18 +231,12 @@ constexpr uint64_t kProtocol_ErrorVectorOptional_Ordinal = 6406191217027936606lu
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorVectorOptional_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventVectorOptional_Ordinal = 1684763340073130077lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventVectorOptional_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_VectorOptionalTable;
 
 
 [[maybe_unused]]
@@ -352,21 +247,12 @@ constexpr uint64_t kProtocol_OneWayArrayVectorNested_Ordinal = 59126037621335241
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayArrayVectorNested_Ordinal = 5351275678438791132lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
 
 [[maybe_unused]]
@@ -377,18 +263,12 @@ constexpr uint64_t kProtocol_ErrorArrayVectorNested_Ordinal = 908560492160580215
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorArrayVectorNested_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventArrayVectorNested_Ordinal = 1228201560727880574lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventArrayVectorNested_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ArrayVectorNestedTable;
 
 
 [[maybe_unused]]
@@ -399,21 +279,12 @@ constexpr uint64_t kProtocol_OneWayResource_Ordinal = 6553996787849601058lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_OneWayResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_TwoWayResource_Ordinal = 1802709005492464987lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_TwoWayResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 
 
 [[maybe_unused]]
@@ -424,18 +295,12 @@ constexpr uint64_t kProtocol_ErrorResource_Ordinal = 6568609240497354166lu;
 constexpr ::fidl::MessageDynamicFlags kProtocol_ErrorResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 
-extern "C" const fidl_type_t test_typesinprotocols_Protocol_ErrorResource_ResultTable;
-
-
 [[maybe_unused]]
 constexpr uint64_t kProtocol_EventResource_Ordinal = 5745997765922613643lu;
 
 
 [[maybe_unused]]
 constexpr ::fidl::MessageDynamicFlags kProtocol_EventResource_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
-
-
-extern "C" const fidl_type_t test_typesinprotocols_ResourceTable;
 #ifdef __Fuchsia__
 }  // namespace test_typesinprotocols
 

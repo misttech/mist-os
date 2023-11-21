@@ -46,17 +46,6 @@ struct fidl::internal::DisplayError<uint32_t> {
   static size_t Format(const uint32_t& value, char* destination, size_t capacity);
 };
 
-// FormatApplicationError| helps to format application errors represented using
-// enums. It implements the common part of formatting and string concatenation.
-//
-// |member_name| is a string literal that is the C++ member name corresponding
-// to |value|, which must be a FIDL 32-bit enum. Signed values should go through
-// casting.
-//
-// If the |value| is not a known enum member, |member_name| should be |nullptr|.
-size_t FormatApplicationError(uint32_t value, const char* member_name, const fidl_type_t* type,
-                              char* destination, size_t capacity);
-
 }  // namespace fidl::internal
 
 #endif  // LIB_FIDL_CPP_WIRE_INTERNAL_DISPLAY_ERROR_H_

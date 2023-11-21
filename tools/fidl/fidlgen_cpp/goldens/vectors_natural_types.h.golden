@@ -24,8 +24,6 @@ namespace test_vectors {
 
 class ExampleUseOfVectors;
 
-extern "C" const fidl_type_t test_vectors_ExampleUseOfVectorsTable;
-
 class ExampleUseOfVectors {
  private:
   struct Storage_;
@@ -124,8 +122,6 @@ inline ExampleUseOfVectors& ExampleUseOfVectors::vector_of_vector_of_bool(::std:
 
 }  // namespace test_vectors
 namespace fidl {
-
-extern "C" const fidl_type_t test_vectors_ExampleUseOfVectorsTable;
 
 template <>
 struct IsFidlType<::test_vectors::ExampleUseOfVectors> : public std::true_type {};

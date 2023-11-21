@@ -28,11 +28,8 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl:
 
   using Completer = fidl::Completer<>;
 };
-namespace test_inheritancewithrecursivedecl {
-__LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ParentFirstRequestTable;
 
 #ifdef __Fuchsia__
-}  // namespace test_inheritancewithrecursivedecl
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Parent> final : public ::fidl::internal::NaturalClientBase {
@@ -40,11 +37,8 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::P
   using NaturalClientBase::NaturalClientBase;
   ::fit::result<::fidl::OneWayError> First(::fidl::Request<::test_inheritancewithrecursivedecl::Parent::First> request) const;
 };
-namespace test_inheritancewithrecursivedecl {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_inheritancewithrecursivedecl
 
 #ifdef __Fuchsia__
 
@@ -185,11 +179,7 @@ struct ::fidl::internal::NaturalMethodTypes<::test_inheritancewithrecursivedecl:
   using Completer = fidl::Completer<>;
 };
 
-namespace test_inheritancewithrecursivedecl {
-__LOCAL extern "C" const fidl_type_t test_inheritancewithrecursivedecl_ChildSecondRequestTable;
-
 #ifdef __Fuchsia__
-}  // namespace test_inheritancewithrecursivedecl
 
 template <>
 class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::Child> final : public ::fidl::internal::NaturalClientBase {
@@ -199,11 +189,8 @@ class ::fidl::internal::NaturalClientImpl<::test_inheritancewithrecursivedecl::C
 
   ::fit::result<::fidl::OneWayError> Second(::fidl::Request<::test_inheritancewithrecursivedecl::Child::Second> request) const;
 };
-namespace test_inheritancewithrecursivedecl {
 
 #endif  // __Fuchsia__
-
-}  // namespace test_inheritancewithrecursivedecl
 
 #ifdef __Fuchsia__
 

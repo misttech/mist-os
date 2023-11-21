@@ -27,13 +27,6 @@ namespace test_emptystruct {
 
 class EmptyProtocol;
 
-__LOCAL extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_emptystruct_EmptyProtocolReceiveRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
-
-__LOCAL extern "C" const fidl_type_t test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
 }  // namespace test_emptystruct
 
 template <>
@@ -315,8 +308,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::Send>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_emptystruct::test_emptystruct_EmptyProtocolSendRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(1 + sizeof(fidl_message_header_t));
@@ -343,8 +334,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalEvent<::test_em
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalEvent<::test_emptystruct::EmptyProtocol::Receive>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_emptystruct::test_emptystruct_EmptyProtocolReceiveRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(1 + sizeof(fidl_message_header_t));
@@ -369,8 +358,6 @@ struct IsFidlTransactionalMessage<::fidl::internal::TransactionalRequest<::test_
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalRequest<::test_emptystruct::EmptyProtocol::SendAndReceive>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_emptystruct::test_emptystruct_EmptyProtocolSendAndReceiveRequestTable;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = FIDL_ALIGN(1 + sizeof(fidl_message_header_t));
@@ -398,8 +385,6 @@ struct IsFidlType<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAn
 
 template <>
 struct TypeTraits<::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_emptystruct::test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
@@ -416,8 +401,6 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_emptystruc
 static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>, body) == sizeof(fidl_message_header_t));
 template <>
 struct TypeTraits<::fidl::WireResponse<::test_emptystruct::EmptyProtocol::SendAndReceive>> {
-  static constexpr const fidl_type_t* kType =
-      &::test_emptystruct::test_emptystruct_EmptyProtocolSendAndReceiveResponseTable;
   static constexpr bool kHasServerToClientBody = true;
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;

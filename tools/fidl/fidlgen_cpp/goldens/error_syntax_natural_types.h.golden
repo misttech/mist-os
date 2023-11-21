@@ -31,8 +31,6 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResponse;
 
 class ExampleUseOfErrorSyntaxCallWhichMayFailResult;
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
-
 class ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
  private:
   struct Storage_;
@@ -90,8 +88,6 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailRequest {
   static constexpr auto kPadding = std::make_tuple();
 };
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable;
-
 class ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
  private:
   struct Storage_;
@@ -148,8 +144,6 @@ class ExampleUseOfErrorSyntaxCallWhichMayFailResponse {
       &Storage_::value, 0});
   static constexpr auto kPadding = std::make_tuple();
 };
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 
 class ExampleUseOfErrorSyntaxCallWhichMayFailResult {
  private:
@@ -309,8 +303,6 @@ inline ExampleUseOfErrorSyntaxCallWhichMayFailResponse& ExampleUseOfErrorSyntaxC
 }  // namespace test_errorsyntax
 namespace fidl {
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntaxCallWhichMayFailRequestTable;
-
 template <>
 struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest> : public std::true_type {};
 
@@ -330,8 +322,6 @@ template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRequest, 16> {};
 
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResponseTable;
-
 template <>
 struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse> : public std::true_type {};
 
@@ -350,8 +340,6 @@ struct IsStruct<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailRespo
 template <>
 struct internal::NaturalCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, ::fidl::internal::NaturalCodingConstraintEmpty> final
     : public ::fidl::internal::NaturalStructCodingTraits<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResponse, 8> {};
-
-extern "C" const fidl_type_t test_errorsyntax_ExampleUseOfErrorSyntax_CallWhichMayFail_ResultTable;
 
 template <>
 struct IsFidlType<::test_errorsyntax::ExampleUseOfErrorSyntaxCallWhichMayFailResult> : public std::true_type {};
