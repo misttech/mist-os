@@ -144,10 +144,12 @@ void Dfv2Driver::CompatServerInitialized(zx::result<> compat_result) {
   }
 
   auto inspect_sink = incoming()->Connect<fuchsia_inspect::InspectSink>();
-  if (inspect_sink.is_ok()) {
-    exposed_inspector_.emplace(inspect::ComponentInspector(
-        dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
+  if (inspect_sink.is_error() || !inspect_sink->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to inspect sink: %s", inspect_sink.status_string());
+    return CompleteStart(inspect_sink.take_error());
   }
+  exposed_inspector_.emplace(inspect::ComponentInspector(
+      dispatcher(), {.inspector = inspector(), .client_end = std::move(inspect_sink.value())}));
 
   {
     fuchsia_hardware_sdmmc::SdmmcService::InstanceHandler handler({
