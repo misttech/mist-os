@@ -15,7 +15,7 @@ group("tests") {
     ":driver_runtime_sdk_tests",
     ":driver_runtime_shutdown_process_tests",
     ":driver_runtime_tests",
-    "microbenchmarks",
+    "microbenchmarks:driver_runtime_microbenchmarks",
   ]
 }
 

@@ -18,7 +18,6 @@ import("//build/testing/perf/test.gni")
 
 test_list = [
   # keep-sorted start
-  "driver_runtime_microbenchmarks_test",
   "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
@@ -198,7 +197,6 @@ if (is_host) {
   metric_files = [
     # keep-sorted start
     "fuchsia.audio.txt",
-    "fuchsia.driver_runtime_microbenchmarks.txt",
     "fuchsia.fidl_microbenchmarks.cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_cpp.txt",
     "fuchsia.fidl_microbenchmarks.driver_llcpp.txt",
