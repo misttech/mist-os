@@ -47,7 +47,7 @@ type IdentifyHostResponse = table {
     6: product_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
     // The board as set via `fx set` in-tree, like `x64` for example.
     7: board_config string:fuchsia.buildinfo.MAX_STRING_LENGTH;
-    // TODO(https://fxbug.dev/94339): The semantics of this field are not well
+    // TODO(https://fxbug.dev/287693745): The semantics of this field are not well
     // defined. Are these addresses intended to be used to connect to the
     // device, or only identify it? Various comments in the code refer to
     // needing the scope id of a given address, but such a scope id would
@@ -58,7 +58,7 @@ type IdentifyHostResponse = table {
     8: addresses vector<fuchsia.net.Subnet>:MAX;
 };
 
-type IdentifyHostError = strict enum : uint32 {
+type IdentifyHostError = flexible enum : uint32 {
     // Indicates that the attempt to list device network interfaces failed.
     LIST_INTERFACES_FAILED = 1;
     // Indicates that attempting to get the nodename of the target failed.

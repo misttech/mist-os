@@ -473,13 +473,6 @@ mod test {
                     // store channels so that they do not die.
                     let mut server_channels = vec![];
                     match request {
-                        fremotecontrol::RemoteControlRequest::RootLifecycleController {
-                            server,
-                            responder,
-                        } => {
-                            server_channels.push(server.into_channel());
-                            responder.send(Ok(())).expect("error sending EchoString response");
-                        }
                         fremotecontrol::RemoteControlRequest::OpenCapability {
                             moniker,
                             capability_set,

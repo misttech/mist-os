@@ -8,18 +8,14 @@ use {
     component_debug::dirs::*,
     component_debug::lifecycle::*,
     fidl::endpoints::ServerEnd,
-    fidl::prelude::*,
     fidl_fuchsia_developer_remotecontrol as rcs,
     fidl_fuchsia_developer_remotecontrol_connector as connector,
-    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as io,
-    fidl_fuchsia_net_ext::SocketAddress as SocketAddressExt,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fidl_fuchsia_diagnostics as diagnostics, fidl_fuchsia_io as io, fidl_fuchsia_sys2 as fsys,
     fuchsia_component::client::connect_to_protocol_at_path,
     fuchsia_zircon as zx,
-    futures::future::join,
     futures::prelude::*,
     moniker::Moniker,
-    std::{borrow::Borrow, cell::RefCell, collections::HashMap, net::SocketAddr, rc::Rc, rc::Weak},
+    std::{borrow::Borrow, cell::RefCell, collections::HashMap, rc::Rc, rc::Weak},
     tracing::*,
 };
 
@@ -130,26 +126,6 @@ impl RemoteControlService {
                 self.clone().identify_host(responder).await?;
                 Ok(())
             }
-            rcs::RemoteControlRequest::ConnectCapability {
-                moniker,
-                capability_name,
-                server_chan,
-                flags,
-                responder,
-            } => {
-                responder.send(
-                    self.clone()
-                        .open_capability(
-                            moniker,
-                            fsys::OpenDirType::ExposedDir,
-                            capability_name,
-                            flags,
-                            server_chan,
-                        )
-                        .await,
-                )?;
-                Ok(())
-            }
             rcs::RemoteControlRequest::OpenCapability {
                 moniker,
                 capability_set,
@@ -169,108 +145,6 @@ impl RemoteControlService {
                         )
                         .await,
                 )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::RootRealmExplorer { server, responder } => {
-                responder.send(
-                    fdio::service_connect(
-                        &format!(
-                            "/svc/{}.root",
-                            fidl_fuchsia_sys2::RealmExplorerMarker::PROTOCOL_NAME
-                        ),
-                        server.into_channel(),
-                    )
-                    .map_err(|i| i.into_raw()),
-                )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::RootRealmQuery { server, responder } => {
-                responder.send(
-                    fdio::service_connect(
-                        &format!(
-                            "/svc/{}.root",
-                            fidl_fuchsia_sys2::RealmQueryMarker::PROTOCOL_NAME
-                        ),
-                        server.into_channel(),
-                    )
-                    .map_err(|i| i.into_raw()),
-                )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::RootLifecycleController { server, responder } => {
-                responder.send(
-                    fdio::service_connect(
-                        &format!(
-                            "/svc/{}.root",
-                            fidl_fuchsia_sys2::LifecycleControllerMarker::PROTOCOL_NAME
-                        ),
-                        server.into_channel(),
-                    )
-                    .map_err(|i| i.into_raw()),
-                )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::RootRouteValidator { server, responder } => {
-                responder.send(
-                    fdio::service_connect(
-                        &format!(
-                            "/svc/{}.root",
-                            fidl_fuchsia_sys2::RouteValidatorMarker::PROTOCOL_NAME
-                        ),
-                        server.into_channel(),
-                    )
-                    .map_err(|i| i.into_raw()),
-                )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::KernelStats { server, responder } => {
-                responder.send(
-                    fdio::service_connect(
-                        &format!("/svc/{}", fidl_fuchsia_kernel::StatsMarker::PROTOCOL_NAME),
-                        server.into_channel(),
-                    )
-                    .map_err(|i| i.into_raw()),
-                )?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::ForwardTcp { addr, socket, responder } => {
-                let addr: SocketAddressExt = addr.into();
-                let addr = addr.0;
-                let result = match fasync::Socket::from_socket(socket) {
-                    Ok(socket) => match self.connect_forwarded_port(addr, socket).await {
-                        Ok(()) => Ok(()),
-                        Err(e) => {
-                            error!("Port forward connection failed: {:?}", e);
-                            Err(rcs::TunnelError::ConnectFailed)
-                        }
-                    },
-                    Err(e) => {
-                        error!("Could not use socket asynchronously: {:?}", e);
-                        Err(rcs::TunnelError::SocketFailed)
-                    }
-                };
-                responder.send(result)?;
-                Ok(())
-            }
-            rcs::RemoteControlRequest::ReverseTcp { addr, client, responder } => {
-                let addr: SocketAddressExt = addr.into();
-                let addr = addr.0;
-                let client = match client.into_proxy() {
-                    Ok(proxy) => proxy,
-                    Err(e) => {
-                        error!("Could not communicate with callback: {:?}", e);
-                        responder.send(Err(rcs::TunnelError::CallbackError))?;
-                        return Ok(());
-                    }
-                };
-                let result = match self.listen_reversed_port(addr, client).await {
-                    Ok(()) => Ok(()),
-                    Err(e) => {
-                        error!("Port forward connection failed: {:?}", e);
-                        Err(rcs::TunnelError::ConnectFailed)
-                    }
-                };
-                responder.send(result)?;
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
@@ -318,81 +192,6 @@ impl RemoteControlService {
                 }
             })
             .await;
-    }
-
-    async fn listen_reversed_port(
-        &self,
-        listen_addr: SocketAddr,
-        client: rcs::ForwardCallbackProxy,
-    ) -> Result<(), std::io::Error> {
-        let mut listener = fasync::net::TcpListener::bind(&listen_addr)?.accept_stream().fuse();
-
-        fasync::Task::local(async move {
-            let mut client_closed = client.on_closed().fuse();
-
-            loop {
-                // Listen for a connection, or exit if the client has gone away.
-                let (stream, addr) = futures::select! {
-                    result = listener.next() => {
-                        match result {
-                            Some(Ok(x)) => x,
-                            Some(Err(e)) => {
-                                warn!("Error accepting connection: {:?}", e);
-                                continue;
-                            }
-                            None => {
-                                warn!("reverse tunnel to {:?} listener socket closed", listen_addr);
-                                break;
-                            }
-                        }
-                    }
-                    _ = client_closed => {
-                        info!("reverse tunnel {:?} client has closed", listen_addr);
-                        break;
-                    }
-                };
-
-                info!("reverse tunnel connection from {:?} to {:?}", addr, listen_addr);
-
-                let (local, remote) = zx::Socket::create_stream();
-
-                let local = match fasync::Socket::from_socket(local) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        warn!("Error converting socket to async: {:?}", e);
-                        continue;
-                    }
-                };
-
-                spawn_forward_traffic(stream, local);
-
-                // Send the socket to the client.
-                if let Err(e) = client.forward(remote, &SocketAddressExt(addr).into()) {
-                    // The client has gone away, so stop the task.
-                    if let fidl::Error::ClientChannelClosed { .. } = e {
-                        warn!("tunnel client channel closed while forwarding socket");
-                        break;
-                    }
-
-                    warn!("Could not return forwarded socket to client: {:?}", e);
-                }
-            }
-        })
-        .detach();
-
-        Ok(())
-    }
-
-    async fn connect_forwarded_port(
-        &self,
-        addr: SocketAddr,
-        socket: fasync::Socket,
-    ) -> Result<(), std::io::Error> {
-        let tcp_conn = fasync::net::TcpStream::connect(addr)?.await?;
-
-        spawn_forward_traffic(tcp_conn, socket);
-
-        Ok(())
     }
 
     fn map_moniker(self: &Rc<Self>, moniker: String) -> String {
@@ -554,120 +353,20 @@ async fn check_entry_exists(
     Err(rcs::ConnectCapabilityError::NoMatchingCapabilities)
 }
 
-#[derive(Debug)]
-enum ForwardError {
-    TcpToZx(anyhow::Error),
-    ZxToTcp(anyhow::Error),
-    Both { tcp_to_zx: anyhow::Error, zx_to_tcp: anyhow::Error },
-}
-
-fn spawn_forward_traffic(tcp_side: fasync::net::TcpStream, zx_side: fasync::Socket) {
-    fasync::Task::local(async move {
-        match forward_traffic(tcp_side, zx_side).await {
-            Ok(()) => {}
-            Err(ForwardError::TcpToZx(err)) => {
-                error!("error forwarding from tcp to zx socket: {:#}", err);
-            }
-            Err(ForwardError::ZxToTcp(err)) => {
-                error!("error forwarding from zx to tcp socket: {:#}", err);
-            }
-            Err(ForwardError::Both { tcp_to_zx, zx_to_tcp }) => {
-                error!("error forwarding from zx to tcp socket:\n{:#}\n{:#}", tcp_to_zx, zx_to_tcp);
-            }
-        }
-    })
-    .detach()
-}
-
-async fn forward_traffic(
-    tcp_side: fasync::net::TcpStream,
-    zx_side: fasync::Socket,
-) -> Result<(), ForwardError> {
-    // We will forward traffic with two sub-tasks. One to stream bytes from the
-    // tcp socket to the zircon socket, and vice versa. Since we have two tasks,
-    // we need to handle how we exit the loops, otherwise we risk leaking
-    // resource.
-    //
-    // To handle this, we'll create two promises that will resolve upon the
-    // stream closing. For the zircon socket, we can use a native signal, but
-    // unfortunately fasync::net::TcpStream doesn't support listening for
-    // closure, so we'll just use a oneshot channel to signal to the other task
-    // when the tcp stream closes.
-    let (tcp_closed_tx, mut tcp_closed_rx) = futures::channel::oneshot::channel::<()>();
-    let mut zx_closed = fasync::OnSignals::new(&zx_side, zx::Signals::SOCKET_PEER_CLOSED).fuse();
-    let zx_side = &zx_side;
-
-    let (mut tcp_read, mut tcp_write) = tcp_side.split();
-    let (mut zx_read, mut zx_write) = zx_side.split();
-
-    let tcp_to_zx = async move {
-        let res = async move {
-            // TODO(84188): Use a buffer pool once we have them.
-            let mut buf = [0; 4096];
-            loop {
-                futures::select! {
-                    res = tcp_read.read(&mut buf).fuse() => {
-                        let num_bytes = res.context("read tcp socket")?;
-                        if num_bytes == 0 {
-                            return Ok(());
-                        }
-
-                        zx_write.write_all(&buf[..num_bytes]).await.context("write zx socket")?;
-                        zx_write.flush().await.context("flush zx socket")?;
-                    }
-                    _ = zx_closed => {
-                        return Ok(());
-                    }
-                }
-            }
-        }
-        .await;
-
-        // Let the other task know the tcp stream has shut down. If the other
-        // task finished before this one, this send could fail. That's okay, so
-        // just ignore the result.
-        let _ = tcp_closed_tx.send(());
-
-        res
-    };
-
-    let zx_to_tcp = async move {
-        // TODO(84188): Use a buffer pool once we have them.
-        let mut buf = [0; 4096];
-        loop {
-            futures::select! {
-                res = zx_read.read(&mut buf).fuse() => {
-                    let num_bytes = res.context("read zx socket")?;
-                    if num_bytes == 0 {
-                        return Ok(());
-                    }
-                    tcp_write.write_all(&buf[..num_bytes]).await.context("write tcp socket")?;
-                    tcp_write.flush().await.context("flush tcp socket")?;
-                }
-                _ = tcp_closed_rx => {
-                    break Ok(());
-                }
-            }
-        }
-    };
-
-    match join(tcp_to_zx, zx_to_tcp).await {
-        (Ok(()), Ok(())) => Ok(()),
-        (Err(tcp_to_zx), Err(zx_to_tcp)) => Err(ForwardError::Both { tcp_to_zx, zx_to_tcp }),
-        (Err(tcp_to_zx), Ok(())) => Err(ForwardError::TcpToZx(tcp_to_zx)),
-        (Ok(()), Err(zx_to_tcp)) => Err(ForwardError::ZxToTcp(zx_to_tcp)),
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use {
-        super::*, assert_matches::assert_matches, fidl_fuchsia_buildinfo as buildinfo,
-        fidl_fuchsia_developer_remotecontrol as rcs, fidl_fuchsia_device as fdevice,
-        fidl_fuchsia_hwinfo as hwinfo, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
-        fidl_fuchsia_net_interfaces as fnet_interfaces, fidl_fuchsia_sysinfo as sysinfo,
-        fuchsia_component::server::ServiceFs, fuchsia_zircon as zx, std::net::Ipv4Addr,
-    };
+    use super::*;
+    use fidl_fuchsia_buildinfo as buildinfo;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_device as fdevice;
+    use fidl_fuchsia_hwinfo as hwinfo;
+    use fidl_fuchsia_io as fio;
+    use fidl_fuchsia_net as fnet;
+    use fidl_fuchsia_net_interfaces as fnet_interfaces;
+    use fidl_fuchsia_sysinfo as sysinfo;
+    use fuchsia_async as fasync;
+    use fuchsia_component::server::ServiceFs;
+    use fuchsia_zircon as zx;
 
     const NODENAME: &'static str = "thumb-set-human-shred";
     const BOOT_TIME: u64 = 123456789000000000;
@@ -1132,94 +831,5 @@ mod tests {
         let service = make_rcs_with_maps(HashMap::new());
         assert_eq!(service.map_moniker(FAKE_SERVICE_MONIKER.to_string()), FAKE_SERVICE_MONIKER);
         Ok(())
-    }
-
-    async fn create_forward_tunnel(
-    ) -> (fasync::net::TcpStream, fasync::Socket, fasync::Task<Result<(), ForwardError>>) {
-        let addr = (Ipv4Addr::LOCALHOST, 0).into();
-        let listener = fasync::net::TcpListener::bind(&addr).unwrap();
-        let listen_addr = listener.local_addr().unwrap();
-        let mut listener_stream = listener.accept_stream();
-
-        let (remote_tx, remote_rx) = futures::channel::oneshot::channel();
-
-        // Run the listener in a background task so it can forward traffic in
-        // parallel with the test.
-        let forward_task = fasync::Task::local(async move {
-            let (stream, _) = listener_stream.next().await.unwrap().unwrap();
-
-            let (local, remote) = zx::Socket::create_stream();
-            let local = fasync::Socket::from_socket(local).unwrap();
-            let remote = fasync::Socket::from_socket(remote).unwrap();
-
-            remote_tx.send(remote).unwrap();
-
-            forward_traffic(stream, local).await
-        });
-
-        // We should connect to the TCP socket, which should set us up a zircon socket.
-        let tcp_stream = fasync::net::TcpStream::connect(listen_addr).unwrap().await.unwrap();
-        let zx_socket = remote_rx.await.unwrap();
-
-        (tcp_stream, zx_socket, forward_task)
-    }
-
-    #[fuchsia::test]
-    async fn test_forward_traffic_tcp_closes_first() {
-        let (mut tcp_stream, mut zx_socket, forward_task) = create_forward_tunnel().await;
-
-        // Now any traffic that is sent to the tcp stream should come out of the zx socket.
-        let msg = b"ping";
-        tcp_stream.write_all(msg).await.unwrap();
-
-        let mut buf = [0; 4096];
-        zx_socket.read_exact(&mut buf[..msg.len()]).await.unwrap();
-        assert_eq!(&buf[..msg.len()], msg);
-
-        // Send a reply from the zx socket to the tcp stream.
-        let msg = b"pong";
-        zx_socket.write_all(msg).await.unwrap();
-
-        tcp_stream.read_exact(&mut buf[..msg.len()]).await.unwrap();
-        assert_eq!(&buf[..msg.len()], msg);
-
-        // Now, close the tcp stream, this should cause the zx socket to close as well.
-        std::mem::drop(tcp_stream);
-
-        let mut buf = vec![];
-        zx_socket.read_to_end(&mut buf).await.unwrap();
-        assert_eq!(&buf, &Vec::<u8>::default());
-
-        // Make sure the forward task shuts down as well.
-        assert_matches!(forward_task.await, Ok(()));
-    }
-
-    #[fuchsia::test]
-    async fn test_forward_traffic_zx_socket_closes_first() {
-        let (mut tcp_stream, mut zx_socket, forward_task) = create_forward_tunnel().await;
-
-        // Check that the zx socket can send the first data.
-        let msg = b"ping";
-        zx_socket.write_all(msg).await.unwrap();
-
-        let mut buf = [0; 4096];
-        tcp_stream.read_exact(&mut buf[..msg.len()]).await.unwrap();
-        assert_eq!(&buf[..msg.len()], msg);
-
-        let msg = b"pong";
-        tcp_stream.write_all(msg).await.unwrap();
-
-        zx_socket.read_exact(&mut buf[..msg.len()]).await.unwrap();
-        assert_eq!(&buf[..msg.len()], msg);
-
-        // Now, close the zx socket, this should cause the tcp stream to close as well.
-        std::mem::drop(zx_socket);
-
-        let mut buf = vec![];
-        tcp_stream.read_to_end(&mut buf).await.unwrap();
-        assert_eq!(&buf, &Vec::<u8>::default());
-
-        // Make sure the forward task shuts down as well.
-        assert_matches!(forward_task.await, Ok(()));
     }
 }

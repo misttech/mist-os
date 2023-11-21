@@ -44,18 +44,14 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
     "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
     "//src/developer/remote-control/fidl:fuchsia.developer.remotecontrol.connector_rust",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
-    "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/sys/lib/component_debug",
@@ -69,7 +65,7 @@ rustc_library("lib") {
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/lib/fuchsia",
-    "//third_party/rust_crates:assert_matches",
+    "//src/lib/fuchsia-async",
   ]
 
   sources = [
