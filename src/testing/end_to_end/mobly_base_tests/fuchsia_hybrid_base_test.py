@@ -53,14 +53,13 @@ class FuchsiaHybridBaseTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def test_launch_hermetic_test(self) -> None:
         """Test to launch hermetic Fuchsia test and process test artifacts."""
-        cmd = [
-            "test",
-            "run",
+        self.dut.ffx.run_test_component(
             self.ffx_test_url,
-            "--output-directory",
-            self.test_case_path,
-        ] + self.ffx_test_options
-        self.dut.ffx.run(cmd, timeout=self.timeout_sec, capture_output=False)
+            ffx_test_args=["--output_directory", self.test_case_path]
+            + self.ffx_test_options,
+            timeout=self.timeout_sec,
+            capture_output=False,
+        )
 
 
 if __name__ == "__main__":
