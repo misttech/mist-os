@@ -202,7 +202,7 @@ impl PackageBuilder {
         self.overwrite_files = overwrite_files
     }
 
-    fn validate_ok_to_modify(&self, at_path: impl AsRef<str>) -> Result<()> {
+    fn validate_ok_to_modify(&self, at_path: &str) -> Result<()> {
         let at_path = at_path.as_ref();
         if RESERVED_PATHS.contains(&at_path) {
             bail!("Cannot add '{}', it will be created by the PackageBuilder", at_path);
@@ -278,6 +278,19 @@ impl PackageBuilder {
         Ok(())
     }
 
+    /// Remove a file from the package's meta.far.
+    ///
+    /// Errors
+    ///
+    /// Will return an error if the file is not already in the meta.far
+    pub fn remove_file_from_far(&mut self, at_path: impl AsRef<str>) -> Result<()> {
+        self.validate_ok_to_modify(at_path.as_ref())?;
+        match self.far_contents.remove(at_path.as_ref()) {
+            Some(_key) => Ok(()),
+            None => Err(anyhow!("file not in meta.far")),
+        }
+    }
+
     /// Add a file to the package as a blob itself.
     ///
     /// Errors
@@ -296,6 +309,19 @@ impl PackageBuilder {
         self.blobs.insert(at_path.to_string(), file.to_string());
 
         Ok(())
+    }
+
+    /// Remove a file currently in the package as a blob
+    ///
+    /// Errors
+    ///
+    /// Will return an error if the file is not already in the package contents
+    pub fn remove_blob_file(&mut self, at_path: impl AsRef<str>) -> Result<()> {
+        self.validate_ok_to_modify(at_path.as_ref())?;
+        match self.blobs.remove(at_path.as_ref()) {
+            Some(_key) => Ok(()),
+            None => Err(anyhow!("file not in package contents")),
+        }
     }
 
     /// Write the contents to a file, and add that file as a blob at the given
@@ -861,6 +887,59 @@ mod tests {
                         std::fs::read_to_string(&blob_info.source_path).unwrap(),
                         second_blob_contents,
                     )
+                }
+                other => panic!("unrecognized path in blobs `{other}`"),
+            }
+        }
+    }
+
+    #[test]
+    fn test_removes() {
+        let gendir = TempDir::new().unwrap();
+        let mut builder = PackageBuilder::new("some_pkg_name");
+        assert!(builder.add_contents_to_far("meta/foo", "foo", gendir.path()).is_ok());
+        assert!(builder.add_contents_to_far("meta/bar", "bar", gendir.path()).is_ok());
+
+        assert!(builder.add_contents_as_blob("baz", "baz", gendir.path()).is_ok());
+        assert!(builder.add_contents_as_blob("boom", "boom", gendir.path()).is_ok());
+
+        assert!(builder.remove_file_from_far("meta/foo").is_ok());
+        assert!(builder.remove_file_from_far("meta/does_not_exist").is_err());
+
+        assert!(builder.remove_blob_file("baz").is_ok());
+        assert!(builder.remove_blob_file("does_not_exist").is_err());
+
+        let outdir = TempDir::new().unwrap();
+        let metafar_path = outdir.path().join("meta.far");
+
+        let pkg_manifest = builder.build(&outdir, &metafar_path).unwrap();
+
+        // We should be able to build the package, and it should not have our
+        // removed files in either the meta.far or the contents.
+        for blob_info in pkg_manifest.blobs() {
+            match &*blob_info.path {
+                PackageManifest::META_FAR_BLOB_PATH => {
+                    let mut metafar = std::fs::File::open(&blob_info.source_path).unwrap();
+                    let mut far_reader = fuchsia_archive::Utf8Reader::new(&mut metafar).unwrap();
+                    let paths_in_far =
+                        far_reader.list().map(|e| e.path().to_string()).collect::<Vec<_>>();
+
+                    for far_path in paths_in_far {
+                        let far_bytes = far_reader.read_file(&far_path).unwrap();
+                        match &*far_path {
+                            MetaContents::PATH => (), // we have separate tests for the meta.far metadata
+                            MetaPackage::PATH => (),
+                            MetaSubpackages::PATH => (),
+                            ABI_REVISION_FILE_PATH => (),
+                            "meta/bar" => {
+                                assert_eq!(far_bytes, "bar".as_bytes());
+                            }
+                            other => panic!("unrecognized file in meta.far: {other}"),
+                        }
+                    }
+                }
+                "boom" => {
+                    assert_eq!(std::fs::read_to_string(&blob_info.source_path).unwrap(), "boom",);
                 }
                 other => panic!("unrecognized path in blobs `{other}`"),
             }

@@ -77,6 +77,24 @@ pub struct PackageArchiveAddCommand {
     pub overwrite: bool,
 }
 
+#[derive(Eq, ArgsInfo, FromArgs, PartialEq, Debug)]
+/// remove a file (<file_to_remove>) from an existing package archive (<archive>), placing the
+/// resulting archive in <output>
+#[argh(subcommand, name = "remove")]
+pub struct PackageArchiveRemoveCommand {
+    /// package archive
+    #[argh(option, short = 'a')]
+    pub archive: PathBuf,
+
+    /// file to add to the package archive
+    #[argh(option, short = 'f')]
+    pub file_to_remove: PathBuf,
+
+    /// file to add to the package archive
+    #[argh(option, short = 'o')]
+    pub output: PathBuf,
+}
+
 /// Builds a package.
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
 #[argh(subcommand, name = "build")]

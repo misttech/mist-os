@@ -6,6 +6,7 @@ use {
     crate::{
         args::{
             PackageArchiveAddCommand, PackageArchiveCreateCommand, PackageArchiveExtractCommand,
+            PackageArchiveRemoveCommand,
         },
         to_writer_json_pretty, write_depfile, BLOBS_JSON_NAME, PACKAGE_MANIFEST_NAME,
     },
@@ -166,6 +167,48 @@ pub async fn cmd_package_archive_add(cmd: PackageArchiveAddCommand) -> Result<()
     Ok(())
 }
 
+pub async fn cmd_package_archive_remove(cmd: PackageArchiveRemoveCommand) -> Result<()> {
+    // Extract the archive
+    let tmp = TempDir::new()?;
+    let root =
+        Utf8Path::from_path(tmp.path()).ok_or_else(|| anyhow!("couldn't create utf-8 path"))?;
+    let extract_dir = root.join("extract");
+
+    cmd_package_archive_extract(PackageArchiveExtractCommand {
+        out: extract_dir.clone(),
+        repository: None,
+        blobs_json: true,
+        archive: cmd.archive.clone().into(),
+    })
+    .await?;
+
+    // Add the file, either in the meta.far or the content blobs
+    let pkg_builder_outdir = TempDir::new()?;
+    let original_pkg_manifest =
+        PackageManifest::try_load_from(extract_dir.join(PACKAGE_MANIFEST_NAME))?;
+    let mut pkg_builder =
+        PackageBuilder::from_manifest(original_pkg_manifest, pkg_builder_outdir.path())?;
+
+    let file_to_remove =
+        cmd.file_to_remove.to_str().ok_or_else(|| anyhow!("couldn't create str from file path"))?;
+
+    if cmd.file_to_remove.starts_with("meta/") {
+        pkg_builder.remove_file_from_far(file_to_remove)?;
+    } else {
+        pkg_builder.remove_blob_file(file_to_remove)?;
+    }
+
+    // Serialize the archive, overwriting the original
+    let build_tmpdir = TempDir::new()?;
+    let new_pkg_manifest =
+        pkg_builder.build(build_tmpdir.path(), build_tmpdir.path().join("meta.far"))?;
+    let output_archive = File::create(&cmd.output)
+        .with_context(|| format!("creating new package archive file {}", cmd.output.display()))?;
+    let () = new_pkg_manifest.archive(extract_dir, output_archive).await?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -185,10 +228,12 @@ mod tests {
     const LIB_CONTENTS: &[u8] = b"lib";
 
     const META_FAR_HASH: &str = "f1a91cbbd41fef65416522a9de7e1d8be0f962ec6371cb747a403cff03d656e6";
-    const MODIFIED_META_FAR_HASH: &str =
+    const META_FAR_HASH_WITH_ADDED_FILE: &str =
         "c1f005cbf6e7d71cf1014c2ab8a493b55640ef169aa2b94f211cd0588236f989";
     const META_FAR_HASH_WITH_MODIFIED_BIN: &str =
         "9084b9e928d29b97e39a1f8f155c7e1ec1aa005cf43fe9a6b958b160d3741a3e";
+    const META_FAR_HASH_WITHOUT_BIN: &str =
+        "2c8dfa9b2b2b095109ca1e37edb6cbbe16cf474bf4b523247b9aac8a5b66fcac";
     const BIN_HASH: &str = "5d202ed772f4de29ecd7bc9a3f20278cd69ae160e36ba8b434512ca45003c7a3";
     const MODIFIED_BIN_HASH: &str =
         "8b9dd6886ff377a19d8716a30a0659897fba5cbdfb43649bf93317fcb6fdb18c";
@@ -482,9 +527,9 @@ mod tests {
             .unwrap(),
             serde_json::json!([
                     {
-                        "source_path": format!("blobs/{MODIFIED_META_FAR_HASH}"),
+                        "source_path": format!("blobs/{META_FAR_HASH_WITH_ADDED_FILE}"),
                         "path": "meta/",
-                        "merkle": MODIFIED_META_FAR_HASH,
+                        "merkle": META_FAR_HASH_WITH_ADDED_FILE,
                         "size": 16384,
                     },
                     {
@@ -545,6 +590,82 @@ mod tests {
                         "path": "bin",
                         "merkle": MODIFIED_BIN_HASH,
                         "size": 4,
+                    },
+                    {
+                        "source_path": format!("blobs/{LIB_HASH}"),
+                        "path": "lib",
+                        "merkle": LIB_HASH,
+                        "size": 3,
+                    },
+                ]
+            )
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_archive_remove() {
+        let tmp = TempDir::new().unwrap();
+        let root = Utf8Path::from_path(tmp.path()).unwrap();
+
+        let pkg_dir = root.join("pkg");
+        let package = create_package(&pkg_dir);
+
+        // Write the archive.
+        let archive_path = root.join("archive.far");
+        cmd_package_archive_create(PackageArchiveCreateCommand {
+            out: archive_path.clone().into(),
+            root_dir: pkg_dir.to_owned(),
+            package_manifest: package.manifest_path.clone(),
+            depfile: None,
+        })
+        .await
+        .unwrap();
+
+        // Read the generated archive file.
+        let mut archive = Utf8Reader::new(File::open(&archive_path).unwrap()).unwrap();
+
+        assert_eq!(
+            read_archive(&mut archive),
+            BTreeMap::from([
+                ("meta.far".to_string(), package.meta_far_contents.clone()),
+                (BIN_HASH.to_string(), BIN_CONTENTS.to_vec()),
+                (LIB_HASH.to_string(), LIB_CONTENTS.to_vec()),
+            ]),
+        );
+
+        // Remove a file from the archive
+        cmd_package_archive_remove(PackageArchiveRemoveCommand {
+            archive: archive_path.clone().into(),
+            file_to_remove: "bin".into(),
+            output: archive_path.clone().into(),
+        })
+        .await
+        .unwrap();
+
+        // Extract the archive.
+        let extract_dir = root.join("extract");
+        cmd_package_archive_extract(PackageArchiveExtractCommand {
+            out: extract_dir.clone(),
+            repository: None,
+            archive: archive_path.clone().into(),
+            blobs_json: true,
+        })
+        .await
+        .unwrap();
+
+        let mut extract_contents = read_dir(&extract_dir);
+
+        assert_eq!(
+            serde_json::from_slice::<serde_json::Value>(
+                &extract_contents.remove(&extract_dir.join(BLOBS_JSON_NAME)).unwrap(),
+            )
+            .unwrap(),
+            serde_json::json!([
+                    {
+                        "source_path": format!("blobs/{META_FAR_HASH_WITHOUT_BIN}"),
+                        "path": "meta/",
+                        "merkle": META_FAR_HASH_WITHOUT_BIN,
+                        "size": 16384,
                     },
                     {
                         "source_path": format!("blobs/{LIB_HASH}"),
