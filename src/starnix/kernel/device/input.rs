@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{framebuffer::Framebuffer, DeviceMode},
+    device::{framebuffer::Framebuffer, registry::DeviceOps, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
@@ -16,7 +16,7 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_uapi::{
-    device_type::{DeviceType, INPUT_MAJOR, KEYBOARD_INPUT_MINOR, TOUCH_INPUT_MINOR},
+    device_type::{DeviceType, INPUT_MAJOR},
     error,
     errors::Errno,
     open_flags::OpenFlags,
@@ -50,6 +50,7 @@ use futures::{
     StreamExt as _,
 };
 use starnix_lock::Mutex;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::{collections::VecDeque, sync::Arc};
 use zerocopy::AsBytes as _; // for `as_bytes()`
 
@@ -59,6 +60,9 @@ pub struct InputDevice {
     pub touch_input_file: Arc<InputFile>,
 
     pub keyboard_input_file: Arc<InputFile>,
+
+    /// Stores the input_files_node to share with uinput.
+    pub input_files_node: fuchsia_inspect::Node,
 }
 
 impl InputDevice {
@@ -66,14 +70,14 @@ impl InputDevice {
         let fb_state = framebuffer.info.read();
         let input_files_node = kernel_node.create_child("input_files");
         let touch_input_file = InputFile::new_touch(
+            INPUT_ID,
             fb_state.xres.try_into().expect("Failed to convert framebuffer width to i32."),
             fb_state.yres.try_into().expect("Failed to convert framebuffer height to i32."),
             input_files_node.create_child("touch_input_file"),
         );
-        let keyboard_input_file = InputFile::new_keyboard();
-        kernel_node.record(input_files_node);
+        let keyboard_input_file = InputFile::new_keyboard(INPUT_ID);
         std::mem::drop(fb_state);
-        Arc::new(InputDevice { touch_input_file, keyboard_input_file })
+        Arc::new(InputDevice { touch_input_file, keyboard_input_file, input_files_node })
     }
 
     pub fn start_relay(
@@ -205,6 +209,11 @@ struct TouchEvent {
     pos_y: f32,
 }
 
+// Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
+// sensible value, but other fields may not be.
+const INPUT_ID: uapi::input_id =
+    uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
+
 impl InputFile {
     // Per https://www.linuxjournal.com/article/6429, the driver version is 32-bits wide,
     // and interpreted as:
@@ -213,19 +222,25 @@ impl InputFile {
     // * [07-00]: patch level
     const DRIVER_VERSION: u32 = 0;
 
-    // Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
-    // sensible value, but other fields may not be.
-    const INPUT_ID: uapi::input_id =
-        uapi::input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
-
     /// Creates an `InputFile` instance suitable for emulating a touchscreen.
-    fn new_touch(width: i32, height: i32, inspect_node: fuchsia_inspect::Node) -> Arc<Self> {
+    ///
+    /// # Parameters
+    /// - `input_id`: device's bustype, vendor id, product id, and version.
+    /// - `width`: width of screen.
+    /// - `height`: height of screen.
+    /// - `inspect_node`: The root node for "touch_input_file" inspect tree.
+    pub fn new_touch(
+        input_id: uapi::input_id,
+        width: i32,
+        height: i32,
+        inspect_node: fuchsia_inspect::Node,
+    ) -> Arc<Self> {
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
         // Hence, the range of touch positions is exactly the same as the range of view
         // coordinates.
         Arc::new(Self {
             driver_version: Self::DRIVER_VERSION,
-            input_id: Self::INPUT_ID,
+            input_id,
             supported_keys: touch_key_attributes(),
             supported_position_attributes: touch_position_attributes(),
             supported_motion_attributes: BitSet::new(), // None supported, not a mouse.
@@ -256,10 +271,14 @@ impl InputFile {
         })
     }
 
-    fn new_keyboard() -> Arc<Self> {
+    /// Creates an `InputFile` instance suitable for emulating a keyboard.
+    ///
+    /// # Parameters
+    /// - `input_id`: device's bustype, vendor id, product id, and version.
+    pub fn new_keyboard(input_id: uapi::input_id) -> Arc<Self> {
         Arc::new(Self {
             driver_version: Self::DRIVER_VERSION,
-            input_id: Self::INPUT_ID,
+            input_id,
             supported_keys: keyboard_key_attributes(),
             supported_position_attributes: keyboard_position_attributes(),
             supported_motion_attributes: BitSet::new(), // None supported, not a mouse.
@@ -859,28 +878,44 @@ fn phase_change_from_fidl_phase(fidl_phase: &FidlEventPhase) -> Option<PhaseChan
     }
 }
 
-pub fn init_input_devices(system_task: &CurrentTask) {
+// Maintain an atomic increment number as device_id, used as X in
+// /dev/input/eventX.
+static NEXT_DEVICE_ID: AtomicU32 = AtomicU32::new(0);
+
+/// get_next_device_id() returns the current value of NEXT_DEVICE_ID for next
+/// available device id, and increase the NEXT_DEVICE_ID for next call.
+fn get_next_device_id() -> u32 {
+    NEXT_DEVICE_ID.fetch_add(1, Ordering::SeqCst)
+}
+
+/// add_and_register_input_device to kernel.
+///
+/// # Parameters:
+/// - `system_task`: current task.
+/// - `dev_ops`: the open op handler of the device.
+pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl DeviceOps) {
     let kernel = system_task.kernel();
 
     let input_class =
         kernel.device_registry.add_class(b"input", kernel.device_registry.virtual_bus());
-    let touch_attr = KObjectDeviceAttribute::new(
-        input_class.clone(),
-        b"event0",
-        b"input/event0",
-        DeviceType::new(INPUT_MAJOR, TOUCH_INPUT_MINOR),
-        DeviceMode::Char,
-    );
-    kernel.add_and_register_device(system_task, touch_attr, create_touch_device);
 
-    let keyboard_attr = KObjectDeviceAttribute::new(
+    let device_id = get_next_device_id();
+    let attr = KObjectDeviceAttribute::new(
         input_class,
-        b"event1",
-        b"input/event1",
-        DeviceType::new(INPUT_MAJOR, KEYBOARD_INPUT_MINOR),
+        format!("event{}", device_id).as_bytes(),
+        // TODO(b/310963779): file name should not include /, need another way
+        // to create this dev.
+        format!("input/event{}", device_id).as_bytes(),
+        DeviceType::new(INPUT_MAJOR, device_id),
         DeviceMode::Char,
     );
-    kernel.add_and_register_device(system_task, keyboard_attr, create_keyboard_device);
+    kernel.add_and_register_device(system_task, attr, dev_ops);
+}
+
+/// add and register 1 touch device and 1 keyboard device to kernel.
+pub fn init_input_devices(system_task: &CurrentTask) {
+    add_and_register_input_device(system_task, create_touch_device);
+    add_and_register_input_device(system_task, create_keyboard_device);
 }
 
 #[cfg(test)]
@@ -950,8 +985,12 @@ mod test {
     fn start_touch_input(
     ) -> (Arc<InputFile>, fuipointer::TouchSourceRequestStream, std::thread::JoinHandle<()>) {
         let inspector = fuchsia_inspect::Inspector::default();
-        let input_file =
-            InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
+        let input_file = InputFile::new_touch(
+            INPUT_ID,
+            720,  /* screen height */
+            1200, /* screen width */
+            inspector.root().create_child("touch_input_file"),
+        );
         let (touch_source_proxy, touch_source_stream) =
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");
@@ -961,7 +1000,7 @@ mod test {
 
     fn start_keyboard_input(
     ) -> (Arc<InputFile>, fuiinput::KeyboardRequestStream, std::thread::JoinHandle<()>) {
-        let input_file = InputFile::new_keyboard();
+        let input_file = InputFile::new_keyboard(INPUT_ID);
         let (keyboard_proxy, keyboard_stream) =
             fidl::endpoints::create_proxy_and_stream::<fuiinput::KeyboardMarker>()
                 .expect("failed to create Keyboard channel");
@@ -974,7 +1013,7 @@ mod test {
     fn start_button_input(
     ) -> (Arc<InputFile>, fuipolicy::DeviceListenerRegistryRequestStream, std::thread::JoinHandle<()>)
     {
-        let input_file = InputFile::new_keyboard();
+        let input_file = InputFile::new_keyboard(INPUT_ID);
         let (device_registry_proxy, device_listener_stream) =
             fidl::endpoints::create_proxy_and_stream::<fuipolicy::DeviceListenerRegistryMarker>()
                 .expect("Failed to create DeviceListenerRegistry proxy and stream.");
@@ -1266,8 +1305,12 @@ mod test {
     async fn provides_correct_axis_ranges((x_max, y_max): (i32, i32), ioctl_op: u32) -> (i32, i32) {
         // Set up resources.
         let inspector = fuchsia_inspect::Inspector::default();
-        let input_file =
-            InputFile::new_touch(x_max, y_max, inspector.root().create_child("touch_input_file"));
+        let input_file = InputFile::new_touch(
+            INPUT_ID,
+            x_max,
+            y_max,
+            inspector.root().create_child("touch_input_file"),
+        );
         let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
         let address = map_memory(
             &current_task,
@@ -1574,8 +1617,12 @@ mod test {
     #[::fuchsia::test]
     fn touch_input_file_initialized_with_inspect_node() {
         let inspector = fuchsia_inspect::Inspector::default();
-        let _touch_file =
-            InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
+        let _touch_file = InputFile::new_touch(
+            INPUT_ID,
+            720,  /* screen height */
+            1200, /* screen width */
+            inspector.root().create_child("touch_input_file"),
+        );
 
         assert_data_tree!(inspector, root: {
             touch_input_file: {
@@ -1596,8 +1643,12 @@ mod test {
     #[::fuchsia::test]
     async fn touch_relay_updates_touch_inspect_status() {
         let inspector = fuchsia_inspect::Inspector::default();
-        let input_file =
-            InputFile::new_touch(720, 1200, inspector.root().create_child("touch_input_file"));
+        let input_file = InputFile::new_touch(
+            INPUT_ID,
+            720,  /* screen height */
+            1200, /* screen width */
+            inspector.root().create_child("touch_input_file"),
+        );
         let (touch_source_proxy, mut touch_source_stream) =
             fidl::endpoints::create_proxy_and_stream::<TouchSourceMarker>()
                 .expect("failed to create TouchSource channel");

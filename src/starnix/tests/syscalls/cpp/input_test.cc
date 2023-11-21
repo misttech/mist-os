@@ -34,6 +34,8 @@ bool get_bit(const std::array<uint8_t, SIZE>& buf, size_t bit_num) {
 // TODO(quiche): Maybe move this to a test fixture, and guarantee removal of the input
 // node between test cases.
 test_helper::ScopedFD GetInputFile(const uint32_t kInputMinor) {
+  // TODO(b/310963779): Here should directly /dev/input/eventX.
+
   // Typically, this would be `/dev/input/event0` or `/dev/input/event1`, but there's
   // not much to be gained by exercising `mkdir()` in these tests.
   std::string kInputFile = "/dev/input" + std::to_string(kInputMinor);

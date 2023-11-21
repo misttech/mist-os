@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::{
+        input::{add_and_register_input_device, InputFile},
+        DeviceOps,
+    },
     fs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
     logging::{log_info, log_warn},
     mm::MemoryAccessorExt,
@@ -12,8 +16,7 @@ use crate::{
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
 use starnix_uapi::{
-    device_type::DeviceType,
-    error,
+    device_type, error,
     errors::Errno,
     open_flags::OpenFlags,
     uapi,
@@ -25,9 +28,15 @@ use std::sync::Arc;
 // supports UI_DEV_SETUP.
 const UINPUT_VERSION: u32 = 5;
 
+#[derive(Clone)]
+enum DeviceType {
+    Keyboard,
+    Touchscreen,
+}
+
 pub fn create_uinput_device(
     _current_task: &CurrentTask,
-    _id: DeviceType,
+    _id: device_type::DeviceType,
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
@@ -35,9 +44,7 @@ pub fn create_uinput_device(
 }
 
 struct UinputDeviceMutableState {
-    #[allow(dead_code)]
     enabled_evbits: BitVec,
-    #[allow(dead_code)]
     input_id: Option<uapi::input_id>,
 }
 
@@ -55,6 +62,8 @@ impl UinputDevice {
         })
     }
 
+    /// UI_SET_EVBIT caller pass a u32 as the event type "EV_*" to set this
+    /// uinput device may handle events with the given event type.
     fn ui_set_evbit(&self, arg: SyscallArg) -> Result<SyscallResult, Errno> {
         let evbit: u32 = arg.into();
         match evbit {
@@ -69,9 +78,9 @@ impl UinputDevice {
         }
     }
 
-    // UI_GET_VERSION caller pass a address for u32 to `arg` to receive the
-    // uinput version. ioctl returns SUCCESS(0) for success calls, and
-    // EFAULT(14) for given address is null.
+    /// UI_GET_VERSION caller pass a address for u32 to `arg` to receive the
+    /// uinput version. ioctl returns SUCCESS(0) for success calls, and
+    /// EFAULT(14) for given address is null.
     fn ui_get_version(
         &self,
         current_task: &CurrentTask,
@@ -107,9 +116,28 @@ impl UinputDevice {
         Ok(SUCCESS)
     }
 
-    fn ui_dev_create(&self) -> Result<SyscallResult, Errno> {
-        // TODO(b/308156116): impl ui_dev_create.
-        log_info!("ui_dev_create()");
+    /// UI_DEV_CREATE calls create the uinput device with given information
+    /// from previous ioctl() calls.
+    fn ui_dev_create(&self, current_task: &CurrentTask) -> Result<SyscallResult, Errno> {
+        let (input_id, enabled_evbits) = {
+            let inner = self.inner.lock();
+            let input_id = match inner.input_id {
+                Some(input_id) => input_id,
+                None => return error!(EINVAL),
+            };
+            (input_id, inner.enabled_evbits.clone())
+        };
+
+        // Currently only support Keyboard and Touchscreen, if evbits contains
+        // EV_ABS, consider it is Touchscreen. This need to be revisit when we
+        // want to support more device types.
+        let device_type = match enabled_evbits.get(uapi::EV_ABS as usize) {
+            Some(true) => DeviceType::Touchscreen,
+            Some(false) | None => DeviceType::Keyboard,
+        };
+
+        add_and_register_input_device(current_task, VirtualDevice { input_id, device_type });
+
         Ok(SUCCESS)
     }
 
@@ -141,7 +169,7 @@ impl FileOps for Arc<UinputDevice> {
             | uapi::UI_SET_PHYS
             | uapi::UI_SET_PROPBIT => Ok(SUCCESS),
             uapi::UI_DEV_SETUP => self.ui_dev_setup(current_task, arg),
-            uapi::UI_DEV_CREATE => self.ui_dev_create(),
+            uapi::UI_DEV_CREATE => self.ui_dev_create(current_task),
             uapi::UI_DEV_DESTROY => self.ui_dev_destroy(),
             // default_ioctl() handles file system related requests and reject
             // others.
@@ -173,6 +201,36 @@ impl FileOps for Arc<UinputDevice> {
     ) -> Result<usize, Errno> {
         log_warn!("uinput FD does not support read().");
         error!(EINVAL)
+    }
+}
+
+#[derive(Clone)]
+pub struct VirtualDevice {
+    input_id: uapi::input_id,
+    device_type: DeviceType,
+}
+
+impl DeviceOps for VirtualDevice {
+    fn open(
+        &self,
+        current_task: &CurrentTask,
+        _id: device_type::DeviceType,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        match &self.device_type {
+            DeviceType::Keyboard => Ok(Box::new(InputFile::new_keyboard(self.input_id))),
+            DeviceType::Touchscreen => {
+                let input_files_node = &current_task.kernel().input_device.input_files_node;
+                // TODO(b/304595635): Check if screen size is required.
+                Ok(Box::new(InputFile::new_touch(
+                    self.input_id,
+                    1000,
+                    1000,
+                    input_files_node.create_child("touch_input_file"),
+                )))
+            }
+        }
     }
 }
 
