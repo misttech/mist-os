@@ -4544,7 +4544,7 @@ mod tests {
         "matchers": [ {"any": false } ],
         "provisioning": "delegated"
     }, {
-        "matchers": [ {"any": true } ],
+        "matchers": [ {"interface_name": "xyz" } ],
         "provisioning": "local"
     } ]
 }
@@ -4633,11 +4633,15 @@ mod tests {
 
         let expected_provisioning_policy = Vec::from([
             interface::ProvisioningRule {
-                matchers: HashSet::from([interface::MatchingRule::Any(false)]),
+                matchers: HashSet::from([interface::ProvisioningMatchingRule::Common(
+                    interface::MatchingRule::Any(false),
+                )]),
                 provisioning: interface::ProvisioningAction::Delegated,
             },
             interface::ProvisioningRule {
-                matchers: HashSet::from([interface::MatchingRule::Any(true)]),
+                matchers: HashSet::from([interface::ProvisioningMatchingRule::InterfaceName {
+                    pattern: glob::Pattern::new("xyz").unwrap(),
+                }]),
                 provisioning: interface::ProvisioningAction::Local,
             },
         ]);
@@ -5051,12 +5055,8 @@ mod tests {
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
     }
 
-    // TODO(fxbug.dev/135108): Include the 'interface name' matcher
-    // pattern as a test case.
-    #[test]
-    fn test_config_denies_invalid_glob() {
-        // Should fail on improper glob: square braces not closed.
-        let bad_config = r#"
+    #[test_case(
+        r#"
 {
   "dns_config": { "servers": [] },
   "filter_config": {
@@ -5072,13 +5072,38 @@ mod tests {
     "naming_scheme": []
   }]
 }
-"#;
-
+"#,
+        "invalid range";
+        "topological_path"
+    )]
+    #[test_case(
+        r#"
+{
+  "dns_config": { "servers": [] },
+  "filter_config": {
+    "rules": [],
+    "nat_rules": [],
+    "rdr_rules": []
+  },
+  "filter_enabled_interface_types": [],
+  "allowed_upstream_device_classes": [],
+  "forwarded_device_classes": { "ipv4": [], "ipv6": [] },
+  "interface_provisioning_policy": [{
+    "matchers": [ { "interface_name": "[speling" } ],
+    "provisioning": "delegated"
+  }]
+}
+"#,
+        "did not match any variant";
+        "interface_name"
+    )]
+    fn test_config_denies_invalid_glob(bad_config: &'static str, err_text: &'static str) {
+        // Should fail on improper glob: square braces not closed.
         let err =
             Config::load_str(bad_config).expect_err("config shouldn't accept invalid pattern");
         let err = err.downcast::<serde_json::Error>().expect("downcast error");
         assert_eq!(err.classify(), serde_json::error::Category::Data);
         // Ensure the error is complaining about invalid glob.
-        assert!(format!("{:?}", err).contains("invalid range"));
+        assert!(format!("{:?}", err).contains(err_text));
     }
 }

@@ -402,7 +402,7 @@ where
     glob::Pattern::new(&buf).map_err(serde::de::Error::custom)
 }
 
-// TODO(fxbug.dev/135094): Add interface matchers for naming policy
+/// The matching rules available for a `NamingRule`.
 #[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
 pub enum MatchingRule {
@@ -414,6 +414,21 @@ pub enum MatchingRule {
     DeviceClasses(Vec<DeviceClass>),
     // Signals whether this rule should match any interface.
     Any(bool),
+}
+
+/// The matching rules available for a `ProvisoningRule`.
+#[derive(Debug, Deserialize, Eq, Hash, PartialEq)]
+#[serde(untagged)]
+pub enum ProvisioningMatchingRule {
+    // TODO(github.com/serde-rs/serde/issues/912): Use `other` once it supports
+    // deserializing into non-unit variants. `untagged` can only be applied
+    // to the entire enum, so `interface_name` is used as a field to ensure
+    // stability across configuration matching rules.
+    InterfaceName {
+        #[serde(rename = "interface_name", deserialize_with = "deserialize_glob_pattern")]
+        pattern: glob::Pattern,
+    },
+    Common(MatchingRule),
 }
 
 impl MatchingRule {
@@ -437,6 +452,28 @@ impl MatchingRule {
                 Ok(class_list.contains(&info.device_class.into()))
             }
             MatchingRule::Any(matches_any_interface) => Ok(*matches_any_interface),
+        }
+    }
+}
+
+impl ProvisioningMatchingRule {
+    #[allow(unused)]
+    fn does_interface_match(
+        &self,
+        info: &DeviceInfoRef<'_>,
+        interface_name: &str,
+    ) -> Result<bool, anyhow::Error> {
+        match &self {
+            ProvisioningMatchingRule::InterfaceName { pattern } => {
+                // Match the interface if the provided pattern finds any
+                // matches in the interface under comparison's name.
+                Ok(pattern.matches(interface_name))
+            }
+            ProvisioningMatchingRule::Common(matching_rule) => {
+                // Handle the other `MatchingRule`s the same as the naming
+                // policy matchers.
+                matching_rule.does_interface_match(info)
+            }
         }
     }
 }
@@ -646,7 +683,7 @@ pub struct ProvisioningRule {
     /// A set of rules to check against an interface's properties. All rules
     /// must apply for the provisioning action to take effect.
     #[allow(unused)]
-    pub matchers: HashSet<MatchingRule>,
+    pub matchers: HashSet<ProvisioningMatchingRule>,
     /// The provisioning policy that netcfg applies to a matching
     /// interface.
     #[allow(unused)]
@@ -1180,6 +1217,36 @@ mod tests {
         // Create a matching rule for the provided glob expression.
         let matching_rule = MatchingRule::TopologicalPath(glob::Pattern::new(glob_str).unwrap());
         let does_interface_match = matching_rule.does_interface_match(&device_info).unwrap();
+        assert_eq!(does_interface_match, want_match);
+    }
+
+    // Glob matches the default naming by MAC address.
+    #[test_case(
+        "ethx5",
+        r"ethx[0-9]*",
+        true;
+        "pattern_matches"
+    )]
+    #[test_case("arbitraryname", r"*", true; "pattern_matches_any")]
+    // Glob matches default naming by SDIO + bus path.
+    #[test_case(
+        "wlans1002",
+        r"eths[0-9][0-9][0-9][0-9]*",
+        false;
+        "no_matches"
+    )]
+    fn test_interface_matching_by_interface_name(
+        interface_name: &'static str,
+        glob_str: &'static str,
+        want_match: bool,
+    ) {
+        // Create a matching rule for the provided glob expression.
+        let provisioning_matching_rule = ProvisioningMatchingRule::InterfaceName {
+            pattern: glob::Pattern::new(glob_str).unwrap(),
+        };
+        let does_interface_match = provisioning_matching_rule
+            .does_interface_match(&default_device_info(), interface_name)
+            .unwrap();
         assert_eq!(does_interface_match, want_match);
     }
 
