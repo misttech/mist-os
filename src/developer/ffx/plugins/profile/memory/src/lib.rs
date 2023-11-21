@@ -225,6 +225,9 @@ mod tests {
             mmu: 0,
             ipc: 0,
             other: 0,
+            zram_compressed_total: None,
+            zram_fragmentation: None,
+            zram_uncompressed: None
             },
             processes: vec![
             raw::Process::Headers(raw::ProcessHeaders::default()),

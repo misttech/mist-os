@@ -77,6 +77,19 @@ pub mod raw {
         /// Non-free memory that isn't accounted for in any other
         /// field, in bytes.
         pub other: u64,
+        /// On a system with zRAM, the size in bytes of all memory,
+        /// including metadata, fragmentation and other overheads, of
+        /// the compressed memory area.
+        #[serde(default)]
+        pub zram_compressed_total: Option<u64>,
+        /// On a system with zRAM, the size in bytes of the content that
+        /// is currently being compressed and stored.
+        #[serde(default)]
+        pub zram_uncompressed: Option<u64>,
+        /// On a system with zRAM, the size in bytes of any fragmentation
+        /// in the compressed memory area.
+        #[serde(default)]
+        pub zram_fragmentation: Option<u64>,
     }
 
     /// Placeholder to validate the JSON schema. None of those fields
@@ -124,6 +137,8 @@ pub mod raw {
         pub parent_koid: String,
         pub committed_bytes: String,
         pub allocated_bytes: String,
+        #[serde(default)]
+        pub populated_bytes: Option<String>,
     }
 
     impl Default for VmoHeaders {
@@ -134,6 +149,7 @@ pub mod raw {
                 parent_koid: "parent_koid".to_string(),
                 committed_bytes: "committed_bytes".to_string(),
                 allocated_bytes: "allocated_bytes".to_string(),
+                populated_bytes: Some("populated_bytes".to_string()),
             }
         }
     }
@@ -146,6 +162,8 @@ pub mod raw {
         pub parent_koid: u64,
         pub committed_bytes: u64,
         pub allocated_bytes: u64,
+        #[serde(default)]
+        pub populated_bytes: Option<u64>,
     }
 
     #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
@@ -218,17 +236,37 @@ pub mod processed {
         /// (directly, or indirectly via children VMOs) by the
         /// process.
         pub private: u64,
+        /// Total uncompressed size, in bytes, of the VMOs contributing to `private`.
+        pub private_populated: u64,
         /// Total size, in bytes, of VMOs retained (directly, or
         /// indirectly via children VMOs) by several processes. The
         /// cost of each VMO is shared evenly among all its retaining
         /// processes.
         pub scaled: u64,
+        /// Total uncompressed size, in bytes, of the VMOs contributing to `scaled`.
+        pub scaled_populated: u64,
         /// Total size, in bytes, of VMOs retained (exclusively or
         /// not, directly, or indirectly via children VMOs) by this
         /// process.
         pub total: u64,
+        /// Total uncompressed size, in bytes, of the VMOs contributing to `total`.
+        pub total_populated: u64,
         /// List of VMOs aggregated in this group.
         pub vmos: Vec<u64>,
+    }
+
+    impl RetainedMemory {
+        fn add_vmo(&mut self, vmo: &processed::Vmo, share_count: u64) {
+            self.total += vmo.committed_bytes;
+            self.total_populated += vmo.populated_bytes.unwrap_or(vmo.committed_bytes);
+            self.scaled += vmo.committed_bytes / share_count;
+            self.scaled_populated +=
+                vmo.populated_bytes.unwrap_or(vmo.committed_bytes) / share_count;
+            if share_count == 1 {
+                self.private += vmo.committed_bytes;
+                self.private_populated += vmo.populated_bytes.unwrap_or(vmo.committed_bytes);
+            }
+        }
     }
 
     /// Summary of memory-related data for a given process.
@@ -253,6 +291,8 @@ pub mod processed {
         pub parent_koid: u64,
         pub committed_bytes: u64,
         pub allocated_bytes: u64,
+        #[serde(default)]
+        pub populated_bytes: Option<u64>,
     }
 
     pub type Kernel = raw::Kernel;
@@ -323,6 +363,7 @@ pub mod processed {
                     name,
                     committed_bytes,
                     allocated_bytes,
+                    populated_bytes,
                 }) = vmo
                 {
                     let vmo_name_index = name as usize;
@@ -335,6 +376,7 @@ pub mod processed {
                             name: vmo_name_string,
                             committed_bytes,
                             allocated_bytes,
+                            populated_bytes,
                         },
                     );
                 }
@@ -400,24 +442,16 @@ pub mod processed {
         for process in processes.iter_mut() {
             if let Some(vmo_koids) = process_to_charged_vmos.get(&process.koid) {
                 for vmo_koid in vmo_koids.iter() {
-                    if let Some(processed::Vmo { name, committed_bytes, .. }) =
-                        koid_to_vmo.get(&vmo_koid)
-                    {
+                    if let Some(vmo) = koid_to_vmo.get(&vmo_koid) {
                         let share_count = match vmo_to_charged_processes.get(&vmo_koid) {
                             Some(v) => v.len() as u64,
                             None => unreachable!(),
                         };
-                        let name = rename(name).to_string();
+                        let name = rename(&vmo.name).to_string();
                         let name_sizes = process.name_to_vmo_memory.entry(name).or_default();
                         name_sizes.vmos.push(*vmo_koid);
-                        name_sizes.total += committed_bytes;
-                        process.memory.total += committed_bytes;
-                        name_sizes.scaled += committed_bytes / share_count;
-                        process.memory.scaled += committed_bytes / share_count;
-                        if share_count == 1 {
-                            name_sizes.private += committed_bytes;
-                            process.memory.private += committed_bytes;
-                        }
+                        name_sizes.add_vmo(vmo, share_count);
+                        process.memory.add_vmo(vmo, share_count);
                     }
                 }
             }
@@ -513,6 +547,7 @@ mod tests {
                     parent_koid: 0,
                     committed_bytes: 300,
                     allocated_bytes: 300,
+                    populated_bytes: Some(300),
                 }),
                 raw::Vmo::Data(raw::VmoData {
                     koid: 2,
@@ -520,13 +555,15 @@ mod tests {
                     parent_koid: 1,
                     committed_bytes: 100,
                     allocated_bytes: 100,
+                    populated_bytes: Some(100),
                 }),
                 raw::Vmo::Data(raw::VmoData {
                     koid: 3,
                     name: 2,
                     parent_koid: 0,
                     committed_bytes: 100,
-                    allocated_bytes: 100,
+                    allocated_bytes: 200,
+                    populated_bytes: Some(200),
                 }),
             ],
         };
@@ -538,6 +575,9 @@ mod tests {
                     private: 0,
                     scaled: 100,
                     total: 300,
+                    private_populated: 0,
+                    scaled_populated: 100,
+                    total_populated: 300,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -548,6 +588,9 @@ mod tests {
                             private: 0,
                             scaled: 100,
                             total: 300,
+                            private_populated: 0,
+                            scaled_populated: 100,
+                            total_populated: 300,
                             vmos: vec![1],
                         },
                     );
@@ -566,6 +609,9 @@ mod tests {
                     private: 0,
                     scaled: 150,
                     total: 400,
+                    private_populated: 0,
+                    scaled_populated: 150,
+                    total_populated: 400,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -576,6 +622,9 @@ mod tests {
                             private: 0,
                             scaled: 100,
                             total: 300,
+                            private_populated: 0,
+                            scaled_populated: 100,
+                            total_populated: 300,
                             vmos: vec![1],
                         },
                     );
@@ -585,6 +634,9 @@ mod tests {
                             private: 0,
                             scaled: 50,
                             total: 100,
+                            private_populated: 0,
+                            scaled_populated: 50,
+                            total_populated: 100,
                             vmos: vec![2],
                         },
                     );
@@ -604,6 +656,9 @@ mod tests {
                     private: 100,
                     scaled: 100,
                     total: 100,
+                    private_populated: 200,
+                    scaled_populated: 200,
+                    total_populated: 200,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -614,6 +669,9 @@ mod tests {
                             private: 100,
                             scaled: 100,
                             total: 100,
+                            private_populated: 200,
+                            scaled_populated: 200,
+                            total_populated: 200,
                             vmos: vec![3],
                         },
                     );
@@ -632,6 +690,9 @@ mod tests {
                     private: 0,
                     scaled: 150,
                     total: 400,
+                    private_populated: 0,
+                    scaled_populated: 150,
+                    total_populated: 400,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -642,6 +703,9 @@ mod tests {
                             private: 0,
                             scaled: 50,
                             total: 100,
+                            private_populated: 0,
+                            scaled_populated: 50,
+                            total_populated: 100,
                             vmos: vec![2],
                         },
                     );
@@ -651,6 +715,9 @@ mod tests {
                             private: 0,
                             scaled: 100,
                             total: 300,
+                            private_populated: 0,
+                            scaled_populated: 100,
+                            total_populated: 300,
                             vmos: vec![1],
                         },
                     );
@@ -708,6 +775,7 @@ mod tests {
                 parent_koid: 0,
                 committed_bytes: 300,
                 allocated_bytes: 300,
+                populated_bytes: Some(300),
             },
             processed::Vmo {
                 koid: 2,
@@ -715,13 +783,15 @@ mod tests {
                 parent_koid: 1,
                 committed_bytes: 100,
                 allocated_bytes: 100,
+                populated_bytes: Some(100),
             },
             processed::Vmo {
                 koid: 3,
                 name: "vmo3".to_string(),
                 parent_koid: 0,
                 committed_bytes: 100,
-                allocated_bytes: 100,
+                allocated_bytes: 200,
+                populated_bytes: Some(200),
             },
         ];
 
@@ -774,6 +844,7 @@ mod tests {
                     parent_koid: 0,
                     committed_bytes: 500,
                     allocated_bytes: 1000,
+                    populated_bytes: Some(500),
                 }),
                 raw::Vmo::Data(raw::VmoData {
                     koid: 2,
@@ -781,6 +852,7 @@ mod tests {
                     parent_koid: 1,
                     committed_bytes: 0,
                     allocated_bytes: 1000,
+                    populated_bytes: Some(50),
                 }),
             ],
         };
@@ -792,6 +864,9 @@ mod tests {
                     private: 0,
                     scaled: 250,
                     total: 500,
+                    private_populated: 0,
+                    scaled_populated: 250,
+                    total_populated: 500,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -802,6 +877,9 @@ mod tests {
                             private: 0,
                             scaled: 250,
                             total: 500,
+                            private_populated: 0,
+                            scaled_populated: 250,
+                            total_populated: 500,
                             vmos: vec![1],
                         },
                     );
@@ -820,6 +898,9 @@ mod tests {
                     private: 0,
                     scaled: 250,
                     total: 500,
+                    private_populated: 50,
+                    scaled_populated: 300,
+                    total_populated: 550,
                     vmos: vec![],
                 },
                 name_to_vmo_memory: {
@@ -830,6 +911,9 @@ mod tests {
                             private: 0,
                             scaled: 0,
                             total: 0,
+                            private_populated: 50,
+                            scaled_populated: 50,
+                            total_populated: 50,
                             vmos: vec![2],
                         },
                     );
@@ -839,6 +923,9 @@ mod tests {
                             private: 0,
                             scaled: 250,
                             total: 500,
+                            private_populated: 0,
+                            scaled_populated: 250,
+                            total_populated: 500,
                             vmos: vec![1],
                         },
                     );
@@ -881,6 +968,7 @@ mod tests {
                 parent_koid: 0,
                 committed_bytes: 500,
                 allocated_bytes: 1000,
+                populated_bytes: Some(500),
             },
             processed::Vmo {
                 koid: 2,
@@ -888,6 +976,7 @@ mod tests {
                 parent_koid: 1,
                 committed_bytes: 0,
                 allocated_bytes: 1000,
+                populated_bytes: Some(50),
             },
         ];
         pretty_assertions::assert_eq!(

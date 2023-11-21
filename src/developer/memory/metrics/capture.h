@@ -32,6 +32,7 @@ struct Vmo {
       : koid(v.koid),
         parent_koid(v.parent_koid),
         committed_bytes(v.committed_bytes),
+        populated_bytes(v.populated_bytes),
         allocated_bytes(v.size_bytes) {
     strncpy(name, v.name, sizeof(name));
   }
@@ -39,6 +40,7 @@ struct Vmo {
   char name[ZX_MAX_NAME_LEN];
   zx_koid_t parent_koid;
   uint64_t committed_bytes;
+  uint64_t populated_bytes;
   uint64_t allocated_bytes;
   std::vector<zx_koid_t> children;
 };
@@ -67,10 +69,13 @@ class OS {
 
   virtual zx_status_t GetKernelMemoryStats(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_t* kmem) = 0;
+      zx_info_kmem_stats_t& kmem) = 0;
   virtual zx_status_t GetKernelMemoryStatsExtended(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem = nullptr) = 0;
+      zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem = nullptr) = 0;
+  virtual zx_status_t GetKernelMemoryStatsCompression(
+      const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+      zx_info_kmem_stats_compression_t& kmem_compression) = 0;
 };
 
 // GetInfoVector executes an OS::GetInfo call that outputs a list of element inside |buffer|,
@@ -137,6 +142,7 @@ class Capture {
   zx_time_t time() const { return time_; }
   const zx_info_kmem_stats_t& kmem() const { return kmem_; }
   const zx_info_kmem_stats_extended_t& kmem_extended() const { return kmem_extended_; }
+  const zx_info_kmem_stats_compression_t& kmem_compression() const { return kmem_compression_; }
 
   const std::unordered_map<zx_koid_t, Process>& koid_to_process() const { return koid_to_process_; }
 
@@ -157,6 +163,7 @@ class Capture {
   zx_time_t time_;
   zx_info_kmem_stats_t kmem_ = {};
   zx_info_kmem_stats_extended_t kmem_extended_ = {};
+  zx_info_kmem_stats_compression_t kmem_compression_ = {};
   std::unordered_map<zx_koid_t, Process> koid_to_process_;
   std::unordered_map<zx_koid_t, Vmo> koid_to_vmo_;
   std::vector<zx_koid_t> root_vmos_;

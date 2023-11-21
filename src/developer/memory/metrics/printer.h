@@ -36,7 +36,10 @@ class Printer {
           "vmo":1276194816,
           "mmu":65294336,
           "ipc":196608,
-          "other":61440
+          "other":61440,
+          "zram_compressed_total": 65294336,
+          "zram_uncompressed": 65294336,
+          "zram_fragmentation": 65294336,
         },
         "Processes":[
           ["koid","name","vmos"],
@@ -45,8 +48,8 @@ class Printer {
         ],
         "VmoNames":["scudo:primary", ...],
         "Vmos":[
-          ["koid","name","parent_koid","committed_bytes","allocated_bytes"],
-          [47440,38,47437,4096,4096],
+          ["koid","name","parent_koid","committed_bytes","allocated_bytes","populated_bytes"],
+          [47440,38,47437,4096,4096,4096],
           ...
         ]
       }
@@ -81,7 +84,10 @@ class Printer {
   //           "vmo":1276194816,
   //           "mmu":65294336,
   //           "ipc":196608,
-  //           "other":61440
+  //           "other":61440,
+  //           "zram_compressed_total": 65294336,
+  //           "zram_uncompressed": 65294336,
+  //           "zram_fragmentation": 65294336,
   //         },
   //         "Processes":[
   //           ["koid","name","vmos"],
@@ -90,8 +96,8 @@ class Printer {
   //         ],
   //         "VmoNames":["scudo:primary", ...],
   //         "Vmos":[
-  //           ["koid","name","parent_koid","committed_bytes","allocated_bytes"],
-  //           [47440,38,47437,4096,4096],
+  //           ["koid","name","parent_koid","committed_bytes","allocated_bytes","populated_bytes"],
+  //           [47440,38,47437,4096,4096,4096],
   //           ...
   //         ]
   //      }

@@ -97,11 +97,14 @@ class MockOS : public OS {
                       size_t* actual, size_t* avail) override;
 
   zx_status_t GetKernelMemoryStats(const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-                                   zx_info_kmem_stats_t* kmem) override;
+                                   zx_info_kmem_stats_t& kmem) override;
 
   zx_status_t GetKernelMemoryStatsExtended(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) override;
+      zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem) override;
+  zx_status_t GetKernelMemoryStatsCompression(
+      const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+      zx_info_kmem_stats_compression_t& kmem_compression) override;
 
   OsResponses responses_;
   uint32_t i_get_property_;

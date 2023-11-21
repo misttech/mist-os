@@ -87,18 +87,18 @@ zx_status_t MockOS::GetInfo(zx_handle_t handle, uint32_t topic, void* buffer, si
 }
 
 zx_status_t MockOS::GetKernelMemoryStats(
-    const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client, zx_info_kmem_stats_t* kmem) {
+    const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client, zx_info_kmem_stats_t& kmem) {
   const GetInfoResponse* r =
       GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
   if (r == nullptr)
     return ZX_ERR_INVALID_ARGS;
-  memcpy(kmem, r->values, r->value_size);
+  memcpy(&kmem, r->values, r->value_size);
   return r->ret;
 }
 
 zx_status_t MockOS::GetKernelMemoryStatsExtended(
     const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-    zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) {
+    zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem) {
   const GetInfoResponse* r1 =
       GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
   if (r1 == nullptr)
@@ -108,8 +108,19 @@ zx_status_t MockOS::GetKernelMemoryStatsExtended(
       GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_EXTENDED);
   if (r2 == nullptr)
     return ZX_ERR_INVALID_ARGS;
-  memcpy(kmem_ext, r2->values, r2->value_size);
+  memcpy(&kmem_ext, r2->values, r2->value_size);
   return r2->ret;
+}
+
+zx_status_t MockOS::GetKernelMemoryStatsCompression(
+    const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+    zx_info_kmem_stats_compression_t& kmem_compression) {
+  const GetInfoResponse* r =
+      GetGetInfoResponse(TestUtils::kRootHandle, ZX_INFO_KMEM_STATS_COMPRESSION);
+  if (r == nullptr)
+    return ZX_ERR_INVALID_ARGS;
+  memcpy(&kmem_compression, r->values, r->value_size);
+  return r->ret;
 }
 
 // static.

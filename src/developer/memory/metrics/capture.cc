@@ -84,7 +84,7 @@ class OSImpl : public OS, public TaskEnumerator {
   }
 
   zx_status_t GetKernelMemoryStats(const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-                                   zx_info_kmem_stats_t* kmem) override {
+                                   zx_info_kmem_stats_t& kmem) override {
     TRACE_DURATION("memory_metrics", "Capture::GetKernelMemoryStats");
     if (!stats_client.is_valid()) {
       return ZX_ERR_BAD_STATE;
@@ -94,21 +94,21 @@ class OSImpl : public OS, public TaskEnumerator {
       return result.status();
     }
     const auto& stats = result->stats;
-    kmem->total_bytes = stats.total_bytes();
-    kmem->free_bytes = stats.free_bytes();
-    kmem->wired_bytes = stats.wired_bytes();
-    kmem->total_heap_bytes = stats.total_heap_bytes();
-    kmem->free_heap_bytes = stats.free_heap_bytes();
-    kmem->vmo_bytes = stats.vmo_bytes();
-    kmem->mmu_overhead_bytes = stats.mmu_overhead_bytes();
-    kmem->ipc_bytes = stats.ipc_bytes();
-    kmem->other_bytes = stats.other_bytes();
+    kmem.total_bytes = stats.total_bytes();
+    kmem.free_bytes = stats.free_bytes();
+    kmem.wired_bytes = stats.wired_bytes();
+    kmem.total_heap_bytes = stats.total_heap_bytes();
+    kmem.free_heap_bytes = stats.free_heap_bytes();
+    kmem.vmo_bytes = stats.vmo_bytes();
+    kmem.mmu_overhead_bytes = stats.mmu_overhead_bytes();
+    kmem.ipc_bytes = stats.ipc_bytes();
+    kmem.other_bytes = stats.other_bytes();
     return ZX_OK;
   }
 
   zx_status_t GetKernelMemoryStatsExtended(
       const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
-      zx_info_kmem_stats_extended_t* kmem_ext, zx_info_kmem_stats_t* kmem) override {
+      zx_info_kmem_stats_extended_t& kmem_ext, zx_info_kmem_stats_t* kmem) override {
     TRACE_DURATION("memory_metrics", "Capture::GetKernelMemoryStatsExtended");
     if (!stats_client.is_valid()) {
       return ZX_ERR_BAD_STATE;
@@ -118,33 +118,65 @@ class OSImpl : public OS, public TaskEnumerator {
       return result.status();
     }
     const auto& stats = result->stats;
-    kmem_ext->total_bytes = stats.total_bytes();
-    kmem_ext->free_bytes = stats.free_bytes();
-    kmem_ext->wired_bytes = stats.wired_bytes();
-    kmem_ext->total_heap_bytes = stats.total_heap_bytes();
-    kmem_ext->free_heap_bytes = stats.free_heap_bytes();
-    kmem_ext->vmo_bytes = stats.vmo_bytes();
-    kmem_ext->vmo_pager_total_bytes = stats.vmo_pager_total_bytes();
-    kmem_ext->vmo_pager_newest_bytes = stats.vmo_pager_newest_bytes();
-    kmem_ext->vmo_pager_oldest_bytes = stats.vmo_pager_oldest_bytes();
-    kmem_ext->vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes();
-    kmem_ext->vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes();
-    kmem_ext->mmu_overhead_bytes = stats.mmu_overhead_bytes();
-    kmem_ext->ipc_bytes = stats.ipc_bytes();
-    kmem_ext->other_bytes = stats.other_bytes();
+    kmem_ext.total_bytes = stats.total_bytes();
+    kmem_ext.free_bytes = stats.free_bytes();
+    kmem_ext.wired_bytes = stats.wired_bytes();
+    kmem_ext.total_heap_bytes = stats.total_heap_bytes();
+    kmem_ext.free_heap_bytes = stats.free_heap_bytes();
+    kmem_ext.vmo_bytes = stats.vmo_bytes();
+    kmem_ext.vmo_pager_total_bytes = stats.vmo_pager_total_bytes();
+    kmem_ext.vmo_pager_newest_bytes = stats.vmo_pager_newest_bytes();
+    kmem_ext.vmo_pager_oldest_bytes = stats.vmo_pager_oldest_bytes();
+    kmem_ext.vmo_discardable_locked_bytes = stats.vmo_discardable_locked_bytes();
+    kmem_ext.vmo_discardable_unlocked_bytes = stats.vmo_discardable_unlocked_bytes();
+    kmem_ext.mmu_overhead_bytes = stats.mmu_overhead_bytes();
+    kmem_ext.ipc_bytes = stats.ipc_bytes();
+    kmem_ext.other_bytes = stats.other_bytes();
 
     // Copy over shared fields from kmem_ext to kmem, if provided.
     if (kmem) {
-      kmem->total_bytes = kmem_ext->total_bytes;
-      kmem->free_bytes = kmem_ext->free_bytes;
-      kmem->wired_bytes = kmem_ext->wired_bytes;
-      kmem->total_heap_bytes = kmem_ext->total_heap_bytes;
-      kmem->free_heap_bytes = kmem_ext->free_heap_bytes;
-      kmem->vmo_bytes = kmem_ext->vmo_bytes;
-      kmem->mmu_overhead_bytes = kmem_ext->mmu_overhead_bytes;
-      kmem->ipc_bytes = kmem_ext->ipc_bytes;
-      kmem->other_bytes = kmem_ext->other_bytes;
+      kmem->total_bytes = kmem_ext.total_bytes;
+      kmem->free_bytes = kmem_ext.free_bytes;
+      kmem->wired_bytes = kmem_ext.wired_bytes;
+      kmem->total_heap_bytes = kmem_ext.total_heap_bytes;
+      kmem->free_heap_bytes = kmem_ext.free_heap_bytes;
+      kmem->vmo_bytes = kmem_ext.vmo_bytes;
+      kmem->mmu_overhead_bytes = kmem_ext.mmu_overhead_bytes;
+      kmem->ipc_bytes = kmem_ext.ipc_bytes;
+      kmem->other_bytes = kmem_ext.other_bytes;
     }
+    return ZX_OK;
+  }
+
+  zx_status_t GetKernelMemoryStatsCompression(
+      const fidl::WireSyncClient<fuchsia_kernel::Stats>& stats_client,
+      zx_info_kmem_stats_compression_t& kmem_compression) override {
+    TRACE_DURATION("memory_metrics", "Capture::GetKernelMemoryStatsCompression");
+    if (!stats_client.is_valid()) {
+      return ZX_ERR_BAD_STATE;
+    }
+    auto result = stats_client->GetMemoryStatsCompression();
+    if (result.status() != ZX_OK) {
+      return result.status();
+    }
+    kmem_compression.uncompressed_storage_bytes = result->uncompressed_storage_bytes();
+    kmem_compression.compressed_storage_bytes = result->compressed_storage_bytes();
+    kmem_compression.compressed_fragmentation_bytes = result->compressed_fragmentation_bytes();
+    kmem_compression.compression_time = result->compression_time();
+    kmem_compression.decompression_time = result->decompression_time();
+    kmem_compression.total_page_compression_attempts = result->total_page_compression_attempts();
+    kmem_compression.failed_page_compression_attempts = result->failed_page_compression_attempts();
+    kmem_compression.total_page_decompressions = result->total_page_decompressions();
+    kmem_compression.compressed_page_evictions = result->compressed_page_evictions();
+    kmem_compression.eager_page_compressions = result->eager_page_compressions();
+    kmem_compression.memory_pressure_page_compressions =
+        result->memory_pressure_page_compressions();
+    kmem_compression.critical_memory_page_compressions =
+        result->critical_memory_page_compressions();
+    kmem_compression.pages_decompressed_unit_ns = result->pages_decompressed_unit_ns();
+    std::copy(result->pages_decompressed_within_log_time().begin(),
+              result->pages_decompressed_within_log_time().end(),
+              std::begin(kmem_compression.pages_decompressed_within_log_time));
     return ZX_OK;
   }
 
@@ -200,14 +232,22 @@ zx_status_t Capture::GetCapture(Capture* capture, const CaptureState& state, Cap
   // free memory level every 10s in order to keep the highwater digest updated, so a lightweight
   // syscall is preferable.
   if (level == CaptureLevel::KMEM) {
-    return os.GetKernelMemoryStats(state.stats_client, &capture->kmem_);
+    return os.GetKernelMemoryStats(state.stats_client, capture->kmem_);
   }
 
   // ZX_INFO_KMEM_STATS_EXTENDED is more expensive to collect than ZX_INFO_KMEM_STATS, so only query
   // it for the more detailed capture levels. Use kmem_extended_ to populate the shared fields in
   // kmem_ (kmem_extended_ is a superset of kmem_), avoiding the need for a redundant syscall.
-  zx_status_t err = os.GetKernelMemoryStatsExtended(state.stats_client, &capture->kmem_extended_,
-                                                    &capture->kmem_);
+  zx_status_t err =
+      os.GetKernelMemoryStatsExtended(state.stats_client, capture->kmem_extended_, &capture->kmem_);
+  if (err != ZX_OK) {
+    return err;
+  }
+
+  // Some Fuchsia systems use ZRAM, ie. compressed RAM. ZX_INFO_KMEM_STATS_COMPRESSION retrieves
+  // information about this compression, so we can get an accurate view of the actual physical
+  // memory used.
+  err = os.GetKernelMemoryStatsCompression(state.stats_client, capture->kmem_compression_);
   if (err != ZX_OK) {
     return err;
   }

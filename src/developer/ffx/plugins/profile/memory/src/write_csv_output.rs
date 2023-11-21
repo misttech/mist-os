@@ -122,7 +122,15 @@ mod tests {
             process_data: vec![processed::Process {
                 koid: 4,
                 name: "P".to_string(),
-                memory: RetainedMemory { private: 11, scaled: 22, total: 33, vmos: vec![] },
+                memory: RetainedMemory {
+                    private: 11,
+                    scaled: 22,
+                    total: 33,
+                    private_populated: 11,
+                    scaled_populated: 22,
+                    total_populated: 33,
+                    vmos: vec![],
+                },
                 name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
@@ -131,6 +139,9 @@ mod tests {
                             private: 4,
                             scaled: 55,
                             total: 666,
+                            private_populated: 4,
+                            scaled_populated: 55,
+                            total_populated: 666,
                             vmos: vec![],
                         },
                     );
@@ -140,6 +151,9 @@ mod tests {
                             private: 44,
                             scaled: 555,
                             total: 6666,
+                            private_populated: 44,
+                            scaled_populated: 555,
+                            total_populated: 6666,
                             vmos: vec![],
                         },
                     );
@@ -149,6 +163,9 @@ mod tests {
                             private: 444,
                             scaled: 5555,
                             total: 66666,
+                            private_populated: 444,
+                            scaled_populated: 5555,
+                            total_populated: 66666,
                             vmos: vec![],
                         },
                     );
@@ -177,7 +194,15 @@ mod tests {
             processes: vec![processed::Process {
                 koid: 4,
                 name: "P".to_string(),
-                memory: RetainedMemory { private: 11, scaled: 22, total: 33, vmos: vec![] },
+                memory: RetainedMemory {
+                    private: 11,
+                    scaled: 22,
+                    total: 33,
+                    private_populated: 11,
+                    scaled_populated: 22,
+                    total_populated: 33,
+                    vmos: vec![],
+                },
                 name_to_vmo_memory: HashMap::new(),
                 vmos: HashSet::new(),
             }],

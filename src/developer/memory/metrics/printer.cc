@@ -47,6 +47,14 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
         .AddMember("vmo_discardable_unlocked", k_ext.vmo_discardable_unlocked_bytes, a);
   }
 
+  const auto& k_zram = capture.kmem_compression();
+  bool has_zram = k_zram.compressed_storage_bytes > 0;
+  if (has_zram) {
+    kernel.AddMember("zram_compressed_total", k_zram.compressed_storage_bytes, a)
+        .AddMember("zram_uncompressed", k_zram.uncompressed_storage_bytes, a)
+        .AddMember("zram_fragmentation", k_zram.compressed_fragmentation_bytes, a);
+  }
+
   struct NameCount {
     std::string_view name_;
     mutable size_t count;
@@ -106,6 +114,9 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
       .PushBack("parent_koid", a)
       .PushBack("committed_bytes", a)
       .PushBack("allocated_bytes", a);
+  if (has_zram) {
+    vmo_header.PushBack("populated_bytes", a);
+  }
   vmos.PushBack(vmo_header, a);
   for (const auto& [k, v] : capture.koid_to_vmo()) {
     rapidjson::Value vmo_value(rapidjson::kArrayType);
@@ -114,6 +125,9 @@ rapidjson::Document DocumentFromCapture(const memory::Capture& capture) {
         .PushBack(v.parent_koid, a)
         .PushBack(v.committed_bytes, a)
         .PushBack(v.allocated_bytes, a);
+    if (has_zram) {
+      vmo_value.PushBack(v.populated_bytes, a);
+    }
     vmos.PushBack(vmo_value, a);
   }
   TRACE_DURATION_END("memory_metrics", "Printer::DocumentFromCapture::Vmos");

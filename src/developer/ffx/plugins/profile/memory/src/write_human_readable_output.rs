@@ -105,6 +105,9 @@ fn print_complete_digest<W: Write>(
 ) -> Result<()> {
     writeln!(w, "Time:  {} ns", digest.time)?;
     writeln!(w, "VMO:   {}", size_formatter(digest.total_committed_bytes_in_vmos))?;
+    if let Some(zram_compressed) = digest.kernel.zram_compressed_total {
+        writeln!(w, "ZRAM:  {}", size_formatter(zram_compressed))?;
+    }
     writeln!(w, "Free:  {}", size_formatter(digest.kernel.free))?;
     writeln!(w)?;
     writeln!(w, "Task:      kernel")?;
@@ -174,19 +177,51 @@ mod tests {
             let mut map = HashMap::new();
             map.insert(
                 "xx".to_string(),
-                processed::RetainedMemory { private: 0, scaled: 0, total: 0, vmos: vec![] },
+                processed::RetainedMemory {
+                    private: 0,
+                    scaled: 0,
+                    total: 0,
+                    private_populated: 0,
+                    scaled_populated: 0,
+                    total_populated: 0,
+                    vmos: vec![],
+                },
             );
             map.insert(
                 "zb".to_string(),
-                processed::RetainedMemory { private: 0, scaled: 10, total: 10, vmos: vec![] },
+                processed::RetainedMemory {
+                    private: 0,
+                    scaled: 10,
+                    total: 10,
+                    private_populated: 0,
+                    scaled_populated: 10,
+                    total_populated: 10,
+                    vmos: vec![],
+                },
             );
             map.insert(
                 "ab".to_string(),
-                processed::RetainedMemory { private: 0, scaled: 10, total: 10, vmos: vec![] },
+                processed::RetainedMemory {
+                    private: 0,
+                    scaled: 10,
+                    total: 10,
+                    private_populated: 0,
+                    scaled_populated: 10,
+                    total_populated: 10,
+                    vmos: vec![],
+                },
             );
             map.insert(
                 "zz".to_string(),
-                processed::RetainedMemory { private: 0, scaled: 20, total: 20, vmos: vec![] },
+                processed::RetainedMemory {
+                    private: 0,
+                    scaled: 20,
+                    total: 20,
+                    private_populated: 0,
+                    scaled_populated: 20,
+                    total_populated: 20,
+                    vmos: vec![],
+                },
             );
             map
         };
@@ -203,7 +238,15 @@ mod tests {
             process_data: vec![processed::Process {
                 koid: 4,
                 name: "P".to_string(),
-                memory: RetainedMemory { private: 11, scaled: 22, total: 33, vmos: vec![] },
+                memory: RetainedMemory {
+                    private: 11,
+                    scaled: 22,
+                    total: 33,
+                    private_populated: 11,
+                    scaled_populated: 22,
+                    total_populated: 33,
+                    vmos: vec![],
+                },
                 name_to_vmo_memory: {
                     let mut result = HashMap::new();
                     result.insert(
@@ -212,6 +255,9 @@ mod tests {
                             private: 4444,
                             scaled: 55555,
                             total: 666666,
+                            private_populated: 4444,
+                            scaled_populated: 55555,
+                            total_populated: 666666,
                             vmos: vec![],
                         },
                     );
@@ -221,6 +267,9 @@ mod tests {
                             private: 4444,
                             scaled: 55555,
                             total: 666666,
+                            private_populated: 4444,
+                            scaled_populated: 55555,
+                            total_populated: 666666,
                             vmos: vec![],
                         },
                     );
@@ -230,6 +279,9 @@ mod tests {
                             private: 44444,
                             scaled: 555555,
                             total: 6666666,
+                            private_populated: 4444,
+                            scaled_populated: 55555,
+                            total_populated: 666666,
                             vmos: vec![],
                         },
                     );
