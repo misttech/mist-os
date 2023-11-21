@@ -24,7 +24,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         ffx_test_url (str): Test URL to execute via `ffx test run`.
 
     Optional Mobly Test Params:
-        ffx_test_options(list[str]): Test options to supply to `ffx test run`
+        ffx_test_args(list[str]): Test options to supply to `ffx test run`
             Default: []
         test_component_args (list[str]): Options to supply to the test component.
             Default: []
@@ -43,7 +43,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
         metrics are present.
         """
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-        self.ffx_test_options: list[str] = self.user_params["ffx_test_options"]
+        self.ffx_test_args: list[str] = self.user_params["ffx_test_args"]
         self.ffx_test_url: str = self.user_params["ffx_test_url"]
         self.expected_metric_names_filepath: str = self.user_params[
             "expected_metric_names_filepath"
@@ -78,13 +78,13 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
                 test_args.append(results_file_path)
 
             test_dir = os.path.join(self.test_case_path, f"ffx_test_{i}")
-            ffx_test_options = self.ffx_test_options + [
+            ffx_test_args = self.ffx_test_args + [
                 "--output-directory",
                 test_dir,
             ]
             self.device.ffx.run_test_component(
                 self.ffx_test_url,
-                ffx_test_args=ffx_test_options,
+                ffx_test_args=ffx_test_args,
                 test_component_args=test_args,
                 timeout=None,
                 capture_output=False,

@@ -13,16 +13,16 @@ import signal
 import subprocess
 import time
 
-from fuchsia_base_hybrid_test_lib import fuchsia_hybrid_base_test
+from fuchsia_base_test import fuchsia_base_test
 from mobly import test_runner
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
+class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
     """Fuchsia power measurement base test class.
 
-    Single device hybrid test with power measurement.
+    Single device test with power measurement.
 
     Attributes:
         fuchsia_devices: List of FuchsiaDevice objects.
@@ -33,18 +33,22 @@ class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
         metric_name: Name of power metric being measured.
 
     Required Mobly Test Params:
-        ffx_test_options (list[str]): Test options to supply to `ffx test run`
+        ffx_test_args (list[str]): Arguments to supply to `ffx test run`
         ffx_test_url (str): Test URL to execute via `ffx test run`
         timeout_sec (int): Test timeout.
         power_metric (str): Name of power metric being measured.
     """
 
-    def __init__(self, config):
-        super().__init__(config)
+    def setup_class(self):
+        super().setup_class()
         self.metric_name = self.user_params["power_metric"]
         self.power_trace_path = os.path.join(
             self.log_path, f"{self.metric_name}_power_trace.csv"
         )
+        self.ffx_test_url = self.user_params["ffx_test_url"]
+        self.ffx_test_args = self.user_params["ffx_test_args"]
+        self.timeout_sec = self.user_params["timeout_sec"]
+        self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
     def _find_measurepower_path(self):
         path = os.environ.get("MEASUREPOWER_PATH")
@@ -106,7 +110,12 @@ class FuchsiaPowerBaseTest(fuchsia_hybrid_base_test.FuchsiaHybridBaseTest):
         """
         with self._start_power_measurement() as proc:
             self._wait_first_sample(proc)
-            super().test_launch_hermetic_test()
+            self.device.ffx.run_test_component(
+                self.ffx_test_url,
+                ffx_test_args=self.ffx_test_args,
+                timeout=self.timeout_sec,
+                capture_output=False,
+            )
             self._stop_power_measurement(proc)
 
 

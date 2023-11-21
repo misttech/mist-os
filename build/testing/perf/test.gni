@@ -202,10 +202,10 @@ template("fuchsia_component_perf_test") {
         process_runs = invoker.process_runs
       }
 
-      ffx_test_options = []
+      ffx_test_args = []
 
       if (defined(invoker.test_type)) {
-        ffx_test_options += [
+        ffx_test_args += [
           "--realm",
           type_moniker_map[invoker.test_type],
         ]

@@ -19,19 +19,6 @@ python_library("fuchsia_base_test") {
   ]
 }
 
-python_library("fuchsia_base_hybrid_test") {
-  testonly = true
-
-  # Add "_lib" suffix to avoid import collision in the PYZ file when
-  # `fuchsia_hybrid_base_test` is used as the source in both Python lib and test
-  library_name = "fuchsia_base_hybrid_test_lib"
-  sources = [
-    "__init__.py",
-    "fuchsia_hybrid_base_test.py",
-  ]
-  library_deps = [ ":fuchsia_base_test" ]
-}
-
 python_library("fuchsia_power_base_test") {
   testonly = true
 
@@ -43,7 +30,7 @@ python_library("fuchsia_power_base_test") {
     "fuchsia_power_base_test.py",
   ]
   library_deps = [
-    ":fuchsia_base_hybrid_test",
+    ":fuchsia_base_test",
     "//src/performance/lib/perf_publish",
   ]
 }
