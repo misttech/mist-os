@@ -5,8 +5,7 @@
 //! Tools for describing and enforcing lock acquisition order.
 //!
 //! To use these tools:
-//! 1. A lock level must be defined for each type of lock. This is done using
-//! `lock_level!(LockLevel)` where `LockA` is a name of the level.
+//! 1. A lock level must be defined for each type of lock. This can be a simple enum.
 //! 2. Then a relation `LockedAfter` between these levels must be described,
 //! forming a graph. This graph must be acyclic, since a cycle would indicate
 //! a potential deadlock.
@@ -34,8 +33,8 @@
 //!    b: Mutex<u32>,
 //! }
 //!
-//! lock_level!(LockA);
-//! lock_level!(LockB);
+//! pub enum A {}
+//! pub enum B {}
 //!
 //! impl LockFor<LockA> for HoldsLocks {
 //!    type Data = u8;
@@ -77,8 +76,8 @@
 //! accidental lock ordering inversion introduced while defining the graph.
 //! This won't compile:
 //! ```compile_fail
-//! lock_level!(LockA);
-//! lock_level!(LockB);
+//! pub enum A {}
+//! pub enum B {}
 //!
 //! impl_lock_after(LockA => LockB);
 //! impl_lock_after(LockB => LockA);
@@ -98,8 +97,8 @@
 //! #    b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(LockA);
-//! # lock_level!(LockB);
+//! # pub enum A {}
+//! # pub enum B {}
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #    type Data = u8;
@@ -147,8 +146,8 @@
 //! #     b: Mutex<u32>,
 //! # }
 //! #
-//! # lock_level!(LockA);
-//! # lock_level!(LockB);
+//! # pub enum A {}
+//! # pub enum B {}
 //! #
 //! # impl LockFor<LockA> for HoldsLocks {
 //! #     type Data = u8;
@@ -330,7 +329,7 @@ mod test {
     #[test]
     fn example() {
         extern crate self as lock_sequence;
-        use crate::{impl_lock_after, lock_level, relation::LockAfter, Unlocked};
+        use crate::{impl_lock_after, relation::LockAfter, Unlocked};
 
         #[derive(Default)]
         pub struct HoldsLocks {
@@ -338,8 +337,8 @@ mod test {
             b: Mutex<u32>,
         }
 
-        lock_level!(LockA);
-        lock_level!(LockB);
+        pub enum LockA {}
+        pub enum LockB {}
 
         impl LockFor<LockA> for HoldsLocks {
             type Data = u8;
@@ -380,16 +379,16 @@ mod test {
 
         extern crate self as lock_sequence;
 
-        use crate::{impl_lock_after, lock_level, relation::LockAfter, Unlocked};
+        use crate::{impl_lock_after, relation::LockAfter, Unlocked};
 
-        lock_level!(A);
-        lock_level!(B);
-        lock_level!(C);
-        lock_level!(D);
-        lock_level!(E);
-        lock_level!(F);
-        lock_level!(G);
-        lock_level!(H);
+        pub enum A {}
+        pub enum B {}
+        pub enum C {}
+        pub enum D {}
+        pub enum E {}
+        pub enum F {}
+        pub enum G {}
+        pub enum H {}
 
         impl LockAfter<Unlocked> for A {}
         impl_lock_after!(A => B);

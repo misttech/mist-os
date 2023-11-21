@@ -20,6 +20,7 @@ use crate::{
         },
         FileOps, FileSystemHandle, FsNode,
     },
+    lock_ordering::KernelIpTables,
     logging::log_error,
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
@@ -41,7 +42,7 @@ use futures::FutureExt;
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
-use starnix_lock::{declare_lock_levels, OrderedRwLock, RwLock};
+use starnix_lock::{OrderedRwLock, RwLock};
 use starnix_uapi::{
     device_type::DeviceType, errno, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
 };
@@ -52,9 +53,6 @@ use std::{
         Arc, Weak,
     },
 };
-
-declare_lock_levels![KernelIpTables];
-use self::lock_levels::KernelIpTables;
 
 /// The shared, mutable state for the entire Starnix kernel.
 ///

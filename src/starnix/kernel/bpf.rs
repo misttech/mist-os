@@ -21,12 +21,13 @@ use crate::{
         FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
         FsString, LookupContext, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
     },
+    lock_ordering::BpfMapEntries,
     logging::{log_trace, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, Kernel},
 };
 use lock_sequence::{Locked, Unlocked};
-use starnix_lock::{declare_lock_levels, OrderedMutex};
+use starnix_lock::OrderedMutex;
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
@@ -48,9 +49,6 @@ use starnix_uapi::{
 };
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
-
-declare_lock_levels![BpfMapEntries];
-use self::lock_levels::BpfMapEntries;
 
 /// The default selinux context to use for each BPF object.
 const DEFAULT_BPF_SELINUX_CONTEXT: &FsStr = b"u:object_r:fs_bpf:s0";

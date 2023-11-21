@@ -107,14 +107,6 @@ pub trait LockBefore<X> {}
 
 impl<B: LockAfter<A>, A> LockBefore<B> for A {}
 
-// Define a lock level that corresponds to some state that can be locked.
-#[macro_export]
-macro_rules! lock_level {
-    ($A:ident) => {
-        pub enum $A {}
-    };
-}
-
 // Defines the order between two lock levels. Lock B comes after A if B
 // can be acquired while A is locked.
 #[macro_export]
@@ -138,9 +130,9 @@ mod test {
 
     extern crate self as lock_sequence;
 
-    lock_level!(A);
-    lock_level!(B);
-    lock_level!(C);
+    pub enum A {}
+    pub enum B {}
+    pub enum C {}
 
     impl_lock_after!(A => B);
     impl_lock_after!(B => C);

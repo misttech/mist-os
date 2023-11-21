@@ -196,23 +196,6 @@ impl<T, L> OrderedRwLock<T, L> {
     }
 }
 
-/// A helper macro to define a module containing the decalaration of lock levels.
-/// Example:
-/// ```
-/// declare_lock_levels![LevelA, LevelB];
-/// use self::lock_levels::{LevelA, LevelB};
-/// ```
-/// Note that this macro doesn't add any ordering between the declared levels.
-#[macro_export]
-macro_rules! declare_lock_levels {
-    ( $( $A:ident ),* ) => {
-        pub mod lock_levels {
-            use lock_sequence::lock_level;
-            $(lock_level!($A);)*
-        }
-    };
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
@@ -235,7 +218,15 @@ mod test {
         }
     }
 
-    declare_lock_levels![A, B, C, D, E, F];
+    mod lock_levels {
+        pub enum A {}
+        pub enum B {}
+        pub enum C {}
+        pub enum D {}
+        pub enum E {}
+        pub enum F {}
+    }
+
     use lock_levels::{A, B, C, D, E, F};
 
     mod lock_ordering {
