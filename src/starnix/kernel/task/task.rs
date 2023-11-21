@@ -2,27 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::PidTable;
-use bitflags::bitflags;
-use extended_pstate::ExtendedPstateState;
-use fuchsia_zircon::{
-    sys::zx_thread_state_general_regs_t,
-    AsHandleRef, Signals, Task as _, {self as zx},
-};
-use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use starnix_sync::{EventWaitGuard, WakeReason};
-use std::{
-    cmp,
-    convert::TryFrom,
-    ffi::CString,
-    fmt,
-    mem::MaybeUninit,
-    sync::{
-        atomic::{AtomicU8, Ordering},
-        Arc,
-    },
-};
-
 use crate::{
     arch::{
         registers::RegisterState,
@@ -42,12 +21,19 @@ use crate::{
     },
     syscalls::{decls::Syscall, SyscallResult},
     task::{
-        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Kernel, ProcessEntryRef,
-        ProcessGroup, PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilter,
+        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Kernel, PidTable,
+        ProcessEntryRef, ProcessGroup, PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilter,
         SeccompFilterContainer, SeccompNotifierHandle, SeccompState, SeccompStateValue,
         ThreadGroup, UtsNamespaceHandle, Waiter,
     },
 };
+use bitflags::bitflags;
+use extended_pstate::ExtendedPstateState;
+use fuchsia_zircon::{
+    self as zx, sys::zx_thread_state_general_regs_t, AsHandleRef, Signals, Task as _,
+};
+use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{EventWaitGuard, WakeReason};
 use starnix_uapi::{
     auth::{
         PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
@@ -73,6 +59,17 @@ use starnix_uapi::{
     PTRACE_EVENT_STOP, ROBUST_LIST_LIMIT, SECCOMP_FILTER_FLAG_LOG,
     SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
     SI_KERNEL,
+};
+use std::{
+    cmp,
+    convert::TryFrom,
+    ffi::CString,
+    fmt,
+    mem::MaybeUninit,
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
 };
 
 /// The task object associated with the currently executing thread.
@@ -1716,6 +1713,9 @@ impl ReleasableByRef for Task {
         // Release the fd table.
         self.files.release(current_task);
 
+        // Apply any delayed releasers left.
+        current_task.trigger_delayed_releaser();
+
         self.signal_vfork();
     }
 }
@@ -1736,6 +1736,10 @@ impl CurrentTask {
 
     pub fn temp_task(&self) -> TempRef<'_, Task> {
         TempRef::from(&self.task)
+    }
+
+    pub fn trigger_delayed_releaser(&self) {
+        self.kernel().delayed_releaser.apply(self);
     }
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(

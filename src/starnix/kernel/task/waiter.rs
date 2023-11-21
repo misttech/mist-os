@@ -454,6 +454,9 @@ impl PortWaiter {
             }
         };
 
+        // Trigger delayed releaser before blocking.
+        current_task.trigger_delayed_releaser();
+
         if is_waiting {
             current_task.run_in_state(RunState::Waiter(WaiterRef::from_port(self)), callback)
         } else {

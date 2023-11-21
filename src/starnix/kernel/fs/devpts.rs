@@ -710,6 +710,7 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         let _pts = open_file(&task, fs, b"0").expect("open file");
         std::mem::drop(ptmx);
+        task.trigger_delayed_releaser();
         lookup_node(&task, fs, b"0").unwrap_err();
     }
 
@@ -727,6 +728,8 @@ mod tests {
         lookup_node(&task, fs, b"2").expect("component_lookup");
 
         std::mem::drop(_ptmx1);
+        task.trigger_delayed_releaser();
+
         lookup_node(&task, fs, b"1").unwrap_err();
 
         _ptmx1 = open_ptmx_and_unlock(&task, fs).expect("ptmx");

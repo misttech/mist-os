@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    delayed_releaser::FileReleaser,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         file_server::serve_file,
@@ -29,6 +30,7 @@ use starnix_uapi::{
     errors::{Errno, EAGAIN, ETIMEDOUT},
     fsxattr, off_t,
     open_flags::OpenFlags,
+    ownership::Releasable,
     pid_t,
     resource_limits::Resource,
     seal_flags::SealFlags,
@@ -897,8 +899,8 @@ pub struct FileObject {
     _file_write_guard: Option<FileWriteGuard>,
 }
 
-pub type FileHandle = Arc<FileObject>;
-pub type WeakFileHandle = Weak<FileObject>;
+pub type FileHandle = Arc<FileReleaser>;
+pub type WeakFileHandle = Weak<FileReleaser>;
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
@@ -935,16 +937,19 @@ impl FileObject {
         let fs = name.entry.node.fs();
         let kernel = fs.kernel.upgrade().ok_or_else(|| errno!(ENOENT))?;
         let id = FileObjectId(kernel.next_file_object_id.next());
-        let file = FileHandle::new_cyclic(|weak_handle| Self {
-            weak_handle: weak_handle.clone(),
-            id,
-            name,
-            fs,
-            ops,
-            offset: Mutex::new(0),
-            flags: Mutex::new(flags - OpenFlags::CREAT),
-            async_owner: Default::default(),
-            _file_write_guard: file_write_guard,
+        let file = FileHandle::new_cyclic(|weak_handle| {
+            Self {
+                weak_handle: weak_handle.clone(),
+                id,
+                name,
+                fs,
+                ops,
+                offset: Mutex::new(0),
+                flags: Mutex::new(flags - OpenFlags::CREAT),
+                async_owner: Default::default(),
+                _file_write_guard: file_write_guard,
+            }
+            .into()
         });
         file.notify(InotifyMask::OPEN);
         Ok(file)
@@ -1392,10 +1397,12 @@ impl FileObject {
     }
 }
 
-impl Drop for FileObject {
-    fn drop(&mut self) {
-        self.ops().close(self);
-        self.name.entry.node.on_file_closed(self);
+impl Releasable for FileObject {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, _current_task: &CurrentTask) {
+        self.ops().close(&self);
+        self.name.entry.node.on_file_closed(&self);
         let event =
             if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
         self.notify(event);

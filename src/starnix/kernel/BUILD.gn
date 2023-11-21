@@ -217,6 +217,7 @@ rustc_binary("starnix_kernel_bin") {
     "atomic_counter.rs",
     "auth.rs",
     "bpf.rs",
+    "delayed_releaser.rs",
     "device/binder.rs",
     "device/common.rs",
     "device/features.rs",

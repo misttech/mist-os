@@ -35,6 +35,7 @@ mod arch;
 mod atomic_counter;
 mod auth;
 mod bpf;
+mod delayed_releaser;
 mod device;
 mod diagnostics;
 mod drop_notifier;

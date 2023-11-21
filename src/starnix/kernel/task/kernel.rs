@@ -4,6 +4,7 @@
 
 use crate::{
     atomic_counter::{AtomicU32Counter, AtomicU64Counter},
+    delayed_releaser::DelayedReleaser,
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
         BinderDriver, DeviceMode, DeviceOps, DeviceRegistry, Features,
@@ -202,6 +203,11 @@ pub struct Kernel {
 
     // The Fuchsia build version returned by `fuchsia.buildinfo.Provider`.
     pub build_version: OnceCell<String>,
+
+    // The service to handle delayed releases. This is required for elements that requires to
+    // execute some code when released and requires a known context (both in term of lock context,
+    // as well as `CurrentTask`).
+    pub delayed_releaser: DelayedReleaser,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -321,6 +327,7 @@ impl Kernel {
             },
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
+            delayed_releaser: Default::default(),
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

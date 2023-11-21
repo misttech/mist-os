@@ -1177,7 +1177,7 @@ mod test {
         // Set up resources.
         let (input_file, mut touch_source_stream, relay_thread) = start_touch_input();
         let waiter = Waiter::new();
-        let (_kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
+        let (kernel, current_task, file_object) = make_kernel_objects(input_file.clone());
 
         // Ask `input_file` to notify `waiter` when data is available to read.
         input_file.wait_async(
@@ -1188,8 +1188,9 @@ mod test {
             EventHandler::None,
         );
 
-        let waiter_thread = std::thread::spawn(move || waiter.wait(&current_task));
-        assert!(!waiter_thread.is_finished());
+        let mut waiter_thread =
+            kernel.kthreads.spawner().spawn_and_get_result(move |task| waiter.wait(&task));
+        assert!(futures::poll!(&mut waiter_thread).is_pending());
 
         // Reply to first `Watch` request.
         answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
@@ -1203,7 +1204,7 @@ mod test {
         answer_next_watch_request(&mut touch_source_stream, make_touch_event()).await;
 
         // Block until `waiter_thread` completes.
-        waiter_thread.join().expect("join() failed").expect("wait() failed");
+        waiter_thread.await.expect("join() failed").expect("wait() failed");
 
         // Cleanly tear down the `TouchSource` client.
         std::mem::drop(touch_source_stream); // Close Zircon channel.

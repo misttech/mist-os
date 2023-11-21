@@ -656,16 +656,15 @@ mod tests {
     #[::fuchsia::test]
     async fn access_file_system() {
         let (kernel, current_task) = create_kernel_and_task();
+        let fs = TmpFs::new_fs(&kernel);
+
+        let root_handle = serve_file(
+            &current_task,
+            &fs.root().open_anonymous(&current_task, OpenFlags::RDWR).expect("open"),
+        )
+        .expect("serve");
 
         fasync::unblock(move || {
-            let fs = TmpFs::new_fs(&kernel);
-
-            let root_handle = serve_file(
-                &current_task,
-                &fs.root().open_anonymous(&current_task, OpenFlags::RDWR).expect("open"),
-            )
-            .expect("serve");
-
             let root_zxio = Zxio::create(root_handle.into_handle()).expect("create");
 
             assert_directory_content(&root_zxio, &[b"."]);

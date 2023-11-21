@@ -86,6 +86,8 @@ pub fn execute_syscall(
             dispatch_syscall(locked, current_task, &syscall)
         };
 
+    current_task.trigger_delayed_releaser();
+
     match result {
         Ok(return_value) => {
             log_trace!("-> {:#x}", return_value.value());

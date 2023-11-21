@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    delayed_releaser::FileReleaser,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
@@ -35,6 +36,8 @@ use zerocopy::AsBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
 
+type FileHandleKey = WeakKey<FileReleaser>;
+
 // InotifyFileObject represents an inotify instance created by inotify_init(2) or inotify_init1(2).
 pub struct InotifyFileObject {
     state: Mutex<InotifyState>,
@@ -58,7 +61,7 @@ pub struct InotifyWatcher {
 
 #[derive(Default)]
 pub struct InotifyWatchers {
-    watchers: Mutex<HashMap<WeakKey<FileObject>, InotifyWatcher>>,
+    watchers: Mutex<HashMap<FileHandleKey, InotifyWatcher>>,
 }
 
 #[derive(Default)]
@@ -378,7 +381,7 @@ impl InotifyEvent {
 }
 
 impl InotifyWatchers {
-    fn add(&self, mask: InotifyMask, watch_id: WdNumber, inotify: WeakKey<FileObject>) {
+    fn add(&self, mask: InotifyMask, watch_id: WdNumber, inotify: FileHandleKey) {
         let mut watchers = self.watchers.lock();
         watchers.insert(inotify, inotify::InotifyWatcher { watch_id, mask });
     }
@@ -392,7 +395,7 @@ impl InotifyWatchers {
     fn maybe_update(
         &self,
         mask: InotifyMask,
-        inotify: &WeakKey<FileObject>,
+        inotify: &FileHandleKey,
     ) -> Result<Option<WdNumber>, Errno> {
         let combine_existing = mask.contains(InotifyMask::MASK_ADD);
         let create_new = mask.contains(InotifyMask::MASK_CREATE);
@@ -417,14 +420,20 @@ impl InotifyWatchers {
         }
     }
 
-    fn remove(&self, inotify: &WeakKey<FileObject>) {
+    fn remove(&self, inotify: &FileHandleKey) {
         let mut watchers = self.watchers.lock();
         watchers.remove(inotify);
     }
 
     fn remove_by_ref(&self, inotify: &FileObject) {
         let mut watchers = self.watchers.lock();
-        watchers.retain(|weak_key, _| weak_key.0.as_ptr() != inotify as *const _);
+        watchers.retain(|weak_key, _| {
+            if let Some(handle) = weak_key.0.upgrade() {
+                !std::ptr::eq(handle.as_ref().as_ref(), inotify)
+            } else {
+                false
+            }
+        })
     }
 
     /// Notifies all watchers that listen for the specified event mask with
