@@ -177,7 +177,7 @@ and usable as a [documentation widget][documentation-widgets].
 
 <!-- xrefs -->
 
-[glossary-yaml]: /docs/glossary/glossary.yaml
+[glossary-yaml]: /docs/glossary/_glossary.yaml
 [glossary-index]: /docs/glossary/README.md
 [documentation-widgets]: /docs/contribute/docs/widgets.md
 

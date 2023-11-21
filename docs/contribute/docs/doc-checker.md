@@ -221,7 +221,7 @@ This file defines the redirection rules for deprecated documents.
 
 See: [Redirect the pages to the deprecation notice](/docs/contribute/docs/deprecating-docs.md#redirect_the_pages_to_the_deprecation_notice).
 
-### Structure of glossary.yaml
+### Structure of _glossary.yaml
 
 This file defines the glossary of Fuchsia terminology.
 

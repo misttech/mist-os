@@ -185,7 +185,7 @@ Note: When using the widgets in Jinja2 there are additional parameters available
         <td><code>term</code></td>
         <td><b>Required</b><br>Specify a term that is defined
           in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-          glossary.yaml</a> file.</td>
+          _glossary.yaml</a> file.</td>
       </tr>
     </tbody>
   </table>
@@ -201,7 +201,7 @@ Note: When using the widgets in Jinja2 there are additional parameters available
         <td><code>term</code></td>
         <td><b>Required</b><br>Specify a term that is defined
           in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-          glossary.yaml</a> file.</td>
+          _glossary.yaml</a> file.</td>
       </tr>
       <tr>
         <td><code>display_name</code></td>
@@ -291,7 +291,7 @@ Note: The parameters for markdown and Jinja2 are the same.
       <td><code>term</code></td>
       <td><b>Required</b><br>Specify a term that is defined
         in the <a href="{{fuchsia_editor }}{{ glossary_file }}">
-        glossary.yaml</a> file.</td>
+        _glossary.yaml</a> file.</td>
     </tr>
     <tr>
         <td><code>display_name</code></td>
@@ -304,6 +304,6 @@ Note: The parameters for markdown and Jinja2 are the same.
 <!-- xrefs -->
 
 [doc-widgets]: /docs/_common/_doc_widgets.md
-[glossary-yaml]: /docs/glossary/glossary.yaml
+[glossary-yaml]: /docs/glossary/_glossary.yaml
 [jinja-macros]: https://jinja.palletsprojects.com/en/2.11.x/templates/#macros
 [glossary-add]: /docs/contribute/docs/glossary-entries.md
