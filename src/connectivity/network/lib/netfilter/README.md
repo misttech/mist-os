@@ -16,7 +16,7 @@
 
 ## Regular Rule Syntax
   ```
-  action direction ["proto" proto]
+  action direction ["proto" proto] ["devclass" devclass]
      ["from" [["!"]src_subnet] [src_port]]
      ["to" [["!"]dst_subnet] [dst_port]] [log] [state] ";"
   ```
@@ -32,6 +32,13 @@
   * proto (optional)
 
     "tcp", "udp", or "icmp".
+
+  * devclass (optional)
+
+    "virtual", "ethernet", "wlan", "ppp", "bridge", "ap"
+
+    The device class to which this rule applies. If omitted, any
+    class of interface can match.
 
   * src\_subnet, dst\_subnet (optional)
 

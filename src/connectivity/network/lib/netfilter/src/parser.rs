@@ -6,6 +6,7 @@ use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
 
+use fidl_fuchsia_hardware_network as fhnet;
 use fidl_fuchsia_net as net;
 use fidl_fuchsia_net_filter_deprecated as filter;
 
@@ -17,6 +18,7 @@ rule = {
      action ~
      direction ~
      proto ~
+     devclass ~
      src ~
      dst ~
      log ~
@@ -56,6 +58,14 @@ proto = { ("proto" ~ (tcp | udp | icmp))? }
   tcp = { "tcp" }
   udp = { "udp" }
   icmp = { "icmp" }
+
+devclass = { ("devclass" ~ (virt | ethernet | wlan | ppp | bridge | ap))? }
+  virt = { "virt" }
+  ethernet = { "ethernet" }
+  wlan = { "wlan" }
+  ppp = { "ppp" }
+  bridge = { "bridge" }
+  ap = { "ap" }
 
 src = { ("from" ~ invertible_subnet? ~ port_range?)? }
 dst = { ("to" ~ invertible_subnet? ~ port_range?)? }
@@ -153,6 +163,22 @@ fn parse_proto(pair: Pair<'_, Rule>) -> filter::SocketProtocol {
             _ => unreachable!(),
         },
         None => filter::SocketProtocol::Any,
+    }
+}
+
+fn parse_devclass(pair: Pair<'_, Rule>) -> filter::DeviceClass {
+    assert_eq!(pair.as_rule(), Rule::devclass);
+    match pair.into_inner().next() {
+        Some(pair) => match pair.as_rule() {
+            Rule::virt => filter::DeviceClass::Match_(fhnet::DeviceClass::Virtual),
+            Rule::ethernet => filter::DeviceClass::Match_(fhnet::DeviceClass::Ethernet),
+            Rule::wlan => filter::DeviceClass::Match_(fhnet::DeviceClass::Wlan),
+            Rule::ppp => filter::DeviceClass::Match_(fhnet::DeviceClass::Ppp),
+            Rule::bridge => filter::DeviceClass::Match_(fhnet::DeviceClass::Bridge),
+            Rule::ap => filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
+            _ => unreachable!(),
+        },
+        None => filter::DeviceClass::Any(filter::Empty {}),
     }
 }
 
@@ -285,6 +311,7 @@ fn parse_rule(pair: Pair<'_, Rule>) -> Result<filter::Rule, Error> {
     let action = parse_action(pairs.next().unwrap());
     let direction = parse_direction(pairs.next().unwrap());
     let proto = parse_proto(pairs.next().unwrap());
+    let device_class = parse_devclass(pairs.next().unwrap());
     let (src_subnet, src_subnet_invert_match, src_port_range) = parse_src(pairs.next().unwrap())?;
     let (dst_subnet, dst_subnet_invert_match, dst_port_range) = parse_dst(pairs.next().unwrap())?;
     let log = parse_log(pairs.next().unwrap());
@@ -303,7 +330,7 @@ fn parse_rule(pair: Pair<'_, Rule>) -> Result<filter::Rule, Error> {
         nic: 0, // TODO: Support NICID (currently always 0 (= any))
         log: log,
         keep_state: keep_state,
-        device_class: filter::DeviceClass::Any(filter::Empty {}),
+        device_class: device_class,
     })
 }
 
@@ -795,6 +822,28 @@ mod test {
                 log: false,
                 keep_state: true,
                 device_class: filter::DeviceClass::Any(filter::Empty {}),
+            }])
+        );
+    }
+
+    #[test]
+    fn test_rule_with_device_class() {
+        assert_eq!(
+            parse_str_to_rules("pass in proto tcp devclass ap;"),
+            Ok(vec![filter::Rule {
+                action: filter::Action::Pass,
+                direction: filter::Direction::Incoming,
+                proto: filter::SocketProtocol::Tcp,
+                src_subnet: None,
+                src_subnet_invert_match: false,
+                src_port_range: filter::PortRange { start: 0, end: 0 },
+                dst_subnet: None,
+                dst_subnet_invert_match: false,
+                dst_port_range: filter::PortRange { start: 0, end: 0 },
+                nic: 0,
+                log: false,
+                keep_state: false,
+                device_class: filter::DeviceClass::Match_(fhnet::DeviceClass::WlanAp),
             }])
         );
     }

@@ -10,6 +10,7 @@ rustc_library("netfilter") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.network:fuchsia.hardware.network_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
     "//src/lib/fidl/rust/fidl",
