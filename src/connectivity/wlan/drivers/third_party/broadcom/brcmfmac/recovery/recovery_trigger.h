@@ -35,13 +35,11 @@ class RecoveryTrigger {
   // List the trigger condition objects here.
   TriggerCondition firmware_crash_;
   TriggerCondition sdio_timeout_;
-  TriggerCondition ctrl_frame_response_timeout_;
 
   // Limits of the occurrence of trigger conditions. This value is 1 means that the recovery should
   // be trigger immediately when being updated.
   static constexpr uint32_t kFirmwareCrashThreshold = 1;
   static constexpr uint16_t kSdioTimeoutThreshold = 5;
-  static constexpr uint16_t kCtrlFrameResponseTimeoutThreshold = 5;
 };
 
 }  // namespace wlan::brcmfmac

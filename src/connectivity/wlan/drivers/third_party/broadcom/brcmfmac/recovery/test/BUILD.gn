@@ -11,7 +11,7 @@
 # NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE
 # OF THIS SOFTWARE.
 
-import("//build/components.gni")
+import("//build/test/test_package.gni")
 
 executable("recovery_trigger_test") {
   output_name = "recovery_trigger_test"
@@ -21,17 +21,17 @@ executable("recovery_trigger_test") {
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac:core",
     "//src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/recovery",
     "//src/connectivity/wlan/lib/common/cpp:common",
-    "//src/devices/testing/mock-ddk",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/sync",
   ]
 }
 
-fuchsia_unittest_package("brcmfmac_recovery_test") {
+unittest_package("brcmfmac_recovery_test") {
+  package_name = "brcmfmac-recovery-test"
   deps = [ ":recovery_trigger_test" ]
-  test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
+  tests = [
+    {
+      name = "recovery_trigger_test"
+    },
+  ]
 }

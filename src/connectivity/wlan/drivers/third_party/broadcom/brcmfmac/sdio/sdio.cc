@@ -2606,16 +2606,8 @@ zx_status_t brcmf_sdio_bus_txctl(brcmf_bus* bus_if, unsigned char* msg, uint msg
           "operation timed out.");
     });
     bus->sdcnt.tx_ctlerrs++;
-
-    zx_status_t err = sdiodev->drvr->recovery_trigger->ctrl_frame_response_timeout_.Inc();
-    if (err != ZX_OK) {
-      BRCMF_WARN("Failed to trigger, recovery likely in progress - status: %s",
-                 zx_status_get_string(err));
-    }
     return wait_status;
   }
-
-  sdiodev->drvr->recovery_trigger->ctrl_frame_response_timeout_.Clear();
 
   zx_status_t status = ZX_OK;
   brcmf_sdio_if_ctrl_frame_stat_set(bus, [&status]() { status = ZX_ERR_SHOULD_WAIT; });
