@@ -11,13 +11,12 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
-      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
       "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
       "//src/developer/ffx/config:lib",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/protocols:lib",
+      "//src/developer/ffx/lib/rcs:lib",
       "//src/developer/ffx/lib/tasks:lib",
-      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-async",
       "//src/lib/network/fidl_fuchsia_net_ext",
       "//third_party/rust_crates:anyhow",
@@ -27,6 +26,13 @@ if (is_host) {
       "//third_party/rust_crates:serde",
       "//third_party/rust_crates:serde_json",
       "//third_party/rust_crates:tracing",
+    ]
+
+    test_deps = [
+      "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+      "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+      "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
+      "//src/lib/fidl/rust/fidl",
     ]
 
     sources = [ "src/lib.rs" ]
