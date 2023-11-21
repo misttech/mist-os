@@ -1807,7 +1807,7 @@ impl ResolvedInstanceState {
         for child in &children {
             let child_name = Name::new(&child.name).unwrap();
             let child_dict = child_dicts.remove(&child_name).expect("missing child dict");
-            self.add_child(component, child, None, None, None, child_dict).await.map_err(
+            let _ = self.add_child(component, child, None, None, None, child_dict).await.map_err(
                 |err| ResolveActionError::AddStaticChildError {
                     child_name: child.name.to_string(),
                     err,

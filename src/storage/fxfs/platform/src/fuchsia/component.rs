@@ -571,7 +571,7 @@ mod tests {
 
     #[fuchsia::test(threads = 2)]
     async fn test_create_and_remove() {
-        run_test(|client, _| {
+        let _ = run_test(|client, _| {
             let volumes_proxy = connect_to_protocol_at_dir_svc::<VolumesMarker>(client)
                 .expect("Unable to connect to Volumes protocol");
 
@@ -637,7 +637,7 @@ mod tests {
 
     #[fuchsia::test(threads = 2)]
     async fn test_volumes_enumeration() {
-        run_test(|client, _| {
+        let _ = run_test(|client, _| {
             let volumes_proxy = connect_to_protocol_at_dir_svc::<VolumesMarker>(client)
                 .expect("Unable to connect to Volumes protocol");
 

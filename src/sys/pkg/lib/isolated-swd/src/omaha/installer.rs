@@ -47,7 +47,7 @@ impl Installer for IsolatedInstaller {
         observer: Option<&'a dyn ProgressObserver>,
     ) -> LocalBoxFuture<'_, (Self::InstallResult, Vec<AppInstallResult<Self::Error>>)> {
         if let Some(o) = observer.as_ref() {
-            o.receive_progress(None, 0., None, None);
+            let _ = o.receive_progress(None, 0., None, None);
         }
 
         async move {
@@ -72,7 +72,7 @@ impl Installer for IsolatedInstaller {
                 .await
                 .map_err(IsolatedInstallError::Failure)?;
             if let Some(o) = observer.as_ref() {
-                o.receive_progress(None, 1., None, None);
+                let _ = o.receive_progress(None, 1., None, None);
             }
             Ok(())
         }

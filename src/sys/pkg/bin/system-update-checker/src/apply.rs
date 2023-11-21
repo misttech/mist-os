@@ -240,7 +240,7 @@ mod test_apply_system_update_impl {
     async fn test_call_installer() {
         let mut update_installer = WasCalledUpdateInstaller { was_called: false };
 
-        apply_system_update_impl(
+        let _ = apply_system_update_impl(
             TEST_DEFAULT_UPDATE_URL,
             &mut update_installer,
             Initiator::User,
@@ -284,7 +284,7 @@ mod test_apply_system_update_impl {
     async fn test_call_install_with_right_arguments() {
         let mut update_installer = ArgumentCapturingUpdateInstaller::default();
 
-        apply_system_update_impl(
+        let _ = apply_system_update_impl(
             TEST_DEFAULT_UPDATE_URL,
             &mut update_installer,
             Initiator::User,
@@ -313,7 +313,7 @@ mod test_apply_system_update_impl {
         let mut update_installer = ArgumentCapturingUpdateInstaller::default();
 
         let target_url = "fuchsia-pkg://fuchsia.test/my-update";
-        apply_system_update_impl(
+        let _ = apply_system_update_impl(
             TEST_DEFAULT_UPDATE_URL,
             &mut update_installer,
             Initiator::User,

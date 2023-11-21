@@ -54,7 +54,7 @@ async fn start_tool_impl(tool: StartTool) -> Result<()> {
         None
     };
 
-    start_instance(&lifecycle_controller, &moniker)
+    let _ = start_instance(&lifecycle_controller, &moniker)
         .await
         .map_err(|e| format_start_error(&moniker, e))?;
 

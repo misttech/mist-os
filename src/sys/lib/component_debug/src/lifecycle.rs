@@ -503,7 +503,7 @@ mod test {
     async fn test_start() {
         let moniker = Moniker::parse_str("core/foo").unwrap();
         let lc = lifecycle_start("core/foo");
-        start_instance(&lc, &moniker).await.unwrap();
+        let _ = start_instance(&lc, &moniker).await.unwrap();
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
