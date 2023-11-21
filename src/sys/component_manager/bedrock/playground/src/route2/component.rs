@@ -7,7 +7,7 @@ use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
-use sandbox::{AsRouter, Capability, Data, Dict, Request, Router};
+use sandbox::{AsRouter, Capability, Data, Dict, Open, Request, Router};
 use std::{
     collections::HashMap,
     fmt,
@@ -288,7 +288,18 @@ impl fmt::Debug for Resolver {
 mod test {
     use super::*;
     use anyhow::Context;
+    use fidl::endpoints::ClientEnd;
+    use fidl_fidl_examples_routing_echo::{EchoMarker, EchoRequest, EchoRequestStream};
+    use fidl_fuchsia_io as fio;
+    use fuchsia_async as fasync;
+    use futures::{channel::mpsc, StreamExt};
     use moniker::MonikerBase;
+    use serve_processargs::{ignore_not_found, NamespaceBuilder};
+    use vfs::{
+        directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
+        execution_scope::ExecutionScope,
+        service,
+    };
 
     async fn build_test_topology(
         availability_a: Availability,
@@ -458,5 +469,227 @@ mod test {
         try_route(Availability::Transitional, Availability::Transitional, Availability::Optional)
             .await
             .unwrap_err();
+    }
+
+    async fn echo_server(mut requests: EchoRequestStream) {
+        loop {
+            match requests.next().await {
+                None => break,
+                Some(Err(err)) => {
+                    panic!("echo_server(): failed to receive a message: {}", err);
+                }
+                Some(Ok(EchoRequest::EchoString { value, responder })) => {
+                    responder
+                        .send(value.as_ref().map(|s| &**s))
+                        .expect("echo_server(): responder.send() failed");
+                }
+            }
+        }
+    }
+
+    /// Tests the integration with a fuchsia.io outgoing directory.
+    ///
+    /// It builds the following topology:
+    ///
+    ///           root
+    ///          /    \
+    ///     child_a   child_b
+    ///
+    /// child_a will expose a protocol named `fuchsia.echo.Echo`, located at the path
+    /// `/svc/echo` in the outgoing directory of the program of child_a, for simplicity.
+    ///
+    /// child_b will use the `fuchsia.echo.Echo` protocol, located at the path
+    /// `/svc/echo2` in the incoming namespace of the program of child_b, to show that
+    /// these paths are independent.
+    #[fuchsia::test]
+    async fn test_expose_protocol_from_outgoing_directory() -> Result<()> {
+        // child_a exposes capability "fuchsia.echo.Echo"
+        let child_a_decl = decl::Component {
+            uses: Vec::new(),
+            offers: Vec::new(),
+            exposes: vec![decl::Expose {
+                name: "fuchsia.echo.Echo".to_string(),
+                from: decl::Ref::Hammerspace,
+                availability: Availability::Required,
+            }],
+            children: Vec::new(),
+        };
+
+        // child_b uses "fuchsia.echo.Echo" from parent
+        let child_b_decl = decl::Component {
+            uses: vec![decl::Use {
+                name: "fuchsia.echo.Echo".to_string(),
+                from: decl::Ref::Parent,
+                availability: Availability::Required,
+            }],
+            offers: Vec::new(),
+            exposes: Vec::new(),
+            children: Vec::new(),
+        };
+
+        // root offers "fuchsia.echo.Echo" from child_a to child_b.
+        let root_decl = decl::Component {
+            uses: Vec::new(),
+            offers: vec![decl::Offer {
+                name: "fuchsia.echo.Echo".to_string(),
+                from: decl::Ref::Child("child_a".to_string()),
+                to: decl::Ref::Child("child_b".to_string()),
+                availability: decl::Availability::SameAsTarget,
+            }],
+            exposes: Vec::new(),
+            children: vec![
+                decl::Child { name: "child_a".to_string() },
+                decl::Child { name: "child_b".to_string() },
+            ],
+        };
+
+        let resolver = move |name: &str| -> decl::Component {
+            match name {
+                "root" => root_decl.clone(),
+                "child_a" => child_a_decl.clone(),
+                "child_b" => child_b_decl.clone(),
+                _ => panic!("unknown component {name}"),
+            }
+        };
+        let resolver = Resolver(Arc::new(resolver));
+
+        let (child_b_started_sender, child_b_started) = oneshot::channel();
+        let child_b_started_sender = Arc::new(Mutex::new(Some(child_b_started_sender)));
+
+        // The runner in this test is a function that takes the name and input `Dict` of the
+        // program to run, then returns an output `Router`.
+        let runner = move |name: &str, input: Dict| -> Router {
+            match name {
+                "root" => Dict::new().as_router(),
+                "child_a" => {
+                    // Serve an outgoing directory in child_a that contains:
+                    //
+                    // - /svc
+                    // -    /echo -> an echo protocol
+                    //
+                    let root = pfs::simple();
+                    let svc = pfs::simple();
+                    let echo = service::host(echo_server);
+                    svc.add_entry("echo", echo).unwrap();
+                    root.add_entry("svc", svc).unwrap();
+
+                    let scope = ExecutionScope::new();
+                    let (outgoing, server_end) = fidl::endpoints::create_endpoints();
+                    root.open(
+                        scope,
+                        fio::OpenFlags::RIGHT_READABLE,
+                        ".".try_into().unwrap(),
+                        server_end,
+                    );
+                    let outgoing: ClientEnd<fio::DirectoryMarker> = outgoing.into_channel().into();
+
+                    // Represent the outgoing directory of this program as an Open.
+                    let outgoing = Open::from(outgoing);
+
+                    // Create an Open that opens `svc/echo` from the outgoing directory. The
+                    // "svc/echo" corresponds to the "path" field of an ExposeDecl
+                    // (program interface).
+                    let echo = outgoing.downscope_path(sandbox::Path::new("svc/echo"));
+
+                    // Add the Open to the output dictionary. "fuchsia.echo.Echo" is the name of
+                    // the capability in the output dictionary of the component
+                    // (component-to-component interface).
+                    let mut output = Dict::new();
+                    output.entries.insert("fuchsia.echo.Echo".to_string(), Box::new(echo));
+                    output.as_router()
+                }
+                "child_b" => {
+                    let sender = child_b_started_sender.clone().lock().unwrap().take().unwrap();
+
+                    // Given the input dict of the child_b component, make a namespace for a
+                    // hypothetical child_b program, then send it to the main test function.
+                    let input = input.as_router();
+                    let (errors, errors_receiver) = mpsc::unbounded();
+
+                    // Makes an Open that will request the `fuchsia.echo.Echo` capability
+                    // from the `input` router every time someone opens it.
+                    //
+                    // This corresponds to a UseDecl that uses "fuchsia.echo.Echo" from the
+                    // input dictionary (component-to-component contract).
+                    let echo = input.into_open(
+                        Request {
+                            rights: None,
+                            relative_path: sandbox::Path::new("fuchsia.echo.Echo"),
+                            target_moniker: Moniker::try_from(vec!["child_b"]).unwrap(),
+                            availability: Availability::Required,
+                        },
+                        fio::DirentType::Service,
+                        errors,
+                    );
+
+                    // Install the Open into a namespace. The "/svc/echo2" corresponds to the
+                    // "path" in a UseDecl (program contract).
+                    let mut namespace = NamespaceBuilder::new(ignore_not_found());
+                    namespace
+                        .add_object(
+                            Box::new(echo),
+                            &namespace::Path::try_from("/svc/echo2").unwrap(),
+                        )
+                        .unwrap();
+                    sender.send(namespace.serve().unwrap()).map_err(|_| ()).unwrap();
+
+                    // Log errors when routing capabilities.
+                    fasync::Task::spawn(async move {
+                        let mut errors_receiver = errors_receiver;
+                        while let Some(err) = errors_receiver.next().await {
+                            tracing::error!("Error during routing: {err}");
+                        }
+                    })
+                    .detach();
+
+                    // child_b outputs no capabilities.
+                    Dict::new().as_router()
+                }
+                _ => panic!("unknown program {name}"),
+            }
+        };
+        let runner = Runner(Arc::new(runner));
+
+        let mut root_input = Dict::new();
+        root_input.entries.insert("resolver".to_string(), Box::new(Data::new(resolver.clone())));
+        root_input.entries.insert("runner".to_string(), Box::new(Data::new(runner.clone())));
+
+        // Resolve the root component.
+        let root = Component::new("root".to_string(), resolver.clone());
+        root.set_input(root_input);
+        let _router = root.resolve();
+
+        // Resolve and run child_b.
+        match root.state.lock().unwrap().deref() {
+            ComponentState::MissingInput | ComponentState::Unresolved(_) => {
+                panic!("should be resolved")
+            }
+            ComponentState::Resolved(ref resolved) => {
+                let child_b = resolved.children.get("child_b").unwrap();
+                child_b.start();
+            }
+        }
+
+        // Obtain the namespace of child_b when it is started.
+        let (namespace, fut) = child_b_started.await.context("should receive one start request")?;
+
+        // Serve the namespace in the background.
+        fasync::Task::spawn(fut).detach();
+
+        // Connect to "/svc/echo2" in the namespace.
+        // We should reach the `echo_server` in child_a.
+        let mut entries = namespace.flatten();
+        assert_eq!(entries.len(), 1);
+        let svc = entries.pop().unwrap();
+        assert_eq!(svc.path.as_str(), "/svc");
+        let svc = svc.directory;
+        let echo = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<EchoMarker>(
+            &svc, "echo2",
+        )
+        .unwrap();
+
+        assert_eq!(echo.echo_string(Some("hello")).await.unwrap().unwrap(), "hello");
+
+        Ok(())
     }
 }

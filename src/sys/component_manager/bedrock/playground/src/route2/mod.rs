@@ -10,10 +10,22 @@
 //!
 //! ## Why router?
 //!
-//! - Every capability is not only lazy, but also changes with each unresolve/resolve.
-//! - If you got an output dictionary from a component, and that component got unresolved
-//!   and re-resolved, what happens to the output dictionary? The router design avoids
-//!   having to deal with this question.
+//! Every capability is not only lazy, but also changes with each unresolve/resolve.
+//!
+//! - The output of capability routing today is not really the underlying capabilities,
+//! but a route (factory) to get a capability.
+//!
+//! - On unresolve/resolve, it's the route that changes - e.g. it can break if the source
+//! component is destroyed, get routed to a different source, or apply a new
+//! transformation like if the decl specifies a different subdir or availability.
+//!
+//! - The capability that travels through the route can change as a result of the new
+//! route. e.g. an optional capability may be None if the route now points to void.
+//!
+//! If you got an output dictionary from a component, and that component got unresolved
+//! and re-resolved, what happens to the output dictionary? The router design avoids
+//! having to deal with this question, as the consumer never gets hold of the output
+//! directory directly, but instead interacts with it via the router.
 //!
 //! ## Data flow
 //!
@@ -24,6 +36,8 @@
 //! ```
 //!
 //! ## A hypothetical interfacing with CFv2 runners
+//!
+//! ### Providing capabilities to the program
 //!
 //! When starting the program, we need to do these:
 //!
@@ -56,6 +70,16 @@
 //! Open::new(open_fn)
 //! ```
 //!
+//! ### Exposing capabilities from the program
+//!
+//! The output the program will be represented by a [`Dict`] of capabilities.
+//! Each key corresponds to the name of the capability (e.g. `fuchsia.echo.Echo`). Each value
+//! will be a capability that will open an appropriate path within the outgoing directory of
+//! the program, itself represented by an [`Open`].
+//!
+//! A router is obtained from this [`Dict`].
+//!
+//! The parent will then set up routes from this program the same way as it does for components.
 
 pub mod component;
 pub mod program;

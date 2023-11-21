@@ -24,12 +24,14 @@ rustc_test("bin") {
     "//examples/components/routing/fidl:echo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/lib/replace-with",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/lib/cm_types",
@@ -39,6 +41,7 @@ rustc_test("bin") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:thiserror",
+    "//third_party/rust_crates:tracing",
   ]
 
   sources = [

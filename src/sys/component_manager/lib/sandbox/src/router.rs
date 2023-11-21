@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 use anyhow::{anyhow, Context, Result};
 use cm_types::Availability;
+use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::{
-    channel::oneshot::{self, Canceled},
+    channel::{
+        mpsc::UnboundedSender,
+        oneshot::{self, Canceled},
+    },
     future::BoxFuture,
     Future,
 };
 use moniker::Moniker;
 use std::{collections::VecDeque, fmt, sync::Arc};
+use vfs::execution_scope::ExecutionScope;
 
-use crate::{AnyCapability, Capability, CloneError};
+use crate::{AnyCapability, Capability, CloneError, Open};
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
 /// asynchronously using a request that traverses through the component topology.
@@ -31,6 +36,7 @@ pub struct Router {
 pub type RouteFn = dyn Fn(Request, Completer) -> () + Send + Sync;
 
 /// [`Request`] contains metadata around how to obtain a capability.
+#[derive(Debug, Clone)]
 pub struct Request {
     /// If the capability supports fuchsia.io rights attenuation,
     /// requests to access an attenuated capability with the specified rights.
@@ -154,6 +160,65 @@ impl Router {
         };
         Router::new(route_fn)
     }
+
+    /// Converts the [Router] capability into an [Open] capability such that open requests
+    /// will be fulfilled via the specified `request` on the router.
+    ///
+    /// `entry_type` is the type of the entry when the `Open` is accessed through a `fuchsia.io`
+    /// connection.
+    ///
+    /// When routing failed while exercising the returned [Open] capability, errors will be
+    /// sent to `errors`.
+    pub fn into_open(
+        self,
+        request: Request,
+        entry_type: fio::DirentType,
+        errors: UnboundedSender<anyhow::Error>,
+    ) -> Open {
+        let router = self.clone();
+        let errors = Arc::new(errors);
+        Open::new(
+            move |scope: ExecutionScope,
+                  flags: fio::OpenFlags,
+                  relative_path: vfs::path::Path,
+                  server_end: zx::Channel| {
+                let request = request.clone();
+                let router = router.clone();
+                let scope_clone = scope.clone();
+                let errors = errors.clone();
+                scope.spawn(async move {
+                    // Request a capability from the `router`.
+                    let router = router;
+                    let result = route(&router, request).await;
+                    match result {
+                        Ok(capability) => {
+                            // Connect to the capability by converting it into `Open`, then open it.
+                            let open: Result<Open, _> = capability.try_into();
+                            match open {
+                                Ok(open) => {
+                                    open.open(scope_clone, flags, relative_path, server_end);
+                                }
+                                Err(error) => {
+                                    // Capabilities that don't support opening, such as a Handle
+                                    // capability, can fail and get logged here. We can also model
+                                    // a Void source this way.
+                                    let _ = errors.unbounded_send(error.into());
+                                    let _ =
+                                        server_end.close_with_epitaph(zx::Status::NOT_SUPPORTED);
+                                }
+                            }
+                        }
+                        Err(error) => {
+                            // Routing failed (e.g. broken route).
+                            let _ = errors.unbounded_send(error);
+                            let _ = server_end.close_with_epitaph(zx::Status::UNAVAILABLE);
+                        }
+                    }
+                })
+            },
+            entry_type,
+        )
+    }
 }
 
 impl From<&AnyCapability> for Router {
@@ -215,7 +280,7 @@ impl AsRouter for Router {
     }
 }
 
-/// Generic routing function.
+/// Obtain a capability from `router`, following the description in `request`.
 pub async fn route(router: &Router, request: Request) -> Result<AnyCapability> {
     let (fut, completer) = Completer::new();
     router.route(request, completer);
