@@ -9,7 +9,7 @@ use super::{Procedure, ProcedureMarker};
 
 use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
 use crate::peer::indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
-use crate::peer::service_level_connection::SharedState;
+use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[derive(Debug)]
 pub enum Stages {
@@ -24,6 +24,7 @@ pub enum Stages {
     HfIndicatorEnable,
 }
 
+#[derive(Debug)]
 pub struct SlcInitProcedure {
     terminated: bool,
     state: Stages,
@@ -53,9 +54,9 @@ impl Procedure for SlcInitProcedure {
     /// Checks for sequential ordering of commands by first checking the
     /// stage the SLCI is in and then extract important data from AG responses
     /// and proceed to next stage if necessary.
-    fn ag_update(
+    fn transition(
         &mut self,
-        state: &mut SharedState,
+        state: &mut ProcedureManipulatedState,
         update: &Vec<at::Response>,
     ) -> Result<Vec<at::Command>, Error> {
         if self.is_terminated() {
@@ -263,7 +264,7 @@ mod tests {
     fn slci_mandatory_exchanges_and_termination() {
         let mut procedure = SlcInitProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
@@ -272,12 +273,12 @@ mod tests {
             at::Response::Ok,
         ];
         let expected_command1 = vec![at::Command::CindTest {}];
-        assert_eq!(procedure.ag_update(&mut state, &response1).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), expected_command1);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = vec![at::Response::RawBytes(indicator_msg), at::Response::Ok];
         let expected_command2 = vec![at::Command::CindRead {}];
-        assert_eq!(procedure.ag_update(&mut state, &response2).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), expected_command2);
 
         let response3 = vec![
             at::Response::Success(at::Success::Cind {
@@ -293,11 +294,11 @@ mod tests {
         ];
         let update3 =
             vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
-        assert_eq!(procedure.ag_update(&mut state, &response3).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), update3);
 
         let response4 = vec![at::Response::Ok];
         let update4 = Vec::<at::Command>::new();
-        assert_eq!(procedure.ag_update(&mut state, &response4).unwrap(), update4);
+        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), update4);
 
         assert!(procedure.is_terminated());
     }
@@ -310,7 +311,7 @@ mod tests {
         let mut ag_features = AgFeatures::default();
         hf_features.set(HfFeatures::HF_INDICATORS, true);
         ag_features.set(AgFeatures::HF_INDICATORS, true);
-        let mut state = SharedState::load_with_set_features(hf_features, ag_features);
+        let mut state = ProcedureManipulatedState::load_with_set_features(hf_features, ag_features);
 
         assert!(!state.hf_indicators.enhanced_safety.1);
         assert!(!state.hf_indicators.battery_level.1);
@@ -324,14 +325,14 @@ mod tests {
         ];
         let expected_command1 = vec![at::Command::CindTest {}];
 
-        assert_eq!(procedure.ag_update(&mut state, &response1).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), expected_command1);
         assert_matches!(procedure.state, Stages::ListIndicators);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = vec![at::Response::RawBytes(indicator_msg), at::Response::Ok];
         let expected_command2 = vec![at::Command::CindRead {}];
 
-        assert_eq!(procedure.ag_update(&mut state, &response2).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), expected_command2);
         assert_matches!(procedure.state, Stages::EnableIndicators);
 
         let response3 = vec![
@@ -349,19 +350,19 @@ mod tests {
         let expected_command3 =
             vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
 
-        assert_eq!(procedure.ag_update(&mut state, &response3).unwrap(), expected_command3);
+        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), expected_command3);
         assert_matches!(procedure.state, Stages::IndicatorStatusUpdate);
 
         let response4 = vec![at::Response::Ok];
         let expected_command4 = vec![at::Command::Bind {
             indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64],
         }];
-        assert_eq!(procedure.ag_update(&mut state, &response4).unwrap(), expected_command4);
+        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), expected_command4);
         assert_matches!(procedure.state, Stages::HfIndicator);
 
         let response5 = vec![at::Response::Ok];
         let expected_command5 = vec![at::Command::BindTest {}];
-        assert_eq!(procedure.ag_update(&mut state, &response5).unwrap(), expected_command5);
+        assert_eq!(procedure.transition(&mut state, &response5).unwrap(), expected_command5);
         assert_matches!(procedure.state, Stages::HfIndicatorRequest);
 
         let response6 = vec![
@@ -374,7 +375,7 @@ mod tests {
             at::Response::Ok,
         ];
         let expected_command6 = vec![at::Command::BindRead {}];
-        assert_eq!(procedure.ag_update(&mut state, &response6).unwrap(), expected_command6);
+        assert_eq!(procedure.transition(&mut state, &response6).unwrap(), expected_command6);
         assert!(state.hf_indicators.enhanced_safety.1);
         assert!(state.hf_indicators.battery_level.1);
         assert_matches!(procedure.state, Stages::HfIndicatorEnable);
@@ -391,7 +392,7 @@ mod tests {
             at::Response::Ok,
         ];
         let expected_command7 = Vec::<at::Command>::new();
-        assert_eq!(procedure.ag_update(&mut state, &response7).unwrap(), expected_command7);
+        assert_eq!(procedure.transition(&mut state, &response7).unwrap(), expected_command7);
         assert!(state.hf_indicators.enhanced_safety.0.enabled);
         assert!(state.hf_indicators.battery_level.0.enabled);
         assert!(procedure.is_terminated());
@@ -404,7 +405,7 @@ mod tests {
         hf_features.set(HfFeatures::CODEC_NEGOTIATION, true);
         let mut ag_features = AgFeatures::default();
         ag_features.set(AgFeatures::CODEC_NEGOTIATION, true);
-        let mut state = SharedState::load_with_set_features(hf_features, ag_features);
+        let mut state = ProcedureManipulatedState::load_with_set_features(hf_features, ag_features);
 
         assert!(!procedure.is_terminated());
 
@@ -414,13 +415,13 @@ mod tests {
         ];
         let expected_command1 = vec![at::Command::Bac { codecs: vec![CVSD.into(), MSBC.into()] }];
 
-        assert_eq!(procedure.ag_update(&mut state, &response1).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), expected_command1);
         assert_matches!(procedure.state, Stages::CodecNegotiation);
 
         let response2 = vec![at::Response::Ok];
         let expected_command2 = vec![at::Command::CindTest {}];
 
-        assert_eq!(procedure.ag_update(&mut state, &response2).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), expected_command2);
         assert_matches!(procedure.state, Stages::ListIndicators);
         assert!(!procedure.is_terminated());
     }
@@ -433,7 +434,7 @@ mod tests {
         hf_features.set(HfFeatures::THREE_WAY_CALLING, true);
         let mut ag_features = AgFeatures::default();
         ag_features.set(AgFeatures::THREE_WAY_CALLING, true);
-        let mut state = SharedState::load_with_set_features(hf_features, ag_features);
+        let mut state = ProcedureManipulatedState::load_with_set_features(hf_features, ag_features);
 
         assert!(!procedure.is_terminated());
 
@@ -443,13 +444,13 @@ mod tests {
         ];
         let expected_command1 = vec![at::Command::CindTest {}];
 
-        assert_eq!(procedure.ag_update(&mut state, &response1).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), expected_command1);
         assert_matches!(procedure.state, Stages::ListIndicators);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
         let response2 = vec![at::Response::RawBytes(indicator_msg), at::Response::Ok];
         let expected_command2 = vec![at::Command::CindRead {}];
-        assert_eq!(procedure.ag_update(&mut state, &response2).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), expected_command2);
         assert_matches!(procedure.state, Stages::EnableIndicators);
 
         let response3 = vec![
@@ -466,12 +467,12 @@ mod tests {
         ];
         let update3 =
             vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
-        assert_eq!(procedure.ag_update(&mut state, &response3).unwrap(), update3);
+        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), update3);
         assert_matches!(procedure.state, Stages::IndicatorStatusUpdate);
 
         let response4 = vec![at::Response::Ok];
         let update4 = vec![at::Command::ChldTest {}];
-        assert_eq!(procedure.ag_update(&mut state, &response4).unwrap(), update4);
+        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), update4);
         assert_matches!(procedure.state, Stages::CallHoldAndMultiParty);
 
         let commands = vec![
@@ -486,7 +487,7 @@ mod tests {
         let response5 =
             vec![at::Response::Success(at::Success::Chld { commands }), at::Response::Ok];
         let update5 = Vec::<at::Command>::new();
-        assert_eq!(procedure.ag_update(&mut state, &response5).unwrap(), update5);
+        assert_eq!(procedure.transition(&mut state, &response5).unwrap(), update5);
         assert!(procedure.is_terminated());
 
         let features = vec![
@@ -506,13 +507,13 @@ mod tests {
     fn error_when_incorrect_response_at_feature_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::Features);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Missing the accompanying Ok response so should result in error.
         let wrong_response = vec![at::Response::Success(at::Success::Brsf { features: 0 })];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -523,13 +524,13 @@ mod tests {
         hf_features.set(HfFeatures::CODEC_NEGOTIATION, true);
         let mut ag_features = AgFeatures::default();
         ag_features.set(AgFeatures::CODEC_NEGOTIATION, true);
-        let mut state = SharedState::load_with_set_features(hf_features, ag_features);
+        let mut state = ProcedureManipulatedState::load_with_set_features(hf_features, ag_features);
 
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error..
         let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -537,13 +538,13 @@ mod tests {
     fn error_when_incorrect_response_at_list_indicators_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::ListIndicators);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Missing the accompanying Ok response so should result in error.
         let wrong_response = vec![at::Response::RawBytes(CIND_TEST_RESPONSE_BYTES.to_vec())];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -551,7 +552,7 @@ mod tests {
     fn error_when_incorrect_response_at_enable_indicators_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::EnableIndicators);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
@@ -565,7 +566,7 @@ mod tests {
             roam: false,
             battchg: 0,
         })];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -573,13 +574,13 @@ mod tests {
     fn error_when_incorrect_response_at_indicator_update_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::IndicatorStatusUpdate);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
         let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -590,7 +591,7 @@ mod tests {
             call_waiting_or_three_way_calling: true,
             ..HandsFreeFeatureSupport::default()
         };
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
@@ -600,7 +601,7 @@ mod tests {
             at::Response::Ok,
         ];
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -611,7 +612,7 @@ mod tests {
             call_waiting_or_three_way_calling: true,
             ..HandsFreeFeatureSupport::default()
         };
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
@@ -621,7 +622,7 @@ mod tests {
             at::Response::Ok,
         ];
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -629,13 +630,13 @@ mod tests {
     fn error_when_incorrect_response_at_hf_indicator_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::HfIndicator);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
         let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -643,13 +644,13 @@ mod tests {
     fn error_when_incorrect_response_at_hf_indicator_request_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::HfIndicatorRequest);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
         let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -657,13 +658,13 @@ mod tests {
     fn error_when_incorrect_response_at_hf_indicator_enable_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::HfIndicatorEnable);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
         let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -671,7 +672,7 @@ mod tests {
     fn error_when_no_ok_at_hf_indicator_enable_stage() {
         let mut procedure = SlcInitProcedure::start_at_state(Stages::HfIndicatorEnable);
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(!procedure.is_terminated());
 
@@ -680,7 +681,7 @@ mod tests {
             anum: at::BluetoothHFIndicator::BatteryLevel,
             state: true,
         })];
-        assert_matches!(procedure.ag_update(&mut state, &wrong_response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -688,7 +689,7 @@ mod tests {
     fn error_when_update_on_terminated_procedure() {
         let mut procedure = SlcInitProcedure::start_terminated();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         assert!(procedure.is_terminated());
         // Valid response of first step of SLCI
@@ -696,7 +697,7 @@ mod tests {
             at::Response::Success(at::Success::Brsf { features: AgFeatures::default().bits() }),
             at::Response::Ok,
         ];
-        let update = procedure.ag_update(&mut state, &valid_response);
+        let update = procedure.transition(&mut state, &valid_response);
         assert_matches!(update, Err(_));
     }
 }

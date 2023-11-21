@@ -9,7 +9,7 @@ use {
     fuchsia_bluetooth::profile::{psm_from_protocol, Psm},
     fuchsia_bluetooth::types::{Channel, PeerId},
     futures::channel::mpsc,
-    futures::{select, FutureExt, StreamExt},
+    futures::{select, StreamExt},
     profile_client::ProfileEvent,
     std::convert::TryInto,
     std::default::Default,

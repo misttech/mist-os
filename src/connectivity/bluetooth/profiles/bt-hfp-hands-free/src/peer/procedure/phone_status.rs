@@ -8,7 +8,7 @@ use tracing::warn;
 
 use super::{Procedure, ProcedureMarker};
 
-use crate::peer::service_level_connection::SharedState;
+use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 /// This implementation supports the 7 indicators defined in HFP v1.8 Section 4.35.
 /// The indices of these indicators are fixed.
@@ -20,6 +20,7 @@ const SIGNAL_INDICATOR_INDEX: i64 = 5;
 const ROAM_INDICATOR_INDEX: i64 = 6;
 const BATT_CHG_INDICATOR_INDEX: i64 = 7;
 
+#[derive(Debug)]
 pub struct PhoneStatusProcedure {
     // Whether the procedure has sent the phone status to the HF.
     terminated: bool,
@@ -36,9 +37,9 @@ impl Procedure for PhoneStatusProcedure {
         ProcedureMarker::PhoneStatus
     }
 
-    fn ag_update(
+    fn transition(
         &mut self,
-        state: &mut SharedState,
+        state: &mut ProcedureManipulatedState,
         update: &Vec<at::Response>,
     ) -> Result<Vec<at::Command>, Error> {
         for respones in update {
@@ -102,12 +103,12 @@ mod tests {
     fn update_with_invalid_response_returns_error() {
         let mut procedure = PhoneStatusProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
         let response = vec![at::Response::Ok];
 
         assert!(!procedure.is_terminated());
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &response), Err(_));
 
         assert!(!procedure.is_terminated());
     }
@@ -116,7 +117,7 @@ mod tests {
     fn update_with_invalid_index_keeps_values() {
         let mut procedure = PhoneStatusProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
         let response = vec![at::Response::Success(at::Success::Ciev { ind: 0, value: 1 })];
 
         state.ag_indicators.set_default_values();
@@ -130,7 +131,7 @@ mod tests {
         assert_eq!(state.ag_indicators.roam.value.unwrap(), false);
         assert_eq!(state.ag_indicators.battchg.value.unwrap(), 0);
 
-        let _ = procedure.ag_update(&mut state, &response);
+        let _ = procedure.transition(&mut state, &response);
 
         assert!(procedure.is_terminated());
         assert_eq!(state.ag_indicators.service.value.unwrap(), false);
@@ -146,7 +147,7 @@ mod tests {
     fn update_properly_changes_value() {
         let mut procedure = PhoneStatusProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         state.ag_indicators.set_default_values();
 
@@ -170,7 +171,7 @@ mod tests {
             at::Response::Success(at::Success::Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 }),
         ];
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Ok(_));
+        assert_matches!(procedure.transition(&mut state, &response), Ok(_));
 
         assert_eq!(state.ag_indicators.service.value.unwrap(), true);
         assert_eq!(state.ag_indicators.call.value.unwrap(), true);
@@ -187,7 +188,7 @@ mod tests {
     fn update_maintains_value_when_updates_disabled() {
         let mut procedure = PhoneStatusProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
         state.indicators_update_enabled = false;
 
         state.ag_indicators.set_default_values();
@@ -212,7 +213,7 @@ mod tests {
             at::Response::Success(at::Success::Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 }),
         ];
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Ok(_));
+        assert_matches!(procedure.transition(&mut state, &response), Ok(_));
 
         assert_eq!(state.ag_indicators.service.value.unwrap(), false);
         assert_eq!(state.ag_indicators.call.value.unwrap(), false);

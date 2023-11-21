@@ -2,31 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Error, Result};
+use anyhow::{format_err, Error, Result};
+use at_commands as at;
 use fuchsia_async as fasync;
 use fuchsia_bluetooth::types::{Channel, PeerId};
-use tracing::{info, warn};
+use futures::select;
+use futures::StreamExt;
+use tracing::{debug, info, warn};
 
 use crate::config::HandsFreeFeatureSupport;
-use crate::peer::service_level_connection::SlcState;
+use crate::peer::at_connection::AtConnection;
+use crate::peer::procedure::{ProcedureInput, ProcedureOutput};
+use crate::peer::procedure_manager::ProcedureManager;
 
 pub struct PeerTask {
     peer_id: PeerId,
-    // TODO(fxb/127025) Use to manage AT responses
-    #[allow(unused)]
-    slc_state: SlcState,
+    procedure_manager: ProcedureManager,
+    at_connection: AtConnection,
 }
 
 impl PeerTask {
     pub fn spawn(
         peer_id: PeerId,
         config: HandsFreeFeatureSupport,
-        _rfcomm: Channel,
+        rfcomm: Channel,
     ) -> fasync::Task<()> {
-        // TODO(fxr/127086) Use the RFCOMM channel to set up an AT connection
-        let slc_state = SlcState::new(config);
+        let procedure_manager = ProcedureManager::new(peer_id, config);
+        let at_connection = AtConnection::new(peer_id, rfcomm);
 
-        let peer_task = Self { peer_id, slc_state };
+        let peer_task = Self { peer_id, procedure_manager, at_connection };
 
         let fasync_task = fasync::Task::local(peer_task.run());
         fasync_task
@@ -41,9 +45,40 @@ impl PeerTask {
         }
     }
 
-    /// Processes and handles received AT responses from the remote peer through the RFCOMM channel
     async fn run_inner(&mut self) -> Result<(), Error> {
-        // TODO(fxb/127025) Select on FIDL messages and AT responses
+        select! {
+            at_response_result_option = self.at_connection.next() => {
+                debug!("Received AT response: {:?}", at_response_result_option);
+
+                let at_response_result =
+                    at_response_result_option.ok_or(format_err!("AT Connection closed"))?;
+                let at_response = at_response_result?;
+
+                self.handle_at_response(at_response);
+            }
+            procedure_output_result_option = self.procedure_manager.next() => {
+                debug!("Received procedure output: {:?}", procedure_output_result_option);
+
+                let procedure_output_result =
+                    procedure_output_result_option.ok_or(format_err!("Procedure manager stream closed."))?;
+                let procedure_output = procedure_output_result?;
+
+                self.handle_procedure_output(procedure_output);
+            }
+            // TODO(fxb/127025) Select on FIDL messages and unsolicited messages.
+        }
         Ok(())
+    }
+
+    fn handle_at_response(&mut self, at_response: at::Response) {
+        // TODO(fxb/127362) Handle unsolicited responses separately.
+
+        let procedure_input = ProcedureInput::AtResponseFromAg(at_response);
+        self.procedure_manager.enqueue(procedure_input);
+    }
+
+    // TODO(fxb/127025) Handle procedure outputs.
+    fn handle_procedure_output(&self, _procedure_output: ProcedureOutput) {
+        unimplemented!("handle_procedure_output");
     }
 }

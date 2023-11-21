@@ -53,7 +53,8 @@ rustc_binary("bin") {
     "src/peer/procedure/codec_connection_setup.rs",
     "src/peer/procedure/phone_status.rs",
     "src/peer/procedure/slc_initialization.rs",
-    "src/peer/service_level_connection.rs",
+    "src/peer/procedure_manager.rs",
+    "src/peer/procedure_manipulated_state.rs",
     "src/profile.rs",
     "src/service_definition.rs",
   ]

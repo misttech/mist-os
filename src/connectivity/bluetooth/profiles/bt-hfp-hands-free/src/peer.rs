@@ -19,7 +19,8 @@ mod at_connection;
 mod indicators;
 mod peer_task;
 mod procedure;
-mod service_level_connection;
+mod procedure_manager;
+mod procedure_manipulated_state;
 
 /// Represents a Bluetooth peer that supports the AG role. Manages the Service
 /// Level Connection, Audio Connection, and FIDL APIs.

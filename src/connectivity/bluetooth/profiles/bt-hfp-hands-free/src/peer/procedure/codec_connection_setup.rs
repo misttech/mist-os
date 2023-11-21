@@ -8,8 +8,9 @@ use tracing::warn;
 
 use super::{Procedure, ProcedureMarker};
 
-use crate::peer::service_level_connection::SharedState;
+use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
+#[derive(Debug)]
 pub struct CodecConnectionSetupProcedure {
     // Whether the procedure has sent the phone status to the HF.
     terminated: bool,
@@ -26,9 +27,9 @@ impl Procedure for CodecConnectionSetupProcedure {
         ProcedureMarker::CodecConnectionSetup
     }
 
-    fn ag_update(
+    fn transition(
         &mut self,
-        state: &mut SharedState,
+        state: &mut ProcedureManipulatedState,
         update: &Vec<at::Response>,
     ) -> Result<Vec<at::Command>, Error> {
         // TODO(fxbug.dev/109735) - Put in stages like SLCI procedure.
@@ -40,7 +41,7 @@ impl Procedure for CodecConnectionSetupProcedure {
                         Ok(vec![at::Command::Bcs { codec: codec }])
                     } else {
                         // According to HFP v1.8 Section 4.11.3, if the received codec ID is
-                        // not available, the HF shalle respond with AT+BAC with its available
+                        // not available, the HF shall respond with AT+BAC with its available
                         // codecs.
                         warn!("Codec received is not supported. Sending supported codecs to AG.");
                         self.terminated = true;
@@ -86,7 +87,7 @@ mod tests {
     fn properly_responds_to_supported_codec() {
         let mut procedure = CodecConnectionSetupProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
         let agreed_codec = CVSD;
 
         let response1 =
@@ -94,11 +95,11 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        assert_matches!(procedure.ag_update(&mut state, &response1), Ok(_));
+        assert_matches!(procedure.transition(&mut state, &response1), Ok(_));
         assert_eq!(state.selected_codec.expect("Codec agreed upon."), agreed_codec);
 
         let response2 = vec![at::Response::Ok];
-        assert_matches!(procedure.ag_update(&mut state, &response2), Ok(_));
+        assert_matches!(procedure.transition(&mut state, &response2), Ok(_));
 
         assert!(procedure.is_terminated())
     }
@@ -107,7 +108,7 @@ mod tests {
     fn properly_responds_to_unsupported_codec() {
         let mut procedure = CodecConnectionSetupProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
         let unsupported_codec = MSBC;
 
         let response =
@@ -115,7 +116,7 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Ok(_));
+        assert_matches!(procedure.transition(&mut state, &response), Ok(_));
         assert_matches!(state.selected_codec, None);
 
         assert!(procedure.is_terminated())
@@ -125,13 +126,13 @@ mod tests {
     fn error_from_invalid_responses() {
         let mut procedure = CodecConnectionSetupProcedure::new();
         let config = HandsFreeFeatureSupport::default();
-        let mut state = SharedState::new(config);
+        let mut state = ProcedureManipulatedState::new(config);
 
         let response = vec![at::Response::Success(at::Success::TestResponse {})];
 
         assert!(!procedure.is_terminated());
 
-        assert_matches!(procedure.ag_update(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, &response), Err(_));
 
         assert!(!procedure.is_terminated())
     }
