@@ -46,14 +46,6 @@ Afterwards, you should add the GN dependency for your test's language:
     {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/realm_builder/cpp/BUILD.gn" region_tag="realm_builder_dep_cpp" adjust_indentation="auto" %}
     ```
 
-* {Dart}
-
-    **Add the Dart Realm Builder library to your `BUILD.gn` file**
-
-    ```gn
-    {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/realm_builder/BUILD.gn" region_tag="realm_builder_dep_dart" adjust_indentation="auto" %}
-    ```
-
 ## Initialize Realm Builder {#init-realm}
 
 After adding the necessary dependencies, initialize Realm Builder inside your
