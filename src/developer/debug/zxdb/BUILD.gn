@@ -24,6 +24,15 @@ if (is_host) {
       "//src/developer/debug/zxdb/console",
       "//src/developer/debug/zxdb/debug_adapter",
     ]
+
+    if (is_linux && current_cpu == "x64") {
+      # Support the local built-in debug agent on Linux.
+      sources += [
+        "local_agent.cc",
+        "local_agent.h",
+      ]
+      deps += [ "//src/developer/debug/debug_agent:lib" ]
+    }
   }
 
   sdk_host_tool("zxdb_sdk") {

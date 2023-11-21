@@ -302,10 +302,13 @@ Session::Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, debug:
   ListenForSystemSettings();
 }
 
-Session::Session(debug::StreamBuffer* stream, System::Where where)
-    : stream_(stream), system_(this), weak_factory_(this) {
+Session::Session(debug::StreamBuffer* stream)
+    : stream_(stream),
+      remote_api_(std::make_unique<RemoteAPIImpl>(this)),
+      system_(this),
+      weak_factory_(this) {
   ListenForSystemSettings();
-  system_.DidConnect(where);
+  SendLocalHello([](const Err&) {});
 }
 
 Session::~Session() = default;
@@ -482,15 +485,7 @@ void Session::OpenMinidump(const std::string& path, fit::callback<void(const Err
   // the core file in order to properly populate the architecture information in time to print it to
   // the UI with all the exception information correctly decoded, which is architecture specific and
   // can only happen after the architecture information has been given here.
-  remote_api_->Hello(debug_ipc::HelloRequest(),
-                     [callback = std::move(callback), weak_this = GetWeakPtr()](
-                         const Err& err, debug_ipc::HelloReply reply) mutable {
-                       if (weak_this && !err.has_error()) {
-                         weak_this->SetArch(reply.arch, reply.platform, reply.page_size);
-                       }
-
-                       callback(err);
-                     });
+  SendLocalHello(std::move(callback));
 
   system().GetTargets()[0]->Attach(
       minidump->ProcessID(), [](fxl::WeakPtr<Target> target, const Err&, uint64_t timestamp) {});
@@ -755,21 +750,7 @@ Err Session::ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
   }
   pending_connection_ = nullptr;
 
-  // Version check.
-  if (reply.version > debug_ipc::kCurrentProtocolVersion ||
-      reply.version < debug_ipc::kMinimumProtocolVersion) {
-    return Err(
-        "The IPC version of the debug_agent on the system (v%u) is not in the supported\n"
-        "range of the zxdb frontend (v%u to v%u).",
-        reply.version, debug_ipc::kMinimumProtocolVersion, debug_ipc::kCurrentProtocolVersion);
-  }
-
-  ipc_version_ = reply.version;
-  remote_api_->SetVersion(reply.version);
-
-  // Initialize arch-specific stuff.
-  Err err = SetArch(reply.arch, reply.platform, reply.page_size);
-  if (err.has_error()) {
+  if (Err err = HandleHelloReply(reply); err.has_error()) {
     return err;
   }
 
@@ -787,8 +768,47 @@ Err Session::ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
 
   // Connection succeeds.
   system_.DidConnect(where);
+  SyncAgentStatus();
+  return Err();
+}
 
-  // Query which processes the debug agent is already connected to.
+void Session::SendLocalHello(fit::callback<void(const Err&)> cb) {
+  // In order to use the RemoteAPI wrappers, we need to manually set the version first. This is
+  // OK since we know the connection is to our same build (either to the built-in debug_agent or to
+  // the minidump backend) and has the same version.
+  ipc_version_ = debug_ipc::kCurrentProtocolVersion;
+  remote_api_->SetVersion(debug_ipc::kCurrentProtocolVersion);
+  remote_api_->Hello(debug_ipc::HelloRequest{.version = debug_ipc::kCurrentProtocolVersion},
+                     [weak_this = GetWeakPtr(), cb = std::move(cb)](
+                         const Err& err, debug_ipc::HelloReply reply) mutable {
+                       if (weak_this && !err.has_error()) {
+                         if (weak_this->HandleHelloReply(reply).ok()) {
+                           weak_this->SyncAgentStatus();
+                           weak_this->system_.DidConnect(System::Where::kLocal);
+                         }
+                         cb(err);
+                       }
+                     });
+}
+
+Err Session::HandleHelloReply(const debug_ipc::HelloReply& reply) {
+  // Version check.
+  if (reply.version > debug_ipc::kCurrentProtocolVersion ||
+      reply.version < debug_ipc::kMinimumProtocolVersion) {
+    return Err(
+        "The IPC version of the debug_agent on the system (v%u) is not in the supported\n"
+        "range of the zxdb frontend (v%u to v%u).",
+        reply.version, debug_ipc::kMinimumProtocolVersion, debug_ipc::kCurrentProtocolVersion);
+  }
+
+  ipc_version_ = reply.version;
+  remote_api_->SetVersion(reply.version);
+
+  // Initialize arch-specific stuff.
+  return SetArch(reply.arch, reply.platform, reply.page_size);
+}
+
+void Session::SyncAgentStatus() {
   remote_api()->Status(
       debug_ipc::StatusRequest{},
       [this, session = GetWeakPtr()](const Err& err, debug_ipc::StatusReply reply) {
@@ -822,8 +842,6 @@ Err Session::ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
           }
         }
       });
-
-  return Err();
 }
 
 void Session::OnSettingChanged(const SettingStore& store, const std::string& setting_name) {

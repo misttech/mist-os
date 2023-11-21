@@ -22,6 +22,7 @@ struct CommandLineOptions {
  public:
   std::optional<std::string> connect;
   std::optional<std::string> unix_connect;
+  bool local = false;
   bool debug_mode = false;
   std::optional<std::string> core;
   std::vector<std::string> attach;

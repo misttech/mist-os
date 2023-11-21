@@ -27,6 +27,14 @@ const char kUnixConnectHelp[] = R"(  --unix-connect=<filepath>
   -u <filepath>
       Attempts to connect to a debug_agent through a unix socket.)";
 
+const char kLocalHelp[] = R"(  --local
+  -l
+      Runs the built-in local debug_agent for debugging the local system. Only
+      supported on x64 Linux.
+
+      In this mode, any non-switch parameters (or anything after '--') will be
+      treated as the program to debug and its parameters.)";
+
 const char kConnectHelp[] = R"(  --connect=<host>:<port>
   -c <host>:<port>
       Attempts to connect to a debug_agent running on the given host/port.)";
@@ -133,6 +141,7 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
 
   parser.AddSwitch("connect", 'c', kConnectHelp, &CommandLineOptions::connect);
   parser.AddSwitch("unix-connect", 'u', kUnixConnectHelp, &CommandLineOptions::unix_connect);
+  parser.AddSwitch("local", 'l', kLocalHelp, &CommandLineOptions::local);
   parser.AddSwitch("core", 0, kCoreHelp, &CommandLineOptions::core);
   parser.AddSwitch("debug-mode", 'd', kDebugModeHelp, &CommandLineOptions::debug_mode);
   parser.AddSwitch("attach", 'a', kAttachHelp, &CommandLineOptions::attach);

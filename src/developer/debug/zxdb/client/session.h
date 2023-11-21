@@ -72,9 +72,9 @@ class Session : public SettingStoreObserver {
   Session(std::unique_ptr<RemoteAPI> remote_api, debug::Arch arch, debug::Platform platform,
           uint64_t page_size);
 
-  // Creates with a previously-allocated connection. The pointer must outlive this class. In this
-  // mode, the stream can not be disconnected.
-  explicit Session(debug::StreamBuffer* stream, System::Where where);
+  // Creates with a previously-allocated local connection. The pointer must outlive this class. In
+  // this mode, the stream can not be disconnected.
+  explicit Session(debug::StreamBuffer* stream);
   virtual ~Session();
 
   fxl::WeakPtr<Session> GetWeakPtr() { return weak_factory_.GetWeakPtr(); }
@@ -218,6 +218,17 @@ class Session : public SettingStoreObserver {
   Err ResolvePendingConnection(fxl::RefPtr<PendingConnection> pending,
                                const debug_ipc::HelloReply& reply,
                                std::unique_ptr<debug::BufferedFD> buffer);
+
+  // Sends a hello request to a locally connected debug_agent where the IPC protocol version is
+  // known. Handles saving the relevant information on the reply, and then calls the callback.
+  void SendLocalHello(fit::callback<void(const Err&)> cb);
+
+  // Saves any information from the "hello" reply.
+  Err HandleHelloReply(const debug_ipc::HelloReply& reply);
+
+  // Syncs the status of the debug agent (like which processes it's already connected to and what
+  // processes are in limbo). Called after a connection is initiated.
+  void SyncAgentStatus();
 
   void ListenForSystemSettings();
 
