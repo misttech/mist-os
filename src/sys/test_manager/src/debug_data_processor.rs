@@ -131,7 +131,7 @@ impl DebugDataProcessor {
         }
         proxy.finish().await?;
 
-        debug_data_server::serve_iterator(&debug_directory_path, run_event_sender).await?;
+        debug_data_server::serve_directory(&debug_directory_path, run_event_sender).await?;
 
         if let MaybeOwnedDirectory::Owned(tmp) = debug_directory {
             tmp.close()?;

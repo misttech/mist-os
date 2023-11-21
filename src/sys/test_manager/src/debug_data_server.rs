@@ -66,24 +66,36 @@ async fn copy_kernel_debug_data(
 }
 
 const DEBUG_DATA_TIMEOUT_SECONDS: i64 = 15;
-const DEBUG_DATA_PATH: &'static str = "/debugdata";
+const EARLY_BOOT_DEBUG_DATA_PATH: &'static str = "/debugdata";
 
-// TODO(fxbug.dev/110062): Once scp is no longer needed this can just call serve_iterator instead.
 pub(crate) async fn send_kernel_debug_data(
+    iterator: ftest_manager::DebugDataIteratorRequestStream,
+) -> Result<(), Error> {
+    tracing::info!("Serving kernel debug data");
+    let directory = fuchsia_fs::directory::open_in_namespace(
+        EARLY_BOOT_DEBUG_DATA_PATH,
+        fuchsia_fs::OpenFlags::RIGHT_READABLE,
+    )?;
+
+    serve_iterator(EARLY_BOOT_DEBUG_DATA_PATH, directory, iterator).await
+}
+
+// TODO(b/308192477): Remove once our clients stop using this scp.
+pub(crate) async fn deprecated_send_kernel_debug_data(
     mut event_sender: mpsc::Sender<RunEvent>,
     accumulate: bool,
 ) {
     if !accumulate {
-        tracing::info!("Serving kernel debug data");
+        tracing::info!("(deprecated) Serving kernel debug data");
         // If we're not accumulating, we don't need the custom copy logic.
-        if let Err(e) = serve_iterator(DEBUG_DATA_PATH, event_sender).await {
+        if let Err(e) = serve_directory(EARLY_BOOT_DEBUG_DATA_PATH, event_sender).await {
             warn!("Error serving kernel debug data: {:?}", e);
         }
         return;
     }
 
     let root_dir = match fuchsia_fs::directory::open_in_namespace(
-        DEBUG_DATA_PATH,
+        EARLY_BOOT_DEBUG_DATA_PATH,
         fuchsia_fs::OpenFlags::RIGHT_READABLE,
     ) {
         Ok(dir) => dir,
@@ -113,7 +125,10 @@ pub(crate) async fn send_kernel_debug_data(
         }
     })
     .filter_map(|entry| async move {
-        let path = PathBuf::from(DEBUG_DATA_PATH).join(entry.name).to_string_lossy().to_string();
+        let path = PathBuf::from(EARLY_BOOT_DEBUG_DATA_PATH)
+            .join(entry.name)
+            .to_string_lossy()
+            .to_string();
         match fuchsia_fs::file::open_in_namespace(&path, fuchsia_fs::OpenFlags::RIGHT_READABLE) {
             Ok(file) => Some((path, file)),
             Err(err) => {
@@ -212,34 +227,50 @@ async fn serve_file_over_socket(file: fio::FileProxy, socket: fuchsia_zircon::So
     }
 }
 
+pub(crate) async fn serve_directory(
+    dir_path: &str,
+    mut event_sender: mpsc::Sender<RunEvent>,
+) -> Result<(), Error> {
+    let directory =
+        fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
+    {
+        let file_stream = fuchsia_fs::directory::readdir_recursive(
+            &directory,
+            Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
+        )
+        .filter_map(|entry| filter_map_filename(entry, dir_path));
+        pin_mut!(file_stream);
+        if file_stream.next().await.is_none() {
+            // No files to serve.
+            return Ok(());
+        }
+
+        drop(file_stream);
+    }
+
+    let (client, iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>()?;
+    let _ = event_sender.send(RunEvent::debug_data(client).into()).await;
+    event_sender.disconnect(); // No need to hold this open while we serve the iterator.
+
+    serve_iterator(dir_path, directory, iterator).await
+}
+
 /// Serves the |DebugDataIterator| protocol by serving all the files contained under
 /// |dir_path|.
 ///
 /// The contents under |dir_path| are assumed to not change while the iterator is served.
 pub(crate) async fn serve_iterator(
     dir_path: &str,
-    mut event_sender: mpsc::Sender<RunEvent>,
+    directory: fio::DirectoryProxy,
+    mut iterator: ftest_manager::DebugDataIteratorRequestStream,
 ) -> Result<(), Error> {
-    let directory =
-        fuchsia_fs::directory::open_in_namespace(dir_path, fuchsia_fs::OpenFlags::RIGHT_READABLE)?;
     let file_stream = fuchsia_fs::directory::readdir_recursive(
         &directory,
         Some(fasync::Duration::from_seconds(DEBUG_DATA_TIMEOUT_SECONDS)),
     )
-    .filter_map(|entry| filter_map_filename(entry, dir_path))
-    .peekable();
+    .filter_map(|entry| filter_map_filename(entry, dir_path));
     pin_mut!(file_stream);
-
-    if file_stream.as_mut().peek().await.is_none() {
-        // No files to serve.
-        return Ok(());
-    }
-
     let mut file_stream = file_stream.fuse();
-
-    let (client, mut iterator) = create_request_stream::<ftest_manager::DebugDataIteratorMarker>()?;
-    let _ = event_sender.send(RunEvent::debug_data(client).into()).await;
-    event_sender.disconnect(); // No need to hold this open while we serve the iterator.
 
     let mut file_tasks = vec![];
     while let Some(request) = iterator.try_next().await? {
@@ -333,7 +364,7 @@ mod test {
     ) -> (Option<ftest_manager::DebugDataIteratorProxy>, fasync::Task<Result<(), Error>>) {
         let (send, mut recv) = mpsc::channel(0);
         let dir_path = dir.path().to_str().unwrap().to_string();
-        let task = fasync::Task::local(async move { serve_iterator(&dir_path, send).await });
+        let task = fasync::Task::local(async move { serve_directory(&dir_path, send).await });
         let proxy = recv.next().await.map(|event| {
             let RunEventPayload::DebugData(client) = event.into_payload();
             client.into_proxy().expect("into proxy")

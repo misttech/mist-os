@@ -250,8 +250,11 @@ impl TestRunBuilder {
         let ((), ()) = futures::future::join(
             remote.then(|_| async move {
                 // send debug data once the test completes.
-                debug_data_server::send_kernel_debug_data(event_sender, accumulate_debug_data)
-                    .await;
+                debug_data_server::deprecated_send_kernel_debug_data(
+                    event_sender,
+                    accumulate_debug_data,
+                )
+                .await;
                 debug_task.await;
             }),
             Self::run_controller(

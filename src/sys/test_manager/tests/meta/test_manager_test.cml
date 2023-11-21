@@ -19,5 +19,9 @@
             protocol: "fuchsia.test.manager.RunBuilder",
             from: "#test_manager",
         },
+        {
+            protocol: "fuchsia.test.manager.EarlyBootProfile",
+            from: "#test_manager",
+        },
     ],
 }

@@ -22,5 +22,7 @@ mod utilities;
 pub use {
     above_root_capabilities::AboveRootCapabilitiesForTest,
     self_diagnostics::RootDiagnosticNode,
-    test_manager_server::{run_test_manager, run_test_manager_query_server},
+    test_manager_server::{
+        run_test_manager, run_test_manager_query_server, serve_early_boot_profiles,
+    },
 };

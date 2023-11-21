@@ -670,6 +670,19 @@ async fn debug_data_test() {
     assert_eq!(num_debug_data_events, 1);
 }
 
+// Test that we can hook up DebugDataIterator connection for EarlyBootPrfile.
+#[fuchsia::test]
+async fn early_boot_profile_test() {
+    let proxy = client::connect_to_protocol::<ftest_manager::EarlyBootProfileMarker>()
+        .expect("cannot connect to run builder proxy");
+    let (debug_data_proxy, iterator) = endpoints::create_proxy().unwrap();
+    proxy.register_watcher(iterator).unwrap();
+
+    // We cannot check the returned value as it can be empty vector or bunch of socket connections.
+    // But we can check that our call to DebugDataIterator goes through.
+    let _ = debug_data_proxy.get_next().await.unwrap();
+}
+
 #[fuchsia::test]
 async fn debug_data_accumulate_test() {
     let test_url = "fuchsia-pkg://fuchsia.com/test_manager_test#meta/debug_data_write_test.cm";

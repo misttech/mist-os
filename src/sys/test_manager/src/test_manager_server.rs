@@ -7,6 +7,7 @@ use {
         above_root_capabilities::AboveRootCapabilitiesForTest,
         constants,
         debug_data_processor::{DebugDataDirectory, DebugDataProcessor},
+        debug_data_server,
         error::TestManagerError,
         facet,
         offers::map_offers,
@@ -309,6 +310,43 @@ pub async fn run_test_manager_query_server(
             }
             Err(e) => {
                 let _ = responder.send(Err(e.into()));
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn serve_early_boot_profiles(
+    mut stream: ftest_manager::EarlyBootProfileRequestStream,
+) -> Result<(), TestManagerError> {
+    while let Some(req) = stream.try_next().await.map_err(TestManagerError::Stream)? {
+        match req {
+            ftest_manager::EarlyBootProfileRequest::RegisterWatcher {
+                iterator,
+                control_handle,
+            } => {
+                let iterator = match iterator.into_stream() {
+                    Ok(i) => i,
+                    Err(e) => {
+                        warn!("Invalid debug data iterator: {}", e);
+                        control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                        break;
+                    }
+                };
+                if let Err(e) = debug_data_server::send_kernel_debug_data(iterator).await {
+                    warn!("Err serving kernel profiles: {}", e);
+                    control_handle.shutdown_with_epitaph(zx::Status::INTERNAL);
+                    break;
+                }
+            }
+            ftest_manager::EarlyBootProfileRequest::_UnknownMethod {
+                ordinal,
+                control_handle,
+                ..
+            } => {
+                warn!("Unknown EarlyBootProfile request received: {}, closing connection", ordinal);
+                control_handle.shutdown_with_epitaph(zx::Status::NOT_SUPPORTED);
+                break;
             }
         }
     }

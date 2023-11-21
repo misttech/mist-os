@@ -103,6 +103,14 @@ async fn main() -> Result<(), Error> {
                 .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
             })
             .detach();
+        })
+        .add_fidl_service(move |stream| {
+            fasync::Task::local(async move {
+                test_manager_lib::serve_early_boot_profiles(stream)
+                    .await
+                    .unwrap_or_else(|error| warn!(?error, "test manager returned error"))
+            })
+            .detach();
         });
     fs.take_and_serve_directory_handle()?;
     fs.collect::<()>().await;
