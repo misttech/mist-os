@@ -322,7 +322,7 @@ impl DevPtmxFile {
 impl FileOps for DevPtmxFile {
     fileops_impl_nonseekable!();
 
-    fn close(&self, _file: &FileObject) {
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.terminal.main_close();
         self.dev_pts_root.remove_child(format!("{}", self.terminal.id).as_bytes());
     }
@@ -418,7 +418,7 @@ impl DevPtsFile {
 impl FileOps for DevPtsFile {
     fileops_impl_nonseekable!();
 
-    fn close(&self, _file: &FileObject) {
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.terminal.replica_close();
     }
 

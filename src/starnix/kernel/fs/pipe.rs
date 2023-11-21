@@ -301,7 +301,7 @@ pub struct PipeFileObject {
 impl FileOps for PipeFileObject {
     fileops_impl_nonseekable!();
 
-    fn close(&self, file: &FileObject) {
+    fn close(&self, file: &FileObject, _current_task: &CurrentTask) {
         let mut events = FdEvents::empty();
         let mut pipe = self.pipe.lock();
         let flags = file.flags();

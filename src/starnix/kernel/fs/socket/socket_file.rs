@@ -97,7 +97,7 @@ impl FileOps for SocketFile {
         self.socket.ioctl(file, current_task, request, arg)
     }
 
-    fn close(&self, _file: &FileObject) {
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.socket.close();
     }
 }

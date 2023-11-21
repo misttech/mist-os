@@ -111,7 +111,7 @@ fn add_equivalent_fd_events(mut events: FdEvents) -> FdEvents {
 /// Corresponds to struct file_operations in Linux, plus any filesystem-specific data.
 pub trait FileOps: Send + Sync + AsAny + 'static {
     /// Called when the FileObject is closed.
-    fn close(&self, _file: &FileObject) {}
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {}
 
     /// Called every time close() is called on this file, even if the file is not ready to be
     /// released.
@@ -739,8 +739,8 @@ macro_rules! delegate {
 impl FileOps for ProxyFileOps {
     delegate! {
         self.0;
-        fn close(&self, _file: &FileObject);
-        fn flush(&self, _file: &FileObject);
+        fn close(&self, file: &FileObject, current_task: &CurrentTask,);
+        fn flush(&self, file: &FileObject);
         fn read(
             &self,
             file: &FileObject,
@@ -1400,8 +1400,8 @@ impl FileObject {
 impl Releasable for FileObject {
     type Context<'a> = &'a CurrentTask;
 
-    fn release(self, _current_task: &CurrentTask) {
-        self.ops().close(&self);
+    fn release(self, current_task: Self::Context<'_>) {
+        self.ops().close(&self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =
             if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };

@@ -875,7 +875,7 @@ struct SeccompNotifierFileObject {
 impl FileOps for SeccompNotifierFileObject {
     fileops_impl_nonseekable!();
 
-    fn close(&self, _file: &FileObject) {
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         let mut state = self.notifier.lock();
 
         for (cookie, notification) in state.pending_notifications.iter() {

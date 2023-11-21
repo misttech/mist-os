@@ -120,7 +120,7 @@ impl FileOps for RemoteBinderFileOps {
         Ok(FdEvents::empty())
     }
 
-    fn close(&self, _file: &FileObject) {
+    fn close(&self, _file: &FileObject, _current_task: &CurrentTask) {
         self.0.close();
     }
 

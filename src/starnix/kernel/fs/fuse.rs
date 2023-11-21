@@ -285,31 +285,20 @@ impl FuseFileObject {
 }
 
 impl FileOps for FuseFileObject {
-    fn close(&self, file: &FileObject) {
+    fn close(&self, file: &FileObject, current_task: &CurrentTask) {
         let node = if let Ok(node) = self.get_fuse_node(file) {
             node
         } else {
             log_error!("Unexpected file type");
             return;
         };
-        // TODO(b/297439724): This should receives a CurrentTask instead of relying on
-        // the system task.
         let mode = file.node().info().mode;
-        match self.kernel.kthreads.workaround_for_b297439724_new_system_task() {
-            Ok(workaround_task) => {
-                if let Err(e) = self.connection.execute_operation(
-                    &workaround_task,
-                    node,
-                    FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
-                ) {
-                    log_error!("Error when relasing fh: {e:?}");
-                }
-                workaround_task.thread_group.exit(ExitStatus::Exit(0));
-                workaround_task.release(());
-            }
-            Err(e) => {
-                log_error!("Error creating workaround task: {e:?}");
-            }
+        if let Err(e) = self.connection.execute_operation(
+            &current_task,
+            node,
+            FuseOperation::Release { flags: file.flags(), mode, open_out: self.open_out },
+        ) {
+            log_error!("Error when relasing fh: {e:?}");
         }
     }
 
