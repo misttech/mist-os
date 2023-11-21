@@ -22,8 +22,6 @@ class TestArgs(unittest.TestCase):
             ["--device", "--host"],
             ["--status-delay", ".00001"],
             ["--suggestion-count", "-1"],
-            ["--exact", "--host"],
-            ["--exact", "--device"],
         ]:
             flags = args.parse_args(arg_list)
             try:

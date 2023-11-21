@@ -77,10 +77,6 @@ class Flags:
             raise FlagError("--count must be a positive number")
         if self.suggestion_count < 0:
             raise FlagError("--suggestion-count must be non-negative")
-        if self.exact and (self.device or self.host):
-            raise FlagError(
-                "--exact cannot be combined with --host or --device"
-            )
 
         if not termout.is_valid() and self.status:
             raise FlagError(

@@ -189,8 +189,6 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             mode = selection.SelectionMode.HOST
         elif flags.device:
             mode = selection.SelectionMode.DEVICE
-        elif flags.exact:
-            mode = selection.SelectionMode.EXACT
         elif flags.only_e2e:
             mode = selection.SelectionMode.E2E
         selections = await selection.select_tests(
@@ -199,6 +197,7 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
             mode,
             flags.fuzzy,
             recorder=recorder,
+            exact_match=flags.exact,
         )
         # Mutate the selections based on the command line flags.
         selections.apply_flags(flags)

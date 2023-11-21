@@ -34,9 +34,7 @@ class SelectionMode(Enum):
     ANY = 0
     HOST = 1
     DEVICE = 2
-    # TODO(b/312271472): Refactor exact matches to be a separate argument
-    EXACT = 3
-    E2E = 4
+    E2E = 3
 
 
 # Default threshold for matching.
@@ -55,6 +53,7 @@ async def select_tests(
     mode: SelectionMode = SelectionMode.ANY,
     fuzzy_distance_threshold: int = DEFAULT_FUZZY_DISTANCE_THRESHOLD,
     recorder: event.EventRecorder | None = None,
+    exact_match: bool = False,
 ) -> selection_types.TestSelections:
     """Perform selection on the incoming list of tests.
 
@@ -69,6 +68,7 @@ async def select_tests(
         mode (SelectionMode, optional): Selection mode. Defaults to ANY.
         fuzzy_distance_threshold (int, optional): Distance threshold for including tests in selection.
         recorder (EventRecorder, optional): If set, record match duration events.
+        exact_match (bool, optional): If set, force exact matches only. Otherwise do fuzzy matching.
 
     Raises:
         RuntimeError: If the required dldist script is not found
@@ -108,7 +108,7 @@ async def select_tests(
         return filtered_entry_scores
 
     if not selection:
-        if mode == SelectionMode.EXACT:
+        if exact_match:
             raise SelectionError(
                 "A selection is required when --exact is specified"
             )
@@ -186,7 +186,7 @@ async def select_tests(
                     lambda: NO_MATCH_DISTANCE
                 )
                 tests = []
-                if mode != SelectionMode.EXACT:
+                if not exact_match:
                     tasks = (
                         [label.distances(n, recorder, id) for n in group.names]
                         + [name.distances(n, recorder, id) for n in group.names]
@@ -249,10 +249,7 @@ async def select_tests(
                 # out of the above sets of scores.
                 final_score = match_distances[entry]
 
-                if (
-                    mode == SelectionMode.EXACT
-                    and final_score != PERFECT_MATCH_DISTANCE
-                ):
+                if exact_match and final_score != PERFECT_MATCH_DISTANCE:
                     # Allow only exact matches in exact match mode.
                     final_score = NO_MATCH_DISTANCE
 

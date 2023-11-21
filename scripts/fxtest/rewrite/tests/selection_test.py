@@ -260,7 +260,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(device_selected.has_device_test())
 
     async def test_select_all_fails_on_exact(self):
-        """Test that empty selection fails if EXACT mode is used"""
+        """Test that empty selection fails if exact_match is used"""
         tests = [
             self._make_package_test("src/tests", "foo", "bar"),
             self._make_host_test("src/tests2", "baz"),
@@ -268,7 +268,9 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
 
         try:
             selections = await selection.select_tests(
-                tests, [], mode=selection.SelectionMode.EXACT
+                tests,
+                [],
+                exact_match=True,
             )
             self.assertTrue(False, f"Expected a SelectionError: {selections}")
         except selection.SelectionError:
@@ -337,7 +339,9 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         ]
 
         host_exact = await selection.select_tests(
-            tests, ["binaryytest"], mode=selection.SelectionMode.EXACT
+            tests,
+            ["binaryytest"],
+            exact_match=True,
         )
         self.assertEqual(0, len(host_exact.selected))
         self.assertEqual(
@@ -346,7 +350,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
 
     async def test_exact_matches(self):
-        """Test that EXACT matching mode works correctly"""
+        """Test that exact_mode matching mode works correctly"""
 
         tests = [
             self._make_package_test("src/tests", "foo-pkg", "bar-test"),
@@ -355,7 +359,9 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
 
         # Don't match package or component in exact mode
         device_exact = await selection.select_tests(
-            tests, ["foo-pkg"], mode=selection.SelectionMode.EXACT
+            tests,
+            ["foo-pkg"],
+            exact_match=True,
         )
         self.assertEqual(0, len(device_exact.selected))
         self.assertEqual(
@@ -365,7 +371,9 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             selection.NO_MATCH_DISTANCE,
         )
         device_exact = await selection.select_tests(
-            tests, ["bar-test"], mode=selection.SelectionMode.EXACT
+            tests,
+            ["bar-test"],
+            exact_match=True,
         )
         self.assertEqual(0, len(device_exact.selected))
         self.assertEqual(
@@ -401,7 +409,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         device_exact = await selection.select_tests(
             tests,
             ["fuchsia-pkg://fuchsia.com/foo-pkg#meta/bar-test.cm"],
-            mode=selection.SelectionMode.EXACT,
+            exact_match=True,
         )
         self.assertEqual(1, len(device_exact.selected))
         self.assertEqual(
@@ -415,7 +423,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         package_exact = await selection.select_tests(
             tests,
             ["--package", "foo-pkg"],
-            mode=selection.SelectionMode.EXACT,
+            exact_match=True,
         )
         self.assertEqual(1, len(package_exact.selected))
         self.assertEqual(
@@ -426,9 +434,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
         )
 
         component_exact = await selection.select_tests(
-            tests,
-            ["--component", "bar-test"],
-            mode=selection.SelectionMode.EXACT,
+            tests, ["--component", "bar-test"], exact_match=True
         )
         self.assertEqual(1, len(component_exact.selected))
         self.assertEqual(
