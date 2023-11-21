@@ -15,7 +15,6 @@ use crate::{
     },
     logging::{impossible_error, log_info, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
 };
 use fidl_fuchsia_io as fio;
@@ -27,6 +26,7 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_fs::directory as ffs_dir;
 use fuchsia_zircon as zx;
 use starnix_lock::RwLock;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,

@@ -19,12 +19,12 @@ use crate::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessorExt, ProtectionFlags,
     },
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCallback, WaitCanceler, Waiter},
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
     errno, error,

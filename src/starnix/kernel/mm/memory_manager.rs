@@ -3844,7 +3844,7 @@ mod tests {
                 *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Ok(crate::syscalls::SUCCESS)
+            Ok(starnix_syscalls::SUCCESS)
         );
 
         // This should split the mapping into 3 pieces with the second piece having the name "foo"
@@ -3884,7 +3884,7 @@ mod tests {
                 *PAGE_SIZE,
                 name_addr.ptr() as u64,
             ),
-            Ok(crate::syscalls::SUCCESS)
+            Ok(starnix_syscalls::SUCCESS)
         );
 
         let target = create_task(&kernel, "another-task");

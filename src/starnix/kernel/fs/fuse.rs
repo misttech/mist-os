@@ -14,11 +14,11 @@ use crate::{
     },
     logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
-    syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
 use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, errno_from_code, error,

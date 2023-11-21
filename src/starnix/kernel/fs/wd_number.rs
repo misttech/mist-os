@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use std::fmt;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
@@ -21,6 +22,18 @@ impl WdNumber {
 
     pub fn raw(&self) -> i32 {
         self.0
+    }
+}
+
+impl std::convert::From<WdNumber> for SyscallResult {
+    fn from(value: WdNumber) -> Self {
+        value.raw().into()
+    }
+}
+
+impl std::convert::From<SyscallArg> for WdNumber {
+    fn from(value: SyscallArg) -> Self {
+        WdNumber::from_raw(value.into())
     }
 }
 

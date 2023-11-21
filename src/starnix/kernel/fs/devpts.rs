@@ -19,9 +19,9 @@ use crate::{
     },
     logging::not_implemented,
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
 };
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, TTY_ALT_MAJOR},
     errno, error,

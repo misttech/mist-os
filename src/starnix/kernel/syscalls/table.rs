@@ -5,11 +5,8 @@
 use lock_sequence::{Locked, Unlocked};
 use paste::paste;
 
-use crate::{
-    arch::syscalls::sys_clone,
-    syscalls::{decls::Syscall, SyscallResult},
-    task::CurrentTask,
-};
+use crate::{arch::syscalls::sys_clone, task::CurrentTask};
+use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::errors::Errno;
 
 macro_rules! syscall_match {

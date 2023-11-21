@@ -4,7 +4,6 @@
 
 use fuchsia_zircon as zx;
 
-use crate::syscalls::decls::Syscall;
 use starnix_uapi::uapi::user_regs_struct;
 
 /// The state of the task's registers when the thread of execution entered the kernel.
@@ -24,7 +23,7 @@ pub struct RegisterState {
 
 impl RegisterState {
     /// Saves any register state required to restart `syscall`.
-    pub fn save_registers_for_restart(&mut self, _syscall: &Syscall) {
+    pub fn save_registers_for_restart(&mut self, _syscall_number: u64) {
         // The x0 register may be clobbered during syscall handling (for the return value), but is
         // needed when restarting a syscall.
         self.orig_a0 = self.a0;

@@ -11,10 +11,10 @@ use crate::{
         InotifyMask, WdNumber,
     },
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::WeakKey,
     auth::CAP_SYS_ADMIN,

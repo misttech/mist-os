@@ -12,12 +12,12 @@ use crate::{
     },
     logging::not_implemented,
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_old_dev_t,
     device_type::{DeviceType, LOOP_MAJOR},

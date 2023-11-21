@@ -10,11 +10,11 @@ use crate::{
     fs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
     logging::{log_info, log_warn},
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, error,
     errors::Errno,

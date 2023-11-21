@@ -12,9 +12,9 @@ use lock_sequence::{Locked, Unlocked};
 use crate::{
     logging::{log_error, log_info, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS},
     task::CurrentTask,
 };
+use starnix_syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
     errno, error,

@@ -19,7 +19,6 @@ use crate::{
     },
     logging::log_warn,
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
 };
 use fuchsia_zircon as zx;
@@ -30,6 +29,7 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
     auth::CAP_NET_RAW,

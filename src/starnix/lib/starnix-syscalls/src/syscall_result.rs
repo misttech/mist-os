@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::{FdFlags, FdNumber, WdNumber};
 use starnix_uapi::{
     file_mode::FileMode, open_flags::OpenFlags, seal_flags::SealFlags, signals::Signal,
     user_address::UserAddress,
@@ -36,27 +35,9 @@ impl From<SealFlags> for SyscallResult {
     }
 }
 
-impl From<FdFlags> for SyscallResult {
-    fn from(value: FdFlags) -> Self {
-        SyscallResult(value.bits() as u64)
-    }
-}
-
 impl From<OpenFlags> for SyscallResult {
     fn from(value: OpenFlags) -> Self {
         SyscallResult(value.bits() as u64)
-    }
-}
-
-impl From<FdNumber> for SyscallResult {
-    fn from(value: FdNumber) -> Self {
-        SyscallResult(value.raw() as u64)
-    }
-}
-
-impl From<WdNumber> for SyscallResult {
-    fn from(value: WdNumber) -> Self {
-        SyscallResult(value.raw() as u64)
     }
 }
 

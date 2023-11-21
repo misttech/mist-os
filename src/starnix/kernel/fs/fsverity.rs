@@ -146,10 +146,10 @@ pub mod ioctl {
         },
         log_warn,
         mm::{MemoryAccessor, MemoryAccessorExt},
-        syscalls::{SyscallResult, SUCCESS},
         task::CurrentTask,
     };
     use num_traits::FromPrimitive;
+    use starnix_syscalls::{SyscallResult, SUCCESS};
     use starnix_uapi::{
         errno, error,
         errors::Errno,

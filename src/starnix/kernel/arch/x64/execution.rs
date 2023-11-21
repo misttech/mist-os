@@ -2,12 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    syscalls::{
-        decls::{Syscall, SyscallDecl},
-        SyscallArg,
-    },
-    task::CurrentTask,
+use crate::task::CurrentTask;
+use starnix_syscalls::{
+    decls::{Syscall, SyscallDecl},
+    SyscallArg,
 };
 
 /// Generates CFI directives so the unwinder will be redirected to unwind the stack provided in `state`.
@@ -66,17 +64,14 @@ macro_rules! restore_cfi_directives {
 pub(crate) use generate_cfi_directives;
 pub(crate) use restore_cfi_directives;
 
-impl Syscall {
-    /// Populates the syscall parameters from the x64 registers.
-    pub fn new(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
-        Syscall {
-            decl: syscall_decl,
-            arg0: SyscallArg::from_raw(current_task.registers.rdi),
-            arg1: SyscallArg::from_raw(current_task.registers.rsi),
-            arg2: SyscallArg::from_raw(current_task.registers.rdx),
-            arg3: SyscallArg::from_raw(current_task.registers.r10),
-            arg4: SyscallArg::from_raw(current_task.registers.r8),
-            arg5: SyscallArg::from_raw(current_task.registers.r9),
-        }
+pub fn new_syscall(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
+    Syscall {
+        decl: syscall_decl,
+        arg0: SyscallArg::from_raw(current_task.registers.rdi),
+        arg1: SyscallArg::from_raw(current_task.registers.rsi),
+        arg2: SyscallArg::from_raw(current_task.registers.rdx),
+        arg3: SyscallArg::from_raw(current_task.registers.r10),
+        arg4: SyscallArg::from_raw(current_task.registers.r8),
+        arg5: SyscallArg::from_raw(current_task.registers.r9),
     }
 }

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    arch::execution::new_syscall,
     fs::{
         fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
         FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions,
@@ -10,11 +11,7 @@ use crate::{
     logging::log_trace,
     mm::MemoryManager,
     signals::dequeue_signal,
-    syscalls::{
-        decls::{Syscall, SyscallDecl},
-        table::dispatch_syscall,
-        SyscallResult,
-    },
+    syscalls::table::dispatch_syscall,
     task::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
         Waiter,
@@ -28,6 +25,10 @@ use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use lock_sequence::{Locked, Unlocked};
+use starnix_syscalls::{
+    decls::{Syscall, SyscallDecl},
+    SyscallResult,
+};
 use starnix_uapi::{errno, errors::Errno, mount_flags::MountFlags};
 use std::{convert::TryFrom, sync::Arc};
 
@@ -65,11 +66,11 @@ pub fn execute_syscall(
     syscall_decl: SyscallDecl,
 ) -> Option<ErrorContext> {
     #[cfg(feature = "syscall_stats")]
-    SyscallDecl::stats_property(syscall_decl.number).add(1);
+    crate::syscalls::syscall_stats::syscall_stats_property(syscall_decl.number).add(1);
 
-    let syscall = Syscall::new(syscall_decl, current_task);
+    let syscall = new_syscall(syscall_decl, current_task);
 
-    current_task.registers.save_registers_for_restart(&syscall);
+    current_task.registers.save_registers_for_restart(syscall.decl.number);
 
     log_trace!("{:?}", syscall);
 

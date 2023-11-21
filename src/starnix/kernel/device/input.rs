@@ -12,9 +12,9 @@ use crate::{
     },
     logging::{log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},
     error,

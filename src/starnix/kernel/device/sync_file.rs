@@ -10,7 +10,6 @@ use crate::{
     },
     logging::{impossible_error, log_warn},
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
         WaitCanceler, Waiter,
@@ -19,6 +18,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     c_char, error,
     errors::Errno,

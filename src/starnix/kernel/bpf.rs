@@ -23,11 +23,11 @@ use crate::{
     },
     logging::{log_trace, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::{SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel},
 };
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::{declare_lock_levels, OrderedMutex};
+use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,

@@ -19,7 +19,6 @@ use crate::{
     signals::{
         send_standard_signal, RunState, SignalActions, SignalDetail, SignalInfo, SignalState,
     },
-    syscalls::{decls::Syscall, SyscallResult},
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, Kernel, PidTable,
         ProcessEntryRef, ProcessGroup, PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilter,
@@ -34,6 +33,7 @@ use fuchsia_zircon::{
 };
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
+use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
     auth::{
         PtraceAccessMode, CAP_KILL, CAP_SYS_ADMIN, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,

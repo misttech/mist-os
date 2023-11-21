@@ -16,13 +16,13 @@ use crate::{
     fs::{FdNumber, FileHandle, MountNamespaceFile},
     logging::{log_error, log_trace, not_implemented},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
-    syscalls::SyscallResult,
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
         ptrace_dispatch, ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers,
         SchedulerPolicy, SeccompAction, SeccompStateValue, Task, PR_SET_PTRACER_ANY,
     },
 };
+use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
     auth::{
@@ -1620,7 +1620,8 @@ pub fn sys_kcmp(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{mm::syscalls::sys_munmap, syscalls::SUCCESS, testing::*};
+    use crate::{mm::syscalls::sys_munmap, testing::*};
+    use starnix_syscalls::SUCCESS;
     use starnix_uapi::{SCHED_FIFO, SCHED_NORMAL};
     use std::{mem, u64};
 

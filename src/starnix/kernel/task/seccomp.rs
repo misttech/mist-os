@@ -11,7 +11,6 @@ use crate::{
     logging::log_warn,
     mm::MemoryAccessorExt,
     signals::{send_standard_signal, SignalDetail, SignalInfo},
-    syscalls::{decls::Syscall, SyscallArg, SyscallResult},
     task::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
@@ -19,6 +18,7 @@ use crate::{
 };
 use bstr::ByteSlice;
 use starnix_lock::Mutex;
+use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error,
     errors::Errno,

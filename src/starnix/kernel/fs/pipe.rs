@@ -13,10 +13,10 @@ use crate::{
     },
     mm::{MemoryAccessorExt, PAGE_SIZE},
     signals::{send_standard_signal, SignalInfo},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     errno, error,
     errors::Errno,

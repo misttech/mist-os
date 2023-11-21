@@ -13,12 +13,12 @@ use crate::{
     logging::{log_trace, log_warn},
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{SignalDetail, SignalInfo, SignalState},
-    syscalls::SyscallResult,
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
 };
 use extended_pstate::ExtendedPstateState;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::RwLockWriteGuard;
+use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,
     errors::{

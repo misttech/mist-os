@@ -12,7 +12,6 @@ use crate::{
         restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
         SI_HEADER_SIZE,
     },
-    syscalls::SyscallResult,
     task::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,
@@ -20,6 +19,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
+use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,
     errors::{Errno, ErrnoResultExt, ETIMEDOUT},

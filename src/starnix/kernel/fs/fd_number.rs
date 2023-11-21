@@ -6,6 +6,7 @@ use std::fmt;
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::fs::FsStr;
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errno, errors::Errno, AT_FDCWD};
 
 // NB: We believe deriving Default (i.e., have a default FdNumber of 0) will be error-prone.
@@ -31,6 +32,18 @@ impl FdNumber {
         let name = std::str::from_utf8(s).map_err(|_| errno!(EINVAL))?;
         let num = name.parse::<i32>().map_err(|_| errno!(EINVAL))?;
         Ok(FdNumber(num))
+    }
+}
+
+impl std::convert::From<FdNumber> for SyscallResult {
+    fn from(value: FdNumber) -> Self {
+        value.raw().into()
+    }
+}
+
+impl std::convert::From<SyscallArg> for FdNumber {
+    fn from(value: SyscallArg) -> Self {
+        FdNumber::from_raw(value.into())
     }
 }
 

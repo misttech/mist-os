@@ -8,9 +8,9 @@ use crate::{
         default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
     logging::log,
-    syscalls::{SyscallArg, SyscallResult},
     task::CurrentTask,
 };
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
 pub struct SyslogFile;

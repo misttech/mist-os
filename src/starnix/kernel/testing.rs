@@ -22,9 +22,9 @@ use crate::{
         syscalls::{do_mmap, sys_mremap},
         MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE,
     },
-    syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, Kernel, Task},
 };
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     errors::Errno,
     open_flags::OpenFlags,

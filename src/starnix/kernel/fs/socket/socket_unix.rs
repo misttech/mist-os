@@ -17,9 +17,9 @@ use crate::{
         FdEvents, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext,
     },
     mm::MemoryAccessorExt,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EventHandler, Task, WaitCanceler, WaitQueue, Waiter},
 };
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     errno, error,
     errors::{Errno, EACCES, EINTR, EPERM},

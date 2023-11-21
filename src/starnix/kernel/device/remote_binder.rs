@@ -11,7 +11,6 @@ use crate::{
     },
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
 };
 use anyhow::{Context, Error};
@@ -32,6 +31,7 @@ use futures::{
     Future, Stream, StreamExt, TryStreamExt,
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, errno_from_code, error,

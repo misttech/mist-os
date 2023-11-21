@@ -20,12 +20,12 @@ use crate::{
     },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,
     auth::{CAP_DAC_READ_SEARCH, CAP_SYS_ADMIN, CAP_WAKE_ALARM, PTRACE_MODE_ATTACH_REALCREDS},

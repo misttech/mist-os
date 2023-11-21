@@ -8,6 +8,7 @@ use crate::{
 };
 use bitflags::bitflags;
 use starnix_lock::Mutex;
+use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error, errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef,
     resource_limits::Resource, FD_CLOEXEC,
@@ -17,6 +18,12 @@ use std::sync::Arc;
 bitflags! {
     pub struct FdFlags: u32 {
         const CLOEXEC = FD_CLOEXEC;
+    }
+}
+
+impl std::convert::From<FdFlags> for SyscallResult {
+    fn from(value: FdFlags) -> Self {
+        value.bits().into()
     }
 }
 

@@ -14,9 +14,9 @@ use crate::{
         },
         FdEvents, FileHandle, FileObject, FileOps,
     },
-    syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
 };
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{error, errors::Errno, open_flags::OpenFlags};
 
 pub fn new_socket_file(

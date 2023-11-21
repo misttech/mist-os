@@ -18,7 +18,6 @@ use crate::{
     },
     logging::{impossible_error, log_warn},
     mm::ProtectionFlags,
-    syscalls::{SyscallArg, SyscallResult},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vmex_resource::VMEX_RESOURCE,
 };
@@ -28,6 +27,7 @@ use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,

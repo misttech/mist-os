@@ -10,7 +10,6 @@ use crate::{
     logging::{log_warn, set_current_task_info, set_zx_name},
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
-    syscalls::decls::SyscallDecl,
     task::{
         CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, TaskFlags, ThreadGroup,
         ThreadGroupWriteGuard,
@@ -22,6 +21,7 @@ use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
 use lock_sequence::{Locked, Unlocked};
+use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
     errors::Errno, from_status_like_fdio, ownership::ReleasableByRef, pid_t, signals::SIGKILL,
 };

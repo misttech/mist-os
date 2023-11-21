@@ -26,7 +26,6 @@ use crate::{
     },
     logging::{impossible_error, log_error, log_warn, set_zx_name},
     mm::{MemoryAccessorExt, ProtectionFlags},
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::CurrentTask,
 };
 use fidl_fuchsia_logger;
@@ -150,6 +149,7 @@ use magma::{
     MAGMA_STATUS_OK,
 };
 use starnix_lock::Mutex;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,

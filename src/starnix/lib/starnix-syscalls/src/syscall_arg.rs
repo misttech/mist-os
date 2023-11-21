@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::{FdNumber, WdNumber};
 use starnix_uapi::{
     device_type::DeviceType,
     file_mode::FileMode,
@@ -70,11 +69,9 @@ impl_from_syscall_arg! { for u64: arg => arg.raw() as Self }
 impl_from_syscall_arg! { for UserAddress: arg => Self::from(arg.raw()) }
 impl_from_syscall_arg! { for UserCString: arg => Self::new(arg.into()) }
 
-impl_from_syscall_arg! { for FdNumber: arg => Self::from_raw(arg.raw() as i32) }
 impl_from_syscall_arg! { for FileMode: arg => Self::from_bits(arg.raw() as u32) }
 impl_from_syscall_arg! { for DeviceType: arg => Self::from_bits(arg.raw()) }
 impl_from_syscall_arg! { for UncheckedSignal: arg => Self::new(arg.raw()) }
-impl_from_syscall_arg! { for WdNumber: arg => Self::from_raw(arg.raw() as i32) }
 
 impl<T> From<SyscallArg> for UserRef<T> {
     fn from(arg: SyscallArg) -> UserRef<T> {

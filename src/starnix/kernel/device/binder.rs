@@ -23,7 +23,6 @@ use crate::{
         MemoryAccessorExt, ProtectionFlags,
     },
     mutable_state::Guard,
-    syscalls::{SyscallArg, SyscallResult, SUCCESS},
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
     },
@@ -35,6 +34,7 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
+use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::ArcKey,
     binder_buffer_object, binder_driver_command_protocol,
