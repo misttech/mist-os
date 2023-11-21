@@ -170,7 +170,7 @@ Specifically, the protocol
 is used to write and monitor internationalization-related settings.
 
 ```fidl {:.devsite-disable-click-to-copy}
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/fidl/fuchsia.settings/intl.fidl" indented_block="protocol Intl" exclude_regexp="(//.*)|(^$)" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="sdk/fidl/fuchsia.settings/intl.fidl" indented_block="closed protocol Intl" exclude_regexp="(//.*)|(^$)" %}
 ```
 
 ```fidl {:.devsite-disable-click-to-copy}
