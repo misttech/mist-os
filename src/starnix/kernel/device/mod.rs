@@ -6,6 +6,7 @@ mod binder;
 mod common;
 mod features;
 mod framebuffer_server;
+mod input_event_conversion;
 mod perfetto_consumer;
 mod registry;
 mod remote_binder;
