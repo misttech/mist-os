@@ -50,12 +50,25 @@ type Updater interface {
 
 func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
 	logger.Infof(ctx, "Checking system log for errors")
-	cmd := []string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"}
 
+	// Try to dump logs using the new logger.
 	var stdout bytes.Buffer
-
-	if err := c.Run(ctx, cmd, &stdout, os.Stderr); err != nil {
-		return err
+	if err := c.Run(
+		ctx,
+		[]string{"log_listener", "--tag", "system-updater", "dump"},
+		&stdout,
+		os.Stderr,
+	); err != nil {
+		// Otherwise fall back to the old logger
+		stdout = bytes.Buffer{}
+		if err := c.Run(
+			ctx,
+			[]string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"},
+			&stdout,
+			os.Stderr,
+		); err != nil {
+			return err
+		}
 	}
 
 	re := regexp.MustCompile("skipping unsupported .* type:")
