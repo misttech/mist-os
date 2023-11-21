@@ -448,6 +448,7 @@ def _fuchsia_product_bundle_impl(ctx):
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
     ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_ffx_isolate_dir")
     product_name = "{}.{}".format(ctx.attr.product_name, ctx.attr.board_name)
+    delivery_blob_type = ctx.attr.delivery_blob_type
 
     # In the future, the product bundles should be versioned independently of
     # the sdk version. So far they have been the same value.
@@ -470,6 +471,9 @@ def _fuchsia_product_bundle_impl(ctx):
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
     ]
+
+    if delivery_blob_type:
+        ffx_invocation.append("--delivery-blob-type " + delivery_blob_type)
 
     # Gather the environment variables needed in the script.
     env = {
@@ -559,6 +563,9 @@ fuchsia_product_bundle = rule(
         "board_name": attr.string(
             doc = "Name of the board this PB runs on. E.g. qemu-x64",
             mandatory = True,
+        ),
+        "delivery_blob_type": attr.string(
+            doc = "Delivery blob type of the product bundle.",
         ),
         "partitions_config": attr.label(
             doc = "Partitions config to use",
