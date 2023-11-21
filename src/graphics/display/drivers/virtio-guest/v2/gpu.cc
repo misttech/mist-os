@@ -249,8 +249,8 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
 
     std::string debug_name =
         fxl::StringPrintf("virtio-gpu-display[%lu]", fsl::GetCurrentProcessKoid());
-    auto set_debug_status = sysmem_->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
-                                                        fsl::GetCurrentProcessKoid());
+    auto set_debug_status = sysmem->SetDebugClientInfo(fidl::StringView::FromExternal(debug_name),
+                                                       fsl::GetCurrentProcessKoid());
     if (!set_debug_status.ok()) {
       FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
               set_debug_status.status_string());
