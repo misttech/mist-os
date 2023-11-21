@@ -10,15 +10,18 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
     fn define_configuration(
         context: &ConfigurationContext<'_>,
         config: &BluetoothConfig,
-        _builder: &mut dyn ConfigurationBuilder,
+        builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         // Snoop is only useful when Inspect filtering is turned on. In practice, this is in Eng &
         // UserDebug builds.
-        // TODO(b/310964410): Currently a no-op. Update rules for snoop after the soft-migration.
         match (context.build_type, config.snoop) {
             (BuildType::User, _) => {}
-            (_, Snoop::Eager) => {}
-            (_, Snoop::Lazy) => {}
+            (_, Snoop::Eager) => {
+                builder.platform_bundle("bluetooth_snoop_eager");
+            }
+            (_, Snoop::Lazy) => {
+                builder.platform_bundle("bluetooth_snoop_lazy");
+            }
             (_, Snoop::None) => {}
         }
 

@@ -171,6 +171,12 @@
             availability: "optional",
         },
         {
+            protocol: "fuchsia.bluetooth.snoop.Snoop",
+            from: "#bt-snoop",
+            to: "#bluetooth-core",
+            source_availability: "unknown",
+        },
+        {
             protocol: [ "fuchsia.device.NameProvider" ],
             from: "parent",
             to: [

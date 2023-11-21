@@ -22,10 +22,5 @@
             to: [ "#bt-snoop" ],
             subdir: "bt-hci",
         },
-        {
-            protocol: [ "fuchsia.bluetooth.snoop.Snoop" ],
-            from: "#bt-snoop",
-            to: [ "#bluetooth-core" ],
-        },
     ],
 }

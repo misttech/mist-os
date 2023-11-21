@@ -48,6 +48,7 @@
         {
             protocol: [ "fuchsia.bluetooth.snoop.Snoop" ],
             from: "parent",
+            availability: "optional",
         },
     ],
     offer: [
