@@ -26,12 +26,7 @@ executable("display_detect") {
   ]
 }
 
-fuchsia_package_with_single_component("display-detect-pkg") {
-  manifest = "meta/display-detect.cml"
-  deps = [ ":display_detect" ]
-}
-
-fuchsia_shell_package("display-detect") {
+fuchsia_package_with_single_component("display-detect") {
   manifest = "meta/display-detect.cml"
   deps = [ ":display_detect" ]
 }

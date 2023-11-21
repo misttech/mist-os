@@ -24,7 +24,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("export-ffs") {
+fuchsia_package("export-ffs") {
   deps = [ ":bin" ]
 }
 

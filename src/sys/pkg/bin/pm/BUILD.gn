@@ -34,7 +34,7 @@ go_binary("pm_bin") {
   sdk_category = "partner"
 }
 
-fuchsia_shell_package("pm") {
+fuchsia_package_with_single_component("pm") {
   manifest = "meta/pm.cml"
   deps = [ ":pm_bin" ]
 }

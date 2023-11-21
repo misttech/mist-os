@@ -298,7 +298,7 @@ group("package_deps") {
     "//src/starnix:benchmarks",
     "//src/tests/benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
-    "//third_party/sbase",
+    "//third_party/sbase:sbase-pkgs",
 
     # Many tests use sl4f to communicate with the target.
     "//src/testing/sl4f",
@@ -306,7 +306,7 @@ group("package_deps") {
     # These are used by netstack benchmarks.
     "//src/connectivity/network/netstack3:netstack3_benchmarks",
     "//src/connectivity/network/tests/benchmarks",
-    "//third_party/iperf",
+    "//third_party/iperf:iperf3_pkg",
 
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",

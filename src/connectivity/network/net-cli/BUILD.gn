@@ -103,7 +103,7 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("net-cli") {
+fuchsia_package("net-cli") {
   deps = [
     ":bin",
     "//build/validate:non_production_tag",

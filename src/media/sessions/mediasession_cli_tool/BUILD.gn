@@ -23,6 +23,6 @@ rustc_binary("mediasession_cli_tool_bin") {
   sources = [ "src/main.rs" ]
 }
 
-fuchsia_shell_package("mediasession_cli_tool") {
+fuchsia_package("mediasession_cli_tool") {
   deps = [ ":mediasession_cli_tool_bin" ]
 }

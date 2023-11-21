@@ -32,6 +32,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("bt-intel-tool") {
+fuchsia_package("bt-intel-tool") {
   deps = [ ":bin" ]
 }

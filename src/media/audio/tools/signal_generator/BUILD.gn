@@ -27,6 +27,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("signal_generator") {
+fuchsia_package("signal_generator") {
   deps = [ ":bin" ]
 }

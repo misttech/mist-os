@@ -17,7 +17,7 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("log") {
+fuchsia_package("log") {
   deps = [ ":bin" ]
 }
 

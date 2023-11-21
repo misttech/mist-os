@@ -62,7 +62,7 @@ executable("bin") {
 }
 
 # Traditional CLI package.
-fuchsia_shell_package("hwstress_cli") {
+fuchsia_package("hwstress_cli") {
   package_name = "hwstress-cli"
   deps = [ ":bin" ]
 }

@@ -25,6 +25,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("activity-ctl") {
+fuchsia_package("activity-ctl") {
   deps = [ ":bin" ]
 }

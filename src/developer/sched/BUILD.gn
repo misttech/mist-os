@@ -35,7 +35,7 @@ executable("bin") {
   deps = [ ":lib" ]
 }
 
-fuchsia_shell_package("sched") {
+fuchsia_package("sched") {
   deps = [ ":bin" ]
 }
 

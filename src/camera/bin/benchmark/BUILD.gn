@@ -36,6 +36,6 @@ executable("camera_benchmark_bin") {
   ]
 }
 
-fuchsia_shell_package("camera_benchmark") {
+fuchsia_package("camera_benchmark") {
   deps = [ ":camera_benchmark_bin" ]
 }

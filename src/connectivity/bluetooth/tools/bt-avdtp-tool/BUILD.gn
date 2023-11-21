@@ -33,7 +33,7 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("bt-avdtp-tool") {
+fuchsia_package("bt-avdtp-tool") {
   deps = [ ":bin" ]
 }
 

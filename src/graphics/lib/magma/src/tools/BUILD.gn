@@ -32,7 +32,7 @@ fuchsia_test_component("magma-info-cmp") {
   test_type = "system"
 }
 
-fuchsia_shell_package("magma-info") {
+fuchsia_package("magma-info") {
   deps = [ ":magma-info-bin" ]
 }
 

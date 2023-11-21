@@ -20,6 +20,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("vol") {
+fuchsia_package("vol") {
   deps = [ ":bin" ]
 }

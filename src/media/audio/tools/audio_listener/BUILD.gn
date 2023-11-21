@@ -22,6 +22,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("audio_listener") {
+fuchsia_package("audio_listener") {
   deps = [ ":bin" ]
 }

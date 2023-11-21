@@ -16,6 +16,6 @@ group("for_transition") {
   public_deps = [ ":donut" ]
 }
 
-fuchsia_shell_package("donut") {
+fuchsia_package("donut") {
   deps = [ "cli:bin" ]
 }

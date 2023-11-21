@@ -173,7 +173,7 @@ if (!is_kernel) {
   # bssl command line tool #
   ##########################
   if (is_fuchsia) {
-    fuchsia_shell_package("boringssl_tool") {
+    fuchsia_package("boringssl_tool") {
       deps = [ ":bssl" ]
     }
   } else {

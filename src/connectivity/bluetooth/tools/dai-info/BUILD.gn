@@ -21,6 +21,6 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("dai-info") {
+fuchsia_package("dai-info") {
   deps = [ ":bin" ]
 }

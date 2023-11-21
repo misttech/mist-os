@@ -27,6 +27,6 @@ executable("wav_player_bin") {
   ]
 }
 
-fuchsia_shell_package("wav_player") {
+fuchsia_package("wav_player") {
   deps = [ ":wav_player_bin" ]
 }

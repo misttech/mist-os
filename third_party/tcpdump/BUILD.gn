@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 
-fuchsia_shell_package("tcpdump") {
+fuchsia_package("tcpdump") {
   deps = [ ":bin" ]
 }
 

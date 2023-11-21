@@ -28,6 +28,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("virtual_audio_util") {
+fuchsia_package("virtual_audio_util") {
   deps = [ ":bin" ]
 }

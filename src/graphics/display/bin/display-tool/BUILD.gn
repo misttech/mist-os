@@ -46,7 +46,7 @@ rustc_binary("bin") {
   test_deps = [ "//src/lib/fuchsia" ]
 }
 
-fuchsia_shell_package("display-tool") {
+fuchsia_package_with_single_component("display-tool") {
   manifest = "meta/display-tool.cml"
   deps = [ ":bin" ]
 }

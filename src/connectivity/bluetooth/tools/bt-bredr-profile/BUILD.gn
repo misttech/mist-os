@@ -37,7 +37,7 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("bt-bredr-profile") {
+fuchsia_package("bt-bredr-profile") {
   deps = [ ":bin" ]
 }
 

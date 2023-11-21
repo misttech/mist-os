@@ -66,7 +66,7 @@ rustc_binary("bin") {
   ]
 }
 
-fuchsia_shell_package("lowpanctl") {
+fuchsia_package("lowpanctl") {
   deps = [ ":bin" ]
 }
 

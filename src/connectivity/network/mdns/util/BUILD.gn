@@ -9,7 +9,7 @@ group("util") {
   deps = [ ":mdns-util" ]
 }
 
-fuchsia_shell_package("mdns-util") {
+fuchsia_package("mdns-util") {
   deps = [ ":bin" ]
 }
 

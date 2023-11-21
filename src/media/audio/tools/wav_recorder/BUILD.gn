@@ -26,6 +26,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("wav_recorder") {
+fuchsia_package("wav_recorder") {
   deps = [ ":bin" ]
 }

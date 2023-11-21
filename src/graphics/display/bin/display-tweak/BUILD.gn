@@ -39,7 +39,7 @@ fuchsia_package_with_single_component("display-tweak-pkg") {
   deps = [ ":bin" ]
 }
 
-fuchsia_shell_package("display-tweak") {
+fuchsia_package("display-tweak") {
   deps = [ ":bin" ]
 }
 

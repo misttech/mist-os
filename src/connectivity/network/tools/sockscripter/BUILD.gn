@@ -68,7 +68,7 @@ fuchsia_unittest_package("sockscripter-unittest") {
   deps = [ ":sockscripter_test" ]
 }
 
-fuchsia_shell_package("package") {
+fuchsia_package("package") {
   package_name = "sockscripter"
   deps = [ ":bin" ]
 }

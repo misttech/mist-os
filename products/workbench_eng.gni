@@ -61,5 +61,8 @@ fxfs_blob = true
 legacy_base_package_labels = [ "//src/connectivity:tools" ]
 
 # Debugging support
-discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]
+discoverable_package_labels = [
+  "//bundles/tools",
+  "//src/developer/debug/debug_agent",
+]
 # END: Baseline eng support

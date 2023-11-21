@@ -77,7 +77,7 @@ group("factory_reset") {
   deps = [ ":factory_reset_pkg" ]
 }
 
-fuchsia_shell_package("fdr_cli") {
+fuchsia_package("fdr_cli") {
   deps = [ ":fdr" ]
 }
 

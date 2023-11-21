@@ -8,6 +8,7 @@ import("//build/assembly/kernel_aib.gni")
 import("//build/bazel/bazel_inputs.gni")
 import("//build/icu/icu_assembly_input_bundle.gni")
 import("//bundles/assembly/platform_aibs.gni")
+import("//third_party/sbase/binaries.gni")
 import("//zircon/kernel/phys/qemu.gni")
 
 ########
@@ -771,6 +772,227 @@ assembly_input_bundle("core_realm_eng") {
       ]
     },
   ]
+
+  # Included with //bundles/tools.
+  shell_commands += [
+    {
+      package = "sched"
+      components = [ "sched" ]
+    },
+    {
+      package = "cowsay"
+      components = [ "cowsay" ]
+    },
+    {
+      package = "hwstress-cli"
+      components = [ "hwstress" ]
+    },
+    {
+      package = "time"
+      components = [ "time" ]
+    },
+    {
+      package = "uname"
+      components = [ "uname" ]
+    },
+    {
+      package = "far"
+      components = [ "far" ]
+    },
+    {
+      package = "trace"
+      components = [ "trace" ]
+    },
+    {
+      package = "camera_benchmark"
+      components = [ "camera_benchmark_bin" ]
+    },
+    {
+      package = "camera_sensor_cli"
+      components = [ "camera_sensor_cli_bin" ]
+    },
+    {
+      package = "lowpanctl"
+      components = [ "lowpanctl" ]
+    },
+    {
+      package = "nc"
+      components = [ "nc" ]
+    },
+    {
+      package = "sockscripter"
+      components = [ "sockscripter" ]
+    },
+    {
+      package = "iperf3"
+      components = [ "iperf3" ]
+    },
+    {
+      package = "tcpdump"
+      components = [ "tcpdump" ]
+    },
+    {
+      package = "mdns-util"
+      components = [ "mdns-util" ]
+    },
+    {
+      package = "net-cli"
+      components = [ "net" ]
+    },
+    {
+      package = "donut"
+      components = [ "donut" ]
+    },
+    {
+      package = "dai-info"
+      components = [ "dai-info" ]
+    },
+    {
+      package = "bt-bredr-profile"
+      components = [ "bt-bredr-profile" ]
+    },
+    {
+      package = "bt-cli"
+      components = [ "bt-cli" ]
+    },
+    {
+      package = "bt-le-central"
+      components = [ "bt-le-central" ]
+    },
+    {
+      package = "bt-le-peripheral"
+      components = [ "bt-le-peripheral" ]
+    },
+    {
+      package = "bt-pairing-tool"
+      components = [ "bt-pairing-tool" ]
+    },
+    {
+      package = "bt-snoop-cli"
+      components = [ "bt-snoop-cli" ]
+    },
+    {
+      package = "bt-fct-hci"
+      components = [ "bt-fct-hci" ]
+    },
+    {
+      package = "bt-hci-tool"
+      components = [ "bt-hci-tool" ]
+    },
+    {
+      package = "bt-intel-tool"
+      components = [ "bt-intel-tool" ]
+    },
+    {
+      package = "bt-avdtp-tool"
+      components = [ "bt-avdtp-tool" ]
+    },
+    {
+      package = "bt-avrcp-controller"
+      components = [ "bt-avrcp-controller" ]
+    },
+    {
+      package = "display-detect"
+      components = [ "display_detect" ]
+    },
+    {
+      package = "display-png"
+      components = [ "display_png" ]
+    },
+    {
+      package = "display-tool"
+      components = [ "display-tool" ]
+    },
+    {
+      package = "display-tweak"
+      components = [ "display-tweak" ]
+    },
+    {
+      package = "magma-info"
+      components = [ "magma-info" ]
+    },
+    {
+      package = "audio_listener"
+      components = [ "audio_listener" ]
+    },
+    {
+      package = "signal_generator"
+      components = [ "signal_generator" ]
+    },
+    {
+      package = "virtual_audio_util"
+      components = [ "virtual_audio" ]
+    },
+    {
+      package = "vol"
+      components = [ "vol" ]
+    },
+    {
+      package = "wav_player"
+      components = [ "wav_player" ]
+    },
+    {
+      package = "wav_recorder"
+      components = [ "wav_recorder" ]
+    },
+    {
+      package = "mediasession_cli_tool"
+      components = [ "mediasession_cli_tool" ]
+    },
+    {
+      package = "fdr_cli"
+      components = [ "fdr" ]
+    },
+    {
+      package = "export-ffs"
+      components = [ "export-ffs" ]
+    },
+    {
+      package = "pm"
+      components = [ "pm" ]
+    },
+    {
+      package = "activity-ctl"
+      components = [ "activity_ctl" ]
+    },
+    {
+      package = "log"
+      components = [ "log" ]
+    },
+    {
+      package = "input"
+      components = [ "input" ]
+    },
+    {
+      package = "boringssl_tool"
+      components = [ "bssl" ]
+    },
+    {
+      package = "curl"
+      components = [ "curl" ]
+    },
+    {
+      package = "scp"
+      components = [ "scp" ]
+    },
+    {
+      package = "ssh-keygen"
+      components = [ "ssh-keygen" ]
+    },
+    {
+      package = "ssh"
+      components = [ "ssh" ]
+    },
+  ]
+  foreach(bin, sbase_binaries) {
+    shell_commands += [
+      {
+        package = bin
+        components = [ bin ]
+      },
+    ]
+  }
+
   compiled_packages = [
     {
       name = "core"
@@ -2863,7 +3085,7 @@ assembly_input_bundle("emulator_support") {
 # Enabling a soft-transition, remove when complete
 # TODO(122864) Remove transitional labels
 group("third_party_sbase_for_transition") {
-  public_deps = [ "//third_party/sbase" ]
+  public_deps = [ "//third_party/sbase:sbase-pkgs" ]
 }
 
 # Assembly may select at most one bundle with `intl_services` name prefix.

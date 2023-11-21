@@ -32,6 +32,6 @@ executable("bin") {
   ]
 }
 
-fuchsia_shell_package("bt-hci-tool") {
+fuchsia_package("bt-hci-tool") {
   deps = [ ":bin" ]
 }

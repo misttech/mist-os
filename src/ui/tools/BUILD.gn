@@ -30,7 +30,7 @@ group("tests") {
 # have any CMX.
 non_component_tools = [ "input" ]
 foreach(tool, non_component_tools) {
-  fuchsia_shell_package(tool) {
+  fuchsia_package(tool) {
     deps = [ tool ]
   }
 }

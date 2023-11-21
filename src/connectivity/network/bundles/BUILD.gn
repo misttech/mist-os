@@ -6,7 +6,7 @@ group("tools") {
   testonly = true
   deps = [
     "//src/connectivity/network/tools",
-    "//third_party/iperf",
+    "//third_party/iperf:iperf3_pkg",
     "//third_party/tcpdump",
   ]
 }

@@ -33,9 +33,11 @@ group("tools") {
     "//src/sys/tools/log",
     "//src/ui/tools:scenic",
     "//third_party/boringssl:boringssl_tool",
-    "//third_party/curl",
-    "//third_party/iperf",
-    "//third_party/openssh-portable:openssh-tools",
+    "//third_party/curl:curl_pkg",
+    "//third_party/iperf:iperf3_pkg",
+    "//third_party/openssh-portable:scp-shell-pkg",
+    "//third_party/openssh-portable:ssh-keygen-shell-pkg",
+    "//third_party/openssh-portable:ssh-shell-pkg",
     "//tools",
 
     # Tools that are included via the host_toolchain are in a separate group for

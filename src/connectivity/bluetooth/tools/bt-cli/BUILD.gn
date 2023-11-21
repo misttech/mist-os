@@ -43,7 +43,7 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("bt-cli") {
+fuchsia_package("bt-cli") {
   deps = [ ":bin" ]
 }
 

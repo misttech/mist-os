@@ -35,7 +35,7 @@ rustc_binary("bin") {
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-fuchsia_shell_package("bt-avrcp-controller") {
+fuchsia_package("bt-avrcp-controller") {
   deps = [ ":bin" ]
 }
 

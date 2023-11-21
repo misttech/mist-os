@@ -55,7 +55,7 @@ source_set("options") {
   ]
 }
 
-fuchsia_shell_package("trace") {
+fuchsia_package("trace") {
   deps = [
     ":bin",
 

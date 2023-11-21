@@ -32,6 +32,6 @@ executable("camera_sensor_cli_bin") {
   ]
 }
 
-fuchsia_shell_package("camera_sensor_cli") {
+fuchsia_package("camera_sensor_cli") {
   deps = [ ":camera_sensor_cli_bin" ]
 }

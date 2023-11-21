@@ -4,6 +4,6 @@
 
 import("//build/components.gni")
 
-fuchsia_shell_package("nc") {
+fuchsia_package("nc") {
   deps = [ "third_party/openbsd-netcat:nc" ]
 }

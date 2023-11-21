@@ -26,12 +26,7 @@ rustc_binary("display_png") {
   sources = [ "display-png.rs" ]
 }
 
-fuchsia_package_with_single_component("display-png-pkg") {
-  manifest = "meta/display-png.cml"
-  deps = [ ":display_png" ]
-}
-
-fuchsia_shell_package("display-png") {
+fuchsia_package_with_single_component("display-png") {
   manifest = "meta/display-png.cml"
   deps = [ ":display_png" ]
 }

@@ -23,7 +23,7 @@ sdk_host_tool("bin_sdk") {
   deps = [ ":bin" ]
 }
 
-fuchsia_shell_package("far") {
+fuchsia_package("far") {
   deps = [ ":bin" ]
 }
 

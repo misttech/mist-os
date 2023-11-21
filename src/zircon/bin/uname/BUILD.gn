@@ -12,6 +12,6 @@ executable("bin") {
   deps = [ "//src/zircon/lib/zircon" ]
 }
 
-fuchsia_shell_package("uname") {
+fuchsia_package("uname") {
   deps = [ ":bin" ]
 }
