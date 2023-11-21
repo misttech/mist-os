@@ -1058,7 +1058,6 @@ mod tests {
         device::{binder::tests::run_process_accessor, BinderFs},
         fs::{FileSystemOptions, WhatToMount},
         mm::MemoryAccessor,
-        task::Task,
         testing::*,
     };
     use fidl::{
@@ -1115,7 +1114,7 @@ mod tests {
             )
             .expect("mount");
 
-            let task: AutoReleasableTask = Task::create_init_child_process(
+            let task: AutoReleasableTask = CurrentTask::create_init_child_process(
                 &kernel,
                 &CString::new("remote_binder".to_string()).expect("CString"),
             )

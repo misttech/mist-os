@@ -9,7 +9,7 @@ use crate::{
         FdEvents, FileHandle,
     },
     logging::log_error,
-    task::{CurrentTask, EventHandler, Kernel, Task, Waiter},
+    task::{CurrentTask, EventHandler, Kernel, Waiter},
 };
 use lock_sequence::{Locked, Unlocked};
 use perfetto_consumer_proto::perfetto::protos::{
@@ -518,7 +518,7 @@ pub fn start_perfetto_consumer_thread(
 ) -> Result<(), Errno> {
     let init_task_weak = kernel.pids.read().get_task(1);
     let init_task = init_task_weak.upgrade().ok_or_else(|| errno!(EINVAL))?;
-    let task = Task::create_process_without_parent(
+    let task = CurrentTask::create_process_without_parent(
         kernel,
         CString::new("perfetto_consumer".to_string()).unwrap(),
         // Perfetto consumer runs in a separate thread, not in the init task proper.

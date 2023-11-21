@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 mod abstract_socket_namespace;
+mod current_task;
 mod interval_timer;
 mod iptables;
 mod kernel;
@@ -22,6 +23,7 @@ mod uts_namespace;
 mod waiter;
 
 pub use abstract_socket_namespace::*;
+pub use current_task::*;
 pub use interval_timer::*;
 pub use iptables::*;
 pub use kernel::*;

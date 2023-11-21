@@ -365,6 +365,7 @@ rustc_binary("starnix_kernel_bin") {
     "syscalls/table.rs",
     "syscalls/time.rs",
     "task/abstract_socket_namespace.rs",
+    "task/current_task.rs",
     "task/interval_timer.rs",
     "task/iptables.rs",
     "task/kernel.rs",

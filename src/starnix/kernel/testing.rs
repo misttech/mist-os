@@ -79,14 +79,15 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
             .expect("failed to create kernel");
 
     let fs = FsContext::new(create_fs(&kernel));
-    let init_task = Task::create_process_without_parent(
+    let init_task = CurrentTask::create_process_without_parent(
         &kernel,
         CString::new("test-task").unwrap(),
         fs.clone(),
     )
     .expect("failed to create first task");
-    let system_task =
-        OwnedRefByRef::new(Task::create_system_task(&kernel, fs).expect("create system task"));
+    let system_task = OwnedRefByRef::new(
+        CurrentTask::create_system_task(&kernel, fs).expect("create system task"),
+    );
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     init_common_devices(kernel.kthreads.system_task());
@@ -105,7 +106,7 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
 ///
 /// The `Task` is backed by a real process, and can be used to test syscalls.
 pub fn create_task(kernel: &Arc<Kernel>, task_name: &str) -> AutoReleasableTask {
-    let task = Task::create_process_without_parent(
+    let task = CurrentTask::create_process_without_parent(
         kernel,
         CString::new(task_name).unwrap(),
         FsContext::new(create_pkgfs(kernel)),

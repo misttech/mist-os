@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    dynamic_thread_spawner::DynamicThreadSpawner,
-    task::{CurrentTask, Task},
-};
+use crate::{dynamic_thread_spawner::DynamicThreadSpawner, task::CurrentTask};
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
@@ -80,7 +77,7 @@ impl KernelThreads {
         &self,
     ) -> Result<OwnedRefByRef<CurrentTask>, Errno> {
         let system_task = self.system_task();
-        Ok(OwnedRefByRef::new(Task::create_system_task(
+        Ok(OwnedRefByRef::new(CurrentTask::create_system_task(
             system_task.kernel(),
             system_task.fs().clone(),
         )?))
@@ -91,7 +88,7 @@ impl KernelThreads {
     }
 
     pub fn new_system_thread(&self) -> Result<CurrentTask, Errno> {
-        Task::create_kernel_thread(self.system_task(), CString::new("[kthread]").unwrap())
+        CurrentTask::create_kernel_thread(self.system_task(), CString::new("[kthread]").unwrap())
     }
 
     pub fn spawn<F>(&self, f: F)

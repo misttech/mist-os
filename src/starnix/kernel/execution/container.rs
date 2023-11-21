@@ -14,7 +14,7 @@ use crate::{
         WhatToMount,
     },
     logging::{log_error, log_info, log_warn},
-    task::{CurrentTask, ExitStatus, Kernel, Task},
+    task::{CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
 };
 use anyhow::{anyhow, bail, Error};
@@ -333,7 +333,7 @@ async fn create_container(
     debug_assert!(init_pid == 1);
 
     let system_task = OwnedRefByRef::new(
-        Task::create_system_task(&kernel, Arc::clone(&fs_context))
+        CurrentTask::create_system_task(&kernel, Arc::clone(&fs_context))
             .source_context("create system task")?,
     );
 
@@ -464,7 +464,7 @@ fn create_init_task(
     } else {
         CString::new(config.init[0].clone())?
     };
-    let task = Task::create_init_process(kernel, pid, initial_name, fs_context)?;
+    let task = CurrentTask::create_init_process(kernel, pid, initial_name, fs_context)?;
     release_on_error!(task, (), {
         task.set_creds(credentials);
         set_rlimits(&task, &config.rlimits)?;

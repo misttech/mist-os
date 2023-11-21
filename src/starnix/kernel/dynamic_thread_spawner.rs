@@ -170,7 +170,7 @@ impl RunningThread {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
-                        match Task::create_kernel_thread(
+                        match CurrentTask::create_kernel_thread(
                             &system_task,
                             CString::new("[kthreadd]").unwrap(),
                         ) {
@@ -225,7 +225,7 @@ impl RunningThread {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
-                        match Task::create_kernel_thread(
+                        match CurrentTask::create_kernel_thread(
                             &system_task,
                             CString::new("[kthreadd]").unwrap(),
                         ) {

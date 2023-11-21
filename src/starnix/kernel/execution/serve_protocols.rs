@@ -13,7 +13,7 @@ use crate::{
         FdFlags, FileHandle,
     },
     logging::log_error,
-    task::{CurrentTask, ExitStatus, Kernel, Task},
+    task::{CurrentTask, ExitStatus, Kernel},
 };
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
@@ -177,7 +177,7 @@ fn create_task_with_pty(
     environ: Vec<CString>,
     window_size: uapi::winsize,
 ) -> Result<(CurrentTask, FileHandle), Errno> {
-    let mut current_task = Task::create_init_child_process(kernel, &binary_path)?;
+    let mut current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
     let pty = release_on_error!(current_task, (), {
         let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
         current_task.exec(executable, binary_path, argv, environ)?;
