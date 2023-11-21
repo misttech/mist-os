@@ -168,7 +168,7 @@ release branches. For example, If you want to remove a test from the CTF release
 for API level 20, your CL needs to be cherry picked onto the `releases/f20`
 branch.
 
-## Test requirements
+## Test requirements {#test-requirements}
 
 Every test must meet these requirements before being added to CTF.
 
