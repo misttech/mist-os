@@ -6,7 +6,7 @@ use anyhow::Result;
 use errors::ffx_error;
 use ffx_debug_connect::DebugAgentSocket;
 use fho::{deferred, moniker, Deferred, FfxContext, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_debugger::DebugAgentProxy;
+use fidl_fuchsia_debugger::LauncherProxy;
 use fuchsia_async::unblock;
 use sdk::SdkVersion;
 use std::process::Command;
@@ -52,7 +52,7 @@ pub struct FidlTool {
     cmd: ffx_debug_fidlcat_args::FidlcatCommand,
     sdk: ffx_config::Sdk,
     #[with(deferred(moniker("/core/debug_agent")))]
-    debugger_proxy: Deferred<DebugAgentProxy>,
+    launcher_proxy: Deferred<LauncherProxy>,
 }
 
 fho::embedded_plugin!(FidlTool);
@@ -62,7 +62,7 @@ impl FfxMain for FidlTool {
     type Writer = SimpleWriter;
 
     async fn main(self, _writer: SimpleWriter) -> fho::Result<()> {
-        let Self { cmd, sdk, debugger_proxy } = self;
+        let Self { cmd, sdk, launcher_proxy } = self;
 
         if let Err(e) = symbol_index::ensure_symbol_index_registered(&sdk).await {
             tracing::warn!("ensure_symbol_index_registered failed, error was: {:#?}", e);
@@ -75,7 +75,7 @@ impl FfxMain for FidlTool {
         if cmd.from.is_some() && cmd.from.as_ref().unwrap() != "device" {
             arguments.add_value("--from", &cmd.from.unwrap());
         } else {
-            let debugger_proxy = debugger_proxy.await?;
+            let debugger_proxy = launcher_proxy.await?;
             debug_agent_socket = Some(DebugAgentSocket::create(debugger_proxy)?);
         }
 

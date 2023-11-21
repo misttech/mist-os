@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Result};
 use errors::ffx_error;
-use fidl_fuchsia_debugger::DebugAgentProxy;
+use fidl_fuchsia_debugger as fdebugger;
 use fuchsia_async::{unblock, Task};
 use signal_hook::{consts::signal::SIGUSR1, iterator::Signals};
 use std::{path::PathBuf, process::Command};
@@ -19,7 +19,7 @@ pub struct Debugger {
 
 impl Debugger {
     /// Create a debugger that uses the given debug agent.
-    pub async fn new(debugger_proxy: DebugAgentProxy) -> Result<Self> {
+    pub async fn new(debugger_proxy: fdebugger::LauncherProxy) -> Result<Self> {
         let socket = DebugAgentSocket::create(debugger_proxy)?;
         Debugger::from_socket(socket).await
     }

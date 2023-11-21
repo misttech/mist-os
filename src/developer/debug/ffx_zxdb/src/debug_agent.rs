@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use async_net::unix::UnixListener;
+use fidl_fuchsia_debugger as fdebugger;
 use fuchsia_zircon_status::Status;
 use futures_util::{
     future::FutureExt,
@@ -17,18 +18,16 @@ use std::{
 /// Represents a connectable socket to the remote debug_agent. It's essentially a FIDL socket and a
 /// UNIX socket proxied by us.
 pub struct DebugAgentSocket {
-    debugger_proxy: fidl_fuchsia_debugger::DebugAgentProxy,
+    launcher_proxy: fdebugger::LauncherProxy,
     unix_socket_path: PathBuf,
     unix_socket: UnixListener,
 }
 
 impl DebugAgentSocket {
     /// Create a UNIX socket on the host side for zxdb/fidlcat to connect.
-    pub fn create(
-        debugger_proxy: fidl_fuchsia_debugger::DebugAgentProxy,
-    ) -> Result<DebugAgentSocket> {
+    pub fn create(launcher_proxy: fdebugger::LauncherProxy) -> Result<DebugAgentSocket> {
         let (unix_socket_path, unix_socket) = make_temp_unix_socket()?;
-        return Ok(DebugAgentSocket { debugger_proxy, unix_socket_path, unix_socket });
+        return Ok(DebugAgentSocket { launcher_proxy, unix_socket_path, unix_socket });
     }
 
     /// The path to the UNIX socket.
@@ -45,7 +44,17 @@ impl DebugAgentSocket {
 
         // Create a FIDL socket to the debug_agent on the device.
         let (fidl_left, fidl_right) = fidl::Socket::create_stream();
-        self.debugger_proxy.connect(fidl_right).await?.map_err(Status::from_raw)?;
+
+        let (client_proxy, server_end) =
+            fidl::endpoints::create_proxy::<fdebugger::DebugAgentMarker>()?;
+
+        // TODO(jruthe): give callers options to connect to already existing
+        // DebugAgents or to launch a new one rather than unconditionally
+        // starting a new one every time.
+        self.launcher_proxy.launch(server_end).await?.map_err(Status::from_raw)?;
+
+        client_proxy.connect(fidl_right).await?.map_err(Status::from_raw)?;
+
         let fidl_conn = fidl::AsyncSocket::from_socket(fidl_left)?;
 
         let (mut unix_rx, mut unix_tx) = unix_conn.split();

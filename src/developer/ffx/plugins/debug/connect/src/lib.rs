@@ -8,7 +8,7 @@ use errors::ffx_bail;
 use ffx_debug_connect_args::ConnectCommand;
 use ffx_zxdb::{forward_to_agent, Debugger};
 use fho::{moniker, FfxMain, FfxTool, SimpleWriter};
-use fidl_fuchsia_debugger::DebugAgentProxy;
+use fidl_fuchsia_debugger as fdebugger;
 use signal_hook::consts::signal::SIGINT;
 use std::{
     process::Command,
@@ -22,7 +22,7 @@ pub struct ConnectTool {
     #[command]
     cmd: ConnectCommand,
     #[with(moniker("/core/debug_agent"))]
-    debugger_proxy: fidl_fuchsia_debugger::DebugAgentProxy,
+    debugger_proxy: fdebugger::LauncherProxy,
 }
 
 fho::embedded_plugin!(ConnectTool);
@@ -37,7 +37,10 @@ impl FfxMain for ConnectTool {
     }
 }
 
-async fn connect_tool_impl(cmd: ConnectCommand, debugger_proxy: DebugAgentProxy) -> Result<()> {
+async fn connect_tool_impl(
+    cmd: ConnectCommand,
+    debugger_proxy: fdebugger::LauncherProxy,
+) -> Result<()> {
     let socket = DebugAgentSocket::create(debugger_proxy)?;
 
     if cmd.agent_only {
