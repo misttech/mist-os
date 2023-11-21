@@ -7,50 +7,40 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use windowed_stats::aggregations::{create_saturating_add_fn, SumAndCount};
-use windowed_stats::{
-    CombinedWindowedStats, FifteenMinutelyWindows, HourlyWindows, MinutelyWindows,
-};
+use windowed_stats::{FifteenMinutelyWindows, HourlyWindows, MinutelyWindows, TimeSeries};
 
-pub(crate) struct Stats {
-    pub(crate) reachability_lost_count: CombinedWindowedStats<u32>,
-    pub(crate) internet_available_sec: CombinedWindowedStats<i32>,
-    pub(crate) dns_active_sec: CombinedWindowedStats<i32>,
-    pub(crate) total_duration_sec: CombinedWindowedStats<i32>,
-    pub(crate) ipv4_state: CombinedWindowedStats<SumAndCount>,
-    pub(crate) ipv6_state: CombinedWindowedStats<SumAndCount>,
+#[derive(Debug)]
+pub struct Stats {
+    pub(crate) reachability_lost_count: TimeSeries<u32>,
+    pub(crate) internet_available_sec: TimeSeries<i32>,
+    pub(crate) dns_active_sec: TimeSeries<i32>,
+    pub(crate) total_duration_sec: TimeSeries<i32>,
+    pub(crate) ipv4_state: TimeSeries<SumAndCount>,
+    pub(crate) ipv6_state: TimeSeries<SumAndCount>,
 }
 
 impl Stats {
     pub(crate) fn new() -> Self {
         Self {
-            reachability_lost_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            internet_available_sec: CombinedWindowedStats::new(create_saturating_add_fn),
-            dns_active_sec: CombinedWindowedStats::new(create_saturating_add_fn),
+            reachability_lost_count: TimeSeries::new(create_saturating_add_fn),
+            internet_available_sec: TimeSeries::new(create_saturating_add_fn),
+            dns_active_sec: TimeSeries::new(create_saturating_add_fn),
 
             // `total_duration_sec` is served as the denominator for duration stats like
             // `internet_available_sec` and `dns_active_sec`. This is really only needed
             // for the most recent window, so we just instantiate window sizes 1 to save
             // space. For preceding windows with fully elapsed time, it's already implied
             // that for example, the denominator for the minutely window would be 60 seconds.
-            total_duration_sec: CombinedWindowedStats::with_n_windows(
+            total_duration_sec: TimeSeries::with_n_windows(
                 MinutelyWindows(1),
                 FifteenMinutelyWindows(1),
                 HourlyWindows(1),
                 create_saturating_add_fn,
             ),
 
-            ipv4_state: CombinedWindowedStats::new(create_saturating_add_fn),
-            ipv6_state: CombinedWindowedStats::new(create_saturating_add_fn),
+            ipv4_state: TimeSeries::new(create_saturating_add_fn),
+            ipv6_state: TimeSeries::new(create_saturating_add_fn),
         }
-    }
-
-    pub(crate) fn slide_minute(&mut self) {
-        self.reachability_lost_count.slide_minute();
-        self.internet_available_sec.slide_minute();
-        self.dns_active_sec.slide_minute();
-        self.total_duration_sec.slide_minute();
-        self.ipv4_state.slide_minute();
-        self.ipv6_state.slide_minute();
     }
 
     pub(crate) fn log_inspect(&mut self, node: &InspectNode) {

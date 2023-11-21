@@ -8,7 +8,7 @@ pub fn create_saturating_add_fn<T: SaturatingAdd>() -> Box<dyn Fn(&T, &T) -> T +
     Box::new(|value1, value2| value1.saturating_add(value2))
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub struct SumAndCount {
     pub sum: u32,
     pub count: u32,

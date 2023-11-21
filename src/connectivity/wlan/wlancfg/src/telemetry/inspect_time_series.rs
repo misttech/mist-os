@@ -8,24 +8,25 @@ use {
     parking_lot::Mutex,
     std::sync::Arc,
     windowed_stats::{
-        aggregations::create_saturating_add_fn, CombinedWindowedStats, FifteenMinutelyWindows,
-        HourlyWindows, MinutelyWindows,
+        aggregations::create_saturating_add_fn, FifteenMinutelyWindows, HourlyWindows,
+        MinutelyWindows, TimeSeries,
     },
 };
 
-pub(crate) struct TimeSeriesStats {
-    pub(crate) total_duration_sec: CombinedWindowedStats<i32>,
-    pub(crate) connected_duration_sec: CombinedWindowedStats<i32>,
-    pub(crate) connect_attempt_count: CombinedWindowedStats<u32>,
-    pub(crate) connect_successful_count: CombinedWindowedStats<u32>,
-    pub(crate) disconnect_count: CombinedWindowedStats<u32>,
+#[derive(Debug)]
+pub struct TimeSeriesStats {
+    pub(crate) total_duration_sec: TimeSeries<i32>,
+    pub(crate) connected_duration_sec: TimeSeries<i32>,
+    pub(crate) connect_attempt_count: TimeSeries<u32>,
+    pub(crate) connect_successful_count: TimeSeries<u32>,
+    pub(crate) disconnect_count: TimeSeries<u32>,
 
     // Packet counters stats, or stats calculated from packet counters
-    pub(crate) rx_unicast_total_count: CombinedWindowedStats<u32>,
-    pub(crate) rx_unicast_drop_count: CombinedWindowedStats<u32>,
-    pub(crate) tx_total_count: CombinedWindowedStats<u32>,
-    pub(crate) tx_drop_count: CombinedWindowedStats<u32>,
-    pub(crate) no_rx_duration_sec: CombinedWindowedStats<i32>,
+    pub(crate) rx_unicast_total_count: TimeSeries<u32>,
+    pub(crate) rx_unicast_drop_count: TimeSeries<u32>,
+    pub(crate) tx_total_count: TimeSeries<u32>,
+    pub(crate) tx_drop_count: TimeSeries<u32>,
+    pub(crate) no_rx_duration_sec: TimeSeries<i32>,
 }
 
 impl TimeSeriesStats {
@@ -36,35 +37,22 @@ impl TimeSeriesStats {
             // window sizes 1 to save space.
             // For preceding windows with fully elapsed time, it's already implied
             // that for example, the denominator for the minutely window would be 60 seconds.
-            total_duration_sec: CombinedWindowedStats::with_n_windows(
+            total_duration_sec: TimeSeries::with_n_windows(
                 MinutelyWindows(1),
                 FifteenMinutelyWindows(1),
                 HourlyWindows(1),
                 create_saturating_add_fn,
             ),
-            connected_duration_sec: CombinedWindowedStats::new(create_saturating_add_fn),
-            connect_attempt_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            connect_successful_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            disconnect_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            rx_unicast_total_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            rx_unicast_drop_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            tx_total_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            tx_drop_count: CombinedWindowedStats::new(create_saturating_add_fn),
-            no_rx_duration_sec: CombinedWindowedStats::new(create_saturating_add_fn),
+            connected_duration_sec: TimeSeries::new(create_saturating_add_fn),
+            connect_attempt_count: TimeSeries::new(create_saturating_add_fn),
+            connect_successful_count: TimeSeries::new(create_saturating_add_fn),
+            disconnect_count: TimeSeries::new(create_saturating_add_fn),
+            rx_unicast_total_count: TimeSeries::new(create_saturating_add_fn),
+            rx_unicast_drop_count: TimeSeries::new(create_saturating_add_fn),
+            tx_total_count: TimeSeries::new(create_saturating_add_fn),
+            tx_drop_count: TimeSeries::new(create_saturating_add_fn),
+            no_rx_duration_sec: TimeSeries::new(create_saturating_add_fn),
         }
-    }
-
-    pub(crate) fn slide_minute(&mut self) {
-        self.total_duration_sec.slide_minute();
-        self.connected_duration_sec.slide_minute();
-        self.connect_attempt_count.slide_minute();
-        self.connect_successful_count.slide_minute();
-        self.disconnect_count.slide_minute();
-        self.rx_unicast_total_count.slide_minute();
-        self.rx_unicast_drop_count.slide_minute();
-        self.tx_total_count.slide_minute();
-        self.tx_drop_count.slide_minute();
-        self.no_rx_duration_sec.slide_minute();
     }
 
     pub(crate) fn log_inspect(&mut self, node: &InspectNode) {

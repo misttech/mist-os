@@ -352,6 +352,10 @@ pub enum TelemetryEvent {
     RecoveryEvent {
         reason: RecoveryReason,
     },
+    /// Get the TimeSeries held by telemetry loop. Intended for test only.
+    GetTimeSeries {
+        sender: oneshot::Sender<Arc<Mutex<TimeSeriesStats>>>,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -527,12 +531,6 @@ pub fn serve_telemetry(
                     // rather than 23 hours.
                     if interval_tick % INTERVAL_TICKS_PER_HR == 0 {
                         telemetry.signal_hr_passed().await;
-                    }
-
-                    if interval_tick % INTERVAL_TICKS_PER_MINUTE == 0 {
-                        // Slide the window of all time series stats only after
-                        // `handle_periodic_telemetry` is called.
-                        telemetry.stats_logger.time_series_stats.lock().slide_minute();
                     }
                 }
             }
@@ -1434,6 +1432,9 @@ impl Telemetry {
             TelemetryEvent::RecoveryEvent { reason } => {
                 self.stats_logger.log_recovery_occurrence(reason).await;
             }
+            TelemetryEvent::GetTimeSeries { sender } => {
+                let _result = sender.send(Arc::clone(&self.stats_logger.time_series_stats));
+            }
         }
     }
 
@@ -1705,22 +1706,22 @@ impl StatsLogger {
                 self.time_series_stats
                     .lock()
                     .total_duration_sec
-                    .add_value(&(round_to_nearest_second(*duration) as i32));
+                    .log_value(&(round_to_nearest_second(*duration) as i32));
             }
             StatOp::AddConnectedDuration(duration) => {
                 self.time_series_stats
                     .lock()
                     .connected_duration_sec
-                    .add_value(&(round_to_nearest_second(*duration) as i32));
+                    .log_value(&(round_to_nearest_second(*duration) as i32));
             }
             StatOp::AddConnectAttemptsCount => {
-                self.time_series_stats.lock().connect_attempt_count.add_value(&1u32);
+                self.time_series_stats.lock().connect_attempt_count.log_value(&1u32);
             }
             StatOp::AddConnectSuccessfulCount => {
-                self.time_series_stats.lock().connect_successful_count.add_value(&1u32);
+                self.time_series_stats.lock().connect_successful_count.log_value(&1u32);
             }
             StatOp::AddDisconnectCount(..) => {
-                self.time_series_stats.lock().disconnect_count.add_value(&1u32);
+                self.time_series_stats.lock().disconnect_count.log_value(&1u32);
             }
             StatOp::AddRxTxPacketCounters {
                 rx_unicast_total,
@@ -1731,19 +1732,19 @@ impl StatsLogger {
                 self.time_series_stats
                     .lock()
                     .rx_unicast_total_count
-                    .add_value(&(*rx_unicast_total as u32));
+                    .log_value(&(*rx_unicast_total as u32));
                 self.time_series_stats
                     .lock()
                     .rx_unicast_drop_count
-                    .add_value(&(*rx_unicast_drop as u32));
-                self.time_series_stats.lock().tx_total_count.add_value(&(*tx_total as u32));
-                self.time_series_stats.lock().tx_drop_count.add_value(&(*tx_drop as u32));
+                    .log_value(&(*rx_unicast_drop as u32));
+                self.time_series_stats.lock().tx_total_count.log_value(&(*tx_total as u32));
+                self.time_series_stats.lock().tx_drop_count.log_value(&(*tx_drop as u32));
             }
             StatOp::AddNoRxDuration(duration) => {
                 self.time_series_stats
                     .lock()
                     .no_rx_duration_sec
-                    .add_value(&(round_to_nearest_second(*duration) as i32));
+                    .log_value(&(round_to_nearest_second(*duration) as i32));
             }
             StatOp::AddDowntimeDuration(..)
             | StatOp::AddDowntimeNoSavedNeighborDuration(..)
@@ -4263,31 +4264,15 @@ mod tests {
         let (mut test_helper, mut test_fut) = setup_test();
 
         test_helper.advance_by(25.seconds(), test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    total_duration_sec: {
-                        "@time": 25_000_000_000i64,
-                        "1m": vec![15i64],
-                        "15m": vec![15i64],
-                        "1h": vec![15i64],
-                    }
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let total_duration_sec: Vec<_> =
+            time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
+        assert_eq!(total_duration_sec, vec![15]);
 
         test_helper.advance_to_next_telemetry_checkpoint(test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    total_duration_sec: contains {
-                        "1m": vec![30i64],
-                        "15m": vec![30i64],
-                        "1h": vec![30i64],
-                    }
-                },
-            }
-        });
+        let total_duration_sec: Vec<_> =
+            time_series.lock().total_duration_sec.minutely_iter().map(|v| *v).collect();
+        assert_eq!(total_duration_sec, vec![30]);
     }
 
     /// This test is to verify that after a `TelemetryEvent::UpdateExperiment`,
@@ -4691,25 +4676,13 @@ mod tests {
         }
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         test_helper.drain_cobalt_events(&mut test_fut);
-
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    connect_attempt_count: {
-                        "@time": 0i64,
-                        "1m": vec![11u64],
-                        "15m": vec![11u64],
-                        "1h": vec![11u64],
-                    },
-                    connect_successful_count: {
-                        "@time": 0i64,
-                        "1m": vec![1u64],
-                        "15m": vec![1u64],
-                        "1h": vec![1u64],
-                    }
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let connect_attempt_count: Vec<_> =
+            time_series.lock().connect_attempt_count.minutely_iter().map(|v| *v).collect();
+        let connect_successful_count: Vec<_> =
+            time_series.lock().connect_successful_count.minutely_iter().map(|v| *v).collect();
+        assert_eq!(connect_attempt_count, vec![11]);
+        assert_eq!(connect_successful_count, vec![1]);
     }
 
     #[fuchsia::test]
@@ -4819,18 +4792,10 @@ mod tests {
         test_helper.send_connected_event(random_bss_description!(Wpa2));
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    disconnect_count: {
-                        "@time": 0i64,
-                        "1m": vec![0u64],
-                        "15m": vec![0u64],
-                        "1h": vec![0u64],
-                    }
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let disconnect_count: Vec<_> =
+            time_series.lock().disconnect_count.minutely_iter().map(|v| *v).collect();
+        assert_eq!(disconnect_count, vec![0]);
 
         let info = DisconnectInfo {
             disconnect_source: fidl_sme::DisconnectSource::Ap(fidl_sme::DisconnectCause {
@@ -4844,17 +4809,10 @@ mod tests {
             .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
         test_helper.drain_cobalt_events(&mut test_fut);
 
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    disconnect_count: contains {
-                        "1m": vec![1u64],
-                        "15m": vec![1u64],
-                        "1h": vec![1u64],
-                    }
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let disconnect_count: Vec<_> =
+            time_series.lock().disconnect_count.minutely_iter().map(|v| *v).collect();
+        assert_eq!(disconnect_count, vec![1]);
     }
 
     #[fuchsia::test]
@@ -4864,18 +4822,10 @@ mod tests {
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
         test_helper.advance_by(90.seconds(), test_fut.as_mut());
 
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    connected_duration_sec: {
-                        "@time": 90_000_000_000i64,
-                        "1m": vec![60i64, 30i64],
-                        "15m": vec![90i64],
-                        "1h": vec![90i64],
-                    }
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let connected_duration_sec: Vec<_> =
+            time_series.lock().connected_duration_sec.minutely_iter().map(|v| *v).collect();
+        assert_eq!(connected_duration_sec, vec![45, 45]);
     }
 
     #[fuchsia::test]
@@ -5045,38 +4995,26 @@ mod tests {
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(2.minutes(), test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    rx_unicast_drop_count: {
-                        "@time": 120_000_000_000i64,
-                        // Note: Packets from the first 15 seconds are not accounted because we
-                        //       we did not take packet measurement at 0th second mark.
-                        "1m": vec![135u64, 180u64, 0u64],
-                        "15m": vec![315u64],
-                        "1h": vec![315u64],
-                    },
-                    rx_unicast_total_count: {
-                        "@time": 120_000_000_000i64,
-                        "1m": vec![4500u64, 6000u64, 0u64],
-                        "15m": vec![10500u64],
-                        "1h": vec![10500u64],
-                    },
-                    tx_drop_count: {
-                        "@time": 120_000_000_000i64,
-                        "1m": vec![90u64, 120u64, 0u64],
-                        "15m": vec![210u64],
-                        "1h": vec![210u64],
-                    },
-                    tx_total_count: {
-                        "@time": 120_000_000_000i64,
-                        "1m": vec![450u64, 600u64, 0u64],
-                        "15m": vec![1050u64],
-                        "1h": vec![1050u64],
-                    },
-                },
-            }
-        });
+
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let rx_unicast_drop_count: Vec<_> =
+            time_series.lock().rx_unicast_drop_count.minutely_iter().map(|v| *v).collect();
+        let rx_unicast_total_count: Vec<_> =
+            time_series.lock().rx_unicast_total_count.minutely_iter().map(|v| *v).collect();
+        let tx_drop_count: Vec<_> =
+            time_series.lock().tx_drop_count.minutely_iter().map(|v| *v).collect();
+        let tx_total_count: Vec<_> =
+            time_series.lock().tx_total_count.minutely_iter().map(|v| *v).collect();
+
+        // Note: Packets from the first 15 seconds are not accounted because we
+        //       we did not take packet measurement at 0th second mark.
+        //       Additionally, the count for 45th-60th second mark is logged
+        //       at the 60th mark, which is considered to be part of the second
+        //       window.
+        assert_eq!(rx_unicast_drop_count, vec![90, 180, 45]);
+        assert_eq!(rx_unicast_total_count, vec![3000, 6000, 1500]);
+        assert_eq!(tx_drop_count, vec![60, 120, 30]);
+        assert_eq!(tx_total_count, vec![300, 600, 150]);
     }
 
     #[fuchsia::test]
@@ -5132,20 +5070,10 @@ mod tests {
         assert_eq!(test_helper.advance_test_fut(&mut test_fut), Poll::Pending);
 
         test_helper.advance_by(150.seconds(), test_fut.as_mut());
-        assert_data_tree_with_respond_blocking_req!(test_helper, test_fut, root: contains {
-            stats: contains {
-                time_series: contains {
-                    no_rx_duration_sec: {
-                        "@time": 150_000_000_000i64,
-                        // Note: Packets from the first 15 seconds are not accounted because we
-                        //       we did not take packet measurement at 0th second mark.
-                        "1m": vec![45i64, 60i64, 30i64],
-                        "15m": vec![135i64],
-                        "1h": vec![135i64],
-                    },
-                },
-            }
-        });
+        let time_series = test_helper.get_time_series(&mut test_fut);
+        let no_rx_duration_sec: Vec<_> =
+            time_series.lock().no_rx_duration_sec.minutely_iter().map(|v| *v).collect();
+        assert_eq!(no_rx_duration_sec, vec![30, 60, 45]);
     }
 
     #[fuchsia::test]
@@ -8935,6 +8863,17 @@ mod tests {
                     _ => return persistence_reqs,
                 }
             }
+        }
+
+        fn get_time_series(
+            &mut self,
+            test_fut: &mut (impl Future<Output = ()> + Unpin),
+        ) -> Arc<Mutex<TimeSeriesStats>> {
+            let (sender, mut receiver) = oneshot::channel();
+            self.telemetry_sender.send(TelemetryEvent::GetTimeSeries { sender });
+            assert_variant!(self.advance_test_fut(test_fut), Poll::Pending);
+            self.drain_cobalt_events(test_fut);
+            assert_variant!(receiver.try_recv(), Ok(Some(stats)) => stats)
         }
     }
 
