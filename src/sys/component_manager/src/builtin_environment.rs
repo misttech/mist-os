@@ -482,13 +482,13 @@ pub struct BuiltinEnvironment {
     pub event_source_factory: Arc<EventSourceFactory>,
     pub stop_notifier: Arc<RootStopNotifier>,
     pub directory_ready_notifier: Arc<DirectoryReadyNotifier>,
+    pub inspect_sink_provider: Arc<InspectSinkProvider>,
     pub event_stream_provider: Arc<EventStreamProvider>,
     pub event_logger: Option<Arc<EventLogger>>,
     pub component_tree_stats: Arc<ComponentTreeStats<DiagnosticsTask>>,
     pub component_startup_time_stats: Arc<ComponentEarlyStartupTimeStats>,
     pub debug: bool,
     pub num_threads: usize,
-    pub inspector: Inspector,
     pub realm_builder_resolver: Option<Arc<RealmBuilderResolver>>,
     pub dict: Dict,
     _builtin_receivers_task_group: TaskGroup,
@@ -899,6 +899,9 @@ impl BuiltinEnvironment {
             Arc::new(DirectoryReadyNotifier::new(Arc::downgrade(&model)));
         model.root().hooks.install(directory_ready_notifier.hooks()).await;
 
+        // Set up the Inspect sink provider.
+        let inspect_sink_provider = Arc::new(InspectSinkProvider::new(inspector));
+
         // Set up the event registry.
         let event_registry = {
             let mut event_registry = EventRegistry::new(Arc::downgrade(&model));
@@ -908,7 +911,7 @@ impl BuiltinEnvironment {
             );
             event_registry.register_synthesis_provider(
                 EventType::CapabilityRequested,
-                Arc::new(InspectSinkProvider::new()),
+                inspect_sink_provider.clone(),
             );
             Arc::new(event_registry)
         };
@@ -983,6 +986,7 @@ impl BuiltinEnvironment {
             .await;
 
         // Set up the Component Tree Diagnostics runtime statistics.
+        let inspector = inspect_sink_provider.inspector();
         let component_tree_stats =
             ComponentTreeStats::new(inspector.root().create_child("stats")).await;
         component_tree_stats.track_component_manager_stats().await;
@@ -1020,13 +1024,13 @@ impl BuiltinEnvironment {
             event_source_factory,
             stop_notifier,
             directory_ready_notifier,
+            inspect_sink_provider,
             event_stream_provider,
             event_logger,
             component_tree_stats,
             component_startup_time_stats,
             debug,
             num_threads,
-            inspector,
             realm_builder_resolver,
             dict,
             _builtin_receivers_task_group: builtin_receivers_task_group,
@@ -1257,6 +1261,11 @@ impl BuiltinEnvironment {
         // cannot be made.
         drop(self._service_fs_task.take());
         Ok(())
+    }
+
+    #[cfg(test)]
+    pub fn inspector(&self) -> &Inspector {
+        self.inspect_sink_provider.inspector()
     }
 }
 

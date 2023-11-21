@@ -11,7 +11,7 @@ use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TaskGroup;
-use fuchsia_inspect::component;
+use fuchsia_inspect::Inspector;
 use futures::lock::Mutex;
 use inspect_runtime::{publish, PublishOptions};
 use moniker::Moniker;
@@ -25,11 +25,16 @@ pub struct InspectSinkProvider {
     /// the existing servers will eventually die and a new one will be inserted here when
     /// `EventSynthesisProvider::provide` is triggered on reconnect.
     inspect_tree_server_tasks: Mutex<TaskGroup>,
+    inspector: Inspector,
 }
 
 impl InspectSinkProvider {
-    pub fn new() -> Self {
-        Self { inspect_tree_server_tasks: Mutex::new(TaskGroup::new()) }
+    pub fn new(inspector: Inspector) -> Self {
+        Self { inspect_tree_server_tasks: Mutex::new(TaskGroup::new()), inspector }
+    }
+
+    pub fn inspector(&self) -> &Inspector {
+        &self.inspector
     }
 }
 
@@ -46,10 +51,9 @@ impl EventSynthesisProvider for InspectSinkProvider {
 
         let (client, server) = fidl::endpoints::create_endpoints();
 
-        if let Some(server_task) = publish(
-            component::inspector(),
-            PublishOptions::default().on_inspect_sink_client(client),
-        ) {
+        if let Some(server_task) =
+            publish(&self.inspector, PublishOptions::default().on_inspect_sink_client(client))
+        {
             self.inspect_tree_server_tasks.lock().await.add(server_task);
 
             // this value is irrelevant, archivist won't do anything with it but it is part of
