@@ -12,6 +12,8 @@ import shlex
 import subprocess
 import sys
 
+from enum import Enum
+
 # Special values identifying a PE (i.e., Portable Executable) image, of which
 # UEFI executables are examples.
 #
@@ -36,71 +38,6 @@ def is_pe(filepath):
         return f.read(4) == PE_SIGNATURE
 
 
-class BootTest(object):
-    def __init__(self, images_by_label, test_json, build_dir):
-        self.build_dir = build_dir
-        test = test_json["test"]
-
-        self.name = test["name"]
-        self.label = test["label"]
-
-        images = test_json["image_overrides"]
-
-        self.zbi = images_by_label[images["zbi"]] if "zbi" in images else None
-        self.qemu_kernel = (
-            images_by_label[images["qemu_kernel"]]
-            if "qemu_kernel" in images
-            else None
-        )
-        self.efi_disk = (
-            images_by_label[images["efi_disk"]]
-            if "efi_disk" in images
-            else None
-        )
-
-        arch_image = self.qemu_kernel or self.efi_disk or self.zbi or None
-        self.arch = arch_image.get("cpu", None) if arch_image else None
-
-    # Enables sorting by name.
-    def __lt__(self, other):
-        return self.name < other.name
-
-    @staticmethod
-    def is_boot_test(test_json):
-        return "image_overrides" in test_json
-
-    def is_uefi_boot(self):
-        if self.efi_disk:
-            return True
-        # The QEMU kernel might be a UEFI executable. Look for PE magic.
-        if not self.qemu_kernel:
-            return False
-        kernel = os.path.join(self.build_dir, self.qemu_kernel["path"])
-        return is_pe(kernel)
-
-    def print(self, command=None):
-        kinds = []
-        if self.is_uefi_boot():
-            kinds.append("UEFI")
-        if self.qemu_kernel:
-            kinds.append("QEMU kernel")
-        if self.zbi:
-            kinds.append("ZBI")
-        if self.efi_disk:
-            kinds.append("EFI disk")
-        print("* %s (%s)" % (self.name, ", ".join(kinds)))
-        print("    label: %s" % self.label)
-        print("    cpu: %s" % (self.arch or "Unknown!"))
-        if self.qemu_kernel:
-            print("    qemu kernel: %s" % self.qemu_kernel["path"])
-        if self.zbi:
-            print("    zbi: %s" % self.zbi["path"])
-        if self.efi_disk:
-            print("    efi disk: %s" % self.efi_disk["path"])
-        if command:
-            print("    command: %s" % " ".join(map(shlex.quote, command)))
-
-
 def error(str):
     RED = "\033[91m"
     END = "\033[0m"
@@ -111,6 +48,149 @@ def warning(str):
     YELLOW = "\033[93m"
     END = "\033[0m"
     print(YELLOW + "WARNING: " + str + END)
+
+
+def info(str):
+    BLUE = "\033[94m"
+    END = "\033[0m"
+    print(BLUE + "INFO: " + str + END)
+
+
+class BootTest(object):
+    # The state of the associated product bundle.
+    class ProductBundle(Enum):
+        # The product bundle name given in the test metadata is not recognized.
+        UNKNOWN = 0
+
+        # The product bundle is not yet built.
+        NOT_BUILT = 1
+
+        # The product bundle is built.
+        BUILT = 2
+
+    def __init__(self, product_bundles, test_json, build_dir):
+        self.build_dir = build_dir
+
+        test = test_json["test"]
+        self.name = test["name"]
+        self.label = test["label"]
+
+        self.zbi = None
+        self.qemu_kernel = None
+        self.efi_disk = None
+
+        if test_json["product_bundle"] in product_bundles:
+            self._product_bundle = product_bundles[test_json["product_bundle"]]
+            if os.path.exists(
+                os.path.join(build_dir, self._product_bundle["json"])
+            ):
+                self._state = self.ProductBundle.BUILT
+                self._set_images_if_built()
+            else:
+                self._state = self.ProductBundle.NOT_BUILT
+
+        else:
+            self._product_bundle = {
+                "cpu": None,
+                "json": None,
+                "name": test_json["product_bundle"],
+                "path": None,
+            }
+            self._state = self.ProductBundle.UNKNOWN
+
+    def _set_images_if_built(self):
+        assert self._state == self.ProductBundle.BUILT
+        with open(
+            os.path.join(self.build_dir, self._product_bundle["json"])
+        ) as f:
+            manifest = json.load(f)
+
+        product_bundle_dir = self._product_bundle["path"]
+
+        # If no "system A" contents are specified, then we assume that intended
+        # test logic is given by EFI partition contents.
+        if manifest.get("system_a", []) == []:
+            bootloader_partitions = manifest["partitions"][
+                "bootloader_partitions"
+            ]
+            assert (
+                len(bootloader_partitions) == 1
+            ), 'expected "bootloader_partitions" to specify precisely one EFI disk'
+            self.efi_disk = os.path.join(
+                product_bundle_dir, bootloader_partitions[0]["image"]
+            )
+            return
+
+        for image in manifest["system_a"]:
+            path = os.path.join(product_bundle_dir, image["path"])
+            if image["type"] == "zbi":
+                self.zbi = path
+            elif image["type"] == "kernel":
+                self.qemu_kernel = path
+
+    # Enables sorting by name.
+    def __lt__(self, other):
+        return self.name < other.name
+
+    @staticmethod
+    def is_boot_test(test_json):
+        return "product_bundle" in test_json
+
+    def is_uefi_boot(self):
+        if self.efi_disk:
+            return True
+        # The QEMU kernel might be a UEFI executable. Look for PE magic.
+        if not self.qemu_kernel:
+            return False
+        kernel = os.path.join(self.build_dir, self.qemu_kernel)
+        return is_pe(kernel)
+
+    def arch(self):
+        return self._product_bundle["cpu"]
+
+    def product_bundle_name(self):
+        return self._product_bundle["name"]
+
+    # Attempts to ensure that the associated product bundle is built, returning
+    # a boolean indicating success.
+    def ensure_product_bundle(self):
+        if self._state != self.ProductBundle.NOT_BUILT:
+            return self._state == self.ProductBundle.BUILT
+        info("building %s..." % self._product_bundle["json"])
+        ret = subprocess.run(
+            ["fx", "build", self._product_bundle["json"]], cwd=self.build_dir
+        ).returncode
+        if ret == 0:
+            self._state = self.ProductBundle.BUILT
+            self._set_images_if_built()
+        return ret == 0
+
+    def print(self, command=None):
+        kinds = []
+        if self._state == self.ProductBundle.UNKNOWN:
+            kinds = ["unknown: product bundle not recognized"]
+        elif self._state == self.ProductBundle.NOT_BUILT:
+            kinds = ["unknown: not yet built"]
+        else:
+            if self.is_uefi_boot():
+                kinds.append("UEFI")
+            if self.qemu_kernel:
+                kinds.append("QEMU kernel")
+            if self.zbi:
+                kinds.append("ZBI")
+            if self.efi_disk:
+                kinds.append("EFI disk")
+        print("* %s (%s)" % (self.name, ", ".join(kinds)))
+        print("    label: %s" % self.label)
+        print("    cpu: %s" % (self.arch() or "Unknown!"))
+        if self.qemu_kernel:
+            print("    qemu kernel: %s" % self.qemu_kernel)
+        if self.zbi:
+            print("    zbi: %s" % self.zbi)
+        if self.efi_disk:
+            print("    efi disk: %s" % self.efi_disk)
+        if command:
+            print("    command: %s" % " ".join(map(shlex.quote, command)))
 
 
 def find_bootserver(build_dir):
@@ -185,12 +265,12 @@ def main():
         print("FUCHSIA_ARCH not set")
         return 1
 
-    # Construct a map of images by GN label. Boot test metadata records its
-    # desired images that way.
-    with open(os.path.join(build_dir, "images.json")) as file:
-        images = {}
-        for image in json.load(file):
-            images[image["label"]] = image
+    # Construct a map of product bundles by name. Boot test metadata points to a
+    # product bundle in this way.
+    with open(os.path.join(build_dir, "product_bundles.json")) as file:
+        product_bundles = {}
+        for bundle in json.load(file):
+            product_bundles[bundle["name"]] = bundle
 
     # There can be multiple versions of the same boot test for different host
     # architectures. These will otherwise only differ in metadata name, a
@@ -199,8 +279,8 @@ def main():
         boot_tests = {}
         for test in json.load(file):
             if BootTest.is_boot_test(test):
-                boot_test = BootTest(images, test, build_dir)
-                if boot_test.arch == args.arch:
+                boot_test = BootTest(product_bundles, test, build_dir)
+                if boot_test.arch() == args.arch:
                     boot_tests[boot_test.name] = boot_test
 
     if not boot_tests:
@@ -234,24 +314,28 @@ def main():
         return 1
 
     test = matches[0]
+    assert (
+        test.ensure_product_bundle(),
+        "unable to build product bundle %s" % test.product_bundle_name(),
+    )
     if args.boot:
         if test.qemu_kernel:
             print(error("cannot use --boot with QEMU-only test %s" % test.name))
             return 1
         assert test.zbi
         bootserver = find_bootserver(build_dir)
-        cmd = [bootserver, "--boot"] + test.zbi["path"] + args.args
+        cmd = [bootserver, "--boot"] + test.zbi + args.args
     else:
-        cmd = ["fx", "qemu", "--arch", args.arch] + args.args
+        cmd = ["fx", "qemu", "--arch", args.arch()] + args.args
 
         if test.is_uefi_boot():
             cmd += ["--uefi"]
         if test.qemu_kernel:
-            cmd += ["-t", test.qemu_kernel["path"]]
+            cmd += ["-t", test.qemu_kernel]
         if test.zbi:
-            cmd += ["-z", test.zbi["path"]]
+            cmd += ["-z", test.zbi]
         if test.efi_disk:
-            cmd += ["-D", test.efi_disk["path"]]
+            cmd += ["-D", test.efi_disk]
 
     for arg in args.cmdline:
         cmd += ["-c", arg]

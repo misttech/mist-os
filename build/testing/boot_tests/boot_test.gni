@@ -89,6 +89,7 @@ template("_boot_test") {
     os = host_os
     cpu = invoker.cpu_for_host
     isolated = true
+    product_bundle = name
 
     forward_variables_from(invoker,
                            [

@@ -349,6 +349,7 @@ template("product_bundle") {
           label = get_label_info(":$target_name", "label_with_toolchain")
           path = rebase_path(files.outdir, root_build_dir)
           name = product_name
+          cpu = current_cpu
           product_version = product_version
           if (!skip_transfer_manifest) {
             transfer_manifest_path =

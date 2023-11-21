@@ -1436,7 +1436,9 @@ build_api_module("detailed_size_checker_data") {
 #     Required: The name of the product bundle. The main product bundle is
 #               expected to have the name $product.$board.
 #   path
-#     Required: Path to the product bundle directory.
+#     Required: Path to the product bundle directory
+#   cpu
+#     Required: The target CPU architecture of the associated images.
 #   product_version
 #     Required: A string indicating the version of the product bundle.
 #   transfer_manifest_path

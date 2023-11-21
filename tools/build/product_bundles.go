@@ -9,8 +9,12 @@ type ProductBundle struct {
 	// Label is the GN label for the product bundle.
 	Label string `json:"label,omitempty"`
 
-	// <product.board> label for this product bundle.
+	// Name is the name of the product bundle, given by <product.board> in the
+	// case of the main product bundle.
 	Name string `json:"name"`
+
+	// CPU is the target CPU architecture of the associated images.
+	CPU string `json:"cpu"`
 
 	// Path is the path to the product bundle directory.
 	Path string `json:"path,omitempty"`
