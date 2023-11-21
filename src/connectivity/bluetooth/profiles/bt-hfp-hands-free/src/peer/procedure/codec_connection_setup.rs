@@ -6,7 +6,7 @@ use anyhow::{format_err, Error};
 use at_commands as at;
 use tracing::warn;
 
-use super::{Procedure, ProcedureMarker};
+use super::Procedure;
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
@@ -23,8 +23,8 @@ impl CodecConnectionSetupProcedure {
 }
 
 impl Procedure for CodecConnectionSetupProcedure {
-    fn marker(&self) -> ProcedureMarker {
-        ProcedureMarker::CodecConnectionSetup
+    fn name(&self) -> &str {
+        "Codec Connection Setup"
     }
 
     fn transition(

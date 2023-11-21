@@ -5,7 +5,7 @@
 use anyhow::{format_err, Error};
 use at_commands as at;
 
-use super::{Procedure, ProcedureMarker};
+use super::Procedure;
 
 use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
 use crate::peer::indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
@@ -52,8 +52,8 @@ impl SlcInitProcedure {
 }
 
 impl Procedure for SlcInitProcedure {
-    fn marker(&self) -> ProcedureMarker {
-        ProcedureMarker::SlcInitialization
+    fn name(&self) -> &str {
+        "SLC Initialization"
     }
 
     /// Checks for sequential ordering of commands by first checking the

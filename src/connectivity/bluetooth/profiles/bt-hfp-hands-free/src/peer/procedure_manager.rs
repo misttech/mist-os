@@ -12,7 +12,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use tracing::warn;
 
-use super::procedure::{Procedure, ProcedureInput, ProcedureMarker, ProcedureOutput};
+use super::procedure::{Procedure, ProcedureInput, ProcedureInputT, ProcedureOutput};
 use super::procedure_manipulated_state::ProcedureManipulatedState;
 
 use crate::config::HandsFreeFeatureSupport;
@@ -73,27 +73,6 @@ impl ProcedureManager {
         }
     }
 
-    fn initialize_procedure_from_input(
-        &mut self,
-        input: &ProcedureInput,
-    ) -> Result<Box<dyn Procedure>> {
-        let procedure_id = ProcedureMarker::procedure_from_initial_input(
-            self.procedure_managed_state.initialized,
-            input,
-        );
-        match procedure_id {
-            Some(id) => {
-                let procedure = id.initialize();
-                Ok(procedure)
-            }
-            None => Err(format_err!(
-                "Could not match input to specific procedure {:?} for peer {:}",
-                input,
-                self.peer_id
-            )),
-        }
-    }
-
     // Inserts a ProcedureInput into the proper queue. If it can start a
     // procedure, it goes into the future_procedure_inputs queue; otherwise it
     // goes into the current_procedure_inputs queue.
@@ -102,13 +81,7 @@ impl ProcedureManager {
             waker.wake();
         }
 
-        let input_can_start_procedure = ProcedureMarker::procedure_from_initial_input(
-            self.procedure_managed_state.initialized,
-            &input,
-        )
-        .is_some();
-
-        if input_can_start_procedure {
+        if input.can_start_procedure() {
             self.future_procedure_inputs.push_back(input);
         } else {
             self.current_procedure_inputs.push_back(input);
@@ -142,10 +115,16 @@ impl ProcedureManager {
             return None;
         };
 
-        let procedure_result = self.initialize_procedure_from_input(&input);
-        match procedure_result {
-            Ok(proc) => self.current_procedure = Some(proc),
-            Err(err) => return Some(Err(err)),
+        let procedure_option = input.to_initialized_procedure();
+        match procedure_option {
+            Some(proc) => self.current_procedure = Some(proc),
+            None => {
+                return Some(Err(format_err!(
+                    "Unable to match procedure for input {:?} from peer {:}",
+                    input,
+                    self.peer_id
+                )))
+            }
         };
 
         Some(Ok(input))
@@ -212,7 +191,9 @@ impl ProcedureManager {
         if terminated_procedure && procedure_inputs {
             warn!(
                 "Inputs ({:?}) queued for terminated procedure {:?} for peer {}",
-                self.current_procedure_inputs, self.current_procedure, self.peer_id
+                self.current_procedure_inputs,
+                self.current_procedure.as_ref().map(|p| p.name()).unwrap_or("None"),
+                self.peer_id
             );
         }
     }

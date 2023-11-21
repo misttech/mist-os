@@ -6,7 +6,7 @@ use anyhow::{format_err, Error};
 use at_commands as at;
 use tracing::warn;
 
-use super::{Procedure, ProcedureMarker};
+use super::Procedure;
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
@@ -33,8 +33,8 @@ impl PhoneStatusProcedure {
 }
 
 impl Procedure for PhoneStatusProcedure {
-    fn marker(&self) -> ProcedureMarker {
-        ProcedureMarker::PhoneStatus
+    fn name(&self) -> &str {
+        "Phone Status"
     }
 
     fn transition(

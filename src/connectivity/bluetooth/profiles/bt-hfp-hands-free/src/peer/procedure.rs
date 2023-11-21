@@ -52,44 +52,37 @@ pub enum ProcedureOutput {
     None,
 }
 
-// TODO(fxb/127356) Get rid of ProcedureMarker and move this behavior to ProcedureInput
-#[derive(Debug, Eq, Hash, PartialEq, Clone, Copy)]
-pub enum ProcedureMarker {
-    /// The Service Level Connection Initialization procedure as defined in HFP v1.8 Section 4.2.
-    SlcInitialization,
-    /// The Transfer of Phone Status procedures as defined in HFP v1.8 Section 4.4 - 4.7.
-    PhoneStatus,
-    /// The Codec Connection Setup where the AG informs the HF which codeic ID will be used.
-    CodecConnectionSetup,
+pub trait ProcedureInputT {
+    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure>>;
+
+    fn can_start_procedure(&self) -> bool;
 }
 
-impl ProcedureMarker {
-    /// Matches a specific marker to procedure
-    pub fn initialize(&self) -> Box<dyn Procedure> {
+impl ProcedureInputT for ProcedureInput {
+    /// Matches a specific input to procedure
+    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure>> {
         match self {
-            Self::SlcInitialization => Box::new(SlcInitProcedure::new()),
-            Self::PhoneStatus => Box::new(PhoneStatusProcedure::new()),
-            Self::CodecConnectionSetup => Box::new(CodecConnectionSetupProcedure::new()),
+            // TODO(fxb/130999) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
+            at_response_pattern!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
+            at_response_pattern!(Ciev) => Some(Box::new(PhoneStatusProcedure::new())),
+            at_response_pattern!(Bcs) => Some(Box::new(CodecConnectionSetupProcedure::new())),
+            _ => None,
         }
     }
 
-    /// Returns the ProcedureMarker for the procedure that this ProcedureInput can start.
-    pub fn procedure_from_initial_input(
-        slc_initialized: bool,
-        input: &ProcedureInput,
-    ) -> Option<Self> {
-        match input {
-            at_response_pattern!(Brsf) if !slc_initialized => Some(Self::SlcInitialization),
-            at_response_pattern!(Ciev) => Some(Self::PhoneStatus),
-            at_response_pattern!(Bcs) => Some(Self::CodecConnectionSetup),
-            _ => None,
+    fn can_start_procedure(&self) -> bool {
+        match self {
+            at_response_pattern!(Brsf) | at_response_pattern!(Ciev) | at_response_pattern!(Bcs) => {
+                true
+            }
+            _ => false,
         }
     }
 }
 
 pub trait Procedure: fmt::Debug {
-    /// Returns the unique identifier associated with this procedure.
-    fn marker(&self) -> ProcedureMarker;
+    /// Returns the name of this procedure for logging.
+    fn name(&self) -> &str;
 
     /// Receive an AG `update` to progress the procedure. Returns an error in updating
     /// the procedure or command(s) to be sent back to AG
