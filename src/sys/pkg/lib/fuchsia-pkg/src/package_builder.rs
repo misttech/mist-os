@@ -58,6 +58,9 @@ pub struct PackageBuilder {
 
     /// Metafile of subpackages.
     subpackages: BTreeMap<RelativePackageUrl, (Hash, PathBuf)>,
+
+    /// Whether new files with the same path should overwrwite previous files at that path.
+    overwrite_files: bool,
 }
 
 impl PackageBuilder {
@@ -73,6 +76,7 @@ impl PackageBuilder {
             published_name: None,
             repository: None,
             subpackages: BTreeMap::default(),
+            overwrite_files: false,
         }
     }
 
@@ -192,12 +196,50 @@ impl PackageBuilder {
         self.blob_sources_relative = relative_to
     }
 
-    fn validate_ok_to_add_at_path(&self, at_path: impl AsRef<str>) -> Result<()> {
+    /// Specify whether new additions of a file that have already been added should overwrite,
+    /// or fail
+    pub fn overwrite_files(&mut self, overwrite_files: bool) {
+        self.overwrite_files = overwrite_files
+    }
+
+    fn validate_ok_to_modify(&self, at_path: impl AsRef<str>) -> Result<()> {
         let at_path = at_path.as_ref();
         if RESERVED_PATHS.contains(&at_path) {
             bail!("Cannot add '{}', it will be created by the PackageBuilder", at_path);
         }
 
+        Ok(())
+    }
+
+    fn validate_ok_to_add_in_far(&self, at_path: impl AsRef<str>) -> Result<()> {
+        let at_path = at_path.as_ref();
+        self.validate_ok_to_modify(at_path)?;
+
+        // Never allow overwriting a blob path if we think we're writing into a far
+        if self.blobs.contains_key(at_path) {
+            return Err(anyhow!(
+                "Package '{}' already contains a file (as a blob) at: '{}'",
+                self.name,
+                at_path
+            ));
+        }
+
+        if self.far_contents.contains_key(at_path) && !self.overwrite_files {
+            return Err(anyhow!(
+                "Package '{}' already contains a file (in the far) at: '{}'",
+                self.name,
+                at_path
+            ));
+        }
+
+        Ok(())
+    }
+
+    fn validate_ok_to_add_as_blob(&self, at_path: impl AsRef<str>) -> Result<()> {
+        let at_path = at_path.as_ref();
+        self.validate_ok_to_modify(at_path)?;
+
+        // Never allow overwriting a path in the far if we think we're writing a blob
         if self.far_contents.contains_key(at_path) {
             return Err(anyhow!(
                 "Package '{}' already contains a file (in the far) at: '{}'",
@@ -205,7 +247,7 @@ impl PackageBuilder {
                 at_path
             ));
         }
-        if self.blobs.contains_key(at_path) {
+        if self.blobs.contains_key(at_path) && !self.overwrite_files {
             return Err(anyhow!(
                 "Package '{}' already contains a file (as a blob) at: '{}'",
                 self.name,
@@ -229,7 +271,7 @@ impl PackageBuilder {
     ) -> Result<()> {
         let at_path = at_path.as_ref();
         let file = file.as_ref();
-        self.validate_ok_to_add_at_path(at_path)?;
+        self.validate_ok_to_add_in_far(at_path)?;
 
         self.far_contents.insert(at_path.to_string(), file.to_string());
 
@@ -249,7 +291,7 @@ impl PackageBuilder {
     ) -> Result<()> {
         let at_path = at_path.as_ref();
         let file = file.as_ref();
-        self.validate_ok_to_add_at_path(at_path)?;
+        self.validate_ok_to_add_as_blob(at_path)?;
 
         self.blobs.insert(at_path.to_string(), file.to_string());
 
@@ -265,7 +307,7 @@ impl PackageBuilder {
         gendir: impl AsRef<Path>,
     ) -> Result<()> {
         // Preflight that the file paths are valid before attempting to write.
-        self.validate_ok_to_add_at_path(&at_path)?;
+        self.validate_ok_to_add_as_blob(&at_path)?;
         let source_path = Self::write_contents_to_file(gendir, at_path.as_ref(), contents)?;
         self.add_file_as_blob(at_path, source_path.path_to_string()?)
     }
@@ -279,7 +321,7 @@ impl PackageBuilder {
         gendir: impl AsRef<Path>,
     ) -> Result<()> {
         // Preflight that the file paths are valid before attempting to write.
-        self.validate_ok_to_add_at_path(&at_path)?;
+        self.validate_ok_to_add_in_far(&at_path)?;
         let source_path = Self::write_contents_to_file(gendir, at_path.as_ref(), contents)?;
         self.add_file_to_far(at_path, source_path.path_to_string()?)
     }
@@ -385,6 +427,7 @@ impl PackageBuilder {
             published_name,
             repository,
             subpackages,
+            overwrite_files: _,
         } = self;
 
         far_contents.insert(
@@ -855,8 +898,25 @@ mod tests {
     }
 
     #[test]
+    fn test_builder_allows_overwrite_path_in_far_when_flag_set() {
+        let mut builder = PackageBuilder::new("some_pkg_name");
+        builder.overwrite_files(true);
+        builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
+        assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_ok());
+    }
+
+    #[test]
     fn test_builder_rejects_path_as_blob_when_existing_path_in_far() {
         let mut builder = PackageBuilder::new("some_pkg_name");
+        builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
+        assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
+    }
+
+    #[test]
+    fn test_builder_rejects_path_as_blob_when_existing_path_in_far_and_overwrite_set() {
+        // even if we set the overwrite flag, we shouldn't allow a blob to overwrite a file in the far
+        let mut builder = PackageBuilder::new("some_pkg_name");
+        builder.overwrite_files(true);
         builder.add_file_to_far("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
     }
@@ -869,10 +929,27 @@ mod tests {
     }
 
     #[test]
+    fn test_builder_rejects_path_in_far_when_existing_path_as_blob_and_overwrite_set() {
+        // even if we set the overwrite flag, we shouldn't allow a far file to overwrite a blob
+        let mut builder = PackageBuilder::new("some_pkg_name");
+        builder.overwrite_files(true);
+        builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
+        assert!(builder.add_file_to_far("some/far/file", "some/src/file").is_err());
+    }
+
+    #[test]
     fn test_builder_rejects_path_in_blob_when_existing_path_as_blob() {
         let mut builder = PackageBuilder::new("some_pkg_name");
         builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
         assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_err());
+    }
+
+    #[test]
+    fn test_builder_allows_overwrite_path_as_blob_when_flag_set() {
+        let mut builder = PackageBuilder::new("some_pkg_name");
+        builder.overwrite_files(true);
+        builder.add_file_as_blob("some/far/file", "some/src/file").unwrap();
+        assert!(builder.add_file_as_blob("some/far/file", "some/src/file").is_ok());
     }
 
     #[test]
