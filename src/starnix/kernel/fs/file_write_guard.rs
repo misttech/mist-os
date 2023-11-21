@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::sync::Arc;
-
-use crate::fs::fs_node::FsNodeHandle;
+use crate::fs::FsNodeHandle;
 use starnix_uapi::{errno, error, errors::Errno, seal_flags::SealFlags};
+use std::sync::Arc;
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub enum FileWriteGuardMode {
@@ -173,10 +172,10 @@ impl Eq for FileWriteGuardRef {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::FsNode, testing::*};
+    use crate::testing::*;
     use starnix_uapi::{device_type::DeviceType, file_mode::FileMode};
 
-    fn create_fs_node() -> Arc<FsNode> {
+    fn create_fs_node() -> FsNodeHandle {
         let (_kernel, current_task) = create_kernel_and_task();
 
         current_task

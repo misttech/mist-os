@@ -124,6 +124,7 @@ pub struct FsNode {
 }
 
 pub type FsNodeHandle = Arc<FsNode>;
+pub type WeakFsNodeHandle = Weak<FsNode>;
 
 #[derive(Debug, Default, Clone)]
 pub struct FsNodeInfo {

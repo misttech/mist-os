@@ -7,7 +7,7 @@ use crate::{
     fs::{
         emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
         DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
-        FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, SeekTarget,
     },
     task::CurrentTask,
 };
@@ -28,7 +28,7 @@ pub struct StaticDirectoryBuilder<'a> {
     mode: FileMode,
     creds: FsCred,
     entry_creds: FsCred,
-    entries: BTreeMap<&'static FsStr, Arc<FsNode>>,
+    entries: BTreeMap<&'static FsStr, FsNodeHandle>,
 }
 
 impl<'a> StaticDirectoryBuilder<'a> {
@@ -93,7 +93,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
 
     /// Adds an [`FsNode`] entry to the directory, which already has an inode number and file mode.
     /// Panics if an entry with the same name was already added.
-    pub fn node(&mut self, name: &'static FsStr, node: Arc<FsNode>) {
+    pub fn node(&mut self, name: &'static FsStr, node: FsNodeHandle) {
         assert!(
             self.entries.insert(name, node).is_none(),
             "adding a duplicate entry into a StaticDirectory",
@@ -111,7 +111,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
     }
 
     /// Builds an [`FsNode`] that serves as a directory of the entries added to this builder.
-    pub fn build(self, current_task: &CurrentTask) -> Arc<FsNode> {
+    pub fn build(self, current_task: &CurrentTask) -> FsNodeHandle {
         self.fs.create_node(
             current_task,
             Arc::new(StaticDirectory { entries: self.entries }),
@@ -141,7 +141,7 @@ impl<'a> StaticDirectoryBuilder<'a> {
 }
 
 pub struct StaticDirectory {
-    entries: BTreeMap<&'static FsStr, Arc<FsNode>>,
+    entries: BTreeMap<&'static FsStr, FsNodeHandle>,
 }
 
 impl FsNodeOps for Arc<StaticDirectory> {
@@ -161,7 +161,7 @@ impl FsNodeOps for Arc<StaticDirectory> {
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         self.entries.get(name).cloned().ok_or_else(|| {
             errno!(
                 ENOENT,

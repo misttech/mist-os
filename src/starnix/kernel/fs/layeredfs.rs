@@ -6,7 +6,8 @@ use crate::{
     fs::{
         fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek, CacheMode,
         DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
-        FileSystemHandle, FileSystemOps, FsNode, FsNodeOps, FsStr, FsString, MountInfo, SeekTarget,
+        FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
+        MountInfo, SeekTarget,
     },
     task::{CurrentTask, Kernel},
 };
@@ -73,7 +74,7 @@ impl FsNodeOps for Arc<LayeredFs> {
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         if let Some(fs) = self.mappings.get(name) {
             Ok(fs.root().node.clone())
         } else {

@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use zerocopy::AsBytes;
-
 use crate::{
     fs::{
         buffers::{
@@ -16,7 +14,7 @@ use crate::{
             SocketOps, SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
             DEFAULT_LISTEN_BACKLOG,
         },
-        FdEvents, FdNumber, FileHandle, FileObject, FsNode, FsStr, LookupContext,
+        FdEvents, FdNumber, FileHandle, FileObject, FsNodeHandle, FsStr, LookupContext,
     },
     mm::MemoryAccessorExt,
     syscalls::{SyscallArg, SyscallResult, SUCCESS},
@@ -34,6 +32,7 @@ use starnix_uapi::{
     SO_NO_CHECK, SO_PASSCRED, SO_PEERCRED, SO_PEERSEC, SO_RCVBUF, SO_REUSEADDR, SO_REUSEPORT,
     SO_SNDBUF,
 };
+use zerocopy::AsBytes;
 
 use starnix_lock::Mutex;
 use std::sync::Arc;
@@ -394,7 +393,7 @@ impl UnixSocket {
         &self,
         socket: &SocketHandle,
         address: SocketAddress,
-        node: &Arc<FsNode>,
+        node: &FsNodeHandle,
     ) -> Result<(), Errno> {
         let unix_socket = downcast_socket_to_unix(socket);
         let mut inner = unix_socket.lock();

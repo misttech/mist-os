@@ -239,7 +239,7 @@ impl OverlayNode {
         node: &FsNode,
         lower: Option<ActiveEntry>,
         upper: Option<ActiveEntry>,
-    ) -> Arc<FsNode> {
+    ) -> FsNodeHandle {
         let entry = upper.as_ref().or(lower.as_ref()).expect("expect either lower or upper node");
         let info = entry.entry().node.info().clone();
 

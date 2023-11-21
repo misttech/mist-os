@@ -6,7 +6,7 @@ use crate::{
     atomic_counter::AtomicU64Counter,
     fs::{
         DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        XattrOp,
+        WeakFsNodeHandle, XattrOp,
     },
     task::{CurrentTask, Kernel},
 };
@@ -60,7 +60,7 @@ pub struct FileSystem {
     /// Rather than calling FsNode::new directly, file systems should call
     /// FileSystem::get_or_create_node to see if the FsNode already exists in
     /// the cache.
-    nodes: Mutex<HashMap<ino_t, Weak<FsNode>>>,
+    nodes: Mutex<HashMap<ino_t, WeakFsNodeHandle>>,
 
     /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
     /// filesystems with permanent entries, this will hold a strong reference to every node to make
@@ -188,8 +188,8 @@ impl FileSystem {
     fn prepare_node_for_insertion(
         &self,
         current_task: &CurrentTask,
-        node: &Arc<FsNode>,
-    ) -> Weak<FsNode> {
+        node: &FsNodeHandle,
+    ) -> WeakFsNodeHandle {
         if let Some(label) = self.selinux_context.get() {
             let _ = node.ops().set_xattr(
                 node,

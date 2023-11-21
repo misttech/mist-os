@@ -1005,7 +1005,7 @@ impl NamespaceNode {
 
     /// Create a namespace node that is not mounted in a namespace and that refers to a node that
     /// is not rooted in a hierarchy and has no name.
-    pub fn new_anonymous_unrooted(node: Arc<FsNode>) -> Self {
+    pub fn new_anonymous_unrooted(node: FsNodeHandle) -> Self {
         Self::new_anonymous(DirEntry::new_unrooted(node))
     }
 

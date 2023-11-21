@@ -10,7 +10,8 @@ use crate::{
         kobject::{KObject, KObjectHandle, KType, UEventFsNode},
         sysfs::SysFsOps,
         BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
-        FileOps, FsNode, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+        FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory,
+        VecDirectoryEntry,
     },
     logging::not_implemented,
     task::CurrentTask,
@@ -18,7 +19,7 @@ use crate::{
 use starnix_uapi::{
     device_type::DeviceType, error, errors::Errno, file_mode::mode, open_flags::OpenFlags,
 };
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 pub struct DeviceDirectory {
     kobject: Weak<KObject>,
@@ -76,7 +77,7 @@ impl FsNodeOps for DeviceDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         match name {
             b"dev" => Ok(node.fs().create_node(
                 current_task,
@@ -136,7 +137,7 @@ impl FsNodeOps for BlockDeviceDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         match name {
             b"queue" => Ok(node.fs().create_node(
                 current_task,
@@ -177,7 +178,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         match name {
             b"read_ahead_kb" => Ok(node.fs().create_node(
                 current_task,

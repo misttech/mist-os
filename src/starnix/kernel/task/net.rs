@@ -6,7 +6,7 @@ use crate::{
     fs::{
         emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, proc::ProcSysNetDev,
         unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle,
-        FsNode, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
     task::CurrentTask,
 };
@@ -18,7 +18,7 @@ struct NetstackDevice {
     /// The device-specific directories that are found under `/proc/sys/net`.
     proc_sys_net: Option<ProcSysNetDev>,
     /// The device-specific node found under `/sys/class.net`.
-    sys_class_net: Option<Arc<FsNode>>,
+    sys_class_net: Option<FsNodeHandle>,
 }
 
 /// Keeps track of network devices and their [`NetstackDevice`].
@@ -62,7 +62,7 @@ impl NetstackDevices {
 /// An implementation of a directory holding netstack interface-specific
 /// directories such as those found under `/proc/sys/net` and `/sys/class/net`.
 pub struct NetstackDevicesDirectory {
-    dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>,
+    dir_fn: fn(&NetstackDevice) -> Option<&FsNodeHandle>,
 }
 
 impl NetstackDevicesDirectory {
@@ -82,7 +82,7 @@ impl NetstackDevicesDirectory {
         Self::new(|d| d.sys_class_net.as_ref())
     }
 
-    fn new(dir_fn: fn(&NetstackDevice) -> Option<&Arc<FsNode>>) -> Arc<Self> {
+    fn new(dir_fn: fn(&NetstackDevice) -> Option<&FsNodeHandle>) -> Arc<Self> {
         Arc::new(Self { dir_fn })
     }
 }
@@ -104,7 +104,7 @@ impl FsNodeOps for Arc<NetstackDevicesDirectory> {
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         let entries = current_task.kernel().netstack_devices.entries.lock();
         entries.get(name).and_then(self.dir_fn).map(Arc::clone).ok_or_else(|| {
             errno!(

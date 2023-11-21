@@ -78,7 +78,7 @@ impl FsNodeOps for Arc<TaskDirectory> {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         self.node_ops.lookup(node, current_task, name)
     }
 }
@@ -267,7 +267,7 @@ impl FsNodeOps for FdDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
         let task = Task::from_weak(&self.task)?;
         // Make sure that the file descriptor exists before creating the node.
@@ -332,7 +332,7 @@ impl FsNodeOps for NsDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         // If name is a given namespace, link to the current identifier of the that namespace for
         // the current task.
         // If name is {namespace}:[id], get a file descriptor for the given namespace.
@@ -471,7 +471,7 @@ impl FsNodeOps for TaskListDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         let tid = std::str::from_utf8(name)
             .map_err(|_| errno!(ENOENT))?
             .parse::<pid_t>()

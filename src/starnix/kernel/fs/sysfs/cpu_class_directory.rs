@@ -9,14 +9,14 @@ use crate::{
         kobject::{KObject, KObjectHandle},
         sysfs::SysFsOps,
         tmpfs::TmpfsDirectory,
-        BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeInfo, FsNodeOps, FsStr, VecDirectory,
-        VecDirectoryEntry,
+        BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        VecDirectory, VecDirectoryEntry,
     },
     task::CurrentTask,
 };
 use fuchsia_zircon as zx;
 use starnix_uapi::{error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
-use std::sync::{Arc, Weak};
+use std::sync::Weak;
 
 pub struct CpuClassDirectory {
     kobject: Weak<KObject>,
@@ -80,7 +80,7 @@ impl FsNodeOps for CpuClassDirectory {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<Arc<FsNode>, Errno> {
+    ) -> Result<FsNodeHandle, Errno> {
         match name {
             name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
                 current_task,

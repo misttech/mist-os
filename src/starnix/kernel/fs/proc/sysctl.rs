@@ -5,8 +5,8 @@
 use crate::{
     auth::FsCred,
     fs::{
-        inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, StaticDirectoryBuilder,
+        inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps,
+        StaticDirectoryBuilder,
     },
     task::{
         ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
@@ -14,7 +14,7 @@ use crate::{
 };
 use starnix_lock::Mutex;
 use starnix_uapi::{auth::CAP_SYS_ADMIN, error, errors::Errno, file_mode::mode};
-use std::{borrow::Cow, sync::Arc};
+use std::borrow::Cow;
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
@@ -139,11 +139,11 @@ impl BytesFileOps for KernelTaintedFile {
 /// Holds the device-specific directories that are found under `/proc/sys/net`.
 pub struct ProcSysNetDev {
     /// The `/proc/sys/net/ipv4/{device}/neigh` directory.
-    ipv4_neigh: Arc<FsNode>,
+    ipv4_neigh: FsNodeHandle,
     /// The `/proc/sys/net/ipv6/{device}/conf` directory.
-    ipv6_conf: Arc<FsNode>,
+    ipv6_conf: FsNodeHandle,
     /// The `/proc/sys/net/ipv6/{device}/neigh` directory.
-    ipv6_neigh: Arc<FsNode>,
+    ipv6_neigh: FsNodeHandle,
 }
 
 impl ProcSysNetDev {
@@ -179,15 +179,15 @@ impl ProcSysNetDev {
         }
     }
 
-    pub fn get_ipv4_neigh(&self) -> &Arc<FsNode> {
+    pub fn get_ipv4_neigh(&self) -> &FsNodeHandle {
         &self.ipv4_neigh
     }
 
-    pub fn get_ipv6_conf(&self) -> &Arc<FsNode> {
+    pub fn get_ipv6_conf(&self) -> &FsNodeHandle {
         &self.ipv6_conf
     }
 
-    pub fn get_ipv6_neigh(&self) -> &Arc<FsNode> {
+    pub fn get_ipv6_neigh(&self) -> &FsNodeHandle {
         &self.ipv6_neigh
     }
 }
