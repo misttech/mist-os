@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::{anyhow, Context};
 use assembly_config_schema::platform_config::diagnostics_config::{
     ArchivistConfig, DiagnosticsConfig,
 };
+use assembly_config_schema::FileEntry;
 use std::collections::BTreeSet;
 
 const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
@@ -28,7 +30,8 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         diagnostics_config: &DiagnosticsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let DiagnosticsConfig { archivist, additional_serial_log_components } = diagnostics_config;
+        let DiagnosticsConfig { archivist, additional_serial_log_components, sampler } =
+            diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
             "fuchsia.component.KcounterBinder",
@@ -99,6 +102,31 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
                     builder.platform_bundle("diagnostics_triage_detect_mali");
                 }
             }
+        }
+
+        for metrics_config in &sampler.metrics_configs {
+            let filename = metrics_config
+                .file_name()
+                .ok_or(anyhow!("Failed to get filename for metrics config: {}", &metrics_config))?;
+            builder
+                .package("sampler")
+                .config_data(FileEntry {
+                    source: metrics_config.clone(),
+                    destination: format!("metrics/assembly/{}", filename),
+                })
+                .context(format!("Adding metrics config to sampler: {}", &metrics_config))?;
+        }
+        for fire_config in &sampler.fire_configs {
+            let filename = fire_config
+                .file_name()
+                .ok_or(anyhow!("Failed to get filename for fire config: {}", &fire_config))?;
+            builder
+                .package("sampler")
+                .config_data(FileEntry {
+                    source: fire_config.clone(),
+                    destination: format!("fire/assembly/{}", filename),
+                })
+                .context(format!("Adding fire config to sampler: {}", &fire_config))?;
         }
 
         Ok(())

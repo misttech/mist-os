@@ -366,6 +366,14 @@ template("product_assembly_configuration") {
       is_list = true
     },
     {
+      node_path = "platform.diagnostics.sampler"
+      fields = [
+        "fire_configs",
+        "metrics_configs",
+      ]
+      is_list = true
+    },
+    {
       node_path = "platform.forensics.cobalt"
       fields = [ "registry" ]
     },

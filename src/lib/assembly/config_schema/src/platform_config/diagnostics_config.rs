@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
 /// Diagnostics configuration options for the diagnostics area.
@@ -12,6 +13,8 @@ pub struct DiagnosticsConfig {
     pub archivist: Option<ArchivistConfig>,
     #[serde(default)]
     pub additional_serial_log_components: Vec<String>,
+    #[serde(default)]
+    pub sampler: SamplerConfig,
 }
 
 /// Diagnostics configuration options for the archivist configuration area.
@@ -20,6 +23,16 @@ pub struct DiagnosticsConfig {
 pub enum ArchivistConfig {
     Default,
     LowMem,
+}
+
+/// Diagnostics configuration options for the sampler configuration area.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SamplerConfig {
+    /// The metrics configs to pass to sampler.
+    pub metrics_configs: Vec<Utf8PathBuf>,
+    /// The fire configs to pass to sampler.
+    pub fire_configs: Vec<Utf8PathBuf>,
 }
 
 #[cfg(test)]
@@ -58,7 +71,11 @@ mod tests {
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
-            DiagnosticsConfig { archivist: None, additional_serial_log_components: Vec::new() }
+            DiagnosticsConfig {
+                archivist: None,
+                additional_serial_log_components: Vec::new(),
+                sampler: SamplerConfig::default()
+            }
         );
     }
 
@@ -76,7 +93,11 @@ mod tests {
         let config: PlatformConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(
             config.diagnostics,
-            DiagnosticsConfig { archivist: None, additional_serial_log_components: Vec::new() }
+            DiagnosticsConfig {
+                archivist: None,
+                additional_serial_log_components: Vec::new(),
+                sampler: SamplerConfig::default()
+            }
         );
     }
 
@@ -100,7 +121,8 @@ mod tests {
             config.diagnostics,
             DiagnosticsConfig {
                 archivist: None,
-                additional_serial_log_components: vec!["/foo".to_string()]
+                additional_serial_log_components: vec!["/foo".to_string()],
+                sampler: SamplerConfig::default(),
             }
         );
     }
