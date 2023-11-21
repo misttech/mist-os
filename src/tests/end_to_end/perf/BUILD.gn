@@ -25,7 +25,6 @@ test_list = [
   "netstack_benchmarks_test",
   "netstack_benchmarks_with_tracing_test",
   "netstack_tun_socket_benchmarks_test",
-  "network_device_microbenchmarks_test",
   "perftest_trace_events_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
@@ -221,7 +220,6 @@ if (is_host) {
     "fuchsia.netstack.resource_usage.netstack3.txt",
     "fuchsia.netstack.resource_usage.txt",
     "fuchsia.netstack3.core.txt",
-    "fuchsia.network.device.txt",
     "fuchsia.network.socket.loopback.fake_netstack.txt",
     "fuchsia.network.socket.loopback.fastudp.txt",
     "fuchsia.network.socket.loopback.netstack3.txt",
@@ -292,6 +290,7 @@ if (is_host) {
 group("package_deps") {
   testonly = true
   public_deps = [
+    "//src/connectivity/network/drivers/network-device/device:benchmarks",
     "//src/devices/bin/driver_runtime/microbenchmarks",
     "//src/diagnostics:benchmarks",
     "//src/lib/diagnostics:benchmarks",
@@ -308,9 +307,6 @@ group("package_deps") {
     "//src/connectivity/network/netstack3:netstack3_benchmarks",
     "//src/connectivity/network/tests/benchmarks",
     "//third_party/iperf",
-
-    # Used by network device benchmarks.
-    "//src/connectivity/network/drivers/network-device/device:network-device-microbenchmarks",
 
     # These are used by flatland_benchmarks and input_latency_benchmarks
     "//src/ui/examples:flatland-examples",
