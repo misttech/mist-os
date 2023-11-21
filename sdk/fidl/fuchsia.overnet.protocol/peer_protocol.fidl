@@ -1,12 +1,17 @@
 // Copyright 2018 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+@available(added=16)
 library fuchsia.overnet.protocol;
 
-using zx;
+// WARNING: The overnet protocol is considered frozen and should not be
+// modified. Future development will likely occur in a new protocol, such as
+// is proposed in RFC-0228
 
-// TODO(ctiller): make this fuchsia.io.MAX_FILENAME
-const MAX_SERVICE_NAME_LENGTH uint64 = 255;
+using zx;
+using fuchsia.io;
+
+const MAX_SERVICE_NAME_LENGTH uint64 = fuchsia.io.MAX_NAME_LENGTH;
 
 /// Peer-to-peer protocol between two Overnet nodes.
 /// Client QUIC connections send this xunion to servers over QUIC stream 0.

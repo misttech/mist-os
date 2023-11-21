@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 library fuchsia.overnet.protocol;
 
+// WARNING: The overnet protocol is considered frozen and should not be
+// modified. Future development will likely occur in a new protocol, such as
+// is proposed in RFC-0228
+
 /// Identifies a single overnet stream between two processes on the Overnet
 /// mesh.
 type StreamId = struct {

@@ -3,6 +3,10 @@
 // found in the LICENSE file.
 library fuchsia.overnet.protocol;
 
+// WARNING: The overnet protocol is considered frozen and should not be
+// modified. Future development will likely occur in a new protocol, such as
+// is proposed in RFC-0228
+
 using zx;
 
 /// A single message proxied from a Zircon channel over an Overnet stream.
