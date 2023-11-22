@@ -36,6 +36,7 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/lib/profile-client:test-profile-server",
     "//src/lib/async-utils",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:paste",
   ]
 
   sources = [
@@ -53,6 +54,7 @@ rustc_binary("bin") {
     "src/peer/procedure/codec_connection_setup.rs",
     "src/peer/procedure/phone_status.rs",
     "src/peer/procedure/slc_initialization.rs",
+    "src/peer/procedure/test.rs",
     "src/peer/procedure_manager.rs",
     "src/peer/procedure_manipulated_state.rs",
     "src/profile.rs",

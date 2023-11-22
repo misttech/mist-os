@@ -24,13 +24,11 @@ pub struct CodecConnectionSetupProcedure {
     state: State,
 }
 
-impl CodecConnectionSetupProcedure {
-    pub fn new() -> Self {
+impl Procedure<ProcedureInput, ProcedureOutput> for CodecConnectionSetupProcedure {
+    fn new() -> Self {
         Self { state: State::WaitingForBcs }
     }
-}
 
-impl Procedure for CodecConnectionSetupProcedure {
     fn name(&self) -> &str {
         "Codec Connection Setup"
     }

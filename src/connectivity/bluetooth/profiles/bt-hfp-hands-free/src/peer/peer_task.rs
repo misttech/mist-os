@@ -17,7 +17,7 @@ use crate::peer::procedure_manager::ProcedureManager;
 
 pub struct PeerTask {
     peer_id: PeerId,
-    procedure_manager: ProcedureManager,
+    procedure_manager: ProcedureManager<ProcedureInput, ProcedureOutput>,
     at_connection: AtConnection,
 }
 

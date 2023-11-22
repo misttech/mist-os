@@ -2,17 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::Error;
+use anyhow::{Error, Result};
 use at_commands as at;
 use std::fmt;
-
-pub mod codec_connection_setup;
-pub mod phone_status;
-pub mod slc_initialization;
+use std::fmt::Debug;
+use std::marker::Unpin;
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
+
+#[cfg(test)]
+pub mod test;
+
+// Individual procedures
+pub mod codec_connection_setup;
 use codec_connection_setup::CodecConnectionSetupProcedure;
+
+pub mod phone_status;
 use phone_status::PhoneStatusProcedure;
+
+pub mod slc_initialization;
 use slc_initialization::SlcInitProcedure;
 
 macro_rules! at_ok {
@@ -41,10 +49,10 @@ macro_rules! at_cmd {
 }
 pub(crate) use at_cmd;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommandFromHf {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureInput {
     AtResponseFromAg(at::Response),
     // TODO(fxb/127025) Use this in task.rs.
@@ -52,10 +60,10 @@ pub enum ProcedureInput {
     CommandFromHf(CommandFromHf),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum CommandToHf {}
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum ProcedureOutput {
     AtCommandToAg(at::Command),
     // TODO(fxbug.dev/127025) use this in PeerTask and procedures.
@@ -63,15 +71,15 @@ pub enum ProcedureOutput {
     CommandToHf(CommandToHf),
 }
 
-pub trait ProcedureInputT {
-    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure>>;
+pub trait ProcedureInputT<O: ProcedureOutputT>: Clone + Debug + PartialEq + Unpin {
+    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, O>>>;
 
     fn can_start_procedure(&self) -> bool;
 }
 
-impl ProcedureInputT for ProcedureInput {
+impl ProcedureInputT<ProcedureOutput> for ProcedureInput {
     /// Matches a specific input to procedure
-    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure>> {
+    fn to_initialized_procedure(&self) -> Option<Box<dyn Procedure<Self, ProcedureOutput>>> {
         match self {
             // TODO(fxb/130999) This is wrong--we need to start SLCI ourselves, not wait for an AT command.
             at_resp!(Brsf) => Some(Box::new(SlcInitProcedure::new())),
@@ -89,7 +97,15 @@ impl ProcedureInputT for ProcedureInput {
     }
 }
 
-pub trait Procedure: fmt::Debug {
+pub trait ProcedureOutputT: Clone + Debug + PartialEq + Unpin {}
+impl ProcedureOutputT for ProcedureOutput {}
+
+pub trait Procedure<I: ProcedureInputT<O>, O: ProcedureOutputT>: fmt::Debug {
+    /// Create a new instance of the procedure.
+    fn new() -> Self
+    where
+        Self: Sized;
+
     /// Returns the name of this procedure for logging.
     fn name(&self) -> &str;
 
@@ -98,8 +114,8 @@ pub trait Procedure: fmt::Debug {
     fn transition(
         &mut self,
         state: &mut ProcedureManipulatedState,
-        input: ProcedureInput,
-    ) -> Result<Vec<ProcedureOutput>, Error>;
+        input: I,
+    ) -> Result<Vec<O>, Error>;
 
     /// Returns true if the Procedure is finished.
     fn is_terminated(&self) -> bool;

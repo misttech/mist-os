@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll, Waker};
 use tracing::warn;
 
-use super::procedure::{Procedure, ProcedureInput, ProcedureInputT, ProcedureOutput};
+use super::procedure::{Procedure, ProcedureInputT, ProcedureOutputT};
 use super::procedure_manipulated_state::ProcedureManipulatedState;
 
 use crate::config::HandsFreeFeatureSupport;
@@ -42,16 +42,16 @@ use crate::config::HandsFreeFeatureSupport;
 // enqueued which can start a procedure, it is used to do so, and the output
 // from the prodedure is returned.
 
-pub struct ProcedureManager {
+pub struct ProcedureManager<I: ProcedureInputT<O>, O: ProcedureOutputT> {
     /// ID of the peer for logging.
     peer_id: PeerId,
     /// Current procedure for responses to be routed to.
-    current_procedure: Option<Box<dyn Procedure>>,
+    current_procedure: Option<Box<dyn Procedure<I, O>>>,
     /// Commands that will be processed by the current procedure.
-    current_procedure_inputs: VecDeque<ProcedureInput>,
+    current_procedure_inputs: VecDeque<I>,
     /// Commands that will start new procedures that will be processed when the current procedure
     /// has finished.
-    future_procedure_inputs: VecDeque<ProcedureInput>,
+    future_procedure_inputs: VecDeque<I>,
     /// Waker for the stream of outputs from procedure state machines managed by this struct.
     stream_waker: Option<Waker>,
     /// Collection of shared features and indicators between two
@@ -59,7 +59,7 @@ pub struct ProcedureManager {
     pub procedure_managed_state: ProcedureManipulatedState,
 }
 
-impl ProcedureManager {
+impl<I: ProcedureInputT<O>, O: ProcedureOutputT> ProcedureManager<I, O> {
     pub fn new(peer_id: PeerId, config: HandsFreeFeatureSupport) -> Self {
         let procedure_managed_state = ProcedureManipulatedState::new(config);
         Self {
@@ -75,7 +75,7 @@ impl ProcedureManager {
     // Inserts a ProcedureInput into the proper queue. If it can start a
     // procedure, it goes into the future_procedure_inputs queue; otherwise it
     // goes into the current_procedure_inputs queue.
-    pub fn enqueue(&mut self, input: ProcedureInput) {
+    pub fn enqueue(&mut self, input: I) {
         if let Some(waker) = self.stream_waker.take() {
             waker.wake();
         }
@@ -88,7 +88,7 @@ impl ProcedureManager {
     }
 
     // Must be called with current_procedure set to Some(...)
-    fn get_current_procedure_input(&mut self) -> Option<Result<ProcedureInput>> {
+    fn get_current_procedure_input(&mut self) -> Option<Result<I>> {
         assert!(self.current_procedure.is_some());
 
         let Some(input) = self.current_procedure_inputs.pop_front() else {
@@ -99,7 +99,7 @@ impl ProcedureManager {
     }
 
     // Must be called with current_procedure set to None.
-    fn set_new_procedure_and_get_input(&mut self) -> Option<Result<ProcedureInput>> {
+    fn set_new_procedure_and_get_input(&mut self) -> Option<Result<I>> {
         assert!(self.current_procedure.is_none());
 
         let Some(input) = self.future_procedure_inputs.pop_front() else {
@@ -121,7 +121,7 @@ impl ProcedureManager {
         Some(Ok(input))
     }
 
-    fn run_procedure_with_input(&mut self, input: ProcedureInput) -> Result<Vec<ProcedureOutput>> {
+    fn run_procedure_with_input(&mut self, input: I) -> Result<Vec<O>> {
         // The current procedure was already set or is was set by
         // `set_new_procedure_and_get_input` if it returned successfully.
         let procedure = self.current_procedure.as_mut().unwrap();
@@ -132,7 +132,7 @@ impl ProcedureManager {
 
     /// Run the current procedure if it exists an there are inputs for it, without checking for
     /// errors cases or cleaning up terminated procedures.
-    fn run_current_or_new_procedure(&mut self) -> Option<Result<Vec<ProcedureOutput>>> {
+    fn run_current_or_new_procedure(&mut self) -> Option<Result<Vec<O>>> {
         let input = if self.current_procedure.is_some() {
             self.get_current_procedure_input()
         } else {
@@ -187,7 +187,7 @@ impl ProcedureManager {
     ///
     /// Returns None if there is no procedure to run or input for it, or Some of a Result output by
     /// the procedure.
-    fn run_next_procedure(&mut self) -> Option<Result<Vec<ProcedureOutput>>> {
+    fn run_next_procedure(&mut self) -> Option<Result<Vec<O>>> {
         // Confirm there are no inputs for the current procedure when no procedure exists.  This
         // would mean we've received inputs since the last procedure was terminated or before any
         // procedure was started. This indicates either a bug in the previous procedure or a
@@ -228,9 +228,9 @@ impl ProcedureManager {
 ///   - The second ProcedureOutput is processed, which assumes the ProcedureManiplated state is
 ///     in its previous state.
 // TODO(fxb/129730) This can return individual ProcedureOutputs if all state management is moved to
-// the PeerTask and thus synchronized there.
-impl Stream for ProcedureManager {
-    type Item = Result<Vec<ProcedureOutput>>;
+// the PeerTask and thus synchronized there..
+impl<I: ProcedureInputT<O>, O: ProcedureOutputT> Stream for ProcedureManager<I, O> {
+    type Item = Result<Vec<O>>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
@@ -249,10 +249,227 @@ impl Stream for ProcedureManager {
     }
 }
 
-impl FusedStream for ProcedureManager {
+impl<I: ProcedureInputT<O>, O: ProcedureOutputT> FusedStream for ProcedureManager<I, O> {
     fn is_terminated(&self) -> bool {
         // It is never the case that the ProcedureManager is terminated--a client could always
         // enqueue new procedure inputs.
         false
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::config::HandsFreeFeatureSupport;
+    use crate::peer::procedure::test;
+
+    use fuchsia_async as fasync;
+    use futures::StreamExt;
+
+    #[fuchsia::test]
+    fn one_procedure_runs() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let peer_id = PeerId(1);
+        let config = HandsFreeFeatureSupport::default();
+
+        let mut procedure_manager =
+            ProcedureManager::<test::ProcedureInput, test::ProcedureOutput>::new(peer_id, config);
+
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureOne);
+        let output1 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output1, vec![test::ProcedureOutput::ProcedureOneStarted]);
+
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureOne);
+        let output2 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output2, vec![test::ProcedureOutput::ProcedureOneContinued]);
+
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureOne);
+        let output3 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output3, vec![test::ProcedureOutput::ProcedureOneTerminated]);
+    }
+
+    #[fuchsia::test]
+    fn one_procedure_queued_runs() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let peer_id = PeerId(1);
+        let config = HandsFreeFeatureSupport::default();
+
+        let mut procedure_manager =
+            ProcedureManager::<test::ProcedureInput, test::ProcedureOutput>::new(peer_id, config);
+
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureOne);
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureOne);
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureOne);
+
+        let output1 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output1, vec![test::ProcedureOutput::ProcedureOneStarted]);
+
+        let output2 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output2, vec![test::ProcedureOutput::ProcedureOneContinued]);
+
+        let output3 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output3, vec![test::ProcedureOutput::ProcedureOneTerminated]);
+    }
+
+    #[fuchsia::test]
+    fn procedure_fails_on_bad_input() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let peer_id = PeerId(1);
+        let config = HandsFreeFeatureSupport::default();
+
+        let mut procedure_manager =
+            ProcedureManager::<test::ProcedureInput, test::ProcedureOutput>::new(peer_id, config);
+
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureOne);
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureTwo);
+
+        let output1 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output1, vec![test::ProcedureOutput::ProcedureOneStarted]);
+
+        let _output2 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect_err("Procedure manager succeeded incorrectly");
+    }
+
+    #[fuchsia::test]
+    fn multiple_procedures_run() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let peer_id = PeerId(1);
+        let config = HandsFreeFeatureSupport::default();
+
+        let mut procedure_manager =
+            ProcedureManager::<test::ProcedureInput, test::ProcedureOutput>::new(peer_id, config);
+
+        // Procedure One /////////////////////////////////////////////////////
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureOne);
+        let output1 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output1, vec![test::ProcedureOutput::ProcedureOneStarted]);
+
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureOne);
+        let output2 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output2, vec![test::ProcedureOutput::ProcedureOneContinued]);
+
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureOne);
+        let output3 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output3, vec![test::ProcedureOutput::ProcedureOneTerminated]);
+
+        // Procedure Two /////////////////////////////////////////////////////
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureTwo);
+        let output1 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output1, vec![test::ProcedureOutput::ProcedureTwoStarted]);
+
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureTwo);
+        let output2 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output2, vec![test::ProcedureOutput::ProcedureTwoContinued]);
+
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureTwo);
+        let output3 = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+        assert_eq!(output3, vec![test::ProcedureOutput::ProcedureTwoTerminated]);
+    }
+
+    #[fuchsia::test]
+    fn multiple_procedures_interleaved_run() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let peer_id = PeerId(1);
+        let config = HandsFreeFeatureSupport::default();
+
+        let mut procedure_manager =
+            ProcedureManager::<test::ProcedureInput, test::ProcedureOutput>::new(peer_id, config);
+
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureOne);
+        let output_one_started = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureOne);
+        let output_one_continued = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        // Early start message for Procedure Two
+        procedure_manager.enqueue(test::ProcedureInput::StartProcedureTwo);
+        // No immedaite output for Procedure Two
+
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureOne);
+        let output_one_terminated = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        // Now that Procedure One is finished, we get output for Procedure Tow.
+        let output_two_started = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        procedure_manager.enqueue(test::ProcedureInput::ContinueProcedureTwo);
+        let output_two_continued = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        procedure_manager.enqueue(test::ProcedureInput::TerminateProcedureTwo);
+        let output_two_terminated = exec
+            .run_singlethreaded(procedure_manager.next())
+            .expect("Stream closed")
+            .expect("Procedure manager error");
+
+        // Procedure One runs first.
+        assert_eq!(output_one_started, vec![test::ProcedureOutput::ProcedureOneStarted]);
+        assert_eq!(output_one_continued, vec![test::ProcedureOutput::ProcedureOneContinued]);
+        assert_eq!(output_one_terminated, vec![test::ProcedureOutput::ProcedureOneTerminated]);
+
+        // Then Procedure Two runs next.
+        assert_eq!(output_two_started, vec![test::ProcedureOutput::ProcedureTwoStarted]);
+        assert_eq!(output_two_continued, vec![test::ProcedureOutput::ProcedureTwoContinued]);
+        assert_eq!(output_two_terminated, vec![test::ProcedureOutput::ProcedureTwoTerminated]);
     }
 }

@@ -27,13 +27,11 @@ pub struct PhoneStatusProcedure {
     terminated: bool,
 }
 
-impl PhoneStatusProcedure {
-    pub fn new() -> Self {
+impl Procedure<ProcedureInput, ProcedureOutput> for PhoneStatusProcedure {
+    fn new() -> Self {
         Self { terminated: false }
     }
-}
 
-impl Procedure for PhoneStatusProcedure {
     fn name(&self) -> &str {
         "Phone Status"
     }

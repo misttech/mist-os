@@ -52,7 +52,11 @@ impl SlcInitProcedure {
     }
 }
 
-impl Procedure for SlcInitProcedure {
+impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
+    fn new() -> Self {
+        Self { state: State::SupportedFeaturesExchange }
+    }
+
     fn name(&self) -> &str {
         "SLC Initialization"
     }
