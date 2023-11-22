@@ -79,6 +79,7 @@ func newUpdateImages(
 	}
 
 	return &UpdateImages{
+		repo:       repo,
 		images:     images,
 		zbiUrl:     zbiUrl,
 		vbmetaUrl:  vbmetaUrl,
@@ -137,12 +138,7 @@ func (u *UpdateImages) replaceZbiPackage(
 		return nil, fmt.Errorf("failed to set vbmeta partition: %w", err)
 	}
 
-	return &UpdateImages{
-		images:     images,
-		zbiPackage: dstZbi,
-		zbiUrl:     dstZbiUrl,
-		vbmetaUrl:  dstVbmetaUrl,
-	}, nil
+	return newUpdateImages(ctx, u.repo, images)
 }
 
 func (u *UpdateImages) zbiPath() string {
