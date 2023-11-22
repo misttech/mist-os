@@ -34,10 +34,10 @@ def get_fuchsia_api_level(ctx):
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
 def _valid_api_levels(ctx):
-    if hasattr(ctx.attr, "valid_api_levels_for_test") and len(ctx.attr.valid_api_levels_for_test) > 0:
+    if getattr(ctx.attr, "valid_api_levels_for_test", None):
         levels = ctx.attr.valid_api_levels_for_test
     else:
-        levels = [entry["api_level"] for entry in VALID_TARGET_APIS]
+        levels = [entry.api_level for entry in VALID_TARGET_APIS]
 
     # The unset level is still valid since it can indicate that the user did
     # not set the value. If we don't do this then we have no way if the
@@ -46,17 +46,15 @@ def _valid_api_levels(ctx):
 
 def _fuchsia_api_level_impl(ctx):
     raw_level = ctx.build_setting_value
+    if raw_level not in _valid_api_levels(ctx):
+        fail("ERROR: {} is not a valid API level. API level should be one of {}".format(
+            raw_level,
+            _valid_api_levels(ctx),
+        ))
 
-    for level in _valid_api_levels(ctx):
-        if raw_level == level:
-            return FuchsiaAPILevelInfo(
-                level = raw_level,
-            )
-
-    fail("ERROR: {} is not a valid API level. API level should be one of {}".format(
-        raw_level,
-        _valid_api_levels(ctx),
-    ))
+    return FuchsiaAPILevelInfo(
+        level = raw_level,
+    )
 
 fuchsia_api_level = rule(
     doc = """A build configuration value containing the fuchsia api level
@@ -75,17 +73,4 @@ fuchsia_api_level = rule(
             default = [],
         ),
     },
-)
-
-fuchsia_static_api_level = rule(
-    doc = """A build configuration value containing the fuchsia api level
-
-    The fuchsia_static_api_level is a build configuration value that cannot be
-    set from the command line. This lets us propagate the value via a transition
-    while still allowing for users to set their own flags via the command line.
-    Put another way, this is the output of a transition whereas the fuchsia_api_level
-    is the input to the transition.
-    """,
-    implementation = _fuchsia_api_level_impl,
-    build_setting = config.string(flag = False),
 )

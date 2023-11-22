@@ -5,6 +5,11 @@
 # Constraints and platforms for Fuchsia.
 
 load("@bazel_skylib//lib:selects.bzl", "selects")
+load("//:api_version.bzl", "VALID_TARGET_APIS")
+
+package(
+    default_visibility = ["//:__subpackages__"],
+)
 
 # The version of the Fuchsia toolchain. Specific to particular local builds of
 # Fuchsia or particular versions of the IDK.
@@ -13,8 +18,23 @@ constraint_setting(
     visibility = ["//visibility:public"],
 )
 
-# CPU based configurations
+# Target API level constraints.
+config_setting(
+    name = "api_level_unspecified",
+    deprecation = "Warning: Dependencies with unspecified API levels are being used, incompatibility may occur.",
+)
 
+[
+    config_setting(
+        name = "api_level_%s" % target_api.api_level,
+        flag_values = {
+            "//fuchsia:fuchsia_api_level": target_api.api_level,
+        },
+    )
+    for target_api in VALID_TARGET_APIS
+]
+
+# CPU based configurations
 selects.config_setting_group(
     name = "cpu_arm64",
     match_any = [

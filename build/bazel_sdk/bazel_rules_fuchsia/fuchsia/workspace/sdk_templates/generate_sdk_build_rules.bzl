@@ -37,6 +37,8 @@ def _get_starlark_list(values, prefix = "", suffix = "", remove_prefix = ""):
     for v in values:
         if type(v) == "dict":
             values_str += "    " + _get_starlark_dict(v) + ",\n"
+        elif type(v) == "struct":
+            values_str += "    " + str(v) + ",\n"
         else:
             if len(remove_prefix) > 0 and v.startswith(remove_prefix):
                 v = v[len(remove_prefix):]
@@ -57,6 +59,8 @@ def _get_starlark_dict(entries):
         v = entries[k]
         if type(v) == "list":
             v_str = "[" + _get_starlark_list(v).replace("\n", "") + "]"
+        elif type(v) == "struct":
+            values_str += "    " + str(v) + ",\n"
         else:
             v_str = "\"" + str(v) + "\""
         entries_str += "    \"" + k + "\": " + v_str + ",\n"
@@ -267,13 +271,17 @@ def _generate_companion_host_tool_build_rules(ctx, meta, relative_dir, build_fil
     process_context.files_to_copy[meta["_meta_sdk_root"]].extend(files_str)
 
 # buildifier: disable=unused-variable
-def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):  # @unused
+def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._api_version_template)
     versions = []
     max_api = -1
     if "data" in meta and "api_levels" in meta["data"]:
         for api_level, value in meta["data"]["api_levels"].items():
-            versions.append({"abi_revision": value["abi_revision"], "api_level": api_level})
+            versions.append(struct(
+                abi_revision = value["abi_revision"],
+                api_level = api_level,
+                status = value["status"],
+            ))
             max_api = max(max_api, int(api_level))
 
     # unlike other template rules that affect the corresponding BUILD.bazel file,
@@ -299,7 +307,7 @@ def _generate_api_version_rules(ctx, meta, relative_dir, build_file, process_con
             "{{default_target_api}}": str(max_api),
             "{{default_clang_target_api}}": str(clang_api_level_override) or str(max_api),
             "{{default_fidl_target_api}}": str(fidl_api_level_override) or str(max_api),
-            "{{valid_target_apis}}": _get_starlark_list(versions),
+            "{{valid_target_apis}}": _get_starlark_list(sorted(versions, key = lambda version: int(version.api_level))),
         },
     )
 
@@ -426,6 +434,14 @@ _FUCHSIA_CLANG_VARIANT_MAP = {
     "": "@fuchsia_clang//:novariant",
     "asan": "@fuchsia_clang//:asan_variant",
 }
+
+# Maps a Fuchsia API level to the corresponding config_setting() label in
+# @fuchsia_sdk//fuchsia/constraints
+def _fuchsia_api_level_constraint(api_level):
+    return "//fuchsia/constraints:api_level_%s" % _to_fuchsia_api_level_name(api_level)
+
+def _to_fuchsia_api_level_name(api_level):
+    return "unspecified" if api_level == "-1" else api_level
 
 def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._cc_prebuilt_library_template)

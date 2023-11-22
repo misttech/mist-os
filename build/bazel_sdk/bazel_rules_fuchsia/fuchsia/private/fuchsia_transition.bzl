@@ -32,47 +32,33 @@ CPU_MAP = {
 }
 
 _REPO_DEFAULT_API_LEVEL_TARGET_NAME = "//fuchsia:repository_default_fuchsia_api_level"
-_OVERRIDE_API_LEVEL_TARGET_NAME = "//fuchsia:override_fuchsia_api_level"
 
 def _update_fuchsia_api_level(settings, attr):
-    # The logic for determining what API level to use is as follows. The first
-    # value that is true will be used
-    # 1. Check if a user has set the value by using the override flag
+    # The logic for determining what API level to use.
+    # The effective precedence is specified below:
+
+    # 1. Check the value that is manually specified via command-line
+    manually_specified_api_level = settings[FUCHSIA_API_LEVEL_TARGET_NAME]
+
     # 2. Check the value that is set on the fuchsia_package
+    target_specified_api_level = getattr(attr, "fuchsia_api_level", None)
+
     # 3. Check the repository_default_fuchsia_api_level flag
-    # 4. fail
+    repo_default_api_level = settings[_REPO_DEFAULT_API_LEVEL_TARGET_NAME]
 
-    override_value = settings[_OVERRIDE_API_LEVEL_TARGET_NAME]
+    # TODO(b/303683945): Remove this fallback once users are setting their API level.
+    # 4. Use the highest api specified by IDK metadata versions.json.
+    temporary_fallback_api_level = str(DEFAULT_TARGET_API)
 
-    # Check if we have a user provided value
-    if override_value != "":
-        # buildifier: disable=print
-        print("Using user provided API level {}".format(override_value))
-        return override_value
-
-    # TODO(b/303681889): We are currently using the fuchsia_transition in a way
-    # that causes analysis to run on more targets than we should. Some of these
-    # targets don't have an api level setting so we need to check for that here.
-    if hasattr(attr, "fuchsia_api_level"):
-        # If not set on the command  line, use the value in the package rule
-        api_level = attr.fuchsia_api_level
-        if api_level != "":
-            return api_level
-    else:
-        # We need to return an empty value here because there are some rules which
-        # use this tranition but do not have the api level as an attribute. If we
-        # return anything else here the api level setting will be set to some
-        # value and we will not be able to know if this is a user's intention
-        # or a misconfigured transition.
-        return ""
-
-    repo_default_value = settings[_REPO_DEFAULT_API_LEVEL_TARGET_NAME]
-    if repo_default_value != "":
-        return repo_default_value
-
-    #TODO(b/303683945): We should fail here once users are setting their API level.
-    return str(DEFAULT_TARGET_API)
-    # fail("Packages must be built against an API level.")
+    return (
+        manually_specified_api_level
+    ) or (
+        target_specified_api_level
+    ) or (
+        repo_default_api_level
+    ) or (
+        temporary_fallback_api_level
+    ) or fail("Packages must be built against an API level.")
 
 def _package_supplied_platform(attr):
     # We should be pulling the platform off of the package but we need to clean
@@ -131,7 +117,7 @@ def _fuchsia_transition_impl(settings, attr):
 fuchsia_transition = transition(
     implementation = _fuchsia_transition_impl,
     inputs = [
-        _OVERRIDE_API_LEVEL_TARGET_NAME,
+        FUCHSIA_API_LEVEL_TARGET_NAME,
         _REPO_DEFAULT_API_LEVEL_TARGET_NAME,
         "//command_line_option:cpu",
         "//command_line_option:copt",

@@ -13,7 +13,7 @@ build:fuchsia_riscv64 --cpu=riscv64
 build:fuchsia_riscv64 --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 build:fuchsia_riscv64 --copt=--debug --strip=never
 
-build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//fuchsia:override_fuchsia_api_level
+build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//fuchsia:fuchsia_api_level
 build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//fuchsia:repository_default_fuchsia_api_level
 
 # This value determines what API level we compile our packages against when they
