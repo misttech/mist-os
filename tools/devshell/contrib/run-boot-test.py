@@ -314,9 +314,8 @@ def main():
         return 1
 
     test = matches[0]
-    assert (
-        test.ensure_product_bundle(),
-        "unable to build product bundle %s" % test.product_bundle_name(),
+    assert test.ensure_product_bundle(), (
+        "unable to build product bundle %s" % test.product_bundle_name()
     )
     if args.boot:
         if test.qemu_kernel:
@@ -326,7 +325,7 @@ def main():
         bootserver = find_bootserver(build_dir)
         cmd = [bootserver, "--boot"] + test.zbi + args.args
     else:
-        cmd = ["fx", "qemu", "--arch", args.arch()] + args.args
+        cmd = ["fx", "qemu", "--arch", args.arch] + args.args
 
         if test.is_uefi_boot():
             cmd += ["--uefi"]
