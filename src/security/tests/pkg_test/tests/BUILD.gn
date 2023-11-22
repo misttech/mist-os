@@ -12,6 +12,7 @@ if (is_fuchsia) {
     testonly = true
     options = {
       data_filesystem_format = "minfs"
+      fxfs_blob = false
     }
   }
 
@@ -48,6 +49,8 @@ if (is_fuchsia) {
       "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
     ]
 
+    use_fxfs_blob = false
+
     # Inject config file for test component.
     update_domain = "test.fuchsia.com"
 
@@ -63,6 +66,8 @@ if (is_fuchsia) {
     base_packages = [
       "//src/security/tests/pkg_test/config:pkg_resolver_repository_config",
     ]
+
+    use_fxfs_blob = false
 
     # Inject config file for test component.
     update_domain = "test.fuchsia.com"
