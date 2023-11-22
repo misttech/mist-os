@@ -1364,6 +1364,52 @@ TEST(GptDeviceLoadEntries, EntryOverlapsWithLastEntry) {
           .status_value());
 }
 
+TEST(GptDeviceLoadEntries, EntriesCrcIncludesPadding) {
+  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[MinimumBytesPerCopy(kBlockSize).value()]());
+  uint8_t* blocks = buffer.get();
+
+  uint32_t entry_count = 4;
+  header.entries_count = entry_count;
+  UpdateHeaderCrcs(&header, &blocks[kBlockSize], kMaxPartitionTableSize);
+  memcpy(blocks, &header, sizeof(header));
+  zx::result gpt =
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt);
+  ASSERT_EQ(gpt.value()->EntryCount(), entry_count);
+}
+
+TEST(GptDeviceLoadEntries, BadEntriesCrc) {
+  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[MinimumBytesPerCopy(kBlockSize).value()]());
+  uint8_t* blocks = buffer.get();
+
+  uint32_t entry_count = 4;
+  header.entries_count = entry_count;
+  UpdateHeaderCrcs(&header, &blocks[kBlockSize], static_cast<uint64_t>(kEntrySize) * entry_count);
+  header.entries_crc = ~header.entries_crc;
+  header.crc32 = CalculateCrc(header);
+  memcpy(blocks, &header, sizeof(header));
+  zx::result gpt =
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
+  EXPECT_STATUS(gpt, ZX_ERR_BAD_STATE);
+}
+
+TEST(GptDeviceLoadEntries, MaxEntryCount) {
+  gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
+  std::unique_ptr<uint8_t[]> buffer(new uint8_t[MinimumBytesPerCopy(kBlockSize).value()]());
+  uint8_t* blocks = buffer.get();
+
+  uint32_t entry_count = kPartitionCount;
+  header.entries_count = entry_count;
+  UpdateHeaderCrcs(&header, &blocks[kBlockSize], static_cast<uint64_t>(kEntrySize) * entry_count);
+  memcpy(blocks, &header, sizeof(header));
+  zx::result gpt =
+      GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
+  ASSERT_OK(gpt);
+  ASSERT_EQ(gpt.value()->EntryCount(), entry_count);
+}
+
 TEST(GptDeviceEntryCountTest, DefaultValue) {
   gpt_header_t header = InitializePrimaryHeader(kBlockSize, kBlockCount).value();
   std::unique_ptr<uint8_t[]> buffer(new uint8_t[MinimumBytesPerCopy(kBlockSize).value()]());
@@ -1386,7 +1432,7 @@ TEST(GptDeviceEntryCountTest, FewerEntries) {
   uint32_t entry_count = 4;
   header.entries_count = entry_count;
   UpdateHeaderCrcs(&header, &blocks[kBlockSize],
-                   MinimumBytesPerCopy(kBlockSize).value() - kBlockSize);
+                   static_cast<uint64_t>(entry_count) * header.entries_size);
   memcpy(blocks, &header, sizeof(header));
   zx::result gpt =
       GptDevice::Load(blocks, MinimumBytesPerCopy(kBlockSize).value(), kBlockSize, kBlockCount);
