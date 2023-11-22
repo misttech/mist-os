@@ -287,7 +287,7 @@ void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
 
   {
     // Check current segment summary
-    std::lock_guard curseg_lock(curseg->curseg_mutex);
+    fs::SharedLock curseg_lock(curseg->curseg_mutex);
     i = LookupJournalInCursum(sum, JournalType::kNatJournal, nid, 0);
     if (i >= 0) {
       ne = NatInJournal(sum, i);
@@ -308,8 +308,8 @@ void NodeManager::GetNodeInfo(nid_t nid, NodeInfo &out) {
 
 // The maximum depth is four.
 // Offset[0] will have raw inode offset.
-zx::result<int32_t> NodeManager::GetNodePath(VnodeF2fs &vnode, pgoff_t block, int32_t (&offset)[4],
-                                             uint32_t (&noffset)[4]) {
+zx::result<size_t> NodeManager::GetNodePath(VnodeF2fs &vnode, pgoff_t block, int32_t (&offset)[4],
+                                            uint32_t (&noffset)[4]) {
   const pgoff_t direct_index = vnode.GetAddrsPerInode();
   const pgoff_t direct_blks = kAddrsPerBlock;
   const pgoff_t dptrs_per_blk = kNidsPerBlock;
@@ -317,8 +317,8 @@ zx::result<int32_t> NodeManager::GetNodePath(VnodeF2fs &vnode, pgoff_t block, in
       safemath::CheckMul(safemath::checked_cast<pgoff_t>(kAddrsPerBlock), kNidsPerBlock)
           .ValueOrDie();
   const pgoff_t dindirect_blks = indirect_blks * kNidsPerBlock;
-  int32_t n = 0;
-  int32_t level = 0;
+  size_t n = 0;
+  size_t level = 0;
 
   noffset[0] = 0;
   do {
@@ -463,24 +463,20 @@ zx_status_t NodeManager::FindLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Lo
     return node_path.error_value();
   }
 
-  auto level = *node_path;
-
-  nid_t nid = vnode.Ino();
-
-  for (auto i = 0; i <= level; ++i) {
-    LockedPage node_page;
-    if (zx_status_t err = GetNodePage(nid, &node_page); err != ZX_OK) {
-      return err;
-    }
-
-    if (i < level) {
-      NodePage &node = node_page.GetPage<NodePage>();
-      nid = node.GetNid(offset[i]);
-      ReadaheadNodePages(node, offset[i]);
-    } else {
-      *out = std::move(node_page);
-    }
+  size_t level = *node_path;
+  LockedPage node_page;
+  if (zx_status_t err = GetNodePage(vnode.Ino(), &node_page); err != ZX_OK) {
+    return err;
   }
+
+  for (size_t i = 0; i < level; ++i) {
+    auto page_or = GetNextNodePage(node_page, offset[i]);
+    if (page_or.is_error()) {
+      return page_or.error_value();
+    }
+    node_page = std::move(*page_or);
+  }
+  *out = std::move(node_page);
   return ZX_OK;
 }
 
@@ -493,40 +489,38 @@ zx_status_t NodeManager::GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, Loc
     return node_path.error_value();
   }
 
-  auto level = *node_path;
+  size_t level = *node_path;
+  LockedPage node_page;
+  if (zx_status_t err = GetNodePage(vnode.Ino(), &node_page); err != ZX_OK) {
+    return err;
+  }
 
-  nid_t nid = vnode.Ino();
-  LockedPage parent;
-  for (auto i = 0; i <= level; ++i) {
-    LockedPage node_page;
-    if (!nid && i > 0) {
+  LockedPage parent = std::move(node_page);
+  for (size_t i = 0; i < level; ++i) {
+    nid_t nid = parent.GetPage<NodePage>().GetNid(offset[i]);
+    if (!nid) {
       // alloc new node
       if (AllocNid(nid).is_error()) {
         return ZX_ERR_NO_SPACE;
       }
 
-      if (zx_status_t err = NewNodePage(vnode, nid, noffset[i], &node_page); err != ZX_OK) {
+      if (zx_status_t err = NewNodePage(vnode, nid, noffset[i + 1], &node_page); err != ZX_OK) {
         AddFreeNid(nid);
         return err;
       }
 
-      parent.GetPage<NodePage>().SetNid(offset[i - 1], nid);
+      parent.GetPage<NodePage>().SetNid(offset[i], nid);
       parent.SetDirty();
     } else {
-      if (zx_status_t err = GetNodePage(nid, &node_page); err != ZX_OK) {
-        return err;
+      auto page_or = GetNextNodePage(parent, offset[i]);
+      if (page_or.is_error()) {
+        return page_or.error_value();
       }
+      node_page = std::move(*page_or);
     }
-
-    if (i < level) {
-      NodePage &node = node_page.GetPage<NodePage>();
-      nid = node.GetNid(offset[i]);
-      ReadaheadNodePages(node, offset[i]);
-      parent = std::move(node_page);
-    } else {
-      *out = std::move(node_page);
-    }
+    parent = std::move(node_page);
   }
+  *out = std::move(parent);
   return ZX_OK;
 }
 
@@ -655,17 +649,17 @@ zx::result<uint32_t> NodeManager::TruncateNodes(VnodeF2fs &vnode, nid_t start_ni
 }
 
 zx_status_t NodeManager::TruncatePartialNodes(VnodeF2fs &vnode, const Inode &ri,
-                                              const int32_t (&offset)[4], int32_t depth) {
+                                              const int32_t (&offset)[4], size_t depth) {
   LockedPage pages[2];
   nid_t nid[3];
-  auto idx = depth - 2;
+  size_t idx = depth - 2;
 
   if (nid[0] = LeToCpu(ri.i_nid[offset[0] - kNodeDir1Block]); !nid[0]) {
     return ZX_OK;
   }
 
   // get indirect nodes in the path
-  for (auto i = 0; i < idx + 1; ++i) {
+  for (size_t i = 0; i < idx + 1; ++i) {
     if (auto ret = fs_->GetNodeManager().GetNodePage(nid[i], &pages[i]); ret != ZX_OK) {
       return ret;
     }
@@ -862,86 +856,93 @@ zx_status_t NodeManager::NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, 
   return ZX_OK;
 }
 
-zx::result<LockedPage> NodeManager::ReadNodePage(LockedPage page, nid_t nid) {
+zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
   NodeInfo ni;
   GetNodeInfo(nid, ni);
   if (ni.blk_addr == kNullAddr) {
-    return zx::error(ZX_ERR_NOT_FOUND);
+    return ZX_ERR_NOT_FOUND;
   }
-  if (page->IsUptodate()) {
-    return zx::ok(std::move(page));
-  }
-
-  auto status = fs_->MakeReadOperation(page, ni.blk_addr, PageType::kNode);
-  if (status.is_error()) {
-    return status.take_error();
-  }
-  return zx::ok(std::move(page));
-}
-
-zx_status_t NodeManager::GetNodePage(nid_t nid, LockedPage *out) {
   LockedPage page;
   if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
     return ret;
   }
-
-  auto page_or = ReadNodePage(std::move(page), nid);
-  if (page_or.is_error()) {
-    return page_or.status_value();
+  if (page->IsUptodate() || ni.blk_addr == kNewAddr) {
+    page->SetUptodate();
+    *out = std::move(page);
+    return ZX_OK;
   }
 
-  ZX_DEBUG_ASSERT(nid == (*page_or).GetPage<NodePage>().NidOfNode());
+  auto status = fs_->MakeReadOperation(page, ni.blk_addr, PageType::kNode);
+  if (status.is_error()) {
+    return status.error_value();
+  }
+
+  ZX_DEBUG_ASSERT(nid == page.GetPage<NodePage>().NidOfNode());
 #if 0  // porting needed
   // mark_page_accessed(page);
 #endif
-  *out = std::move(*page_or);
+  *out = std::move(page);
   return ZX_OK;
 }
 
-void NodeManager::ReadaheadNodePages(NodePage &parent, size_t start) {
-  {
-    LockedPage page;
-    nid_t nid = parent.GetNid(start);
-    if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
-      ZX_ASSERT_MSG(0, "failed to get a node page. nid: %u", nid);
-      return;
-    }
-    if (page->IsUptodate()) {
-      return;
-    }
-  }
-  uint32_t max_offset = 0;
+zx::result<LockedPage> NodeManager::GetNextNodePage(LockedPage &node_page, size_t start) {
+  NodePage &parent = node_page.GetPage<NodePage>();
+  size_t max_offset = kNidsPerBlock;
   if (parent.IsInode()) {
     max_offset = kNodeDir1Block + kNidsPerInode;
-  } else {
-    max_offset = kNidsPerBlock;
   }
-  std::vector<LockedPage> pages;
-  std::vector<block_t> addrs;
-  pages.reserve(kDefaultReadaheadSize);
-  addrs.reserve(kDefaultReadaheadSize);
-  size_t num_nids = 0;
-  for (; start < max_offset && num_nids < kDefaultReadaheadSize; ++start) {
-    nid_t nid = parent.GetNid(start);
+  std::vector<nid_t> nids;
+  for (size_t i = start; i < max_offset && nids.size() < kDefaultReadaheadSize; ++i) {
+    nid_t nid = parent.GetNid(i);
     if (!nid) {
+      if (i == start) {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
       continue;
     }
+    nids.push_back(nid);
+  }
+  ZX_DEBUG_ASSERT(nids.size());
+
+  std::vector<LockedPage> pages;
+  std::vector<block_t> addrs;
+  pages.reserve(nids.size());
+  addrs.reserve(nids.size());
+
+  nid_t target_nid = nids[0];
+  for (nid_t nid : nids) {
     LockedPage page;
-    zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page);
-    ZX_ASSERT_MSG(ret == ZX_OK, "failed to get a node page. %s", zx_status_get_string(ret));
-    // If |page| is not uptodate, retrieve its block addr to populate cache.
-    if (!page->IsUptodate()) {
-      NodeInfo ni;
-      GetNodeInfo(nid, ni);
-      addrs.push_back(ni.blk_addr);
-      pages.push_back(std::move(page));
-      ++num_nids;
+    ZX_ASSERT(nid);
+    NodeInfo ni;
+    GetNodeInfo(nid, ni);
+    if (ni.blk_addr == kNullAddr) {
+      if (nid == target_nid) {
+        return zx::error(ZX_ERR_NOT_FOUND);
+      }
+      continue;
     }
+
+    if (zx_status_t ret = fs_->GetNodeVnode().GrabCachePage(nid, &page); ret != ZX_OK) {
+      return zx::error(ret);
+    }
+    if (page->IsUptodate() || ni.blk_addr == kNewAddr) {
+      page->SetUptodate();
+      if (nid == target_nid) {
+        return zx::ok(std::move(page));
+      }
+      continue;
+    }
+
+    addrs.push_back(ni.blk_addr);
+    pages.push_back(std::move(page));
   }
-  if (num_nids) {
-    auto ret = fs_->MakeReadOperations(pages, addrs, PageType::kNode);
-    ZX_ASSERT_MSG(ret.is_ok(), "failed to read-ahead node pages. %s", ret.status_string());
+  ZX_DEBUG_ASSERT(addrs.size());
+
+  if (auto ret = fs_->MakeReadOperations(pages, addrs, PageType::kNode); ret.is_error()) {
+    FX_LOGS(ERROR) << "failed to read node pages. " << ret.status_string();
+    return ret.take_error();
   }
+  return zx::ok(std::move(pages[0]));
 }
 
 pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {

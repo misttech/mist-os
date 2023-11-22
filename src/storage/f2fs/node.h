@@ -106,11 +106,10 @@ class NodeManager {
   void NodeInfoFromRawNat(NodeInfo &ni, RawNatEntry &raw_ne);
   zx_status_t BuildNodeManager();
   void DestroyNodeManager();
-  zx::result<LockedPage> ReadNodePage(LockedPage page, nid_t nid);
   zx_status_t GetNodePage(nid_t nid, LockedPage *out);
   // If the node page at |start| doesn't hit in the cache, do readahead node pages
   // from |start| in |parent|.
-  void ReadaheadNodePages(NodePage &parent, size_t start);
+  zx::result<LockedPage> GetNextNodePage(LockedPage &parent, size_t start);
 
   zx::result<bool> IsSameDnode(VnodeF2fs &vnode, pgoff_t index, uint32_t node_offset);
   // If indices use the same node page, read the node page once and reuse it. This
@@ -224,9 +223,9 @@ class NodeManager {
   void SetNodeAddr(NodeInfo &ni, block_t new_blkaddr);
   int TryToFreeNats(int nr_shrink);
 
-  zx::result<int32_t> GetNodePath(VnodeF2fs &vnode, pgoff_t block,
-                                  int32_t (&offset)[kMaxNodeBlockLevel],
-                                  uint32_t (&noffset)[kMaxNodeBlockLevel]);
+  zx::result<size_t> GetNodePath(VnodeF2fs &vnode, pgoff_t block,
+                                 int32_t (&offset)[kMaxNodeBlockLevel],
+                                 uint32_t (&noffset)[kMaxNodeBlockLevel]);
 
   // Caller should ensure node_page is locked.
   void TruncateNode(VnodeF2fs &vnode, nid_t nid, NodePage &node_page);
@@ -234,7 +233,7 @@ class NodeManager {
   zx::result<uint32_t> TruncateNodes(VnodeF2fs &vnode, nid_t start_nid, uint32_t nofs, int32_t ofs,
                                      int32_t depth);
   zx_status_t TruncatePartialNodes(VnodeF2fs &vnode, const Inode &ri,
-                                   const int32_t (&offset)[kMaxNodeBlockLevel], int32_t depth);
+                                   const int32_t (&offset)[kMaxNodeBlockLevel], size_t depth);
   zx_status_t NewNodePage(VnodeF2fs &vnode, nid_t nid, uint32_t ofs, LockedPage *out);
 
   void BuildFreeNids() __TA_EXCLUDES(free_nid_tree_lock_) __TA_EXCLUDES(build_lock_);

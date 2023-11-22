@@ -386,8 +386,9 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
     nid = dnode_page.GetPage<NodePage>().NidOfNode();
   }
 
-  // fault injection for ReadNodePage()
+  // fault injection for GetNodePage()
   fs_->WriteCheckpoint(false, false);
+
   MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, kNullAddr);
 
   {

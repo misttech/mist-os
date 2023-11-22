@@ -124,12 +124,12 @@ struct DirtySeglistInfo {
 // for active log information
 struct CursegInfo {
   BlockBuffer<SummaryBlock> sum_blk;
-  uint32_t segno = 0;        // current segment number
-  uint32_t zone = 0;         // current zone number
-  uint32_t next_segno = 0;   // preallocated segment
-  std::mutex curseg_mutex;   // lock for consistency
-  uint16_t next_blkoff = 0;  // next block offset to write
-  uint8_t alloc_type = 0;    // current allocation type
+  uint32_t segno = 0;            // current segment number
+  uint32_t zone = 0;             // current zone number
+  uint32_t next_segno = 0;       // preallocated segment
+  fs::SharedMutex curseg_mutex;  // lock for consistency
+  uint16_t next_blkoff = 0;      // next block offset to write
+  uint8_t alloc_type = 0;        // current allocation type
 };
 
 // For SIT manager
