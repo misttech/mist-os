@@ -164,7 +164,7 @@ fn get_suitable_dhcpv6_prefix(
     interface_config: AcquirePrefixInterfaceConfig,
 ) -> Option<PrefixOnInterface> {
     if let Some(PrefixOnInterface { interface_id, prefix, lifetimes: _ }) = current_prefix {
-        let crate::InterfaceState { config, control: _, device_class: _ } =
+        let crate::InterfaceState { config, control: _, device_class: _, provisioning: _ } =
             interface_states.get(&interface_id).unwrap_or_else(|| {
                 panic!(
                     "interface {} cannot be found but provides current prefix = {:?}",
@@ -200,37 +200,42 @@ fn get_suitable_dhcpv6_prefix(
 
     interface_states
         .iter()
-        .filter_map(|(interface_id, crate::InterfaceState { config, device_class, control: _ })| {
-            let prefixes = match config {
-                crate::InterfaceConfigState::Host(crate::HostInterfaceState {
-                    dhcpv4_client: _,
-                    dhcpv6_client_state,
-                    dhcpv6_pd_config: _,
-                }) => {
-                    if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
-                        prefixes
-                    } else {
+        .filter_map(
+            |(
+                interface_id,
+                crate::InterfaceState { config, device_class, control: _, provisioning: _ },
+            )| {
+                let prefixes = match config {
+                    crate::InterfaceConfigState::Host(crate::HostInterfaceState {
+                        dhcpv4_client: _,
+                        dhcpv6_client_state,
+                        dhcpv6_pd_config: _,
+                    }) => {
+                        if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
+                            prefixes
+                        } else {
+                            return None;
+                        }
+                    }
+                    crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {}) => {
                         return None;
                     }
+                };
+                match interface_config {
+                    AcquirePrefixInterfaceConfig::Upstreams => {
+                        allowed_upstream_device_classes.contains(&device_class)
+                    }
+                    AcquirePrefixInterfaceConfig::Id(want_id) => interface_id.get() == want_id,
                 }
-                crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {}) => {
-                    return None;
-                }
-            };
-            match interface_config {
-                AcquirePrefixInterfaceConfig::Upstreams => {
-                    allowed_upstream_device_classes.contains(&device_class)
-                }
-                AcquirePrefixInterfaceConfig::Id(want_id) => interface_id.get() == want_id,
-            }
-            .then(|| {
-                prefixes.iter().map(|(&prefix, &lifetimes)| PrefixOnInterface {
-                    interface_id: *interface_id,
-                    prefix,
-                    lifetimes,
+                .then(|| {
+                    prefixes.iter().map(|(&prefix, &lifetimes)| PrefixOnInterface {
+                        interface_id: *interface_id,
+                        prefix,
+                        lifetimes,
+                    })
                 })
-            })
-        })
+            },
+        )
         .flatten()
         .max_by(
             |PrefixOnInterface {
@@ -361,7 +366,10 @@ mod tests {
     use net_declare::{fidl_socket_addr_v6, net_subnet_v6};
     use test_case::test_case;
 
-    use crate::{DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState};
+    use crate::{
+        interface::ProvisioningAction, DeviceClass, HostInterfaceState, InterfaceConfigState,
+        InterfaceState,
+    };
 
     use super::*;
 
@@ -382,6 +390,7 @@ mod tests {
             device_class: DeviceClass,
             dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
             dhcpv6_client_state: Option<ClientState>,
+            provisioning: ProvisioningAction,
         ) -> Self {
             Self {
                 control,
@@ -391,6 +400,7 @@ mod tests {
                     dhcpv6_pd_config,
                 }),
                 device_class,
+                provisioning,
             }
         }
     }
@@ -508,6 +518,7 @@ mod tests {
                         sockaddr: fidl_socket_addr_v6!("[fe80::1]:546"),
                         prefixes: prefixes,
                     }),
+                    ProvisioningAction::Local,
                 )
             }))
             .collect();

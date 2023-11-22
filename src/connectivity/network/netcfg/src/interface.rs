@@ -711,12 +711,14 @@ impl ProvisioningRule {
 
 // Find the first `ProvisioningRule` that matches the device and get
 // the associated `ProvisioningAction`
-#[allow(unused)]
-fn find_provisioning_action_from_provisioning_rules(
+pub(crate) fn find_provisioning_action_from_provisioning_rules(
     provisioning_rules: &[ProvisioningRule],
-    info: &DeviceInfoRef<'_>,
+    topological_path: &str,
+    mac: &fidl_fuchsia_net_ext::MacAddress,
+    device_class: fidl_fuchsia_hardware_network::DeviceClass,
     interface_name: &str,
 ) -> ProvisioningAction {
+    let info = DeviceInfoRef { topological_path, mac, device_class };
     provisioning_rules
         .iter()
         .find_map(|rule| {
@@ -730,6 +732,18 @@ fn find_provisioning_action_from_provisioning_rules(
             "There must always be at least one ProvisioningRule that \
                  matches. The fallback rule should match any interface.",
         )
+}
+
+// Matches any device and uses the Local provisioning action.
+// Reason: Netcfg should provision all devices unless configuration
+// indicates otherwise.
+pub(crate) fn fallback_provisioning_rule() -> ProvisioningRule {
+    ProvisioningRule {
+        matchers: HashSet::from([ProvisioningMatchingRule::InterfaceName {
+            pattern: glob::Pattern::new("*").unwrap(),
+        }]),
+        provisioning: ProvisioningAction::Local,
+    }
 }
 
 #[cfg(test)]
@@ -1737,15 +1751,12 @@ mod tests {
                     ))]),
                     provisioning: ProvisioningAction::Delegated,
                 },
-                ProvisioningRule {
-                    matchers: HashSet::from([ProvisioningMatchingRule::InterfaceName {
-                        pattern: glob::Pattern::new("*").unwrap(),
-                    }]),
-                    provisioning: ProvisioningAction::Local,
-                },
+                fallback_provisioning_rule(),
             ],
-            &default_device_info(),
-            "wlanx5009",
+            "",
+            &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
+            fhwnet::DeviceClass::Wlan,
+            "wlans5009",
         );
         assert_eq!(provisioning_action, expected);
     }
