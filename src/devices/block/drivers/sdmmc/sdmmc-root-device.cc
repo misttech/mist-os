@@ -155,7 +155,7 @@ SdmmcRootDevice::ParseMetadata(
                                          .enable_cache(true)
                                          .removable(false)
                                          .max_command_packing(kMaxCommandPacking)
-                                         .use_fidl(false)
+                                         .use_fidl(true)
                                          .Build()));
     } else {
       FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
