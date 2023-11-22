@@ -1024,7 +1024,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:62
+From //build/product.gni:65
 
 ### clang_embed_bitcode
 
@@ -2639,7 +2639,7 @@ From //BUILD.gn:106
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:54
+From //build/product.gni:57
 
 ### emu_window_size_width
 
@@ -2647,7 +2647,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:53
+From //build/product.gni:56
 
 ### enable_frame_pointers
 
@@ -3227,10 +3227,13 @@ From //build/product.gni:38
 ### fuchsia_product_assembly_config_label
 
 The product assembly config used to configure the main Fuchsia image.
+For GN products, this is required.
+For Bazel products, this is optional.
+For Bazel products, netboot will only be available when this is supplied.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:41
+From //build/product.gni:44
 
 ### fuchsia_sdk_root
 
@@ -7361,7 +7364,7 @@ toolchain, so that recompilations with the new compiler can be triggered.
 When using the prebuilt, this is ignored and the CIPD instance ID of the
 prebuilt is used.
 
-**Current value (from the default):** `"FHytseXd4rjeI5U7Ag9M7k5CS5MCNnZ6ykn_18csqX8C"`
+**Current value (from the default):** `"ojk3FucoEwJiOkKtlLI9EiuueGORHurbFEY5synNI80C"`
 
 From //build/rust/config.gni:38
 
@@ -8698,7 +8701,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:50
+From //build/product.gni:53
 
 ### vm_tracing_level
 
@@ -8847,7 +8850,7 @@ From //products/bringup.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:44
+From //build/product.gni:47
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
@@ -8855,7 +8858,7 @@ From //products/bringup.gni:23
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:44
+From //build/product.gni:47
 
 ### zircon_a_partition
 
