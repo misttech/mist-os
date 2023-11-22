@@ -20,8 +20,8 @@ use core::{
 use net_types::{
     ethernet::Mac,
     ip::{
-        AddrSubnetEither, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet,
-        SubnetEither,
+        AddrSubnetEither, GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6,
+        Ipv6Addr, Subnet, SubnetEither,
     },
     SpecifiedAddr, UnicastAddr,
 };
@@ -63,7 +63,7 @@ use crate::{
     },
     ip::{
         device::{
-            nud::{LinkResolutionContext, LinkResolutionNotifier},
+            nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
         icmp::{BufferIcmpContext, IcmpContext, IcmpIpExt},
@@ -211,7 +211,6 @@ impl FakeNonSyncCtxState {
     pub(crate) fn udp_state_mut<I: Ip>(
         &mut self,
     ) -> &mut HashMap<crate::transport::udp::SocketId<I>, Vec<Vec<u8>>> {
-        use net_types::ip::GenericOverIp;
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct Wrapper<'a, I: Ip>(
@@ -459,9 +458,9 @@ impl RngContext for FakeNonSyncCtx {
     }
 }
 
-impl EventContext<DispatchedEvent> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: DispatchedEvent) {
-        self.with_inner_mut(|ctx| ctx.events.on_event(event))
+impl<T: Into<DispatchedEvent>> EventContext<T> for FakeNonSyncCtx {
+    fn on_event(&mut self, event: T) {
+        self.with_inner_mut(|ctx| ctx.events.on_event(event.into()))
     }
 }
 
@@ -1254,13 +1253,16 @@ pub(crate) fn handle_queued_rx_packets(sync_ctx: &FakeSyncCtx, ctx: &mut FakeNon
 }
 
 /// Wraps all events emitted by Core into a single enum type.
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq, Hash, GenericOverIp)]
+#[generic_over_ip()]
 #[allow(missing_docs)]
 pub enum DispatchedEvent {
     IpDeviceIpv4(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>),
     IpDeviceIpv6(IpDeviceEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>),
     IpLayerIpv4(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv4>),
     IpLayerIpv6(IpLayerEvent<WeakDeviceId<FakeNonSyncCtx>, Ipv6>),
+    NeighborIpv4(nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>),
+    NeighborIpv6(nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>),
 }
 
 impl<I: Ip> From<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, I, FakeInstant>>
@@ -1339,27 +1341,32 @@ impl From<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for DispatchedEvent {
     }
 }
 
-impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv4>) {
-        self.on_event(DispatchedEvent::from(event))
+impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>>
+    for nud::Event<Mac, EthernetWeakDeviceId<FakeNonSyncCtx>, I, FakeInstant>
+{
+    fn from(
+        nud::Event { device, kind, addr, at }: nud::Event<
+            Mac,
+            EthernetDeviceId<FakeNonSyncCtx>,
+            I,
+            FakeInstant,
+        >,
+    ) -> Self {
+        Self { device: device.downgrade(), kind, addr, at }
     }
 }
 
-impl EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpLayerEvent<DeviceId<FakeNonSyncCtx>, Ipv6>) {
-        self.on_event(DispatchedEvent::from(event))
-    }
-}
-
-impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv4, FakeInstant>) {
-        self.on_event(DispatchedEvent::from(event))
-    }
-}
-
-impl EventContext<IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>> for FakeNonSyncCtx {
-    fn on_event(&mut self, event: IpDeviceEvent<DeviceId<FakeNonSyncCtx>, Ipv6, FakeInstant>) {
-        self.on_event(DispatchedEvent::from(event))
+impl<I: Ip> From<nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>>
+    for DispatchedEvent
+{
+    fn from(
+        e: nud::Event<Mac, EthernetDeviceId<FakeNonSyncCtx>, I, FakeInstant>,
+    ) -> DispatchedEvent {
+        I::map_ip(
+            e,
+            |e| DispatchedEvent::NeighborIpv4(e.into()),
+            |e| DispatchedEvent::NeighborIpv6(e.into()),
+        )
     }
 }
 

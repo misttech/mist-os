@@ -9,7 +9,7 @@ use core::time::Duration;
 use lock_order::{lock::UnlockedAccess, Locked};
 use net_types::{
     ip::{Ipv4, Ipv4Addr},
-    SpecifiedAddr, UnicastAddr, UnicastAddress, Witness as _,
+    SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::{
@@ -19,13 +19,19 @@ use packet_formats::{
 use tracing::{debug, trace, warn};
 
 use crate::{
-    context::{CounterContext, SendFrameContext, TimerContext, TracingContext},
+    context::{
+        CounterContext, EventContext, InstantBindingsTypes, SendFrameContext, TimerContext,
+        TracingContext,
+    },
     counters::Counter,
-    device::{link::LinkDevice, DeviceIdContext, FrameDestination},
+    device::{
+        link::{LinkDevice, LinkUnicastAddress},
+        DeviceIdContext, FrameDestination,
+    },
     ip::device::nud::{
-        BufferNudContext, BufferNudSenderContext, ConfirmationFlags, DynamicNeighborUpdateSource,
-        LinkResolutionContext, LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler,
-        NudState, NudTimerId,
+        self, BufferNudContext, BufferNudSenderContext, ConfirmationFlags,
+        DynamicNeighborUpdateSource, LinkResolutionContext, LinkResolutionNotifier,
+        NudConfigContext, NudContext, NudHandler, NudState, NudTimerId,
     },
     Instant, NonSyncContext, SyncCtx,
 };
@@ -47,12 +53,12 @@ use crate::{
 ///
 /// `ArpDevice` is implemented for all `L: LinkDevice where L::Address: HType`.
 pub(crate) trait ArpDevice: LinkDevice<Address = Self::HType> {
-    type HType: HType + UnicastAddress + core::fmt::Debug;
+    type HType: HType + LinkUnicastAddress + core::fmt::Debug;
 }
 
 impl<L: LinkDevice> ArpDevice for L
 where
-    L::Address: HType + UnicastAddress,
+    L::Address: HType + LinkUnicastAddress,
 {
     type HType = L::Address;
 }
@@ -147,14 +153,22 @@ pub(crate) trait BufferArpSenderContext<
 
 /// The non-synchronized execution context for the ARP protocol.
 pub(crate) trait ArpNonSyncCtx<D: ArpDevice, DeviceId>:
-    TimerContext<ArpTimerId<D, DeviceId>> + TracingContext + LinkResolutionContext<D>
+    TimerContext<ArpTimerId<D, DeviceId>>
+    + TracingContext
+    + LinkResolutionContext<D>
+    + EventContext<nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>>
 {
 }
 
 impl<
         DeviceId,
         D: ArpDevice,
-        C: TimerContext<ArpTimerId<D, DeviceId>> + TracingContext + LinkResolutionContext<D>,
+        C: TimerContext<ArpTimerId<D, DeviceId>>
+            + TracingContext
+            + LinkResolutionContext<D>
+            + EventContext<
+                nud::Event<D::Address, DeviceId, Ipv4, <Self as InstantBindingsTypes>::Instant>,
+            >,
     > ArpNonSyncCtx<D, DeviceId> for C
 {
 }
@@ -708,8 +722,11 @@ mod tests {
         }
     }
 
-    type FakeNonSyncCtxImpl =
-        FakeNonSyncCtx<ArpTimerId<EthernetLinkDevice, FakeLinkDeviceId>, (), ()>;
+    type FakeNonSyncCtxImpl = FakeNonSyncCtx<
+        ArpTimerId<EthernetLinkDevice, FakeLinkDeviceId>,
+        nud::Event<Mac, FakeLinkDeviceId, Ipv4, FakeInstant>,
+        (),
+    >;
 
     type FakeCtxImpl = FakeSyncCtx<
         FakeArpCtx,

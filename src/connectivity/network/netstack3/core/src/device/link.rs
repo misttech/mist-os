@@ -49,13 +49,17 @@ impl LinkAddress for Mac {
     }
 }
 
+/// A link address that can be unicast.
+pub trait LinkUnicastAddress: LinkAddress + UnicastAddress {}
+impl<L: LinkAddress + UnicastAddress> LinkUnicastAddress for L {}
+
 /// A link device.
 ///
 /// `LinkDevice` is used to identify a particular link device implementation. It
 /// is only intended to exist at the type level, never instantiated at runtime.
 pub trait LinkDevice: Device + Debug {
     /// The type of address used to address link devices of this type.
-    type Address: LinkAddress + UnicastAddress;
+    type Address: LinkUnicastAddress;
 }
 
 /// Utilities for testing link devices.

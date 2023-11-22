@@ -1419,8 +1419,9 @@ mod tests {
         error::{ExistsError, NotFoundError},
         ip::{
             device::{
-                nud::DynamicNeighborUpdateSource, slaac::SlaacConfiguration, IpAddressId as _,
-                IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
+                nud::{self, DynamicNeighborUpdateSource},
+                slaac::SlaacConfiguration,
+                IpAddressId as _, IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
             },
             receive_ip_packet,
             testutil::is_in_ip_multicast,
@@ -1455,8 +1456,11 @@ mod tests {
         }
     }
 
-    type FakeNonSyncCtx =
-        crate::context::testutil::FakeNonSyncCtx<EthernetTimerId<FakeDeviceId>, (), ()>;
+    type FakeNonSyncCtx = crate::context::testutil::FakeNonSyncCtx<
+        EthernetTimerId<FakeDeviceId>,
+        nud::Event<Mac, FakeDeviceId, Ipv4, FakeInstant>,
+        (),
+    >;
 
     type FakeCtx = crate::context::testutil::WrappedFakeSyncCtx<
         ArpState<EthernetLinkDevice, FakeInstant, FakeLinkResolutionNotifier<EthernetLinkDevice>>,

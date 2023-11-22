@@ -2301,6 +2301,15 @@ mod tests {
             addr,
             mac,
         );
+        assert_eq!(
+            non_sync_ctx.take_events(),
+            [DispatchedEvent::NeighborIpv4(nud::Event {
+                device: ethernet_device_id.downgrade(),
+                addr,
+                kind: nud::EventKind::Added(nud::EventState::Static(mac)),
+                at: non_sync_ctx.now(),
+            })]
+        );
         assert_matches!(
             NudHandler::<Ipv4, _, _>::resolve_link_addr(
                 &mut Locked::new(sync_ctx),
@@ -2313,11 +2322,19 @@ mod tests {
 
         set_ipv4_enabled(&mut non_sync_ctx, false, true);
         assert_eq!(
-            non_sync_ctx.take_events()[..],
-            [DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
-                device: weak_device_id.clone(),
-                ip_enabled: false,
-            })]
+            non_sync_ctx.take_events(),
+            [
+                DispatchedEvent::NeighborIpv4(nud::Event {
+                    device: ethernet_device_id.downgrade(),
+                    addr,
+                    kind: nud::EventKind::Removed,
+                    at: non_sync_ctx.now(),
+                }),
+                DispatchedEvent::IpDeviceIpv4(IpDeviceEvent::EnabledChanged {
+                    device: weak_device_id.clone(),
+                    ip_enabled: false,
+                })
+            ]
         );
 
         // Assert that static ARP entries are flushed on link down.
@@ -2561,6 +2578,15 @@ mod tests {
             addr,
             mac,
         );
+        assert_eq!(
+            non_sync_ctx.take_events(),
+            [DispatchedEvent::NeighborIpv6(nud::Event {
+                device: ethernet_device_id.downgrade(),
+                addr,
+                kind: nud::EventKind::Added(nud::EventState::Static(mac)),
+                at: non_sync_ctx.now(),
+            })]
+        );
         assert_matches!(
             NudHandler::<Ipv6, _, _>::resolve_link_addr(
                 &mut Locked::new(sync_ctx),
@@ -2579,8 +2605,14 @@ mod tests {
         };
         test_disable_device(&mut sync_ctx, &mut non_sync_ctx, true);
         assert_eq!(
-            non_sync_ctx.take_events()[..],
+            non_sync_ctx.take_events(),
             [
+                DispatchedEvent::NeighborIpv6(nud::Event {
+                    device: ethernet_device_id.downgrade(),
+                    addr,
+                    kind: nud::EventKind::Removed,
+                    at: non_sync_ctx.now(),
+                }),
                 DispatchedEvent::IpDeviceIpv6(IpDeviceEvent::AddressRemoved {
                     device: weak_device_id.clone(),
                     addr: ll_addr.addr().into(),

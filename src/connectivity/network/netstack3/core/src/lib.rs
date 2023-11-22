@@ -51,6 +51,7 @@ use derivative::Derivative;
 use lock_order::lock::UnlockedAccess;
 use lock_order::Locked;
 use net_types::{
+    ethernet::Mac,
     ip::{
         AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
         Subnet,
@@ -367,7 +368,21 @@ pub trait NonSyncContext:
         ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantBindingsTypes>::Instant>,
     > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
     + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-    + transport::udp::NonSyncContext<Ipv4>
+    + EventContext<
+        ip::device::nud::Event<
+            Mac,
+            device::EthernetDeviceId<Self>,
+            Ipv4,
+            <Self as InstantBindingsTypes>::Instant,
+        >,
+    > + EventContext<
+        ip::device::nud::Event<
+            Mac,
+            device::EthernetDeviceId<Self>,
+            Ipv6,
+            <Self as InstantBindingsTypes>::Instant,
+        >,
+    > + transport::udp::NonSyncContext<Ipv4>
     + transport::udp::NonSyncContext<Ipv6>
     + IcmpContext<Ipv4>
     + IcmpContext<Ipv6>
@@ -399,7 +414,21 @@ impl<
                 >,
             > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
             + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-            + transport::udp::NonSyncContext<Ipv4>
+            + EventContext<
+                ip::device::nud::Event<
+                    Mac,
+                    device::EthernetDeviceId<Self>,
+                    Ipv4,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + EventContext<
+                ip::device::nud::Event<
+                    Mac,
+                    device::EthernetDeviceId<Self>,
+                    Ipv6,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + transport::udp::NonSyncContext<Ipv4>
             + transport::udp::NonSyncContext<Ipv6>
             + IcmpContext<Ipv4>
             + IcmpContext<Ipv6>

@@ -62,6 +62,7 @@ use timers::TimerDispatcher;
 
 use net_declare::net_subnet_v4;
 use net_types::{
+    ethernet::Mac,
     ip::{AddrSubnet, AddrSubnetEither, Ip, IpAddr, IpAddress, Ipv4, Ipv4Addr, Ipv6, Mtu, Subnet},
     SpecifiedAddr,
 };
@@ -79,6 +80,7 @@ use netstack3_core::{
     handle_timer,
     ip::{
         device::{
+            nud,
             slaac::SlaacConfiguration,
             state::{Ipv6DeviceConfiguration, Lifetime},
             IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
@@ -666,6 +668,14 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
                 ))
             }
         };
+    }
+}
+
+impl<I: Ip> EventContext<nud::Event<Mac, EthernetDeviceId<Self>, I, StackTime>>
+    for BindingsNonSyncCtxImpl
+{
+    fn on_event(&mut self, event: nud::Event<Mac, EthernetDeviceId<Self>, I, StackTime>) {
+        tracing::warn!("TODO(https://fxbug.dev/124960): NUD events are unhandled: {event:?}");
     }
 }
 
