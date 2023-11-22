@@ -453,8 +453,6 @@ struct InterfaceState {
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
     device_class: DeviceClass,
     config: InterfaceConfigState,
-    // TODO(fxbug.dev/135160): Make use of this field instead of `install_only`
-    #[allow(unused)]
     provisioning: interface::ProvisioningAction,
 }
 
@@ -526,8 +524,13 @@ impl InterfaceState {
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
-        let Self { config, control: _, device_class: _, provisioning: _ } = self;
+        let Self { config, control: _, device_class: _, provisioning } = self;
         let fnet_interfaces_ext::Properties { online, .. } = properties;
+
+        // Netcfg won't handle interface update results for a delegated
+        // interface.
+        debug_assert!(provisioning == &interface::ProvisioningAction::Local);
+
         match config {
             InterfaceConfigState::Host(HostInterfaceState {
                 dhcpv4_client,
@@ -941,10 +944,13 @@ impl<'a> NetCfg<'a> {
             DnsServersUpdateSource::Netstack => Ok(()),
             DnsServersUpdateSource::Dhcpv6 { interface_id } => {
                 let interface_id = interface_id.try_into().expect("should be nonzero");
-                let InterfaceState { config, control: _, device_class: _, provisioning: _ } = self
+                let InterfaceState { config, control: _, device_class: _, provisioning } = self
                     .interface_states
                     .get_mut(&interface_id)
                     .unwrap_or_else(|| panic!("no interface state found for id={}", interface_id));
+
+                // Netcfg won't start a DHCPv6 client for a delegated interface.
+                debug_assert!(provisioning == &interface::ProvisioningAction::Local);
 
                 match config {
                     InterfaceConfigState::Host(HostInterfaceState {
@@ -1184,22 +1190,16 @@ impl<'a> NetCfg<'a> {
                     }
                 }
                 Event::ProvisioningEvent(event) => {
-                    // With `install_only` mode on, ignore all provisioning
-                    // events, so that only device enumeration is performed.
-                    if self.install_only {
-                        debug!("ignoring event due to install only mode {event:?}")
-                    } else {
-                        self.handle_provisioning_event(
-                            event,
-                            dns_watchers.get_mut(),
-                            &mut dhcpv6_prefix_provider_requests,
-                            &mut virtualization_handler,
-                            &mut virtualization_events,
-                            &mut masquerade_handler,
-                            &mut masquerade_events,
-                        )
-                        .await?
-                    }
+                    self.handle_provisioning_event(
+                        event,
+                        dns_watchers.get_mut(),
+                        &mut dhcpv6_prefix_provider_requests,
+                        &mut virtualization_handler,
+                        &mut virtualization_events,
+                        &mut masquerade_handler,
+                        &mut masquerade_events,
+                    )
+                    .await?
                 }
             }
         }
@@ -1450,6 +1450,38 @@ impl<'a> NetCfg<'a> {
         let update_result = interface_properties
             .update(event)
             .context("failed to update interface properties with watcher event")?;
+
+        // When the underlying interface id for the event represents an
+        // interface netcfg installed, determine whether the event should
+        // be ignored given the interface's provisioning policy.
+        if let Some(id) = match &update_result {
+            fnet_interfaces_ext::UpdateResult::NoChange => None,
+            fnet_interfaces_ext::UpdateResult::Existing { properties, state: _ } => {
+                Some(properties.id)
+            }
+            fnet_interfaces_ext::UpdateResult::Added { properties, state: _ } => {
+                Some(properties.id)
+            }
+            fnet_interfaces_ext::UpdateResult::Changed { previous: _, current, state: _ } => {
+                Some(current.id)
+            }
+            fnet_interfaces_ext::UpdateResult::Removed(
+                fnet_interfaces_ext::PropertiesAndState { properties, state: _ },
+            ) => Some(properties.id),
+        } {
+            if let Some(&InterfaceState { provisioning, .. }) = interface_states.get(&id) {
+                if provisioning == interface::ProvisioningAction::Delegated {
+                    // Ignore result handling, which prevents provisioning
+                    // activity from starting such as DHCP and DHCPv6 clients.
+                    debug!(
+                        "ignoring interface watcher event because provisioning \
+                    is delegated for this interface: {:?}",
+                        &update_result
+                    );
+                    return Ok(());
+                }
+            }
+        }
 
         Self::handle_interface_update_result(
             &update_result,
@@ -2161,10 +2193,9 @@ impl<'a> NetCfg<'a> {
                 &self.stack,
                 interface_id,
                 info,
-                // TODO(fxbug.dev/135160): Make use of provisioning action
-                // instead of install_only.
                 // Disable in-stack DHCPv4 when provisioning is ignored.
-                self.dhcpv4_client_provider.is_none() && !self.install_only,
+                self.dhcpv4_client_provider.is_none()
+                    && provisioning_action == interface::ProvisioningAction::Local,
             )
             .await
             .context("error configuring host")?;
