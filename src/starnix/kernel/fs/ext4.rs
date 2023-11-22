@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         default_seek, fileops_impl_directory, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
         fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig, CacheMode,
@@ -23,8 +22,8 @@ use ext4_read_only::{
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_uapi::{
-    errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags, off_t,
-    open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,
+    auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
+    off_t, open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,
 };
 use std::sync::Arc;
 

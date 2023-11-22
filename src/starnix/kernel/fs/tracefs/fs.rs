@@ -4,14 +4,13 @@
 
 use super::tracing_directory::TraceMarkerFile;
 use crate::{
-    auth::FsCred,
     fs::{
         CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNodeInfo, FsStr, StaticDirectoryBuilder,
     },
     task::CurrentTask,
 };
-use starnix_uapi::{errors::Errno, file_mode::mode, statfs, TRACEFS_MAGIC};
+use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, TRACEFS_MAGIC};
 use std::sync::Arc;
 
 pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {

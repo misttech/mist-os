@@ -6,7 +6,6 @@
 
 use crate::{
     atomic_counter::AtomicU64Counter,
-    auth::FsCred,
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
@@ -37,6 +36,7 @@ use starnix_sync::InterruptibleEvent;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     arc_key::ArcKey,
+    auth::FsCred,
     binder_buffer_object, binder_driver_command_protocol,
     binder_driver_command_protocol_BC_ACQUIRE, binder_driver_command_protocol_BC_ACQUIRE_DONE,
     binder_driver_command_protocol_BC_CLEAR_DEATH_NOTIFICATION,

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
         DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle, FsNode,
@@ -12,6 +11,7 @@ use crate::{
     task::CurrentTask,
 };
 use starnix_uapi::{
+    auth::FsCred,
     device_type::DeviceType,
     errno,
     errors::Errno,

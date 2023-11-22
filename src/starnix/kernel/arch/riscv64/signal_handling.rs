@@ -139,7 +139,9 @@ pub fn update_register_state_for_restart(registers: &mut RegisterState, err: Err
 }
 
 // Generates `__riscv_fp_state` struct from ExtendedPstateState.
-fn extended_pstate_to_riscv_fpregs(extended_pstate: &ExtendedPstateState) -> starnix_uapi::__riscv_fp_state {
+fn extended_pstate_to_riscv_fpregs(
+    extended_pstate: &ExtendedPstateState,
+) -> starnix_uapi::__riscv_fp_state {
     let d_state = starnix_uapi::__riscv_d_ext_state {
         f: *extended_pstate.get_riscv64_fp_registers(),
         fcsr: extended_pstate.get_riscv64_fcsr(),

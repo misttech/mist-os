@@ -1426,7 +1426,6 @@ impl fmt::Debug for FileObject {
 #[cfg(test)]
 mod tests {
     use crate::{
-        auth::FsCred,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             tmpfs::TmpFs,
@@ -1434,7 +1433,9 @@ mod tests {
         },
         testing::*,
     };
-    use starnix_uapi::{device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags};
+    use starnix_uapi::{
+        auth::FsCred, device_type::DeviceType, file_mode::FileMode, open_flags::OpenFlags,
+    };
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,

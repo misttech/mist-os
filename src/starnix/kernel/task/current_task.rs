@@ -16,7 +16,6 @@ use crate::{
         registers::RegisterState,
         task::{decode_page_fault_exception_report, get_signal_for_general_exception},
     },
-    auth::Credentials,
     execution::{create_zircon_process, TaskInfo},
     fs::{
         FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
@@ -33,7 +32,7 @@ use crate::{
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
-    auth::CAP_SYS_ADMIN,
+    auth::{Credentials, CAP_SYS_ADMIN},
     device_type::DeviceType,
     errno, error,
     errors::Errno,

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::Credentials,
     device::{init_common_devices, parse_features, run_container_features},
     execution::{
         create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
@@ -39,6 +38,7 @@ use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
 use starnix_uapi::{
+    auth::Credentials,
     errno,
     errors::{SourceContext, ENOENT},
     mount_flags::MountFlags,

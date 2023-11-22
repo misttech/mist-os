@@ -11,7 +11,6 @@ use std::{cmp, ffi::CString, sync::Arc};
 use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
-    auth::{Credentials, SecureBits},
     execution::execute_task,
     fs::{FdNumber, FileHandle, MountNamespaceFile},
     logging::{log_error, log_trace, not_implemented},
@@ -26,8 +25,8 @@ use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
     auth::{
-        Capabilities, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN, CAP_SYS_NICE,
-        CAP_SYS_PTRACE,
+        Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
+        CAP_SYS_NICE, CAP_SYS_PTRACE,
     },
     c_int, clone_args, errno, error,
     errors::Errno,

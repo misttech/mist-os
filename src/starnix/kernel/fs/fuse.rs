@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
@@ -20,6 +19,7 @@ use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
+    auth::FsCred,
     device_type::DeviceType,
     errno, errno_from_code, error,
     errors::{Errno, EINTR, EINVAL, ENOSYS},

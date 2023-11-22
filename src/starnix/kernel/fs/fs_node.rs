@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     device::DeviceMode,
     fs::{
         fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
@@ -23,7 +22,7 @@ use starnix_lock::{Mutex, RwLock, RwLockReadGuard};
 use starnix_uapi::{
     __kernel_ulong_t,
     as_any::AsAny,
-    auth::{CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
+    auth::{FsCred, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID, CAP_MKNOD, CAP_SYS_ADMIN},
     device_type::DeviceType,
     errno, error,
     errors::{Errno, EACCES, ENOSYS},
@@ -787,7 +786,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
@@ -799,7 +798,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _name: &crate::fs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
@@ -810,7 +809,7 @@ macro_rules! fs_node_impl_dir_readonly {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _target: &crate::fs::FsStr,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
@@ -902,7 +901,7 @@ macro_rules! fs_node_impl_not_dir {
             _name: &crate::fs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
@@ -913,7 +912,7 @@ macro_rules! fs_node_impl_not_dir {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
@@ -924,7 +923,7 @@ macro_rules! fs_node_impl_not_dir {
             _current_task: &crate::task::CurrentTask,
             _name: &crate::fs::FsStr,
             _target: &crate::fs::FsStr,
-            _owner: crate::auth::FsCred,
+            _owner: starnix_uapi::auth::FsCred,
         ) -> Result<crate::fs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
@@ -1939,7 +1938,8 @@ impl Drop for FsNode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{auth::Credentials, fs::buffers::VecOutputBuffer, testing::*};
+    use crate::{fs::buffers::VecOutputBuffer, testing::*};
+    use starnix_uapi::auth::Credentials;
 
     #[::fuchsia::test]
     async fn open_device_file() {

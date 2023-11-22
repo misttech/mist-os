@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::InputBuffer,
         fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
@@ -17,7 +16,8 @@ use crate::{
     task::CurrentTask,
 };
 use starnix_uapi::{
-    device_type::DeviceType, error, errors::Errno, file_mode::mode, open_flags::OpenFlags,
+    auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::mode,
+    open_flags::OpenFlags,
 };
 use std::sync::Weak;
 

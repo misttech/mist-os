@@ -33,7 +33,6 @@ mod trace;
 
 mod arch;
 mod atomic_counter;
-mod auth;
 mod bpf;
 mod delayed_releaser;
 mod device;

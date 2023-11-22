@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -29,7 +28,7 @@ use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
+    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     from_status_like_fdio, fsverity_descriptor, ino_t, mount_flags::MountFlags, off_t,
     open_flags::OpenFlags, statfs,
 };
@@ -1526,7 +1525,6 @@ impl FsNodeOps for RemoteSymlink {
 mod test {
     use super::*;
     use crate::{
-        auth::Credentials,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             EpollFileObject, LookupContext, Namespace, SymlinkMode, TimeUpdateType,
@@ -1541,7 +1539,7 @@ mod test {
     use fuchsia_fs::{directory, file};
     use fuchsia_zircon::HandleBased;
     use fxfs_testing::{TestFixture, TestFixtureOptions};
-    use starnix_uapi::{epoll_event, errors::EINVAL, file_mode::mode};
+    use starnix_uapi::{auth::Credentials, epoll_event, errors::EINVAL, file_mode::mode};
 
     #[::fuchsia::test]
     async fn test_tree() -> Result<(), anyhow::Error> {

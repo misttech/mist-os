@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, InotifyMask,
         MountInfo, NamespaceNode, UnlinkKind,
@@ -13,6 +12,7 @@ use crate::{
 use bitflags::bitflags;
 use starnix_lock::{RwLock, RwLockWriteGuard};
 use starnix_uapi::{
+    auth::FsCred,
     errno, error,
     errors::{Errno, ENOENT},
     file_mode::{Access, FileMode},

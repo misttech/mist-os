@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args,
         CacheMode, DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode,
@@ -19,6 +18,7 @@ use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
+    auth::FsCred,
     device_type::DeviceType,
     errno, error,
     errors::{Errno, EEXIST, ENOENT},

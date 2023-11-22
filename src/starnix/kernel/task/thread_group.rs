@@ -4,7 +4,6 @@
 
 use crate::{
     atomic_counter::AtomicU64Counter,
-    auth::Credentials,
     device::terminal::{ControllingSession, Terminal},
     drop_notifier::DropNotifier,
     logging::{log_error, log_warn, not_implemented},
@@ -26,7 +25,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_uapi::{
-    auth::{CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
+    auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     errno, error,
     errors::Errno,
     itimerval,

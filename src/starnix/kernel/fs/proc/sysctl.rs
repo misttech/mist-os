@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps,
         StaticDirectoryBuilder,
@@ -13,7 +12,12 @@ use crate::{
     },
 };
 use starnix_lock::Mutex;
-use starnix_uapi::{auth::CAP_SYS_ADMIN, error, errors::Errno, file_mode::mode};
+use starnix_uapi::{
+    auth::{FsCred, CAP_SYS_ADMIN},
+    error,
+    errors::Errno,
+    file_mode::mode,
+};
 use std::borrow::Cow;
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {

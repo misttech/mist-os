@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         directory_file::MemoryDirectoryFile, fs_args, fs_node_impl_not_dir,
         fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem, FileSystemHandle,
@@ -16,6 +15,7 @@ use crate::{
 };
 use starnix_lock::{Mutex, MutexGuard};
 use starnix_uapi::{
+    auth::FsCred,
     device_type::DeviceType,
     error,
     errors::Errno,

@@ -13,7 +13,6 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, Anon,
@@ -31,6 +30,7 @@ use starnix_lock::OrderedMutex;
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,
+    auth::FsCred,
     bpf_attr__bindgen_ty_1, bpf_attr__bindgen_ty_10, bpf_attr__bindgen_ty_12,
     bpf_attr__bindgen_ty_2, bpf_attr__bindgen_ty_4, bpf_attr__bindgen_ty_5, bpf_attr__bindgen_ty_9,
     bpf_cmd, bpf_cmd_BPF_BTF_LOAD, bpf_cmd_BPF_MAP_CREATE, bpf_cmd_BPF_MAP_GET_NEXT_KEY,

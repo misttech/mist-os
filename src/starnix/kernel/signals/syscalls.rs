@@ -854,13 +854,13 @@ fn negate_pid(pid: pid_t) -> Result<pid_t, Errno> {
 mod tests {
     use super::*;
     use crate::{
-        auth::Credentials,
         mm::{vmo::round_up_to_system_page_size, PAGE_SIZE},
         signals::{send_standard_signal, testing::dequeue_signal_for_test},
         task::{ExitStatus, ProcessExitInfo},
         testing::*,
     };
     use starnix_uapi::{
+        auth::Credentials,
         errors::ERESTARTSYS,
         signals::{
             SIGCHLD, SIGHUP, SIGINT, SIGIO, SIGKILL, SIGRTMIN, SIGSEGV, SIGSTOP, SIGTERM, SIGTRAP,

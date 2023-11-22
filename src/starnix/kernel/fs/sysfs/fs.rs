@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         cgroup::CgroupDirectoryNode,
         kobject::{KObjectHandle, KType},
@@ -13,7 +12,7 @@ use crate::{
     },
     task::{CurrentTask, NetstackDevicesDirectory},
 };
-use starnix_uapi::{errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
+use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
 use std::sync::Arc;
 
 struct SysFs;

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
@@ -24,8 +23,8 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use once_cell::sync::{Lazy, OnceCell};
 use starnix_uapi::{
-    errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags, pid_t,
-    time::duration_to_scheduler_clock,
+    auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
+    pid_t, time::duration_to_scheduler_clock,
 };
 
 use maplit::btreemap;

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         fs_node_impl_dir_readonly,
         kobject::{KObject, KObjectHandle},
@@ -15,7 +14,7 @@ use crate::{
     task::CurrentTask,
 };
 use fuchsia_zircon as zx;
-use starnix_uapi::{error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
+use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
 pub struct CpuClassDirectory {

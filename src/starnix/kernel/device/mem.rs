@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     device::{simple_device_ops, DeviceMode},
     fs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -21,8 +20,8 @@ use fuchsia_zircon::{
     cprng_draw, {self as zx},
 };
 use starnix_uapi::{
-    device_type::DeviceType, error, errors::Errno, file_mode::FileMode, open_flags::OpenFlags,
-    user_address::UserAddress,
+    auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
+    open_flags::OpenFlags, user_address::UserAddress,
 };
 
 #[derive(Default)]

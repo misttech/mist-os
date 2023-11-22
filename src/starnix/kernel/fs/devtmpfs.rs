@@ -3,14 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     device::DeviceMode,
     fs::{
         kobject::DeviceMetadata, tmpfs::TmpFs, DirEntryHandle, FileSystemHandle, FsStr, MountInfo,
     },
     task::CurrentTask,
 };
-use starnix_uapi::{device_type::DeviceType, errors::Errno, file_mode::mode};
+use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 
 pub fn dev_tmp_fs(current_task: &CurrentTask) -> &FileSystemHandle {
     current_task.kernel().dev_tmp_fs.get_or_init(|| init_devtmpfs(current_task))

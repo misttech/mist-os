@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     device::{
         terminal::{TTYState, Terminal},
         DeviceMode, DeviceOps,
@@ -23,6 +22,7 @@ use crate::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
+    auth::FsCred,
     device_type::{DeviceType, TTY_ALT_MAJOR},
     errno, error,
     errors::Errno,
@@ -618,7 +618,6 @@ fn shared_ioctl(
 mod tests {
     use super::*;
     use crate::{
-        auth::{Credentials, FsCred},
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             tmpfs::TmpFs,
@@ -627,6 +626,7 @@ mod tests {
         testing::*,
     };
     use starnix_uapi::{
+        auth::{Credentials, FsCred},
         file_mode::FileMode,
         signals::{SIGCHLD, SIGTTOU},
     };

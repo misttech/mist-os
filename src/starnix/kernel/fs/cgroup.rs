@@ -8,7 +8,6 @@
 //! to a control group (for the duration of their lifetime).
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_not_dir,
         DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle,
@@ -18,7 +17,7 @@ use crate::{
 };
 use starnix_lock::Mutex;
 use starnix_uapi::{
-    device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
+    auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, ownership::WeakRef, pid_t,
 };
 use std::sync::Arc;

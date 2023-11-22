@@ -50,8 +50,13 @@ use futures::{
     StreamExt as _,
 };
 use starnix_lock::Mutex;
-use std::sync::atomic::{AtomicU32, Ordering};
-use std::{collections::VecDeque, sync::Arc};
+use std::{
+    collections::VecDeque,
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
+};
 use zerocopy::AsBytes as _; // for `as_bytes()`
 
 pub struct InputDevice {

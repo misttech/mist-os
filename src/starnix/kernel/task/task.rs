@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::{Credentials, FsCred},
     fs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
     logging::{log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
@@ -21,7 +20,8 @@ use fuchsia_zircon::{
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::{
-        PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS, PTRACE_MODE_REALCREDS,
+        Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
+        PTRACE_MODE_REALCREDS,
     },
     errno, error,
     errors::Errno,

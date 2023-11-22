@@ -10,7 +10,6 @@ use std::{
 };
 
 use crate::{
-    auth::FsCred,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         devpts::{get_device_type_for_pts, DEVPTS_COUNT},
@@ -20,6 +19,7 @@ use crate::{
     task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_uapi::{
+    auth::FsCred,
     cc_t,
     device_type::DeviceType,
     error,

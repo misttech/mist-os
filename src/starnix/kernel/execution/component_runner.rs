@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::Credentials,
     device::run_component_features,
     execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
     fs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
@@ -25,7 +24,7 @@ use fuchsia_zircon as zx;
 use futures::{channel::oneshot, FutureExt, StreamExt};
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
 use starnix_uapi::{
-    auth::Capabilities,
+    auth::{Capabilities, Credentials},
     device_type::DeviceType,
     errors::{Errno, EEXIST, ENOTDIR},
     file_mode::mode,

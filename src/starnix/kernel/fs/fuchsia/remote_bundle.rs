@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    auth::FsCred,
     fs::{
         default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
         fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
@@ -26,6 +25,7 @@ use fuchsia_zircon::{
 };
 use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
+    auth::FsCred,
     errno, error,
     errors::{Errno, SourceContext},
     file_mode::FileMode,
