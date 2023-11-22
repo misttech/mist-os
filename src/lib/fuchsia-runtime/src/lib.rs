@@ -40,6 +40,7 @@ extern "C" {
     pub fn zx_take_startup_handle(hnd_info: u32) -> zx_handle_t;
     pub fn zx_thread_self() -> zx_handle_t;
     pub fn zx_process_self() -> zx_handle_t;
+    pub fn thrd_get_zx_process() -> zx_handle_t;
     pub fn zx_vmar_root_self() -> zx_handle_t;
     pub fn zx_job_default() -> zx_handle_t;
     pub fn zx_utc_reference_get() -> zx_handle_t;
@@ -311,7 +312,10 @@ pub fn thread_self() -> Unowned<'static, Thread> {
 /// Get a reference to the handle of the current process.
 pub fn process_self() -> Unowned<'static, Process> {
     unsafe {
-        let handle = zx_process_self();
+        // zx_process_self() doesn't work correctly in jobs where multiple processes share
+        // the portion of their address space for global variables. Use thrd_get_zx_process() to
+        // return the correct value in that context. See https://fxbug.dev/133807 for background.
+        let handle = thrd_get_zx_process();
         Unowned::from_raw_handle(handle)
     }
 }
