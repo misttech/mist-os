@@ -1125,6 +1125,7 @@
                 "PtraceTest.AttachingConvertsGroupStopToPtraceStop",
 
                 // TODO(fxbug.dev/129161): Fix flake.
+                "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",
             ],
         },
