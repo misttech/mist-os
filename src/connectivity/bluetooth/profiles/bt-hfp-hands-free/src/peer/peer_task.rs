@@ -51,19 +51,21 @@ impl PeerTask {
                 debug!("Received AT response: {:?}", at_response_result_option);
 
                 let at_response_result =
-                    at_response_result_option.ok_or(format_err!("AT Connection closed"))?;
+                    at_response_result_option.ok_or(format_err!("AT connection closed"))?;
                 let at_response = at_response_result?;
 
                 self.handle_at_response(at_response);
             }
-            procedure_output_result_option = self.procedure_manager.next() => {
-                debug!("Received procedure output: {:?}", procedure_output_result_option);
+            procedure_outputs_result_option = self.procedure_manager.next() => {
+                debug!("Received procedure output: {:?}", procedure_outputs_result_option);
 
-                let procedure_output_result =
-                    procedure_output_result_option.ok_or(format_err!("Procedure manager stream closed."))?;
-                let procedure_output = procedure_output_result?;
+                let procedure_outputs_result =
+                    procedure_outputs_result_option.ok_or(format_err!("Procedure manager stream closed"))?;
+                let procedure_outputs = procedure_outputs_result?;
 
-                self.handle_procedure_output(procedure_output);
+                for procedure_output in procedure_outputs {
+                    self.handle_procedure_output(procedure_output);
+                }
             }
             // TODO(fxb/127025) Select on FIDL messages and unsolicited messages.
         }

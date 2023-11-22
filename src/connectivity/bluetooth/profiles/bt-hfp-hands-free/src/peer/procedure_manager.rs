@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Result};
-use at_commands as at;
 use fuchsia_bluetooth::types::PeerId;
 use futures::stream::FusedStream;
 use futures::Stream;
@@ -88,14 +87,6 @@ impl ProcedureManager {
         }
     }
 
-    // TODO(fxb/127381) Convert procedures to use ProcedureInputs and remove this method.
-    fn extract_response_from_input(input: ProcedureInput) -> Vec<at::Response> {
-        match input {
-            ProcedureInput::AtResponseFromAg(response) => vec![response],
-            _ => unimplemented!(),
-        }
-    }
-
     // Must be called with current_procedure set to Some(...)
     fn get_current_procedure_input(&mut self) -> Option<Result<ProcedureInput>> {
         assert!(self.current_procedure.is_some());
@@ -130,25 +121,18 @@ impl ProcedureManager {
         Some(Ok(input))
     }
 
-    fn run_procedure_with_input(
-        &mut self,
-        input: ProcedureInput,
-    ) -> Option<Result<ProcedureOutput>> {
+    fn run_procedure_with_input(&mut self, input: ProcedureInput) -> Result<Vec<ProcedureOutput>> {
         // The current procedure was already set or is was set by
         // `set_new_procedure_and_get_input` if it returned successfully.
         let procedure = self.current_procedure.as_mut().unwrap();
-        let result = procedure.transition(
-            &mut self.procedure_managed_state,
-            &Self::extract_response_from_input(input),
-        );
-        // TODO(fxb/127381) Convert procedures to use ProcedureOutputs and remove this.
-        let result = result.map(ProcedureOutput::AtCommandsToAg);
-        Some(result)
+        let result = procedure.transition(&mut self.procedure_managed_state, input);
+
+        result
     }
 
     /// Run the current procedure if it exists an there are inputs for it, without checking for
     /// errors cases or cleaning up terminated procedures.
-    fn run_current_or_new_procedure(&mut self) -> Option<Result<ProcedureOutput>> {
+    fn run_current_or_new_procedure(&mut self) -> Option<Result<Vec<ProcedureOutput>>> {
         let input = if self.current_procedure.is_some() {
             self.get_current_procedure_input()
         } else {
@@ -156,7 +140,7 @@ impl ProcedureManager {
         };
 
         match input {
-            Some(Ok(input)) => self.run_procedure_with_input(input),
+            Some(Ok(input)) => Some(self.run_procedure_with_input(input)),
             // Repackage unsuccessful variants.
             Some(Err(err)) => Some(Err(err)),
             None => None,
@@ -203,7 +187,7 @@ impl ProcedureManager {
     ///
     /// Returns None if there is no procedure to run or input for it, or Some of a Result output by
     /// the procedure.
-    fn run_next_procedure(&mut self) -> Option<Result<ProcedureOutput>> {
+    fn run_next_procedure(&mut self) -> Option<Result<Vec<ProcedureOutput>>> {
         // Confirm there are no inputs for the current procedure when no procedure exists.  This
         // would mean we've received inputs since the last procedure was terminated or before any
         // procedure was started. This indicates either a bug in the previous procedure or a
@@ -233,15 +217,33 @@ impl ProcedureManager {
     }
 }
 
+/// This Stream produces outputs from the individual procedures as vectors of ProcedureOutputs.
+/// Polling this Stream will cause the next input to be fed into the current procedure if both
+/// exist.
+///
+/// The outputs should be processed as a batch to prevent races.
+/// Specifically, if two ProcedureOutputs are produced, and
+///   - The first output causes an AT Command to be sent to the peer, and
+///   - A response is received which causes the procedure to update ProcedureManipulatedState, and
+///   - The second ProcedureOutput is processed, which assumes the ProcedureManiplated state is
+///     in its previous state.
+// TODO(fxb/129730) This can return individual ProcedureOutputs if all state management is moved to
+// the PeerTask and thus synchronized there.
 impl Stream for ProcedureManager {
-    type Item = Result<ProcedureOutput>;
+    type Item = Result<Vec<ProcedureOutput>>;
 
     fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match self.run_next_procedure() {
-            Some(result) => Poll::Ready(Some(result)),
-            None => {
-                self.stream_waker = Some(context.waker().clone());
-                Poll::Pending
+        loop {
+            let output = self.run_next_procedure();
+            match &output {
+                // If there's no ProcedureOutputs, loop and run the next procedure if possible.
+                Some(Ok(no_outputs)) if no_outputs.is_empty() => continue,
+                Some(Ok(_outputs)) => break Poll::Ready(output),
+                Some(Err(_)) => break Poll::Ready(output),
+                None => {
+                    self.stream_waker = Some(context.waker().clone());
+                    break Poll::Pending;
+                }
             }
         }
     }

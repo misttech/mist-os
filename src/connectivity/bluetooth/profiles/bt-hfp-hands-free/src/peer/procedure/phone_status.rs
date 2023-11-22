@@ -6,7 +6,8 @@ use anyhow::{format_err, Error};
 use at_commands as at;
 use tracing::warn;
 
-use super::Procedure;
+use super::at_resp;
+use super::{Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
@@ -40,46 +41,41 @@ impl Procedure for PhoneStatusProcedure {
     fn transition(
         &mut self,
         state: &mut ProcedureManipulatedState,
-        update: &Vec<at::Response>,
-    ) -> Result<Vec<at::Command>, Error> {
-        for respones in update {
-            match respones {
-                at::Response::Success(at::Success::Ciev { ind, value }) => {
-                    if state.indicators_update_enabled {
-                        match *ind {
-                            SERVICE_INDICATOR_INDEX => {
-                                state.ag_indicators.service.set_if_enabled(*value != 0);
-                            }
-                            CALL_INDICATOR_INDEX => {
-                                state.ag_indicators.call.set_if_enabled(*value != 0);
-                            }
-                            CALL_SETUP_INDICATOR_INDEX => {
-                                state.ag_indicators.callsetup.set_if_enabled(*value as u8);
-                            }
-                            CALL_HELD_INDICATOR_INDEX => {
-                                state.ag_indicators.callheld.set_if_enabled(*value as u8);
-                            }
-                            SIGNAL_INDICATOR_INDEX => {
-                                state.ag_indicators.signal.set_if_enabled(*value as u8);
-                            }
-                            ROAM_INDICATOR_INDEX => {
-                                state.ag_indicators.roam.set_if_enabled(*value != 0);
-                            }
-                            BATT_CHG_INDICATOR_INDEX => {
-                                state.ag_indicators.battchg.set_if_enabled(*value as u8);
-                            }
-                            _ => {
-                                warn!("Indicator index {:?} is out of bounds from accepted indicators.", ind);
-                            }
-                        }
-                    }
-                }
-                _ => {
-                    return Err(format_err!(
-                        "Received invalid response during a phone status update procedure: {:?}",
-                        respones
-                    ));
-                }
+        input: ProcedureInput,
+    ) -> Result<Vec<ProcedureOutput>, Error> {
+        match input {
+            at_resp!(Ciev { ind, value }) if !state.indicators_update_enabled => {
+                warn!(
+                    "Received indicator {:} with value {:} when indicator update is disabled.",
+                    ind, value
+                )
+            }
+            at_resp!(Ciev { ind: SERVICE_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.service.set_if_enabled(value != 0);
+            }
+            at_resp!(Ciev { ind: CALL_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.call.set_if_enabled(value != 0);
+            }
+            at_resp!(Ciev { ind: CALL_SETUP_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.callsetup.set_if_enabled(value as u8);
+            }
+            at_resp!(Ciev { ind: CALL_HELD_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.callheld.set_if_enabled(value as u8);
+            }
+            at_resp!(Ciev { ind: SIGNAL_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.signal.set_if_enabled(value as u8);
+            }
+            at_resp!(Ciev { ind: ROAM_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.roam.set_if_enabled(value != 0);
+            }
+            at_resp!(Ciev { ind: BATT_CHG_INDICATOR_INDEX, value }) => {
+                state.ag_indicators.battchg.set_if_enabled(value as u8);
+            }
+            _ => {
+                return Err(format_err!(
+                    "Received invalid response during a phone status update procedure: {:?}",
+                    input
+                ));
             }
         }
         self.terminated = true;
@@ -98,49 +94,20 @@ mod tests {
     use assert_matches::assert_matches;
 
     use crate::config::HandsFreeFeatureSupport;
+    use crate::peer::procedure::at_ok;
 
     #[fuchsia::test]
     fn update_with_invalid_response_returns_error() {
         let mut procedure = PhoneStatusProcedure::new();
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
-        let response = vec![at::Response::Ok];
+        let response = at_ok!();
 
         assert!(!procedure.is_terminated());
 
-        assert_matches!(procedure.transition(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, response), Err(_));
 
         assert!(!procedure.is_terminated());
-    }
-
-    #[fuchsia::test]
-    fn update_with_invalid_index_keeps_values() {
-        let mut procedure = PhoneStatusProcedure::new();
-        let config = HandsFreeFeatureSupport::default();
-        let mut state = ProcedureManipulatedState::new(config);
-        let response = vec![at::Response::Success(at::Success::Ciev { ind: 0, value: 1 })];
-
-        state.ag_indicators.set_default_values();
-
-        assert!(!procedure.is_terminated());
-        assert_eq!(state.ag_indicators.service.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.call.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.callsetup.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.callheld.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.signal.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.roam.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.battchg.value.unwrap(), 0);
-
-        let _ = procedure.transition(&mut state, &response);
-
-        assert!(procedure.is_terminated());
-        assert_eq!(state.ag_indicators.service.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.call.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.callsetup.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.callheld.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.signal.value.unwrap(), 0);
-        assert_eq!(state.ag_indicators.roam.value.unwrap(), false);
-        assert_eq!(state.ag_indicators.battchg.value.unwrap(), 0);
     }
 
     #[fuchsia::test]
@@ -161,24 +128,32 @@ mod tests {
         assert_eq!(state.ag_indicators.roam.value.unwrap(), false);
         assert_eq!(state.ag_indicators.battchg.value.unwrap(), 0);
 
-        let response = vec![
-            at::Response::Success(at::Success::Ciev { ind: SERVICE_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_SETUP_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_HELD_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: SIGNAL_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: ROAM_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 }),
-        ];
-
-        assert_matches!(procedure.transition(&mut state, &response), Ok(_));
-
+        let response = at_resp!(Ciev { ind: SERVICE_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.service.value.unwrap(), true);
+
+        let response = at_resp!(Ciev { ind: CALL_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.call.value.unwrap(), true);
+
+        let response = at_resp!(Ciev { ind: CALL_SETUP_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.callsetup.value.unwrap(), 1);
+
+        let response = at_resp!(Ciev { ind: CALL_HELD_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.callheld.value.unwrap(), 1);
+
+        let response = at_resp!(Ciev { ind: SIGNAL_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.signal.value.unwrap(), 1);
+
+        let response = at_resp!(Ciev { ind: ROAM_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.roam.value.unwrap(), true);
+
+        let response = at_resp!(Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 });
+        assert_matches!(procedure.transition(&mut state, response), Ok(_));
         assert_eq!(state.ag_indicators.battchg.value.unwrap(), 1);
 
         assert!(procedure.is_terminated());
@@ -203,17 +178,19 @@ mod tests {
         assert_eq!(state.ag_indicators.roam.value.unwrap(), false);
         assert_eq!(state.ag_indicators.battchg.value.unwrap(), 0);
 
-        let response = vec![
-            at::Response::Success(at::Success::Ciev { ind: SERVICE_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_SETUP_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: CALL_HELD_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: SIGNAL_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: ROAM_INDICATOR_INDEX, value: 1 }),
-            at::Response::Success(at::Success::Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 }),
+        let responses = vec![
+            at_resp!(Ciev { ind: SERVICE_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: CALL_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: CALL_SETUP_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: CALL_HELD_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: SIGNAL_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: ROAM_INDICATOR_INDEX, value: 1 }),
+            at_resp!(Ciev { ind: BATT_CHG_INDICATOR_INDEX, value: 1 }),
         ];
 
-        assert_matches!(procedure.transition(&mut state, &response), Ok(_));
+        for response in responses {
+            assert_matches!(procedure.transition(&mut state, response), Ok(_));
+        }
 
         assert_eq!(state.ag_indicators.service.value.unwrap(), false);
         assert_eq!(state.ag_indicators.call.value.unwrap(), false);

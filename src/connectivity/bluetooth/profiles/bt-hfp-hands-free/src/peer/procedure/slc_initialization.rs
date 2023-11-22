@@ -5,7 +5,8 @@
 use anyhow::{format_err, Error};
 use at_commands as at;
 
-use super::Procedure;
+use super::{at_cmd, at_ok, at_resp};
+use super::{Procedure, ProcedureInput, ProcedureOutput};
 
 use crate::features::{extract_features_from_command, AgFeatures, CVSD, MSBC};
 use crate::peer::indicators::{BATTERY_LEVEL, ENHANCED_SAFETY, INDICATOR_REPORTING_MODE};
@@ -62,158 +63,162 @@ impl Procedure for SlcInitProcedure {
     fn transition(
         &mut self,
         state: &mut ProcedureManipulatedState,
-        update: &Vec<at::Response>,
-    ) -> Result<Vec<at::Command>, Error> {
+        input: ProcedureInput,
+    ) -> Result<Vec<ProcedureOutput>, Error> {
         if self.is_terminated() {
-            return Err(format_err!("Procedure is already terminated at {:?} stage before processing update for response(s): {:?}.", self.state, update));
+            return Err(format_err!(
+                "Procedure is already terminated before processing update for response(s): {:?}.",
+                input
+            ));
         }
 
-        let output = match (&self.state, &update[..]) {
+        let output_option = match (&self.state, input) {
             // Sent AT+BRSF, waiting for +BRSF /////////////////////////////////////////////////////
-            (
-                State::SupportedFeaturesExchange,
-                [at::Response::Success(at::Success::Brsf { features })],
-            ) => {
-                state.ag_features = AgFeatures::from_bits_truncate(*features);
+            (State::SupportedFeaturesExchange, at_resp!(Brsf { features })) => {
+                state.ag_features = AgFeatures::from_bits_truncate(features);
                 self.state = State::WaitingForOkAfterSupportedFeaturesExchange;
-                vec![]
+                None
             }
 
             // Received +BSRF, waiting for OK //////////////////////////////////////////////////////
-            (State::WaitingForOkAfterSupportedFeaturesExchange, [at::Response::Ok]) => {
+            (State::WaitingForOkAfterSupportedFeaturesExchange, at_ok!()) => {
                 if state.supports_codec_negotiation() {
                     self.state = State::CodecNegotiation;
                     state.supported_codecs.push(MSBC);
                     // TODO(fxb/130963) Make this configurable.
                     // By default, we support the CVSD and MSBC codecs.
-                    vec![at::Command::Bac { codecs: vec![CVSD.into(), MSBC.into()] }]
+                    Some(at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] }))
                 } else {
                     self.state = State::TestAgIndicators;
-                    vec![at::Command::CindTest {}]
+                    Some(at_cmd!(CindTest {}))
                 }
             }
 
             // Sent AT+BAC, waiting for OK /////////////////////////////////////////////////////////
-            (State::CodecNegotiation, [at::Response::Ok]) => {
+            (State::CodecNegotiation, at_ok!()) => {
                 self.state = State::TestAgIndicators;
-                vec![at::Command::CindTest {}]
+                Some(at_cmd!(CindTest {}))
             }
 
             // Sent AT+CIND=?, waiting for +CIND: //////////////////////////////////////////////////
-            (State::TestAgIndicators, [at::Response::RawBytes(_bytes)]) => {
+            (
+                State::TestAgIndicators,
+                ProcedureInput::AtResponseFromAg(at::Response::RawBytes(_bytes)),
+            ) => {
                 // TODO(fxbug.dev/108331): Read additional indicators by parsing raw bytes instead
                 // ofjust checking for existence of raw bytes.
                 self.state = State::WaitingForOkAfterTestAgIndicators;
-                vec![]
+                None
             }
 
             // Received +CIND, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterTestAgIndicators, [at::Response::Ok]) => {
+            (State::WaitingForOkAfterTestAgIndicators, at_ok!()) => {
                 self.state = State::ReadAgIndicators;
-                vec![at::Command::CindRead {}]
+                Some(at_cmd!(CindRead {}))
             }
 
             // Sent AT+CIND?, waiting for +CIND: ///////////////////////////////////////////////////
-            (State::ReadAgIndicators, [at::Response::Success(cmd @ at::Success::Cind { .. })]) => {
+            (
+                State::ReadAgIndicators,
+                ProcedureInput::AtResponseFromAg(at::Response::Success(
+                    cmd @ at::Success::Cind { .. },
+                )),
+            ) => {
                 state.ag_indicators.update_indicator_values(&cmd);
                 self.state = State::WaitingForOkAfterReadAgIndicators;
-                vec![]
+                None
             }
 
             // Received +CIND:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterReadAgIndicators, [at::Response::Ok]) => {
+            (State::WaitingForOkAfterReadAgIndicators, at_ok!()) => {
                 self.state = State::AgIndicatorStatusUpdate;
-                vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }]
+                Some(at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }))
             }
 
             // Sent AT+CMER, waiting for OK ////////////////////////////////////////////////////////
-            (State::AgIndicatorStatusUpdate, [at::Response::Ok]) => {
+            (State::AgIndicatorStatusUpdate, at_ok!()) => {
                 if state.supports_three_way_calling() {
                     self.state = State::CallHoldAndMultiParty;
-                    vec![at::Command::ChldTest {}]
+                    Some(at_cmd!(ChldTest {}))
                 } else if state.supports_hf_indicators() {
                     self.state = State::HfSupportedHfIndicators;
-                    vec![at::Command::Bind {
+                    Some(at_cmd!(Bind {
                         indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64],
-                    }]
+                    }))
                 } else {
                     self.state = State::Terminated;
-                    vec![]
+                    None
                 }
             }
 
             // Sent AT+CHLD=?, waiting for +CHLD: //////////////////////////////////////////////////
-            (
-                State::CallHoldAndMultiParty,
-                [at::Response::Success(at::Success::Chld { commands })],
-            ) => {
+            (State::CallHoldAndMultiParty, at_resp!(Chld { commands })) => {
                 state.three_way_features = extract_features_from_command(&commands)?;
                 self.state = State::WaitingForOkAfterCallHoldAndMultiParty;
-                vec![]
+                None
             }
 
             // Received +CHLD:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterCallHoldAndMultiParty, [at::Response::Ok]) => {
+            (State::WaitingForOkAfterCallHoldAndMultiParty, at_ok!()) => {
                 if state.supports_hf_indicators() {
                     self.state = State::HfSupportedHfIndicators;
-                    vec![at::Command::Bind {
-                        indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64],
-                    }]
+                    Some(at_cmd!(Bind {
+                        indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64]
+                    }))
                 } else {
                     self.state = State::Terminated;
-                    vec![]
+                    None
                 }
             }
-
             // Sent AT+BIND=, waiting for OK ///////////////////////////////////////////////////////
-            (State::HfSupportedHfIndicators, [at::Response::Ok]) => {
+            (State::HfSupportedHfIndicators, at_ok!()) => {
                 self.state = State::TestHfIndicators;
-                vec![at::Command::BindTest {}]
+                Some(at_cmd!(BindTest {}))
             }
 
             // Sent AT+BIND=?, waiting for +BIND: ///////////////////////////////////////////////////
-            (
-                State::TestHfIndicators,
-                [at::Response::Success(at::Success::BindList { indicators })],
-            ) => {
-                state.hf_indicators.set_supported_indicators(indicators);
+            (State::TestHfIndicators, at_resp!(BindList { indicators })) => {
+                state.hf_indicators.set_supported_indicators(&indicators);
                 self.state = State::WaitingForOkAfterTestHfIndicators;
-                vec![]
+                None
             }
 
             // Received +BIND:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterTestHfIndicators, [at::Response::Ok]) => {
+            (State::WaitingForOkAfterTestHfIndicators, at_ok!()) => {
                 self.state = State::ReadHfIndicators;
-                vec![at::Command::BindRead {}]
+                Some(at_cmd!(BindRead {}))
             }
 
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
             (
                 State::ReadHfIndicators,
-                [at::Response::Success(cmd @ at::Success::BindStatus { .. })],
+                ProcedureInput::AtResponseFromAg(at::Response::Success(
+                    cmd @ at::Success::BindStatus { .. },
+                )),
             ) => {
                 state.hf_indicators.change_indicator_state(&cmd)?;
-                vec![]
+                None
             }
 
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
-            (State::ReadHfIndicators, [at::Response::Ok]) => {
+            (State::ReadHfIndicators, at_ok!()) => {
                 self.state = State::Terminated;
-                vec![]
+                None
             }
 
             // Unexpected AT response for state ////////////////////////////////////////////////////
-            _ => {
+            (state, input) => {
                 // Early return for error
                 return Err(format_err!(
                     "Wrong responses at {:?} stage of SLCI with response(s): {:?}.",
-                    self.state,
-                    update
+                    state,
+                    input
                 ));
             }
         };
 
-        Ok(output)
+        let outputs = output_option.into_iter().collect();
+        Ok(outputs)
     }
 
     fn is_terminated(&self) -> bool {
@@ -249,24 +254,22 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let response1 = vec![at::Response::Success(at::Success::Brsf {
-            features: AgFeatures::default().bits(),
-        })];
-        let response1_ok = vec![at::Response::Ok];
-        let expected_command1 = vec![at::Command::CindTest {}];
+        let response1 = at_resp!(Brsf { features: AgFeatures::default().bits() });
+        let response1_ok = at_ok!();
+        let expected_command1 = vec![at_cmd!(CindTest {})];
 
-        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response1_ok).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = vec![at::Response::RawBytes(indicator_msg)];
-        let response2_ok = vec![at::Response::Ok];
-        let expected_command2 = vec![at::Command::CindRead {}];
-        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), vec![]);
+        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2_ok = at_ok!();
+        let expected_command2 = vec![at_cmd!(CindRead {})];
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
 
-        assert_eq!(procedure.transition(&mut state, &response2_ok).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = vec![at::Response::Success(at::Success::Cind {
+        let response3 = at_resp!(Cind {
             service: false,
             call: false,
             callsetup: 0,
@@ -274,15 +277,15 @@ mod tests {
             signal: 0,
             roam: false,
             battchg: 0,
-        })];
-        let response3_ok = vec![at::Response::Ok];
+        });
+        let response3_ok = at_ok!();
         let update3 =
-            vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
-        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response3_ok).unwrap(), update3);
+            vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3);
 
-        let response4 = vec![at::Response::Ok];
-        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), vec![]);
+        let response4 = at_ok!();
+        assert_eq!(procedure.transition(&mut state, response4).unwrap(), vec![]);
 
         assert!(procedure.is_terminated());
     }
@@ -303,23 +306,22 @@ mod tests {
         assert!(!state.hf_indicators.battery_level.0.enabled);
         assert!(!procedure.is_terminated());
 
-        let response1 =
-            vec![at::Response::Success(at::Success::Brsf { features: ag_features.bits() })];
-        let response1_ok = vec![at::Response::Ok];
-        let expected_command1 = vec![at::Command::CindTest {}];
+        let response1 = at_resp!(Brsf { features: ag_features.bits() });
+        let response1_ok = at_ok!();
+        let expected_command1 = vec![at_cmd!(CindTest {})];
 
-        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response1_ok).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = vec![at::Response::RawBytes(indicator_msg)];
-        let response2_ok = vec![at::Response::Ok];
-        let expected_command2 = vec![at::Command::CindRead {}];
+        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2_ok = at_ok!();
+        let expected_command2 = vec![at_cmd!(CindRead {})];
 
-        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response2_ok).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = vec![at::Response::Success(at::Success::Cind {
+        let response3 = at_resp!(Cind {
             service: false,
             call: false,
             callsetup: 0,
@@ -327,49 +329,44 @@ mod tests {
             signal: 0,
             roam: false,
             battchg: 0,
-        })];
-        let response3_ok = vec![at::Response::Ok];
+        });
+        let response3_ok = at_ok!();
         let expected_command3 =
-            vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
+            vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
 
-        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response3_ok).unwrap(), expected_command3);
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), expected_command3);
 
-        let response4 = vec![at::Response::Ok];
-        let expected_command4 = vec![at::Command::Bind {
-            indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64],
-        }];
-        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), expected_command4);
+        let response4 = at_ok!();
+        let expected_command4 =
+            vec![at_cmd!(Bind { indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64] })];
+        assert_eq!(procedure.transition(&mut state, response4).unwrap(), expected_command4);
 
-        let response5 = vec![at::Response::Ok];
-        let expected_command5 = vec![at::Command::BindTest {}];
-        assert_eq!(procedure.transition(&mut state, &response5).unwrap(), expected_command5);
+        let response5 = at_ok!();
+        let expected_command5 = vec![at_cmd!(BindTest {})];
+        assert_eq!(procedure.transition(&mut state, response5).unwrap(), expected_command5);
 
-        let response6 = vec![at::Response::Success(at::Success::BindList {
+        let response6 = at_resp!(BindList {
             indicators: vec![
                 at::BluetoothHFIndicator::BatteryLevel,
                 at::BluetoothHFIndicator::EnhancedSafety,
             ],
-        })];
-        let response6_ok = vec![at::Response::Ok];
-        let expected_command6 = vec![at::Command::BindRead {}];
-        assert_eq!(procedure.transition(&mut state, &response6).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response6_ok).unwrap(), expected_command6);
+        });
+        let response6_ok = at_ok!();
+        let expected_command6 = vec![at_cmd!(BindRead {})];
+        assert_eq!(procedure.transition(&mut state, response6).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response6_ok).unwrap(), expected_command6);
         assert!(state.hf_indicators.enhanced_safety.1);
         assert!(state.hf_indicators.battery_level.1);
 
-        let response7 = vec![at::Response::Success(at::Success::BindStatus {
-            anum: at::BluetoothHFIndicator::EnhancedSafety,
-            state: true,
-        })];
-        let response8 = vec![at::Response::Success(at::Success::BindStatus {
-            anum: at::BluetoothHFIndicator::BatteryLevel,
-            state: true,
-        })];
-        let response9 = vec![at::Response::Ok];
-        assert_eq!(procedure.transition(&mut state, &response7).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response8).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response9).unwrap(), vec![]);
+        let response7 =
+            at_resp!(BindStatus { anum: at::BluetoothHFIndicator::EnhancedSafety, state: true });
+        let response8 =
+            at_resp!(BindStatus { anum: at::BluetoothHFIndicator::BatteryLevel, state: true });
+        let response9 = at_ok!();
+        assert_eq!(procedure.transition(&mut state, response7).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response8).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response9).unwrap(), vec![]);
         assert!(state.hf_indicators.enhanced_safety.0.enabled);
         assert!(state.hf_indicators.battery_level.0.enabled);
     }
@@ -385,18 +382,17 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let response1 =
-            vec![at::Response::Success(at::Success::Brsf { features: ag_features.bits() })];
-        let response1_ok = vec![at::Response::Ok];
-        let expected_command1 = vec![at::Command::Bac { codecs: vec![CVSD.into(), MSBC.into()] }];
+        let response1 = at_resp!(Brsf { features: ag_features.bits() });
+        let response1_ok = at_ok!();
+        let expected_command1 = vec![at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] })];
 
-        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response1_ok).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
-        let response2 = vec![at::Response::Ok];
-        let expected_command2 = vec![at::Command::CindTest {}];
+        let response2 = at_ok!();
+        let expected_command2 = vec![at_cmd!(CindTest {})];
 
-        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), expected_command2);
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), expected_command2);
         assert!(!procedure.is_terminated());
     }
 
@@ -412,22 +408,21 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let response1 =
-            vec![at::Response::Success(at::Success::Brsf { features: ag_features.bits() })];
-        let response1_ok = vec![at::Response::Ok];
-        let expected_command1 = vec![at::Command::CindTest {}];
+        let response1 = at_resp!(Brsf { features: ag_features.bits() });
+        let response1_ok = at_ok!();
+        let expected_command1 = vec![at_cmd!(CindTest {})];
 
-        assert_eq!(procedure.transition(&mut state, &response1).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response1_ok).unwrap(), expected_command1);
+        assert_eq!(procedure.transition(&mut state, response1).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response1_ok).unwrap(), expected_command1);
 
         let indicator_msg = CIND_TEST_RESPONSE_BYTES.to_vec();
-        let response2 = vec![at::Response::RawBytes(indicator_msg)];
-        let response2_ok = vec![at::Response::Ok];
-        let expected_command2 = vec![at::Command::CindRead {}];
-        assert_eq!(procedure.transition(&mut state, &response2).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response2_ok).unwrap(), expected_command2);
+        let response2 = ProcedureInput::AtResponseFromAg(at::Response::RawBytes(indicator_msg));
+        let response2_ok = at_ok!();
+        let expected_command2 = vec![at_cmd!(CindRead {})];
+        assert_eq!(procedure.transition(&mut state, response2).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response2_ok).unwrap(), expected_command2);
 
-        let response3 = vec![at::Response::Success(at::Success::Cind {
+        let response3 = at_resp!(Cind {
             service: false,
             call: false,
             callsetup: 0,
@@ -435,16 +430,16 @@ mod tests {
             signal: 0,
             roam: false,
             battchg: 0,
-        })];
-        let response3_ok = vec![at::Response::Ok];
+        });
+        let response3_ok = at_ok!();
         let update3 =
-            vec![at::Command::Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }];
-        assert_eq!(procedure.transition(&mut state, &response3).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response3_ok).unwrap(), update3);
+            vec![at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 })];
+        assert_eq!(procedure.transition(&mut state, response3).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response3_ok).unwrap(), update3);
 
-        let response4 = vec![at::Response::Ok];
-        let update4 = vec![at::Command::ChldTest {}];
-        assert_eq!(procedure.transition(&mut state, &response4).unwrap(), update4);
+        let response4 = at_ok!();
+        let update4 = vec![at_cmd!(ChldTest {})];
+        assert_eq!(procedure.transition(&mut state, response4).unwrap(), update4);
 
         let commands = vec![
             String::from("0"),
@@ -455,10 +450,10 @@ mod tests {
             String::from("3"),
             String::from("4"),
         ];
-        let response5 = vec![at::Response::Success(at::Success::Chld { commands })];
-        let response5_ok = vec![at::Response::Ok];
-        assert_eq!(procedure.transition(&mut state, &response5).unwrap(), vec![]);
-        assert_eq!(procedure.transition(&mut state, &response5_ok).unwrap(), vec![]);
+        let response5 = at_resp!(Chld { commands });
+        let response5_ok = at_ok!();
+        assert_eq!(procedure.transition(&mut state, response5).unwrap(), vec![]);
+        assert_eq!(procedure.transition(&mut state, response5_ok).unwrap(), vec![]);
         assert!(procedure.is_terminated());
 
         let features = vec![
@@ -482,8 +477,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -498,8 +493,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -511,8 +506,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -525,8 +520,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -538,8 +533,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -555,9 +550,9 @@ mod tests {
         assert!(!procedure.is_terminated());
 
         let invalid_command = vec![String::from("1A")];
-        let response = vec![at::Response::Success(at::Success::Chld { commands: invalid_command })];
+        let response = at_resp!(Chld { commands: invalid_command });
 
-        assert_matches!(procedure.transition(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -573,9 +568,9 @@ mod tests {
         assert!(!procedure.is_terminated());
 
         let invalid_command = vec![String::from("5")];
-        let response = vec![at::Response::Success(at::Success::Chld { commands: invalid_command })];
+        let response = at_resp!(Chld { commands: invalid_command });
 
-        assert_matches!(procedure.transition(&mut state, &response), Err(_));
+        assert_matches!(procedure.transition(&mut state, response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -588,8 +583,8 @@ mod tests {
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -602,8 +597,8 @@ mod tests {
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -616,8 +611,8 @@ mod tests {
         assert!(!procedure.is_terminated());
 
         // Did not receive expected Ok response as should result in error.
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -629,8 +624,8 @@ mod tests {
 
         assert!(!procedure.is_terminated());
 
-        let wrong_response = vec![at::Response::Success(at::Success::TestResponse {})];
-        assert_matches!(procedure.transition(&mut state, &wrong_response), Err(_));
+        let wrong_response = at_resp!(TestResponse {});
+        assert_matches!(procedure.transition(&mut state, wrong_response), Err(_));
         assert!(!procedure.is_terminated());
     }
 
@@ -642,10 +637,8 @@ mod tests {
 
         assert!(procedure.is_terminated());
         // Valid response of first step of SLCI
-        let valid_response = vec![at::Response::Success(at::Success::Brsf {
-            features: AgFeatures::default().bits(),
-        })];
-        let update = procedure.transition(&mut state, &valid_response);
+        let valid_response = at_resp!(Brsf { features: AgFeatures::default().bits() });
+        let update = procedure.transition(&mut state, valid_response);
         assert_matches!(update, Err(_));
     }
 }
