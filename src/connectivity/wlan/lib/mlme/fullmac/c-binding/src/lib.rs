@@ -4,11 +4,17 @@
 
 use {
     tracing::error,
-    wlan_fullmac_mlme::{device::FullmacDeviceInterface, FullmacMlme, FullmacMlmeHandle},
+    wlan_fullmac_mlme::{
+        device::{FullmacDevice, RawFullmacDeviceInterface},
+        FullmacMlme, FullmacMlmeHandle,
+    },
 };
 
 #[no_mangle]
-pub extern "C" fn start_fullmac_mlme(device: FullmacDeviceInterface) -> *mut FullmacMlmeHandle {
+pub extern "C" fn start_fullmac_mlme(
+    raw_device: RawFullmacDeviceInterface,
+) -> *mut FullmacMlmeHandle {
+    let device = FullmacDevice::new(raw_device);
     match FullmacMlme::start(device) {
         Ok(mlme) => Box::into_raw(Box::new(mlme)),
         Err(e) => {

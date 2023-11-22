@@ -334,12 +334,9 @@ pub trait DeviceOps {
     fn set_link_state(&mut self, controlled_port_state: fidl_mlme::ControlledPortState);
 }
 
-// Our device is used inside a separate worker thread, so we force Rust to allow this.
-unsafe impl Send for FullmacDeviceInterface {}
-
 /// A `FullmacDeviceInterface` allows transmitting frames and MLME messages.
 #[repr(C)]
-pub struct FullmacDeviceInterface {
+pub struct RawFullmacDeviceInterface {
     device: *mut c_void,
     /// Start operations on the underlying device and return the SME channel.
     start: extern "C" fn(
@@ -427,10 +424,24 @@ pub struct FullmacDeviceInterface {
     on_link_state_changed: extern "C" fn(device: *mut c_void, online: bool),
 }
 
-impl DeviceOps for FullmacDeviceInterface {
+// Our device is used inside a separate worker thread, so we force Rust to allow this.
+unsafe impl Send for FullmacDevice {}
+
+pub struct FullmacDevice {
+    raw_device: RawFullmacDeviceInterface,
+}
+
+impl FullmacDevice {
+    pub fn new(raw_device: RawFullmacDeviceInterface) -> FullmacDevice {
+        FullmacDevice { raw_device }
+    }
+}
+
+impl DeviceOps for FullmacDevice {
     fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<zx::Handle, zx::Status> {
         let mut out_channel = 0;
-        let status = (self.start)(self.device, ifc, &mut out_channel as *mut u32);
+        let status =
+            (self.raw_device.start)(self.raw_device.device, ifc, &mut out_channel as *mut u32);
         // Unsafe block required because we cannot pass a Rust handle over FFI. An invalid
         // handle violates the banjo API, and may be detected by the caller of this fn.
         zx::ok(status).and_then(|_| {
@@ -444,77 +455,80 @@ impl DeviceOps for FullmacDeviceInterface {
     }
 
     fn query_device_info(&mut self) -> banjo_wlan_fullmac::WlanFullmacQueryInfo {
-        (self.query_device_info)(self.device)
+        (self.raw_device.query_device_info)(self.raw_device.device)
     }
 
     fn query_mac_sublayer_support(&mut self) -> banjo_wlan_common::MacSublayerSupport {
-        (self.query_mac_sublayer_support)(self.device)
+        (self.raw_device.query_mac_sublayer_support)(self.raw_device.device)
     }
 
     fn query_security_support(&mut self) -> banjo_wlan_common::SecuritySupport {
-        (self.query_security_support)(self.device)
+        (self.raw_device.query_security_support)(self.raw_device.device)
     }
 
     fn query_spectrum_management_support(
         &mut self,
     ) -> banjo_wlan_common::SpectrumManagementSupport {
-        (self.query_spectrum_management_support)(self.device)
+        (self.raw_device.query_spectrum_management_support)(self.raw_device.device)
     }
 
     fn start_scan(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
-        (self.start_scan)(
-            self.device,
+        (self.raw_device.start_scan)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
         )
     }
     fn connect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
-        (self.connect)(
-            self.device,
+        (self.raw_device.connect)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
         )
     }
     fn reconnect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
-        (self.reconnect)(
-            self.device,
+        (self.raw_device.reconnect)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
         )
     }
     fn auth_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
-        (self.auth_resp)(
-            self.device,
+        (self.raw_device.auth_resp)(
+            self.raw_device.device,
             &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
         )
     }
     fn deauth(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest) {
-        (self.deauth)(
-            self.device,
+        (self.raw_device.deauth)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
         )
     }
     fn assoc_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
-        (self.assoc_resp)(
-            self.device,
+        (self.raw_device.assoc_resp)(
+            self.raw_device.device,
             &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
         )
     }
     fn disassoc(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
-        (self.disassoc)(
-            self.device,
+        (self.raw_device.disassoc)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
         )
     }
     fn reset(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
-        (self.reset)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest)
+        (self.raw_device.reset)(
+            self.raw_device.device,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
+        )
     }
     fn start_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest) {
-        (self.start_bss)(
-            self.device,
+        (self.raw_device.start_bss)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
         )
     }
     fn stop_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
-        (self.stop_bss)(
-            self.device,
+        (self.raw_device.stop_bss)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
         )
     }
@@ -522,20 +536,29 @@ impl DeviceOps for FullmacDeviceInterface {
         &mut self,
         mut req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
     ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp {
-        (self.set_keys_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacSetKeysReq)
+        (self.raw_device.set_keys_req)(
+            self.raw_device.device,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacSetKeysReq,
+        )
     }
     fn del_keys_req(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacDelKeysReq) {
-        (self.del_keys_req)(self.device, &mut req as *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq)
+        (self.raw_device.del_keys_req)(
+            self.raw_device.device,
+            &mut req as *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq,
+        )
     }
     fn eapol_tx(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
-        (self.eapol_tx)(
-            self.device,
+        (self.raw_device.eapol_tx)(
+            self.raw_device.device,
             &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
         )
     }
     fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse {
         let mut out_status: i32 = 0;
-        let stats = (self.get_iface_counter_stats)(self.device, &mut out_status as *mut i32);
+        let stats = (self.raw_device.get_iface_counter_stats)(
+            self.raw_device.device,
+            &mut out_status as *mut i32,
+        );
         if out_status == zx::sys::ZX_OK {
             fidl_mlme::GetIfaceCounterStatsResponse::Stats(
                 banjo_to_fidl::convert_iface_counter_stats(stats),
@@ -546,7 +569,10 @@ impl DeviceOps for FullmacDeviceInterface {
     }
     fn get_iface_histogram_stats(&mut self) -> fidl_mlme::GetIfaceHistogramStatsResponse {
         let mut out_status: i32 = 0;
-        let stats = (self.get_iface_histogram_stats)(self.device, &mut out_status as *mut i32);
+        let stats = (self.raw_device.get_iface_histogram_stats)(
+            self.raw_device.device,
+            &mut out_status as *mut i32,
+        );
         if out_status == zx::sys::ZX_OK {
             fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
                 banjo_to_fidl::convert_iface_histogram_stats(stats),
@@ -556,23 +582,26 @@ impl DeviceOps for FullmacDeviceInterface {
         }
     }
     fn sae_handshake_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp) {
-        (self.sae_handshake_resp)(
-            self.device,
+        (self.raw_device.sae_handshake_resp)(
+            self.raw_device.device,
             &mut resp as *mut banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp,
         )
     }
     fn sae_frame_tx(&mut self, mut frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) {
-        (self.sae_frame_tx)(self.device, &mut frame as *mut banjo_wlan_fullmac::WlanFullmacSaeFrame)
+        (self.raw_device.sae_frame_tx)(
+            self.raw_device.device,
+            &mut frame as *mut banjo_wlan_fullmac::WlanFullmacSaeFrame,
+        )
     }
     fn wmm_status_req(&mut self) {
-        (self.wmm_status_req)(self.device)
+        (self.raw_device.wmm_status_req)(self.raw_device.device)
     }
     fn set_link_state(&mut self, controlled_port_state: fidl_mlme::ControlledPortState) {
         let online = match controlled_port_state {
             fidl_mlme::ControlledPortState::Open => true,
             fidl_mlme::ControlledPortState::Closed => false,
         };
-        (self.on_link_state_changed)(self.device, online)
+        (self.raw_device.on_link_state_changed)(self.raw_device.device, online)
     }
 }
 

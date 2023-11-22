@@ -89,7 +89,8 @@ typedef struct {
   void (*on_link_state_changed)(void *device, bool online);
 } rust_fullmac_device_interface_t;
 
-extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(rust_fullmac_device_interface_t device);
+extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(
+    rust_fullmac_device_interface_t raw_device);
 
 extern "C" void stop_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme);
 
