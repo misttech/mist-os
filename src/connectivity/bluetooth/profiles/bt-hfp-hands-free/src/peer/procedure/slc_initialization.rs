@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{format_err, Error};
+use anyhow::{format_err, Result};
 use at_commands as at;
 
 use super::{at_cmd, at_ok, at_resp};
@@ -14,20 +14,20 @@ use crate::peer::procedure_manipulated_state::ProcedureManipulatedState;
 
 #[derive(Debug, PartialEq)]
 pub enum State {
-    SupportedFeaturesExchange, // Sent AT+BRSF, waiting for +BRSF.
-    WaitingForOkAfterSupportedFeaturesExchange, // Received +BRSF, waiting for OK.
-    CodecNegotiation,          // Sent AT+BAC, waiting for OK.
-    TestAgIndicators,          // Sent AT+CIND=?, waiting for first +CIND
-    WaitingForOkAfterTestAgIndicators, // Waiting for OK after +CIND
-    ReadAgIndicators,          // Sent AT+CIND?, waiting for second +CIND
-    WaitingForOkAfterReadAgIndicators, // Waiting for OL after second +CIND
-    AgIndicatorStatusUpdate,   // Sent AT+CMER, waiting for OK.
-    CallHoldAndMultiParty,     // Sent AT+CHLD, waiting for +CHLD
-    WaitingForOkAfterCallHoldAndMultiParty, // Waiting for OK after +CHLD
-    HfSupportedHfIndicators,   // Sent AT+BIND, waiting for OK.
-    TestHfIndicators,          // Sent AT+BIND=?, waiting for +BIND.
-    WaitingForOkAfterTestHfIndicators, // Waiting for OK after +BIND.
-    ReadHfIndicators,          // Sent AT+BIND?, waiting for +BIND or OK.
+    SentSupportedFeatures,         // Sent AT+BRSF, waiting for +BRSF.
+    ReceivedSupportedFeatures,     // Received +BRSF, waiting for OK.
+    SentAvailableCodecs,           // Sent AT+BAC, waiting for OK.
+    TestedSupportedAgIndicators,   // Sent AT+CIND=?, waiting for first +CIND
+    ReceivedSupportedAgIndicators, // Waiting for OK after +CIND
+    ReadAgIndicatorStatuses,       // Sent AT+CIND?, waiting for second +CIND
+    ReceivedAgIndicatorStatuses,   // Waiting for OK after second +CIND
+    SentAgIndicatorStatusUpdate,   // Sent AT+CMER, waiting for OK.
+    SentCallHoldAndMultiparty,     // Sent AT+CHLD, waiting for +CHLD
+    ReceivedCallHoldAndMultiparty, // Waiting for OK after +CHLD
+    SentSupportedHfIndicators,     // Sent AT+BIND, waiting for OK.
+    TestedSupportedHfIndicators,   // Sent AT+BIND=?, waiting for +BIND.
+    ReceivedSupportedHfIndicators, // Waiting for OK after +BIND.
+    ReadEnabledHfIndicators,       // Sent AT+BIND?, waiting for +BIND or OK.
     Terminated,
 }
 
@@ -38,7 +38,7 @@ pub struct SlcInitProcedure {
 
 impl SlcInitProcedure {
     pub fn new() -> Self {
-        Self { state: State::SupportedFeaturesExchange }
+        Self { state: State::SentSupportedFeatures }
     }
 
     #[cfg(test)]
@@ -50,11 +50,118 @@ impl SlcInitProcedure {
     pub fn start_terminated() -> Self {
         Self { state: State::Terminated }
     }
+
+    fn receive_supported_features(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+        features: i64,
+    ) -> Option<ProcedureOutput> {
+        state.ag_features = AgFeatures::from_bits_truncate(features);
+        self.state = State::ReceivedSupportedFeatures;
+        None
+    }
+
+    fn send_available_codecs(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+    ) -> Option<ProcedureOutput> {
+        self.state = State::SentAvailableCodecs;
+        state.supported_codecs.push(MSBC);
+        // TODO(fxb/130963) Make this configurable.
+        // By default, we support the CVSD and MSBC codecs.
+        Some(at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] }))
+    }
+
+    fn test_supported_ag_indicators(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::TestedSupportedAgIndicators;
+        Some(at_cmd!(CindTest {}))
+    }
+
+    fn receive_supported_ag_indicators(&mut self, _bytes: Vec<u8>) -> Option<ProcedureOutput> {
+        // TODO(fxbug.dev/108331): Read additional indicators by parsing raw bytes instead
+        // ofjust checking for existence of raw bytes.
+        self.state = State::ReceivedSupportedAgIndicators;
+        None
+    }
+
+    fn read_ag_indicator_statuses(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::ReadAgIndicatorStatuses;
+        Some(at_cmd!(CindRead {}))
+    }
+
+    fn receive_ag_indicator_statuses(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+        cmd: &at::Success,
+    ) -> Option<ProcedureOutput> {
+        state.ag_indicators.update_indicator_values(cmd);
+        self.state = State::ReceivedAgIndicatorStatuses;
+        None
+    }
+
+    fn send_ag_indicator_status_update(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::SentAgIndicatorStatusUpdate;
+        Some(at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }))
+    }
+
+    fn send_call_hold_and_multparty(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::SentCallHoldAndMultiparty;
+        Some(at_cmd!(ChldTest {}))
+    }
+
+    fn receive_call_hold_and_multiparty(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+        commands: &Vec<String>,
+    ) -> Result<Option<ProcedureOutput>> {
+        state.three_way_features = extract_features_from_command(commands)?;
+        self.state = State::ReceivedCallHoldAndMultiparty;
+        Ok(None)
+    }
+
+    fn send_supported_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::SentSupportedHfIndicators;
+        Some(at_cmd!(Bind { indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64] }))
+    }
+
+    fn test_supported_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::TestedSupportedHfIndicators;
+        Some(at_cmd!(BindTest {}))
+    }
+
+    fn receive_supported_hf_indicators(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+        indicators: &Vec<at::BluetoothHFIndicator>,
+    ) -> Option<ProcedureOutput> {
+        state.hf_indicators.set_supported_indicators(indicators);
+        self.state = State::ReceivedSupportedHfIndicators;
+        None
+    }
+
+    fn read_enabled_hf_indicators(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::ReadEnabledHfIndicators;
+        Some(at_cmd!(BindRead {}))
+    }
+
+    fn receive_enabled_hf_indicator(
+        &mut self,
+        state: &mut ProcedureManipulatedState,
+        cmd: &at::Success,
+    ) -> Result<Option<ProcedureOutput>> {
+        state.hf_indicators.change_indicator_state(cmd)?;
+        Ok(None)
+    }
+
+    fn terminate(&mut self) -> Option<ProcedureOutput> {
+        self.state = State::Terminated;
+        None
+    }
 }
 
 impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
     fn new() -> Self {
-        Self { state: State::SupportedFeaturesExchange }
+        Self { state: State::SentSupportedFeatures }
     }
 
     fn name(&self) -> &str {
@@ -68,147 +175,98 @@ impl Procedure<ProcedureInput, ProcedureOutput> for SlcInitProcedure {
         &mut self,
         state: &mut ProcedureManipulatedState,
         input: ProcedureInput,
-    ) -> Result<Vec<ProcedureOutput>, Error> {
+    ) -> Result<Vec<ProcedureOutput>> {
         if self.is_terminated() {
             return Err(format_err!(
                 "Procedure is already terminated before processing update for response(s): {:?}.",
                 input
             ));
         }
-
         let output_option = match (&self.state, input) {
             // Sent AT+BRSF, waiting for +BRSF /////////////////////////////////////////////////////
-            (State::SupportedFeaturesExchange, at_resp!(Brsf { features })) => {
-                state.ag_features = AgFeatures::from_bits_truncate(features);
-                self.state = State::WaitingForOkAfterSupportedFeaturesExchange;
-                None
+            (State::SentSupportedFeatures, at_resp!(Brsf { features })) => {
+                self.receive_supported_features(state, features)
             }
 
             // Received +BSRF, waiting for OK //////////////////////////////////////////////////////
-            (State::WaitingForOkAfterSupportedFeaturesExchange, at_ok!()) => {
+            (State::ReceivedSupportedFeatures, at_ok!()) => {
                 if state.supports_codec_negotiation() {
-                    self.state = State::CodecNegotiation;
-                    state.supported_codecs.push(MSBC);
-                    // TODO(fxb/130963) Make this configurable.
-                    // By default, we support the CVSD and MSBC codecs.
-                    Some(at_cmd!(Bac { codecs: vec![CVSD.into(), MSBC.into()] }))
+                    self.send_available_codecs(state)
                 } else {
-                    self.state = State::TestAgIndicators;
-                    Some(at_cmd!(CindTest {}))
+                    self.test_supported_ag_indicators()
                 }
             }
 
             // Sent AT+BAC, waiting for OK /////////////////////////////////////////////////////////
-            (State::CodecNegotiation, at_ok!()) => {
-                self.state = State::TestAgIndicators;
-                Some(at_cmd!(CindTest {}))
-            }
+            (State::SentAvailableCodecs, at_ok!()) => self.test_supported_ag_indicators(),
 
             // Sent AT+CIND=?, waiting for +CIND: //////////////////////////////////////////////////
             (
-                State::TestAgIndicators,
-                ProcedureInput::AtResponseFromAg(at::Response::RawBytes(_bytes)),
-            ) => {
-                // TODO(fxbug.dev/108331): Read additional indicators by parsing raw bytes instead
-                // ofjust checking for existence of raw bytes.
-                self.state = State::WaitingForOkAfterTestAgIndicators;
-                None
-            }
+                State::TestedSupportedAgIndicators,
+                ProcedureInput::AtResponseFromAg(at::Response::RawBytes(bytes)),
+            ) => self.receive_supported_ag_indicators(bytes),
 
             // Received +CIND, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterTestAgIndicators, at_ok!()) => {
-                self.state = State::ReadAgIndicators;
-                Some(at_cmd!(CindRead {}))
-            }
+            (State::ReceivedSupportedAgIndicators, at_ok!()) => self.read_ag_indicator_statuses(),
 
             // Sent AT+CIND?, waiting for +CIND: ///////////////////////////////////////////////////
             (
-                State::ReadAgIndicators,
+                State::ReadAgIndicatorStatuses,
                 ProcedureInput::AtResponseFromAg(at::Response::Success(
                     cmd @ at::Success::Cind { .. },
                 )),
-            ) => {
-                state.ag_indicators.update_indicator_values(&cmd);
-                self.state = State::WaitingForOkAfterReadAgIndicators;
-                None
-            }
+            ) => self.receive_ag_indicator_statuses(state, &cmd),
 
             // Received +CIND:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterReadAgIndicators, at_ok!()) => {
-                self.state = State::AgIndicatorStatusUpdate;
-                Some(at_cmd!(Cmer { mode: INDICATOR_REPORTING_MODE, keyp: 0, disp: 0, ind: 1 }))
+            (State::ReceivedAgIndicatorStatuses, at_ok!()) => {
+                self.send_ag_indicator_status_update()
             }
 
             // Sent AT+CMER, waiting for OK ////////////////////////////////////////////////////////
-            (State::AgIndicatorStatusUpdate, at_ok!()) => {
+            (State::SentAgIndicatorStatusUpdate, at_ok!()) => {
                 if state.supports_three_way_calling() {
-                    self.state = State::CallHoldAndMultiParty;
-                    Some(at_cmd!(ChldTest {}))
+                    self.send_call_hold_and_multparty()
                 } else if state.supports_hf_indicators() {
-                    self.state = State::HfSupportedHfIndicators;
-                    Some(at_cmd!(Bind {
-                        indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64],
-                    }))
+                    self.send_supported_hf_indicators()
                 } else {
-                    self.state = State::Terminated;
-                    None
+                    self.terminate()
                 }
             }
 
             // Sent AT+CHLD=?, waiting for +CHLD: //////////////////////////////////////////////////
-            (State::CallHoldAndMultiParty, at_resp!(Chld { commands })) => {
-                state.three_way_features = extract_features_from_command(&commands)?;
-                self.state = State::WaitingForOkAfterCallHoldAndMultiParty;
-                None
+            (State::SentCallHoldAndMultiparty, at_resp!(Chld { commands })) => {
+                self.receive_call_hold_and_multiparty(state, &commands)?
             }
 
             // Received +CHLD:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterCallHoldAndMultiParty, at_ok!()) => {
+            (State::ReceivedCallHoldAndMultiparty, at_ok!()) => {
                 if state.supports_hf_indicators() {
-                    self.state = State::HfSupportedHfIndicators;
-                    Some(at_cmd!(Bind {
-                        indicators: vec![ENHANCED_SAFETY as i64, BATTERY_LEVEL as i64]
-                    }))
+                    self.send_supported_hf_indicators()
                 } else {
-                    self.state = State::Terminated;
-                    None
+                    self.terminate()
                 }
             }
             // Sent AT+BIND=, waiting for OK ///////////////////////////////////////////////////////
-            (State::HfSupportedHfIndicators, at_ok!()) => {
-                self.state = State::TestHfIndicators;
-                Some(at_cmd!(BindTest {}))
-            }
+            (State::SentSupportedHfIndicators, at_ok!()) => self.test_supported_hf_indicators(),
 
             // Sent AT+BIND=?, waiting for +BIND: ///////////////////////////////////////////////////
-            (State::TestHfIndicators, at_resp!(BindList { indicators })) => {
-                state.hf_indicators.set_supported_indicators(&indicators);
-                self.state = State::WaitingForOkAfterTestHfIndicators;
-                None
+            (State::TestedSupportedHfIndicators, at_resp!(BindList { indicators })) => {
+                self.receive_supported_hf_indicators(state, &indicators)
             }
 
             // Received +BIND:, waiting for OK /////////////////////////////////////////////////////
-            (State::WaitingForOkAfterTestHfIndicators, at_ok!()) => {
-                self.state = State::ReadHfIndicators;
-                Some(at_cmd!(BindRead {}))
-            }
+            (State::ReceivedSupportedHfIndicators, at_ok!()) => self.read_enabled_hf_indicators(),
 
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
             (
-                State::ReadHfIndicators,
+                State::ReadEnabledHfIndicators,
                 ProcedureInput::AtResponseFromAg(at::Response::Success(
                     cmd @ at::Success::BindStatus { .. },
                 )),
-            ) => {
-                state.hf_indicators.change_indicator_state(&cmd)?;
-                None
-            }
+            ) => self.receive_enabled_hf_indicator(state, &cmd)?,
 
             // Sent AT+BIND?, waiting for +BIND: or OK /////////////////////////////////////////////
-            (State::ReadHfIndicators, at_ok!()) => {
-                self.state = State::Terminated;
-                None
-            }
+            (State::ReadEnabledHfIndicators, at_ok!()) => self.terminate(),
 
             // Unexpected AT response for state ////////////////////////////////////////////////////
             (state, input) => {
@@ -475,7 +533,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_feature_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::SupportedFeaturesExchange);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentSupportedFeatures);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -488,7 +546,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_codec_negotiation_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::CodecNegotiation);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentAvailableCodecs);
         let mut hf_features = HfFeatures::default();
         hf_features.set(HfFeatures::CODEC_NEGOTIATION, true);
         let mut ag_features = AgFeatures::default();
@@ -504,7 +562,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_list_indicators_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::TestAgIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::TestedSupportedAgIndicators);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -517,8 +575,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_enable_indicators_stage() {
-        let mut procedure =
-            SlcInitProcedure::start_at_state(State::WaitingForOkAfterReadAgIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::ReceivedAgIndicatorStatuses);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -531,7 +588,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_indicator_update_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::AgIndicatorStatusUpdate);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentAgIndicatorStatusUpdate);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -544,7 +601,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_call_hold_stage_non_number_index() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::CallHoldAndMultiParty);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentCallHoldAndMultiparty);
         let config = HandsFreeFeatureSupport {
             call_waiting_or_three_way_calling: true,
             ..HandsFreeFeatureSupport::default()
@@ -562,7 +619,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_call_hold_stage_invalid_command() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::CallHoldAndMultiParty);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentCallHoldAndMultiparty);
         let config = HandsFreeFeatureSupport {
             call_waiting_or_three_way_calling: true,
             ..HandsFreeFeatureSupport::default()
@@ -580,7 +637,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_hf_indicator_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::HfSupportedHfIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::SentSupportedHfIndicators);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -594,7 +651,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_hf_indicator_request_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::TestHfIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::TestedSupportedHfIndicators);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -608,7 +665,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_incorrect_response_at_hf_indicator_enable_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::ReadHfIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::ReadEnabledHfIndicators);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
@@ -622,7 +679,7 @@ mod tests {
 
     #[fuchsia::test]
     fn error_when_no_ok_at_hf_indicator_enable_stage() {
-        let mut procedure = SlcInitProcedure::start_at_state(State::ReadHfIndicators);
+        let mut procedure = SlcInitProcedure::start_at_state(State::ReadEnabledHfIndicators);
         let config = HandsFreeFeatureSupport::default();
         let mut state = ProcedureManipulatedState::new(config);
 
