@@ -110,9 +110,13 @@ class FuchsiaPowerBaseTest(fuchsia_base_test.FuchsiaBaseTest):
         """
         with self._start_power_measurement() as proc:
             self._wait_first_sample(proc)
+            ffx_test_args = self.ffx_test_args + [
+                "--output-directory",
+                self.test_case_path,
+            ]
             self.device.ffx.run_test_component(
                 self.ffx_test_url,
-                ffx_test_args=self.ffx_test_args,
+                ffx_test_args=ffx_test_args,
                 timeout=self.timeout_sec,
                 capture_output=False,
             )
