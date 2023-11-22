@@ -50,6 +50,11 @@ func DirIsEmpty(dir string) (bool, error) {
 // and directory modes. If skipUnknown is true, it returns the list of skipped files.
 func CopyDir(srcDir, dstDir string, unknownFilesMode UnknownFilesMode) ([]string, error) {
 	var skippedFiles []string
+	// Requires srcDir to be an absolute path given that the code below (filepath.Rel and
+	// filepath.EvalSymlinks) are not going to work as expected with relative paths.
+	if !filepath.IsAbs(srcDir) {
+		return skippedFiles, fmt.Errorf("CopyDir wants %s argument to be absolute, got relative path.", srcDir)
+	}
 	err := filepath.Walk(srcDir, func(srcPath string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -74,12 +79,20 @@ func CopyDir(srcDir, dstDir string, unknownFilesMode UnknownFilesMode) ([]string
 			}
 
 		case os.ModeSymlink:
-			srcLink, err := os.Readlink(srcPath)
-			if err != nil {
-				return err
+			srcLink, err := filepath.EvalSymlinks(srcPath)
+			if errors.Is(err, os.ErrNotExist) {
+				switch unknownFilesMode {
+				case RaiseError:
+					return fmt.Errorf("symlink %s: link %s does not exist", srcPath, srcLink)
+				case SkipUnknownFiles:
+					skippedFiles = append(skippedFiles, srcPath)
+					return nil
+				}
+			} else if err != nil {
+				return fmt.Errorf("filepath.EvalSymlinks %s: %w", srcPath, err)
 			}
 			if err := os.Symlink(srcLink, dstPath); err != nil {
-				return err
+				return fmt.Errorf("os.Symlink %s, %s: %w", srcLink, dstPath, err)
 			}
 
 		default:
