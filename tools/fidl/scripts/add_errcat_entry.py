@@ -4,8 +4,10 @@
 # found in the LICENSE file.
 
 import argparse
+import glob
 import os
 import re
+import sys
 import textwrap
 from pathlib import Path
 from dataclasses import dataclass, asdict
@@ -31,6 +33,10 @@ GOOD_TESTS_CC = FUCHSIA_DIR / "tools/fidl/fidlc/tests/errcat_good_tests.cc"
 # Templates
 DOC_TEMPLATE = (
     FUCHSIA_DIR / "tools/fidl/scripts/add_errcat_templates/doc.md.template"
+)
+DOC_RETIRED_TEMPLATE = (
+    FUCHSIA_DIR
+    / "tools/fidl/scripts/add_errcat_templates/doc_retired.md.template"
 )
 INCLUDECODE_TEMPLATE = (
     FUCHSIA_DIR
@@ -65,14 +71,13 @@ def find_error_num(regex, line):
     return int(result.groups(1)[0])
 
 
-def insert_lines_at_line_num(path, lines, line_num, line):
-    lines.insert(line_num, line + "\n")
+def write_lines(path, lines):
     if not dry_run:
         with open(path, "w") as f:
             f.write("".join(lines))
 
 
-# Scans each line in path and tries mathcing with entry_matcher, whose $1 group
+# Scans each line in path and tries matching with entry_matcher, whose $1 group
 # should be 4 digits e.g. 1234 in fi-1234. Once it finds a line where than
 # number exceeds num, inserts to_insert just before it. If none exceed num,
 # starts at the last matching line, searches for after_regex (if provided), goes
@@ -80,7 +85,6 @@ def insert_lines_at_line_num(path, lines, line_num, line):
 def insert_entry(
     path, entry_matcher, num, to_insert, after_offset, after_regex=None
 ):
-    # Only add an entry for this numeral if none already exists.
     with open(path) as f:
         lines = f.readlines()
 
@@ -95,7 +99,8 @@ def insert_entry(
         if entry_num is None:
             continue
         if entry_num > num:
-            insert_lines_at_line_num(path, lines, line_num, to_insert)
+            lines.insert(line_num, to_insert + "\n")
+            write_lines(path, lines)
             return 1
         insert_after = line_num
 
@@ -107,10 +112,34 @@ def insert_entry(
             after_regex, lines[insert_after]
         ):
             insert_after += 1
-    insert_lines_at_line_num(
-        path, lines, insert_after + after_offset, to_insert
-    )
+    lines.insert(insert_after + after_offset, to_insert + "\n")
+    write_lines(path, lines)
     return 1
+
+
+# The opposite of insert_entry. Removes the lines where entry_matcher matches
+# and its $1 group is num. Removes additional lines if after_regex is given.
+def remove_entry(path, entry_matcher, num, after_regex=None):
+    with open(path) as f:
+        lines = f.readlines()
+    i = 0
+    new_lines = []
+    delta = 0
+    while i < len(lines):
+        line = lines[i]
+        entry_num = find_error_num(entry_matcher, line)
+        if entry_num == num:
+            delta -= 1
+            if after_regex:
+                while i < len(lines):
+                    if re.search(after_regex, lines[i]):
+                        break
+                    i += 1
+        else:
+            new_lines.append(line)
+        i += 1
+    write_lines(path, new_lines)
+    return delta
 
 
 def substitute(template_path, subs):
@@ -120,38 +149,54 @@ def substitute(template_path, subs):
     return template.substitute(subs)
 
 
-def create_file(file_path, template_path, subs):
+def create_file(file_path, template_path, subs, overwrite_existing):
+    old = ""
     if file_path.is_file():
-        return 0
+        if not overwrite_existing:
+            return 0
+        with open(file_path) as f:
+            old = f.read()
+    new = substitute(template_path, subs)
     if not dry_run:
         with open(file_path, "w") as f:
-            f.write(substitute(template_path, subs))
+            f.write(new)
+    if old == new:
+        return 0
     return 1
+
+
+def remove_file(file_path):
+    if not file_path.is_file():
+        return 0
+    if not dry_run:
+        os.remove(file_path)
+    return -1
+
+
+def markdown_filename(n):
+    return f"_fi-{n:04}.md"
 
 
 @dataclass
 class Change:
-    markdown_file_created: int = 0
-    markdown_txt_line_added: int = 0
-    index_entry_added: int = 0
-    redirect_entry_added: int = 0
-    bad_fidl_created: int = 0
-    good_fidl_created: int = 0
-    bad_txt_lines_added: int = 0
-    good_txt_lines_added: int = 0
-    good_tests_added: int = 0
+    markdown_file: int = 0
+    markdown_txt_line: int = 0
+    index_entry: int = 0
+    redirect_entry: int = 0
+    bad_fidl_files: int = 0
+    good_fidl_files: int = 0
+    bad_txt_lines: int = 0
+    good_txt_lines: int = 0
+    good_tests: int = 0
 
 
-def main(args):
-    global dry_run
-    dry_run = args.dry_run
-
+def perform_change(args) -> Change:
     change = Change()
     n = args.numeral
     ns = f"{n:04}"
 
     # Add an index entry if none exists.
-    change.index_entry_added = insert_entry(
+    change.index_entry = insert_entry(
         INDEX_FILE,
         REGEX_INDEX_ENTRY,
         n,
@@ -160,7 +205,7 @@ def main(args):
     )
 
     # Add a redirect entry if none exists.
-    change.redirect_entry_added = insert_entry(
+    change.redirect_entry = insert_entry(
         REDIRECT_FILE,
         REGEX_REDIRECT_ENTRY,
         n,
@@ -168,147 +213,168 @@ def main(args):
         after_offset=2,
     )
 
-    # Create .test.fidl files for "bad" examples, and add to BUILD.gn.
+    # Create/remove .test.fidl files for "bad" examples, and update files.txt.
     bad_includecodes = []
-    for b in range(args.bad):
-        suffix = chr(ord("a") + b) if args.bad > 1 else ""
-        case_name = "fi-" + ns + ("-" + suffix if suffix else "")
-        flat_name = ns + suffix
-
-        # Add any new files we need.
-        filename = f"{case_name}.test.fidl"
-        change.bad_fidl_created += create_file(
-            BAD_FIDL_DIR / filename,
-            BAD_TEMPLATE,
-            {
-                "num": ns,
-                "case_name": case_name,
-                "flat_name": flat_name,
-            },
+    if args.retire:
+        for path_str in glob.glob(f"{BAD_FIDL_DIR}/fi-{ns}*.test.fidl"):
+            change.bad_fidl_files += remove_file(Path(path_str))
+        change.bad_txt_lines += remove_entry(
+            BAD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n
         )
+    else:
+        for b in range(args.bad):
+            suffix = chr(ord("a") + b) if args.bad > 1 else ""
+            case_name = "fi-" + ns + ("-" + suffix if suffix else "")
+            flat_name = ns + suffix
 
-        # Insert this filename into files.txt.
-        change.bad_txt_lines_added += insert_entry(
-            BAD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n, filename, after_offset=1
-        )
-
-        # Create the markdown entry for this case.
-        bad_includecodes.append(
-            substitute(
-                INCLUDECODE_TEMPLATE,
-                {
-                    "kind": "bad",
+            # Add any new files we need.
+            filename = f"{case_name}.test.fidl"
+            change.bad_fidl_files += create_file(
+                file_path=BAD_FIDL_DIR / filename,
+                template_path=BAD_TEMPLATE,
+                subs={
+                    "num": ns,
                     "case_name": case_name,
+                    "flat_name": flat_name,
                 },
+                overwrite_existing=False,
             )
-        )
+
+            # Insert this filename into files.txt.
+            change.bad_txt_lines += insert_entry(
+                BAD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n, filename, after_offset=1
+            )
+
+            # Create the markdown entry for this case.
+            bad_includecodes.append(
+                substitute(
+                    INCLUDECODE_TEMPLATE,
+                    {
+                        "kind": "bad",
+                        "case_name": case_name,
+                    },
+                )
+            )
 
     # Create .test.fidl files for "good" examples, and add to BUILD.gn.
     good_includecodes = []
-    for g in range(args.good):
-        suffix = chr(ord("a") + g) if args.good > 1 else ""
-        case_name = "fi-" + ns + ("-" + suffix if suffix else "")
-        flat_name = ns + suffix
-
-        # Add any new files we need.
-        filename = f"{case_name}.test.fidl"
-        change.good_fidl_created += create_file(
-            GOOD_FIDL_DIR / filename,
-            GOOD_TEMPLATE,
-            {
-                "num": ns,
-                "case_name": case_name,
-                "flat_name": flat_name,
-            },
+    if args.retire:
+        for path_str in glob.glob(f"{GOOD_FIDL_DIR}/fi-{ns}*.test.fidl"):
+            change.good_fidl_files += remove_file(Path(path_str))
+        change.good_txt_lines += remove_entry(
+            GOOD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n
         )
-
-        # Insert this filename into files.txt.
-        change.good_txt_lines_added += insert_entry(
-            GOOD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n, filename, after_offset=1
-        )
-
-        # Create the markdown entry for this case.
-        good_includecodes.append(
-            substitute(
-                INCLUDECODE_TEMPLATE,
-                {
-                    "kind": "good",
-                    "case_name": case_name,
-                },
-            )
-        )
-
-        # Add a test case if none exists.
-        insert = textwrap.dedent(
-            f"""\
-            TEST(ErrcatTests, Good{flat_name}) {{
-              TestLibrary library;
-              library.AddFile("good/{filename}");
-              ASSERT_COMPILED(library);
-            }}
-            """
-        )
-        change.good_tests_added += insert_entry(
+        change.good_tests += remove_entry(
             GOOD_TESTS_CC,
             REGEX_GOOD_TEST,
             n,
-            insert,
-            after_offset=2,
             after_regex=r"^}$",
         )
+    else:
+        for g in range(args.good):
+            suffix = chr(ord("a") + g) if args.good > 1 else ""
+            case_name = "fi-" + ns + ("-" + suffix if suffix else "")
+            flat_name = ns + suffix
+
+            # Add any new files we need.
+            filename = f"{case_name}.test.fidl"
+            change.good_fidl_files += create_file(
+                file_path=GOOD_FIDL_DIR / filename,
+                template_path=GOOD_TEMPLATE,
+                subs={
+                    "num": ns,
+                    "case_name": case_name,
+                    "flat_name": flat_name,
+                },
+                overwrite_existing=False,
+            )
+
+            # Insert this filename into files.txt.
+            change.good_txt_lines += insert_entry(
+                GOOD_FIDL_TXT, REGEX_FIDL_TXT_LINE, n, filename, after_offset=1
+            )
+
+            # Create the markdown entry for this case.
+            good_includecodes.append(
+                substitute(
+                    INCLUDECODE_TEMPLATE,
+                    {
+                        "kind": "good",
+                        "case_name": case_name,
+                    },
+                )
+            )
+
+            # Add a test case if none exists.
+            insert = textwrap.dedent(
+                f"""\
+                TEST(ErrcatGoodTests, Good{flat_name}) {{
+                TestLibrary library;
+                library.AddFile("good/{filename}");
+                ASSERT_COMPILED(library);
+                }}
+                """
+            )
+            change.good_tests += insert_entry(
+                GOOD_TESTS_CC,
+                REGEX_GOOD_TEST,
+                n,
+                insert,
+                after_offset=2,
+                after_regex=r"^}$",
+            )
 
     # Create the Markdown file for the actual doc.
-    markdown_filename = f"_fi-{ns}.md"
-    change.markdown_file_created = create_file(
-        ERRCAT_DIR / markdown_filename,
-        DOC_TEMPLATE,
-        {
+    md_filename = markdown_filename(n)
+    change.markdown_file = create_file(
+        file_path=ERRCAT_DIR / md_filename,
+        template_path=DOC_RETIRED_TEMPLATE if args.retire else DOC_TEMPLATE,
+        subs={
             "num": ns,
             "good_includecodes": "\n".join(good_includecodes),
             "bad_includecodes": "\n".join(bad_includecodes),
         },
+        overwrite_existing=args.retire,
     )
 
     # Insert the Markdown filename into _files.txt.
-    change.markdown_txt_line_added += insert_entry(
-        ERRCAT_TXT, REGEX_ERRCAT_TXT_LINE, n, markdown_filename, after_offset=1
+    change.markdown_txt_line += insert_entry(
+        ERRCAT_TXT, REGEX_ERRCAT_TXT_LINE, n, md_filename, after_offset=1
     )
 
+    return change
+
+
+def main(args):
+    global dry_run
+    dry_run = args.dry_run
+    change = perform_change(args)
     if not (any(asdict(change).values())):
-        print(f"There is nothing to do for fi-{ns}")
+        print(f"There is nothing to do for fi-{args.numeral:04}")
         return
 
-    added = "Would add" if dry_run else "Added"
-    created = "Would create" if dry_run else "Created"
-    rel = lambda path: path.relative_to(Path.cwd())
-    if change.markdown_file_created:
-        print(f"* {created} {rel(ERRCAT_DIR / markdown_filename)}")
-    if change.markdown_txt_line_added:
-        print(f"* {added} 1 line to {rel(ERRCAT_TXT)}")
-    if change.index_entry_added:
-        print(f"* {added} index entry in {rel(INDEX_FILE)}")
-    if change.redirect_entry_added:
-        print(f"* {added} redirect entry in {rel(REDIRECT_FILE)}")
-    if change.bad_fidl_created:
-        print(
-            f"* {created} {change.bad_fidl_created} file(s) in {rel(BAD_FIDL_DIR)}"
-        )
-    if change.good_fidl_created:
-        print(
-            f"* {created} {change.good_fidl_created} file(s) in {rel(GOOD_FIDL_DIR)}"
-        )
-    if change.bad_txt_lines_added:
-        print(
-            f"* {added} {change.bad_txt_lines_added} line(s) to {rel(BAD_FIDL_TXT)}"
-        )
-    if change.good_txt_lines_added:
-        print(
-            f"* {added} {change.good_txt_lines_added} line(s) to {rel(GOOD_FIDL_TXT)}"
-        )
-    if change.good_tests_added:
-        print(
-            f"* {added} {change.good_tests_added} test case(s) to {rel(GOOD_TESTS_CC)}"
-        )
+    def report(count, kind, path):
+        if count == 0:
+            return
+        if count > 0:
+            action = "Would add" if dry_run else "Added"
+        else:
+            action = "Would remove" if dry_run else "Removed"
+        print(f"* {action} {abs(count)} {kind}: {path.relative_to(Path.cwd())}")
+
+    report(
+        change.markdown_file,
+        "file",
+        ERRCAT_DIR / markdown_filename(args.numeral),
+    )
+    report(change.markdown_txt_line, "line", ERRCAT_TXT)
+    report(change.index_entry, "index entry", INDEX_FILE)
+    report(change.redirect_entry, "redirect entry", REDIRECT_FILE)
+    report(change.bad_fidl_files, "file(s)", BAD_FIDL_DIR)
+    report(change.good_fidl_files, "file(s)", GOOD_FIDL_DIR)
+    report(change.bad_txt_lines, "line(s)", BAD_FIDL_TXT)
+    report(change.good_txt_lines, "line(s)", GOOD_FIDL_TXT)
+    report(change.good_tests, "test case(s)", GOOD_TESTS_CC)
 
 
 if __name__ == "__main__":
@@ -341,6 +407,12 @@ if __name__ == "__main__":
         type=int,
         default=1,
         help='Number of "good" example .test.fidl files to generate',
+    )
+    parser.add_argument(
+        "-r",
+        "--retire",
+        action="store_true",
+        help="Retire the given error number",
     )
     parser.add_argument(
         "-n",

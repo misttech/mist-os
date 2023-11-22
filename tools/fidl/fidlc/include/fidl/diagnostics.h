@@ -417,9 +417,14 @@ constexpr ErrorDef<202, std::string_view> ErrTransitionalNotAllowed(
 
 // To add a new error:
 //
-// 1. Define it above using the last error's number + 1
+// 1. Define it above using N = last error's number + 1
 // 2. Add it to the end of kAllDiagnosticDefs below
-// 3. Run $FUCHSIA_DIR/tools/fidl/scripts/add_errcat_entry.py
+// 3. Run $FUCHSIA_DIR/tools/fidl/scripts/add_errcat_entry.py N
+//
+// To retire an error:
+//
+// 1. Change its definition above to be a RetiredDef
+// 2. Run $FUCHSIA_DIR/tools/fidl/scripts/add_errcat_entry.py -r N
 
 static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0001 */ &ErrInvalidCharacter,
