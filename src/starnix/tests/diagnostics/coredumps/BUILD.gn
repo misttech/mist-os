@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("coredumps") {
   testonly = true
@@ -34,24 +35,8 @@ fuchsia_test_component("integration_test") {
   check_includes = false
 }
 
-_bin_name = "generate_linux_coredump"
-if (is_linux) {
-  executable(_bin_name) {
-    testonly = true
-    sources = [ "src/coredump.cc" ]
-
-    # TODO(https://fxbug.dev/116773) enable on asan builders
-    exclude_toolchain_tags = [ "instrumented" ]
-  }
-}
-
-_coredump_bin_label = ":${_bin_name}($target_linux_toolchain)"
-_coredump_out_dir = get_label_info(_coredump_bin_label, "root_out_dir")
-resource("generate_linux_coredump_resource") {
-  testonly = true
-  sources = [ "${_coredump_out_dir}/${_bin_name}" ]
-  outputs = [ "data/tests/${_bin_name}" ]
-  deps = [ _coredump_bin_label ]
+starnix_linux_test_executable("generate_linux_coredump") {
+  sources = [ "src/coredump.cc" ]
 }
 
 fuchsia_component("container") {
@@ -62,7 +47,7 @@ fuchsia_component("container") {
 fuchsia_component("coredump") {
   testonly = true
   manifest = "meta/coredump.cml"
-  deps = [ ":generate_linux_coredump_resource" ]
+  deps = [ ":generate_linux_coredump" ]
 }
 
 fuchsia_test_package("starnix_coredump_diagnostics_test") {

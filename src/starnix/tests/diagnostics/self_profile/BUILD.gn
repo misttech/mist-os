@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/starnix/kernel/starnix.gni")
+import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("self_profile") {
   testonly = true
@@ -36,31 +37,14 @@ rustc_binary("bin") {
   ]
 }
 
-_bin_name = "linux_pipe_writer"
-if (is_linux) {
-  executable(_bin_name) {
-    testonly = true
-    sources = [ "src/pipe_writer.cc" ]
-
-    # TODO(https://fxbug.dev/116773) enable sanitizers
-    exclude_toolchain_tags = [ "instrumented" ]
-  }
-}
-
-# TODO(https://fxbug.dev/302378657) use starnix_linux_component() for this
-_pipe_writer_bin_label = ":${_bin_name}($target_linux_toolchain)"
-_pipe_writer_out_dir = get_label_info(_pipe_writer_bin_label, "root_out_dir")
-resource("linux_pipe_writer_resource") {
-  testonly = true
-  sources = [ "${_pipe_writer_out_dir}/${_bin_name}" ]
-  outputs = [ "data/tests/${_bin_name}" ]
-  deps = [ _pipe_writer_bin_label ]
+starnix_linux_test_executable("linux_pipe_writer") {
+  sources = [ "src/pipe_writer.cc" ]
 }
 
 fuchsia_component("pipe_writer") {
   testonly = true
   manifest = "meta/pipe_writer.cml"
-  deps = [ ":linux_pipe_writer_resource" ]
+  deps = [ ":linux_pipe_writer" ]
 }
 
 fuchsia_test_component("integration_test") {
