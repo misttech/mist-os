@@ -654,7 +654,7 @@ func AddRandomFilesToUpdate(
 		return nil, nil, err
 	}
 
-	systemImageSize, err := srcSystemImage.SystemImageSize(ctx)
+	systemImageSize, err := srcSystemImage.SystemImageAlignedBlobSize(ctx)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error determining system image size: %w", err)
 	}

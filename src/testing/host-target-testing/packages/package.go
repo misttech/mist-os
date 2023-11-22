@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	BlobBlockSize   = 4096
+	BlobBlockSize   = 8192
 	maxBlobFileSize = BlobBlockSize * 1000
 )
 
@@ -253,7 +253,7 @@ func (p *Package) TransitiveBlobSize(ctx context.Context) (uint64, error) {
 		return 0, err
 	}
 
-	return p.repo.sumBlobSizes(ctx, blobs)
+	return p.repo.sumAlignedBlobSizes(ctx, blobs)
 }
 
 // AddRandomFilesWithAdditionalBytes will add random files to this package that
@@ -273,7 +273,7 @@ func (p *Package) AddRandomFilesWithAdditionalBytes(
 		}
 
 		for bytesToAdd > 0 {
-			// Create blobs up to 4MiB.
+			// Create blobs up to the max blob size.
 			var blobSize uint64
 			if maxBlobFileSize < bytesToAdd {
 				blobSize = maxBlobFileSize
@@ -313,9 +313,25 @@ func (p *Package) addRandomFilesWithUpperBound(
 	rand *rand.Rand,
 	dstPath string,
 	maxSize uint64,
-	initialBlobs map[build.MerkleRoot]struct{},
+	additionalBlobs map[build.MerkleRoot]struct{},
 ) (Package, error) {
-	initialSize, err := p.repo.sumBlobSizes(ctx, initialBlobs)
+	// Merge the package blobs with the additional blobs to compute the
+	// initial size.
+	packageBlobs, err := p.TransitiveBlobs(ctx)
+	if err != nil {
+		return Package{}, err
+	}
+
+	initialBlobs := make(map[build.MerkleRoot]struct{})
+	for blob := range packageBlobs {
+		initialBlobs[blob] = struct{}{}
+	}
+
+	for blob := range additionalBlobs {
+		initialBlobs[blob] = struct{}{}
+	}
+
+	initialSize, err := p.repo.sumAlignedBlobSizes(ctx, initialBlobs)
 	if err != nil {
 		return Package{}, err
 	}
@@ -339,7 +355,7 @@ func (p *Package) addRandomFilesWithUpperBound(
 	}
 
 	bytesToAdd := maxSize - initialSize
-	for bytesToAdd > 0 {
+	for bytesToAdd != 0 {
 		dstPackage, err := p.AddRandomFilesWithAdditionalBytes(
 			ctx,
 			rand,
@@ -363,27 +379,26 @@ func (p *Package) addRandomFilesWithUpperBound(
 		// Merge the package blobs with our initial blob set, since there could
 		// be external blobs we want to include, such as from the system image
 		// packages or the update images.
-		for blob := range initialBlobs {
+		for blob := range additionalBlobs {
 			blobs[blob] = struct{}{}
 		}
 
-		size, err := dstPackage.repo.sumBlobSizes(ctx, blobs)
+		size, err := p.repo.sumAlignedBlobSizes(ctx, blobs)
 		if err != nil {
 			return Package{}, err
 		}
 
-		if maxSize < size {
-			logger.Warningf(
-				ctx,
-				"package %s with size %d is bigger than %d, trying again",
-				dstPackage.Path(),
-				size,
-				maxSize,
-			)
+		// Otherwise reduce the amount of bytes we're trying to add, and try
+		// again.
+		logger.Infof(
+			ctx,
+			"Generated package %s by adding %d bytes, produced package size %d",
+			dstPackage.Path(),
+			bytesToAdd,
+			size,
+		)
 
-			// Shrink the package size by the amount we overshot by.
-			bytesToAdd -= size - maxSize
-		} else {
+		if size <= maxSize {
 			logger.Infof(
 				ctx,
 				"Accepting package %s with size %d is smaller than %d",
@@ -392,6 +407,31 @@ func (p *Package) addRandomFilesWithUpperBound(
 				maxSize,
 			)
 			return dstPackage, nil
+		}
+
+		// Otherwise we overshot our target.
+		delta := size - maxSize
+		logger.Warningf(
+			ctx,
+			"Generated package %s overshot %d by %d.",
+			dstPackage.Path(),
+			maxSize,
+			delta,
+		)
+
+		// Error out if we failed to add a single byte.
+		if bytesToAdd == 1 {
+			break
+		}
+
+		// Otherwise, subtract some bytes from the amount we're trying to add to
+		// the package.
+		if delta < bytesToAdd {
+			bytesToAdd -= delta
+		} else {
+			// If our delta is larger than the amount of bytes we're trying to
+			// add, check if just adding a single byte is sufficient.
+			bytesToAdd = 1
 		}
 	}
 

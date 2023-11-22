@@ -203,11 +203,27 @@ func (r *Repository) BlobSize(ctx context.Context, merkle build.MerkleRoot) (uin
 	return r.blobStore.BlobSize(ctx, r.deliveryBlobType, merkle)
 }
 
+func (r *Repository) AlignedBlobSize(ctx context.Context, merkle build.MerkleRoot) (uint64, error) {
+	size, err := r.BlobSize(ctx, merkle)
+	if err != nil {
+		return 0, err
+	}
+
+	// Align the number to the next block.
+	remainder := size % BlobBlockSize
+	if remainder != 0 {
+		size += BlobBlockSize - remainder
+	}
+
+	return size, nil
+
+}
+
 // sumBlobSizes sums up all the blob sizes from the blob store.
-func (r *Repository) sumBlobSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
+func (r *Repository) sumAlignedBlobSizes(ctx context.Context, blobs map[build.MerkleRoot]struct{}) (uint64, error) {
 	totalSize := uint64(0)
 	for blob := range blobs {
-		size, err := r.BlobSize(ctx, blob)
+		size, err := r.AlignedBlobSize(ctx, blob)
 		if err != nil {
 			return 0, nil
 		}

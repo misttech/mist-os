@@ -100,13 +100,13 @@ func (u *SystemImagePackage) EditPackage(
 // SystemImageSize returns the transitive space needed to store all the blobs
 // in the system image. It does not include the update image package
 // blobs, since those are garbage collected during the OTA.
-func (u *SystemImagePackage) SystemImageSize(ctx context.Context) (uint64, error) {
+func (u *SystemImagePackage) SystemImageAlignedBlobSize(ctx context.Context) (uint64, error) {
 	blobs, err := u.SystemImageBlobs(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	return u.p.repo.sumBlobSizes(ctx, blobs)
+	return u.p.repo.sumAlignedBlobSizes(ctx, blobs)
 }
 
 // SystemImageBlobs returns the transitive blobs in the system image and the

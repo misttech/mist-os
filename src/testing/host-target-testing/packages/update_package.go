@@ -433,68 +433,85 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 	tempDir string,
 	editFunc func(tempDir string, zbiName string, vbmetaName string) error,
 ) error {
+	// If the update package has an `images.json`, then edit the zbi found
+	// inside it, rather than the one in the update package.
 	if u.hasImagesManifest {
 		updateImages, err := u.OpenUpdateImages(ctx)
 		if err != nil {
 			return err
 		}
 
-		if err := u.replaceUpdateImages(
+		return u.replaceUpdateImages(
 			ctx,
 			dstUpdatePackagePath,
 			tempDir,
 			updateImages,
 			editFunc,
-		); err != nil {
-			return err
+		)
+	}
+
+	// Directly edit the zbi if we're using the legacy update format
+	if !useNewUpdateFormat {
+		return editFunc(tempDir, "zbi", "fuchsia.vbmeta")
+	}
+
+	// Otherwise we need to migrate to the new update package format.
+	logger.Infof(ctx, "Converting update package %s to new update format", dstUpdatePackagePath)
+
+	originalImagesName := "images.json.orig"
+	originalImagesPath := filepath.Join(tempDir, originalImagesName)
+	f, err := os.Open(originalImagesPath)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	images, err := util.ParseImagesJSON(f)
+	if err != nil {
+		return err
+	}
+
+	updateImages, err := newUpdateImages(ctx, u.r, images)
+	if err != nil {
+		return err
+	}
+
+	namesToRemove := []string{
+		originalImagesName,
+		"zbi",
+		"fuchsia.vbmeta",
+		"recovery",
+		"recovery.vbmeta",
+	}
+
+	// Add all the `firmware*` files.
+	entries, err := os.ReadDir(tempDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "firmware") {
+			namesToRemove = append(namesToRemove, entry.Name())
 		}
-	} else {
-		zbiName := "zbi"
-		vbmetaName := "fuchsia.vbmeta"
+	}
 
-		if useNewUpdateFormat {
-			imagesPath := filepath.Join(tempDir, "images.json.orig")
-			f, err := os.Open(imagesPath)
-			if err != nil {
-				return err
-			}
-			defer f.Close()
-
-			images, err := util.ParseImagesJSON(f)
-			if err != nil {
-				return err
-			}
-
-			updateImages, err := newUpdateImages(ctx, u.r, images)
-			if err != nil {
-				return err
-			}
-
-			if err := u.replaceUpdateImages(
-				ctx,
-				dstUpdatePackagePath,
-				tempDir,
-				updateImages,
-				editFunc,
-			); err != nil {
-				return err
-			}
-
-			if err := os.Remove(filepath.Join(tempDir, zbiName)); err != nil {
-				return err
-			}
-
-			if err := os.Remove(filepath.Join(tempDir, vbmetaName)); err != nil {
-				return err
-			}
-		} else {
-			if err := editFunc(tempDir, zbiName, vbmetaName); err != nil {
+	for _, name := range namesToRemove {
+		path := filepath.Join(tempDir, name)
+		if _, err := os.Stat(path); err == nil {
+			logger.Infof(ctx, "removing %q from the update package %s", name, dstUpdatePackagePath)
+			if err := os.Remove(path); err != nil {
 				return err
 			}
 		}
 	}
 
-	return nil
+	return u.replaceUpdateImages(
+		ctx,
+		dstUpdatePackagePath,
+		tempDir,
+		updateImages,
+		editFunc,
+	)
 }
 
 func (u *UpdatePackage) replaceUpdateImages(

@@ -178,13 +178,13 @@ func (u *UpdateImages) EditZbiAndVbmetaContents(
 	)
 }
 
-func (u *UpdateImages) UpdateImagesSize(ctx context.Context) (uint64, error) {
+func (u *UpdateImages) UpdateImagesAlignedBlobSize(ctx context.Context) (uint64, error) {
 	blobs, err := u.UpdateImagesBlobs(ctx)
 	if err != nil {
 		return 0, err
 	}
 
-	return u.repo.sumBlobSizes(ctx, blobs)
+	return u.repo.sumAlignedBlobSizes(ctx, blobs)
 }
 
 func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {
