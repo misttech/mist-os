@@ -45,6 +45,8 @@ uint G12B_CLK_ID {
 
   CLK_AUDIO = 0x1000b,
 
+  CLK_EMMC_C = 0x1000c,
+
   // PLLs.
   CLK_HIFI_PLL = 0x20002,
 
