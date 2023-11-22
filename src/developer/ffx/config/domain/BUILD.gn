@@ -48,6 +48,9 @@ host_test_data("test_data") {
     "test_data/path_refs/empty-path-ref",
     "test_data/path_refs/path-ref-to-absolute",
     "test_data/path_refs/path-ref-to-relative",
+    "test_data/rfc_example/.build-dir",
+    "test_data/rfc_example/fuchsia_env.toml",
+    "test_data/rfc_example/out/fuchsia_build_config.json",
   ]
 }
 

@@ -302,9 +302,6 @@ impl EnvironmentContext {
             self.query("sdk.root").build(Some(BuildOverride::NoBuild)).get().await.ok();
 
         match (&self.kind, runtime_root) {
-            (EnvironmentKind::ConfigDomain { domain, .. }, None) => {
-                self.sdk_from_config(domain.get_explicit_sdk_root().map(|p| p.as_std_path())).await
-            }
             (EnvironmentKind::InTree { build_dir: Some(build_dir), .. }, None) => {
                 let manifest = build_dir.clone();
                 let module = self.query("sdk.module").get().await.ok();
@@ -581,7 +578,7 @@ mod test {
             context.get_build_config_file().unwrap(),
             domain_root.join(".fuchsia-build-config.json")
         );
-        assert_matches!(context.get_sdk_root().await.unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-project/external/fuchsia_sdk"));
+        assert_matches!(context.get_sdk_root().await.unwrap(), SdkRoot::Full(path) if path == domain_root.join("bazel-out/external/fuchsia_sdk"));
     }
 
     fn check_isolated_paths(context: &EnvironmentContext, isolate_dir: &Path) {

@@ -1,6 +1,6 @@
-[fuchsia.sdk]
-path = "bazel-project/external/fuchsia_sdk"
-
-[fuchsia.config]
+[fuchsia.project]
 build_out_dir = "bazel-out"
 build_config_path = ".fuchsia-build-config.json"
+
+[fuchsia.project.default_config]
+sdk = { root = "$BUILD_DIR/external/fuchsia_sdk" }

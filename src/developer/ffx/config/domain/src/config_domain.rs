@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::io::{BufRead, BufReader};
 use std::{fs::File, io::ErrorKind};
 
 use camino::{Utf8Path, Utf8PathBuf};
@@ -51,13 +52,12 @@ impl FileError {
     }
 }
 
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ConfigDomain {
     root: Utf8PathBuf,
     path: Utf8PathBuf,
     build_dir: Option<Utf8PathBuf>,
     build_config_file: Option<Utf8PathBuf>,
-    sdk_root: Option<Utf8PathBuf>,
     contents: FuchsiaEnv,
 }
 
@@ -113,12 +113,14 @@ impl ConfigDomain {
             })?
             .to_owned();
 
-        let build_dir = resolve_path(&root, contents.fuchsia.config.build_out_dir.as_ref());
-        let build_config_file =
-            resolve_path(&root, contents.fuchsia.config.build_config_path.as_ref());
-        let sdk_root = contents.fuchsia.sdk.path.as_deref().map(|sdk_root| root.join(sdk_root));
+        let build_dir = resolve_path(&root, contents.fuchsia.project.build_out_dir.as_ref(), None);
+        let build_config_file = resolve_path(
+            &root,
+            contents.fuchsia.project.build_config_path.as_ref(),
+            build_dir.as_deref(),
+        );
 
-        Ok(Self { path, contents, root, build_dir, build_config_file, sdk_root })
+        Ok(Self { path, contents, root, build_dir, build_config_file })
     }
 
     /// Gets the root directory this config domain is part of
@@ -134,20 +136,33 @@ impl ConfigDomain {
         self.build_config_file.as_deref()
     }
 
-    pub fn get_explicit_sdk_root(&self) -> Option<&Utf8Path> {
-        self.sdk_root.as_deref()
-    }
-
     pub fn get_config_defaults(&self) -> &ConfigMap {
-        &self.contents.fuchsia.config.defaults
+        &self.contents.fuchsia.project.default_config
     }
+}
+
+fn resolve_path_ref(path_ref: &Utf8Path, root: &Utf8Path) -> Option<Utf8PathBuf> {
+    let path_ref_file = root.join(path_ref);
+    let contents = BufReader::new(File::open(&path_ref_file).ok()?);
+    let inner_path = Utf8PathBuf::from(&contents.lines().next()?.ok()?);
+    Some(root.join(&inner_path))
 }
 
 /// Resolves the given optional ConfigPath in relation to root, potentially
 /// going through an indirect file reference to do so. See [`ConfigPath`] for
 /// more details on the mechanism.
-fn resolve_path(root: &Utf8Path, path: Option<&ConfigPath>) -> Option<Utf8PathBuf> {
-    path.and_then(|path| path.resolve(root))
+fn resolve_path(
+    root: &Utf8Path,
+    path: Option<&ConfigPath>,
+    build_dir: Option<&Utf8Path>,
+) -> Option<Utf8PathBuf> {
+    match path? {
+        ConfigPath::Relative(path) => Some(root.join(path)),
+        ConfigPath::PathRef { path_ref } => resolve_path_ref(path_ref, root),
+        ConfigPath::OutDirRef { out_dir_ref } => {
+            build_dir.map(|build_dir| build_dir.join(out_dir_ref))
+        }
+    }
 }
 
 /// Checks for adjacent files that could also have been loaded and returns an
@@ -209,9 +224,21 @@ mod tests {
             Some(basic_root.join(".fuchsia-build-config.json")).as_deref()
         );
         assert_eq!(domain.get_build_dir(), Some(basic_root.join("bazel-out")).as_deref());
+    }
+
+    #[test]
+    fn rfc_example() {
+        let rfc_root = test_data_path().join("rfc_example").canonicalize_utf8().unwrap();
+        let rfc_root_env = rfc_root.join("fuchsia_env.toml");
+
+        assert_eq!(ConfigDomain::find_root(&rfc_root).as_ref(), Some(&rfc_root_env));
+        assert_eq!(ConfigDomain::find_root(&rfc_root.join("stuff")).as_ref(), Some(&rfc_root_env));
+
+        let domain = ConfigDomain::load_from(&rfc_root_env).unwrap();
+        assert_eq!(domain.get_build_dir(), Some(rfc_root.join("out")).as_deref());
         assert_eq!(
-            domain.get_explicit_sdk_root(),
-            Some(basic_root.join("bazel-project/external/fuchsia_sdk")).as_deref()
+            domain.get_build_config_file(),
+            Some(rfc_root.join("out/fuchsia_build_config.json")).as_deref()
         );
     }
 
@@ -222,5 +249,47 @@ mod tests {
 
         let domain = ConfigDomain::load_from(&basic_root_env).unwrap();
         assert_eq!(domain.get_build_dir(), Some(basic_root.join("build-dir")).as_deref(),);
+    }
+
+    #[test]
+    fn basic_config_path_resolution() {
+        let path_ref_root = test_data_path().join("path_refs");
+
+        assert_eq!(
+            resolve_path("/tmp/blah".into(), Some(&ConfigPath::Relative("hi".into())), None),
+            Some("/tmp/blah/hi".into())
+        );
+        assert_eq!(
+            resolve_path(
+                &path_ref_root,
+                Some(&ConfigPath::PathRef { path_ref: "does-not-exist".into() }),
+                None
+            ),
+            None
+        );
+        assert_eq!(
+            resolve_path(
+                &path_ref_root,
+                Some(&ConfigPath::PathRef { path_ref: "empty-path-ref".into() }),
+                None
+            ),
+            None
+        );
+        assert_eq!(
+            resolve_path(
+                &path_ref_root,
+                Some(&ConfigPath::PathRef { path_ref: "path-ref-to-absolute".into() }),
+                None
+            ),
+            Some("/tmp/blah".into())
+        );
+        assert_eq!(
+            resolve_path(
+                &path_ref_root,
+                Some(&ConfigPath::PathRef { path_ref: "path-ref-to-relative".into() }),
+                None
+            ),
+            Some(path_ref_root.join("build-config-file"))
+        );
     }
 }
