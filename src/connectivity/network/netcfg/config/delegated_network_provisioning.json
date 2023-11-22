@@ -33,5 +33,15 @@
     ],
     "enable_dhcpv6": false,
     "install_only": true,
-    "interface_name_prefix": "eth"
+    "interface_name_prefix": "eth",
+    "interface_provisioning_policy": [
+        {
+            "matchers": [
+                {
+                    "any": true
+                }
+            ],
+            "provisioning": "delegated"
+        }
+    ]
 }

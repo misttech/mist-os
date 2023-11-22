@@ -9,5 +9,15 @@
     },
     "filter_enabled_interface_types": [],
     "interface_metrics": {},
-    "install_only": true
+    "install_only": true,
+    "interface_provisioning_policy": [
+        {
+            "matchers": [
+                {
+                    "any": true
+                }
+            ],
+            "provisioning": "delegated"
+        }
+    ]
 }
