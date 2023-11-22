@@ -193,11 +193,9 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(
-    zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent) {
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<HdmiHost> hdmi_host =
-      fbl::make_unique_checked<HdmiHost>(&alloc_checker, parent, std::move(hdmi));
+  std::unique_ptr<HdmiHost> hdmi_host = fbl::make_unique_checked<HdmiHost>(&alloc_checker, parent);
   if (!alloc_checker.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }

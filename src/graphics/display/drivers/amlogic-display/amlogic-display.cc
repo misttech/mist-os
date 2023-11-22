@@ -1265,16 +1265,7 @@ zx_status_t AmlogicDisplay::SetupHotplugDisplayDetection() {
 zx_status_t AmlogicDisplay::InitializeHdmiVout() {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  zx::result<fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi>> hdmi_client_result =
-      DdkConnectFragmentFidlProtocol<fuchsia_hardware_hdmi::Service::Device>("hdmi");
-  if (hdmi_client_result.is_error()) {
-    zxlogf(ERROR, "Failed to connect to hdmi FIDL protocol: %s",
-           hdmi_client_result.status_string());
-    return hdmi_client_result.status_value();
-  }
-
-  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result =
-      Vout::CreateHdmiVout(parent_, std::move(hdmi_client_result.value()));
+  zx::result<std::unique_ptr<Vout>> create_hdmi_vout_result = Vout::CreateHdmiVout(parent_);
   if (!create_hdmi_vout_result.is_ok()) {
     zxlogf(ERROR, "Failed to initialize HDMI Vout device: %s",
            create_hdmi_vout_result.status_string());

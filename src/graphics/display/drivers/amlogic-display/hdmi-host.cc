@@ -6,8 +6,11 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <limits>
+
+#include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/common.h"
@@ -16,6 +19,8 @@
 #include "src/graphics/display/drivers/amlogic-display/power-regs.h"
 #include "src/graphics/display/drivers/amlogic-display/vpu-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
+#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
 
 namespace amlogic_display {
 
@@ -65,17 +70,6 @@ ValidDcoFrequencyRange GetHdmiPllValidDcoFrequencyRange(int pixel_clock_khz) {
       .minimum_frequency_khz = kDefaultMinimumValidHdmiPllDcoFrequencyKhz,
       .maximum_frequency_khz = kDefaultMaximumValidHdmiPllDcoFrequencyKhz,
   };
-}
-
-fuchsia_hardware_hdmi::wire::DisplayMode ToHdmiFidlDisplayMode(
-    fidl::AnyArena& allocator, const display::DisplayTiming& display_timing_params,
-    const fuchsia_hardware_hdmi::wire::ColorParam& color) {
-  fuchsia_hardware_hdmi::wire::StandardDisplayMode mode =
-      display::ToHdmiFidlStandardDisplayMode(display_timing_params);
-  return fuchsia_hardware_hdmi::wire::DisplayMode::Builder(allocator)
-      .mode(mode)
-      .color(color)
-      .Build();
 }
 
 // `timing` must be a timing supported by `HdmiHost`.
@@ -158,9 +152,64 @@ pll_param CalculateClockParameters(const display::DisplayTiming& timing) {
   return params;
 }
 
+zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(ddk::PDevFidl& pdev) {
+  if (!pdev.is_valid()) {
+    zxlogf(ERROR, "PDev protocol is invalid");
+    return zx::error(ZX_ERR_NO_RESOURCES);
+  }
+
+  // Map registers
+  static constexpr uint32_t kHdmitxControllerIpIndex = MMIO_HDMITX_CONTROLLER_IP;
+  std::optional<fdf::MmioBuffer> hdmitx_controller_ip_mmio;
+  zx_status_t status = pdev.MapMmio(kHdmitxControllerIpIndex, &hdmitx_controller_ip_mmio);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not map MMIO HDMITX Controller IP registers: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  fbl::AllocChecker alloc_checker;
+  std::unique_ptr<designware_hdmi::HdmiTransmitterController> designware_controller =
+      fbl::make_unique_checked<designware_hdmi::HdmiTransmitterControllerImpl>(
+          &alloc_checker, std::move(*hdmitx_controller_ip_mmio));
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Could not allocate memory for DesignWare HdmiTransmitterControllerImpl");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  static constexpr uint32_t kHdmitxTopLevelIndex = MMIO_HDMITX_TOP_LEVEL;
+  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio;
+  status = pdev.MapMmio(kHdmitxTopLevelIndex, &hdmitx_top_level_mmio);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not map MMIO HDMITX top-level registers: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  static constexpr uint32_t kSiliconProviderSmcIndex = 0;
+  zx::resource smc;
+  status = pdev.GetSmc(kSiliconProviderSmcIndex, &smc);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Could not get secure monitor call (SMC) resource: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  std::unique_ptr<HdmiTransmitter> hdmi_transmitter =
+      fbl::make_unique_checked<HdmiTransmitter>(&alloc_checker, std::move(designware_controller),
+                                                std::move(*hdmitx_top_level_mmio), std::move(smc));
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Could not allocate memory for HdmiTransmitter");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+  return zx::ok(std::move(hdmi_transmitter));
+}
+
 }  // namespace
 
 zx_status_t HdmiHost::Init() {
+  // TODO(fxbug.dev/132267): Replace the multi-step initialization with
+  // the builder / factory pattern.
   auto status = pdev_.MapMmio(MMIO_VPU, &vpu_mmio_);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map VPU mmio: %s", zx_status_get_string(status));
@@ -179,11 +228,12 @@ zx_status_t HdmiHost::Init() {
     return status;
   }
 
-  auto res = hdmi_->PowerUp(1);  // only supports 1 display for now.
-  if ((res.status() != ZX_OK) || res->is_error()) {
-    zxlogf(ERROR, "Power Up failed: %s", res.FormatDescription().c_str());
-    return ZX_ERR_INTERNAL;
+  zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter = CreateHdmiTransmitter(pdev_);
+  if (hdmi_transmitter.is_error()) {
+    zxlogf(ERROR, "Could not create HDMI transmitter: %s", hdmi_transmitter.status_string());
+    return hdmi_transmitter.status_value();
   }
+  hdmi_transmitter_ = std::move(hdmi_transmitter).value();
   return ZX_OK;
 }
 
@@ -220,9 +270,9 @@ zx_status_t HdmiHost::HostOn() {
   memory_power0.set_hdmi_memory7_powered_off(false);
   memory_power0.WriteTo(&hhi_mmio_.value());
 
-  auto res = hdmi_->Reset(1);  // only supports 1 display for now
-  if ((res.status() != ZX_OK) || res->is_error()) {
-    zxlogf(ERROR, "Reset failed");
+  zx::result<> reset_result = hdmi_transmitter_->Reset();  // only supports 1 display for now
+  if (reset_result.is_error()) {
+    zxlogf(ERROR, "Failed to reset the HDMI transmitter: %s", reset_result.status_string());
     return ZX_ERR_INTERNAL;
   }
   return ZX_OK;
@@ -234,11 +284,6 @@ void HdmiHost::HostOff() {
   WRITE32_REG(HHI, HHI_HDMI_PHY_CNTL3, 0);
   /* Disable HPLL */
   WRITE32_REG(HHI, HHI_HDMI_PLL_CNTL0, 0);
-
-  auto res = hdmi_->PowerDown(1);  // only supports 1 display for now
-  if (res.status() != ZX_OK) {
-    zxlogf(ERROR, "Power Down failed");
-  }
 }
 
 zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
@@ -293,9 +338,8 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   WRITE32_REG(HHI, HHI_VDAC_CNTL0_G12A, 0);
   WRITE32_REG(HHI, HHI_VDAC_CNTL1_G12A, 8);  // set Cdac_pwd [whatever that is]
 
-  fidl::Arena<2048> allocator;
-  static constexpr fuchsia_hardware_hdmi::wire::ColorParam kColorParams{
-      .input_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCf444,
+  static constexpr designware_hdmi::ColorParam kColorParams{
+      .input_color_format = designware_hdmi::ColorFormat::kCf444,
 
       // We choose the RGB 4:4:4 encoding unconditionally for the HDMI output
       // signals. This implies that we avoid YCbCr encodings, even if they are
@@ -312,16 +356,14 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
       // 4:4:4 pixel encoding in EDID, but does not display colors correctly
       // when we use that encoding. That hardware should be considered when
       // changing this strategy.
-      .output_color_format = fuchsia_hardware_hdmi::wire::ColorFormat::kCfRgb,
+      .output_color_format = designware_hdmi::ColorFormat::kCfRgb,
 
-      .color_depth = fuchsia_hardware_hdmi::wire::ColorDepth::kCd24B,
+      .color_depth = designware_hdmi::ColorDepth::kCd24B,
   };
-  fuchsia_hardware_hdmi::wire::DisplayMode hdmi_fidl_mode =
-      ToHdmiFidlDisplayMode(allocator, timing, kColorParams);
-  auto res = hdmi_->ModeSet(1, hdmi_fidl_mode);  // only supports 1 display for now
-  if ((res.status() != ZX_OK) || res->is_error()) {
-    zxlogf(ERROR, "Unable to initialize interface");
-    return ZX_ERR_INTERNAL;
+  zx::result<> modeset_result = hdmi_transmitter_->ModeSet(timing, kColorParams);
+  if (modeset_result.is_error()) {
+    zxlogf(ERROR, "Failed to set display mode: %s", modeset_result.status_string());
+    return modeset_result.status_value();
   }
 
   // Setup HDMI related registers in VPU
@@ -364,48 +406,11 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
 }
 
 zx_status_t HdmiHost::EdidTransfer(const i2c_impl_op_t* op_list, size_t op_count) {
-  auto ops = std::make_unique<fuchsia_hardware_hdmi::wire::EdidOp[]>(op_count);
-  auto writes = std::make_unique<fidl::VectorView<uint8_t>[]>(op_count);
-  auto reads = std::make_unique<uint16_t[]>(op_count);
-  size_t write_cnt = 0;
-  size_t read_cnt = 0;
-  for (size_t i = 0; i < op_count; ++i) {
-    ops[i].address = op_list[i].address;
-    ops[i].is_write = !op_list[i].is_read;
-    if (op_list[i].is_read) {
-      if (op_list[i].data_size > std::numeric_limits<uint16_t>::max()) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-      reads[read_cnt] = static_cast<uint16_t>(op_list[i].data_size);
-      read_cnt++;
-    } else {
-      writes[write_cnt] = fidl::VectorView<uint8_t>::FromExternal(
-          const_cast<uint8_t*>(op_list[i].data_buffer), op_list[i].data_size);
-      write_cnt++;
-    }
+  zx::result<> i2c_transact_result = hdmi_transmitter_->I2cTransact(op_list, op_count);
+  if (i2c_transact_result.is_error()) {
+    zxlogf(ERROR, "Failed to transfer EDID: %s", i2c_transact_result.status_string());
+    return i2c_transact_result.status_value();
   }
-  auto all_ops =
-      fidl::VectorView<fuchsia_hardware_hdmi::wire::EdidOp>::FromExternal(ops.get(), op_count);
-  auto all_writes =
-      fidl::VectorView<fidl::VectorView<uint8_t>>::FromExternal(writes.get(), write_cnt);
-  auto all_reads = fidl::VectorView<uint16_t>::FromExternal(reads.get(), read_cnt);
-
-  auto res = hdmi_->EdidTransfer(all_ops, all_writes, all_reads);
-  if ((res.status() != ZX_OK) || res->is_error()) {
-    zxlogf(ERROR, "Unable to perform Edid Transfer");
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto read = res->value()->read_segments_data;
-  read_cnt = 0;
-  for (size_t i = 0; i < op_count; ++i) {
-    if (!op_list[i].is_read) {
-      continue;
-    }
-    memcpy(op_list[i].data_buffer, read[read_cnt].data(), read[read_cnt].count());
-    read_cnt++;
-  }
-
   return ZX_OK;
 }
 

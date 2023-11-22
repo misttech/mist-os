@@ -31,14 +31,15 @@
 
 // Should match display_mmios table in board driver
 enum {
-  MMIO_VPU,       // VPU (Video Processing Unit)
-  MMIO_MPI_DSI,   // TOP_MIPI_DSI (DSI "top" host controller integration)
-  MMIO_DSI_PHY,   // DSI_PHY
-  MMIO_HHI,       // HIU (Host Interface Unit) / HHI
-  MMIO_AOBUS,     // RTI / AO_RTI / AOBUS_RTI
-  MMIO_RESET,     // RESET
-  MMIO_GPIO_MUX,  // PERIPHS_REGS (GPIO Multiplexing)
-  MMIO_HDMITX,    // HDMITX (HDMI Transmitter)
+  MMIO_VPU,                   // VPU (Video Processing Unit)
+  MMIO_MPI_DSI,               // TOP_MIPI_DSI (DSI "top" host controller integration)
+  MMIO_DSI_PHY,               // DSI_PHY
+  MMIO_HHI,                   // HIU (Host Interface Unit) / HHI
+  MMIO_AOBUS,                 // RTI / AO_RTI / AOBUS_RTI
+  MMIO_RESET,                 // RESET
+  MMIO_GPIO_MUX,              // PERIPHS_REGS (GPIO Multiplexing)
+  MMIO_HDMITX_CONTROLLER_IP,  // HDMITX (HDMI Transmitter Controller IP)
+  MMIO_HDMITX_TOP_LEVEL,      // HDMITX (HDMI Transmitter Top-level block)
 };
 
 // Should match display_gpios table in board driver

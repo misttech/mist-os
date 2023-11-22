@@ -5,13 +5,13 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_HOST_H_
 
-#include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 
 #include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/lib/amlogic-hdmitx/amlogic-hdmitx.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace amlogic_display {
@@ -88,8 +88,7 @@ struct cea_timing {
 // VPU and HHI register handling, HDMI parameters, etc.
 class HdmiHost {
  public:
-  explicit HdmiHost(zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi>&& chan)
-      : pdev_(ddk::PDevFidl::FromFragment(parent)), hdmi_(std::move(chan)) {}
+  explicit HdmiHost(zx_device_t* parent) : pdev_(ddk::PDevFidl::FromFragment(parent)) {}
 
   zx_status_t Init();
   zx_status_t HostOn();
@@ -118,7 +117,7 @@ class HdmiHost {
 
   ddk::PDevFidl pdev_;
 
-  fidl::WireSyncClient<fuchsia_hardware_hdmi::Hdmi> hdmi_;
+  std::unique_ptr<HdmiTransmitter> hdmi_transmitter_;
 
   std::optional<fdf::MmioBuffer> vpu_mmio_;
   std::optional<fdf::MmioBuffer> hhi_mmio_;

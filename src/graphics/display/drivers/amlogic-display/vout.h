@@ -34,8 +34,7 @@ class Vout : public ddk::I2cImplProtocol<Vout> {
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
-  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(
-      zx_device_t* parent, fidl::ClientEnd<fuchsia_hardware_hdmi::Hdmi> hdmi);
+  static zx::result<std::unique_ptr<Vout>> CreateHdmiVout(zx_device_t* parent);
 
   // Sets only the display size, feature bits and panel settings for testing.
   // Returns a non-null pointer to the Vout instance on success.
