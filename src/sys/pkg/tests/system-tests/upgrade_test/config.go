@@ -61,7 +61,7 @@ func newConfig(fs *flag.FlagSet) (*config, error) {
 	fs.StringVar(&c.afterTestScript, "after-test-script", "", "Run this script after a test step")
 	fs.BoolVar(&c.useFlash, "use-flash", false, "Provision device using flashing instead of paving")
 	fs.UintVar(&c.downgradeOTAAttempts, "downgrade-ota-attempts", 1, "Number of times to try to OTA from the downgrade build to the upgrade build before failing.")
-	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd", "compress storage images, default is zstd")
+	fs.StringVar(&c.bootfsCompression, "bootfs-compression", "zstd.max", "compress storage images, default is zstd.max")
 	fs.BoolVar(&c.buildExpectUnknownFirmware, "build-expect-unknown-firmware", false, "Ignore 'Unknown Firmware' during OTAs")
 	fs.Uint64Var(&c.maxUpdatePackageSize, "max-update-package-size", 0, "Maximum size of all the blobs in the update package")
 	fs.Uint64Var(&c.maxUpdateImagesSize, "max-update-images-size", 0, "Maximum size of all the blobs in the update images")

@@ -148,6 +148,10 @@ _environment_service_account =
 #   use_new_update_format
 #   - Optional: use the new update format.
 #   - Type: boolean, default false
+#
+#   bootfs_compression
+#   - Optional: setting to use when compressing bootfs in the zbi
+#   - Type: string
 template("system_test_upgrade_suite") {
   assert(is_linux || is_mac, "system_tests are for linux/mac only")
 
@@ -369,6 +373,16 @@ template("system_test_upgrade_suite") {
     if (defined(invoker.use_new_update_format) &&
         invoker.use_new_update_format) {
       _args += [ "-use-new-update-format" ]
+    }
+
+    if (defined(invoker.bootfs_compression)) {
+      assert(
+          invoker.bootfs_compression != "",
+          "'${_host_test_target_name}' cannot have an empty bootfs_compression")
+      _args += [
+        "-bootfs-compression",
+        invoker.bootfs_compression,
+      ]
     }
 
     host_test(_host_test_target_name) {
