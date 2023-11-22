@@ -601,6 +601,8 @@ pub struct NetCfg<'a> {
 
     // When true, only perform device enumeration and ignore all provisioning.
     // When false, perform device enumeration and provisioning.
+    // TODO(fxbug.dev/135113): Remove install_only field.
+    #[allow(unused)]
     install_only: bool,
     // Makes sure that all interfaces added by netcfg have the specified prefix.
     interface_name_prefix: String,
@@ -608,9 +610,7 @@ pub struct NetCfg<'a> {
     // Policy configuration to determine the name of an interface.
     #[allow(unused)]
     interface_naming_policy: Vec<interface::NamingRule>,
-    // TODO(fxbug.dev/135110): Begin using configuration based provisioning
     // Policy configuration to determine whether to provision an interface.
-    #[allow(unused)]
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 }
 
@@ -1257,7 +1257,8 @@ impl<'a> NetCfg<'a> {
                 self.update_dns_servers(source, servers).await;
             }
             // TODO(fxbug.dev/130449): Add tests to ensure we do not offer
-            // these services when `install_only` flag is enabled.
+            // these services when interface has ProvisioningAction::Delegated
+            // state.
             ProvisioningEvent::RequestStream(req_stream) => {
                 match req_stream.context("ServiceFs ended unexpectedly")? {
                     RequestStream::Virtualization(req_stream) => virtualization_handler
@@ -2072,9 +2073,7 @@ impl<'a> NetCfg<'a> {
         info!("installed configuration with result {:?}", config);
 
         let provisioning_action = interface::find_provisioning_action_from_provisioning_rules(
-            // TODO(fxbug.dev/135110): Instead of relying on install_only, query
-            // the configuration itself to see what policy was specified.
-            &[provisioning_rule_from_install_only_flag(self.install_only)],
+            &self.interface_provisioning_policy,
             &info.topological_path,
             &mac,
             info.device_class,
@@ -2941,20 +2940,6 @@ impl Mode for VirtualizationEnabled {
             netcfg.installer.clone(),
         );
         netcfg.run(handler).await.context("event loop")
-    }
-}
-
-// With `install_only` mode on, use a ProvisioningRule that will match
-// all interfaces and use a Delegated provisioning action.
-fn provisioning_rule_from_install_only_flag(install_only: bool) -> interface::ProvisioningRule {
-    if !install_only {
-        return interface::fallback_provisioning_rule();
-    }
-    interface::ProvisioningRule {
-        matchers: HashSet::from([interface::ProvisioningMatchingRule::InterfaceName {
-            pattern: glob::Pattern::new("*").unwrap(),
-        }]),
-        provisioning: interface::ProvisioningAction::Delegated,
     }
 }
 
@@ -4638,28 +4623,6 @@ mod tests {
                 panic!("error checking for new DHCPv6 client on interface {}: {:?}", id, e)
             });
         }
-    }
-
-    #[test_case(true, interface::ProvisioningAction::Delegated; "install_only_true")]
-    #[test_case(false, interface::ProvisioningAction::Local; "install_only_false")]
-    fn test_provisioning_action_from_install_only(
-        install_only: bool,
-        expected_action: interface::ProvisioningAction,
-    ) {
-        let rule = provisioning_rule_from_install_only_flag(install_only);
-
-        let action = interface::find_provisioning_action_from_provisioning_rules(
-            &[rule],
-            // Use arbitrary values for topo path, device class, and interface
-            // name. Provisioning rule from
-            // `provisioning_rule_from_install_only_flag` matches any interface.
-            "",
-            &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
-            fidl_fuchsia_hardware_network::DeviceClass::Ethernet,
-            "arbitraryname",
-        );
-
-        assert_eq!(action, expected_action);
     }
 
     #[test]

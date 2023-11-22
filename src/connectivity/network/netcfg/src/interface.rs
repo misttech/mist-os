@@ -710,7 +710,9 @@ impl ProvisioningRule {
 }
 
 // Find the first `ProvisioningRule` that matches the device and get
-// the associated `ProvisioningAction`
+// the associated `ProvisioningAction`. By default, use Local provisioning
+// so that Netcfg will provision interfaces unless configuration
+// indicates otherwise.
 pub(crate) fn find_provisioning_action_from_provisioning_rules(
     provisioning_rules: &[ProvisioningRule],
     topological_path: &str,
@@ -728,22 +730,11 @@ pub(crate) fn find_provisioning_action_from_provisioning_rules(
                 None
             }
         })
-        .expect(
-            "There must always be at least one ProvisioningRule that \
-                 matches. The fallback rule should match any interface.",
+        .unwrap_or(
+            // When there are no `ProvisioningRule`s that match the device,
+            // use Local provisioning.
+            ProvisioningAction::Local,
         )
-}
-
-// Matches any device and uses the Local provisioning action.
-// Reason: Netcfg should provision all devices unless configuration
-// indicates otherwise.
-pub(crate) fn fallback_provisioning_rule() -> ProvisioningRule {
-    ProvisioningRule {
-        matchers: HashSet::from([ProvisioningMatchingRule::InterfaceName {
-            pattern: glob::Pattern::new("*").unwrap(),
-        }]),
-        provisioning: ProvisioningAction::Local,
-    }
 }
 
 #[cfg(test)]
@@ -1744,15 +1735,12 @@ mod tests {
         expected: ProvisioningAction,
     ) {
         let provisioning_action = find_provisioning_action_from_provisioning_rules(
-            &[
-                ProvisioningRule {
-                    matchers: HashSet::from([ProvisioningMatchingRule::Common(MatchingRule::Any(
-                        match_first_rule,
-                    ))]),
-                    provisioning: ProvisioningAction::Delegated,
-                },
-                fallback_provisioning_rule(),
-            ],
+            &[ProvisioningRule {
+                matchers: HashSet::from([ProvisioningMatchingRule::Common(MatchingRule::Any(
+                    match_first_rule,
+                ))]),
+                provisioning: ProvisioningAction::Delegated,
+            }],
             "",
             &fidl_fuchsia_net_ext::MacAddress { octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1] },
             fhwnet::DeviceClass::Wlan,
