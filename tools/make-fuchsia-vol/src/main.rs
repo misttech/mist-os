@@ -43,7 +43,6 @@ const VBMETA_R_GUID: PartType = part_type("6A2460C3-CD11-4E8B-80A8-12CCE268ED0A"
 const MISC_GUID: PartType = part_type("1D75395D-F2C6-476B-A8B7-45CC1C97B476");
 const INSTALLER_GUID: PartType = part_type("4DCE98CE-E77E-45C1-A863-CAF92F1330C1");
 const FVM_GUID: PartType = part_type("41D0E340-57E3-954E-8C1E-17ECAC44CFF5");
-const DATA_GUID: PartType = part_type("08185F0C-892D-428A-A789-DBEEC8F55E6A");
 
 // The relevant part of the product bundle metadata schema, as realized by
 // entries in the product_bundles.json build API module.
@@ -443,7 +442,8 @@ fn run(mut args: TopLevel) -> Result<(), Error> {
             gpt_disk.find_free_sectors().iter().map(|(_offset, length)| length).max().unwrap()
                 * block_size
         });
-        Some(add_partition(&mut gpt_disk, "fuchsia-data", size, DATA_GUID)?)
+        // For now, we use the same name and type as FVM because the paver looks for this.
+        Some(add_partition(&mut gpt_disk, "fvm", size, FVM_GUID)?)
     } else {
         None
     };
