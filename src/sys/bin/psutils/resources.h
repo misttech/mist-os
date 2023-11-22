@@ -10,10 +10,10 @@
 
 __BEGIN_CDECLS
 
-// Returns a new handle to the root resource, which the caller
+// Returns a new handle to the info resource, which the caller
 // is responsible for closing.
 // See docs/objects/resource.md
-zx_status_t get_root_resource(zx_handle_t* root_resource);
+zx_status_t get_info_resource(zx_handle_t* info_resource);
 
 __END_CDECLS
 

@@ -5,7 +5,7 @@
 #include "resources.h"
 
 #include <errno.h>
-#include <fidl/fuchsia.boot/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -16,21 +16,21 @@
 #include <zircon/status.h>
 #include <zircon/syscalls.h>
 
-zx_status_t get_root_resource(zx_handle_t* root_resource) {
-  auto client_end = component::Connect<fuchsia_boot::RootResource>();
+zx_status_t get_info_resource(zx_handle_t* info_resource) {
+  auto client_end = component::Connect<fuchsia_kernel::InfoResource>();
   if (client_end.is_error()) {
-    fprintf(stderr, "ERROR: Cannot open fuchsia.boot.RootResource: %s (%d)\n",
+    fprintf(stderr, "ERROR: Cannot open fuchsia.kernel.InfoResource: %s (%d)\n",
             client_end.status_string(), client_end.status_value());
     return ZX_ERR_NOT_FOUND;
   }
   auto result = fidl::WireSyncClient(std::move(*client_end))->Get();
   if (result.status() != ZX_OK) {
-    fprintf(stderr, "ERROR: Cannot obtain root resource: %s (%d)\n",
+    fprintf(stderr, "ERROR: Cannot obtain info resource: %s (%d)\n",
             zx_status_get_string(result.status()), result.status());
     return ZX_ERR_NOT_FOUND;
   }
 
-  *root_resource = result->resource.release();
+  *info_resource = result->resource.release();
 
   return ZX_OK;
 }

@@ -27,12 +27,12 @@
 // TODO: dynamically compute this based on what it returns
 #define MAX_CPUS 32
 
-static zx_status_t gueststats(zx_handle_t root_resource, zx_duration_t delay) {
+static zx_status_t gueststats(zx_handle_t info_resource, zx_duration_t delay) {
   __UNUSED static zx_info_guest_stats_t old_stats[MAX_CPUS];
   zx_info_guest_stats_t stats[MAX_CPUS];
 
   size_t actual, avail;
-  zx_status_t err = zx_object_get_info(root_resource, ZX_INFO_GUEST_STATS, &stats, sizeof(stats),
+  zx_status_t err = zx_object_get_info(info_resource, ZX_INFO_GUEST_STATS, &stats, sizeof(stats),
                                        &actual, &avail);
   if (err != ZX_OK) {
     fprintf(stderr, "ZX_INFO_GUEST_STATS returns %d (%s)\n", err, zx_status_get_string(err));
@@ -121,7 +121,7 @@ static zx_status_t gueststats(zx_handle_t root_resource, zx_duration_t delay) {
   return ZX_OK;
 }
 
-static zx_status_t cpustats(zx_handle_t root_resource, zx_duration_t delay) {
+static zx_status_t cpustats(zx_handle_t info_resource, zx_duration_t delay) {
   static zx_duration_t last_idle_time[MAX_CPUS];
   static zx_info_cpu_stats_t old_stats[MAX_CPUS];
   zx_info_cpu_stats_t stats[MAX_CPUS];
@@ -129,7 +129,7 @@ static zx_status_t cpustats(zx_handle_t root_resource, zx_duration_t delay) {
   // retrieve the system stats
   size_t actual, avail;
   zx_status_t err =
-      zx_object_get_info(root_resource, ZX_INFO_CPU_STATS, &stats, sizeof(stats), &actual, &avail);
+      zx_object_get_info(info_resource, ZX_INFO_CPU_STATS, &stats, sizeof(stats), &actual, &avail);
   if (err != ZX_OK) {
     fprintf(stderr, "ZX_INFO_CPU_STATS returns %d (%s)\n", err, zx_status_get_string(err));
     return err;
@@ -188,14 +188,14 @@ static zx_status_t cpustats(zx_handle_t root_resource, zx_duration_t delay) {
   return ZX_OK;
 }
 
-static zx_status_t cpuload(zx_handle_t root_resource, zx_duration_t delay) {
+static zx_status_t cpuload(zx_handle_t info_resource, zx_duration_t delay) {
   static zx_duration_t last_idle_time[MAX_CPUS];
   zx_info_cpu_stats_t stats[MAX_CPUS];
 
   // retrieve the system stats
   size_t actual, avail;
   zx_status_t err =
-      zx_object_get_info(root_resource, ZX_INFO_CPU_STATS, &stats, sizeof(stats), &actual, &avail);
+      zx_object_get_info(info_resource, ZX_INFO_CPU_STATS, &stats, sizeof(stats), &actual, &avail);
   if (err != ZX_OK) {
     fprintf(stderr, "ZX_INFO_CPU_STATS returns %d (%s)\n", err, zx_status_get_string(err));
     return err;
@@ -239,10 +239,10 @@ static zx_status_t cpuload(zx_handle_t root_resource, zx_duration_t delay) {
   return ZX_OK;
 }
 
-static zx_status_t memstats(zx_handle_t root_resource) {
+static zx_status_t memstats(zx_handle_t info_resource) {
   zx_info_kmem_stats_t stats;
   zx_status_t err =
-      zx_object_get_info(root_resource, ZX_INFO_KMEM_STATS, &stats, sizeof(stats), NULL, NULL);
+      zx_object_get_info(info_resource, ZX_INFO_KMEM_STATS, &stats, sizeof(stats), NULL, NULL);
   if (err != ZX_OK) {
     fprintf(stderr, "ZX_INFO_KMEM_STATS returns %d (%s)\n", err, zx_status_get_string(err));
     return err;
@@ -368,8 +368,8 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  zx_handle_t root_resource;
-  zx_status_t ret = get_root_resource(&root_resource);
+  zx_handle_t info_resource;
+  zx_status_t ret = get_info_resource(&info_resource);
   if (ret != ZX_OK) {
     return ret;
   }
@@ -394,16 +394,16 @@ int main(int argc, char** argv) {
     }
 
     if (cpu_load) {
-      ret |= cpuload(root_resource, delay);
+      ret |= cpuload(info_resource, delay);
     }
     if (guest_stats) {
-      ret |= gueststats(root_resource, delay);
+      ret |= gueststats(info_resource, delay);
     }
     if (cpu_stats) {
-      ret |= cpustats(root_resource, delay);
+      ret |= cpustats(info_resource, delay);
     }
     if (mem_stats) {
-      ret |= memstats(root_resource);
+      ret |= memstats(info_resource);
     }
     // Separate multiple runs with a blank line.
     printf("\n");
@@ -428,7 +428,7 @@ int main(int argc, char** argv) {
     zx_nanosleep(next_deadline);
   }
 
-  zx_handle_close(root_resource);
+  zx_handle_close(info_resource);
 
   return ret;
 }

@@ -355,15 +355,15 @@ static void print_kernel_json(const char* name, const char* parent, uint64_t siz
 }
 
 zx_status_t dump_kernel_memory() {
-  zx_handle_t root_resource;
-  zx_status_t s = get_root_resource(&root_resource);
+  zx_handle_t info_resource;
+  zx_status_t s = get_info_resource(&info_resource);
   if (s != ZX_OK) {
     return s;
   }
   zx_info_kmem_stats_t stats;
-  s = zx_object_get_info(root_resource, ZX_INFO_KMEM_STATS, &stats, sizeof(stats), nullptr,
+  s = zx_object_get_info(info_resource, ZX_INFO_KMEM_STATS, &stats, sizeof(stats), nullptr,
                          nullptr);
-  zx_handle_close(root_resource);
+  zx_handle_close(info_resource);
   if (s != ZX_OK) {
     fprintf(stderr, "WARNING: failed to get kernel memory stats: %s (%d)\n",
             zx_status_get_string(s), s);
