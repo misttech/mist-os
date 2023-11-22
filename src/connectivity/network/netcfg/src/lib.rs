@@ -2057,11 +2057,14 @@ impl<'a> NetCfg<'a> {
             if let Some(dhcp_server) = &self.dhcp_server {
                 info!("configuring DHCP server for WLAN AP (interface ID={})", interface_id);
                 let () = Self::configure_wlan_ap_and_dhcp_server(
+                    &mut self.filter_enabled_state,
+                    &self.filter,
                     interface_id,
                     dhcp_server,
                     control,
                     &self.stack,
                     interface_name,
+                    info,
                 )
                 .await
                 .context("error configuring wlan ap and dhcp server")?;
@@ -2179,17 +2182,28 @@ impl<'a> NetCfg<'a> {
     /// with the parameters so it is ready to be started when an interface UP event
     /// is received for the WLAN AP.
     async fn configure_wlan_ap_and_dhcp_server(
+        filter_enabled_state: &mut FilterEnabledState,
+        filter: &fnet_filter::FilterProxy,
         interface_id: NonZeroU64,
         dhcp_server: &fnet_dhcp::Server_Proxy,
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         stack: &fidl_fuchsia_net_stack::StackProxy,
         name: String,
+        info: &DeviceInfo,
     ) -> Result<(), errors::Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
         >()
         .context("address state provider: failed to create fidl endpoints")
         .map_err(errors::Error::Fatal)?;
+
+        filter_enabled_state
+            .maybe_update(Some(info.interface_type()), interface_id, filter)
+            .await
+            .map_err(|e| {
+                anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
+            })
+            .map_err(errors::Error::NonFatal)?;
 
         // Calculate and set the interface address based on the network address.
         // The interface address should be the first available address.
