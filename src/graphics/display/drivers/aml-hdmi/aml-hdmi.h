@@ -21,9 +21,8 @@
 #include <ddktl/device.h>
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
-#include <fbl/ref_counted.h>
 
-#include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
+#include "src/graphics/display/lib/amlogic-hdmitx/amlogic-hdmitx.h"
 
 namespace aml_hdmi {
 
@@ -31,7 +30,7 @@ class AmlHdmiDevice;
 using DeviceType = ddk::Device<AmlHdmiDevice, ddk::Messageable<fuchsia_hardware_hdmi::Hdmi>::Mixin,
                                ddk::Unbindable>;
 
-class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
+class AmlHdmiDevice : public DeviceType {
  public:
   // Factory function called by the device manager binding code.
   static zx_status_t Create(zx_device_t* parent);
@@ -78,7 +77,7 @@ class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
   }
   void IsPoweredUp(IsPoweredUpRequestView request, IsPoweredUpCompleter::Sync& completer) override {
     ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
-    completer.Reply(is_powered_up_);
+    completer.Reply(true);
   }
   void Reset(ResetRequestView request, ResetCompleter::Sync& completer) override;
   void ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer) override;
@@ -97,24 +96,9 @@ class AmlHdmiDevice : public DeviceType, public fbl::RefCounted<AmlHdmiDevice> {
   void PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) override;
 
  private:
-  // Issues a secure monitor call (SMC) to ask the secure monitor to initialize
-  // HDCP 1.4 engine.
-  // The secure monitor call resource `smc_` must be valid.
-  zx_status_t InitializeHdcp14();
-
-  void WriteTopLevelReg(uint32_t addr, uint32_t val);
-  uint32_t ReadTopLevelReg(uint32_t addr);
-
-  void PrintRegister(const char* register_name, uint32_t register_address);
-
   ddk::PDevFidl pdev_;
-  fbl::Mutex dw_lock_;
-  std::unique_ptr<designware_hdmi::HdmiTransmitterController> hdmi_dw_ TA_GUARDED(dw_lock_);
-  zx::resource smc_;
 
-  std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio_;
-
-  bool is_powered_up_ = false;
+  std::unique_ptr<amlogic_display::HdmiTransmitter> hdmi_transmitter_;
 
   std::optional<component::OutgoingDirectory> outgoing_;
   fidl::ServerBindingGroup<fuchsia_hardware_hdmi::Hdmi> bindings_;

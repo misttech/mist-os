@@ -20,30 +20,13 @@
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 
-#include "src/graphics/display/drivers/aml-hdmi/top-regs.h"
+#include "src/graphics/display/lib/amlogic-hdmitx/amlogic-hdmitx.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware/color-param.h"
 #include "src/graphics/display/lib/designware/hdmi-transmitter-controller-impl.h"
 #include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
 
-#define HDMI_ASPECT_RATIO_NONE 0
-#define HDMI_ASPECT_RATIO_4x3 1
-#define HDMI_ASPECT_RATIO_16x9 2
-
-#define HDMI_COLORIMETRY_ITU601 1
-#define HDMI_COLORIMETRY_ITU709 2
-
-#define DWC_OFFSET_MASK (0x10UL << 24)
-
 namespace aml_hdmi {
-
-void AmlHdmiDevice::WriteTopLevelReg(uint32_t addr, uint32_t val) {
-  hdmitx_top_level_mmio_->Write32(val, addr);
-}
-
-uint32_t AmlHdmiDevice::ReadTopLevelReg(uint32_t addr) {
-  return hdmitx_top_level_mmio_->Read32(addr);
-}
 
 zx_status_t AmlHdmiDevice::Bind() {
   // TODO(fxbug.dev/132267): Use the builder / factory pattern instead
@@ -64,26 +47,42 @@ zx_status_t AmlHdmiDevice::Bind() {
            zx_status_get_string(status));
     return status;
   }
+
   {
-    fbl::AutoLock dw_lock(&dw_lock_);
-    hdmi_dw_ = std::make_unique<designware_hdmi::HdmiTransmitterControllerImpl>(
-        std::move(*hdmitx_controller_ip_mmio));
-  }
+    fbl::AllocChecker alloc_checker;
+    std::unique_ptr<designware_hdmi::HdmiTransmitterController> designware_controller =
+        fbl::make_unique_checked<designware_hdmi::HdmiTransmitterControllerImpl>(
+            &alloc_checker, std::move(*hdmitx_controller_ip_mmio));
+    if (!alloc_checker.check()) {
+      zxlogf(ERROR, "Could not allocate memory for HdmiDw");
+      return ZX_ERR_NO_MEMORY;
+    }
 
-  static constexpr uint32_t kHdmitxTopLevelIndex = 1;
-  status = pdev_.MapMmio(kHdmitxTopLevelIndex, &hdmitx_top_level_mmio_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not map MMIO HDMITX top-level registers: %s",
-           zx_status_get_string(status));
-    return status;
-  }
+    static constexpr uint32_t kHdmitxTopLevelIndex = 1;
+    std::optional<fdf::MmioBuffer> hdmitx_top_level_mmio;
+    status = pdev_.MapMmio(kHdmitxTopLevelIndex, &hdmitx_top_level_mmio);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Could not map MMIO HDMITX top-level registers: %s",
+             zx_status_get_string(status));
+      return status;
+    }
 
-  static constexpr uint32_t kSiliconProviderSmcIndex = 0;
-  status = pdev_.GetSmc(kSiliconProviderSmcIndex, &smc_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Could not get secure monitor call (SMC) resource: %s",
-           zx_status_get_string(status));
-    return status;
+    static constexpr uint32_t kSiliconProviderSmcIndex = 0;
+    zx::resource smc;
+    status = pdev_.GetSmc(kSiliconProviderSmcIndex, &smc);
+    if (status != ZX_OK) {
+      zxlogf(ERROR, "Could not get secure monitor call (SMC) resource: %s",
+             zx_status_get_string(status));
+      return status;
+    }
+
+    hdmi_transmitter_ = fbl::make_unique_checked<amlogic_display::HdmiTransmitter>(
+        &alloc_checker, std::move(designware_controller), std::move(*hdmitx_top_level_mmio),
+        std::move(smc));
+    if (!alloc_checker.check()) {
+      zxlogf(ERROR, "Could not allocate memory for HdmiTransmitter");
+      return ZX_ERR_NO_MEMORY;
+    }
   }
 
   async_dispatcher_t* dispatcher =
@@ -127,71 +126,15 @@ zx_status_t AmlHdmiDevice::Bind() {
 
 void AmlHdmiDevice::Reset(ResetRequestView request, ResetCompleter::Sync& completer) {
   ZX_DEBUG_ASSERT(request->display_id == 1);  // only supports 1 display for now
-  // TODO(fxb/69679): Add in Resets
-  // reset hdmi related blocks (HIU, HDMI SYS, HDMI_TX)
-  // auto reset0_result = display->reset_register_.WriteRegister32(PRESET0_REGISTER, 1 << 19, 1 <<
-  // 19); if ((reset0_result.status() != ZX_OK) || reset0_result->is_error()) {
-  //   zxlogf(ERROR, "Reset0 Write failed\n");
-  // }
 
-  /* FIXME: This will reset the entire HDMI subsystem including the HDCP engine.
-   * At this point, we have no way of initializing HDCP block, so we need to
-   * skip this for now.
-   */
-  // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 15, 1 <<
-  // 15); // Will mess up hdcp stuff if ((reset2_result.status() != ZX_OK) ||
-  // reset2_result->is_error()) {
-  //   zxlogf(ERROR, "Reset2 Write failed\n");
-  // }
+  zx::result<> result = hdmi_transmitter_->Reset();
 
-  // auto reset2_result = display->reset_register_.WriteRegister32(PRESET2_REGISTER, 1 << 2, 1 <<
-  // 2); if ((reset2_result.status() != ZX_OK) || reset2_result->is_error()) {
-  //   zxlogf(ERROR, "Reset2 Write failed\n");
-  // }
-
-  // Bring HDMI out of reset
-  WriteTopLevelReg(HDMITX_TOP_SW_RESET, 0);
-  usleep(200);
-  WriteTopLevelReg(HDMITX_TOP_CLK_CNTL, 0x000000ff);
-
-  fbl::AutoLock lock(&dw_lock_);
-  auto status = hdmi_dw_->InitHw();
-  if (status == ZX_OK) {
+  if (result.is_ok()) {
     completer.ReplySuccess();
   } else {
-    completer.ReplyError(status);
+    zxlogf(ERROR, "Failed to reset HDMI transmitter: %s", result.status_string());
+    completer.ReplyError(result.error_value());
   }
-}
-
-void CalculateTxParam(const display::DisplayTiming& display_timing,
-                      designware_hdmi::hdmi_param_tx* p) {
-  p->is4K = display_timing.pixel_clock_frequency_khz > 500'000;
-
-  if (display_timing.horizontal_active_px * 3 == display_timing.vertical_active_lines * 4) {
-    p->aspect_ratio = HDMI_ASPECT_RATIO_4x3;
-  } else if (display_timing.horizontal_active_px * 9 == display_timing.vertical_active_lines * 16) {
-    p->aspect_ratio = HDMI_ASPECT_RATIO_16x9;
-  } else {
-    p->aspect_ratio = HDMI_ASPECT_RATIO_NONE;
-  }
-
-  p->colorimetry = HDMI_COLORIMETRY_ITU601;
-}
-
-zx_status_t AmlHdmiDevice::InitializeHdcp14() {
-  ZX_DEBUG_ASSERT(smc_.is_valid());
-
-  static constexpr zx_smc_parameters_t params = {
-      // Silicon Provider secure monitor call: "HDCP14_INIT".
-      .func_id = 0x82000012,
-  };
-  zx_smc_result_t result = {};
-  zx_status_t status = zx_smc_call(smc_.get(), &params, &result);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize HDCP 1.4: %s", zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
 }
 
 void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& completer) {
@@ -202,61 +145,13 @@ void AmlHdmiDevice::ModeSet(ModeSetRequestView request, ModeSetCompleter::Sync& 
   const designware_hdmi::ColorParam color_param =
       designware_hdmi::ToColorParam(request->mode.color());
 
-  designware_hdmi::hdmi_param_tx p;
-  CalculateTxParam(display_timing, &p);
-
-  // Output normal TMDS Data
-  WriteTopLevelReg(HDMITX_TOP_BIST_CNTL, 1 << 12);
-
-  // Configure HDMI TX IP
-  fbl::AutoLock lock(&dw_lock_);
-  hdmi_dw_->ConfigHdmitx(color_param, display_timing, p);
-
-  // Initialize HDCP 1.4.
-  //
-  // AMLogic-provided bringup code initializes HDCP before clearing
-  // interrupts on the DesignWare HDMI IP's. Following the same sequence
-  // would be difficult given our current layering, as we clear interrupts
-  // in HdmiTransmitterController::ConfigHdmitx().
-  //
-  // Fortunately, experiments on VIM3 (using A311D) show that the HDCP
-  // initialization SMC still works if invoked after the interrupts are
-  // cleared.
-  if (smc_.is_valid()) {
-    InitializeHdcp14();
+  zx::result<> modeset_result = hdmi_transmitter_->ModeSet(display_timing, color_param);
+  if (modeset_result.is_ok()) {
+    completer.ReplySuccess();
   } else {
-    // TODO(fxbug.dev/123426): This could occur in tests where fake SMC
-    // resource objects are not yet supported. Once fake SMC is supported, we
-    // should enforce `smc_` to be always valid and always issue a
-    // `zx_smc_call()` syscall.
-    zxlogf(WARNING,
-           "Secure monitor call (SMC) resource is not available. "
-           "Skipping initializing HDCP 1.4.");
+    zxlogf(ERROR, "Failed to set HDMI mode: %s", modeset_result.status_string());
+    completer.ReplyError(modeset_result.error_value());
   }
-
-  WriteTopLevelReg(HDMITX_TOP_INTR_STAT_CLR, 0x0000001f);
-  hdmi_dw_->SetupInterrupts();
-  WriteTopLevelReg(HDMITX_TOP_INTR_MASKN, 0x9f);
-  hdmi_dw_->Reset();
-
-  if (p.is4K) {
-    // Setup TMDS Clocks (taken from recommended test pattern in DVI spec)
-    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0);
-    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x03ff03ff);
-  } else {
-    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_01, 0x001f001f);
-    WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_23, 0x001f001f);
-  }
-  hdmi_dw_->SetFcScramblerCtrl(p.is4K);
-
-  WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x1);
-  usleep(2);
-  WriteTopLevelReg(HDMITX_TOP_TMDS_CLK_PTTN_CNTL, 0x2);
-
-  hdmi_dw_->SetupScdc(p.is4K);
-  hdmi_dw_->ResetFc();
-
-  completer.ReplySuccess();
 }
 
 void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
@@ -327,10 +222,9 @@ void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
     return;
   }
 
-  fbl::AutoLock lock(&dw_lock_);
-  auto status = hdmi_dw_->EdidTransfer(op_list, request->ops.count());
+  zx::result<> i2c_transact_result = hdmi_transmitter_->I2cTransact(op_list, request->ops.count());
 
-  if (status == ZX_OK) {
+  if (i2c_transact_result.is_ok()) {
     fidl::Arena allocator;
     fidl::VectorView<fidl::VectorView<uint8_t>> reads(allocator, read_cnt);
     size_t read_ops_cnt = 0;
@@ -344,29 +238,12 @@ void AmlHdmiDevice::EdidTransfer(EdidTransferRequestView request,
     }
     completer.ReplySuccess(std::move(reads));
   } else {
-    completer.ReplyError(status);
+    completer.ReplyError(i2c_transact_result.error_value());
   }
 }
 
-void AmlHdmiDevice::PrintRegister(const char* register_name, uint32_t register_address) {
-  zxlogf(INFO, "%s (0x%04" PRIx32 "): %" PRIu32, register_name, register_address,
-         ReadTopLevelReg(register_address));
-}
-
 void AmlHdmiDevice::PrintHdmiRegisters(PrintHdmiRegistersCompleter::Sync& completer) {
-  zxlogf(INFO, "------------Top Registers------------");
-  PrintRegister("HDMITX_TOP_SW_RESET", HDMITX_TOP_SW_RESET);
-  PrintRegister("HDMITX_TOP_CLK_CNTL", HDMITX_TOP_CLK_CNTL);
-  PrintRegister("HDMITX_TOP_INTR_MASKN", HDMITX_TOP_INTR_MASKN);
-  PrintRegister("HDMITX_TOP_INTR_STAT_CLR", HDMITX_TOP_INTR_STAT_CLR);
-  PrintRegister("HDMITX_TOP_BIST_CNTL", HDMITX_TOP_BIST_CNTL);
-  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_01", HDMITX_TOP_TMDS_CLK_PTTN_01);
-  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_23", HDMITX_TOP_TMDS_CLK_PTTN_23);
-  PrintRegister("HDMITX_TOP_TMDS_CLK_PTTN_CNTL", HDMITX_TOP_TMDS_CLK_PTTN_CNTL);
-
-  fbl::AutoLock lock(&dw_lock_);
-  hdmi_dw_->PrintRegisters();
-
+  hdmi_transmitter_->PrintRegisters();
   completer.Reply();
 }
 
@@ -391,13 +268,11 @@ AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent)
 AmlHdmiDevice::AmlHdmiDevice(zx_device_t* parent, fdf::MmioBuffer hdmitx_top_level_mmio,
                              std::unique_ptr<designware_hdmi::HdmiTransmitterController> hdmi_dw,
                              zx::resource smc)
-    : DeviceType(parent),
-      pdev_(parent),
-      hdmi_dw_(std::move(hdmi_dw)),
-      smc_(std::move(smc)),
-      hdmitx_top_level_mmio_(std::move(hdmitx_top_level_mmio)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
-  ZX_DEBUG_ASSERT(hdmi_dw_);
+    : DeviceType(parent), pdev_(parent), loop_(&kAsyncLoopConfigNoAttachToCurrentThread) {
+  fbl::AllocChecker alloc_checker;
+  hdmi_transmitter_ = fbl::make_unique_checked<amlogic_display::HdmiTransmitter>(
+      &alloc_checker, std::move(hdmi_dw), std::move(hdmitx_top_level_mmio), std::move(smc));
+  ZX_ASSERT(alloc_checker.check());
 }
 
 AmlHdmiDevice::~AmlHdmiDevice() = default;
