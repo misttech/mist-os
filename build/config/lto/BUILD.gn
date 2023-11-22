@@ -37,6 +37,16 @@ variant("lto") {
       "$disable_branch_funneling",
     ]
     ldflags = [ "-Wl,-mllvm,$disable_branch_funneling" ]
+
+    # TODO(fxbug.dev/136557): The linker flags below are required to avoid code
+    # generation bugs during LTO. They can be removed once LTO properly handles
+    # target features
+    if (target_cpu == "riscv64") {
+      ldflags += [
+        "-Wl,-mllvm,-mattr=+c",
+        "-Wl,-mllvm,-mattr=+relax",
+      ]
+    }
   }
 
   rustflags = [ "-Clto=fat" ]
@@ -68,5 +78,16 @@ variant("thinlto") {
     # periodically garbage-collected by the ThinLTO driver.
     "-Wl,${_cache_dir}$thinlto_cache_dir",
   ]
+
+  # TODO(fxbug.dev/136557): The linker flags below are required to avoid code
+  # generation bugs during LTO. They can be removed once LTO properly handles
+  # target features
+  if (target_cpu == "riscv64") {
+    ldflags += [
+      "-Wl,-mllvm,-mattr=+c",
+      "-Wl,-mllvm,-mattr=+relax",
+    ]
+  }
+
   rustflags = [ "-Clto=thin" ]
 }
