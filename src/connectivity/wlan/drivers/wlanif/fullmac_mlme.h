@@ -8,7 +8,6 @@
 #include <zircon/types.h>
 
 #include <memory>
-#include <optional>
 
 #include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h"
 
