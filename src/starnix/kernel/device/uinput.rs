@@ -22,7 +22,10 @@ use starnix_uapi::{
     uapi,
     user_address::{UserAddress, UserRef},
 };
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU32, Ordering},
+    Arc,
+};
 
 // Return the current uinput API version 5, it also told caller this uinput
 // supports UI_DEV_SETUP.
@@ -138,14 +141,34 @@ impl UinputDevice {
 
         add_and_register_input_device(current_task, VirtualDevice { input_id, device_type });
 
+        new_device();
+
         Ok(SUCCESS)
     }
 
     fn ui_dev_destroy(&self) -> Result<SyscallResult, Errno> {
         // TODO(b/302174354): impl ui_dev_destroy.
         log_info!("ui_dev_destroy()");
+
+        destroy_device();
+
         Ok(SUCCESS)
     }
+}
+
+// TODO(b/312467059): Remove once ESC -> Power workaround can be remove.
+static COUNT_OF_UINPUT_DEVICE: AtomicU32 = AtomicU32::new(0);
+
+fn new_device() {
+    let _ = COUNT_OF_UINPUT_DEVICE.fetch_add(1, Ordering::SeqCst);
+}
+
+fn destroy_device() {
+    let _ = COUNT_OF_UINPUT_DEVICE.fetch_add(1, Ordering::SeqCst);
+}
+
+pub fn uinput_running() -> bool {
+    COUNT_OF_UINPUT_DEVICE.load(Ordering::SeqCst) > 0
 }
 
 impl FileOps for Arc<UinputDevice> {

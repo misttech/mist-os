@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::logging::log_warn;
+use crate::{device::uinput, logging::log_warn};
 use fidl_fuchsia_input::Key;
 use fidl_fuchsia_ui_input3 as fuiinput;
 use fuchsia_zircon as zx;
+use once_cell::sync::Lazy;
 use starnix_uapi::{time::timeval_from_time, uapi};
 use std::collections::HashMap;
 
@@ -19,18 +20,34 @@ pub fn parse_fidl_keyboard_event_to_linux_input_event(
     e: &fuiinput::KeyEvent,
 ) -> Vec<uapi::input_event> {
     match e {
-        // TODO(b/312467059): keep this ESC -> Power workaround for debug.
         &fuiinput::KeyEvent {
             timestamp: Some(time_nanos),
             type_: Some(event_type),
-            key: Some(fidl_fuchsia_input::Key::Escape),
+            key: Some(key),
             ..
         } => {
+            let lkey = KEY_MAP.fuchsia_input_key_to_linux_keycode(key);
+            // return empty for unknown keycode.
+            if lkey == uapi::KEY_RESERVED {
+                return vec![];
+            }
+            let lkey = match lkey {
+                // TODO(b/312467059): keep this ESC -> Power workaround for debug.
+                uapi::KEY_ESC => {
+                    if uinput::uinput_running() {
+                        uapi::KEY_ESC
+                    } else {
+                        uapi::KEY_POWER
+                    }
+                }
+                k => k,
+            };
+
             let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
             let key_event = uapi::input_event {
                 time,
                 type_: uapi::EV_KEY as u16,
-                code: uapi::KEY_POWER as u16,
+                code: lkey as u16,
                 value: if event_type == fuiinput::KeyEventType::Pressed { 1 } else { 0 },
             };
 
@@ -51,8 +68,9 @@ pub fn parse_fidl_keyboard_event_to_linux_input_event(
     }
 }
 
+static KEY_MAP: Lazy<KeyMap> = Lazy::new(|| init_key_map());
+
 /// linux <-> fuchsia key map allow search from 2 way.
-#[allow(dead_code)]
 pub struct KeyMap {
     linux_to_fuchsia: HashMap<u32, Key>,
     fuchsia_to_linux: HashMap<Key, u32>,
@@ -89,7 +107,6 @@ impl KeyMap {
         }
     }
 
-    #[allow(dead_code)]
     pub fn fuchsia_input_key_to_linux_keycode(&self, key: Key) -> u32 {
         match self.fuchsia_to_linux.get(&key) {
             Some(k) => *k,
@@ -102,8 +119,7 @@ impl KeyMap {
     }
 }
 
-#[allow(dead_code)]
-pub fn init_key_map() -> KeyMap {
+fn init_key_map() -> KeyMap {
     let mut m = KeyMap { linux_to_fuchsia: HashMap::new(), fuchsia_to_linux: HashMap::new() };
 
     m.insert(uapi::KEY_ESC, Key::Escape);

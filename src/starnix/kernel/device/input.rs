@@ -1481,8 +1481,10 @@ mod test {
         responses.get(0).cloned()
     }
 
+    #[test_case(fidl_fuchsia_input::Key::Escape, uapi::KEY_POWER; "Esc maps to Power")]
+    #[test_case(fidl_fuchsia_input::Key::A, uapi::KEY_A; "A maps to A")]
     #[::fuchsia::test]
-    async fn sends_keyboard_events() {
+    async fn sends_keyboard_events(fkey: fidl_fuchsia_input::Key, lkey: u32) {
         let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
 
@@ -1503,7 +1505,7 @@ mod test {
         let key_event = fuiinput::KeyEvent {
             timestamp: Some(0),
             type_: Some(fuiinput::KeyEventType::Pressed),
-            key: Some(fidl_fuchsia_input::Key::Escape),
+            key: Some(fkey),
             ..Default::default()
         };
 
@@ -1513,11 +1515,11 @@ mod test {
         relay_thread.join().expect("relay thread failed"); // Wait for relay thread to finish.
         let events = read_uapi_events(keyboard_file, &file_object, &current_task);
         assert_eq!(events.len(), 2);
-        assert_eq!(events[0].code, uapi::KEY_POWER as u16);
+        assert_eq!(events[0].code, lkey as u16);
     }
 
     #[::fuchsia::test]
-    async fn skips_non_esc_keyboard_events() {
+    async fn skips_unknown_keyboard_events() {
         let (keyboard_file, mut keyboard_stream, relay_thread) = start_keyboard_input();
         let (_kernel, current_task, file_object) = make_kernel_objects(keyboard_file.clone());
 
@@ -1538,7 +1540,7 @@ mod test {
         let key_event = fuiinput::KeyEvent {
             timestamp: Some(0),
             type_: Some(fuiinput::KeyEventType::Pressed),
-            key: Some(fidl_fuchsia_input::Key::A),
+            key: Some(fidl_fuchsia_input::Key::AcRefresh),
             ..Default::default()
         };
 
