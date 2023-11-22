@@ -277,7 +277,10 @@ impl Pager {
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
     pub fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
-            error!(error = ?e, "dirty_pages failed");
+            // TODO(fxbug.dev/136457): The kernel can spuriously return ZX_ERR_NOT_FOUND.
+            if e != zx::Status::NOT_FOUND {
+                error!(error = ?e, "dirty_pages failed");
+            }
         }
     }
 
