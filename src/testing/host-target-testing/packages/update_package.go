@@ -6,6 +6,7 @@ package packages
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -94,10 +95,62 @@ func (u *UpdatePackage) OpenSystemImagePackage(ctx context.Context) (*SystemImag
 		return nil, err
 	}
 
-	return &SystemImagePackage{
-		p:        p,
-		packages: u.packages,
-	}, nil
+	systemImagePackage, err := newSystemImagePackage(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+
+	// Make sure that the system image and the `packages.json` file are
+	// consistent.
+	packagesMerkles := make(map[build.MerkleRoot]string)
+	for path, merkle := range u.packages {
+		// TODO(b/312027540): Ignore `subpackage_blobs/0` package merkle, which
+		// shouldn't be in the static packages manifest. We can remove this
+		// after a stepping stone release.
+		if path == "subpackage_blobs/0" {
+			continue
+		}
+
+		if merkle != p.Merkle() {
+			packagesMerkles[merkle] = path
+		}
+	}
+
+	systemImageMerkles := make(map[build.MerkleRoot]string)
+	for path, merkle := range systemImagePackage.packages {
+		systemImageMerkles[merkle] = path
+	}
+
+	for merkle, path := range packagesMerkles {
+		if _, ok := systemImageMerkles[merkle]; ok {
+			delete(systemImageMerkles, merkle)
+		} else {
+			return nil, fmt.Errorf(
+				"update package %s `packages.json` has package %s merkle %s, but it is missing in system image %s",
+				u.Path(),
+				path,
+				merkle,
+				p.Path(),
+			)
+		}
+	}
+
+	if len(systemImageMerkles) != 0 {
+		var b bytes.Buffer
+		for merkle, path := range systemImageMerkles {
+			b.WriteString(fmt.Sprintf("- %s %s\n", path, merkle.String()))
+		}
+
+		return nil, fmt.Errorf(
+			"system image %s contains packages that are not in the update package %s `packages.json`:\n%s",
+			p.Path(),
+			u.Path(),
+			b.String(),
+		)
+
+	}
+
+	return systemImagePackage, nil
 }
 
 func (u *UpdatePackage) OpenUpdateImages(ctx context.Context) (*UpdateImages, error) {

@@ -7,6 +7,7 @@ package packages
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,11 +17,13 @@ import (
 
 	"go.fuchsia.dev/fuchsia/src/sys/pkg/bin/pm/build"
 	far "go.fuchsia.dev/fuchsia/src/sys/pkg/lib/far/go"
+	"go.fuchsia.dev/fuchsia/src/sys/pkg/lib/merkle"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
 const (
-	BlobBlockSize = 4096
+	BlobBlockSize   = 4096
+	maxBlobFileSize = BlobBlockSize * 1000
 )
 
 type FileData []byte
@@ -253,23 +256,59 @@ func (p *Package) TransitiveBlobSize(ctx context.Context) (uint64, error) {
 	return p.repo.sumBlobSizes(ctx, blobs)
 }
 
-// AddRandomFiles will add random files to this package that increases the
-// package size up to `maxSize` bytes. Each file will be less than 10MiB.
-func (p *Package) AddRandomFiles(
+// AddRandomFilesWithAdditionalBytes will add random files to this package that
+// will increase the package size with `bytesToAdd` additional bytes.
+func (p *Package) AddRandomFilesWithAdditionalBytes(
+	ctx context.Context,
+	rand *rand.Rand,
+	dstPath string,
+	bytesToAdd uint64,
+) (Package, error) {
+	logger.Infof(ctx, "Adding %d bytes to package %s", bytesToAdd, p.path)
+
+	return p.EditContents(ctx, dstPath, func(tempDir string) error {
+		otaTestDir := filepath.Join(tempDir, "ota-test")
+		if err := os.Mkdir(otaTestDir, 0700); err != nil {
+			return fmt.Errorf("failed to create %s: %w", otaTestDir, err)
+		}
+
+		for bytesToAdd > 0 {
+			// Create blobs up to 4MiB.
+			var blobSize uint64
+			if maxBlobFileSize < bytesToAdd {
+				blobSize = maxBlobFileSize
+			} else {
+				blobSize = bytesToAdd
+			}
+
+			if err := generateRandomFile(ctx, rand, otaTestDir, blobSize); err != nil {
+				return err
+			}
+			bytesToAdd -= blobSize
+		}
+
+		return nil
+	})
+}
+
+// AddRandomFilesWithUpperBound will add random files to this package that
+// increases the package size up to `maxSize` bytes.
+func (p *Package) AddRandomFilesWithUpperBound(
 	ctx context.Context,
 	rand *rand.Rand,
 	dstPath string,
 	maxSize uint64,
 ) (Package, error) {
-	initialBlobs, err := p.TransitiveBlobs(ctx)
-	if err != nil {
-		return Package{}, err
-	}
-
-	return p.addRandomFiles(ctx, rand, dstPath, maxSize, initialBlobs)
+	return p.addRandomFilesWithUpperBound(
+		ctx,
+		rand,
+		dstPath,
+		maxSize,
+		map[build.MerkleRoot]struct{}{},
+	)
 }
 
-func (p *Package) addRandomFiles(
+func (p *Package) addRandomFilesWithUpperBound(
 	ctx context.Context,
 	rand *rand.Rand,
 	dstPath string,
@@ -301,9 +340,12 @@ func (p *Package) addRandomFiles(
 
 	bytesToAdd := maxSize - initialSize
 	for bytesToAdd > 0 {
-		dstPackage, err := p.repo.EditPackage(ctx, *p, dstPath, func(tempDir string) error {
-			return generateRandomFiles(ctx, rand, tempDir, bytesToAdd)
-		})
+		dstPackage, err := p.AddRandomFilesWithAdditionalBytes(
+			ctx,
+			rand,
+			dstPath,
+			bytesToAdd,
+		)
 		if err != nil {
 			return Package{}, fmt.Errorf(
 				"failed to create the package %s: %w",
@@ -360,61 +402,30 @@ func (p *Package) addRandomFiles(
 	)
 }
 
-// GenerateRandomFiles will create a number of files that sum up to
-// `bytesToAdd` random bytes, each which will be less than 10MiB.
-func generateRandomFiles(
+func generateRandomFile(
 	ctx context.Context,
 	rand *rand.Rand,
-	tempDir string,
-	bytesToAdd uint64,
+	dir string,
+	blobSize uint64,
 ) error {
-	otaTestDir := filepath.Join(tempDir, "ota-test")
-	if err := os.Mkdir(otaTestDir, 0700); err != nil {
-		return fmt.Errorf("failed to create %s: %w", otaTestDir, err)
+	b := make([]byte, blobSize)
+
+	if _, err := rand.Read(b); err != nil {
+		return fmt.Errorf("failed to read %d random bytes: %w", blobSize, err)
 	}
 
-	index := 0
-	bytes := [BlobBlockSize]byte{}
-
-	const maxBlobSize = BlobBlockSize * 1000
-
-	for bytesToAdd > 0 {
-		// Create blobs up to 4MiB.
-		var blobSize uint64
-		if maxBlobSize < bytesToAdd {
-			blobSize = maxBlobSize
-		} else {
-			blobSize = bytesToAdd
-		}
-		bytesToAdd -= blobSize
-
-		blobPath := filepath.Join(otaTestDir, fmt.Sprintf("ota-test-file-%06d", index))
-		f, err := os.Create(blobPath)
-		if err != nil {
-			return fmt.Errorf("failed to create %s: %w", blobPath, err)
-		}
-		defer f.Close()
-
-		for blobSize > 0 {
-			var n uint64
-			if blobSize < BlobBlockSize {
-				n = blobSize
-			} else {
-				n = BlobBlockSize
-			}
-			blobSize -= n
-
-			if _, err := rand.Read(bytes[:n]); err != nil {
-				return fmt.Errorf("failed to read %d random bytes: %w", n, err)
-			}
-
-			if _, err := f.Write(bytes[:n]); err != nil {
-				return fmt.Errorf("failed to write random bytes to %s: %w", blobPath, err)
-			}
-		}
-
-		index += 1
+	var tree merkle.Tree
+	if _, err := tree.ReadFrom(bytes.NewReader(b)); err != nil {
+		return fmt.Errorf("failed to compute merkle: %w", err)
 	}
+	merkle := hex.EncodeToString(tree.Root())
+
+	blobPath := filepath.Join(dir, merkle)
+	if err := os.WriteFile(blobPath, b, 0600); err != nil {
+		return fmt.Errorf("failed to write %s: %w", blobPath, err)
+	}
+
+	logger.Infof(ctx, "generated blob %s with %d size", merkle, blobSize)
 
 	return nil
 }

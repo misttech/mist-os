@@ -196,7 +196,7 @@ func doTestOTAs(
 	// Install version N on the device if it is not already on that version.
 	expectedSystemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 	if err != nil {
-		return fmt.Errorf("error extracting expected system image merkle: %w", err)
+		return fmt.Errorf("error extracting expected system image merkle from %s: %w", updatePackage.Path(), err)
 	}
 
 	// Attempt to check if the device is up-to-date, up to downgradeOTAAttempts times.
@@ -341,7 +341,7 @@ func initializeDevice(
 
 		systemImage, err := updatePackage.OpenSystemImagePackage(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("error extracting expected system image merkle: %w", err)
+			return nil, fmt.Errorf("error extracting expected system image merkle from %s: %w", updatePackage.Path(), err)
 		}
 		expectedSystemImage = systemImage
 	}
@@ -659,25 +659,13 @@ func AddRandomFilesToUpdate(
 		return nil, nil, fmt.Errorf("error determining system image size: %w", err)
 	}
 
-	// If we didn't specify a max system image size, use the max size with an
-	// extra block to make it unique. Otherwise, make sure the current system
-	// size is less than the max size.
-	maxSystemImageSize := c.maxSystemImageSize
-	if maxSystemImageSize == 0 {
-		maxSystemImageSize = systemImageSize + packages.BlobBlockSize
-	} else if maxSystemImageSize < systemImageSize {
-		return nil, nil, fmt.Errorf(
-			"max system image size %d is smaller than the size of the system image %d",
-			c.maxSystemImageSize,
-			systemImageSize,
-		)
-	}
-
 	dstUpdateParts := strings.Split(dstUpdatePath, "/")
 	dstUpdateName := dstUpdateParts[0]
-
-	// Add random files to the system image package in the update.
 	dstSystemImagePath := fmt.Sprintf("%s_system_image/0", dstUpdateName)
+
+	// Add random files to the system image package in the update. Clamp the
+	// package size to the upper bound if we have one, otherwise we'll just add
+	// a single block to make it unique.
 	dstUpdate, dstSystemImage, err := srcUpdate.EditSystemImagePackage(
 		ctx,
 		avbTool,
@@ -687,12 +675,27 @@ func AddRandomFilesToUpdate(
 		c.bootfsCompression,
 		c.useNewUpdateFormat,
 		func(systemImage *packages.SystemImagePackage) (*packages.SystemImagePackage, error) {
-			return systemImage.AddRandomFiles(
-				ctx,
-				rand,
-				dstSystemImagePath,
-				maxSystemImageSize,
-			)
+			if c.maxSystemImageSize == 0 {
+				return systemImage.AddRandomFilesWithAdditionalBytes(
+					ctx,
+					rand,
+					dstSystemImagePath,
+					packages.BlobBlockSize,
+				)
+			} else if c.maxSystemImageSize < systemImageSize {
+				return nil, fmt.Errorf(
+					"max system image size %d is smaller than the size of the system image %d",
+					c.maxSystemImageSize,
+					systemImageSize,
+				)
+			} else {
+				return systemImage.AddRandomFilesWithUpperBound(
+					ctx,
+					rand,
+					dstSystemImagePath,
+					c.maxSystemImageSize,
+				)
+			}
 		},
 	)
 	if err != nil {
@@ -711,7 +714,7 @@ func AddRandomFilesToUpdate(
 			ctx,
 			dstUpdatePath,
 			func(updateImages *packages.UpdateImages) (*packages.UpdateImages, error) {
-				return updateImages.AddRandomFiles(
+				return updateImages.AddRandomFilesWithUpperBound(
 					ctx,
 					rand,
 					dstZbiPath,
@@ -734,7 +737,7 @@ func AddRandomFilesToUpdate(
 		dstUpdate, err = dstUpdate.EditPackage(
 			ctx,
 			func(p packages.Package) (packages.Package, error) {
-				return p.AddRandomFiles(
+				return p.AddRandomFilesWithUpperBound(
 					ctx,
 					rand,
 					dstUpdatePath,

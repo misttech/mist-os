@@ -192,6 +192,13 @@ func (u *UpdateImages) UpdateImagesSize(ctx context.Context) (uint64, error) {
 }
 
 func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleRoot]struct{}, error) {
+	return u.updateImagesBlobs(ctx, false)
+}
+
+func (u *UpdateImages) updateImagesBlobs(
+	ctx context.Context,
+	ignoreZbi bool,
+) (map[build.MerkleRoot]struct{}, error) {
 	visitedPackages := make(map[build.MerkleRoot]struct{})
 	blobs := make(map[build.MerkleRoot]struct{})
 
@@ -199,6 +206,10 @@ func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleR
 		url, merkle, err := util.ParsePackageUrl(partition.Url)
 		if err != nil {
 			return nil, err
+		}
+
+		if ignoreZbi && u.zbiPackage.Merkle() == merkle {
+			continue
 		}
 
 		pkg, err := newPackage(ctx, u.repo, url.Path[1:], merkle)
@@ -230,13 +241,13 @@ func (u *UpdateImages) UpdateImagesBlobs(ctx context.Context) (map[build.MerkleR
 	return blobs, nil
 }
 
-func (u *UpdateImages) AddRandomFiles(
+func (u *UpdateImages) AddRandomFilesWithUpperBound(
 	ctx context.Context,
 	rand *rand.Rand,
 	dstUpdateImagesPath string,
 	maxSize uint64,
 ) (*UpdateImages, error) {
-	initialBlobs, err := u.UpdateImagesBlobs(ctx)
+	additionalBlobs, err := u.updateImagesBlobs(ctx, true)
 	if err != nil {
 		return nil, err
 	}
@@ -244,12 +255,12 @@ func (u *UpdateImages) AddRandomFiles(
 	return u.EditZbiAndVbmetaPackage(
 		ctx,
 		func(p Package, zbiName string, vbmetaName string) (Package, error) {
-			return p.addRandomFiles(
+			return p.addRandomFilesWithUpperBound(
 				ctx,
 				rand,
 				dstUpdateImagesPath,
 				maxSize,
-				initialBlobs,
+				additionalBlobs,
 			)
 		},
 	)
