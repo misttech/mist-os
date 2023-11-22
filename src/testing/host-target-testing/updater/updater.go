@@ -50,12 +50,32 @@ type Updater interface {
 
 func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
 	logger.Infof(ctx, "Checking system log for errors")
-	cmd := []string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"}
 
+	// Try to dump logs using the new logger.
 	var stdout bytes.Buffer
+	if err := c.Run(
+		ctx,
+		[]string{"log_listener", "--tag", "system-updater", "dump"},
+		&stdout,
+		os.Stderr,
+	); err != nil {
+		// Don't bother trying to fall back to the old command if we
+		// disconnected from the device.
+		var errExitMissing *ssh.ExitMissingError
+		if errors.As(err, &errExitMissing) {
+			return err
+		}
 
-	if err := c.Run(ctx, cmd, &stdout, os.Stderr); err != nil {
-		return err
+		// Otherwise fall back to the old logger
+		stdout = bytes.Buffer{}
+		if err := c.Run(
+			ctx,
+			[]string{"log_listener", "--tag", "system-updater", "--dump_logs", "yes"},
+			&stdout,
+			os.Stderr,
+		); err != nil {
+			return err
+		}
 	}
 
 	re := regexp.MustCompile("skipping unsupported .* type:")
@@ -68,18 +88,6 @@ func checkSyslogForUnknownFirmware(ctx context.Context, c client) error {
 		}
 	}
 
-	return nil
-}
-
-func SyslogForUnknownFirmwareIgnoreDisconnect(ctx context.Context, c client) error {
-	if err := checkSyslogForUnknownFirmware(ctx, c); err != nil {
-		var errExitMissing *ssh.ExitMissingError
-		if errors.As(err, &errExitMissing) {
-			logger.Warningf(ctx, "disconnected, assuming did not install unknown firmware")
-			return nil
-		}
-		return err
-	}
 	return nil
 }
 
@@ -210,14 +218,15 @@ func updateCheckNow(
 			"check-now",
 			"--monitor",
 		}
-		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err == nil {
-			if checkForUnkownFirmware {
-				// FIXME(fxbug.dev/126805): We wouldn't have to ignore disconnects if we could trigger an update without it automatically rebooting.
-				if err := SyslogForUnknownFirmwareIgnoreDisconnect(ctx, c); err != nil {
-					return err
-				}
-			}
-		} else {
+
+		err = c.Run(ctx, cmd, os.Stdout, os.Stderr)
+		if err == nil && checkForUnkownFirmware {
+			// FIXME(fxbug.dev/126805): We wouldn't have to ignore disconnects
+			// if we could trigger an update without it automatically rebooting.
+			err = checkSyslogForUnknownFirmware(ctx, c)
+		}
+
+		if err != nil {
 			// If the device rebooted before ssh was able to tell
 			// us the command ran, it will tell us the session
 			// exited without passing along an exit code. So,
@@ -307,7 +316,7 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 
 	logger.Infof(ctx, "OTA successfully downloaded in %s", time.Now().Sub(startTime))
 
-	if err := SyslogForUnknownFirmwareIgnoreDisconnect(ctx, c); err != nil {
+	if err := checkSyslogForUnknownFirmware(ctx, c); err != nil {
 		return err
 	}
 
