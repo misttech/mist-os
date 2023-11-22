@@ -223,7 +223,9 @@ class TestExecution:
             command.CommandOutput: The output of executing this command.
         """
         if self._test.is_e2e_test() and not flags.e2e:
-            raise TestSkipped("Skipping optional end to end test")
+            raise TestSkipped(
+                "Skipping optional end to end test. Pass --e2e to execute this test."
+            )
 
         symbolize = self.should_symbolize()
         command = self.command_line()
