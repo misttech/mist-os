@@ -191,7 +191,7 @@ pub enum MappingName {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct Mapping {
+struct MappingBackingVmo {
     /// The base address of this mapping.
     ///
     /// Keep in mind that the mapping might be trimmed in the RangeMap if the
@@ -204,6 +204,18 @@ struct Mapping {
 
     /// The offset in the VMO that corresponds to the base address.
     vmo_offset: u64,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+enum MappingBacking {
+    Vmo(MappingBackingVmo),
+    // TODO(b/310255065): Add alternate backing strategy behind cfg(feature = "alternate_anon_allocs")
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct Mapping {
+    /// Object backing this mapping.
+    backing: MappingBacking,
 
     /// The flags used by the mapping, including protection.
     flags: MappingFlags,
@@ -241,12 +253,21 @@ impl Mapping {
         name: MappingName,
         file_write_guard: FileWriteGuardRef,
     ) -> Mapping {
-        Mapping { base, vmo, vmo_offset, flags, name, file_write_guard }
+        Mapping {
+            backing: MappingBacking::Vmo(MappingBackingVmo { base, vmo, vmo_offset }),
+            flags,
+            name,
+            file_write_guard,
+        }
     }
 
     /// Converts a `UserAddress` to an offset in this mapping's VMO.
     fn address_to_offset(&self, addr: UserAddress) -> u64 {
-        (addr.ptr() - self.base.ptr()) as u64 + self.vmo_offset
+        match &self.backing {
+            MappingBacking::Vmo(backing) => {
+                (addr.ptr() - backing.base.ptr()) as u64 + backing.vmo_offset
+            }
+        }
     }
 
     fn can_read(&self) -> bool {
@@ -279,11 +300,14 @@ impl Mapping {
         if !self.can_read() {
             return error!(EFAULT);
         }
-
-        self.vmo.read_uninit(bytes, self.address_to_offset(addr)).map_err(|e| {
-            log_warn!("Got an error when reading from vmo: {:?}", e);
-            errno!(EFAULT)
-        })
+        match &self.backing {
+            MappingBacking::Vmo(backing) => {
+                backing.vmo.read_uninit(bytes, self.address_to_offset(addr)).map_err(|e| {
+                    log_warn!("Got an error when reading from vmo: {:?}", e);
+                    errno!(EFAULT)
+                })
+            }
+        }
     }
 
     /// Writes the provided bytes to `addr`.
@@ -296,7 +320,11 @@ impl Mapping {
         if !self.can_write() {
             return error!(EFAULT);
         }
-        self.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
+        match &self.backing {
+            MappingBacking::Vmo(backing) => {
+                backing.vmo.write(bytes, self.address_to_offset(addr)).map_err(|_| errno!(EFAULT))
+            }
+        }
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
@@ -305,10 +333,15 @@ impl Mapping {
             return error!(EFAULT);
         }
 
-        self.vmo
-            .op_range(zx::VmoOp::ZERO, self.address_to_offset(addr), length as u64)
-            .map_err(|_| errno!(EFAULT))?;
-        Ok(length)
+        match &self.backing {
+            MappingBacking::Vmo(backing) => {
+                backing
+                    .vmo
+                    .op_range(zx::VmoOp::ZERO, self.address_to_offset(addr), length as u64)
+                    .map_err(|_| errno!(EFAULT))?;
+                Ok(length)
+            }
+        }
     }
 }
 
@@ -672,39 +705,45 @@ impl MemoryManagerState {
         // Compute the new length of the entire mapping once it has grown.
         let final_length = (original_range.end - original_range.start) + (new_length - old_length);
 
-        if original_mapping.private_anonymous() {
-            // As a special case for private, anonymous mappings, allocate more space in the
-            // VMO. FD-backed mappings have their backing memory handled by the file system.
-            let new_vmo_size = original_mapping
-                .vmo_offset
-                .checked_add(final_length as u64)
-                .ok_or_else(|| errno!(EINVAL))?;
-            original_mapping
-                .vmo
-                .set_size(new_vmo_size)
-                .map_err(MemoryManager::get_errno_for_map_err)?;
-            // Zero-out the pages that were added when growing. This is not necessary, but ensures
-            // correctness of our COW implementation. Ignore any errors.
-            let original_length = original_range.end - original_range.start;
-            let _ = original_mapping.vmo.op_range(
-                zx::VmoOp::ZERO,
-                original_mapping.vmo_offset + original_length as u64,
-                (final_length - original_length) as u64,
-            );
-        }
+        let private_anonymous = original_mapping.private_anonymous();
 
-        // Re-map the original range, which may include pages before the requested range.
-        Ok(Some(self.map_vmo(
-            DesiredAddress::FixedOverwrite(original_range.start),
-            original_mapping.vmo,
-            original_mapping.vmo_offset,
-            final_length,
-            original_mapping.flags,
-            false,
-            original_mapping.name,
-            original_mapping.file_write_guard,
-            released_mappings,
-        )?))
+        // As a special case for private, anonymous mappings, allocate more space in the
+        // VMO. FD-backed mappings have their backing memory handled by the file system.
+        match original_mapping.backing {
+            MappingBacking::Vmo(backing) => {
+                if private_anonymous {
+                    let new_vmo_size = backing
+                        .vmo_offset
+                        .checked_add(final_length as u64)
+                        .ok_or_else(|| errno!(EINVAL))?;
+                    backing
+                        .vmo
+                        .set_size(new_vmo_size)
+                        .map_err(MemoryManager::get_errno_for_map_err)?;
+                    // Zero-out the pages that were added when growing. This is not necessary, but ensures
+                    // correctness of our COW implementation. Ignore any errors.
+                    let original_length = original_range.end - original_range.start;
+                    let _ = backing.vmo.op_range(
+                        zx::VmoOp::ZERO,
+                        backing.vmo_offset + original_length as u64,
+                        (final_length - original_length) as u64,
+                    );
+                }
+
+                // Re-map the original range, which may include pages before the requested range.
+                Ok(Some(self.map_vmo(
+                    DesiredAddress::FixedOverwrite(original_range.start),
+                    backing.vmo,
+                    backing.vmo_offset,
+                    final_length,
+                    original_mapping.flags,
+                    false,
+                    original_mapping.name,
+                    original_mapping.file_write_guard,
+                    released_mappings,
+                )?))
+            }
+        }
     }
 
     /// Grows or shrinks the mapping while moving it to a new destination.
@@ -760,38 +799,40 @@ impl MemoryManagerState {
         }
 
         let offset_into_original_range = (src_addr - original_range.start) as u64;
-        let mut dst_vmo_offset = src_mapping.vmo_offset + offset_into_original_range;
-
-        let vmo = if src_mapping.private_anonymous() {
-            // This mapping is a private, anonymous mapping. Create a COW child VMO that covers
-            // the pages being moved and map that into the destination.
-            let child_vmo = src_mapping
-                .vmo
-                .create_child(
-                    zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                    dst_vmo_offset,
-                    dst_length as u64,
-                )
-                .map_err(MemoryManager::get_errno_for_map_err)?;
-            if dst_length > src_length {
-                // The mapping has grown. Zero-out the pages that were "added" when growing the
-                // mapping. These pages might be pointing inside the parent VMO, in which case
-                // we want to zero them out to make them look like new pages. Since this is a COW
-                // child VMO, this will simply allocate new pages.
-                // This is not necessary, but ensures correctness of our COW implementation.
-                // Ignore any errors.
-                let _ = child_vmo.op_range(
-                    zx::VmoOp::ZERO,
-                    src_length as u64,
-                    (dst_length - src_length) as u64,
-                );
+        let private_anonymous = src_mapping.private_anonymous();
+        let (dst_vmo_offset, vmo) = match src_mapping.backing {
+            MappingBacking::Vmo(backing) => {
+                if private_anonymous {
+                    // This mapping is a private, anonymous mapping. Create a COW child VMO that covers
+                    // the pages being moved and map that into the destination.
+                    let child_vmo = backing
+                        .vmo
+                        .create_child(
+                            zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
+                            backing.vmo_offset + offset_into_original_range,
+                            dst_length as u64,
+                        )
+                        .map_err(MemoryManager::get_errno_for_map_err)?;
+                    if dst_length > src_length {
+                        // The mapping has grown. Zero-out the pages that were "added" when growing the
+                        // mapping. These pages might be pointing inside the parent VMO, in which case
+                        // we want to zero them out to make them look like new pages. Since this is a COW
+                        // child VMO, this will simply allocate new pages.
+                        // This is not necessary, but ensures correctness of our COW implementation.
+                        // Ignore any errors.
+                        let _ = child_vmo.op_range(
+                            zx::VmoOp::ZERO,
+                            src_length as u64,
+                            (dst_length - src_length) as u64,
+                        );
+                    }
+                    (0, Arc::new(child_vmo))
+                } else {
+                    // This mapping is backed by an FD, just map the range of the VMO covering the moved
+                    // pages. If the VMO already had COW semantics, this preserves them.
+                    (backing.vmo_offset + offset_into_original_range, backing.vmo)
+                }
             }
-            dst_vmo_offset = 0;
-            Arc::new(child_vmo)
-        } else {
-            // This mapping is backed by an FD, just map the range of the VMO covering the moved
-            // pages. If the VMO already had COW semantics, this preserves them.
-            src_mapping.vmo
         };
 
         let new_address = self.map_vmo(
@@ -923,36 +964,41 @@ impl MemoryManagerState {
         released_mappings.extend(self.mappings.remove(&(addr..end_addr)));
 
         if let Some((range, mut mapping)) = truncated_tail {
-            // Create and map a child COW VMO mapping that represents the truncated tail.
-            let vmo_info = mapping.vmo.basic_info().map_err(impossible_error)?;
-            let child_vmo_offset = (range.start - mapping.base) as u64 + mapping.vmo_offset;
-            let child_length = range.end - range.start;
-            let mut child_vmo = mapping
-                .vmo
-                .create_child(
-                    zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
-                    child_vmo_offset,
-                    child_length as u64,
-                )
-                .map_err(MemoryManager::get_errno_for_map_err)?;
-            if vmo_info.rights.contains(zx::Rights::EXECUTE) {
-                child_vmo =
-                    child_vmo.replace_as_executable(&VMEX_RESOURCE).map_err(impossible_error)?;
+            match &mut mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    // Create and map a child COW VMO mapping that represents the truncated tail.
+                    let vmo_info = backing.vmo.basic_info().map_err(impossible_error)?;
+                    let child_vmo_offset = (range.start - backing.base) as u64 + backing.vmo_offset;
+                    let child_length = range.end - range.start;
+                    let mut child_vmo = backing
+                        .vmo
+                        .create_child(
+                            zx::VmoChildOptions::SNAPSHOT | zx::VmoChildOptions::RESIZABLE,
+                            child_vmo_offset,
+                            child_length as u64,
+                        )
+                        .map_err(MemoryManager::get_errno_for_map_err)?;
+                    if vmo_info.rights.contains(zx::Rights::EXECUTE) {
+                        child_vmo = child_vmo
+                            .replace_as_executable(&VMEX_RESOURCE)
+                            .map_err(impossible_error)?;
+                    }
+
+                    // Update the mapping.
+                    backing.vmo = Arc::new(child_vmo);
+                    backing.base = range.start;
+                    backing.vmo_offset = 0;
+
+                    self.map_internal(
+                        DesiredAddress::FixedOverwrite(range.start),
+                        &backing.vmo,
+                        0,
+                        child_length,
+                        mapping.flags,
+                        false,
+                    )?;
+                }
             }
-
-            // Update the mapping.
-            mapping.vmo = Arc::new(child_vmo);
-            mapping.base = range.start;
-            mapping.vmo_offset = 0;
-
-            self.map_internal(
-                DesiredAddress::FixedOverwrite(range.start),
-                &mapping.vmo,
-                0,
-                child_length,
-                mapping.flags,
-                false,
-            )?;
 
             // Replace the mapping with a new one that contains updated VMO handle.
             self.mappings.insert(range, mapping);
@@ -961,8 +1007,15 @@ impl MemoryManagerState {
         if let Some((range, mapping)) = truncated_head {
             // Resize the VMO of the head mapping, whose tail was cut off.
             let new_mapping_size = (range.end - range.start) as u64;
-            let new_vmo_size = mapping.vmo_offset + new_mapping_size;
-            mapping.vmo.set_size(new_vmo_size).map_err(MemoryManager::get_errno_for_map_err)?;
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    let new_vmo_size = backing.vmo_offset + new_mapping_size;
+                    backing
+                        .vmo
+                        .set_size(new_vmo_size)
+                        .map_err(MemoryManager::get_errno_for_map_err)?;
+                }
+            }
         }
 
         Ok(())
@@ -1064,14 +1117,16 @@ impl MemoryManagerState {
                     MADV_KEEPONFORK => mapping.flags & MappingFlags::WIPEONFORK.complement(),
                     _ => mapping.flags,
                 };
-                let new_mapping = Mapping::with_name(
-                    range_to_zero.start,
-                    mapping.vmo.clone(),
-                    mapping.vmo_offset + start,
-                    new_flags,
-                    mapping.name.clone(),
-                    mapping.file_write_guard.clone(),
-                );
+                let new_mapping = match &mapping.backing {
+                    MappingBacking::Vmo(backing) => Mapping::with_name(
+                        range_to_zero.start,
+                        backing.vmo.clone(),
+                        backing.vmo_offset + start,
+                        new_flags,
+                        mapping.name.clone(),
+                        mapping.file_write_guard.clone(),
+                    ),
+                };
                 updates.push((range_to_zero, new_mapping));
             } else {
                 if mapping.flags.contains(MappingFlags::SHARED) {
@@ -1097,13 +1152,17 @@ impl MemoryManagerState {
                     }
                 };
 
-                mapping.vmo.op_range(op, start, end - start).map_err(|s| match s {
-                    zx::Status::OUT_OF_RANGE => errno!(EINVAL),
-                    zx::Status::NO_MEMORY => errno!(ENOMEM),
-                    zx::Status::INVALID_ARGS => errno!(EINVAL),
-                    zx::Status::ACCESS_DENIED => errno!(EACCES),
-                    _ => impossible_error(s),
-                })?;
+                match &mapping.backing {
+                    MappingBacking::Vmo(backing) => {
+                        backing.vmo.op_range(op, start, end - start).map_err(|s| match s {
+                            zx::Status::OUT_OF_RANGE => errno!(EINVAL),
+                            zx::Status::NO_MEMORY => errno!(ENOMEM),
+                            zx::Status::INVALID_ARGS => errno!(EINVAL),
+                            zx::Status::ACCESS_DENIED => errno!(EACCES),
+                            _ => impossible_error(s),
+                        })?;
+                    }
+                }
             }
         }
         // Use a separate loop to avoid mutating the mappings structure while iterating over it.
@@ -2005,11 +2064,15 @@ impl MemoryManager {
             std::cmp::Ordering::Less => {
                 // We've been asked to free memory.
                 let delta = old_end - new_end;
-                let vmo = mapping.vmo.clone();
+                match &mapping.backing {
+                    MappingBacking::Vmo(backing) => {
+                        let vmo = &backing.vmo;
+                        let vmo_offset = new_end - brk.base;
+                        vmo.op_range(zx::VmoOp::ZERO, vmo_offset as u64, delta as u64)
+                            .map_err(impossible_error)?;
+                    }
+                }
                 state.unmap(new_end, delta, &mut released_mappings)?;
-                let vmo_offset = new_end - brk.base;
-                vmo.op_range(zx::VmoOp::ZERO, vmo_offset as u64, delta as u64)
-                    .map_err(impossible_error)?;
             }
             std::cmp::Ordering::Greater => {
                 // We've been asked to map more memory.
@@ -2019,13 +2082,19 @@ impl MemoryManager {
                 let mapping = mapping.clone();
 
                 released_mappings.extend(state.mappings.remove(&range));
-                match state.user_vmar.map(
-                    old_end - self.base_addr,
-                    &mapping.vmo,
-                    vmo_offset as u64,
-                    delta,
-                    zx::VmarFlags::PERM_READ | zx::VmarFlags::PERM_WRITE | zx::VmarFlags::SPECIFIC,
-                ) {
+
+                let map_result = match &mapping.backing {
+                    MappingBacking::Vmo(backing) => state.user_vmar.map(
+                        old_end - self.base_addr,
+                        &backing.vmo,
+                        vmo_offset as u64,
+                        delta,
+                        zx::VmarFlags::PERM_READ
+                            | zx::VmarFlags::PERM_WRITE
+                            | zx::VmarFlags::SPECIFIC,
+                    ),
+                };
+                match map_result {
                     Ok(_) => {
                         state.mappings.insert(brk.base..new_end, mapping);
                     }
@@ -2122,53 +2191,57 @@ impl MemoryManager {
             if mapping.flags.contains(MappingFlags::DONTFORK) {
                 continue;
             }
-            let vmo_offset = mapping.vmo_offset + (range.start - mapping.base) as u64;
-            let length = range.end - range.start;
+            match &mut mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    let vmo_offset = backing.vmo_offset + (range.start - backing.base) as u64;
+                    let length = range.end - range.start;
 
-            let target_vmo = if mapping.flags.contains(MappingFlags::SHARED) {
-                mapping.vmo.clone()
-            } else if mapping.flags.contains(MappingFlags::WIPEONFORK) {
-                create_anonymous_mapping_vmo(length as u64)?
-            } else {
-                let basic_info = mapping.vmo.basic_info().map_err(impossible_error)?;
+                    let target_vmo = if mapping.flags.contains(MappingFlags::SHARED) {
+                        backing.vmo.clone()
+                    } else if mapping.flags.contains(MappingFlags::WIPEONFORK) {
+                        create_anonymous_mapping_vmo(length as u64)?
+                    } else {
+                        let basic_info = backing.vmo.basic_info().map_err(impossible_error)?;
 
-                let VmoInfo { vmo, size: vmo_size, needs_snapshot_on_parent } = child_vmos
-                    .entry(basic_info.koid)
-                    .or_insert(clone_vmo(&mapping.vmo, basic_info.rights)?);
+                        let VmoInfo { vmo, size: vmo_size, needs_snapshot_on_parent } = child_vmos
+                            .entry(basic_info.koid)
+                            .or_insert(clone_vmo(&backing.vmo, basic_info.rights)?);
 
-                if *needs_snapshot_on_parent {
-                    let replaced_vmo = replaced_vmos
-                        .entry(basic_info.koid)
-                        .or_insert(snapshot_vmo(&mapping.vmo, *vmo_size, basic_info.rights)?);
-                    map_in_vmar(
-                        &state.user_vmar,
-                        &state.user_vmar_info,
-                        DesiredAddress::FixedOverwrite(range.start),
-                        replaced_vmo,
+                        if *needs_snapshot_on_parent {
+                            let replaced_vmo = replaced_vmos.entry(basic_info.koid).or_insert(
+                                snapshot_vmo(&backing.vmo, *vmo_size, basic_info.rights)?,
+                            );
+                            map_in_vmar(
+                                &state.user_vmar,
+                                &state.user_vmar_info,
+                                DesiredAddress::FixedOverwrite(range.start),
+                                replaced_vmo,
+                                vmo_offset,
+                                length,
+                                mapping.flags,
+                                false,
+                            )?;
+
+                            backing.vmo = replaced_vmo.clone();
+                        }
+                        vmo.clone()
+                    };
+
+                    let mut released_mappings = vec![];
+                    target_state.map_vmo(
+                        DesiredAddress::Fixed(range.start),
+                        target_vmo,
                         vmo_offset,
                         length,
                         mapping.flags,
                         false,
+                        mapping.name.clone(),
+                        FileWriteGuardRef(None),
+                        &mut released_mappings,
                     )?;
-
-                    mapping.vmo = replaced_vmo.clone();
+                    assert!(released_mappings.is_empty());
                 }
-                vmo.clone()
             };
-
-            let mut released_mappings = vec![];
-            target_state.map_vmo(
-                DesiredAddress::Fixed(range.start),
-                target_vmo,
-                vmo_offset,
-                length,
-                mapping.flags,
-                false,
-                mapping.name.clone(),
-                FileWriteGuardRef(None),
-                &mut released_mappings,
-            )?;
-            assert!(released_mappings.is_empty());
         }
 
         target_state.forkable_state = state.forkable_state.clone();
@@ -2369,53 +2442,57 @@ impl MemoryManager {
                 // It's invalid to assign a name to a file-backed mapping.
                 return error!(EBADF);
             }
-            if range.start < addr {
-                // This mapping starts before the named region. Split the mapping so we can apply the name only to
-                // the specified region.
-                let start_split_range = range.start..addr;
-                let start_split_length = addr - range.start;
-                let start_split_mapping = Mapping::new(
-                    range.start,
-                    mapping.vmo.clone(),
-                    mapping.vmo_offset,
-                    mapping.flags,
-                    mapping.file_write_guard.clone(),
-                );
-                state.mappings.insert(start_split_range, start_split_mapping);
+            match &mut mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    if range.start < addr {
+                        // This mapping starts before the named region. Split the mapping so we can apply the name only to
+                        // the specified region.
+                        let start_split_range = range.start..addr;
+                        let start_split_length = addr - range.start;
+                        let start_split_mapping = Mapping::new(
+                            range.start,
+                            backing.vmo.clone(),
+                            backing.vmo_offset,
+                            mapping.flags,
+                            mapping.file_write_guard.clone(),
+                        );
+                        state.mappings.insert(start_split_range, start_split_mapping);
 
-                // Shrink the range of the named mapping to only the named area.
-                mapping.vmo_offset = start_split_length as u64;
-                range = addr..range.end;
-            }
-            if let Some(last_range_end) = last_range_end {
-                if last_range_end != range.start {
-                    // The name must apply to a contiguous range of mapped pages.
-                    return error!(ENOMEM);
+                        // Shrink the range of the named mapping to only the named area.
+                        backing.vmo_offset = start_split_length as u64;
+                        range = addr..range.end;
+                    }
+                    if let Some(last_range_end) = last_range_end {
+                        if last_range_end != range.start {
+                            // The name must apply to a contiguous range of mapped pages.
+                            return error!(ENOMEM);
+                        }
+                    }
+                    last_range_end = Some(range.end.round_up(*PAGE_SIZE)?);
+                    match &name {
+                        Some(vmo_name) => {
+                            set_zx_name(&*backing.vmo, vmo_name);
+                        }
+                        None => {
+                            set_zx_name(&*backing.vmo, b"");
+                        }
+                    };
+                    if range.end > end {
+                        // The named region ends before the last mapping ends. Split the tail off of the
+                        // last mapping to have an unnamed mapping after the named region.
+                        let tail_range = end..range.end;
+                        let tail_offset = range.end - end;
+                        let tail_mapping = Mapping::new(
+                            end,
+                            backing.vmo.clone(),
+                            backing.vmo_offset + tail_offset as u64,
+                            mapping.flags,
+                            mapping.file_write_guard.clone(),
+                        );
+                        state.mappings.insert(tail_range, tail_mapping);
+                        range.end = end;
+                    }
                 }
-            }
-            last_range_end = Some(range.end.round_up(*PAGE_SIZE)?);
-            match &name {
-                Some(vmo_name) => {
-                    set_zx_name(&*mapping.vmo, vmo_name);
-                }
-                None => {
-                    set_zx_name(&*mapping.vmo, b"");
-                }
-            };
-            if range.end > end {
-                // The named region ends before the last mapping ends. Split the tail off of the
-                // last mapping to have an unnamed mapping after the named region.
-                let tail_range = end..range.end;
-                let tail_offset = range.end - end;
-                let tail_mapping = Mapping::new(
-                    end,
-                    mapping.vmo.clone(),
-                    mapping.vmo_offset + tail_offset as u64,
-                    mapping.flags,
-                    mapping.file_write_guard.clone(),
-                );
-                state.mappings.insert(tail_range, tail_mapping);
-                range.end = end;
             }
             mapping.name = match &name {
                 Some(name) => MappingName::Vma(name.clone()),
@@ -2477,7 +2554,11 @@ impl MemoryManager {
         if !mapping.flags.prot_flags().contains(perms) {
             return error!(EACCES);
         }
-        Ok((Arc::clone(&mapping.vmo), mapping.address_to_offset(addr)))
+        match &mapping.backing {
+            MappingBacking::Vmo(backing) => {
+                Ok((Arc::clone(&backing.vmo), mapping.address_to_offset(addr)))
+            }
+        }
     }
 
     /// Does a rough check that the given address is plausibly in the address space of the
@@ -2557,22 +2638,27 @@ impl MemoryManager {
             let size = range.end.ptr() - range.start.ptr();
             result.vm_size += size;
 
-            let vmo_info = mapping.vmo.info().map_err(|_| errno!(EIO))?;
-            let committed_bytes = vmo_info.committed_bytes as usize;
-            result.vm_rss += committed_bytes;
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    let vmo_info = backing.vmo.info().map_err(|_| errno!(EIO))?;
+                    let committed_bytes = vmo_info.committed_bytes as usize;
 
-            if mapping.flags.contains(MappingFlags::ANONYMOUS)
-                && !mapping.flags.contains(MappingFlags::SHARED)
-            {
-                result.rss_anonymous += committed_bytes;
-            }
+                    result.vm_rss += committed_bytes;
 
-            if vmo_info.share_count > 1 {
-                result.rss_shared += committed_bytes;
-            }
+                    if mapping.flags.contains(MappingFlags::ANONYMOUS)
+                        && !mapping.flags.contains(MappingFlags::SHARED)
+                    {
+                        result.rss_anonymous += committed_bytes;
+                    }
 
-            if let MappingName::File(_) = mapping.name {
-                result.rss_file += committed_bytes;
+                    if vmo_info.share_count > 1 {
+                        result.rss_shared += committed_bytes;
+                    }
+
+                    if let MappingName::File(_) = mapping.name {
+                        result.rss_file += committed_bytes;
+                    }
+                }
             }
 
             if mapping.flags.contains(MappingFlags::ELF_BINARY)
@@ -2623,7 +2709,9 @@ fn write_map(
         if map.can_write() { 'w' } else { '-' },
         if map.can_exec() { 'x' } else { '-' },
         if map.flags.contains(MappingFlags::SHARED) { 's' } else { 'p' },
-        map.vmo_offset,
+        match &map.backing {
+            MappingBacking::Vmo(backing) => backing.vmo_offset,
+        },
         if let MappingName::File(filename) = &map.name {
             filename.entry.node.info().ino
         } else {
@@ -2756,38 +2844,41 @@ impl SequenceFileSource for ProcSmapsFile {
             let size_kb = (range.end.ptr() - range.start.ptr()) / 1024;
             writeln!(sink, "Size:\t{size_kb} kB",)?;
 
-            let vmo_info = map.vmo.info().map_err(|_| errno!(EIO))?;
-            let rss_kb = vmo_info.committed_bytes / 1024;
-            writeln!(sink, "Rss:\t{rss_kb} kB")?;
+            match &map.backing {
+                MappingBacking::Vmo(backing) => {
+                    let vmo_info = backing.vmo.info().map_err(|_| errno!(EIO))?;
+                    let rss_kb = vmo_info.committed_bytes / 1024;
+                    writeln!(sink, "Rss:\t{rss_kb} kB")?;
 
-            writeln!(
-                sink,
-                "Pss:\t{} kB",
-                if map.flags.contains(MappingFlags::SHARED) {
-                    rss_kb / vmo_info.share_count as u64
-                } else {
-                    rss_kb
+                    writeln!(
+                        sink,
+                        "Pss:\t{} kB",
+                        if map.flags.contains(MappingFlags::SHARED) {
+                            rss_kb / vmo_info.share_count as u64
+                        } else {
+                            rss_kb
+                        }
+                    )?;
+
+                    let is_shared = vmo_info.share_count > 1;
+                    let shared_clean_kb = if is_shared { rss_kb } else { 0 };
+                    // TODO: Report dirty pages for paged VMOs.
+                    let shared_dirty_kb = 0;
+                    writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
+                    writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
+
+                    let private_clean_kb = if is_shared { 0 } else { rss_kb };
+                    // TODO: Report dirty pages for paged VMOs.
+                    let private_dirty_kb = 0;
+                    writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
+                    writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
+
+                    let anonymous_kb = if map.private_anonymous() { rss_kb } else { 0 };
+                    writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
+                    writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
+                    writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
                 }
-            )?;
-
-            let is_shared = vmo_info.share_count > 1;
-            let shared_clean_kb = if is_shared { rss_kb } else { 0 };
-            // TODO: Report dirty pages for paged VMOs.
-            let shared_dirty_kb = 0;
-            writeln!(sink, "Shared_Clean:\t{shared_clean_kb} kB")?;
-            writeln!(sink, "Shared_Dirty:\t{shared_dirty_kb} kB")?;
-
-            let private_clean_kb = if is_shared { 0 } else { rss_kb };
-            // TODO: Report dirty pages for paged VMOs.
-            let private_dirty_kb = 0;
-            writeln!(sink, "Private_Clean:\t{} kB", private_clean_kb)?;
-            writeln!(sink, "Private_Dirty:\t{} kB", private_dirty_kb)?;
-
-            let anonymous_kb = if map.private_anonymous() { rss_kb } else { 0 };
-            writeln!(sink, "Anonymous:\t{anonymous_kb} kB")?;
-            writeln!(sink, "KernelPageSize:\t{page_size_kb} kB")?;
-            writeln!(sink, "MMUPageSize:\t{page_size_kb} kB")?;
-
+            }
             // TODO(https://fxrev.dev/79328): Add optional fields.
             return Ok(Some(range.end));
         }
@@ -3272,10 +3363,14 @@ mod tests {
             let (range, mapping) = state.mappings.get(&addr).expect("mapping");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
-            assert_eq!(mapping.base, addr);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
-            mapping.vmo.clone()
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
+                    backing.vmo.clone()
+                }
+            }
         };
 
         assert_eq!(mm.unmap(addr, *PAGE_SIZE as usize), Ok(()));
@@ -3290,10 +3385,14 @@ mod tests {
             let (range, mapping) = state.mappings.get(&(addr + *PAGE_SIZE)).expect("second page");
             assert_eq!(range.start, addr + *PAGE_SIZE);
             assert_eq!(range.end, addr + *PAGE_SIZE * 2);
-            assert_eq!(mapping.base, addr + *PAGE_SIZE);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE);
-            assert_ne!(original_vmo.get_koid().unwrap(), mapping.vmo.get_koid().unwrap());
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr + *PAGE_SIZE);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
+                    assert_ne!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                }
+            }
         }
     }
 
@@ -3311,10 +3410,14 @@ mod tests {
             let (range, mapping) = state.mappings.get(&addr).expect("mapping");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + (*PAGE_SIZE * 2));
-            assert_eq!(mapping.base, addr);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
-            mapping.vmo.clone()
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 2);
+                    backing.vmo.clone()
+                }
+            }
         };
 
         assert_eq!(mm.unmap(addr + *PAGE_SIZE, *PAGE_SIZE as usize), Ok(()));
@@ -3329,10 +3432,14 @@ mod tests {
             let (range, mapping) = state.mappings.get(&addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + *PAGE_SIZE);
-            assert_eq!(mapping.base, addr);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE);
-            assert_eq!(original_vmo.get_koid().unwrap(), mapping.vmo.get_koid().unwrap());
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
+                    assert_eq!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                }
+            }
         }
     }
 
@@ -3351,10 +3458,14 @@ mod tests {
             let (range, mapping) = state.mappings.get(&addr).expect("mapping");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + (*PAGE_SIZE * 3));
-            assert_eq!(mapping.base, addr);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE * 3);
-            mapping.vmo.clone()
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE * 3);
+                    backing.vmo.clone()
+                }
+            }
         };
 
         assert_eq!(mm.unmap(addr + *PAGE_SIZE, *PAGE_SIZE as usize), Ok(()));
@@ -3369,19 +3480,27 @@ mod tests {
             let (range, mapping) = state.mappings.get(&addr).expect("first page");
             assert_eq!(range.start, addr);
             assert_eq!(range.end, addr + *PAGE_SIZE);
-            assert_eq!(mapping.base, addr);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE);
-            assert_eq!(original_vmo.get_koid().unwrap(), mapping.vmo.get_koid().unwrap());
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
+                    assert_eq!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                }
+            }
 
             // The last page should be a new child COW VMO.
             let (range, mapping) = state.mappings.get(&(addr + *PAGE_SIZE * 2)).expect("last page");
             assert_eq!(range.start, addr + *PAGE_SIZE * 2);
             assert_eq!(range.end, addr + *PAGE_SIZE * 3);
-            assert_eq!(mapping.base, addr + *PAGE_SIZE * 2);
-            assert_eq!(mapping.vmo_offset, 0);
-            assert_eq!(mapping.vmo.get_size().unwrap(), *PAGE_SIZE);
-            assert_ne!(original_vmo.get_koid().unwrap(), mapping.vmo.get_koid().unwrap());
+            match &mapping.backing {
+                MappingBacking::Vmo(backing) => {
+                    assert_eq!(backing.base, addr + *PAGE_SIZE * 2);
+                    assert_eq!(backing.vmo_offset, 0);
+                    assert_eq!(backing.vmo.get_size().unwrap(), *PAGE_SIZE);
+                    assert_ne!(original_vmo.get_koid().unwrap(), backing.vmo.get_koid().unwrap());
+                }
+            }
         }
     }
 

@@ -28,6 +28,9 @@ declare_args() {
   # TODO(https://fxbug.dev/132980): Enable on other platforms once Zircon
   # support is available.
   starnix_unified_aspace = target_cpu == "x64"
+
+  # Whether to use an alternate strategy for anonymous memory allocations.
+  starnix_enable_alternate_anon_allocs = false
 }
 
 rust_proto_library("perfetto_consumer_proto") {
@@ -410,6 +413,9 @@ rustc_binary("starnix_kernel_bin") {
   }
   if (starnix_unified_aspace) {
     features += [ "unified_aspace" ]
+  }
+  if (starnix_enable_alternate_anon_allocs) {
+    features += [ "alternate_anon_allocs" ]
   }
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
