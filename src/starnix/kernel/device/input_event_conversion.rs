@@ -4,8 +4,52 @@
 
 use crate::logging::log_warn;
 use fidl_fuchsia_input::Key;
-use starnix_uapi::uapi;
+use fidl_fuchsia_ui_input3 as fuiinput;
+use fuchsia_zircon as zx;
+use starnix_uapi::{time::timeval_from_time, uapi};
 use std::collections::HashMap;
+
+/// Converts fuchsia KeyEvent to a vector of `uapi::input_events`.
+///
+/// A single `KeyEvent` may translate into multiple `uapi::input_events`.
+/// 1 key event and 1 sync event.
+///
+/// If translation fails an empty vector is returned.
+pub fn parse_fidl_keyboard_event_to_linux_input_event(
+    e: &fuiinput::KeyEvent,
+) -> Vec<uapi::input_event> {
+    match e {
+        // TODO(b/312467059): keep this ESC -> Power workaround for debug.
+        &fuiinput::KeyEvent {
+            timestamp: Some(time_nanos),
+            type_: Some(event_type),
+            key: Some(fidl_fuchsia_input::Key::Escape),
+            ..
+        } => {
+            let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
+            let key_event = uapi::input_event {
+                time,
+                type_: uapi::EV_KEY as u16,
+                code: uapi::KEY_POWER as u16,
+                value: if event_type == fuiinput::KeyEventType::Pressed { 1 } else { 0 },
+            };
+
+            let sync_event = uapi::input_event {
+                // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
+                time,
+                type_: uapi::EV_SYN as u16,
+                code: uapi::SYN_REPORT as u16,
+                value: 0,
+            };
+
+            let mut events = vec![];
+            events.push(key_event);
+            events.push(sync_event);
+            events
+        }
+        _ => vec![],
+    }
+}
 
 /// linux <-> fuchsia key map allow search from 2 way.
 #[allow(dead_code)]

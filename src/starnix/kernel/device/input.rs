@@ -3,7 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{framebuffer::Framebuffer, registry::DeviceOps, DeviceMode},
+    device::{
+        framebuffer::Framebuffer,
+        input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
+        registry::DeviceOps, DeviceMode,
+    },
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
@@ -431,7 +435,8 @@ impl InputFile {
                     while let Some(Ok(request)) = event_stream.next().await {
                         match request {
                             fuiinput::KeyboardListenerRequest::OnKeyEvent { event, responder } => {
-                                let new_events = parse_fidl_keyboard_event(&event);
+                                let new_events =
+                                    parse_fidl_keyboard_event_to_linux_input_event(&event);
                                 let mut inner = slf.inner.lock();
 
                                 inner.events.extend(new_events);
@@ -693,44 +698,6 @@ fn keyboard_properties() -> BitSet<{ min_bytes(INPUT_PROP_CNT) }> {
     let mut attrs = BitSet::new();
     attrs.set(INPUT_PROP_DIRECT);
     attrs
-}
-
-/// Returns a vector of `uapi::input_events` representing the provided `fidl_event`.
-///
-/// A single `KeyEvent` may translate into multiple `uapi::input_events`.
-///
-/// If translation fails an empty vector is returned.
-fn parse_fidl_keyboard_event(fidl_event: &fuiinput::KeyEvent) -> Vec<uapi::input_event> {
-    match fidl_event {
-        &fuiinput::KeyEvent {
-            timestamp: Some(time_nanos),
-            type_: Some(event_type),
-            key: Some(fidl_fuchsia_input::Key::Escape),
-            ..
-        } => {
-            let time = timeval_from_time(zx::Time::from_nanos(time_nanos));
-            let key_event = uapi::input_event {
-                time,
-                type_: uapi::EV_KEY as u16,
-                code: uapi::KEY_POWER as u16,
-                value: if event_type == fuiinput::KeyEventType::Pressed { 1 } else { 0 },
-            };
-
-            let sync_event = uapi::input_event {
-                // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.
-                time,
-                type_: uapi::EV_SYN as u16,
-                code: uapi::SYN_REPORT as u16,
-                value: 0,
-            };
-
-            let mut events = vec![];
-            events.push(key_event);
-            events.push(sync_event);
-            events
-        }
-        _ => vec![],
-    }
 }
 
 /// Returns `Some` if the FIDL event included a `timestamp`, and a `pointer_sample` which includes
