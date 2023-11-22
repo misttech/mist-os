@@ -15,6 +15,7 @@ for the Fuchsia build.
 
 from dataclasses import dataclass
 import json
+import re
 import typing
 
 from dataparse import dataparse
@@ -115,6 +116,9 @@ class TestListFile:
         return ret
 
 
+_PACKAGE_REGEX = re.compile(r"/([\w\-_]+)#meta")
+
+
 @dataclass
 class Test:
     """Wrapper containing data from both tests.json and test-list.json.
@@ -167,6 +171,19 @@ class Test:
                 for env in self.build.environments or []
             ]
         )
+
+    def package_name(self) -> str | None:
+        """Get the package name for this test if applicable.
+
+        If the test in question is a host test, returns None.
+
+        Returns:
+            str | None: Package name if this is a device test, None otherwise.
+        """
+        if self.build.test.package_url is None:
+            return None
+        m = _PACKAGE_REGEX.findall(self.build.test.package_url)
+        return m[0] if m else None
 
     @classmethod
     def join_test_descriptions(

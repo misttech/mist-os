@@ -237,6 +237,33 @@ To go back to the old fx test, use `fx --enable=legacy_fxtest test`, and please 
         recorder.emit_end("Failed to build.")
         return 1
 
+    if flags.updateifinbase and has_tests_in_base(
+        selections, recorder, exec_env
+    ):
+        status_suffix = (
+            "\nStatus output suspended." if termout.is_init() else ""
+        )
+        recorder.emit_info_message(f"\nBuilding update package.{status_suffix}")
+        recorder.emit_instruction_message(
+            "Use --no-updateifinbase to skip updating base packages."
+        )
+        build_return_code = await run_build_with_suspended_output(
+            ["build/images/updates"]
+        )
+        if build_return_code != 0:
+            recorder.emit_end(
+                f"Failed to build update package ({build_return_code})"
+            )
+            return 1
+        recorder.emit_info_message("\nRunning an OTA before executing tests")
+        ota_result = await execution.run_command(
+            "fx", "ota", "--no-build", recorder=recorder, print_verbatim=True
+        )
+        if ota_result is None or ota_result.return_code != 0:
+            recorder.emit_warning_message(
+                "OTA failed, attempting to run tests anyway"
+            )
+
     # Don't actually run tests if --list was specified, instead gather the
     # list of test cases for each test and output to the user.
     if flags.list:
@@ -464,21 +491,11 @@ async def do_build(
     status_suffix = " Status output suspended." if termout.is_init() else ""
     recorder.emit_info_message(f"\nExecuting build.{status_suffix}")
 
-    # Allow display to update.
-    await asyncio.sleep(0.1)
-
-    if termout.is_init():
-        # Clear the status output while we are doing the build.
-        termout.write_lines([])
-
-    return_code = subprocess.call(
-        ["fx", "build"] + build_command_line,
-    )
+    return_code = await run_build_with_suspended_output(build_command_line)
 
     error = None
     if return_code != 0:
         error = f"Build returned non-zero exit code {return_code}"
-
     if error is not None:
         recorder.emit_end(error, id=build_id)
         return False
@@ -566,30 +583,39 @@ def has_tests_in_base(
     recorder: event.EventRecorder,
     exec_env: environment.ExecutionEnvironment,
 ) -> bool:
-    # TODO(b/291144505): This logic was ported from update-if-in-base, but it appears to be wrong.
-    # BUG(b/291144505): Fix this.
     base_file = os.path.join(exec_env.out_dir, "base_packages.list")
     parse_id = recorder.emit_start_file_parsing("base_packages.list", base_file)
 
-    contents = None
+    manifests: typing.List[str]
     try:
         with open(base_file) as f:
-            contents = f.read()
-    except IOError as e:
+            contents = json.load(f)
+        manifests = contents["content"]["manifests"]
+    except (IOError, json.JSONDecodeError, KeyError) as e:
         recorder.emit_end(f"Parsing file failed: {e}", id=parse_id)
         raise e
 
-    ret = any(
-        [
-            t.build.test.package_url is not None
-            and t.build.test.package_url in contents
-            for t in tests.selected
-        ]
-    )
+    manifest_ends = {m.split("/")[-1] for m in manifests}
+    in_base = [
+        name
+        for t in tests.selected
+        if (name := t.package_name()) in manifest_ends
+    ]
+
+    if in_base:
+        names = ", ".join(in_base[:3])
+        tests_are_in_base_including = (
+            "tests are in base, including"
+            if len(in_base) > 1
+            else "test is in base:"
+        )
+        recorder.emit_info_message(
+            f"\n{len(in_base)} {tests_are_in_base_including} {names}"
+        )
 
     recorder.emit_end(id=parse_id)
 
-    return ret
+    return bool(in_base)
 
 
 @functools.lru_cache
@@ -609,6 +635,22 @@ async def has_device_connected(
         "fx", "is-package-server-running", recorder=recorder, parent=parent
     )
     return output is not None and output.return_code == 0
+
+
+async def run_build_with_suspended_output(
+    build_command_line: typing.List[str],
+) -> int:
+    # Allow display to update.
+    await asyncio.sleep(0.1)
+
+    if termout.is_init():
+        # Clear the status output while we are doing the build.
+        termout.write_lines([])
+
+    return_code = subprocess.call(
+        ["fx", "build"] + build_command_line,
+    )
+    return return_code
 
 
 async def post_build_checklist(

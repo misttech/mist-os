@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import json
 import os
 import shutil
 import tempfile
@@ -167,11 +168,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         patch.start()
         self.addCleanup(patch.stop)
 
-    def _mock_has_tests_in_base(self, value: bool):
-        m = mock.MagicMock(return_value=value)
-        patch = mock.patch("main.has_tests_in_base", m)
-        patch.start()
-        self.addCleanup(patch.stop)
+    def _mock_has_tests_in_base(self, test_packages: typing.List[str]):
+        with open(os.path.join(self.out_dir, "base_packages.list"), "w") as f:
+            json.dump(
+                {
+                    "content": {
+                        "manifests": test_packages,
+                    }
+                },
+                f,
+            )
 
     def _make_call_args_prefix_set(
         self, call_list: mock._CallList
@@ -209,12 +215,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
     def _mock_get_device_environment(
         self, env: environment.DeviceEnvironment
     ) -> mock.MagicMock:
-        # Device environments are created using async, so we need to return
-        # a future from the mock.
-        async def callable_ret():
-            return env
-
-        m = mock.MagicMock(return_value=callable_ret())
+        m = mock.AsyncMock(return_value=env)
         patch = mock.patch(
             "main.execution.get_device_environment_from_exec_env", m
         )
@@ -308,7 +309,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(0)
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
             args.parse_args(["--simple", "--no-build"] + [flag_name])
@@ -381,7 +382,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         command_mock = self._mock_run_command(0)
         subprocess_mock = self._mock_subprocess_call(0)
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(args.parse_args(["--simple"]))
         self.assertEqual(ret, 0)
@@ -417,7 +418,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
 
         command_mock = self._mock_run_command(0)
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
             args.parse_args(["--simple", "--no-build"])
@@ -455,7 +456,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         ]
 
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         ret = await main.async_main_wrapper(
             args.parse_args(["--simple", "--no-build", "--fail"])
@@ -479,7 +480,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         command_mock = self._mock_run_command(0)
 
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         # Run each test 3 times, no parallel to better match behavior of failure case test.
         ret = await main.async_main_wrapper(
@@ -519,7 +520,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
 
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         # Run each test 3 times, no parallel to better match behavior of failure case test.
         ret = await main.async_main_wrapper(
@@ -563,7 +564,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         )
 
         self._mock_has_device_connected(True)
-        self._mock_has_tests_in_base(False)
+        self._mock_has_tests_in_base([])
 
         recorder = event.EventRecorder()
 
@@ -590,3 +591,29 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 "bar::test",
             ],
         )
+
+    @mock.patch("main.run_build_with_suspended_output", side_effect=[0])
+    async def test_updateifinbase(self, _build_mock: mock.AsyncMock):
+        """Test that we appropriately update tests in base"""
+
+        command_mock = self._mock_run_command(0)
+
+        self._mock_has_device_connected(True)
+        self._mock_has_tests_in_base(["foo-test"])
+
+        ret = await main.async_main_wrapper(
+            args.parse_args(
+                [
+                    "--simple",
+                    "--no-build",
+                    "--updateifinbase",
+                    "--parallel",
+                    "1",
+                ]
+            )
+        )
+        self.assertEqual(ret, 0)
+        call_prefixes = self._make_call_args_prefix_set(
+            command_mock.call_args_list
+        )
+        self.assertIsSubset({("fx", "ota", "--no-build")}, call_prefixes)

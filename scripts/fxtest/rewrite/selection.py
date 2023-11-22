@@ -131,7 +131,6 @@ async def select_tests(
     best_matches: typing.Dict[str, int] = defaultdict(lambda: NO_MATCH_DISTANCE)
     TRAILING_PATH = re.compile(r"/([\w\-_\.]+)$")
     COMPONENT_REGEX = re.compile(r"#meta/([\w\-_]+)\.cm")
-    PACKAGE_REGEX = re.compile(r"/([\w\-_]+)#meta")
 
     def extract_label(entry: Test) -> str:
         return entry.build.test.label
@@ -152,10 +151,7 @@ async def select_tests(
         return m[0] if m else None
 
     def extract_package(entry: Test) -> str | None:
-        if entry.build.test.package_url is None:
-            return None
-        m = PACKAGE_REGEX.findall(entry.build.test.package_url)
-        return m[0] if m else None
+        return entry.package_name()
 
     matched: typing.List[str] = []
     match_tasks = []
