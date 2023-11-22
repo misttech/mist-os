@@ -199,8 +199,8 @@ resource("netcfg-with-forwarding-netemul-config") {
 
 resource("netcfg-without-provisioning-netemul-config") {
   testonly = true
-  sources = [ "management/config/install_only.json" ]
-  outputs = [ "netcfg/install_only.json" ]
+  sources = [ "management/config/all_delegated.json" ]
+  outputs = [ "netcfg/all_delegated.json" ]
 }
 
 resource("netcfg-with-iface-name-prefix") {

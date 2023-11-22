@@ -166,7 +166,7 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
 
     let _if_name: String = with_netcfg_owned_device::<M, N, _>(
         name,
-        ManagerConfig::InstallOnly,
+        ManagerConfig::AllDelegated,
         true, /* with_dhcpv6_client */
         |_if_id: u64,
          network: &netemul::TestNetwork<'_>,
