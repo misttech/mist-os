@@ -14,7 +14,6 @@
 
 #include <future>
 
-#include <fbl/unique_fd.h>
 #include <zxtest/zxtest.h>
 
 namespace {

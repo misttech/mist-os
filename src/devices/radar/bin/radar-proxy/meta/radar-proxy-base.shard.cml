@@ -5,7 +5,10 @@
     include: [ "syslog/client.shard.cml" ],
     capabilities: [
         {
-            protocol: [ "fuchsia.hardware.radar.RadarBurstReaderProvider" ],
+            protocol: [
+                "fuchsia.hardware.radar.RadarBurstInjector",
+                "fuchsia.hardware.radar.RadarBurstReaderProvider",
+            ],
         },
     ],
     use: [
@@ -16,6 +19,10 @@
         },
     ],
     expose: [
+        {
+            protocol: "fuchsia.hardware.radar.RadarBurstInjector",
+            from: "self",
+        },
         {
             protocol: "fuchsia.hardware.radar.RadarBurstReaderProvider",
             from: "self",
