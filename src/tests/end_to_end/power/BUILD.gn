@@ -10,4 +10,5 @@ python_library("power_test_utils") {
     "__init__.py",
     "power_test_utils.py",
   ]
+  library_deps = [ "//src/performance/lib/trace_processing" ]
 }

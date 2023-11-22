@@ -28,15 +28,14 @@ class SquareloadTest(fuchsia_power_base_test.FuchsiaPowerBaseTest):
         """
         super().test_launch_hermetic_test()
 
-        metrics = power_test_utils.new_metrics()
-        power_test_utils.read_metrics(self.power_trace_path, metrics)
-
-        fuchsiaperf_json_path = os.path.join(
-            self.log_path,
-            f"{self.metric_name}_power.fuchsiaperf.json",
+        metrics_processor = power_test_utils.PowerMetricsProcessor(
+            power_samples_path=self.power_trace_path
         )
-        power_test_utils.write_metrics(
-            self.metric_name, metrics, fuchsiaperf_json_path
+        metrics_processor.process_metrics()
+        fuchsiaperf_json_path = metrics_processor.write_fuchsiaperf_json(
+            output_dir=self.log_path,
+            metric_name=self.metric_name,
+            trace_results=[],
         )
         publish.publish_fuchsiaperf(
             [fuchsiaperf_json_path],

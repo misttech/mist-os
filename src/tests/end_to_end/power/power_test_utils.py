@@ -5,78 +5,148 @@
 """Fuchsia power test utility library."""
 
 import csv
+from dataclasses import dataclass
 import json
+import os
+
+from trace_processing import trace_metrics
 
 
 def _avg(avg: float, value: float, count: int) -> float:
     return avg + (value - avg) / count
 
 
-def _compute_metrics(
-    sample: dict[object, object], metrics_dict: dict[object, object]
-):
-    n = metrics_dict["sampleCount"] + 1
-    m = metrics_dict
-    current = sample["current"]  # in milliAmpere
-    voltage = sample["voltage"]  # in Volts
-    power = voltage * current * 1e-3  # in Watts
-    m["sampleCount"] = n
-    m["maxPower"] = max(m["maxPower"], power)
-    m["meanPower"] = _avg(m["meanPower"], power, n)
-    m["minPower"] = min(m["minPower"], power)
+@dataclass
+class PowerMetricSample:
+    """A sample of collected power metrics.
+
+    Args:
+      timestamp: timestamp of sample in nanoseconds since epoch.
+      voltage: voltage in Volts.
+      current: current in milliAmpere.
+    """
+
+    timestamp: int
+    voltage: float
+    current: float
+
+    def compute_power(self) -> float:
+        """Compute the power in Watts from sample.
+
+        Returns:
+          Power in Watts.
+        """
+        return self.voltage * self.current * 1e-3
 
 
-def new_metrics() -> dict[object, object]:
-    return {
-        "sampleCount": 0,
-        "maxPower": float("-inf"),
-        "meanPower": 0,
-        "minPower": float("inf"),
-    }
+@dataclass
+class AggregatePowerMetrics:
+    """Aggregate power metrics representation.
+
+    Represents aggregated metrics over a number of power metrics samples.
+
+    Args:
+      sample_count: number of power metric samples.
+      max_power: maximum power in Watts over all samples.
+      mean_power: average power in Watts over all samples.
+      min_power: minimum power in Watts over all samples.
+    """
+
+    sample_count: int = 0
+    max_power: float = float("-inf")
+    mean_power: float = 0
+    min_power: float = float("inf")
+
+    def process_sample(self, sample: PowerMetricSample):
+        """Process a sample of power metrics.
+
+        Args:
+            sample: A sample of power metrics.
+        """
+        power = sample.compute_power()
+        self.sample_count += 1
+        self.max_power = max(self.max_power, power)
+        self.mean_power = _avg(self.mean_power, power, self.sample_count)
+        self.min_power = min(self.min_power, power)
+
+    def to_fuchsiaperf_results(self) -> list[trace_metrics.TestCaseResult]:
+        """Converts Power metrics to fuchsiaperf JSON object.
+
+        Returns:
+          List of JSON object.
+        """
+        results: List[trace_metrics.TestCaseResult] = [
+            trace_metrics.TestCaseResult(
+                metric="MinPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.min_power],
+            ),
+            trace_metrics.TestCaseResult(
+                metric="MeanPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.mean_power],
+            ),
+            trace_metrics.TestCaseResult(
+                metric="MaxPower",
+                unit=trace_metrics.Unit.watts,
+                values=[self.max_power],
+            ),
+        ]
+        return results
 
 
-def read_metrics(power_trace_path: str, metrics_dict: dict[object, object]):
-    with open(power_trace_path, "r") as f:
-        reader = csv.reader(f)
-        header = next(reader)
-        assert header[0] == "Timestamp"
-        assert header[1] == "Current"
-        assert header[2] == "Voltage"
-        for row in reader:
-            sample = {
-                "timestamp": int(row[0]),
-                "current": float(row[1]),
-                "voltage": float(row[2]),
-            }
-            _compute_metrics(sample, metrics_dict)
+class PowerMetricsProcessor:
+    """Power metric processor to extract performance data from raw samples.
 
+    Args:
+      power_samples_path: path to power samples CSV file.
+    """
 
-def write_metrics(
-    metric_name: str,
-    metrics_dict: dict[object, object],
-    fuchsiaperf_json_path: str,
-):
-    m = metrics_dict
-    suite = f"fuchsia.power.{metric_name}"
-    result = [
-        {
-            "label": "MinPower",
-            "test_suite": suite,
-            "unit": "Watts",
-            "values": [m["minPower"]],
-        },
-        {
-            "label": "MeanPower",
-            "test_suite": suite,
-            "unit": "Watts",
-            "values": [m["meanPower"]],
-        },
-        {
-            "label": "MaxPower",
-            "test_suite": suite,
-            "unit": "Watts",
-            "values": [m["maxPower"]],
-        },
-    ]
-    with open(fuchsiaperf_json_path, "w") as outfile:
-        json.dump(result, outfile, indent=4)
+    def __init__(self, power_samples_path: str):
+        self._power_samples_path: str = power_samples_path
+        self._power_metrics: AggregatePowerMetrics = AggregatePowerMetrics()
+
+    def process_metrics(self):
+        """Coverts CSV samples into aggregate metrics."""
+        with open(self._power_samples_path, "r") as f:
+            reader = csv.reader(f)
+            header = next(reader)
+            assert header[0] == "Timestamp"
+            assert header[1] == "Current"
+            assert header[2] == "Voltage"
+            for row in reader:
+                sample = PowerMetricSample(
+                    timestamp=int(row[0]),
+                    voltage=float(row[1]),
+                    current=float(row[2]),
+                )
+                self._power_metrics.process_sample(sample)
+
+    def write_fuchsiaperf_json(
+        self,
+        output_dir: str,
+        metric_name: str,
+        trace_results: list[trace_metrics.TestCaseResult] = [],
+    ) -> str:
+        """Writes the fuchsia_perf JSON file to specified directory.
+
+        Args:
+          output_dir: path to the output directory to write to.
+          metric_name: name of the power metric being measured.
+          trace_metrics: trace-based metrics to include in the output.
+
+        Returns:
+          The fuchiaperf.json file generated by trace processing.
+        """
+        fuchsiaperf_json_path = os.path.join(
+            output_dir,
+            f"{metric_name}_power.fuchsiaperf.json",
+        )
+
+        suite = f"fuchsia.power.{metric_name}"
+        results = self._power_metrics.to_fuchsiaperf_results() + trace_results
+        results_json = [r.to_json(suite) for r in results]
+        with open(fuchsiaperf_json_path, "w") as outfile:
+            json.dump(results_json, outfile, indent=4)
+
+        return fuchsiaperf_json_path
