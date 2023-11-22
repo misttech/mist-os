@@ -71,6 +71,7 @@ TEST_F(SingletonDisplayIntegrationTest, GetMetrics) {
   EXPECT_EQ(90, metrics->extent_in_mm().height);
   EXPECT_EQ(1.f, metrics->recommended_device_pixel_ratio().x);
   EXPECT_EQ(1.f, metrics->recommended_device_pixel_ratio().y);
+  EXPECT_EQ(60000, metrics->maximum_refresh_rate_in_millihertz());
 }
 
 TEST_F(SingletonDisplayIntegrationTest, DevicePixelRatioChange) {

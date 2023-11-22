@@ -19,6 +19,10 @@ type Metrics = table {
     /// be used by a component near the root of the scene graph to set a scale for the rest
     /// of the scene beneath.
     3: recommended_device_pixel_ratio fuchsia.math.VecF;
+    /// The maximum mumber of images transmitted to the display in 1000 seconds.
+    /// This is the display's maximum vertical refresh rate, in millihertz (0.001 Hz).
+    @available(added=16)
+    4: maximum_refresh_rate_in_millihertz uint32;
 };
 
 /// Get information about Scenic's primary display.

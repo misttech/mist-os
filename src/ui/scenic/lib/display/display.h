@@ -30,7 +30,7 @@ class Display {
  public:
   Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px, uint32_t height_in_px,
           uint32_t width_in_mm, uint32_t height_in_mm,
-          std::vector<fuchsia_images2::PixelFormat> pixel_formats);
+          std::vector<fuchsia_images2::PixelFormat> pixel_formats, uint32_t refresh_rate);
   Display(fuchsia::hardware::display::DisplayId id, uint32_t width_in_px, uint32_t height_in_px);
   virtual ~Display() = default;
 
@@ -67,6 +67,10 @@ class Display {
 
   const std::vector<fuchsia_images2::PixelFormat>& pixel_formats() const { return pixel_formats_; }
 
+  uint32_t maximum_refresh_rate_in_millihertz() const {
+    return maximum_refresh_rate_in_millihertz_;
+  }
+
   // Event signaled by DisplayManager when ownership of the display
   // changes. This event backs Scenic's GetDisplayOwnershipEvent API.
   const zx::event& ownership_event() const { return ownership_event_; }
@@ -94,6 +98,7 @@ class Display {
   std::atomic<glm::vec2> device_pixel_ratio_;
   zx::event ownership_event_;
   std::vector<fuchsia_images2::PixelFormat> pixel_formats_;
+  const uint32_t maximum_refresh_rate_in_millihertz_;
 
   bool claimed_ = false;
 

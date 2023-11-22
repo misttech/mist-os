@@ -16,6 +16,12 @@
 namespace scenic_impl {
 namespace display {
 
+namespace {
+
+static constexpr uint32_t kMillihertzPerCentihertz = 10;
+
+}
+
 DisplayManager::DisplayManager(fit::closure display_available_cb)
     : DisplayManager(std::nullopt, std::nullopt, std::move(display_available_cb)) {}
 
@@ -77,7 +83,8 @@ void DisplayManager::OnDisplaysChanged(std::vector<fuchsia::hardware::display::I
       auto& mode = display.modes[mode_idx];
       default_display_ = std::make_unique<Display>(
           display.id, mode.horizontal_resolution, mode.vertical_resolution,
-          display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats));
+          display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats),
+          mode.refresh_rate_e2 * kMillihertzPerCentihertz);
       OnClientOwnershipChange(owns_display_coordinator_);
 
       if (display_available_cb_) {

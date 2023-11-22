@@ -37,6 +37,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.display.singleton/Metrics.maximum_refresh_rate_in_millihertz",
+        "ordinal": "4",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.display.singleton/Metrics.recommended_device_pixel_ratio",
         "ordinal": "3",
         "type": "fuchsia.math/VecF"
