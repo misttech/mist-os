@@ -48,9 +48,6 @@ def _fuchsia_board_configuration_impl(ctx):
         board_config["filesystems"] = filesystems
 
     board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
-    content = json.encode_indent(board_config, indent = "  ")
-    ctx.actions.write(board_config_file, content)
-
     deps = [board_config_file]
 
     if ctx.attr.board_bundles_dir:
@@ -59,6 +56,9 @@ def _fuchsia_board_configuration_impl(ctx):
         board_dir = ctx.actions.declare_directory(board_dir_name)
         _copy_bash(ctx, ctx.file.board_bundles_dir, board_dir)
         deps.append(board_dir)
+
+    content = json.encode_indent(board_config, indent = "  ")
+    ctx.actions.write(board_config_file, content)
 
     return [
         DefaultInfo(
