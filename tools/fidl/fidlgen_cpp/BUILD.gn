@@ -284,7 +284,11 @@ group("tests") {
     ":goldens",
     ":goldens($host_toolchain)",
   ]
-  if (using_old_prebuilt) {
+
+  # TODO(fxbug.dev/136524): Remove this after switching to the new version of Clang-Format.
+  # Currently, Clang-Format on golden tests is locked to a specific version of LLVM,
+  # and should be removed.
+  if (using_old_prebuilt && clang_prefix == default_clang_prefix) {
     deps += [ ":fidlgen_cpp_golden_tests($host_toolchain)" ]
   }
 }
