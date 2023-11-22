@@ -381,8 +381,22 @@ impl BlobDirectory {
     ) -> Result<Box<dyn BlobSet>, BlobDirectoryError> {
         let paths =
             fs::read_dir(directory.as_ref().as_ref()).map_err(BlobDirectoryError::ListError)?;
-        let dir_entries: Vec<_> =
-            paths.collect::<Result<Vec<_>, _>>().map_err(BlobDirectoryError::DirEntryError)?;
+
+        // TODO(b/312722138): Support verification of delivery blobs once the delivery-blob library
+        // supports it. For now, we filter out subdirectories containing delivery blobs.
+        let paths = paths.filter_map(|entry| {
+            let entry = entry.map_err(BlobDirectoryError::DirEntryError);
+            if let Ok(entry) = entry {
+                match entry.file_type().map_err(BlobDirectoryError::ListError) {
+                    Ok(entry_type) => {
+                        return if entry_type.is_dir() { None } else { Some(Ok(entry)) };
+                    }
+                    Err(e) => return Some(Err(e)),
+                }
+            }
+            Some(entry)
+        });
+        let dir_entries: Vec<_> = paths.collect::<Result<Vec<_>, _>>()?;
 
         let mut blob_ids = dir_entries
             .into_par_iter()

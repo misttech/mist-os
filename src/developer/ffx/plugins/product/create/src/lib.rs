@@ -7,7 +7,7 @@
 
 use anyhow::{bail, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
-use assembly_partitions_config::PartitionsConfig;
+use assembly_partitions_config::{Partition, PartitionsConfig};
 use assembly_update_package::{Slot, UpdatePackageBuilder};
 use assembly_update_packages_manifest::UpdatePackagesManifest;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -26,6 +26,9 @@ use sdk_metadata::{
 use std::fs::File;
 use tempfile::TempDir;
 
+/// Default delivery blob type to use for Fxblob-based products.
+const DEFAULT_FXBLOB_DELIVERY_BLOB_TYPE: Option<u32> = Some(1);
+
 /// Create a product bundle.
 #[ffx_plugin()]
 pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
@@ -40,6 +43,19 @@ pub async fn pb_create(cmd: CreateCommand) -> Result<()> {
         SdkVersion::Unknown => bail!("Unable to determine SDK version"),
     };
     pb_create_with_sdk_version(cmd, &sdk_version).await
+}
+
+/// Returns the default delivery blob type a particular assembly manifest requires. Some products
+/// require delivery blobs for packages to be resolved correctly.
+fn default_delivery_blob_type(partitions_config: &PartitionsConfig) -> Option<u32> {
+    if partitions_config.partitions.iter().any(|partition| match partition {
+        Partition::Fxfs { .. } => true,
+        _ => false,
+    }) {
+        DEFAULT_FXBLOB_DELIVERY_BLOB_TYPE
+    } else {
+        None
+    }
 }
 
 /// Create a product bundle using the provided sdk.
@@ -117,7 +133,16 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
         let metadata_path = repo_path.join("repository");
         let blobs_path = repo_path.join("blobs");
         let keys_path = repo_path.join("keys");
-        let repo = FileSystemRepository::new(metadata_path.to_path_buf(), blobs_path.to_path_buf());
+        let delivery_blob_type = cmd.delivery_blob_type.or(default_delivery_blob_type(&partitions));
+        let repo =
+            FileSystemRepository::builder(metadata_path.to_path_buf(), blobs_path.to_path_buf())
+                .delivery_blob_type(
+                    delivery_blob_type
+                        .map(TryInto::try_into)
+                        .transpose()
+                        .context("creating repo")?,
+                )
+                .build();
         let repo_keys =
             RepoKeys::from_dir(tuf_keys.as_std_path()).context("Gathering repo keys")?;
 
@@ -137,7 +162,7 @@ pub async fn pb_create_with_sdk_version(cmd: CreateCommand, sdk_version: &str) -
             name: "fuchsia.com".into(),
             metadata_path: metadata_path,
             blobs_path: blobs_path,
-            delivery_blob_type: cmd.delivery_blob_type,
+            delivery_blob_type: delivery_blob_type,
             root_private_key_path: copy_file(tuf_keys.join("root.json"), &keys_path).ok(),
             targets_private_key_path: copy_file(tuf_keys.join("targets.json"), &keys_path).ok(),
             snapshot_private_key_path: copy_file(tuf_keys.join("snapshot.json"), &keys_path).ok(),
@@ -367,11 +392,8 @@ fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Res
 #[cfg(test)]
 mod test {
     use super::*;
-    use anyhow::bail;
-    use assembly_manifest::AssemblyManifest;
-    use assembly_partitions_config::PartitionsConfig;
     use fuchsia_repo::test_utils;
-    use sdk_metadata::{VirtualDevice, VirtualDeviceV1};
+    use sdk_metadata::VirtualDeviceV1;
     use std::io::Write;
     use tempfile::TempDir;
 
@@ -798,5 +820,76 @@ mod test {
         assert!(matches!(device2, Ok(VirtualDevice::V1(VirtualDeviceV1 { .. }))));
 
         Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn test_default_delivery_blob_type() {
+        let temp = TempDir::new().unwrap();
+        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
+        let pb_dir = tempdir.join("pb");
+
+        let partitions_path = tempdir.join("partitions.json");
+        let partitions_file = File::create(&partitions_path).unwrap();
+        let partitions_config = {
+            let mut config = PartitionsConfig::default();
+            config.partitions = vec![Partition::Fxfs { name: String::from("fxblob") }];
+            config
+        };
+        serde_json::to_writer(&partitions_file, &partitions_config).unwrap();
+
+        let system_path = tempdir.join("system.json");
+        AssemblyManifest::default().write(&system_path).unwrap();
+
+        let tuf_keys = tempdir.join("keys");
+        test_utils::make_repo_keys_dir(&tuf_keys);
+
+        // We don't specify delivery blob type since it should use the default value for Fxfs.
+        pb_create_with_sdk_version(
+            CreateCommand {
+                product_name: String::default(),
+                product_version: String::default(),
+                partitions: partitions_path,
+                system_a: Some(system_path.clone()),
+                system_b: None,
+                system_r: Some(system_path.clone()),
+                tuf_keys: Some(tuf_keys),
+                update_package_version_file: None,
+                update_package_epoch: None,
+                virtual_device: vec![],
+                recommended_device: None,
+                out_dir: pb_dir.clone(),
+                delivery_blob_type: None,
+                with_deprecated_flash_manifest: false,
+            },
+            /*sdk_version=*/ "",
+        )
+        .await
+        .unwrap();
+
+        let pb = ProductBundle::try_load_from(&pb_dir).unwrap();
+        assert_eq!(
+            pb,
+            ProductBundle::V2(ProductBundleV2 {
+                product_name: String::default(),
+                product_version: String::default(),
+                partitions: partitions_config,
+                sdk_version: String::default(),
+                system_a: Some(AssemblyManifest::default().images),
+                system_b: None,
+                system_r: Some(AssemblyManifest::default().images),
+                repositories: vec![Repository {
+                    name: "fuchsia.com".into(),
+                    metadata_path: pb_dir.join("repository"),
+                    blobs_path: pb_dir.join("blobs"),
+                    delivery_blob_type: DEFAULT_FXBLOB_DELIVERY_BLOB_TYPE,
+                    root_private_key_path: Some(pb_dir.join("keys/root.json")),
+                    targets_private_key_path: Some(pb_dir.join("keys/targets.json")),
+                    snapshot_private_key_path: Some(pb_dir.join("keys/snapshot.json")),
+                    timestamp_private_key_path: Some(pb_dir.join("keys/timestamp.json")),
+                }],
+                update_package_hash: None,
+                virtual_devices_path: None,
+            })
+        );
     }
 }
