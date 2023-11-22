@@ -16,7 +16,7 @@ the associated threads.
 
 Every process starts with a single Virtual Memory Address Region (VMAR), the
 process root VMAR, that spans the entire user address space
-(see [`zx_process_create()`](/docs/reference/syscalls/process_create.md)).
+(see [`zx_process_create()`](/reference/syscalls/process_create.md)).
 The root VMAR may be used directly or subdivided into child VMARs.
 
 VMARs are used to map Virtual Memory Objects (VMOs), which provide the code,
@@ -26,7 +26,7 @@ space of the process.
 A process stops execution when:
 
 *   The last thread in the process is terminated or exits.
-*   The process calls [`zx_process_exit()`](/docs/reference/syscalls/process_exit.md)
+*   The process calls [`zx_process_exit()`](/reference/syscalls/process_exit.md)
     to terminate itself.
 *   The parent job terminates the process.
 *   The parent job is destroyed.

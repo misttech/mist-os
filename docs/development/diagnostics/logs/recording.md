@@ -86,8 +86,8 @@ lack a way to express the severity of a message.
 [Rust logging]: /docs/development/languages/rust/logging.md
 [kernel's shared ring buffer]: /zircon/kernel/lib/debuglog/debuglog.cc?l=37&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
 [bindable to file descriptors]: /sdk/lib/fdio/include/lib/fdio/fdio.h?l=36&drc=1bdbf8a4e6f758c3b1782dee352071cc592ca3ab
-[`debuglog_write`]: /docs/reference/syscalls/debuglog_write.md
-[`debuglog_read`]: /docs/reference/syscalls/debuglog_read.md
+[`debuglog_write`]: /reference/syscalls/debuglog_write.md
+[`debuglog_read`]: /reference/syscalls/debuglog_read.md
 [`zxlogf`]: /sdk/lib/driver/compat/cpp/logging.h?l=59&drc=7cf6769e0971693fc1307c6059826596452c75b2
 [kernel params]: /docs/reference/kernel/kernel_cmdline.md#drivernamelogflags
 [`fuchsia.sys/LaunchInfo`]: https://fuchsia.dev/reference/fidl/fuchsia.sys#LaunchInfo

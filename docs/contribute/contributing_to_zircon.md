@@ -42,7 +42,6 @@ Writing documentation is a great idea and is encouraged:
 
 When editing or adding `syscalls` or `cmdlines`, update the following:
 
-*   A list of `syscalls` in [`/docs/reference/syscalls/README.md`][syscall-doc]
 *   A list of kernel `cmdline` options in
     [`/docs/reference/kernel/kernel_cmdline.md`][cmdline-doc].
 
@@ -66,5 +65,4 @@ typedef int ZX_RESUME_NOT_HANDLED_DEPRECATION __attribute__((deprecated));
 [build-zircon-for-all]: /docs/development/kernel/getting_started.md#building_zircon_for_all_targets
 [run-the-tests]: /docs/development/testing/testing.md
 [googlesource-docs]: /docs/concepts/kernel
-[syscall-doc]: /docs/reference/syscalls/README.md
 [cmdline-doc]: /docs/reference/kernel/kernel_cmdline.md

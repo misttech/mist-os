@@ -281,7 +281,7 @@ of having the client pass a forgeable debug name.
 [glossary.zircon boot image]: /docs/glossary/README.md#zircon-boot-image
 [vmo]: /docs/reference/kernel_objects/vm_object.md
 [pmt]: /docs/reference/kernel_objects/pinned_memory_token.md
-[vmo_create_child]: /docs/reference/syscalls/vmo_create_child.md
+[vmo_create_child]: /reference/syscalls/vmo_create_child.md
 [sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
 [HeapType]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#HeapType
 [BufferMemorySettings]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferMemorySettings

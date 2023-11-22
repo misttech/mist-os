@@ -149,11 +149,11 @@ can have two different handles to the same object with different rights.
 
 [handles]: /docs/concepts/kernel/handles.md
 [reference-counted]: https://en.wikipedia.org/wiki/Reference_counting
-[`zx_handle_close`]: /docs/reference/syscalls/handle_close.md
-[`zx_handle_close_many`]: /docs/reference/syscalls/handle_close_many.md
-[`zx_handle_duplicate`]: /docs/reference/syscalls/handle_duplicate.md
-[`zx_thread_exit`]:/docs/reference/syscalls/thread_exit.md
-[`zx_task_kill`]: /docs/reference/syscalls/task_kill.md
+[`zx_handle_close`]: /reference/syscalls/handle_close.md
+[`zx_handle_close_many`]: /reference/syscalls/handle_close_many.md
+[`zx_handle_duplicate`]: /reference/syscalls/handle_duplicate.md
+[`zx_thread_exit`]:/reference/syscalls/thread_exit.md
+[`zx_task_kill`]: /reference/syscalls/task_kill.md
 [VMOs]: /docs/reference/kernel_objects/vm_object.md
 [VMARs]: /docs/reference/kernel_objects/vm_address_region.md
 [threads]: /docs/reference/kernel_objects/thread.md

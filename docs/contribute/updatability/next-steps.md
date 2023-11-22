@@ -215,4 +215,4 @@ even if CTS coverage never reaches 100% of the platform surface.
 [tracing]: /docs/concepts/kernel/tracing-system.md
 [trf]: /docs/development/testing/components/test_runner_framework.md
 [workstation-oot]: /docs/contribute/roadmap/2021/workstation_out_of_tree.md
-[zx-object-get-info]: /docs/reference/syscalls/object_get_info.md
+[zx-object-get-info]: /reference/syscalls/object_get_info.md

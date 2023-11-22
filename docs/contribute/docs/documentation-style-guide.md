@@ -92,7 +92,7 @@ In the Fuchsia documentation you can link to three types of contents:
     tree. These documents exist in `/docs/reference/` and are published in the
     `https://fuchsia.dev/fuchsia-src/reference/` section. These links must link
     to a file with an `.md` extension. For example,
-    `/docs/reference/syscalls/bti_create.md`.
+    `/docs/reference/fidl/bindings/overview.md`.
 
 ### Test your links before submitting a change
 

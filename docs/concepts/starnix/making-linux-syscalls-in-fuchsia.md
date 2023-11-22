@@ -132,6 +132,6 @@ loop {
 [shareable-state]: https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/kernel/object/include/object/shareable_process_state.h
 [starnix-runner]: /docs/concepts/components/v2/starnix.md
 [starnix-readme]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/starnix/kernel/README.md
-[restricted-enter]: /docs/reference/syscalls/restricted_enter.md
-[restricted-bind-state]: /docs/reference/syscalls/restricted_bind_state.md
+[restricted-enter]: /reference/syscalls/restricted_enter.md
+[restricted-bind-state]: /reference/syscalls/restricted_bind_state.md
 [starnix-container]: /docs/concepts/starnix/starnix-container.md

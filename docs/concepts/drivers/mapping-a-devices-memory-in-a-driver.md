@@ -171,11 +171,11 @@ should consider this approach.
 [acpi-getmmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.hardware.acpi/device.fidl;l=324
 [banjo-getmmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/banjo/fuchsia.hardware.platform.device/platform-device.fidl;l=44
 [banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
-[zx-vmo-create-physical]: /docs/reference/syscalls/vmo_create_physical.md
+[zx-vmo-create-physical]: /reference/syscalls/vmo_create_physical.md
 [acpi]: /docs/contribute/governance/rfcs/0112_acpi_support_on_x86.md
 [device-trees]: /docs/contribute/governance/rfcs/0192_device_trees_on_fuchsia.md
 [driver-framework]: /docs/concepts/drivers/driver_framework.md
-[zx-vmo-read]: /docs/reference/syscalls/vmo_read.md
-[zx-vmo-write]: /docs/reference/syscalls/vmo_write.md
+[zx-vmo-read]: /reference/syscalls/vmo_read.md
+[zx-vmo-write]: /reference/syscalls/vmo_write.md
 [root-vmar]: /docs/concepts/memory/address_spaces.md#vmars_mappings_and_vmos
 [lib-mmio]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/lib/mmio/include/lib/mmio/mmio.h

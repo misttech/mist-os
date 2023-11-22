@@ -119,12 +119,12 @@ related object no longer exists.
 
 ## Bad handle policy
 
-Using a handle after it has been [closed](/docs/reference/syscalls/handle_close.md)
+Using a handle after it has been [closed](/reference/syscalls/handle_close.md)
 or closing a handle that has been already closed are mistakes that can create
 hard to diagnose errors.
 
 In order to help developers find these issues, the "bad handle" Job policy can
-be activated using [zx_job_set_policy](/docs/reference/syscalls/job_set_policy.md)
+be activated using [zx_job_set_policy](/reference/syscalls/job_set_policy.md)
 with the condition **ZX_POL_BAD_HANDLE** and the action
 **ZX_POL_ACTION_ALLOW_EXCEPTION**. When a process is launched under a job with
 this policy, any use of an already closed handle will generate an exception

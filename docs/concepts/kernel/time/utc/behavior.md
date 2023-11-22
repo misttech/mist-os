@@ -129,12 +129,12 @@ asserted when the clock is first synchronized.
 
 You may check or wait for either of the signals using one of:
 
-* [`zx_object_wait_async`](/docs/reference/syscalls/object_wait_async.md)
-* [`zx_object_wait_many`](/docs/reference/syscalls/object_wait_many.md)
-* [`zx_object_wait_one`](/docs/reference/syscalls/object_wait_one.md)
+* [`zx_object_wait_async`](/reference/syscalls/object_wait_async.md)
+* [`zx_object_wait_many`](/reference/syscalls/object_wait_many.md)
+* [`zx_object_wait_one`](/reference/syscalls/object_wait_one.md)
 
 You may check details such as the clock's error bound using
-[`zx_clock_get_details`](/docs/reference/syscalls/clock_get_details.md).
+[`zx_clock_get_details`](/reference/syscalls/clock_get_details.md).
 For the UTC clock the error bound is defined as half of a 95% confidence
 interval. In other words, for a randomly selected time on a randomly selected
 Fuchsia device, there is a ≥95% probability that the true value of UTC is

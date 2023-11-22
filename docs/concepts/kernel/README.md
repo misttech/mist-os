@@ -43,7 +43,7 @@ This page is a non-comprehensive index of the zircon documentation.
 + [Thread annotations](/docs/development/kernel/threads/thread_annotations.md)
 + [Handles](/docs/concepts/kernel/handles.md)
 + [Lock validation](lockdep.md)
-+ [System Calls](/docs/reference/syscalls/README.md)
++ [System Calls](/reference/syscalls/README.md)
 + [zxcrypt](/docs/concepts/filesystems/zxcrypt.md)
 
 + [Driver framework (DFv2)](/docs/concepts/drivers/driver_framework.md)

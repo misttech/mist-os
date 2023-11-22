@@ -160,4 +160,4 @@ The problems are
 
 [exception_channel_types]: ../../../concepts/kernel/exceptions.md#exception_channel_types
 [exception_handling]: ../../../concepts/kernel/exceptions.md
-[task_create_exception_channel]: ../../../reference/syscalls/task_create_exception_channel.md
+[task_create_exception_channel]: /reference/syscalls/task_create_exception_channel.md

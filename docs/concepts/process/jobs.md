@@ -40,9 +40,9 @@ process to begin execution.
 A Zircon process is an instance of a program in the traditional sense, which is,
 a set of instructions that are executed by one or more threads, along with a
 collection of resources.
-[`zx_process_create()`](/docs/reference/syscalls/process_create.md) creates a
+[`zx_process_create()`](/reference/syscalls/process_create.md) creates a
 new process within a job. The thread is not executed
-until [`zx_process_start()`](/docs/reference/syscalls/process_start.md)
+until [`zx_process_start()`](/reference/syscalls/process_start.md)
 is called.
 
 A job may be used to terminate, get exceptions from, or debug a child process.
@@ -56,23 +56,23 @@ A security policy, resource policy, or both may be set on an empty job. The
 job's effective policies are the combination of the parent's effective policies
 and the policies specified in the job policy.
 
-The [`zx_job_set_policy()`](/docs/reference/syscalls/job_set_policy.md) system
+The [`zx_job_set_policy()`](/reference/syscalls/job_set_policy.md) system
 call sets job security and resource policies to an empty job. After this call
 succeeds any new child process or child job has the new effective policy
 applied to it.
 
 ## Related syscalls
 
-*   [`zx_job_create()`](/docs/reference/syscalls/job_create.md) creates a new
+*   [`zx_job_create()`](/reference/syscalls/job_create.md) creates a new
 job within a job; creates a new child [job object](/docs/reference/kernel_objects/job.md)
 given a parent job.
-*   [`zx_job_set_critical()`](/docs/reference/syscalls/job_set_critical.md) sets
+*   [`zx_job_set_critical()`](/reference/syscalls/job_set_critical.md) sets
 a process as critical to a job.
 *   When a give process terminates, the corresponding job is be terminated as
-if [`zx_task_kill()`](/docs/reference/syscalls/task_kill.md) was called on
+if [`zx_task_kill()`](/reference/syscalls/task_kill.md) was called on
 it. The return code used is `ZX_TASK_RETCODE_CRITICAL_PROCESS_KILL`.
-*   [`zx_process_create()`](/docs/reference/syscalls/process_create.md) creates
+*   [`zx_process_create()`](/reference/syscalls/process_create.md) creates
 a new process.
-*   [`zx_thread_create()`](/docs/reference/syscalls/thread_create.md) creates a
+*   [`zx_thread_create()`](/reference/syscalls/thread_create.md) creates a
 thread within the specified process. The thread does not start executing until
-[`zx_thread_start()`](/docs/reference/syscalls/thread_start.md) is called.
+[`zx_thread_start()`](/reference/syscalls/thread_start.md) is called.

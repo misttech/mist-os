@@ -37,7 +37,7 @@ request/response, request-expiration, sidecar VMOs, etc. The most appropriate me
 on the nature of the service.
 
 
-[`zx_channel_write()`]: /docs/reference/syscalls/channel_write.md
-[`zx_channel_write_etc()`]: /docs/reference/syscalls/channel_write_etc.md
-[`zx_port_queue()`]: /docs/reference/syscalls/port_queue.md
+[`zx_channel_write()`]: /reference/syscalls/channel_write.md
+[`zx_channel_write_etc()`]: /reference/syscalls/channel_write_etc.md
+[`zx_port_queue()`]: /reference/syscalls/port_queue.md
 

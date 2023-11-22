@@ -377,7 +377,7 @@ See also:
 [sanitizers]: /docs/contribute/testing/sanitizers.md
 [sanitizers-supported-configs]: /docs/contribute/testing/sanitizers.md#supported_configurations
 [stress-tests]: /docs/development/testing/stress_tests.md
-[syscalls]: /docs/reference/syscalls/README.md
+[syscalls]: /reference/syscalls/README.md
 [test-coverage]: /docs/contribute/testing/coverage.md
 [test-package-gn]: /docs/development/components/build.md#test-packages
 [testing-integration]: /docs/development/testing/components/integration_testing.md

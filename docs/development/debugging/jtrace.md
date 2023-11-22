@@ -266,8 +266,8 @@ this behavior and force either small or large records in either situation.
 Small trace entries record the following fields.
 
 + Timestamp: A timestamp which records when the trace entry was added to the buffer. Recorded in
-units of [ticks](/docs/reference/syscalls/ticks_get.md), but translated to the
-[clock monotonic](/docs/reference/syscalls/clock_get_monotonic.md) timeline when the buffer is
+units of [ticks](/reference/syscalls/ticks_get.md), but translated to the
+[clock monotonic](/reference/syscalls/clock_get_monotonic.md) timeline when the buffer is
 dumped.
 + CPU Id: The ID of the CPU which created the trace entry.
 + Tag: A pointer to a C-string literal supplied by the developer to assist in debugging.

@@ -189,5 +189,5 @@ accommodate any major changes in the spec.
 [tbi]: https://developer.arm.com/documentation/den0024/a/ch12s05s01
 [hwasan]: https://clang.llvm.org/docs/HardwareAssistedAddressSanitizerDesign.html
 [rfc143]: /docs/contribute/governance/rfcs/0143_userspace_top_byte_ignore.md
-[features]: /docs/reference/syscalls/system_get_features.md
+[features]: /reference/syscalls/system_get_features.md
 [qemu]: https://lists.gnu.org/archive/html/qemu-riscv/2021-10/msg00682.html

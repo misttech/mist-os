@@ -158,6 +158,6 @@ the unsafe `fuchsia.logger.LogListener` API is [planned](https://fxbug.dev/48758
 [DataType]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#DataType
 [Format]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#Format
 [FormattedContent]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#FormattedContent
-[monotonic clock]: /docs/reference/syscalls/clock_get_monotonic.md
+[monotonic clock]: /reference/syscalls/clock_get_monotonic.md
 [StreamMode]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#StreamMode
 [StreamParameters]: https://fuchsia.dev/reference/fidl/fuchsia.diagnostics#StreamParameters

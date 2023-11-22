@@ -80,7 +80,7 @@ align with requirements from [zx_channel_call][zx_channel_call]. However, the
 syscall has stabilized, and this requirement is no longer needed.
 
 <!-- xrefs -->
-[zx_channel_call]: /docs/reference/syscalls/channel_call.md
+[zx_channel_call]: /reference/syscalls/channel_call.md
 
 ### Version 3 {#version-3}
 

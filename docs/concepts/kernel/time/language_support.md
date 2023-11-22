@@ -116,7 +116,7 @@ synchronized, before reading it.
 [rust-instant]: https://doc.rust-lang.org/std/time/struct.Instant.html
 [rust-system-time]: https://doc.rust-lang.org/std/time/struct.SystemTime.html
 [fuchsia-utc-behavior]: utc/behavior.md#differences_from_other_operating_systems
-[zx-monotonic]: /docs/reference/syscalls/clock_get_monotonic.md
+[zx-monotonic]: /reference/syscalls/clock_get_monotonic.md
 [c-libzircon]: /docs/concepts/process/core_libraries.md#libzircon
 [cpp-libzx]: /docs/concepts/process/core_libraries.md#libzx
 [rust-runtime]: /src/lib/fuchsia-runtime

@@ -62,9 +62,9 @@ should not be considered for eviction, thereby avoiding the cost of fetching
 them back in when they're accessed again.
 
 Learn more about eviction hints in the reference docs:
-[`zx_vmo_op_range`](/docs/reference/syscalls/vmo_op_range.md)
+[`zx_vmo_op_range`](/reference/syscalls/vmo_op_range.md)
 and
-[`zx_vmar_op_range`](/docs/reference/syscalls/vmar_op_range.md).
+[`zx_vmar_op_range`](/reference/syscalls/vmar_op_range.md).
 
 ## Zero page deduplication
 
@@ -93,7 +93,7 @@ they can be reconstructed from the VMAR tree.
 Userspace processes can create a special flavor of
 [VMOs that are discardable](/docs/contribute/governance/rfcs/0012_zircon_discardable_memory.md).
 Clients can
-[lock and unlock ](/docs/reference/syscalls/vmo_op_range.md)discardable
+[lock and unlock ](/reference/syscalls/vmo_op_range.md)discardable
 VMOs depending on whether or not they are being used. When the system is under
 memory pressure, the kernel finds discardable VMOs that are unlocked and frees
 them.

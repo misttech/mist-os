@@ -8,14 +8,14 @@ and entropy sources.
 
 Zircon's built-in CPRNG provides cryptographically secure pseudorandom data in a
 non-blocking fashion. User space programs can access them through the
-[`zx_cprng_draw()`](/docs/reference/syscalls/cprng_draw.md) syscall.
+[`zx_cprng_draw()`](/reference/syscalls/cprng_draw.md) syscall.
 
 Zircon's CPRNG only trusts entropy sources directly accessible from within the
 kernel because anything outside the kernel such as the drivers, which are
 considered userspace programs, cannot be trusted. For the CPRNG to function
 properly and securely, at least one of these sources is required. However,
 userspace programs may inject additional entropy to CPRNG through the
-[`zx_cprng_add_entropy()`](/docs/reference/syscalls/cprng_add_entropy.md)
+[`zx_cprng_add_entropy()`](/reference/syscalls/cprng_add_entropy.md)
 syscall.
 
 

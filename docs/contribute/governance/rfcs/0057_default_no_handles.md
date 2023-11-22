@@ -39,7 +39,7 @@ The need to accommodate handles has led to compromise:
 * In Rust, adding a handle to a type for the first time is source-breaking
   because the type will no longer derive the `Clone` trait. (Properly cloning a
   handle requires invoking the
-  [zx_handle_duplicate](/docs/reference/syscalls/handle_duplicate.md) syscall,
+  [zx_handle_duplicate](/reference/syscalls/handle_duplicate.md) syscall,
   which can fail.)
 * The Rust bindings for protocols take FIDL objects by mutable reference and
   zero out handles, rather than explicitly taking ownership, so that objects

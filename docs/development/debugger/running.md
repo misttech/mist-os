@@ -23,7 +23,7 @@ or a hardware device. If it doesn't work as expected, please check the troublesh
 ### The build type is compatible
 
 Debuggers on Fuchsia depend on privileged syscalls, most notably
-[`zx_process_write_memory`](/docs/reference/syscalls/process_write_memory.md).
+[`zx_process_write_memory`](/reference/syscalls/process_write_memory.md).
 These syscalls are only enabled when the kernel flag
 [`kernel.enable-debugging-syscalls`](/docs/gen/boot-options.md#kernelenable-debugging-syscallsbool)
 is set to `true`, which means debuggers are not available for `user` and `userdebug`

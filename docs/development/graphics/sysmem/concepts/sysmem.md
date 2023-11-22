@@ -182,12 +182,12 @@ collection.
 [BufferCollection]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection
 [channel]: /docs/reference/kernel_objects/channel.md
 [pmt]: /docs/reference/kernel_objects/pinned_memory_token.md
-[vmo_create_child]: /docs/reference/syscalls/vmo_create_child.md
+[vmo_create_child]: /reference/syscalls/vmo_create_child.md
 [handles]: /docs/concepts/kernel/handles.md
 [bind]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#Allocator.BindSharedCollection
 [setconstraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection.SetConstraints
 [fidl]: /docs/development/languages/fidl/README.md
-[map]: /docs/reference/syscalls/vmar_map.md
+[map]: /reference/syscalls/vmar_map.md
 [constraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionConstraints
 [AttachToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection.AttachToken
 [SetDispensable]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionToken.SetDispensable

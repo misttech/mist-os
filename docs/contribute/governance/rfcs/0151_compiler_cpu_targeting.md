@@ -378,4 +378,4 @@ outside the scope of this RFC.
 [rfc-0143]: /docs/contribute/governance/rfcs/0143_userspace_top_byte_ignore.md
 [rust-codegen]: https://doc.rust-lang.org/rustc/codegen-options/index.html#target-cpu
 [wikipedia-core2-diagram]: https://commons.wikimedia.org/wiki/File:Intel_Core2_arch.svg
-[zx_system_get_features]: /docs/reference/syscalls/system_get_features.md
+[zx_system_get_features]: /reference/syscalls/system_get_features.md

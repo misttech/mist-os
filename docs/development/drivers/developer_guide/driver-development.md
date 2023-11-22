@@ -241,7 +241,7 @@ driver should spawn a thread to wait on the interrupt handle.
 The kernel will automatically handle masking and unmasking the interrupt as
 appropriate, depending on whether the interrupt is edge-triggered or
 level-triggered. For level-triggered hardware interrupts,
-[`zx_interrupt_wait()`](/docs/reference/syscalls/interrupt_wait.md) will mask
+[`zx_interrupt_wait()`](/reference/syscalls/interrupt_wait.md) will mask
 the interrupt before returning and unmask the interrupt when it is called again
 the next time. For edge-triggered interrupts, the interrupt remains unmasked.
 
@@ -249,7 +249,7 @@ The interrupt thread should not perform any long-running tasks. For drivers that
 perform lengthy tasks, use a worker thread.
 
 You can signal an interrupt handle with
-[`zx_interrupt_trigger()`](/docs/reference/syscalls/interrupt_trigger.md) on
+[`zx_interrupt_trigger()`](/reference/syscalls/interrupt_trigger.md) on
 slot `ZX_INTERRUPT_SLOT_USER` to return from `zx_interrupt_wait()`. This is
 necessary to shut down the interrupt thread during driver clean up.
 
@@ -296,7 +296,7 @@ example, the virtual console is implemented by the
 [virtcon](/src/bringup/bin/virtcon) component.
 
 Privileged operations such as `zx_vmo_create_contiguous()` and
-[`zx_interrupt_create`](/docs/reference/syscalls/interrupt_create.md) require a
+[`zx_interrupt_create`](/reference/syscalls/interrupt_create.md) require a
 root resource handle. This handle is not available to drivers other than the
 system driver ([ACPI](/src/devices/board/drivers/x86) on x86 systems and
 [platform](/src/devices/bus/drivers/platform) on ARM systems). A device should
@@ -352,7 +352,7 @@ Flag                                    | Meaning
 `DEVICE_SUSPEND_FLAG_REBOOT_BOOTLOADER` | ?
 `DEVICE_SUSPEND_FLAG_REBOOT_RECOVERY`   | ?
 `DEVICE_SUSPEND_FLAG_POWEROFF`          | The driver should shut itself down in preparation for power off
-`DEVICE_SUSPEND_FLAG_MEXEC`             | The driver should shut itself down in preparation for a [soft reboot](/docs/reference/syscalls/system_mexec.md)
+`DEVICE_SUSPEND_FLAG_MEXEC`             | The driver should shut itself down in preparation for a [soft reboot](/reference/syscalls/system_mexec.md)
 `DEVICE_SUSPEND_FLAG_SUSPEND_RAM`       | The driver should arrange so that it can be restarted from RAM
 
 <!---

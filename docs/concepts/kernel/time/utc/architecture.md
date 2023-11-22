@@ -52,7 +52,7 @@ using the standard time API provided by its runtime. See
 
 Components that need deeper insight into the state of time synchronization may
 acquire the UTC clock handle and use it to call
-[`zx_clock_get_details`](/docs/reference/syscalls/clock_get_details.md) or wait
+[`zx_clock_get_details`](/reference/syscalls/clock_get_details.md) or wait
 on the `ZX_CLOCK_STARTED` signal.
 
 ### Timekeeper

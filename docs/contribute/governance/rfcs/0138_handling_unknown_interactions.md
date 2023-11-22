@@ -996,8 +996,8 @@ can receive both one way and two way interactions:
 
 <!-- link labels -->
 
-[`zx_channel_call`]: /docs/reference/syscalls/channel_call.md
-[`zx_channel_write`]: /docs/reference/syscalls/channel_write.md
+[`zx_channel_call`]: /reference/syscalls/channel_call.md
+[`zx_channel_write`]: /reference/syscalls/channel_write.md
 [RFC-0024]: 0024_mandatory_source_compatibility.md
 [RFC-0033]: 0033_handling_unknown_fields_strictness.md
 [RFC-0037-transactional-message-header-v3]: 0037_transactional_message_header_v3.md#transactional-message-header-v3

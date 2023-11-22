@@ -427,4 +427,4 @@ Considered alternatives are:
 [fidlcat]: /docs/development/monitoring/fidlcat
 [fidl-codec-visitor]: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/lib/fidl_codec/visitor.h
 [fidl-service-definition]: /docs/glossary#service
-[zx-channel-read]: /docs/reference/syscalls/channel_read.md
+[zx-channel-read]: /reference/syscalls/channel_read.md

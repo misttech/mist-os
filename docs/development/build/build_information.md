@@ -36,4 +36,4 @@ Lastly, the kernel version may be retrieved with
 [buildinfo-type]: https://fuchsia.dev/reference/fidl/fuchsia.buildinfo#BuildInfo
 [component-manifest]: /docs/concepts/components/v2/component_manifests.md
 [protocol-capability]: /docs/concepts/components/v2/capabilities/protocol.md
-[zx-system-get-version-string]: /docs/reference/syscalls/system_get_version_string.md
+[zx-system-get-version-string]: /reference/syscalls/system_get_version_string.md

@@ -5,7 +5,7 @@
 
 ## Summary
 
-The [`zx_clock_update`](/docs/reference/syscalls/clock_update.md) syscall is
+The [`zx_clock_update`](/reference/syscalls/clock_update.md) syscall is
 used to set the time in a kernel clock object but the current API design limits
 the accuracy that may be achieved. This RFC describes changes to
 `zx_clock_update` that let clock maintainers opt in to supplying more
@@ -39,7 +39,7 @@ clock for UTC and for other future users of kernel clocks.
 A [clock](/docs/reference/kernel_objects/clock.md) is a
 [one dimensional affine transformation](/docs/concepts/kernel/clock_transformations.md)
 of the
-[clock monotonic](/docs/reference/syscalls/clock_get_monotonic.md) reference
+[clock monotonic](/reference/syscalls/clock_get_monotonic.md) reference
 timeline, defining how the "reference" time (i.e. the device's monotonic clock)
 should be translated to the "synthetic" time output by the clock. When a clock
 maintainer requests a change to the clock they are effectively supplying a new
@@ -202,7 +202,7 @@ tests will provide additional test coverage.
 
 ## Documentation
 
-The [`zx_clock_update` reference documentation](/docs/reference/syscalls/clock_update.md)
+The [`zx_clock_update` reference documentation](/reference/syscalls/clock_update.md)
 will be updated to describe this new behavior.
 
 ## Drawbacks, alternatives, and unknowns

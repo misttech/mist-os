@@ -790,7 +790,7 @@ on processing while a flush is ongoing.
 
 ## Prior art and references
 
-- [`zx_pager_create()`](/docs/reference/syscalls/pager_create.md)
-- [`zx_pager_create_vmo()`](/docs/reference/syscalls/pager_create_vmo.md)
-- [`zx_pager_op_range()`](/docs/reference/syscalls/pager_op_range.md)
-- [`zx_stream_create()`](/docs/reference/syscalls/stream_create.md)
+- [`zx_pager_create()`](/reference/syscalls/pager_create.md)
+- [`zx_pager_create_vmo()`](/reference/syscalls/pager_create_vmo.md)
+- [`zx_pager_op_range()`](/reference/syscalls/pager_op_range.md)
+- [`zx_stream_create()`](/reference/syscalls/stream_create.md)

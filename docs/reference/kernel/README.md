@@ -13,5 +13,5 @@ Reference documentation for Fuchsia kernel and subsystems.
 
 ## System calls reference
 
-* [System calls](../syscalls/README.md)
+* [System calls](/reference/syscalls/README.md)
 

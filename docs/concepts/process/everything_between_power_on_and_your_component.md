@@ -167,7 +167,7 @@ component_manager.
 [blobfs]: /docs/concepts/filesystems/blobfs.md
 [bootloader-and-kernel]: /docs/concepts/process/userboot.md#boot_loader_and_kernel_startup
 [component-manager]: /docs/concepts/components/v2/introduction.md#component-manager
-[critical-processes]: /docs/reference/syscalls/job_set_critical.md
+[critical-processes]: /reference/syscalls/job_set_critical.md
 [devfs]: /docs/development/drivers/concepts/device_driver_model/device-model.md
 [driver-manager-exposes]: /src/devices/bin/driver_manager/meta/driver-manager-base.shard.cml?l=83&drc=2deafe53a4a1626b5be2263c13e3dd57024be7db
 [dynamic-linking]: https://en.wikipedia.org/wiki/Dynamic_linker

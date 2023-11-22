@@ -10,7 +10,7 @@ including:
 * FIFOs
 
 The error can also occur when failing to signal a peered object, such as
-[`zx_object_signal_peer`](/docs/reference/syscalls/object_signal_peer.md).
+[`zx_object_signal_peer`](/reference/syscalls/object_signal_peer.md).
 
 This document helps you troubleshoot the following causes
 of a `zx_err_peer_closed` error.

@@ -29,7 +29,7 @@ FIDL datatype that has some desirable properties:
     Scenic View creation. Protocols and components that participate in View
     creation do not have to "tunnel back" the corresponding ViewRef.
 *   ViewRef holders can implement lifecycle management by listening for a
-    [`ZX_EVENTPAIR_PEER_CLOSED`](/docs/reference/syscalls/eventpair_create.md)
+    [`ZX_EVENTPAIR_PEER_CLOSED`](/reference/syscalls/eventpair_create.md)
     zircon signal on the underlying eventpair object.
 
 Each Scenic View has an associated ViewRef.

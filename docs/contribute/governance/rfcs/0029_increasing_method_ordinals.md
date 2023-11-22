@@ -366,5 +366,5 @@ for size in [31, 39, 47, 52, 63]:
 ```
 
 <!-- xrefs -->
-[channel_call]: /docs/reference/syscalls/channel_call.md
+[channel_call]: /reference/syscalls/channel_call.md
 [birthday]: https://en.wikipedia.org/wiki/Birthday_problem#Generalizations1

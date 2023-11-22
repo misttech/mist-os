@@ -369,4 +369,4 @@ have a significant negative impact on memory.
 [memory-monitor]: https://cs.opensource.google.com/fuchsia/fuchsia/+/main:src/developer/memory/monitor
 [rfc-0091]: /docs/contribute/governance/rfcs/0091_getevent_imminent_oom.md
 [rfc-0110]: /docs/contribute/governance/rfcs/0110_reboot_for_critical_components.md
-[sys-get-event-call]: /docs/reference/syscalls/system_get_event.md
+[sys-get-event-call]: /reference/syscalls/system_get_event.md

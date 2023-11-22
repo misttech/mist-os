@@ -266,5 +266,5 @@ platform interfaces are observed and respected.
 [vdso-enforcement]: /docs/concepts/kernel/vdso.md#enforcement
 [vmar]: /docs/reference/kernel_objects/vm_address_region.md
 [workstation-oot]: /docs/contribute/roadmap/2021/workstation_out_of_tree.md
-[zx-object-get-info]: /docs/reference/syscalls/object_get_info.md
-[zx-process-create]: /docs/reference/syscalls/process_create.md
+[zx-object-get-info]: /reference/syscalls/object_get_info.md
+[zx-process-create]: /reference/syscalls/process_create.md

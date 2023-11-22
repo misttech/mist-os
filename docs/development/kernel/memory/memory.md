@@ -11,7 +11,7 @@ A process can use memory 3 ways:
     The programmer usually interfaces with this memory via memory addresses.
  2. Stand-alone VMOs. These are sets of memory pages that are not mapped via a
     VMAR. The programmer interfaces with this memory via handles; usually issuing
-    [vmo_read](/docs/reference/syscalls/vmo_read.md) and [vmo_write](/docs/reference/syscalls/vmo_write.md).
+    [vmo_read](/reference/syscalls/vmo_read.md) and [vmo_write](/reference/syscalls/vmo_write.md).
  3. Kernel memory in the form of handles to kernel objects.
 
 Fuchsia follows an over-commit model: processes can allocate more memory than

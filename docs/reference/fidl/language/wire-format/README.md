@@ -858,8 +858,8 @@ of the `ZX_HANDLE_INVALID` constant.
 Read [The Lost Art of Structure Packing][lostart]{:.external} for an in-depth
 treatise on the subject.
 
-[channel call]: /docs/reference/syscalls/channel_call.md
-[channel write]: /docs/reference/syscalls/channel_write.md
+[channel call]: /reference/syscalls/channel_call.md
+[channel write]: /reference/syscalls/channel_write.md
 [RFC-0030]: /docs/contribute/governance/rfcs/0030_fidl_is_little_endian.md
 [RFC-0059]: /docs/contribute/governance/rfcs/0059_reserved_bits_count_fields.md
 [RFC-0061]: /docs/contribute/governance/rfcs/0061_extensible_unions.md
