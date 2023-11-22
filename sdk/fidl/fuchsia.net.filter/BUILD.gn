@@ -4,21 +4,21 @@
 
 import("//build/fidl/fidl.gni")
 
-fidl("fuchsia.net.root") {
+fidl("fuchsia.net.filter") {
   sdk_category = "internal"
 
   sources = [
-    "filter.fidl",
-    "interfaces.fidl",
+    "admin.fidl",
+    "constants.fidl",
     "overview.fidl",
-    "routes.fidl",
+    "resources.fidl",
+    "watcher.fidl",
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.network",
     "//sdk/fidl/fuchsia.net",
-    "//sdk/fidl/fuchsia.net.filter",
-    "//sdk/fidl/fuchsia.net.interfaces.admin",
-    "//sdk/fidl/fuchsia.net.routes.admin",
+    "//sdk/fidl/fuchsia.net.interfaces",
   ]
 
   enable_hlcpp = true

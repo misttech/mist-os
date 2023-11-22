@@ -1,0 +1,299 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.net.filter;
+
+using fuchsia.hardware.network;
+using fuchsia.net;
+using fuchsia.net.interfaces;
+
+const MAX_NAME_LEN uint8 = 255;
+
+/// A unique identifier for a [`Namespace`].
+alias NamespaceId = string:MAX_NAME_LEN;
+
+/// A namespace.
+///
+/// A namespace is a scoped collection of filtering state, specifically
+/// [`Routine`]s. It is analogous to a table in Netfilter.
+type Namespace = table {
+    /// The identifier of the namespace.
+    ///
+    /// Must be unique within the scope of the controller in which the namespace
+    /// is created.
+    1: id NamespaceId;
+    /// The domain (or domains) in which the namespace operates.
+    2: domain @generated_name("Domain") flexible enum {
+        IPV4 = 1;
+        IPV6 = 2;
+        ALL_IP = 3;
+    };
+};
+
+/// A unique identifier for a [`Routine`].
+type RoutineId = struct {
+    /// The namespace in which the routine is installed.
+    namespace NamespaceId;
+    /// The name of the routine.
+    ///
+    /// Must be unique within the namespace in which the routine is created.
+    name string:MAX_NAME_LEN;
+};
+
+type Empty = struct {};
+
+/// The priority of the routine relative to other routines installed on the same
+/// hook. For a given packet traversing a given hook, all installed routines are
+/// executed in order of priority (stopping early only if a terminal action is
+/// hit).
+///
+/// If two routines are installed with the same priority on the same hook, the
+/// routine that was installed earlier will be evaluated first.
+alias Priority = int32;
+
+/// A routine.
+///
+/// A routine is a sequence of [`Rule`]s. It is analogous to a chain in
+/// Netfilter.
+type Routine = table {
+    /// The ID of the routine.
+    ///
+    /// Must be unique within the scope of the namespace in which the routine is
+    /// created.
+    1: id RoutineId;
+    /// The type of the routine.
+    ///
+    /// IP routines can only include rules with ordinary filter actions, whereas
+    /// NAT routines can also include rules with NAT actions.
+    ///
+    /// Note that NAT routines are only executed *once* for a given connection,
+    /// for the first packet in the flow.
+    2: type @generated_name("RoutineType") flexible union {
+        1: ip @generated_name("IpRoutine") table {
+            /// Installed routines are evaluated iff a packet hits the hook on
+            /// which it is installed.
+            ///
+            /// Uninstalled routines are useful for organizational purposes and
+            /// are only traversed when jumped to from another routine.
+            ///
+            /// If left unset, will be an uninstalled routine.
+            1: installation @generated_name("InstalledIpRoutine") table {
+                /// The hook on which the routine is installed.
+                ///  * The `INGRESS` hook occurs for incoming traffic before a
+                ///    routing decision has been made.
+                ///  * The `LOCAL_INGRESS` hook occurs for incoming traffic that
+                ///    is destined for the local host.
+                ///  * The `FORWARDING` hook occurs for incoming traffic that is
+                ///    destined for another node.
+                ///  * The `LOCAL_EGRESS` hook occurs for locally-generated
+                ///    traffic before a final routing decision has been made.
+                ///  * The `EGRESS` hook occurs for all outgoing traffic after a
+                ///    routing decision has been made.
+                ///
+                /// Required.
+                1: hook @generated_name("IpInstallationHook") flexible enum {
+                    INGRESS = 1;
+                    LOCAL_INGRESS = 2;
+                    FORWARDING = 3;
+                    LOCAL_EGRESS = 4;
+                    EGRESS = 5;
+                };
+                /// The priority of the routine relative to other routines
+                /// installed on the same hook.
+                ///
+                /// Interpreted as 0 if unset.
+                2: priority Priority;
+            };
+        };
+        2: nat @generated_name("NatRoutine") table {
+            /// Installed routines are evaluated whenever a packet hits the hook
+            /// on which it is installed.
+            ///
+            /// Uninstalled routines are useful for organizational purposes and
+            /// are only traversed when jumped to from another routine.
+            ///
+            /// If left unset, will be an uninstalled routine.
+            1: installation @generated_name("InstalledNatRoutine") table {
+                /// The optional hook in which to install the routine. If a
+                /// routine is not installed on a particular hook, it can only
+                /// be reached from other routines.
+                ///  * The `INGRESS` hook occurs for incoming traffic before a
+                ///    routing decision has been made.
+                ///  * The `LOCAL_INGRESS` hook occurs for incoming traffic that
+                ///    is destined for the local host.
+                ///  * The `LOCAL_EGRESS` hook occurs for locally-generated
+                ///    traffic before a routing decision has been made.
+                ///  * The `EGRESS` hook occurs for all outgoing traffic after a
+                ///    routing decision has been made.
+                ///
+                /// Required.
+                1: hook @generated_name("NatInstallationHook") flexible enum {
+                    INGRESS = 1;
+                    LOCAL_INGRESS = 2;
+                    LOCAL_EGRESS = 3;
+                    EGRESS = 4;
+                };
+                /// The priority of the routine relative to other routines
+                /// installed on the same hook.
+                ///
+                /// Interpreted as 0 if unset.
+                2: priority Priority;
+            };
+        };
+    };
+};
+
+/// A unique identifier for a [`Rule`].
+type RuleId = struct {
+    /// The routine to which the rule is added.
+    routine RoutineId;
+    /// The index of the rule.
+    ///
+    /// Must be unique within the routine to which the rule is added. Within a
+    /// given routine, rules will be executed in order of `index`. Note that
+    /// indices in a routine can be sparse; this allows removal and insertion of
+    /// rules while maintaining stable indices for rules that were unchanged.
+    index uint32;
+};
+
+/// A matcher for network interfaces.
+type InterfaceMatcher = flexible union {
+    /// The ID of the interface as assigned by the netstack.
+    1: id fuchsia.net.InterfaceId;
+    /// The name of the interface.
+    2: name fuchsia.net.interfaces.Name;
+    /// The device class of the interface.
+    3: device_class flexible union {
+        /// The loopback interface.
+        1: loopback Empty;
+        /// The interface's network device class.
+        2: device fuchsia.hardware.network.DeviceClass;
+    };
+};
+
+/// A matcher for IP addresses.
+type AddressMatcher = struct {
+    matcher @generated_name("AddressMatcherType") flexible union {
+        /// The subnet that must contain the IP address in the packet header in
+        /// order for it to match.
+        1: subnet fuchsia.net.Subnet;
+        /// The range of addresses that must include the IP address in the
+        /// packet header in order for it to match.
+        ///
+        /// The endpoints of the range must be in the same address family, and
+        /// `start` must <= `end`. (Comparisons are performed on the numerical
+        /// big-endian representation of the IP address.)
+        2: range @generated_name("AddressRange") struct {
+            /// The inclusive start of the address range.
+            start fuchsia.net.IpAddress;
+            /// The inclusive end of the address range.
+            end fuchsia.net.IpAddress;
+        };
+    };
+    /// Whether to check for an "inverse" or "negative" match (in which case,
+    /// if the matcher criteria do *not* apply, it *is* considered a match, and
+    /// vice versa).
+    invert bool;
+};
+
+/// A matcher for transport-layer port numbers.
+///
+/// `start` must <= `end`.
+type PortMatcher = struct {
+    /// The inclusive start of the port range.
+    start uint16;
+    /// The inclusive end of the port range.
+    end uint16;
+    /// Whether to check for an "inverse" or "negative" match.
+    invert bool;
+};
+
+/// The criteria that a packet must match for a rule to be applied.
+///
+/// Each field is optional, and will only be checked if provided. An unset
+/// field will be considered to match any packet. (An entirely empty table
+/// would match every packet.) Another way to think of the matching criteria
+/// for a given rule is as an AND of every provided matcher.
+///
+/// Some matchers are only available in certain contexts. For example, the
+/// `in_interface` is not available in the `EGRESS` hook. If a matcher is
+/// provided that is not available in the context in which the rule is
+/// installed, the installation will fail with an error.
+type Matchers = table {
+    /// The interface on which the packet entered the stack.
+    ///
+    /// Only available in `INGRESS`, `LOCAL_INGRESS`, and `FORWARDING`.
+    1: in_interface InterfaceMatcher;
+    /// The interface through which the packet exits the stack.
+    ///
+    /// Only available in `FORWARDING`, `LOCAL_EGRESS`, and `EGRESS`.
+    2: out_interface InterfaceMatcher;
+    /// Matcher for the source IP address.
+    3: src_addr AddressMatcher;
+    /// Matcher for the destination IP address.
+    4: dst_addr AddressMatcher;
+    /// Matchers for the transport layer protocol.
+    ///
+    /// Note that the variants of the `TransportProtocol` union allow matching
+    /// on the transport layer protocol itself; to match on specific properties
+    /// at the transport layer (such as TCP or UDP ports), clients should use
+    /// the fields of a protocol-specific matcher.
+    5: transport_protocol @generated_name("TransportProtocol") flexible union {
+        1: tcp @generated_name("TcpMatcher") table {
+            /// Matcher for the TCP source port.
+            1: src_port PortMatcher;
+            /// Matcher for the TCP destination port.
+            2: dst_port PortMatcher;
+        };
+        2: udp @generated_name("UdpMatcher") table {
+            /// Matcher for the UDP source port.
+            1: src_port PortMatcher;
+            /// Matcher for the UDP destination port.
+            2: dst_port PortMatcher;
+        };
+        3: icmp @generated_name("IcmpMatcher") table {};
+        4: icmpv6 @generated_name("Icmpv6Matcher") table {};
+    };
+};
+
+/// The action to take on a packet.
+type Action = flexible union {
+    /// Accept the packet.
+    ///
+    /// This is a terminal action for the current routine, i.e. no further rules
+    /// will be evaluated for this packet in the routine in which this rule is
+    /// installed. Subsequent routines on the same hook will still be evaluated.
+    1: accept Empty;
+    /// Drop the packet.
+    ///
+    /// This is a terminal action, i.e. no further rules will be evaluated for
+    /// this packet, even in other routines on the same hook.
+    2: drop Empty;
+    /// Jump from the current routine to the routine identified by the provided
+    /// name.
+    ///
+    /// The target routine must be in the same namespace as the calling routine,
+    /// and it cannot be installed on a hook; it must be an uninstalled routine.
+    3: jump string:MAX_NAME_LEN;
+    /// Stop evaluation of the current routine and return to the calling routine
+    /// (the routine from which the current routine was jumped), continuing
+    /// evaluation at the next rule.
+    ///
+    /// If invoked in an installed routine, equivalent to `accept`, given packets
+    /// are accepted by default in the absence of any matching rules.
+    4: return Empty;
+};
+
+/// A rule is a set of criteria (matchers) and a resultant action.
+type Rule = struct {
+    /// The ID of the rule.
+    ///
+    /// Must be unique within the scope of the routine to which the rule is
+    /// added.
+    id RuleId;
+    /// The criteria that a packet must match for the action to be executed.
+    matchers Matchers;
+    /// The action to take on a matching packet.
+    action Action;
+};
