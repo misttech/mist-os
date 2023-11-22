@@ -2,91 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "aml-uart.h"
+#include "src/devices/serial/drivers/aml-uart/aml-uart.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
-#include <lib/ddk/platform-defs.h>
-#include <lib/device-protocol/pdev-fidl.h>
-#include <lib/fit/defer.h>
-#include <lib/zx/vmo.h>
-#include <stdint.h>
-#include <string.h>
+#ifdef DFV1
+#include <lib/ddk/debug.h>  // nogncheck
+#else
+#include <lib/driver/compat/cpp/logging.h>  // nogncheck
+#endif
+
+#include <threads.h>
 #include <zircon/threads.h>
-#include <zircon/types.h>
 
-#include <bits/limits.h>
-#include <ddktl/device.h>
-#include <fbl/alloc_checker.h>
 #include <fbl/auto_lock.h>
-#include <hwreg/mmio.h>
 
-#include "registers.h"
+#include "src/devices/serial/drivers/aml-uart/registers.h"
 
 namespace serial {
 
 constexpr auto kMinBaudRate = 2;
-
-zx_status_t AmlUart::Create(void* ctx, zx_device_t* parent) {
-  zx_status_t status;
-  auto pdev = ddk::PDevFidl::FromFragment(parent);
-  if (!pdev.is_valid()) {
-    zxlogf(ERROR, "AmlUart::Create: Could not get pdev");
-    return ZX_ERR_NO_RESOURCES;
-  }
-
-  serial_port_info_t info;
-  size_t actual;
-  status =
-      device_get_metadata(parent, DEVICE_METADATA_SERIAL_PORT_INFO, &info, sizeof(info), &actual);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: device_get_metadata failed %d", __func__, status);
-    return status;
-  }
-  if (actual < sizeof(info)) {
-    zxlogf(ERROR, "%s: serial_port_info_t metadata too small", __func__);
-    return ZX_ERR_INTERNAL;
-  }
-
-  std::optional<fdf::MmioBuffer> mmio;
-  status = pdev.MapMmio(0, &mmio);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: pdev_map_&mmio__buffer failed %d", __func__, status);
-    return status;
-  }
-
-  fbl::AllocChecker ac;
-  auto* uart = new (&ac) AmlUart(parent, std::move(pdev), info, *std::move(mmio));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-  return uart->Init();
-}
-
-zx_status_t AmlUart::Init() {
-  auto cleanup = fit::defer([this]() { DdkRelease(); });
-
-  // Default configuration for the case that serial_impl_config is not called.
-  constexpr uint32_t kDefaultBaudRate = 115200;
-  constexpr uint32_t kDefaultConfig = SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
-  SerialImplAsyncConfig(kDefaultBaudRate, kDefaultConfig);
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_SERIAL_IMPL_ASYNC},
-      {BIND_SERIAL_CLASS, 0, serial_port_info_.serial_class},
-  };
-  auto status = DdkAdd(ddk::DeviceAddArgs("aml-uart")
-                           .set_props(props)
-                           .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS));
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: DdkDeviceAdd failed", __func__);
-    return status;
-  }
-
-  cleanup.cancel();
-  return status;
-}
 
 uint32_t AmlUart::ReadState() {
   auto status = Status::Get().ReadFrom(&mmio_);
@@ -442,13 +375,4 @@ void AmlUart::SerialImplAsyncWriteAsync(const uint8_t* buf, size_t length,
   HandleTX();
 }
 
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = AmlUart::Create;
-  return ops;
-}();
-
 }  // namespace serial
-
-ZIRCON_DRIVER(aml_uart, serial::driver_ops, "zircon", "0.1");

@@ -5,40 +5,20 @@
 #ifndef SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 #define SRC_DEVICES_SERIAL_DRIVERS_AML_UART_AML_UART_H_
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
-#include <fuchsia/hardware/serial/c/banjo.h>
-#include <fuchsia/hardware/serialimpl/async/c/banjo.h>
 #include <fuchsia/hardware/serialimpl/async/cpp/banjo.h>
 #include <lib/device-protocol/pdev-fidl.h>
-#include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zircon-internal/thread_annotations.h>
-#include <lib/zx/interrupt.h>
-#include <threads.h>
-#include <zircon/types.h>
 
-#include <utility>
-
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
-#include <soc/aml-common/aml-pwm-regs.h>
 
 namespace serial {
 
-class AmlUart;
-using DeviceType = ddk::Device<AmlUart>;
-
-class AmlUart : public DeviceType,
-                public ddk::SerialImplAsyncProtocol<AmlUart, ddk::base_protocol> {
+class AmlUart : public ddk::SerialImplAsyncProtocol<AmlUart> {
  public:
-  // Spawns device node.
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
-
-  // Device protocol implementation.
-  void DdkRelease() {
-    SerialImplAsyncEnable(false);
-    delete this;
-  }
+  explicit AmlUart(ddk::PDevFidl pdev, const serial_port_info_t& serial_port_info,
+                   fdf::MmioBuffer mmio)
+      : pdev_(std::move(pdev)), serial_port_info_(serial_port_info), mmio_(std::move(mmio)) {}
 
   // Serial protocol implementation.
   zx_status_t SerialImplAsyncGetInfo(serial_port_info_t* info);
@@ -49,18 +29,13 @@ class AmlUart : public DeviceType,
   void SerialImplAsyncWriteAsync(const uint8_t* buf_buffer, size_t buf_size,
                                  serial_impl_async_write_async_callback callback, void* cookie);
 
-  zx_status_t Init();
-
-  explicit AmlUart(zx_device_t* parent, ddk::PDevFidl pdev,
-                   const serial_port_info_t& serial_port_info, fdf::MmioBuffer mmio)
-      : DeviceType(parent),
-        pdev_(std::move(pdev)),
-        serial_port_info_(serial_port_info),
-        mmio_(std::move(mmio)) {}
-
   // Test functions: simulate a data race where the HandleTX / HandleRX functions get called twice.
   void HandleTXRaceForTest();
   void HandleRXRaceForTest();
+
+  const serial_port_info_t& serial_port_info() const { return serial_port_info_; }
+
+  void* get_ops() { return &serial_impl_async_protocol_ops_; }
 
  private:
   using Callback = fit::function<void(uint32_t)>;

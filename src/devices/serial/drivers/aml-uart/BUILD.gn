@@ -7,6 +7,15 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":aml-uart-dfv2-test",
+    ":aml-uart-test",
+    ":aml_uart_bind_test",
+  ]
+}
+
 driver_bind_rules("aml_uart_bind") {
   rules = "aml_uart.bind"
   bind_output = "aml-uart.bindbc"
@@ -19,36 +28,55 @@ driver_bind_rules("aml_uart_bind") {
   disable_fragment_gen = true
 }
 
-fuchsia_driver("aml-uart-driver") {
-  output_name = "aml-uart"
+# -----
+# DFv1
+# -----
+
+config("dfv1") {
+  defines = [ "DFV1" ]
+}
+
+source_set("aml-uart-source") {
   configs += [
+    ":dfv1",
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  sources = [ "aml-uart.cc" ]
+  sources = [
+    "aml-uart-dfv1.cc",
+    "aml-uart-dfv1.h",
+    "aml-uart.cc",
+    "aml-uart.h",
+    "registers.h",
+  ]
   deps = [
-    ":aml_uart_bind",
-    "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
     "//sdk/lib/fit",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/amlogic",
     "//src/devices/lib/driver",
-    "//src/devices/lib/mmio",
     "//src/lib/ddk",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/mmio",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
   ]
+}
+
+fuchsia_driver("aml-uart-driver") {
+  output_name = "aml-uart"
+  deps = [ ":aml-uart-source" ]
 }
 
 fuchsia_driver_component("aml-uart") {
   info = "aml-uart-info.json"
   component_name = "aml-uart"
-  deps = [ ":aml-uart-driver" ]
+  deps = [
+    ":aml-uart-driver",
+    ":aml_uart_bind",
+  ]
   manifest = "meta/aml-uart.cml"
 }
 
@@ -59,33 +87,24 @@ fuchsia_driver_package("package") {
 
 test("aml-uart-test-bin") {
   output_name = "aml-uart-test"
-  configs += [ "//build/config:all_source" ]
+  configs += [
+    ":dfv1",
+    "//build/config:all_source",
+  ]
   sources = [
-    "aml-uart-test.cc",
-    "aml-uart.cc",
+    "tests/aml-uart-dfv1-test.cc",
+    "tests/device_state.h",
   ]
   deps = [
-    ":aml_uart_bind",
-    "//sdk/banjo/fuchsia.hardware.serial:fuchsia.hardware.serial_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
+    ":aml-uart-source",
     "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fit",
-    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
     "//src/devices/bus/testing/fake-pdev",
-    "//src/devices/lib/amlogic",
-    "//src/devices/lib/mmio",
     "//src/devices/testing/fake-mmio-reg",
     "//src/devices/testing/mock-ddk",
     "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/mock-function",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -100,10 +119,84 @@ fuchsia_unittest_package("aml-uart-test") {
   }
 }
 
-group("tests") {
-  testonly = true
-  deps = [
-    ":aml-uart-test",
-    ":aml_uart_bind_test",
+# -----
+# DFv2
+# -----
+
+source_set("aml-uart-dfv2-source") {
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
   ]
+  sources = [
+    "aml-uart-dfv2.cc",
+    "aml-uart-dfv2.h",
+    "aml-uart.cc",
+    "aml-uart.h",
+    "registers.h",
+  ]
+  deps = [
+    "//sdk/lib/driver/compat/cpp:logging",
+    "//src/devices/bin/driver_runtime",
+  ]
+  public_deps = [
+    "//sdk/banjo/fuchsia.hardware.serialimpl.async:fuchsia.hardware.serialimpl.async_banjo_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/lib/mmio",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/zircon-internal",
+  ]
+}
+
+fuchsia_driver("aml-uart-dfv2-driver") {
+  output_name = "aml-uart-dfv2"
+  deps = [ ":aml-uart-dfv2-source" ]
+}
+
+fuchsia_driver_component("aml-uart-dfv2") {
+  info = "aml-uart-info.json"
+  component_name = "aml-uart-dfv2"
+  deps = [
+    ":aml-uart-dfv2-driver",
+    ":aml_uart_bind",
+  ]
+  manifest = "meta/aml-uart-dfv2.cml"
+}
+
+fuchsia_driver_package("package-dfv2") {
+  package_name = "aml-uart-dfv2"
+  driver_components = [ ":aml-uart-dfv2" ]
+}
+
+test("aml-uart-dfv2-test-bin") {
+  output_name = "aml-uart-dfv2-test"
+  configs += [ "//build/config:all_source" ]
+  sources = [
+    "tests/aml-uart-dfv2-test.cc",
+    "tests/device_state.h",
+  ]
+  deps = [
+    ":aml-uart-dfv2-source",
+    "//sdk/fidl/fuchsia.hardware.serial:fuchsia.hardware.serial_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bind/fuchsia.broadcom.platform:fuchsia.broadcom.platform_cpp",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/testing/fake-mmio-reg",
+    "//src/lib/ddk",  # needed for metadata.h
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("aml-uart-dfv2-test") {
+  deps = [ ":aml-uart-dfv2-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
