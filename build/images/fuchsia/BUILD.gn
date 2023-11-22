@@ -48,9 +48,6 @@ if (is_fuchsia) {
       !use_bringup_assembly,
       "The bringup product config cannot rely on the fuchsia assembly.  Bringup has it's own in //build/images/bringup")
 
-  assert(fuchsia_product_assembly_config_label != false,
-         "fuchsia_product_assembly_config_label must be defined for the build")
-
   ##################################################
   # Shared parameters across assemblies in this file
   ##################################################
@@ -72,12 +69,6 @@ if (is_fuchsia) {
     fxfs_sparse = "${outdir}/fxfs.sparse.blk"
     packages_json = "${outdir}/packages.json"
     images_json = "${outdir}/images.json"
-
-    product_assembly_config_file =
-        get_label_info(fuchsia_product_assembly_config_label,
-                       "target_out_dir") + "/" +
-        get_label_info(fuchsia_product_assembly_config_label, "name") +
-        "/product_assembly_config.json"
 
     # Outputs of recovery.
     recovery_name = get_label_info(recovery_label, "name")
@@ -140,7 +131,6 @@ if (is_fuchsia) {
     # Use the GN arg for including shell commands.
     include_shell_commands = include_shell_commands_package
 
-    product_assembly_config_label = fuchsia_product_assembly_config_label
     board_config_label = board_configuration_label
     cmdline_deps = [ "//build/input:bootfs" ]
 
@@ -230,6 +220,10 @@ if (is_fuchsia) {
 
   assembled_system("fuchsia_assembly") {
     forward_variables_from(fuchsia_base, "*")
+    if (fuchsia_product_assembly_config_label != false) {
+      product_assembly_config_label = fuchsia_product_assembly_config_label
+    }
+
     output_dir = root_build_dir
     image_name = "fuchsia"
 
@@ -399,23 +393,29 @@ if (is_fuchsia) {
   ##################################################
   # Netboot
   ##################################################
+  if (enable_netboot) {
+    assert(
+        fuchsia_product_assembly_config_label != false,
+        "fuchsia_product_assembly_config_label must be defined to use netboot")
 
-  # This rolls the primary ZBI together with a compressed RAMDISK image of
-  # fvm.blk into a fat ZBI that boots the full system without using any real
-  # storage.  The system decompresses the fvm.blk image into memory and then
-  # sees that RAM disk just as if it were a real disk on the device.
-  assembled_system("netboot") {
-    image_name = "fuchsia"
-    namespace = "netboot"
-    forward_variables_from(fuchsia_base, "*")
-    ramdisk_in_zbi = true
+    # This rolls the primary ZBI together with a compressed RAMDISK image of
+    # fvm.blk into a fat ZBI that boots the full system without using any real
+    # storage.  The system decompresses the fvm.blk image into memory and then
+    # sees that RAM disk just as if it were a real disk on the device.
+    assembled_system("netboot") {
+      image_name = "fuchsia"
+      namespace = "netboot"
+      forward_variables_from(fuchsia_base, "*")
+      product_assembly_config_label = fuchsia_product_assembly_config_label
+      ramdisk_in_zbi = true
 
-    board_config_label = board_configuration_label
-    image_metadata_overrides = {
-      zbi = {
-        name = "netboot"
-        archive = enable_netboot
-        bootserver_netboot = [ "--boot" ]
+      board_config_label = board_configuration_label
+      image_metadata_overrides = {
+        zbi = {
+          name = "netboot"
+          archive = enable_netboot
+          bootserver_netboot = [ "--boot" ]
+        }
       }
     }
   }

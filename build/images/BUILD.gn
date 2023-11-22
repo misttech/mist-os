@@ -248,8 +248,8 @@ group("images") {
     "//build/images/archive:build_args_metadata",
   ]
 
-  if (defined(labels.images_netboot)) {
-    deps += [ labels.images_netboot ]
+  if (enable_netboot) {
+    deps += [ labels.netboot ]
   }
 }
 

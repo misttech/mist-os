@@ -44,9 +44,9 @@ labels = {
     images = "${_images_without_toolchain}(${default_toolchain})"
     recovery_images = recovery_label
     assembly_name = "fuchsia"
-
-    fuchsia_netboot = "${_images_without_toolchain}:netboot"
   }
+
+  netboot = "//build/images/fuchsia:netboot"
 
   _qemu_deps = qemu_boot_shim.deps
   assert(_qemu_deps == [ _qemu_deps[0] ])

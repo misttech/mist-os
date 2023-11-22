@@ -38,6 +38,9 @@ declare_args() {
   fuchsia_async_trace_level_logging = true
 
   # The product assembly config used to configure the main Fuchsia image.
+  # For GN products, this is required.
+  # For Bazel products, this is optional.
+  # For Bazel products, netboot will only be available when this is supplied.
   fuchsia_product_assembly_config_label = false
 
   # The product assembly config used to configure the Zedboot image.
