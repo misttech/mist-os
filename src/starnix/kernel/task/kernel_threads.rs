@@ -9,9 +9,8 @@ use once_cell::sync::OnceCell;
 use starnix_uapi::{
     errno,
     errors::Errno,
-    ownership::{OwnedRefByRef, ReleasableByRef, WeakRef},
+    ownership::{OwnedRefByRef, ReleasableByRef},
 };
-use std::ffi::CString;
 
 /// The threads that the kernel runs internally.
 ///
@@ -71,24 +70,6 @@ impl KernelThreads {
 
     pub fn system_task(&self) -> &CurrentTask {
         self.system_task.get().as_ref().unwrap()
-    }
-
-    pub fn workaround_for_b297439724_new_system_task(
-        &self,
-    ) -> Result<OwnedRefByRef<CurrentTask>, Errno> {
-        let system_task = self.system_task();
-        Ok(OwnedRefByRef::new(CurrentTask::create_system_task(
-            system_task.kernel(),
-            system_task.fs().clone(),
-        )?))
-    }
-
-    pub fn weak_system_task(&self) -> WeakRef<CurrentTask> {
-        self.system_task.get().unwrap().into()
-    }
-
-    pub fn new_system_thread(&self) -> Result<CurrentTask, Errno> {
-        CurrentTask::create_kernel_thread(self.system_task(), CString::new("[kthread]").unwrap())
     }
 
     pub fn spawn<F>(&self, f: F)
