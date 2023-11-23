@@ -6162,7 +6162,7 @@ From //third_party/pigweed/src/pw_perf_test/perf_test.gni:31
 
 Chooses the EventHandler for running the perf tests
 
-**Current value (from the default):** `"//third_party/pigweed/src/pw_perf_test:log_perf_handler_main"`
+**Current value (from the default):** `"//third_party/pigweed/src/pw_perf_test:logging_main"`
 
 From //third_party/pigweed/src/pw_perf_test/perf_test.gni:28
 
@@ -7828,6 +7828,14 @@ Whether or not logging is disabled globally.
 **Current value (from the default):** `false`
 
 From //src/starnix/kernel/BUILD.gn:14
+
+### starnix_enable_alternate_anon_allocs
+
+Whether to use an alternate strategy for anonymous memory allocations.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:33
 
 ### starnix_enable_trace_and_debug_logs_in_release
 
