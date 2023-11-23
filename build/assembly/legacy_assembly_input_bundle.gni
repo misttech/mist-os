@@ -303,7 +303,6 @@ template("legacy_assembly_input_bundle") {
       "//src/intl/intl_services/meta/intl.core_shard.base.cml",
       "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
       "//src/settings/service/meta/setui_service_base.core_shard.cml",
-      "//src/testing/sl4f/meta/sl4f.core_shard.cml",
       "//src/testing/sl4f/meta/sl4f_base.core_shard.cml",
       "//src/recovery/system/meta/core_shards/base.shard.cml",
       "//src/recovery/system/meta/core_shards/ui.shard.cml",

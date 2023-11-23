@@ -25,6 +25,7 @@
         {
             protocol: "fuchsia.developer.tiles.Controller",
             from: "self",
+            as: "fuchsia.developer.tiles.Controller.flatland",
         },
     ],
 }

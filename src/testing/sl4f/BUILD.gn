@@ -336,11 +336,7 @@ fuchsia_component("audio_recording_comp") {
 }
 
 core_shard("sl4f_core_shard") {
-  shard_file = "meta/sl4f.core_shard.cml"
-}
-
-core_shard("sl4f_terminal_core_shard") {
-  shard_file = "meta/sl4f_terminal.core_shard.cml"
+  shard_file = "meta/sl4f_base.core_shard.cml"
 }
 
 # Enabling a soft-transition, remove when complete
