@@ -427,9 +427,6 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     let aligned_size = round_up(this.byte_size(), read_alignment).unwrap();
     range = round_down(range.start, readahead_alignment)
         ..round_up(range.end, readahead_alignment).unwrap();
-    if range.end > aligned_size {
-        range.end = aligned_size;
-    }
 
     // Zero-pad the tail if requested range exceeds the size of the thing we're reading.
     let mut offset = std::cmp::max(range.start, aligned_size);
@@ -437,6 +434,10 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
         let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
         this.pager().supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
         offset = end;
+    }
+
+    if range.end > aligned_size {
+        range.end = aligned_size;
     }
 
     // Read in chunks of 128 KiB.
