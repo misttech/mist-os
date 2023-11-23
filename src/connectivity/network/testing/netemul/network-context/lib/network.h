@@ -8,8 +8,13 @@
 #include <fuchsia/net/virtualization/cpp/fidl.h>
 #include <fuchsia/netemul/network/cpp/fidl.h>
 #include <lib/fidl/cpp/binding_set.h>
+#include <zircon/types.h>
 
+#include <fstream>
 #include <memory>
+
+#include "src/connectivity/network/testing/netemul/network-context/lib/netdump.h"
+#include "src/lib/fxl/memory/weak_ptr.h"
 
 namespace netemul {
 namespace impl {
@@ -17,6 +22,7 @@ class NetworkBus;
 }
 class NetworkContext;
 class NetworkManager;
+class PacketCapture;
 class Network : public fuchsia::netemul::network::Network {
  public:
   using FNetwork = fuchsia::netemul::network::Network;
@@ -43,6 +49,8 @@ class Network : public fuchsia::netemul::network::Network {
   void RemoveEndpoint(::std::string name, RemoveEndpointCallback callback) override;
   void CreateFakeEndpoint(
       fidl::InterfaceRequest<fuchsia::netemul::network::FakeEndpoint> ep) override;
+  void StartCapture(::std::string name, StartCaptureCallback callback) override;
+  void StopCapture(StopCaptureCallback callback) override;
 
   // ClosedCallback is called when all bindings to the service are gone
   void SetClosedCallback(ClosedCallback cb);
@@ -63,6 +71,19 @@ class Network : public fuchsia::netemul::network::Network {
   std::string name_;
   Config config_;
   fidl::BindingSet<FNetwork> bindings_;
+  std::unique_ptr<PacketCapture> packet_capture_;
+};
+
+class PacketCapture {
+ public:
+  explicit PacketCapture(fxl::WeakPtr<impl::NetworkBus> bus, const std::string& pcap_name);
+  NetworkDump& Dump();
+  void Stop();
+
+ private:
+  std::ofstream pcap_file_;
+  NetworkDump dump_;
+  fxl::WeakPtr<impl::NetworkBus> bus_;
 };
 
 }  // namespace netemul

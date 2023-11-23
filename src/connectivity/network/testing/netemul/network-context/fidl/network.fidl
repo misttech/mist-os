@@ -153,6 +153,24 @@ closed protocol Network {
     strict CreateFakeEndpoint(resource struct {
         ep server_end:FakeEndpoint;
     });
+    /// Starts capturing packet in this network.
+    ///
+    /// The packet capture will be stored at `/custom_artifacts/{name}.pcapng`.
+    ///
+    /// Returns [`ZX_ERR_ALREADY_EXISTS`] if the capturing is already started
+    /// in this network.
+    strict StartCapture(struct {
+        name string:MAX_NAME_LENGTH;
+    }) -> (struct {
+        status zx.Status;
+    });
+
+    /// Stops capturing packets. This function is guaranteed to succeed.
+    ///
+    /// The packet capture will be stored in the file at the path chosen when
+    /// capturing started. The packet capture will stop automatically once the
+    /// network is destroyed regardless of whether this method is called.
+    strict StopCapture() -> ();
 };
 
 /// Simple interface to serve devices over fidl.

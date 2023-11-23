@@ -4,12 +4,23 @@
 
 #include "network.h"
 
-#include <unordered_set>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <string>
+#include <utility>
+
+#include "consumer.h"
 #include "fake_endpoint.h"
 #include "interceptors/latency.h"
 #include "interceptors/packet_loss.h"
 #include "interceptors/reorder.h"
+#include "lib/async/dispatcher.h"
+#include "lib/syslog/cpp/macros.h"
+#include "netdump.h"
 #include "network_context.h"
 #include "src/connectivity/lib/network-device/cpp/network_device_client.h"
 #include "src/lib/fxl/memory/weak_ptr.h"
@@ -84,6 +95,8 @@ class Guest : public fuchsia::net::virtualization::Interface, public data::Consu
     }
   }
 
+  std::string GetName(uint32_t idx) override { return "guest-" + std::to_string(idx); }
+
   fxl::WeakPtr<data::Consumer> GetPointer() { return weak_ptr_factory_.GetWeakPtr(); }
 
  private:
@@ -99,11 +112,14 @@ class Guest : public fuchsia::net::virtualization::Interface, public data::Consu
 class NetworkBus : public data::BusConsumer {
  public:
   NetworkBus() : weak_ptr_factory_(this) {}
-  ~NetworkBus() override = default;
+  ~NetworkBus() override { StopCapture(); }
 
-  decltype(auto) GetPointer() { return weak_ptr_factory_.GetWeakPtr(); }
+  fxl::WeakPtr<NetworkBus> GetPointer() { return weak_ptr_factory_.GetWeakPtr(); }
 
   void Consume(const void* data, size_t len, const data::Consumer::Ptr& sender) override {
+    if (packet_capture_) {
+      packet_capture_->Dump().WritePacket(data, len, sinks_[sender]);
+    }
     if (interceptors_.empty()) {
       ForwardData(data, len, sender);
     } else {
@@ -111,9 +127,22 @@ class NetworkBus : public data::BusConsumer {
     }
   }
 
-  std::unordered_set<data::Consumer::Ptr>& sinks() { return sinks_; }
   std::unordered_map<zx_handle_t, FakeEndpoint>& fake_endpoints() { return fake_endpoints_; }
   std::unordered_map<zx_handle_t, Guest>& guests() { return guests_; }
+
+  std::pair<std::unordered_map<data::Consumer::Ptr, uint32_t>::iterator, bool> AddSink(
+      data::Consumer::Ptr sink) {
+    uint32_t interface_id = 0;
+    if (packet_capture_) {
+      if (sink) {
+        interface_id = packet_capture_->Dump().AddInterfaceWith(
+            [sink](uint32_t idx) { return sink->GetName(idx); });
+      }
+    }
+    return sinks_.insert(std::make_pair(sink, interface_id));
+  }
+
+  void RemoveSink(data::Consumer::Ptr sink) { sinks_.erase(sink); }
 
   void UpdateConfiguration(const Network::Config& config) {
     // first, flush all packets that are currently in interceptors:
@@ -147,6 +176,28 @@ class NetworkBus : public data::BusConsumer {
     }
   }
 
+  zx_status_t StartCapture(const std::string& pcap_name) {
+    if (packet_capture_) {
+      return ZX_ERR_ALREADY_EXISTS;
+    }
+    packet_capture_ = std::make_unique<PacketCapture>(GetPointer(), pcap_name);
+    for (auto it = sinks_.begin(); it != sinks_.end();) {
+      auto& [sink, interface_id] = *it;
+      if (sink) {
+        interface_id = packet_capture_->Dump().AddInterfaceWith([it](uint32_t idx) {
+          auto& [sink, _] = *it;
+          return sink->GetName(idx);
+        });
+        ++it;
+      } else {
+        it = sinks_.erase(it);
+      }
+    }
+    return ZX_OK;
+  }
+
+  void StopCapture() { packet_capture_ = nullptr; }
+
  private:
   Interceptor::ForwardPacketCallback MakeInterceptorCallback() {
     if (interceptors_.empty()) {
@@ -162,9 +213,10 @@ class NetworkBus : public data::BusConsumer {
 
   void ForwardData(const void* data, size_t len, const data::Consumer::Ptr& sender) {
     for (auto i = sinks_.begin(); i != sinks_.end();) {
-      if (*i) {
-        if (i->get() != sender.get()) {  // flood all sinks other than sender
-          (*i)->Consume(data, len);
+      auto& [sink, interface_id] = *i;
+      if (sink) {
+        if (sink.get() != sender.get()) {  // flood all sinks other than sender
+          sink->Consume(data, len);
         }
         ++i;
       } else {
@@ -174,11 +226,14 @@ class NetworkBus : public data::BusConsumer {
     }
   }
 
-  fxl::WeakPtrFactory<data::BusConsumer> weak_ptr_factory_;
-  std::unordered_set<data::Consumer::Ptr> sinks_;
+  fxl::WeakPtrFactory<NetworkBus> weak_ptr_factory_;
+  // Mapping from sink to their interface ID in the packet capture.
+  std::unordered_map<data::Consumer::Ptr, uint32_t> sinks_;
   std::unordered_map<zx_handle_t, FakeEndpoint> fake_endpoints_;
   std::unordered_map<zx_handle_t, Guest> guests_;
   std::vector<std::unique_ptr<Interceptor>> interceptors_;
+
+  std::unique_ptr<PacketCapture> packet_capture_;
 };
 
 }  // namespace impl
@@ -221,7 +276,7 @@ void Network::AddPort(fidl::InterfaceHandle<fuchsia::hardware::network::Port> po
   }
   impl::Guest& guest = it->second;
   auto cleanup = [this, key, &guest](zx_status_t status) {
-    bus_->sinks().erase(guest.GetPointer());
+    bus_->RemoveSink(guest.GetPointer());
     guest.binding().Close(status);
     // There may be other tasks running on the promise executor; schedule destruction so that it
     // happens after other pending work that may want to access the executor.
@@ -229,7 +284,7 @@ void Network::AddPort(fidl::InterfaceHandle<fuchsia::hardware::network::Port> po
   };
 
   {
-    auto [it, inserted] = bus_->sinks().insert(guest.GetPointer());
+    auto [it, inserted] = bus_->AddSink(guest.GetPointer());
     if (!inserted) {
       cleanup(ZX_ERR_INTERNAL);
       return;
@@ -311,7 +366,7 @@ zx_status_t Network::AttachEndpoint(std::string name) {
     return ZX_ERR_INTERNAL;
   }
 
-  auto [it, inserted] = bus_->sinks().insert(std::move(src));
+  auto [it, inserted] = bus_->AddSink(std::move(src));
   if (!inserted) {
     return ZX_ERR_INTERNAL;
   }
@@ -326,7 +381,7 @@ void Network::RemoveEndpoint(::std::string name, Network::RemoveEndpointCallback
   data::Consumer::Ptr src;
   auto status = parent_->endpoint_manager().RemoveSink(name, bus_->GetPointer(), &src);
   if (status == ZX_OK && src) {
-    bus_->sinks().erase(src);
+    bus_->RemoveSink(src);
   }
   callback(status);
 }
@@ -340,12 +395,12 @@ void Network::CreateFakeEndpoint(
   FakeEndpoint& fep = it->second;
 
   {
-    auto [it, inserted] = bus_->sinks().insert(fep.GetPointer());
+    auto [it, inserted] = bus_->AddSink(fep.GetPointer());
     ZX_ASSERT(inserted);
   }
 
   fep.SetOnDisconnected([this, key, &fep]() {
-    bus_->sinks().erase(fep.GetPointer());
+    bus_->RemoveSink(fep.GetPointer());
     bus_->fake_endpoints().erase(key);
   });
 }
@@ -366,6 +421,30 @@ bool Network::CheckConfig(const Config& config) {
   }
 
   return true;
+}
+
+void Network::StartCapture(::std::string name, Network::StartCaptureCallback callback) {
+  callback(bus_->StartCapture(name));
+}
+void Network::StopCapture(Network::StopCaptureCallback callback) {
+  bus_->StopCapture();
+  callback();
+}
+
+PacketCapture::PacketCapture(fxl::WeakPtr<impl::NetworkBus> bus, const std::string& pcap_name)
+    : pcap_file_(std::string("/custom_artifacts/") + pcap_name + ".pcapng",
+                 std::ios::out | std::ios::binary),
+      dump_(&pcap_file_),
+      bus_(std::move(bus)) {}
+
+NetworkDump& PacketCapture::Dump() { return dump_; }
+
+void PacketCapture::Stop() {
+  if (bus_) {
+    bus_->StopCapture();
+    bus_ = nullptr;
+  }
+  pcap_file_.flush();
 }
 
 }  // namespace netemul

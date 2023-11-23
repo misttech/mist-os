@@ -7,7 +7,9 @@
 
 #include <fuchsia/netemul/network/cpp/fidl.h>
 
+#include <cstdint>
 #include <iostream>
+#include <optional>
 #include <sstream>
 
 #include "src/lib/fxl/macros.h"
@@ -21,6 +23,12 @@ class NetworkDump {
   virtual ~NetworkDump() = default;
   void WritePacket(const void* data, size_t len, uint32_t interface = 0);
   uint32_t AddInterface(const std::string& name);
+  // Add an interface, allowing the caller to generate the interface name based
+  // on the index.
+  template <typename F>
+  uint32_t AddInterfaceWith(F f) {
+    return this->AddInterface(f(interface_counter_));
+  }
   size_t packet_count() const { return packet_count_; }
 
  protected:

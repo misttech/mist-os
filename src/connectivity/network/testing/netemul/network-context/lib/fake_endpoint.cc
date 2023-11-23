@@ -69,4 +69,6 @@ void FakeEndpoint::PopReadQueue() {
   }
 }
 
+std::string FakeEndpoint::GetName(uint32_t idx) { return "fake-" + std::to_string(idx); }
+
 }  // namespace netemul

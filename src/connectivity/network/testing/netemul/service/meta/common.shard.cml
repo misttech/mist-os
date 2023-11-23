@@ -32,6 +32,11 @@
     ],
     offer: [
         {
+            storage: "custom_artifacts",
+            from: "parent",
+            to: "#network-context",
+        },
+        {
             protocol: [
                 "fuchsia.process.Launcher",
                 "fuchsia.tracing.provider.Registry",

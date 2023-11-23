@@ -743,6 +743,36 @@ impl<'a> TestNetwork<'a> {
         let () = self.network.create_fake_endpoint(server)?;
         return Ok(TestFakeEndpoint { endpoint, _sandbox: self.sandbox });
     }
+
+    /// Starts capturing packet in this network.
+    ///
+    /// The packet capture will be stored under a predefined directory:
+    /// `/custom_artifacts`. More details can be found here:
+    /// https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts
+    pub async fn start_capture(&self, name: &str) -> Result<PacketCapture> {
+        let manager = self.sandbox.get_network_manager()?;
+        let client = manager.get_network(&self.name).await?.expect("network must exist");
+        zx::ok(self.network.start_capture(name).await?)?;
+        let sync_proxy = fnetemul_network::NetworkSynchronousProxy::new(client.into_channel());
+        Ok(PacketCapture { sync_proxy })
+    }
+
+    /// Stops packet capture in this network.
+    pub async fn stop_capture(&self) -> Result<()> {
+        Ok(self.network.stop_capture().await?)
+    }
+}
+
+/// The object that has the same life as the packet capture, once the object is
+/// dropped, the underlying packet capture will be stopped.
+pub struct PacketCapture {
+    sync_proxy: fnetemul_network::NetworkSynchronousProxy,
+}
+
+impl Drop for PacketCapture {
+    fn drop(&mut self) {
+        self.sync_proxy.stop_capture(zx::Time::INFINITE).expect("failed to stop packet capture")
+    }
 }
 
 /// A virtual network endpoint backed by Netemul.

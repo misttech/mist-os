@@ -95,6 +95,13 @@ uses the `network-context` component to provide access to the
 [`fuchsia.netemul.network/NetworkContext`] protocol. `network-context` provides
 the ability to configure virtual networks.
 
+#### Packet Capture
+
+Sometimes it is useful to have a packet capture to be able to understand and
+debug certain tests. This can be done with the `StartCapture` method on the
+[`fuchsia.netemul.network/Network`] protocol. The capture will be saved under
+[`/custom_artifacts`].
+
 ## Runner
 
 The `netemul-runner` is a [test runner]™️ in the sense of the Component
@@ -312,3 +319,5 @@ using the runner itself) if we have a need for it: https://fxbug.dev/87587.
 [runner-test-driver]: /src/connectivity/network/testing/netemul/doc/runner-test/src/client.rs
 [runner-test-server]: /src/connectivity/network/testing/netemul/doc/runner-test/src/server.rs
 [`fuchsia.netemul/ConfigurableNetstack`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/fidl/configurable_netstack.fidl;l=14
+[`fuchsia.netemul.network/Network`]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/testing/netemul/network-context/fidl/network.fidl;l=122;drc=b907c1b331a1e1e6709292023cd515e44039c813
+[`/custom_artifacts`]: https://fuchsia.dev/fuchsia-src/development/testing/components/test_runner_framework?hl=en#custom-artifacts

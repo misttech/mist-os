@@ -1404,6 +1404,7 @@ async fn tcp_socket_accept_cross_ns<
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let net = sandbox.create_network("net").await.expect("failed to create network");
 
+    let _packet_capture = net.start_capture(name).await.expect("starting packet capture");
     let client = sandbox
         .create_netstack_realm::<Client, _>(format!("{}_client", name))
         .expect("failed to create client realm");

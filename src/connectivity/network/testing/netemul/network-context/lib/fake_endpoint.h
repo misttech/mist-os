@@ -9,7 +9,6 @@
 #include <lib/fidl/cpp/binding.h>
 #include <lib/stdcompat/optional.h>
 
-#include <memory>
 #include <queue>
 
 #include "src/connectivity/network/testing/netemul/network-context/lib/consumer.h"
@@ -37,6 +36,7 @@ class FakeEndpoint : public fuchsia::netemul::network::FakeEndpoint, public data
   void Read(ReadCallback callback) override;
   // data consumer implementations:
   void Consume(const void* data, size_t len) override;
+  std::string GetName(uint32_t idx) override;
 
  private:
   void PopReadQueue();

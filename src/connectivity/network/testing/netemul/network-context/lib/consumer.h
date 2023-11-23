@@ -23,6 +23,7 @@ class Consumer {
   using Ptr = fxl::WeakPtr<Consumer>;
   virtual ~Consumer() = default;
   virtual void Consume(const void* data, size_t len) = 0;
+  virtual std::string GetName(uint32_t idx) = 0;
 };
 
 // Bus consumers are a data sink that may be fed with data that is
