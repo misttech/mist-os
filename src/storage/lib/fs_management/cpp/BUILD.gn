@@ -56,7 +56,6 @@ if (is_fuchsia) {
       "//src/storage/gpt",
       "//src/storage/lib/block_client/cpp",
       "//src/storage/lib/vfs/cpp",
-      "//third_party/boringssl",
       "//zircon/system/ulib/fbl",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/fzl",

@@ -691,7 +691,7 @@ zx::result<> Blobfs::AddBlob(const BlobInfo& blob_info) {
     return inode.take_error();
   }
   inode->blob_size = blob_layout.FileSize();
-  inode->block_count = blob_layout.TotalBlockCount();
+  inode->block_count = safemath::checked_cast<uint32_t>(blob_layout.TotalBlockCount());
   blob_info.GetDigest().CopyTo(inode->merkle_root_hash);
   inode->header.flags |=
       (blob_info.IsCompressed() ? ChunkedCompressor::InodeHeaderCompressionFlags() : 0);

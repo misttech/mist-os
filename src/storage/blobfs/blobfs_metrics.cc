@@ -23,11 +23,6 @@
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
-namespace {
-
-size_t TicksToMs(const zx::ticks& ticks) { return fzl::TicksToNs(ticks) / zx::msec(1); }
-
-}  // namespace
 
 BlobfsMetrics::BlobfsMetrics(bool should_record_page_in, inspect::Inspector inspector)
     : inspector_{std::move(inspector)}, should_record_page_in_(should_record_page_in) {

@@ -28,7 +28,6 @@ static_library("fvm") {
     "//sdk/lib/fit",
     "//src/lib/digest",
     "//src/lib/uuid",
-    "//third_party/boringssl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/range",
     "//zircon/third_party/ulib/lz4",

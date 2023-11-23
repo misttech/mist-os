@@ -103,7 +103,6 @@ static_library("blobfs") {
     "//src/storage/lib/disk_inspector",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",
-    "//third_party/boringssl",
     "//zircon/system/ulib/bitmap",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/range",

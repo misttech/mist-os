@@ -83,7 +83,7 @@ DeliveryBlobHeader DeliveryBlobHeader::Create(DeliveryBlobType type, size_t meta
 bool DeliveryBlobHeader::IsValid() const {
   return std::equal(std::begin(magic), std::end(magic), std::begin(kDeliveryBlobMagic)) &&
          IsValidDeliveryType(type);
-};
+}
 
 zx::result<DeliveryBlobHeader> DeliveryBlobHeader::FromBuffer(cpp20::span<const uint8_t> buffer) {
   if (buffer.size_bytes() < sizeof(DeliveryBlobHeader)) {

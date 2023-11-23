@@ -10,6 +10,7 @@
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <vector>
 
 namespace fs_management {
@@ -54,7 +55,7 @@ struct MkfsOptions {
   bool verbose = false;
 
   // The number of sectors per cluster on a FAT file systems or zero for the default.
-  int sectors_per_cluster = 0;
+  uint16_t sectors_per_cluster = 0;
 
   // Set to use the deprecated padded blobfs format.
   bool deprecated_padded_blobfs_format = false;

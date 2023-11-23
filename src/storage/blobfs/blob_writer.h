@@ -79,7 +79,7 @@ class Blob::Writer {
 
   // The fused write error. Once writing has failed, we return the same error on subsequent writes
   // in case a higher layer dropped the error and returned a short write instead.
-  zx::result<> status() const { return status_; };
+  zx::result<> status() const { return status_; }
 
   // Amount of data written into this writer so far.
   uint64_t total_written() const { return total_written_; }
