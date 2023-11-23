@@ -9578,7 +9578,7 @@ pub struct __kernel_sock_timeval {
     pub tv_usec: __s64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes, PartialEq)]
 pub struct timeval {
     pub tv_sec: __kernel_old_time_t,
     pub tv_usec: __kernel_suseconds_t,
@@ -9602,7 +9602,7 @@ pub struct timezone {
     pub tz_dsttime: crate::types::c_int,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes)]
+#[derive(Debug, Default, Copy, Clone, AsBytes, FromBytes, FromZeroes, PartialEq)]
 pub struct input_event {
     pub time: timeval,
     pub type_: __u16,

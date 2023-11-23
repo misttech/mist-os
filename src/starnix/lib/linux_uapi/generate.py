@@ -98,6 +98,8 @@ AUTO_DERIVE_TRAITS = [
     (r"in6_addr", ["AsBytes", "FromBytes", "FromZeroes"]),
     (r"in6_pktinfo", ["AsBytes", "FromBytes", "FromZeroes"]),
     (r"inotify_event", ["AsBytes"]),
+    (r"input_event", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
+    (r"input_id", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
     (r"ip6t_ip6", ["FromBytes", "FromZeroes"]),
     (r"robust_list_head", ["FromBytes", "FromZeroes"]),
     (r"robust_list", ["FromBytes", "FromZeroes"]),
@@ -106,8 +108,8 @@ AUTO_DERIVE_TRAITS = [
     (r"sockaddr_in*", ["AsBytes", "FromBytes", "FromZeroes"]),
     (r"sock_fprog", ["FromBytes", "FromZeroes"]),
     (r"sysinfo", ["AsBytes"]),
+    (r"timeval", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
     (r"xt_counters_info", ["FromBytes", "FromZeroes"]),
-    (r"input_id", ["AsBytes", "FromBytes", "FromZeroes", "PartialEq"]),
 ]
 
 # General replacements to apply to the contents of the file. These are tuples of
