@@ -160,8 +160,7 @@ zx_status_t Sherlock::EmmcInit() {
 
   fit::result sdmmc_metadata = fidl::Persist(
       fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(fidl_arena)
-          // Maintain the current Sherlock behavior until we determine that trim is needed.
-          .enable_trim(false)
+          .enable_trim(true)
           // Maintain the current Sherlock behavior until we determine that cache is needed.
           .enable_cache(false)
           // Maintain the current Sherlock behavior until we determine that eMMC Packed Commands are
