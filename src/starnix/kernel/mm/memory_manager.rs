@@ -8,9 +8,8 @@ use crate::{
         SequenceFileSource,
     },
     logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
-    mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey},
+    mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
     task::{CurrentTask, Task},
-    vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;

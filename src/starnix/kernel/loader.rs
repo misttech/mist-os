@@ -7,10 +7,9 @@ use crate::{
     logging::{log_error, log_warn},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
-        MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE,
+        MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE,
     },
     task::CurrentTask,
-    vmex_resource::VMEX_RESOURCE,
 };
 use fuchsia_zircon::{
     HandleBased, {self as zx},

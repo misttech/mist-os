@@ -53,7 +53,6 @@ mod syscalls;
 mod task;
 mod time;
 mod vdso;
-mod vmex_resource;
 
 #[cfg(test)]
 mod testing;

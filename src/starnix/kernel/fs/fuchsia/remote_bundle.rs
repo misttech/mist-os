@@ -13,9 +13,8 @@ use crate::{
     },
     impossible_error,
     logging::log_warn,
-    mm::ProtectionFlags,
+    mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    vmex_resource::VMEX_RESOURCE,
 };
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};

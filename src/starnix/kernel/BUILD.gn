@@ -350,6 +350,7 @@ rustc_binary("starnix_kernel_bin") {
     "mm/memory_manager.rs",
     "mm/mod.rs",
     "mm/syscalls.rs",
+    "mm/vmex_resource.rs",
     "mm/vmo.rs",
     "mutable_state.rs",
     "power/manager.rs",
@@ -395,7 +396,6 @@ rustc_binary("starnix_kernel_bin") {
     "trace.rs",
     "vdso/mod.rs",
     "vdso/vdso_loader.rs",
-    "vmex_resource.rs",
   ]
 
   features = []

@@ -16,9 +16,8 @@ use crate::{
         SeekTarget, SymlinkTarget, ValueOrSize, XattrOp,
     },
     logging::{impossible_error, log_warn},
-    mm::ProtectionFlags,
+    mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
-    vmex_resource::VMEX_RESOURCE,
 };
 use fidl::AsHandleRef;
 use fidl_fuchsia_io as fio;

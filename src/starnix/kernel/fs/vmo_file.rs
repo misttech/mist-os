@@ -11,9 +11,8 @@ use crate::{
         MemoryXattrStorage, MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
     },
     logging::impossible_error,
-    mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE},
+    mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE},
     task::CurrentTask,
-    vmex_resource::VMEX_RESOURCE,
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
