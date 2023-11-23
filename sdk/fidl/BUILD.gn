@@ -228,6 +228,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.debugdata",
   "fuchsia.debugger",
   "fuchsia.developer.ffxdaemonlifecycle",
+  "fuchsia.developer.remotecontrol",
   "fuchsia.diagnostics.host",
   "fuchsia.fs",
   "fuchsia.hardware.pty",
