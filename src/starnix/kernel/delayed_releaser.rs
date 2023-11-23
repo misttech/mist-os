@@ -10,7 +10,7 @@ use starnix_uapi::ownership::{Releasable, ReleaseGuard};
 use std::{
     cell::RefCell,
     marker::PhantomData,
-    mem::MaybeUninit,
+    mem::ManuallyDrop,
     ops::{Deref, DerefMut},
     sync::Arc,
 };
@@ -83,21 +83,20 @@ pub trait ReleaserAction<T> {
 
 /// Wrapper around `FileObject` that ensures that a unused `FileObject` is added to the current
 /// delayed releasers to be released at the next release point.
-pub struct ObjectReleaser<T, F: ReleaserAction<T>>(MaybeUninit<ReleaseGuard<T>>, PhantomData<F>);
+pub struct ObjectReleaser<T, F: ReleaserAction<T>>(ManuallyDrop<ReleaseGuard<T>>, PhantomData<F>);
 
 impl<T, F: ReleaserAction<T>> From<T> for ObjectReleaser<T, F> {
     fn from(object: T) -> Self {
-        Self(MaybeUninit::new(object.into()), Default::default())
+        Self(ManuallyDrop::new(object.into()), Default::default())
     }
 }
 
 impl<T, F: ReleaserAction<T>> Drop for ObjectReleaser<T, F> {
     fn drop(&mut self) {
-        let content = std::mem::replace(&mut self.0, MaybeUninit::uninit());
         // SAFETY
-        // The `MaybeUninit` is initialize with a value and only ever extracted in this `drop` method, so
-        // it is guaranteed that it is initialized at this point.
-        let object = unsafe { content.assume_init() };
+        // The `ManuallyDrop` is only ever extracted in this `drop` method, so it is guaranteed
+        // that it still exists.
+        let object = unsafe { ManuallyDrop::take(&mut self.0) };
         F::release(object);
     }
 }
@@ -112,11 +111,7 @@ impl<T, F: ReleaserAction<T>> std::ops::Deref for ObjectReleaser<T, F> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        // SAFETY
-        // The value is initialized by the factory method and only every uninitialized in
-        // Drop. The content is initialized for all the usual object lifecycle.
-        let guard = unsafe { self.0.assume_init_ref() };
-        guard.deref()
+        self.0.deref()
     }
 }
 
