@@ -2599,14 +2599,17 @@ static zx_status_t brcmf_cfg80211_add_key(struct net_device* ndev,
   }
 
   if (req->has_cipher_oui()) {
-    // If a cipher OUI is specified, check that it's the IEEE OUI. Other OUIs indicate a custom
+    // If a cipher OUI is specified, check that it's a known valid OUI. Other OUIs indicate a custom
     // cipher type which the broadcom driver doesn't support.
 
     // IEEE 802.11-2016 3.2 (c.f. "vendor organizationally unique identifier")
     constexpr uint8_t kIeeeOui[] = {0x00, 0x0F, 0xAC};
+    constexpr uint8_t kMsftOui[] = {0x00, 0x50, 0xF2};
     if (!std::equal(req->cipher_oui().begin(), req->cipher_oui().begin() + req->cipher_oui().size(),
-                    kIeeeOui, kIeeeOui + std::size(kIeeeOui))) {
-      BRCMF_ERR("Custom cipher OUI is not supported");
+                    kIeeeOui, kIeeeOui + std::size(kIeeeOui)) &&
+        !std::equal(req->cipher_oui().begin(), req->cipher_oui().begin() + req->cipher_oui().size(),
+                    kMsftOui, kMsftOui + std::size(kMsftOui))) {
+      BRCMF_ERR("Cipher OUI does not match either IEEE or MSFT OUI, not supported.");
       return ZX_ERR_NOT_SUPPORTED;
     }
   }
