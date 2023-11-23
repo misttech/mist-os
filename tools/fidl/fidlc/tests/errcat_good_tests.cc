@@ -4,7 +4,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 // This file is meant to hold standalone tests for each of the "good" examples used in the documents

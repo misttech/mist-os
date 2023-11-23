@@ -517,7 +517,6 @@ protocol TestProtocol {
   -> Press();
 };
 )FIDL");
-
   ASSERT_FALSE(library.Lint());
 
   ASSERT_NO_FAILURES(FindingsEmitThisJson(library.findings(), R"JSON([

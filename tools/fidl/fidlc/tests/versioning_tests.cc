@@ -8,7 +8,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 // This file tests the behavior of the @available attribute. See also
@@ -2255,11 +2254,13 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateElementName);
-  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateElementName);
-  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateElementName);
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember,
+                     "member", "example.fidl:6:5");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember,
+                     "member", "example.fidl:6:5");
+  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember,
+                     "member", "example.fidl:6:5");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(VersioningTests, BadOverlappingMemberNamesMultipleCanonical) {
@@ -2276,11 +2277,16 @@ type Foo = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrDuplicateElementNameCanonical);
-  EXPECT_ERR(library.errors()[1], fidl::ErrDuplicateElementNameCanonical);
-  EXPECT_ERR(library.errors()[2], fidl::ErrDuplicateElementNameCanonical);
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "Member", "member",
+                     "example.fidl:6:5", "member");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "Member", "member",
+                     "example.fidl:6:5", "member");
+  library.ExpectFail(fidl::ErrDuplicateElementNameCanonical,
+                     fidl::flat::Element::Kind::kStructMember, "MEMBER", "member",
+                     "example.fidl:6:5", "member");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // TODO(fxbug.dev/101849): Generalize this with more comprehensive tests in
@@ -2512,7 +2518,9 @@ type Foo = struct {
     dep dependency.Foo;
 };
 )FIDL");
-  ASSERT_ERRORED_TWICE_DURING_COMPILE(example, fidl::ErrNameNotFound, fidl::ErrNameNotFound);
+  example.ExpectFail(fidl::ErrNameNotFound, "Foo", "dependency");
+  example.ExpectFail(fidl::ErrNameNotFound, "Foo", "dependency");
+  ASSERT_COMPILER_DIAGNOSTICS(example);
 }
 
 TEST(VersioningTests, GoodMultiplePlatformsNamedAndAnonymous) {

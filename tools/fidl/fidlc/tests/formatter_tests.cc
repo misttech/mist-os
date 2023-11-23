@@ -15,13 +15,14 @@
 
 namespace {
 std::string Format(const std::string& source, bool reformat_and_compare = true) {
-  auto lib = TestLibrary(source);
+  fidl::SourceFile source_file("example.fidl", source);
 
   // We use a column width of 40, rather than the "real world" 100, to make tests easier to read
   // and write.
-  auto formatter = fidl::fmt::NewFormatter(40, lib.reporter());
+  fidl::Reporter reporter;
+  auto formatter = fidl::fmt::NewFormatter(40, &reporter);
   fidl::ExperimentalFlags experimental_flags;
-  auto result = formatter.Format(lib.source_file(), experimental_flags);
+  auto result = formatter.Format(source_file, experimental_flags);
 
   // If we're still going to reformat, then this is the first pass.  Otherwise, we're on the second
   // pass.

@@ -8,7 +8,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -245,43 +244,41 @@ service FOoBAR {};
 
 TEST(CanonicalNamesTests, BadTopLevel) {
   const auto lower = {
-      "alias fooBar = bool;",                 // these comments prevent clang-format
-      "const fooBar bool = true;",            // from packing multiple items per line
-      "type fooBar = struct {};",             //
-      "type fooBar = struct {};",             //
-      "type fooBar = table {};",              //
-      "type fooBar = union { 1: x bool; };",  //
-      "type fooBar = enum { A = 1; };",       //
-      "type fooBar = bits { A = 1; };",       //
-      "protocol fooBar {};",                  //
-      "service fooBar {};",                   //
+      "alias fooBar = bool;",
+      "const fooBar bool = true;",
+      "type fooBar = struct {};",
+      "type fooBar = struct {};",
+      "type fooBar = table {};",
+      "type fooBar = union { 1: x bool; };",
+      "type fooBar = enum { A = 1; };",
+      "type fooBar = bits { A = 1; };",
+      "protocol fooBar {};",
+      "service fooBar {};",
   };
   const auto upper = {
-      "alias FooBar = bool;",                 //
-      "const FooBar bool = true;",            //
-      "type FooBar = struct {};",             //
-      "type FooBar = struct {};",             //
-      "type FooBar = table {};",              //
-      "type FooBar = union { 1: x bool; };",  //
-      "type FooBar = enum { A = 1; };",       //
-      "type FooBar = bits { A = 1; };",       //
-      "protocol FooBar {};",                  //
-      "service FooBar {};",                   //
+      "alias FooBar = bool;",
+      "const FooBar bool = true;",
+      "type FooBar = struct {};",
+      "type FooBar = struct {};",
+      "type FooBar = table {};",
+      "type FooBar = union { 1: x bool; };",
+      "type FooBar = enum { A = 1; };",
+      "type FooBar = bits { A = 1; };",
+      "protocol FooBar {};",
+      "service FooBar {};",
   };
 
-  for (const auto line1 : lower) {
-    for (const auto line2 : upper) {
+  for (std::string_view lowerLine : lower) {
+    for (std::string_view upperLine : upper) {
       std::ostringstream s;
-      s << "library example;\n\n" << line1 << '\n' << line2 << '\n';
-      const auto fidl = s.str();
+      s << "library example;\n" << lowerLine << '\n' << upperLine << '\n';
+      auto fidl = s.str();
+      SCOPED_TRACE(fidl);
       TestLibrary library(fidl);
-      ASSERT_FALSE(library.Compile(), "%s", fidl.c_str());
-      const auto& errors = library.errors();
-      ASSERT_EQ(errors.size(), 1, "%s", fidl.c_str());
-      ASSERT_ERR(errors[0], fidl::ErrNameCollisionCanonical, "%s", fidl.c_str());
-      ASSERT_SUBSTR(errors[0]->msg.c_str(), "fooBar", "%s", fidl.c_str());
-      ASSERT_SUBSTR(errors[0]->msg.c_str(), "FooBar", "%s", fidl.c_str());
-      ASSERT_SUBSTR(errors[0]->msg.c_str(), "foo_bar", "%s", fidl.c_str());
+      char location[20];
+      snprintf(location, sizeof location, "example.fidl:3:%zu", 1 + upperLine.find("FooBar"));
+      library.ExpectFail(fidl::ErrNameCollisionCanonical, "fooBar", "FooBar", location, "foo_bar");
+      ASSERT_COMPILER_DIAGNOSTICS(library);
     }
   }
 }
@@ -510,25 +507,25 @@ TEST(CanonicalNamesTests, BadVariousCollisions) {
     for (const auto f1 : functions) {
       for (const auto f2 : functions) {
         std::ostringstream s;
-        const auto name1 = f1(base_name);
-        const auto name2 = f2(base_name);
-        s << "library example;\n\ntype " << name1 << " = struct {};\ntype " << name2
-          << " = struct {};\n";
-        const auto fidl = s.str();
+        std::string name1 = f1(base_name);
+        std::string name2 = f2(base_name);
+        s << "library example;\ntype " << name1 << " = struct {};\ntype " << name2
+          << " = struct {};";
+        auto fidl = s.str();
+        SCOPED_TRACE(fidl);
         TestLibrary library(fidl);
-        ASSERT_FALSE(library.Compile(), "%s", fidl.c_str());
-        const auto& errors = library.errors();
-        ASSERT_EQ(errors.size(), 1, "%s", fidl.c_str());
         if (name1 == name2) {
-          ASSERT_ERR(errors[0], fidl::ErrNameCollision, "%s", fidl.c_str());
-          ASSERT_SUBSTR(errors[0]->msg.c_str(), name1.c_str(), "%s", fidl.c_str());
+          library.ExpectFail(fidl::ErrNameCollision, name1, "example.fidl:2:6");
+        } else if (name1 < name2) {
+          // We compile name1 first, and see that name2 collides with it.
+          library.ExpectFail(fidl::ErrNameCollisionCanonical, name2, name1, "example.fidl:2:6",
+                             fidl::utils::canonicalize(name1));
         } else {
-          ASSERT_ERR(errors[0], fidl::ErrNameCollisionCanonical, "%s", fidl.c_str());
-          ASSERT_SUBSTR(errors[0]->msg.c_str(), name1.c_str(), "%s", fidl.c_str());
-          ASSERT_SUBSTR(errors[0]->msg.c_str(), name2.c_str(), "%s", fidl.c_str());
-          ASSERT_SUBSTR(errors[0]->msg.c_str(), fidl::utils::canonicalize(name1).c_str(), "%s",
-                        fidl.c_str());
+          // We compile name2 first, and see that name1 collides with it.
+          library.ExpectFail(fidl::ErrNameCollisionCanonical, name1, name2, "example.fidl:3:6",
+                             fidl::utils::canonicalize(name1));
         }
+        ASSERT_COMPILER_DIAGNOSTICS(library);
       }
     }
   }
@@ -548,13 +545,13 @@ type it__is___the____same = struct {};
 
 TEST(CanonicalNamesTests, BadInconsistentTypeSpelling) {
   const auto decl_templates = {
-      "alias %s = bool;",                 //
-      "type %s = struct {};",             //
-      "type %s = struct {};",             //
-      "type %s = table {};",              //
-      "type %s = union { 1: x bool; };",  //
-      "type %s = enum { A = 1; };",       //
-      "type %s = bits { A = 1; };",       //
+      "alias %s = bool;",
+      "type %s = struct {};",
+      "type %s = struct {};",
+      "type %s = table {};",
+      "type %s = union { 1: x bool; };",
+      "type %s = enum { A = 1; };",
+      "type %s = bits { A = 1; };",
   };
   const auto use_template = "type Example = struct { val %s; };";
 
@@ -570,14 +567,12 @@ TEST(CanonicalNamesTests, BadInconsistentTypeSpelling) {
       decl.replace(decl.find("%s"), 2, decl_name);
       use.replace(use.find("%s"), 2, use_name);
       std::ostringstream s;
-      s << "library example;\n\n" << decl << '\n' << use << '\n';
-      const auto fidl = s.str();
+      s << "library example;\n" << decl << '\n' << use;
+      auto fidl = s.str();
+      SCOPED_TRACE(fidl);
       TestLibrary library(fidl);
-      ASSERT_FALSE(library.Compile(), "%s", fidl.c_str());
-      const auto& errors = library.errors();
-      ASSERT_EQ(errors.size(), 1, "%s", fidl.c_str());
-      ASSERT_ERR(errors[0], fidl::ErrNameNotFound, "%s", fidl.c_str());
-      ASSERT_SUBSTR(errors[0]->msg.c_str(), use_name, "%s", fidl.c_str());
+      library.ExpectFail(fidl::ErrNameNotFound, use_name, "example");
+      ASSERT_COMPILER_DIAGNOSTICS(library);
     }
   }
 }
@@ -591,10 +586,10 @@ TEST(CanonicalNamesTests, BadInconsistentConstSpelling) {
 
   for (const auto& [decl_name, use_name] : names) {
     std::ostringstream s;
-    s << "library example;\n\n"
+    s << "library example;\n"
       << "const " << decl_name << " bool = false;\n"
-      << "const EXAMPLE bool = " << use_name << ";\n";
-    const auto fidl = s.str();
+      << "const EXAMPLE bool = " << use_name << ";";
+    auto fidl = s.str();
     TestLibrary library(fidl);
     library.ExpectFail(fidl::ErrNameNotFound, use_name, "example");
     ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -610,15 +605,14 @@ TEST(CanonicalNamesTests, BadInconsistentEnumMemberSpelling) {
 
   for (const auto& [decl_name, use_name] : names) {
     std::ostringstream s;
-    s << "library example;\n\n"
+    s << "library example;\n"
       << "type Enum = enum { " << decl_name << " = 1; };\n"
-      << "const EXAMPLE Enum = Enum." << use_name << ";\n";
-    const auto fidl = s.str();
+      << "const EXAMPLE Enum = Enum." << use_name << ";";
+    auto fidl = s.str();
+    SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
-    ASSERT_FALSE(library.Compile(), "%s", fidl.c_str());
-    const auto& errors = library.errors();
-    ASSERT_EQ(errors.size(), 1, "%s", fidl.c_str());
-    ASSERT_ERR(errors[0], fidl::ErrMemberNotFound, "%s", fidl.c_str());
+    library.ExpectFail(fidl::ErrMemberNotFound, "enum 'Enum'", use_name);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -631,15 +625,14 @@ TEST(CanonicalNamesTests, BadInconsistentBitsMemberSpelling) {
 
   for (const auto& [decl_name, use_name] : names) {
     std::ostringstream s;
-    s << "library example;\n\n"
+    s << "library example;\n"
       << "type Bits = bits { " << decl_name << " = 1; };\n"
-      << "const EXAMPLE Bits = Bits." << use_name << ";\n";
-    const auto fidl = s.str();
+      << "const EXAMPLE Bits = Bits." << use_name << ";";
+    auto fidl = s.str();
+    SCOPED_TRACE(fidl);
     TestLibrary library(fidl);
-    ASSERT_FALSE(library.Compile(), "%s", fidl.c_str());
-    const auto& errors = library.errors();
-    ASSERT_EQ(errors.size(), 1, "%s", fidl.c_str());
-    ASSERT_ERR(errors[0], fidl::ErrMemberNotFound, "%s", fidl.c_str());
+    library.ExpectFail(fidl::ErrMemberNotFound, "bits 'Bits'", use_name);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 

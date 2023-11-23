@@ -5,7 +5,6 @@
 #include <zxtest/zxtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -208,8 +207,6 @@ type MyUnion = strict union {
   library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kUnionMember,
                      "my_variant", "example.fidl:5:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "union member");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "my_variant");
 }
 
 TEST(UnionTests, BadCannotStartAtZero) {
@@ -247,7 +244,6 @@ type Example = strict union {
 )FIDL");
   library.ExpectFail(fidl::ErrNonDenseOrdinal, 2);
   ASSERT_COMPILER_DIAGNOSTICS(library);
-  ASSERT_SUBSTR(library.errors().at(0)->msg.c_str(), "2");
 }
 
 TEST(UnionTests, BadNoNullableMembers) {

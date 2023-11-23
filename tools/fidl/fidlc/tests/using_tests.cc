@@ -6,7 +6,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -116,6 +115,8 @@ type Foo = struct {
 TEST(UsingTests, BadUnknownUsing) {
   TestLibrary library;
   library.AddFile("bad/fi-0046.test.fidl");
+  library.ExpectFail(fidl::ErrUnknownLibrary, "dependent");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(UsingTests, BadUsingAliasRefThroughFqn) {

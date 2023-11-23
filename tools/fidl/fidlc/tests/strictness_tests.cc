@@ -6,7 +6,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -16,22 +15,16 @@ TEST(StrictnessTests, BadDuplicateModifier) {
 library example;
 
 type One = strict union { 1: b bool; };
-type Two = strict strict union { 1: b bool; };          // line 5
-type Three = strict strict strict union { 1: b bool; }; // line 6
+type Two = strict strict union { 1: b bool; };
+type Three = strict strict strict union { 1: b bool; };
 )FIDL");
-  ASSERT_FALSE(library.Compile());
-
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  ASSERT_ERR(errors[0], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[0]->span.position().line, 5);
-  ASSERT_SUBSTR(errors[0]->msg.c_str(), "strict");
-  ASSERT_ERR(errors[1], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[1]->span.position().line, 6);
-  ASSERT_SUBSTR(errors[1]->msg.c_str(), "strict");
-  ASSERT_ERR(errors[2], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[2]->span.position().line, 6);
-  ASSERT_SUBSTR(errors[2]->msg.c_str(), "strict");
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict));
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict));
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kStrict));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StrictnessTests, BadDuplicateModifierNonConsecutive) {

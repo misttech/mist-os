@@ -20,7 +20,6 @@
 #include "test/test_util.h"
 #include "testing/fidl/async_loop_for_test.h"
 #include "testing/fidl/frobinator_impl.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 
 namespace fidl {
 namespace {

@@ -12,7 +12,6 @@
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -125,7 +124,8 @@ TEST(FlatAstTests, BadMultipleLibrariesSameName) {
   ASSERT_COMPILED(library1);
   TestLibrary library2(&shared);
   library2.AddFile("bad/fi-0041-b.test.fidl");
-  ASSERT_ERRORED_DURING_COMPILE(library2, fidl::ErrMultipleLibrariesWithSameName);
+  library2.ExpectFail(fidl::ErrMultipleLibrariesWithSameName, "test.bad.fi0041");
+  ASSERT_COMPILER_DIAGNOSTICS(library2);
 }
 
 }  // namespace

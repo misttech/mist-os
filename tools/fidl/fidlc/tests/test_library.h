@@ -27,6 +27,30 @@
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
 
+#define ASSERT_COMPILED(library)                         \
+  {                                                      \
+    TestLibrary& library_ref = (library);                \
+    if (!library_ref.Compile()) {                        \
+      EXPECT_EQ(library_ref.errors().size(), 0);         \
+      for (const auto& error : library_ref.errors()) {   \
+        EXPECT_STREQ("", error->def.msg.data());         \
+      }                                                  \
+      FAIL("stopping test, compilation failed");         \
+    }                                                    \
+    EXPECT_EQ(library_ref.warnings().size(), 0);         \
+    for (const auto& warning : library_ref.warnings()) { \
+      EXPECT_STREQ("", warning->def.msg.data());         \
+    }                                                    \
+  }
+
+#define ASSERT_COMPILER_DIAGNOSTICS(library) \
+  {                                          \
+    TestLibrary& library_ref = (library);    \
+    if (!library_ref.CheckCompile()) {       \
+      FAIL("Diagnostics mismatch");          \
+    }                                        \
+  }
+
 struct LintArgs {
  public:
   const std::set<std::string>& included_check_ids = {};
@@ -153,6 +177,14 @@ class TestLibrary final : public SharedInterface {
   // Constructor for a multi-library, multi-file test (call AddSource after).
   explicit TestLibrary(SharedAmongstLibraries* shared) : shared_(shared) {}
 
+  ~TestLibrary() {
+    ZX_ASSERT_MSG(used_,
+                  "TestLibrary appears unused; did you forget to call Parse, Compile, or Lint?");
+    ZX_ASSERT_MSG(
+        expected_diagnostics_.empty(),
+        "TestLibrary has expected diagnostics; did you forget to call ASSERT_COMPILER_DIAGNOSTICS?");
+  }
+
   // Helper for making a single test library depend on library zx, without
   // requiring an explicit SharedAmongstLibraries.
   void UseLibraryZx() {
@@ -254,6 +286,7 @@ class TestLibrary final : public SharedInterface {
         ok = false;
       }
     }
+    expected_diagnostics_.clear();
     return ok;
   }
 
@@ -261,6 +294,7 @@ class TestLibrary final : public SharedInterface {
   // a library.
   bool Parse(std::unique_ptr<fidl::raw::File>* out_ast_ptr) {
     ZX_ASSERT_MSG(all_sources_.size() == 1, "parse can only be used with one source");
+    used_ = true;
     auto source_file = all_sources_.at(0);
     fidl::Lexer lexer(*source_file, reporter());
     fidl::Parser parser(&lexer, reporter(), experimental_flags());
@@ -271,6 +305,7 @@ class TestLibrary final : public SharedInterface {
   // Compiles the library. Must have compiled all dependencies first, using the
   // same SharedAmongstLibraries object for all of them.
   bool Compile() {
+    used_ = true;
     fidl::flat::Compiler compiler(all_libraries(), version_selection(),
                                   internal::GetGeneratedOrdinal64ForTesting, experimental_flags());
     for (auto source_file : all_sources_) {
@@ -298,6 +333,7 @@ class TestLibrary final : public SharedInterface {
   }
 
   bool Lint(LintArgs args = {}) {
+    used_ = true;
     findings_ = fidl::Findings();
 
     bool passed = [&]() {
@@ -531,6 +567,7 @@ class TestLibrary final : public SharedInterface {
   std::vector<fidl::SourceFile*> all_sources_;
   std::unique_ptr<fidl::flat::Compilation> compilation_;
   std::vector<std::string> expected_diagnostics_;
+  bool used_ = false;
 };
 
 #endif  // TOOLS_FIDL_FIDLC_TESTS_TEST_LIBRARY_H_

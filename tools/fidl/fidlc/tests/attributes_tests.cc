@@ -7,7 +7,6 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/attribute_schema.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -410,13 +409,12 @@ type Foo = resource struct {};
 
 )FIDL");
   library.SelectVersion("foo", "1");
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 1);
-  EXPECT_ERR(library.errors()[0], fidl::ErrNameOverlap);
-  ASSERT_EQ(library.warnings().size(), 1);
-  ASSERT_ERR(library.warnings()[0], fidl::WarnAttributeTypo);
-  EXPECT_SUBSTR(library.warnings()[0]->msg.c_str(), "availabe");
-  EXPECT_SUBSTR(library.warnings()[0]->msg.c_str(), "available");
+  library.ExpectWarn(fidl::WarnAttributeTypo, "availabe", "available");
+  library.ExpectFail(fidl::ErrNameOverlap, "Foo", "example.fidl:6:6",
+                     fidl::VersionSet(fidl::VersionRange(fidl::Version::From(1).value(),
+                                                         fidl::Version::From(2).value())),
+                     fidl::Platform::Parse("foo").value());
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // This tests our ability to treat warnings as errors.  It is here because this
@@ -435,14 +433,15 @@ protocol A {
   ASSERT_FALSE(library.Compile());
   ASSERT_EQ(library.warnings().size(), 0);
   ASSERT_EQ(library.errors().size(), 1);
-  ASSERT_ERR(library.errors()[0], fidl::WarnAttributeTypo);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "duc");
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "doc");
+  ASSERT_STREQ(library.errors()[0]->def.msg, fidl::WarnAttributeTypo.msg);
 }
 
 TEST(AttributesTests, BadUnknownArgument) {
   TestLibrary library;
   library.AddFile("bad/fi-0129.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(fidl::ErrUnknownAttributeArg, "available", "discontinued");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadEmptyTransport) {
@@ -608,13 +607,10 @@ protocol MyProtocol {
 };
 
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 11);
-  for (const auto& error : errors) {
-    ASSERT_ERR(error, fidl::ErrInvalidAttributePlacement);
-    ASSERT_SUBSTR(error->msg.c_str(), "selector");
+  for (int i = 0; i < 11; i++) {
+    library.ExpectFail(fidl::ErrInvalidAttributePlacement, "selector");
   }
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadSingleDeprecatedAttribute) {
@@ -641,11 +637,10 @@ protocol MyProtocol {
   MyMethod();
 };
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  for (auto& error : library.errors()) {
-    ASSERT_ERR(error, fidl::ErrDeprecatedAttribute);
+  for (int i = 0; i < 3; i++) {
+    library.ExpectFail(fidl::ErrDeprecatedAttribute, "example_deprecated_attribute");
   }
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 constexpr fidl::ErrorDef<123> TestErrIncorrectNumberOfMembers("incorrect number of members");
@@ -680,8 +675,8 @@ type MyStruct = struct {
 
 )FIDL");
   library.AddAttributeSchema("must_have_three_members").Constrain(MustHaveThreeMembers);
-  ASSERT_ERRORED_DURING_COMPILE(library, TestErrIncorrectNumberOfMembers);
-  ASSERT_SUBSTR(library.errors()[0]->msg.c_str(), "incorrect number of members");
+  library.ExpectFail(TestErrIncorrectNumberOfMembers);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadConstraintOnlyThreeMembersOnMethod) {
@@ -844,7 +839,6 @@ type MyStruct = struct {};
   // TODO(fxbug.dev/112219): If an unnamed string argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind instead of
   // ErrAttributeArgsMustAllBeNamed.
-  // ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
   library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
                      fidl::Token::KindAndSubkind(fidl::Token::Kind::kStringLiteral),
                      fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
@@ -874,7 +868,6 @@ type MyStruct = struct {};
   // TODO(fxbug.dev/112219): If an unnamed identifier argument follows a named
   // argument, it incorrectly produces ErrUnexpectedTokenOfKind and
   // ErrUnexpectedToken instead of ErrAttributeArgsMustAllBeNamed.
-  // ASSERT_ERRORED_DURING_COMPILE(library, fidl::ErrAttributeArgsMustAllBeNamed);
   library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
                      fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen),
                      fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
@@ -1892,11 +1885,10 @@ type MyStruct = struct {};
 const BAD bool = "not a bool";
 
 )FIDL");
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTypeCannotBeConvertedToType);
-  EXPECT_ERR(library.errors()[1], fidl::ErrCannotResolveConstantValue);
-  EXPECT_ERR(library.errors()[2], fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadReferencesInvalidConstWithSingleArgSchema) {
@@ -1911,11 +1903,10 @@ const BAD bool = "not a bool";
 )FIDL");
   library.AddAttributeSchema("foo").AddArg(
       "value", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTypeCannotBeConvertedToType);
-  EXPECT_ERR(library.errors()[1], fidl::ErrCannotResolveConstantValue);
-  EXPECT_ERR(library.errors()[2], fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrCouldNotResolveAttributeArg);
+  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadReferencesInvalidConstWithMultipleArgSchema) {
@@ -1931,11 +1922,10 @@ const BAD bool = "not a bool";
   library.AddAttributeSchema("foo")
       .AddArg("first", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool))
       .AddArg("second", fidl::flat::AttributeArgSchema(fidl::flat::ConstantValue::Kind::kBool));
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTypeCannotBeConvertedToType);
-  EXPECT_ERR(library.errors()[1], fidl::ErrCannotResolveConstantValue);
-  EXPECT_ERR(library.errors()[2], fidl::ErrAttributeArgNotNamed);
+  library.ExpectFail(fidl::ErrAttributeArgNotNamed, "BAD");
+  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(AttributesTests, BadSelfReferenceWithoutSchemaBool) {

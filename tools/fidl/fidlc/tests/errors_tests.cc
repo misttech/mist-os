@@ -5,7 +5,6 @@
 #include <zxtest/zxtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {

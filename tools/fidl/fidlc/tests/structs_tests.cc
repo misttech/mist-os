@@ -5,7 +5,6 @@
 #include <zxtest/zxtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -56,10 +55,12 @@ TEST(StructsTests, BadMissingDefaultValueReferenceTarget) {
 library example;
 
 type MyStruct = struct {
+    @allow_deprecated_struct_defaults
     field int64 = A;
 };
 )FIDL");
-  ASSERT_FALSE(library.Compile());
+  library.ExpectFail(fidl::ErrNameNotFound, "A", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, GoodEnumDefaultValueEnumMemberReference) {
@@ -190,10 +191,12 @@ library example;
 type MyEnum = enum : int32 { A = 5; };
 
 type MyStruct = struct {
+    @allow_deprecated_struct_defaults
     field MyEnum = A;
 };
 )FIDL");
-  ASSERT_FALSE(library.Compile());
+  library.ExpectFail(fidl::ErrNameNotFound, "A", "example");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, BadDefaultValueNullableString) {
@@ -345,20 +348,25 @@ TEST(StructsTests, BadHandleCannotBeBoxedShouldBeOptional) {
 }
 
 TEST(StructsTests, BadTypeCannotBeBoxedShouldBeOptional) {
-  for (const std::string& definition : {
-           "type Foo = struct { union_member box<union { 1: data uint8; }>; };",
-           "type Foo = struct { vector_member box<vector<uint8>>; };",
-           "type Foo = struct { string_member box<string>; };",
-           "type Foo = resource struct { handle_member box<zx.Handle>; };",
-           "protocol Bar {}; type Foo = resource struct { client_member box<client_end:Bar>; };",
-           "protocol Bar {}; type Foo = resource struct { server_member box<server_end:Bar>; };",
-       }) {
-    std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
-    TestLibrary library(fidl_library);
+  std::pair<const char*, const char*> cases[] = {
+      {"UnionMember", "type Foo = struct { union_member box<union { 1: data uint8; }>; };"},
+      {"vector", "type Foo = struct { vector_member box<vector<uint8>>; };"},
+      {"string", "type Foo = struct { string_member box<string>; };"},
+      {"Handle", "type Foo = resource struct { handle_member box<zx.Handle>; };"},
+      {"client_end",
+       "protocol Bar {}; type Foo = resource struct { client_member box<client_end:Bar>; };"},
+      {"server_end",
+       "protocol Bar {}; type Foo = resource struct { server_member box<server_end:Bar>; };"},
+  };
+  for (auto& [boxed_name, definition] : cases) {
+    std::ostringstream s;
+    s << "library example;\nusing zx;\n" << definition;
+    auto fidl = s.str();
+    SCOPED_TRACE(fidl);
+    TestLibrary library(fidl);
     library.UseLibraryZx();
-    ASSERT_FALSE(library.Compile());
-    ASSERT_EQ(library.errors().size(), 1);
-    ASSERT_ERR(library.errors()[0], fidl::ErrCannotBeBoxedShouldBeOptional);
+    library.ExpectFail(fidl::ErrCannotBeBoxedShouldBeOptional, boxed_name);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -370,30 +378,33 @@ TEST(StructsTests, BadCannotBoxPrimitive) {
 }
 
 TEST(StructsTests, BadTypeCannotBeBoxedNorOptional) {
-  for (const std::string& definition : {
-           "type Foo = struct { table_member box<table { 1: data uint8; }>; };",
-           "type Foo = struct { box_member box<box<struct {}>>; };",
-           "type Foo = struct { enum_member box<enum { DATA = 1; }>; };",
-           "type Foo = struct { bits_member box<bits { DATA = 1; }>; };",
-           "type Foo = struct { array_member box<array<uint8, 1>>; };",
-           "type Foo = struct { bool_member box<bool>; };",
-           "type Foo = struct { int8_member box<int8>; };",
-           "type Foo = struct { int16_member box<int16>; };",
-           "type Foo = struct { int32_member box<int32>; };",
-           "type Foo = struct { int64_member box<int64>; };",
-           "type Foo = struct { uint8_member box<uint8>; };",
-           "type Foo = struct { uint16_member box<uint16>; };",
-           "type Foo = struct { uint32_member box<uint32>; };",
-           "type Foo = struct { uint64_member box<uint64>; };",
-           "type Foo = struct { float32_member box<float32>; };",
-           "type Foo = struct { float64_member box<float64>; };",
-       }) {
-    std::string fidl_library = "library example;\nusing zx;\n\n" + definition + "\n";
-    TestLibrary library(fidl_library);
+  std::pair<const char*, const char*> cases[] = {
+      {"TableMember", "type Foo = struct { table_member box<table { 1: data uint8; }>; };"},
+      {"box", "type Foo = struct { box_member box<box<struct {}>>; };"},
+      {"EnumMember", "type Foo = struct { enum_member box<enum { DATA = 1; }>; };"},
+      {"BitsMember", "type Foo = struct { bits_member box<bits { DATA = 1; }>; };"},
+      {"array", "type Foo = struct { array_member box<array<uint8, 1>>; };"},
+      {"bool", "type Foo = struct { bool_member box<bool>; };"},
+      {"int8", "type Foo = struct { int8_member box<int8>; };"},
+      {"int16", "type Foo = struct { int16_member box<int16>; };"},
+      {"int32", "type Foo = struct { int32_member box<int32>; };"},
+      {"int64", "type Foo = struct { int64_member box<int64>; };"},
+      {"uint8", "type Foo = struct { uint8_member box<uint8>; };"},
+      {"uint16", "type Foo = struct { uint16_member box<uint16>; };"},
+      {"uint32", "type Foo = struct { uint32_member box<uint32>; };"},
+      {"uint64", "type Foo = struct { uint64_member box<uint64>; };"},
+      {"float32", "type Foo = struct { float32_member box<float32>; };"},
+      {"float64", "type Foo = struct { float64_member box<float64>; };"},
+  };
+  for (auto& [boxed_name, definition] : cases) {
+    std::ostringstream s;
+    s << "library example;\nusing zx;\n" << definition;
+    auto fidl = s.str();
+    SCOPED_TRACE(fidl);
+    TestLibrary library(fidl);
     library.UseLibraryZx();
-    ASSERT_FALSE(library.Compile());
-    ASSERT_EQ(library.errors().size(), 1);
-    ASSERT_ERR(library.errors()[0], fidl::ErrCannotBeBoxedNorOptional);
+    library.ExpectFail(fidl::ErrCannotBeBoxedNorOptional, boxed_name);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 
@@ -408,11 +419,10 @@ type Foo = struct {
 
 const BAR bool = "not a bool";
 )FIDL");
-  ASSERT_FALSE(library.Compile());
-  ASSERT_EQ(library.errors().size(), 3);
-  EXPECT_ERR(library.errors()[0], fidl::ErrTypeCannotBeConvertedToType);
-  EXPECT_ERR(library.errors()[1], fidl::ErrCannotResolveConstantValue);
-  EXPECT_ERR(library.errors()[2], fidl::ErrCouldNotResolveMemberDefault);
+  library.ExpectFail(fidl::ErrCouldNotResolveMemberDefault, "flag");
+  library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+  library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "\"not a bool\"", "string:10", "bool");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(StructsTests, CannotReferToIntMember) {

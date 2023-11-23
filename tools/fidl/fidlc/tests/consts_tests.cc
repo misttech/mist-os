@@ -7,7 +7,6 @@
 #include <zxtest/zxtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -499,12 +498,11 @@ TEST(ConstsTests, BadConstTestAssignTypeName) {
            "type Example = union { 1: A bool; };",
            "alias Example = string;",
        }) {
-    std::ostringstream ss;
-    ss << "library example;\n";
-    ss << type_declaration << "\n";
-    ss << "const FOO uint32 = Example;\n";
-
-    TestLibrary library(ss.str());
+    std::ostringstream s;
+    s << "library example;\n" << type_declaration << "\nconst FOO uint32 = Example;";
+    auto fidl = s.str();
+    SCOPED_TRACE(fidl);
+    TestLibrary library(fidl);
     library.ExpectFail(fidl::ErrCannotResolveConstantValue);
     library.ExpectFail(fidl::ErrExpectedValueButGotType, "Example");
     ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -770,22 +768,49 @@ const a OneEnum = AnotherEnum.B;
 TEST(ConstsTests, BadConstReferencesInvalidConst) {
   // Test all orderings since this previously crashed only when the invalid
   // const (set to 1 instead of a string) was lexicographically smaller.
-  for (auto& defs : {
-           "const A string = Z; const Z string = 1;",
-           "const A string = 1; const Z string = A;",
-           "const Z string = A; const A string = 1;",
-           "const Z string = 1; const A string = Z;",
-       }) {
-    std::ostringstream ss;
-    ss << "library example;\n";
-    ss << defs << "\n";
-
-    TestLibrary library(ss.str());
-    ASSERT_FALSE(library.Compile());
-    ASSERT_EQ(library.errors().size(), 3);
-    EXPECT_ERR(library.errors()[0], fidl::ErrTypeCannotBeConvertedToType);
-    EXPECT_ERR(library.errors()[1], fidl::ErrCannotResolveConstantValue);
-    EXPECT_ERR(library.errors()[2], fidl::ErrCannotResolveConstantValue);
+  {
+    TestLibrary library(R"FIDL(
+library example;
+const A string = Z;
+const Z string = 1;
+)FIDL");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
+  }
+  {
+    TestLibrary library(R"FIDL(
+library example;
+const A string = 1;
+const Z string = A;
+)FIDL");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
+  }
+  {
+    TestLibrary library(R"FIDL(
+library example;
+const Z string = A;
+const A string = 1;
+)FIDL");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    ASSERT_COMPILER_DIAGNOSTICS(library);
+  }
+  {
+    TestLibrary library(R"FIDL(
+library example;
+const Z string = 1;
+const A string = Z;
+)FIDL");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    library.ExpectFail(fidl::ErrTypeCannotBeConvertedToType, "1", "untyped numeric", "string");
+    library.ExpectFail(fidl::ErrCannotResolveConstantValue);
+    ASSERT_COMPILER_DIAGNOSTICS(library);
   }
 }
 

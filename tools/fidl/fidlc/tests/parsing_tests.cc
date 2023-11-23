@@ -8,7 +8,6 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -669,13 +668,16 @@ type Empty = struct {
 };
 )FIDL");
 
-  ASSERT_FALSE(library.Compile());
-
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  ASSERT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[1], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[2], fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightCurly),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEndOfFile),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadFinalMemberMissingSemicolon) {

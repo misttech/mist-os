@@ -5,7 +5,6 @@
 #include <zxtest/zxtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -100,15 +99,23 @@ type TimeZone = struct {
     region vector<string>;
 };
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 6);
-  ASSERT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[1], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[2], fidl::ErrMissingOrdinalBeforeMember);
-  ASSERT_ERR(errors[3], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[4], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[5], fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kEqual));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kColon));
+  library.ExpectFail(fidl::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kLeftCurly),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kDot),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kLeftAngle),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadDoNotCompileAfterParsingFails) {
@@ -183,20 +190,30 @@ protocol P {
     Method() -> (struct { num uint16; }) error;  // Error
 };
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  const auto& errors = library.errors();
   // NOTE(fxbug.dev/72924): the difference in errors is due to the change in
   // test input (for the TypeWithoutParams and MissingParen cases) rather than
   // any real behavior change
-  ASSERT_EQ(errors.size(), 8);
-  ASSERT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[1], fidl::ErrInvalidProtocolMember);
-  ASSERT_ERR(errors[2], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[3], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[4], fidl::ErrInvalidProtocolMember);
-  ASSERT_ERR(errors[5], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[6], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[7], fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrInvalidProtocolMember);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightCurly),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ParsingTests, BadRecoverableParamListParsing) {
@@ -223,12 +240,12 @@ protocol Example {
   Method() -> (vector<);
 };
 )FIDL");
-  ASSERT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  EXPECT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  EXPECT_ERR(errors[1], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[2], fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightParen),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextServiceMember) {
@@ -265,12 +282,16 @@ type Struct = struct {
     int_value int32;
 };
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  ASSERT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[1], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[2], fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextTableMember) {
@@ -284,14 +305,16 @@ type Table = table {
     4: int_value int32;
 };
 )FIDL");
-  EXPECT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  ASSERT_ERR(errors[0], fidl::ErrUnexpectedTokenOfKind);
-  ASSERT_ERR(errors[1], fidl::ErrUnexpectedTokenOfKind);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kNumericLiteral),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kVector),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
   // NOTE(fxbug.dev/72924): the difference here is just due to the type/member
   // reordering, not a behavior change
-  ASSERT_ERR(errors[2], fidl::ErrMissingOrdinalBeforeMember);
+  library.ExpectFail(fidl::ErrMissingOrdinalBeforeMember);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, BadRecoverToNextUnionMember) {
@@ -386,20 +409,26 @@ type TypeDecl = struct {
 };
 )FIDL");
 
-  ASSERT_FALSE(library.Compile());
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 11);
-  EXPECT_ERR(errors[0], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[1], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[2], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[3], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[4], fidl::ErrUnexpectedToken);
-  EXPECT_ERR(errors[5], fidl::ErrUnexpectedTokenOfKind);
-  EXPECT_ERR(errors[6], fidl::ErrUnexpectedTokenOfKind);
-  EXPECT_ERR(errors[7], fidl::ErrUnexpectedTokenOfKind);
-  EXPECT_ERR(errors[8], fidl::ErrUnexpectedTokenOfKind);
-  EXPECT_ERR(errors[9], fidl::ErrInvalidCharacter);
-  EXPECT_ERR(errors[10], fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightAngle));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightAngle),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kIdentifier));
+  library.ExpectFail(fidl::ErrUnexpectedTokenOfKind,
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kSemicolon),
+                     fidl::Token::KindAndSubkind(fidl::Token::Kind::kRightAngle));
+  library.ExpectFail(fidl::ErrInvalidCharacter, "~");
+  library.ExpectFail(fidl::ErrUnexpectedToken);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, UnexpectedLineBreakInLiteral) {
@@ -419,15 +448,10 @@ TEST(RecoverableParsingTests, UnexpectedControlCharacter) {
 TEST(RecoverableParsingTests, InvalidEscapeSequenceInLiteral) {
   TestLibrary library;
   library.AddFile("bad/fi-0003.test.fidl");
-  EXPECT_FALSE(library.Compile());
-
-  const auto& errors = library.errors();
   // TODO(fxbug.dev/111982): fidlc should recover from all three failures
-  ASSERT_EQ(errors.size(), 2);
-  EXPECT_ERR(errors[0], fidl::ErrInvalidEscapeSequence);
-  EXPECT_SUBSTR(errors[0]->msg.c_str(), "'\\ '");
-  EXPECT_ERR(errors[1], fidl::ErrInvalidEscapeSequence);
-  EXPECT_SUBSTR(errors[1]->msg.c_str(), "'\\i'");
+  library.ExpectFail(fidl::ErrInvalidEscapeSequence, "\\ ");
+  library.ExpectFail(fidl::ErrInvalidEscapeSequence, "\\i");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(RecoverableParsingTests, InvalidHexDigit) {

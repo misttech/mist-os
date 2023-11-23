@@ -7,7 +7,6 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/source_file.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
@@ -73,22 +72,16 @@ TEST(ResourcenessTests, BadDuplicateModifier) {
 library example;
 
 type One = resource struct {};
-type Two = resource resource struct {};            // line 5
-type Three = resource resource resource struct {}; // line 6
+type Two = resource resource struct {};
+type Three = resource resource resource struct {};
 )FIDL");
-  ASSERT_FALSE(library.Compile());
-
-  const auto& errors = library.errors();
-  ASSERT_EQ(errors.size(), 3);
-  ASSERT_ERR(errors[0], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[0]->span.position().line, 5);
-  ASSERT_SUBSTR(errors[0]->msg.c_str(), "resource");
-  ASSERT_ERR(errors[1], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[1]->span.position().line, 6);
-  ASSERT_SUBSTR(errors[1]->msg.c_str(), "resource");
-  ASSERT_ERR(errors[2], fidl::ErrDuplicateModifier);
-  EXPECT_EQ(errors[2]->span.position().line, 6);
-  ASSERT_SUBSTR(errors[2]->msg.c_str(), "resource");
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource));
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource));
+  library.ExpectFail(fidl::ErrDuplicateModifier,
+                     fidl::Token::KindAndSubkind(fidl::Token::Subkind::kResource));
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ResourcenessTests, GoodResourceSimple) {
@@ -116,12 +109,12 @@ TEST(ResourcenessTests, GoodResourceStruct) {
            "using zx;\ntype Foo = resource struct{ a array<zx.Handle, 1>; };",
            "using zx;\ntype Foo = resource struct{ v vector<zx.Handle>; };",
        }) {
-    std::string fidl_library = "library example;\n\n" + definition + "\n";
+    std::string fidl_library = "library example;\n" + definition;
+    SCOPED_TRACE(fidl_library);
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
     ASSERT_COMPILED(library);
-    EXPECT_EQ(library.LookupStruct("Foo")->resourceness, fidl::types::Resourceness::kResource, "%s",
-              fidl_library.c_str());
+    EXPECT_EQ(library.LookupStruct("Foo")->resourceness, fidl::types::Resourceness::kResource);
   }
 }
 
@@ -133,12 +126,12 @@ TEST(ResourcenessTests, GoodResourceTable) {
            "using zx;\ntype Foo = resource table { 1: a array<zx.Handle, 1>; };",
            "using zx;\ntype Foo = resource table { 1: v vector<zx.Handle>; };",
        }) {
-    std::string fidl_library = "library example;\n\n" + definition + "\n";
+    std::string fidl_library = "library example;\n" + definition;
+    SCOPED_TRACE(fidl_library);
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
     ASSERT_COMPILED(library);
-    EXPECT_EQ(library.LookupTable("Foo")->resourceness, fidl::types::Resourceness::kResource, "%s",
-              fidl_library.c_str());
+    EXPECT_EQ(library.LookupTable("Foo")->resourceness, fidl::types::Resourceness::kResource);
   }
 }
 
@@ -149,12 +142,12 @@ TEST(ResourcenessTests, GoodResourceUnion) {
            "using zx;\ntype Foo = resource union { 1: a array<zx.Handle, 1>; };",
            "using zx;\ntype Foo = resource union { 1: v vector<zx.Handle>; };",
        }) {
-    std::string fidl_library = "library example;\n\n" + definition + "\n";
+    std::string fidl_library = "library example;\n" + definition;
+    SCOPED_TRACE(fidl_library);
     TestLibrary library(fidl_library);
     library.UseLibraryZx();
     ASSERT_COMPILED(library);
-    EXPECT_EQ(library.LookupUnion("Foo")->resourceness, fidl::types::Resourceness::kResource, "%s",
-              fidl_library.c_str());
+    EXPECT_EQ(library.LookupUnion("Foo")->resourceness, fidl::types::Resourceness::kResource);
   }
 }
 

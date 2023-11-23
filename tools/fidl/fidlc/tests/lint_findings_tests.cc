@@ -182,15 +182,16 @@ class LintTest {
 
     // Start with checks for invalid test construction:
     auto context = (ss.str() + "Bad test!");
+    SCOPED_TRACE(context);
 
     if (expect_findings && expected_findings_.empty()) {
-      ASSERT_FALSE(default_message_.empty(), "%s", context.c_str());
+      ASSERT_FALSE(default_message_.empty());
       AddFinding(default_check_id_, default_message_);
     }
 
-    ASSERT_FALSE((!expect_findings) && (!expected_findings_.empty()), "%s", context.c_str());
+    ASSERT_FALSE((!expect_findings) && (!expected_findings_.empty()));
 
-    ASSERT_NO_FAILURES(ValidTest(), "%s", context.c_str());
+    ASSERT_NO_FAILURES(ValidTest());
 
     // The test looks good, so run the linter, and update the context
     // value by replacing "Bad test!" with the FIDL source code.
@@ -207,7 +208,7 @@ class LintTest {
         ss << "  * " << check_id << std::endl;
       }
       context = ss.str();
-      EXPECT_TRUE(excluded_check_ids_to_confirm_.empty(), "%s", context.c_str());
+      EXPECT_TRUE(excluded_check_ids_to_confirm_.empty());
     }
 
     std::string source_code = std::string(library().source_file().data());
@@ -229,13 +230,13 @@ class LintTest {
       PrintFindings(ss, finding, library().findings().end(), "UNEXPECTED FINDINGS");
       context = ss.str();
       bool has_unexpected_findings = true;
-      EXPECT_FALSE(has_unexpected_findings, "%s", context.c_str());
+      EXPECT_FALSE(has_unexpected_findings);
     }
     if (expected_finding != expected_findings_.end()) {
       PrintFindings(ss, expected_finding, expected_findings_.end(), "EXPECTED FINDINGS NOT FOUND");
       context = ss.str();
       bool expected_findings_not_found = true;
-      EXPECT_FALSE(expected_findings_not_found, "%s", context.c_str());
+      EXPECT_FALSE(expected_findings_not_found);
     }
   }
 
@@ -281,22 +282,20 @@ class LintTest {
     ss << finding.span().position_str() << ": ";
     utils::PrintFinding(ss, finding);
     auto context = (test_context + ss.str());
-    ASSERT_STRING_EQ(expectf.subcategory(), finding.subcategory(), "%s", context.c_str());
+    SCOPED_TRACE(context);
+    ASSERT_STRING_EQ(expectf.subcategory(), finding.subcategory());
     if (assert_positions_match) {
-      ASSERT_STRING_EQ(expectf.span().position_str(), finding.span().position_str(), "%s",
-                       context.c_str());
+      ASSERT_STRING_EQ(expectf.span().position_str(), finding.span().position_str());
     }
-    ASSERT_STRING_EQ(expectf.message(), finding.message(), "%s", context.c_str());
-    ASSERT_EQ(expectf.suggestion().has_value(), finding.suggestion().has_value(), "%s",
-              context.c_str());
+    ASSERT_STRING_EQ(expectf.message(), finding.message());
+    ASSERT_EQ(expectf.suggestion().has_value(), finding.suggestion().has_value());
     if (finding.suggestion().has_value()) {
-      ASSERT_STRING_EQ(expectf.suggestion()->description(), finding.suggestion()->description(),
-                       "%s", context.c_str());
+      ASSERT_STRING_EQ(expectf.suggestion()->description(), finding.suggestion()->description());
       ASSERT_EQ(expectf.suggestion()->replacement().has_value(),
-                finding.suggestion()->replacement().has_value(), "%s", context.c_str());
+                finding.suggestion()->replacement().has_value());
       if (finding.suggestion()->replacement().has_value()) {
-        ASSERT_STRING_EQ(*expectf.suggestion()->replacement(), *finding.suggestion()->replacement(),
-                         "%s", context.c_str());
+        ASSERT_STRING_EQ(*expectf.suggestion()->replacement(),
+                         *finding.suggestion()->replacement());
       }
     }
   }

@@ -7,7 +7,6 @@
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
-#include "tools/fidl/fidlc/tests/error_test.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
