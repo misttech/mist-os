@@ -18,6 +18,7 @@ use futures::{AsyncReadExt as _, FutureExt as _};
 
 use libc as _;
 use net_declare::fidl_subnet;
+use netemul::{PacketCapture, TestEndpoint, TestNetwork};
 use netstack_testing_common::{
     devices, interfaces,
     realms::{KnownServiceProvider, NetstackVersion},
@@ -72,16 +73,37 @@ struct InterfaceFidlProxies {
 
 // This type holds unused FIDL proxies so that the underlying object stays
 // alive.
-struct FidlProxies {
-    _tun_dev_pair: fnet_tun::DevicePairProxy,
+struct FidlProxies<'a> {
+    tun_or_network: TunOrDebugNetwork<'a>,
     _client_if: InterfaceFidlProxies,
     _server_if: InterfaceFidlProxies,
+}
+
+const DEBUG_NETWORK_NAME: &'static str = "sniff";
+
+enum TunOrDebugNetwork<'a> {
+    Tun(fnet_tun::DevicePairProxy),
+    DebugNetwork { net: TestNetwork<'a>, _ep1: TestEndpoint<'a>, _ep2: TestEndpoint<'a> },
+}
+
+impl<'a> TunOrDebugNetwork<'a> {
+    async fn start_capture(&mut self, name: &str) -> Option<PacketCapture> {
+        match self {
+            TunOrDebugNetwork::Tun(_tun) => None,
+            TunOrDebugNetwork::DebugNetwork { net, _ep1, _ep2 } => {
+                // We exclusively borrowed `net` so no one should be able to capture
+                // packets at the moment.
+                Some(net.start_capture(name).await.expect("failed to start packet capture"))
+            }
+        }
+    }
 }
 
 async fn setup<'a>(
     sandbox: &'a netemul::TestSandbox,
     netstack_version: NetstackVersion,
-) -> (netemul::TestRealm<'a>, netemul::TestRealm<'a>, FidlProxies) {
+    capture_packets: bool,
+) -> (netemul::TestRealm<'a>, netemul::TestRealm<'a>, FidlProxies<'a>) {
     let client_realm = sandbox
         .create_realm(
             "client",
@@ -95,8 +117,26 @@ async fn setup<'a>(
         )
         .expect("create server netstack");
 
-    let (tun_dev_pair, left_port, right_port) =
-        netstack_testing_common::devices::create_eth_tun_pair().await;
+    let (tun_or_network, left_port, right_port) = if capture_packets {
+        let net = sandbox.create_network(DEBUG_NETWORK_NAME).await.expect("create network");
+        let (left_port, left_port_server_end) =
+            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
+                .expect("create left port proxy");
+        let (right_port, right_port_server_end) =
+            fidl::endpoints::create_proxy::<fhardware_network::PortMarker>()
+                .expect("create right port proxy");
+        let ep1 = net.create_endpoint("ep1").await.expect("failed to create endpoint");
+        let ep2 = net.create_endpoint("ep2").await.expect("failed to create endpoint");
+        ep1.get_port(left_port_server_end).expect("failed to get port for endpoint");
+        ep2.get_port(right_port_server_end).expect("failed to get port for endpoint");
+        ep1.set_link_up(true).await.expect("failed to enable endpoint");
+        ep2.set_link_up(true).await.expect("failed to enable endpoint");
+        (TunOrDebugNetwork::DebugNetwork { net, _ep1: ep1, _ep2: ep2 }, left_port, right_port)
+    } else {
+        let (tun_dev_pair, left_port, right_port) =
+            netstack_testing_common::devices::create_eth_tun_pair().await;
+        (TunOrDebugNetwork::Tun(tun_dev_pair), left_port, right_port)
+    };
 
     async fn install_interface(
         realm: &netemul::TestRealm<'_>,
@@ -170,11 +210,7 @@ async fn setup<'a>(
     )
     .await;
 
-    (
-        client_realm,
-        server_realm,
-        FidlProxies { _tun_dev_pair: tun_dev_pair, _client_if, _server_if },
-    )
+    (client_realm, server_realm, FidlProxies { tun_or_network, _client_if, _server_if })
 }
 
 fn format_byte_count(byte_count: usize) -> String {
@@ -219,8 +255,10 @@ async fn bench_tcp<'a, I: IpExt>(
     client_realm: &netemul::TestRealm<'a>,
     server_realm: &netemul::TestRealm<'a>,
     transfer: usize,
+    tun_or_network: &mut TunOrDebugNetwork<'a>,
 ) -> fuchsiaperf::FuchsiaPerfBenchmarkResult {
     let label = format!("WriteRead/TCP/{}/{}", I::NAME, format_byte_count(transfer));
+    let _packet_capture = tun_or_network.start_capture(&label.replace("/", "-")).await;
     let (mut client_sock, mut server_sock) = {
         let (listen_sock, client_sock) = futures::future::join(
             server_realm
@@ -408,11 +446,15 @@ struct Args {
     /// run with trace events enabled
     #[argh(switch)]
     tracing: bool,
+
+    /// produce packet capture
+    #[argh(switch)]
+    pcap: bool,
 }
 
 #[fuchsia::main]
 async fn main() {
-    let Args { output_fuchsiaperf, netstack3, tracing } = argh::from_env();
+    let Args { output_fuchsiaperf, netstack3, tracing, pcap } = argh::from_env();
     let iter_count = if output_fuchsiaperf.is_some() {
         1000
     } else {
@@ -429,13 +471,14 @@ async fn main() {
     } else {
         "fuchsia.network.socket.tun"
     };
-    let (client_realm, server_realm, _fidl_proxies) = if netstack3 {
-        setup(&sandbox, NetstackVersion::ProdNetstack3).await
+    let (client_realm, server_realm, mut fidl_proxies) = if netstack3 {
+        setup(&sandbox, NetstackVersion::ProdNetstack3, pcap).await
     } else {
         if tracing {
-            setup(&sandbox, NetstackVersion::Netstack2 { tracing: true, fast_udp: false }).await
+            setup(&sandbox, NetstackVersion::Netstack2 { tracing: true, fast_udp: false }, pcap)
+                .await
         } else {
-            setup(&sandbox, NetstackVersion::ProdNetstack2).await
+            setup(&sandbox, NetstackVersion::ProdNetstack2, pcap).await
         }
     };
 
@@ -498,6 +541,7 @@ async fn main() {
                     &client_realm,
                     &server_realm,
                     transfer,
+                    &mut fidl_proxies.tun_or_network,
                 )
                 .await,
             );
@@ -509,6 +553,7 @@ async fn main() {
                     &client_realm,
                     &server_realm,
                     transfer,
+                    &mut fidl_proxies.tun_or_network,
                 )
                 .await,
             );
