@@ -4390,9 +4390,9 @@ pub mod tests {
 
     struct BinderProcessFixture {
         driver: Weak<BinderDriver>,
-        task: AutoReleasableTask,
         proc: OwnedRef<BinderProcess>,
         thread: Arc<BinderThread>,
+        task: AutoReleasableTask,
     }
 
     impl BinderProcessFixture {
@@ -4401,7 +4401,7 @@ pub mod tests {
             let (proc, thread) = test_fixture.driver.create_process_and_thread(task.get_pid());
 
             mmap_shared_memory(&test_fixture.driver, &task, &proc);
-            Self { driver: Arc::downgrade(&test_fixture.driver), task, proc, thread }
+            Self { driver: Arc::downgrade(&test_fixture.driver), proc, thread, task }
         }
 
         fn lock_shared_memory(&self) -> starnix_lock::MappedMutexGuard<'_, SharedMemory> {
@@ -4423,13 +4423,14 @@ pub mod tests {
     struct TranslateHandlesTestFixture {
         kernel: Arc<Kernel>,
         driver: Arc<BinderDriver>,
+        init_task: AutoReleasableTask,
     }
 
     impl TranslateHandlesTestFixture {
         fn new() -> Self {
-            let (kernel, _task) = create_kernel_and_task();
+            let (kernel, init_task) = create_kernel_and_task();
             let driver = BinderDriver::new();
-            Self { kernel, driver }
+            Self { kernel, driver, init_task }
         }
 
         fn new_process(&self) -> BinderProcessFixture {
@@ -4465,7 +4466,9 @@ pub mod tests {
                 VMO_LENGTH,
                 prot_flags,
                 MappingOptions::empty(),
-                NamespaceNode::new_anonymous_unrooted(Arc::new(FsNode::new_root(PanickingFsNode))),
+                NamespaceNode::new_anonymous_unrooted(
+                    FsNode::new_root(PanickingFsNode).into_handle(),
+                ),
             )
             .expect("mmap");
     }
@@ -6300,120 +6303,125 @@ pub mod tests {
     }
     #[fuchsia::test]
     async fn transaction_receiver_exits_after_getting_fd_array() {
-        let test = TranslateHandlesTestFixture::new();
-        let sender = test.new_process();
-        let receiver = test.new_process();
+        let _init_task = {
+            let test = TranslateHandlesTestFixture::new();
+            let sender = test.new_process();
+            let receiver = test.new_process();
 
-        // Insert a binder object for the receiver, and grab a handle to it in the sender.
-        const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
-        let (_, guard) = register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
-        let handle = sender
-            .proc
-            .lock()
-            .handles
-            .insert_for_transaction(guard, &mut RefCountActions::default_released());
+            // Insert a binder object for the receiver, and grab a handle to it in the sender.
+            const OBJECT_ADDR: UserAddress = UserAddress::const_from(0x01);
+            let (_, guard) =
+                register_binder_object(&receiver.proc, OBJECT_ADDR, OBJECT_ADDR + 1u64);
+            let handle = sender
+                .proc
+                .lock()
+                .handles
+                .insert_for_transaction(guard, &mut RefCountActions::default_released());
 
-        // Open a file in the sender process that we won't be using. It is there to occupy a file
-        // descriptor so that the translation doesn't happen to use the same FDs for receiver and
-        // sender, potentially hiding a bug.
-        sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
+            // Open a file in the sender process that we won't be using. It is there to occupy a file
+            // descriptor so that the translation doesn't happen to use the same FDs for receiver and
+            // sender, potentially hiding a bug.
+            sender.task.add_file(PanickingFile::new_file(&sender.task), FdFlags::empty()).unwrap();
 
-        // Open two files in the sender process. These will be sent in the transaction.
-        let files = [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
-        let sender_fds = files
-            .iter()
-            .map(|file| sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file"))
-            .collect::<Vec<_>>();
+            // Open two files in the sender process. These will be sent in the transaction.
+            let files =
+                [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
+            let sender_fds = files
+                .into_iter()
+                .map(|file| sender.task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .collect::<Vec<_>>();
 
-        // Ensure that the receiver task has no file descriptors.
-        assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
+            // Ensure that the receiver task has no file descriptors.
+            assert!(receiver.task.files.get_all_fds().is_empty(), "receiver already has files");
 
-        // Allocate memory in the sender to hold all the buffers that will get submitted to the
-        // binder driver.
-        let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
-        let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
+            // Allocate memory in the sender to hold all the buffers that will get submitted to the
+            // binder driver.
+            let sender_addr = map_memory(&sender.task, UserAddress::default(), *PAGE_SIZE);
+            let mut writer = UserMemoryWriter::new(&sender.task, sender_addr);
 
-        // Serialize a simple buffer. This will ensure that the FD array being translated is not at
-        // the beginning of the buffer, exercising the offset math.
-        let sender_padding_addr = writer.write(&[0; 8]);
+            // Serialize a simple buffer. This will ensure that the FD array being translated is not at
+            // the beginning of the buffer, exercising the offset math.
+            let sender_padding_addr = writer.write(&[0; 8]);
 
-        // Serialize a C struct with an fd array.
-        #[repr(C)]
-        #[derive(AsBytes, FromBytes, FromZeroes)]
-        struct Bar {
-            len: u32,
-            fds: [u32; 2],
-            _padding: u32,
-        }
-        let sender_bar_addr = writer.write_object(&Bar {
-            len: 2,
-            fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
-            _padding: 0,
-        });
+            // Serialize a C struct with an fd array.
+            #[repr(C)]
+            #[derive(AsBytes, FromBytes, FromZeroes)]
+            struct Bar {
+                len: u32,
+                fds: [u32; 2],
+                _padding: u32,
+            }
+            let sender_bar_addr = writer.write_object(&Bar {
+                len: 2,
+                fds: [sender_fds[0].raw() as u32, sender_fds[1].raw() as u32],
+                _padding: 0,
+            });
 
-        // Mark the start of the transaction data.
-        let transaction_data_addr = writer.current_address();
+            // Mark the start of the transaction data.
+            let transaction_data_addr = writer.current_address();
 
-        // Write the buffer object representing the padding.
-        let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_padding_addr.ptr() as u64,
-            length: 8,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the padding.
+            let sender_padding_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_padding_addr.ptr() as u64,
+                length: 8,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the buffer object representing the C struct `Bar`.
-        let sender_buffer_addr = writer.write_object(&binder_buffer_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_PTR },
-            buffer: sender_bar_addr.ptr() as u64,
-            length: std::mem::size_of::<Bar>() as u64,
-            ..binder_buffer_object::default()
-        });
+            // Write the buffer object representing the C struct `Bar`.
+            let sender_buffer_addr = writer.write_object(&binder_buffer_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_PTR },
+                buffer: sender_bar_addr.ptr() as u64,
+                length: std::mem::size_of::<Bar>() as u64,
+                ..binder_buffer_object::default()
+            });
 
-        // Write the fd array object that tells the kernel where the file descriptors are in the
-        // `Bar` buffer.
-        let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
-            hdr: binder_object_header { type_: BINDER_TYPE_FDA },
-            pad: 0,
-            num_fds: sender_fds.len() as u64,
-            // The index in the offsets array of the parent buffer.
-            parent: 1,
-            // The location in the parent buffer where the FDs are, which need to be duped.
-            parent_offset: offset_of!(Bar, fds) as u64,
-        });
+            // Write the fd array object that tells the kernel where the file descriptors are in the
+            // `Bar` buffer.
+            let sender_fd_array_addr = writer.write_object(&binder_fd_array_object {
+                hdr: binder_object_header { type_: BINDER_TYPE_FDA },
+                pad: 0,
+                num_fds: sender_fds.len() as u64,
+                // The index in the offsets array of the parent buffer.
+                parent: 1,
+                // The location in the parent buffer where the FDs are, which need to be duped.
+                parent_offset: offset_of!(Bar, fds) as u64,
+            });
 
-        // Write the offsets array.
-        let offsets_addr = writer.current_address();
-        writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
-        writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
+            // Write the offsets array.
+            let offsets_addr = writer.current_address();
+            writer.write_object(&((sender_padding_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_buffer_addr - transaction_data_addr) as u64));
+            writer.write_object(&((sender_fd_array_addr - transaction_data_addr) as u64));
 
-        let end_data_addr = writer.current_address();
+            let end_data_addr = writer.current_address();
 
-        // Construct the input for the binder driver to process.
-        let input = binder_transaction_data_sg {
-            transaction_data: binder_transaction_data {
-                target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
-                data_size: (offsets_addr - transaction_data_addr) as u64,
-                offsets_size: (end_data_addr - offsets_addr) as u64,
-                data: binder_transaction_data__bindgen_ty_2 {
-                    ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
-                        buffer: transaction_data_addr.ptr() as u64,
-                        offsets: offsets_addr.ptr() as u64,
+            // Construct the input for the binder driver to process.
+            let input = binder_transaction_data_sg {
+                transaction_data: binder_transaction_data {
+                    target: binder_transaction_data__bindgen_ty_1 { handle: handle.into() },
+                    data_size: (offsets_addr - transaction_data_addr) as u64,
+                    offsets_size: (end_data_addr - offsets_addr) as u64,
+                    data: binder_transaction_data__bindgen_ty_2 {
+                        ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
+                            buffer: transaction_data_addr.ptr() as u64,
+                            offsets: offsets_addr.ptr() as u64,
+                        },
                     },
+                    ..binder_transaction_data::new_zeroed()
                 },
-                ..binder_transaction_data::new_zeroed()
-            },
-            buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+                buffers_size: std::mem::size_of::<Bar>() as u64 + 8,
+            };
+
+            // Perform the translation and copying.
+            test.driver
+                .handle_transaction(&sender.task, &sender.proc, &sender.thread, input)
+                .expect("transaction queued");
+
+            // Clean up without calling BC_FREE_BUFFER. Should not panic.
+            let TranslateHandlesTestFixture { init_task, .. } = test;
+            init_task
         };
-
-        // Perform the translation and copying.
-        test.driver
-            .handle_transaction(&sender.task, &sender.proc, &sender.thread, input)
-            .expect("transaction queued");
-
-        // Clean up without calling BC_FREE_BUFFER. Should not panic.
-        std::mem::drop(test);
     }
 
     #[fuchsia::test]
@@ -6439,8 +6447,8 @@ pub mod tests {
         // Open two files in the sender process. These will be sent in the transaction.
         let files = [PanickingFile::new_file(&sender.task), PanickingFile::new_file(&sender.task)];
         let sender_fds = files
-            .iter()
-            .map(|file| sender.task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file"))
+            .into_iter()
+            .map(|file| sender.task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
             .collect::<Vec<_>>();
 
         // Ensure that the receiver task has no file descriptors.

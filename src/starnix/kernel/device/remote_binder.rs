@@ -1098,66 +1098,73 @@ mod tests {
             create_endpoints::<fbinder::RemoteControllerMarker>();
         REMOTE_CONTROLLER_CLIENT.lock().insert(service_name.clone(), remote_controller_client);
         // Simulate the remote binder user process.
-        let (kernel, init_task) = create_kernel_and_task();
-        let starnix_thread = std::thread::spawn(move || {
-            init_task
-                .fs()
-                .root()
-                .create_node(&init_task, b"dev", mode!(IFDIR, 0o755), DeviceType::NONE)
-                .expect("mkdir dev");
-            let dev = init_task.lookup_path_from_root(b"/dev").expect("lookup_path_from_root");
-            dev.mount(
-                WhatToMount::Fs(
-                    BinderFs::new_fs(&kernel, FileSystemOptions::default()).expect("new_fs"),
-                ),
-                MountFlags::empty(),
-            )
-            .expect("mount");
+        let (kernel, _init_task) = create_kernel_and_task();
+        let starnix_thread = kernel.kthreads.spawner().spawn_and_get_result({
+            let kernel = Arc::clone(&kernel);
+            move |current_task| {
+                current_task
+                    .fs()
+                    .root()
+                    .create_node(&current_task, b"dev", mode!(IFDIR, 0o755), DeviceType::NONE)
+                    .expect("mkdir dev");
+                let dev =
+                    current_task.lookup_path_from_root(b"/dev").expect("lookup_path_from_root");
+                dev.mount(
+                    WhatToMount::Fs(
+                        BinderFs::new_fs(&kernel, FileSystemOptions::default()).expect("new_fs"),
+                    ),
+                    MountFlags::empty(),
+                )
+                .expect("mount");
 
-            let task: AutoReleasableTask = CurrentTask::create_init_child_process(
-                &kernel,
-                &CString::new("remote_binder".to_string()).expect("CString"),
-            )
-            .expect("Task")
-            .into();
+                let task: AutoReleasableTask = CurrentTask::create_init_child_process(
+                    &kernel,
+                    &CString::new("remote_binder".to_string()).expect("CString"),
+                )
+                .expect("Task")
+                .into();
 
-            let remote_binder_handle =
-                RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);
+                let remote_binder_handle =
+                    RemoteBinderHandle::<TestRemoteControllerConnector>::new(&task.thread_group);
 
-            let service_name_string = CString::new(service_name.as_bytes()).expect("CString::new");
-            let service_name_bytes = service_name_string.as_bytes_with_nul();
-            let service_name_address =
-                map_memory(&task, UserAddress::default(), service_name_bytes.len() as u64);
-            task.mm.write_memory(service_name_address, service_name_bytes).expect("write_memory");
+                let service_name_string =
+                    CString::new(service_name.as_bytes()).expect("CString::new");
+                let service_name_bytes = service_name_string.as_bytes_with_nul();
+                let service_name_address =
+                    map_memory(&task, UserAddress::default(), service_name_bytes.len() as u64);
+                task.mm
+                    .write_memory(service_name_address, service_name_bytes)
+                    .expect("write_memory");
 
-            let start_command_address =
-                map_memory(&task, UserAddress::default(), std::mem::size_of::<u64>() as u64);
-            task.mm
-                .write_object(start_command_address.into(), &service_name_address.ptr())
-                .expect("write_object");
+                let start_command_address =
+                    map_memory(&task, UserAddress::default(), std::mem::size_of::<u64>() as u64);
+                task.mm
+                    .write_object(start_command_address.into(), &service_name_address.ptr())
+                    .expect("write_object");
 
-            let wait_command_address = map_memory(
-                &task,
-                UserAddress::default(),
-                std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
-            );
-
-            let start_result = remote_binder_handle.ioctl(
-                &task,
-                uapi::REMOTE_BINDER_START,
-                start_command_address.into(),
-            );
-            if must_interrupt(&start_result).is_none() {
-                panic!("Unexpected result for start ioctl: {start_result:?}");
-            }
-            loop {
-                let result = remote_binder_handle.ioctl(
+                let wait_command_address = map_memory(
                     &task,
-                    uapi::REMOTE_BINDER_WAIT,
-                    wait_command_address.into(),
+                    UserAddress::default(),
+                    std::mem::size_of::<uapi::remote_binder_wait_command>() as u64,
                 );
-                if must_interrupt(&result).is_none() {
-                    break result;
+
+                let start_result = remote_binder_handle.ioctl(
+                    &task,
+                    uapi::REMOTE_BINDER_START,
+                    start_command_address.into(),
+                );
+                if must_interrupt(&start_result).is_none() {
+                    panic!("Unexpected result for start ioctl: {start_result:?}");
+                }
+                loop {
+                    let result = remote_binder_handle.ioctl(
+                        &task,
+                        uapi::REMOTE_BINDER_WAIT,
+                        wait_command_address.into(),
+                    );
+                    if must_interrupt(&result).is_none() {
+                        break result;
+                    }
                 }
             }
         });
@@ -1212,7 +1219,7 @@ mod tests {
             .expect("close");
 
         std::mem::drop(dev_binder);
-        starnix_thread.join().expect("thread join").expect("thread result");
+        starnix_thread.await.expect("thread join").expect("thread result");
         process_accessor_task.await.expect("process accessor wait");
     }
 

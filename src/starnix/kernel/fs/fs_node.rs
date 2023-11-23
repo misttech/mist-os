@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    delayed_releaser::FsNodeReleaser,
     device::DeviceMode,
     fs::{
         fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
@@ -29,6 +30,7 @@ use starnix_uapi::{
     file_mode::{mode, Access, FileMode},
     fsverity_descriptor, gid_t, ino_t,
     open_flags::OpenFlags,
+    ownership::Releasable,
     resource_limits::Resource,
     signals::SIGXFSZ,
     stat_time_t, statx, statx_timestamp,
@@ -55,6 +57,10 @@ impl Default for FsNodeLinkBehavior {
 }
 
 pub struct FsNode {
+    /// Weak reference to the `FsNodeHandle` of this `FsNode`. This allows to retrieve the
+    /// `FsNodeHandle` from a `FsNode`.
+    pub weak_handle: WeakFsNodeHandle,
+
     /// The FsNodeOps for this FsNode.
     ///
     /// The FsNodeOps are implemented by the individual file systems to provide
@@ -122,8 +128,8 @@ pub struct FsNode {
     pub watchers: inotify::InotifyWatchers,
 }
 
-pub type FsNodeHandle = Arc<FsNode>;
-pub type WeakFsNodeHandle = Weak<FsNode>;
+pub type FsNodeHandle = Arc<FsNodeReleaser>;
+pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 
 #[derive(Debug, Default, Clone)]
 pub struct FsNodeInfo {
@@ -1000,7 +1006,14 @@ impl FsNode {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        Arc::new(Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info))
+        Self::new_internal(ops, fs.kernel.clone(), Arc::downgrade(fs), node_id, info).into_handle()
+    }
+
+    pub fn into_handle(mut self) -> FsNodeHandle {
+        FsNodeHandle::new_cyclic(move |weak_handle| {
+            self.weak_handle = weak_handle.clone();
+            self.into()
+        })
     }
 
     fn new_internal(
@@ -1015,6 +1028,7 @@ impl FsNode {
         #[allow(clippy::let_and_return)]
         {
             let result = Self {
+                weak_handle: Default::default(),
                 kernel,
                 ops,
                 fs,
@@ -1903,11 +1917,9 @@ impl FsNode {
         Ok(())
     }
 
-    pub fn create_write_guard(
-        self: &Arc<Self>,
-        mode: FileWriteGuardMode,
-    ) -> Result<FileWriteGuard, Errno> {
-        self.write_guard_state.lock().create_write_guard(self.clone(), mode)
+    pub fn create_write_guard(&self, mode: FileWriteGuardMode) -> Result<FileWriteGuard, Errno> {
+        let handle = self.weak_handle.upgrade().ok_or_else(|| errno!(ENOENT))?;
+        self.write_guard_state.lock().create_write_guard(handle, mode)
     }
 }
 
@@ -1922,15 +1934,15 @@ impl std::fmt::Debug for FsNode {
     }
 }
 
-impl Drop for FsNode {
-    fn drop(&mut self) {
+impl Releasable for FsNode {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, current_task: Self::Context<'_>) {
         if let Some(fs) = self.fs.upgrade() {
-            fs.remove_node(self);
+            fs.remove_node(&self);
         }
-        if let Some(kernel) = self.kernel.upgrade() {
-            if let Err(err) = self.ops.forget(self, kernel.kthreads.system_task()) {
-                log_error!("Error on FsNodeOps::forget: {err:?}");
-            }
+        if let Err(err) = self.ops.forget(&self, current_task) {
+            log_error!("Error on FsNodeOps::forget: {err:?}");
         }
     }
 }

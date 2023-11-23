@@ -204,12 +204,8 @@ impl RemoteFs {
                 Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id, true),
             };
 
-        let mut root_node = FsNode::new_root(remote_node);
         if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
             options.flags |= MountFlags::RDONLY;
-        }
-        if use_remote_ids {
-            root_node.node_id = node_id;
         }
         // NOTE: This mount option exists for now to workaround selinux issues.  The `defcontext`
         // option operates similarly to Linux's equivalent, but it's not exactly the same.  When our
@@ -229,6 +225,10 @@ impl RemoteFs {
         );
         if let Some(context) = context {
             fs.selinux_context.set(context).unwrap();
+        }
+        let mut root_node = FsNode::new_root(remote_node);
+        if use_remote_ids {
+            root_node.node_id = node_id;
         }
         fs.set_root_node(root_node);
         Ok(fs)
@@ -1572,13 +1572,15 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_blocking_io() -> Result<(), anyhow::Error> {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task) = create_kernel_and_task();
 
         let (client, server) = zx::Socket::create_stream();
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
 
-        let thread = std::thread::spawn(move || {
-            assert_eq!(64, pipe.read(&current_task, &mut VecOutputBuffer::new(64)).unwrap());
+        let thread = kernel.kthreads.spawner().spawn_and_get_result({
+            move |current_task| {
+                assert_eq!(64, pipe.read(&current_task, &mut VecOutputBuffer::new(64)).unwrap());
+            }
         });
 
         // Wait for the thread to become blocked on the read.
@@ -1588,7 +1590,7 @@ mod test {
         assert_eq!(64, server.write(&bytes)?);
 
         // The thread should unblock and join us here.
-        let _ = thread.join();
+        thread.await.expect("join");
 
         Ok(())
     }
@@ -1711,49 +1713,61 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_mode_uid_gid_and_dev_persists() {
-        let fixture = TestFixture::new().await;
-
-        let (server, client) = zx::Channel::create();
-        fixture
-            .root()
-            .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
-            .expect("clone failed");
-
         const FILE_MODE: FileMode = mode!(IFREG, 0o467);
         const DIR_MODE: FileMode = mode!(IFDIR, 0o647);
         const BLK_MODE: FileMode = mode!(IFBLK, 0o746);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        current_task.set_creds(Credentials {
-            euid: 1,
-            fsuid: 1,
-            egid: 2,
-            fsgid: 2,
-            ..current_task.creds()
-        });
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            ns.root()
-                .create_node(&current_task, b"file", FILE_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            ns.root()
-                .create_node(&current_task, b"dir", DIR_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            ns.root()
-                .create_node(&current_task, b"dev", BLK_MODE, DeviceType::RANDOM)
-                .expect("create_node failed");
-        })
-        .await;
+        let fixture = TestFixture::new().await;
 
+        // Simulate a first run of starnix.
+        {
+            let (server, client) = zx::Channel::create();
+            fixture
+                .root()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+                .expect("clone failed");
+
+            let (kernel, _init_task) = create_kernel_and_task();
+            kernel
+                .kthreads
+                .spawner()
+                .spawn_and_get_result({
+                    let kernel = Arc::clone(&kernel);
+                    move |current_task| {
+                        current_task.set_creds(Credentials {
+                            euid: 1,
+                            fsuid: 1,
+                            egid: 2,
+                            fsgid: 2,
+                            ..current_task.creds()
+                        });
+                        let rights =
+                            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                        let fs = RemoteFs::new_fs(
+                            &kernel,
+                            client,
+                            FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                            rights,
+                        )
+                        .expect("new_fs failed");
+                        let ns = Namespace::new(fs);
+                        current_task.fs().set_umask(FileMode::from_bits(0));
+                        ns.root()
+                            .create_node(&current_task, b"file", FILE_MODE, DeviceType::NONE)
+                            .expect("create_node failed");
+                        ns.root()
+                            .create_node(&current_task, b"dir", DIR_MODE, DeviceType::NONE)
+                            .expect("create_node failed");
+                        ns.root()
+                            .create_node(&current_task, b"dev", BLK_MODE, DeviceType::RANDOM)
+                            .expect("create_node failed");
+                    }
+                })
+                .await
+                .expect("spawn");
+        }
+
+        // Simulate a second run.
         let fixture = TestFixture::open(
             fixture.close().await,
             TestFixtureOptions {
@@ -1771,44 +1785,51 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let child = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
-            assert_matches!(
-                &*child.entry.node.info(),
-                FsNodeInfo { mode: FILE_MODE, uid: 1, gid: 2, rdev: DeviceType::NONE, .. }
-            );
-            let child = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"dir")
-                .expect("lookup_child failed");
-            assert_matches!(
-                &*child.entry.node.info(),
-                FsNodeInfo { mode: DIR_MODE, uid: 1, gid: 2, rdev: DeviceType::NONE, .. }
-            );
-            let child = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"dev")
-                .expect("lookup_child failed");
-            assert_matches!(
-                &*child.entry.node.info(),
-                FsNodeInfo { mode: BLK_MODE, uid: 1, gid: 2, rdev: DeviceType::RANDOM, .. }
-            );
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
+                    assert_matches!(
+                        &*child.entry.node.info(),
+                        FsNodeInfo { mode: FILE_MODE, uid: 1, gid: 2, rdev: DeviceType::NONE, .. }
+                    );
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"dir")
+                        .expect("lookup_child failed");
+                    assert_matches!(
+                        &*child.entry.node.info(),
+                        FsNodeInfo { mode: DIR_MODE, uid: 1, gid: 2, rdev: DeviceType::NONE, .. }
+                    );
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"dev")
+                        .expect("lookup_child failed");
+                    assert_matches!(
+                        &*child.entry.node.info(),
+                        FsNodeInfo { mode: BLK_MODE, uid: 1, gid: 2, rdev: DeviceType::RANDOM, .. }
+                    );
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -1825,83 +1846,90 @@ mod test {
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFDIR.bits() | 0o777);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let sub_dir1 = ns
-                .root()
-                .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let sub_dir2 = sub_dir1
-                .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
-                .expect("create_node failed");
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let sub_dir1 = ns
+                        .root()
+                        .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let sub_dir2 = sub_dir1
+                        .create_node(&current_task, b"dir", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
 
-            let dir_handle = ns
-                .root()
-                .entry
-                .open_anonymous(&current_task, OpenFlags::RDONLY)
-                .expect("open failed");
+                    let dir_handle = ns
+                        .root()
+                        .entry
+                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .expect("open failed");
 
-            #[derive(Default)]
-            struct Sink {
-                offset: off_t,
-                dot_dot_inode_num: u64,
-            }
-            impl DirentSink for Sink {
-                fn add(
-                    &mut self,
-                    inode_num: ino_t,
-                    offset: off_t,
-                    entry_type: DirectoryEntryType,
-                    name: &FsStr,
-                ) -> Result<(), Errno> {
-                    if name == b".." {
-                        self.dot_dot_inode_num = inode_num;
-                        assert_eq!(entry_type, DirectoryEntryType::DIR);
+                    #[derive(Default)]
+                    struct Sink {
+                        offset: off_t,
+                        dot_dot_inode_num: u64,
                     }
-                    self.offset = offset;
-                    Ok(())
+                    impl DirentSink for Sink {
+                        fn add(
+                            &mut self,
+                            inode_num: ino_t,
+                            offset: off_t,
+                            entry_type: DirectoryEntryType,
+                            name: &FsStr,
+                        ) -> Result<(), Errno> {
+                            if name == b".." {
+                                self.dot_dot_inode_num = inode_num;
+                                assert_eq!(entry_type, DirectoryEntryType::DIR);
+                            }
+                            self.offset = offset;
+                            Ok(())
+                        }
+                        fn offset(&self) -> off_t {
+                            self.offset
+                        }
+                    }
+                    let mut sink = Sink::default();
+                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+                    // inode_num for .. for the root should be the same as root.
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+
+                    let dir_handle = sub_dir1
+                        .entry
+                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .expect("open failed");
+                    let mut sink = Sink::default();
+                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+                    // inode_num for .. for the first sub directory should be the same as root.
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+
+                    let dir_handle = sub_dir2
+                        .entry
+                        .open_anonymous(&current_task, OpenFlags::RDONLY)
+                        .expect("open failed");
+                    let mut sink = Sink::default();
+                    dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
+
+                    // inode_num for .. for the second sub directory should be the first sub directory.
+                    assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
                 }
-                fn offset(&self) -> off_t {
-                    self.offset
-                }
-            }
-            let mut sink = Sink::default();
-            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
-
-            // inode_num for .. for the root should be the same as root.
-            assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
-
-            let dir_handle = sub_dir1
-                .entry
-                .open_anonymous(&current_task, OpenFlags::RDONLY)
-                .expect("open failed");
-            let mut sink = Sink::default();
-            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
-
-            // inode_num for .. for the first sub directory should be the same as root.
-            assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
-
-            let dir_handle = sub_dir2
-                .entry
-                .open_anonymous(&current_task, OpenFlags::RDONLY)
-                .expect("open failed");
-            let mut sink = Sink::default();
-            dir_handle.readdir(&current_task, &mut sink).expect("readdir failed");
-
-            // inode_num for .. for the second sub directory should be the first sub directory.
-            assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
-        })
-        .await;
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -1916,53 +1944,60 @@ mod test {
             .expect("clone failed");
         const FIFO_MODE: FileMode = FileMode::from_bits(FileMode::IFIFO.bits() | 0o777);
         const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, _init_task) = create_kernel_and_task();
 
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let root = ns.root();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let root = ns.root();
 
-            // Create RemoteSpecialNode (e.g. FIFO)
-            root.create_node(&current_task, b"fifo", FIFO_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let fifo_node = root
-                .lookup_child(&current_task, &mut context, b"fifo")
-                .expect("lookup_child failed");
+                    // Create RemoteSpecialNode (e.g. FIFO)
+                    root.create_node(&current_task, b"fifo", FIFO_MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let fifo_node = root
+                        .lookup_child(&current_task, &mut context, b"fifo")
+                        .expect("lookup_child failed");
 
-            // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
-            // truncate should return EINVAL
-            match fifo_node.truncate(&current_task, 0) {
-                Ok(_) => {
-                    panic!("truncate passed for special node")
+                    // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
+                    // truncate should return EINVAL
+                    match fifo_node.truncate(&current_task, 0) {
+                        Ok(_) => {
+                            panic!("truncate passed for special node")
+                        }
+                        Err(errno) if errno == EINVAL => {}
+                        Err(e) => {
+                            panic!("truncate failed with error {:?}", e)
+                        }
+                    };
+
+                    // Create regular RemoteNode
+                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let reg_node = root
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
+
+                    // We should be able to perform truncate on regular files
+                    reg_node.truncate(&current_task, 0).expect("truncate failed");
                 }
-                Err(errno) if errno == EINVAL => {}
-                Err(e) => {
-                    panic!("truncate failed with error {:?}", e)
-                }
-            };
-
-            // Create regular RemoteNode
-            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let reg_node = root
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
-
-            // We should be able to perform truncate on regular files
-            reg_node.truncate(&current_task, 0).expect("truncate failed");
-        })
-        .await;
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -1977,29 +2012,36 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let node = ns
-                .root()
-                .create_node(&current_task, b"file1", mode!(IFREG, 0o666), DeviceType::NONE)
-                .expect("create_node failed");
-            ns.root()
-                .entry
-                .node
-                .link(&current_task, &ns.root().mount, b"file2", &node.entry.node)
-                .expect("link failed");
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let node = ns
+                        .root()
+                        .create_node(&current_task, b"file1", mode!(IFREG, 0o666), DeviceType::NONE)
+                        .expect("create_node failed");
+                    ns.root()
+                        .entry
+                        .node
+                        .link(&current_task, &ns.root().mount, b"file2", &node.entry.node)
+                        .expect("link failed");
+                }
+            })
+            .await
+            .expect("spawn");
 
         let fixture = TestFixture::open(
             fixture.close().await,
@@ -2018,29 +2060,36 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let child1 = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"file1")
-                .expect("lookup_child failed");
-            let child2 = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"file2")
-                .expect("lookup_child failed");
-            assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let child1 = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file1")
+                        .expect("lookup_child failed");
+                    let child2 = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file2")
+                        .expect("lookup_child failed");
+                    assert!(Arc::ptr_eq(&child1.entry.node, &child2.entry.node));
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -2056,29 +2105,36 @@ mod test {
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let file = ns
-                .root()
-                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            // Change the mode, this change should persist
-            file.entry
-                .node
-                .chmod(&current_task, &file.mount, MODE | FileMode::ALLOW_ALL)
-                .expect("chmod failed");
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let file = ns
+                        .root()
+                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    // Change the mode, this change should persist
+                    file.entry
+                        .node
+                        .chmod(&current_task, &file.mount, MODE | FileMode::ALLOW_ALL)
+                        .expect("chmod failed");
+                }
+            })
+            .await
+            .expect("spawn");
 
         // Tear down the kernel and open the file again. Check that changes persisted.
         let fixture = TestFixture::open(
@@ -2097,25 +2153,32 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let child = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
-            assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
+                    assert_eq!(child.entry.node.info().mode, MODE | FileMode::ALLOW_ALL);
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -2129,29 +2192,36 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
 
-            let statfs = fs.statfs(&current_task).expect("statfs failed");
-            assert!(statfs.f_type != 0);
-            assert!(statfs.f_bsize > 0);
-            assert!(statfs.f_blocks > 0);
-            assert!(statfs.f_bfree > 0 && statfs.f_bfree <= statfs.f_blocks);
-            assert!(statfs.f_files > 0);
-            assert!(statfs.f_ffree > 0 && statfs.f_ffree <= statfs.f_files);
-            assert!(statfs.f_fsid != 0);
-            assert!(statfs.f_namelen > 0);
-            assert!(statfs.f_frsize > 0);
-        })
-        .await;
+                    let statfs = fs.statfs(&current_task).expect("statfs failed");
+                    assert!(statfs.f_type != 0);
+                    assert!(statfs.f_bsize > 0);
+                    assert!(statfs.f_blocks > 0);
+                    assert!(statfs.f_bfree > 0 && statfs.f_bfree <= statfs.f_blocks);
+                    assert!(statfs.f_files > 0);
+                    assert!(statfs.f_ffree > 0 && statfs.f_ffree <= statfs.f_files);
+                    assert!(statfs.f_fsid != 0);
+                    assert!(statfs.f_namelen > 0);
+                    assert!(statfs.f_frsize > 0);
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -2165,35 +2235,42 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let root = ns.root();
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let root = ns.root();
 
-            const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let reg_node = root
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
+                    const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
+                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let reg_node = root
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
 
-            reg_node
-                .entry
-                .node
-                .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 0, 20)
-                .expect("truncate failed");
-        })
-        .await;
+                    reg_node
+                        .entry
+                        .node
+                        .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 0, 20)
+                        .expect("truncate failed");
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -2207,35 +2284,47 @@ mod test {
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let root = ns.root();
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let root = ns.root();
 
-            const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
-            root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let reg_node = root
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
+                    const REG_MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits());
+                    root.create_node(&current_task, b"file", REG_MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let reg_node = root
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
 
-            reg_node
-                .entry
-                .node
-                .fallocate(&current_task, FallocMode::Allocate { keep_size: false }, 1, u64::MAX)
-                .expect_err("truncate unexpectedly passed");
-        })
-        .await;
+                    reg_node
+                        .entry
+                        .node
+                        .fallocate(
+                            &current_task,
+                            FallocMode::Allocate { keep_size: false },
+                            1,
+                            u64::MAX,
+                        )
+                        .expect_err("truncate unexpectedly passed");
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }
@@ -2251,47 +2340,55 @@ mod test {
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        let last_modified = fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns: Arc<Namespace> = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let child = ns
-                .root()
-                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            // Write to file (this should update mtime (time_modify))
-            let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
-            // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
-            // underlying filesystem
-            let time_before_write = child
-                .entry
-                .node
-                .refresh_info(&current_task)
-                .expect("refresh info failed")
-                .time_modify;
-            let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
-            let written = file
-                .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
-                .expect("write failed");
-            assert_eq!(written, write_bytes.len());
-            let last_modified = child
-                .entry
-                .node
-                .refresh_info(&current_task)
-                .expect("refresh info failed")
-                .time_modify;
-            assert!(last_modified > time_before_write);
-            last_modified
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        let last_modified = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns: Arc<Namespace> = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let child = ns
+                        .root()
+                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    // Write to file (this should update mtime (time_modify))
+                    let file =
+                        child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+                    // Call `refresh_info(..)` to refresh `time_modify` with the time managed by the
+                    // underlying filesystem
+                    let time_before_write = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh info failed")
+                        .time_modify;
+                    let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+                    let written = file
+                        .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .expect("write failed");
+                    assert_eq!(written, write_bytes.len());
+                    let last_modified = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh info failed")
+                        .time_modify;
+                    assert!(last_modified > time_before_write);
+                    last_modified
+                }
+            })
+            .await
+            .expect("spawn");
 
         // Tear down the kernel and open the file again. Check that modification time is when we
         // last modified the contents of the file
@@ -2310,31 +2407,38 @@ mod test {
             .root()
             .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
             .expect("clone failed");
-        let (kernel, current_task) = create_kernel_and_task();
-        let refreshed_modified_time = fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns = Namespace::new(fs);
-            let mut context = LookupContext::new(SymlinkMode::NoFollow);
-            let child = ns
-                .root()
-                .lookup_child(&current_task, &mut context, b"file")
-                .expect("lookup_child failed");
-            let last_modified = child
-                .entry
-                .node
-                .refresh_info(&current_task)
-                .expect("refresh info failed")
-                .time_modify;
-            last_modified
-        })
-        .await;
+        let (kernel, _init_task) = create_kernel_and_task();
+        let refreshed_modified_time = kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns = Namespace::new(fs);
+                    let mut context = LookupContext::new(SymlinkMode::NoFollow);
+                    let child = ns
+                        .root()
+                        .lookup_child(&current_task, &mut context, b"file")
+                        .expect("lookup_child failed");
+                    let last_modified = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh info failed")
+                        .time_modify;
+                    last_modified
+                }
+            })
+            .await
+            .expect("spawn");
         assert_eq!(last_modified, refreshed_modified_time);
 
         fixture.close().await;
@@ -2351,57 +2455,76 @@ mod test {
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns: Arc<Namespace> = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let child = ns
-                .root()
-                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
-                .expect("create_node failed");
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns: Arc<Namespace> = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let child = ns
+                        .root()
+                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
 
-            let info_original =
-                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
+                    let info_original = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh_info failed")
+                        .clone();
 
-            child
-                .entry
-                .node
-                .update_atime_mtime(
-                    &current_task,
-                    &child.mount,
-                    TimeUpdateType::Time(zx::Time::from_nanos(30)),
-                    TimeUpdateType::Omit,
-                )
-                .expect("update_atime_mtime failed");
-            let info_after_update =
-                child.entry.node.refresh_info(&current_task).expect("refresh info failed").clone();
-            assert_eq!(info_after_update.time_modify, info_original.time_modify);
-            assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
+                    child
+                        .entry
+                        .node
+                        .update_atime_mtime(
+                            &current_task,
+                            &child.mount,
+                            TimeUpdateType::Time(zx::Time::from_nanos(30)),
+                            TimeUpdateType::Omit,
+                        )
+                        .expect("update_atime_mtime failed");
+                    let info_after_update = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh info failed")
+                        .clone();
+                    assert_eq!(info_after_update.time_modify, info_original.time_modify);
+                    assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
 
-            child
-                .entry
-                .node
-                .update_atime_mtime(
-                    &current_task,
-                    &child.mount,
-                    TimeUpdateType::Omit,
-                    TimeUpdateType::Time(zx::Time::from_nanos(50)),
-                )
-                .expect("update_atime_mtime failed");
-            let info_after_update2 =
-                child.entry.node.refresh_info(&current_task).expect("refresh_info failed").clone();
-            assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
-            assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
-        })
-        .await;
+                    child
+                        .entry
+                        .node
+                        .update_atime_mtime(
+                            &current_task,
+                            &child.mount,
+                            TimeUpdateType::Omit,
+                            TimeUpdateType::Time(zx::Time::from_nanos(50)),
+                        )
+                        .expect("update_atime_mtime failed");
+                    let info_after_update2 = child
+                        .entry
+                        .node
+                        .refresh_info(&current_task)
+                        .expect("refresh_info failed")
+                        .clone();
+                    assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
+                    assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
+                }
+            })
+            .await
+            .expect("spawn");
         fixture.close().await;
     }
 
@@ -2416,60 +2539,74 @@ mod test {
 
         const MODE: FileMode = FileMode::from_bits(FileMode::IFREG.bits() | 0o467);
 
-        let (kernel, current_task) = create_kernel_and_task();
-        fasync::unblock(move || {
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-            let fs = RemoteFs::new_fs(
-                &kernel,
-                client,
-                FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
-                rights,
-            )
-            .expect("new_fs failed");
-            let ns: Arc<Namespace> = Namespace::new(fs);
-            current_task.fs().set_umask(FileMode::from_bits(0));
-            let child = ns
-                .root()
-                .create_node(&current_task, b"file", MODE, DeviceType::NONE)
-                .expect("create_node failed");
-            let file = child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
-            // Call `refresh_info(..)` to refresh ctime and mtime with the time managed by the
-            // underlying filesystem
-            let (ctime_before_write, mtime_before_write) = {
-                let info =
-                    child.entry.node.refresh_info(&current_task).expect("refresh info failed");
-                (info.time_status_change, info.time_modify)
-            };
+        let (kernel, _init_task) = create_kernel_and_task();
+        kernel
+            .kthreads
+            .spawner()
+            .spawn_and_get_result({
+                let kernel = Arc::clone(&kernel);
+                move |current_task| {
+                    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+                    let fs = RemoteFs::new_fs(
+                        &kernel,
+                        client,
+                        FileSystemOptions { source: b"/".to_vec(), ..Default::default() },
+                        rights,
+                    )
+                    .expect("new_fs failed");
+                    let ns: Arc<Namespace> = Namespace::new(fs);
+                    current_task.fs().set_umask(FileMode::from_bits(0));
+                    let child = ns
+                        .root()
+                        .create_node(&current_task, b"file", MODE, DeviceType::NONE)
+                        .expect("create_node failed");
+                    let file =
+                        child.open(&current_task, OpenFlags::RDWR, true).expect("open failed");
+                    // Call `refresh_info(..)` to refresh ctime and mtime with the time managed by the
+                    // underlying filesystem
+                    let (ctime_before_write, mtime_before_write) = {
+                        let info = child
+                            .entry
+                            .node
+                            .refresh_info(&current_task)
+                            .expect("refresh info failed");
+                        (info.time_status_change, info.time_modify)
+                    };
 
-            // Writing to a file should update ctime and mtime
-            let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
-            let written = file
-                .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
-                .expect("write failed");
-            assert_eq!(written, write_bytes.len());
+                    // Writing to a file should update ctime and mtime
+                    let write_bytes: [u8; 5] = [1, 2, 3, 4, 5];
+                    let written = file
+                        .write(&current_task, &mut VecInputBuffer::new(&write_bytes))
+                        .expect("write failed");
+                    assert_eq!(written, write_bytes.len());
 
-            // As Fxfs, the underlying filesystem in this test, can manage file timestamps,
-            // we should not see an update in mtime and ctime without first refreshing the node with
-            // the metadata from Fxfs.
-            let (ctime_after_write_no_refresh, mtime_after_write_no_refresh) = {
-                let info = child.entry.node.info();
-                (info.time_status_change, info.time_modify)
-            };
-            assert_eq!(ctime_after_write_no_refresh, ctime_before_write);
-            assert_eq!(mtime_after_write_no_refresh, mtime_before_write);
+                    // As Fxfs, the underlying filesystem in this test, can manage file timestamps,
+                    // we should not see an update in mtime and ctime without first refreshing the node with
+                    // the metadata from Fxfs.
+                    let (ctime_after_write_no_refresh, mtime_after_write_no_refresh) = {
+                        let info = child.entry.node.info();
+                        (info.time_status_change, info.time_modify)
+                    };
+                    assert_eq!(ctime_after_write_no_refresh, ctime_before_write);
+                    assert_eq!(mtime_after_write_no_refresh, mtime_before_write);
 
-            // Refresh information, we should see `info` with mtime and ctime from the remote
-            // filesystem (assume this is true if the new timestamp values are greater than the ones
-            // without the refresh).
-            let (ctime_after_write_refresh, mtime_after_write_refresh) = {
-                let info =
-                    child.entry.node.refresh_info(&current_task).expect("refresh info failed");
-                (info.time_status_change, info.time_modify)
-            };
-            assert_eq!(ctime_after_write_refresh, mtime_after_write_refresh);
-            assert!(ctime_after_write_refresh > ctime_after_write_no_refresh);
-        })
-        .await;
+                    // Refresh information, we should see `info` with mtime and ctime from the remote
+                    // filesystem (assume this is true if the new timestamp values are greater than the ones
+                    // without the refresh).
+                    let (ctime_after_write_refresh, mtime_after_write_refresh) = {
+                        let info = child
+                            .entry
+                            .node
+                            .refresh_info(&current_task)
+                            .expect("refresh info failed");
+                        (info.time_status_change, info.time_modify)
+                    };
+                    assert_eq!(ctime_after_write_refresh, mtime_after_write_refresh);
+                    assert!(ctime_after_write_refresh > ctime_after_write_no_refresh);
+                }
+            })
+            .await
+            .expect("spawn");
 
         fixture.close().await;
     }

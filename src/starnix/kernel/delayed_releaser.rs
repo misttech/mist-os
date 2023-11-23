@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{FdTableId, FileHandle, FileObject},
+    fs::{FdTableId, FileHandle, FileObject, FsNode},
     task::CurrentTask,
 };
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
@@ -22,13 +22,16 @@ thread_local! {
 
 #[derive(Debug, Default)]
 struct LocalReleasers {
+    dropped_fs_nodes: Vec<ReleaseGuard<FsNode>>,
     closed_files: Vec<ReleaseGuard<FileObject>>,
     flushed_files: Vec<(FileHandle, FdTableId)>,
 }
 
 impl LocalReleasers {
     fn is_empty(&self) -> bool {
-        self.closed_files.is_empty() && self.flushed_files.is_empty()
+        self.dropped_fs_nodes.is_empty()
+            && self.closed_files.is_empty()
+            && self.flushed_files.is_empty()
     }
 }
 
@@ -36,6 +39,9 @@ impl Releasable for LocalReleasers {
     type Context<'a> = &'a CurrentTask;
 
     fn release(self, context: Self::Context<'_>) {
+        for fs_node in self.dropped_fs_nodes {
+            fs_node.release(context);
+        }
         for file in self.closed_files {
             file.release(context);
         }
@@ -134,5 +140,14 @@ impl ReleaserAction<FileObject> for FileObjectReleaserAction {
         });
     }
 }
-
 pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
+
+pub enum FsNodeReleaserAction {}
+impl ReleaserAction<FsNode> for FsNodeReleaserAction {
+    fn release(fs_node: ReleaseGuard<FsNode>) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().dropped_fs_nodes.push(fs_node);
+        });
+    }
+}
+pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;

@@ -88,8 +88,6 @@ impl RemoteBundle {
             "Root node does not exist in remote bundle"
         );
 
-        let mut root_node = FsNode::new_root(DirectoryObject);
-        root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
@@ -104,6 +102,8 @@ impl RemoteBundle {
                 params: b"".to_vec(),
             },
         );
+        let mut root_node = FsNode::new_root(DirectoryObject);
+        root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
         fs.set_root_node(root_node);
         Ok(fs)
     }

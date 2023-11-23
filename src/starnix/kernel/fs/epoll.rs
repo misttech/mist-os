@@ -512,7 +512,6 @@ mod tests {
 
         let (kernel, _init_task) = create_kernel_and_task();
         let current_task = create_task(&kernel, "main-task");
-        let writer_task = create_task(&kernel, "writer-task");
 
         let (pipe_out, pipe_in) = new_pipe(&current_task).unwrap();
 
@@ -530,16 +529,17 @@ mod tests {
             )
             .unwrap();
 
-        let test_string_copy = test_string.clone();
-        let thread = std::thread::spawn(move || {
-            let bytes_written = pipe_in
-                .write(&writer_task, &mut VecInputBuffer::new(test_string_copy.as_bytes()))
-                .unwrap();
-            assert_eq!(bytes_written, test_len);
-            WRITE_COUNT.add(bytes_written);
+        let thread = kernel.kthreads.spawner().spawn_and_get_result({
+            let test_string = test_string.clone();
+            move |task| {
+                let bytes_written =
+                    pipe_in.write(&task, &mut VecInputBuffer::new(test_string.as_bytes())).unwrap();
+                assert_eq!(bytes_written, test_len);
+                WRITE_COUNT.add(bytes_written);
+            }
         });
         let events = epoll_file.wait(&current_task, 10, zx::Time::INFINITE).unwrap();
-        let _ = thread.join();
+        thread.await.expect("join");
         assert_eq!(1, events.len());
         let event = &events[0];
         assert!(FdEvents::from_bits_truncate(event.events).contains(FdEvents::POLLIN));

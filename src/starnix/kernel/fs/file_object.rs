@@ -1467,10 +1467,9 @@ mod tests {
 
         let fh = file_handle.clone();
         let done_clone = done.clone();
-        let task = create_task(&kernel, "write_thread");
-        let write_thread = std::thread::spawn(move || {
+        let write_thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
             for i in 0..2000 {
-                fh.write(&task, &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()))
+                fh.write(current_task, &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()))
                     .expect("write failed");
             }
             done_clone.store(true, Ordering::SeqCst);
@@ -1478,10 +1477,9 @@ mod tests {
 
         let fh = file_handle.clone();
         let done_clone = done.clone();
-        let task = create_task(&kernel, "truncate_thread");
-        let truncate_thread = std::thread::spawn(move || {
+        let truncate_thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
             while !done_clone.load(Ordering::SeqCst) {
-                fh.ftruncate(&task, 0).expect("truncate failed");
+                fh.ftruncate(current_task, 0).expect("truncate failed");
             }
         });
 
@@ -1500,7 +1498,7 @@ mod tests {
             }
         }
 
-        write_thread.join().unwrap();
-        truncate_thread.join().unwrap();
+        write_thread.await.expect("join");
+        truncate_thread.await.expect("join");
     }
 }

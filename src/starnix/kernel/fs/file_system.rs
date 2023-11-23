@@ -164,7 +164,7 @@ impl FileSystem {
             root.set_id(self.next_node_id());
         }
         root.set_fs(self);
-        let root_node = Arc::new(root);
+        let root_node: FsNodeHandle = root.into_handle();
         self.nodes.lock().insert(root_node.node_id, Arc::downgrade(&root_node));
         let root = DirEntry::new(root_node, None, FsString::new());
         assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
@@ -273,11 +273,11 @@ impl FileSystem {
 
     /// Remove the given FsNode from the node cache.
     ///
-    /// Called from the Drop trait of FsNode.
-    pub fn remove_node(&self, node: &mut FsNode) {
+    /// Called from the Release trait of FsNode.
+    pub fn remove_node(&self, node: &FsNode) {
         let mut nodes = self.nodes.lock();
         if let Some(weak_node) = nodes.get(&node.node_id) {
-            if std::ptr::eq(weak_node.as_ptr(), node) {
+            if weak_node.strong_count() == 0 {
                 nodes.remove(&node.node_id);
             }
         }

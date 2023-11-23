@@ -278,9 +278,13 @@ mod tracer {
 mod test {
     use super::*;
     use crate::{task::Kernel, testing::*};
-    use std::sync::{
-        atomic::{AtomicUsize, Ordering},
-        Arc, Barrier,
+    use std::{
+        future::Future,
+        pin::Pin,
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc, Barrier,
+        },
     };
 
     #[::fuchsia::test]
@@ -330,35 +334,28 @@ mod test {
         let (kernel, _current_task) = create_kernel_and_task();
 
         struct Info {
-            kernel: Arc<Kernel>,
             barrier: Barrier,
             queue: RwQueue,
         }
 
-        let info = Arc::new(Info {
-            kernel: Arc::clone(&kernel),
-            barrier: Barrier::new(2),
-            queue: RwQueue::default(),
-        });
+        let info = Arc::new(Info { barrier: Barrier::new(2), queue: RwQueue::default() });
 
         let info1 = Arc::clone(&info);
-        let thread1 = std::thread::spawn(move || {
-            let system_task = create_task(&info1.kernel, "first reader");
-            let guard = info1.queue.read(&system_task).expect("shouldn't be interrupted");
+        let thread1 = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+            let guard = info1.queue.read(&current_task).expect("shouldn't be interrupted");
             info1.barrier.wait();
             std::mem::drop(guard);
         });
 
         let info2 = Arc::clone(&info);
-        let thread2 = std::thread::spawn(move || {
-            let system_task = create_task(&info2.kernel, "second reader");
-            let guard = info2.queue.read(&system_task).expect("shouldn't be interrupted");
+        let thread2 = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+            let guard = info2.queue.read(&current_task).expect("shouldn't be interrupted");
             info2.barrier.wait();
             std::mem::drop(guard);
         });
 
-        thread1.join().expect("failed to join thread");
-        thread2.join().expect("failed to join thread");
+        thread1.await.expect("failed to join thread");
+        thread2.await.expect("failed to join thread");
     }
 
     struct State {
@@ -382,12 +379,11 @@ mod test {
             state: Arc<Self>,
             kernel: Arc<Kernel>,
             count: usize,
-        ) -> std::thread::JoinHandle<()> {
-            std::thread::spawn(move || {
-                let system_task = create_task(&kernel, "writer thread");
+        ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
                 state.gate.wait();
                 for _ in 0..count {
-                    let guard = state.queue.write(&system_task).expect("shouldn't be interrupted");
+                    let guard = state.queue.write(current_task).expect("shouldn't be interrupted");
                     let writer_count = state.writer_count.fetch_add(1, Ordering::Acquire) + 1;
                     let reader_count = state.reader_count.load(Ordering::Acquire);
                     state.writer_count.fetch_sub(1, Ordering::Release);
@@ -398,19 +394,18 @@ mod test {
                         "A reader and writer held the lock at the same time."
                     );
                 }
-            })
+            }))
         }
 
         fn spawn_reader(
             state: Arc<Self>,
             kernel: Arc<Kernel>,
             count: usize,
-        ) -> std::thread::JoinHandle<()> {
-            std::thread::spawn(move || {
-                let system_task = create_task(&kernel, "reader thread");
+        ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
                 state.gate.wait();
                 for _ in 0..count {
-                    let guard = state.queue.read(&system_task).expect("shouldn't be interrupted");
+                    let guard = state.queue.read(current_task).expect("shouldn't be interrupted");
                     let reader_count = state.reader_count.fetch_add(1, Ordering::Acquire) + 1;
                     let writer_count = state.writer_count.load(Ordering::Acquire);
                     state.reader_count.fetch_sub(1, Ordering::Release);
@@ -421,7 +416,7 @@ mod test {
                     );
                     assert!(reader_count > 0, "A reader held the lock without being counted.");
                 }
-            })
+            }))
         }
     }
 
@@ -439,7 +434,7 @@ mod test {
         }
 
         while let Some(thread) = threads.pop() {
-            thread.join().expect("failed to join thread");
+            thread.await.expect("failed to join thread");
         }
     }
 }

@@ -1615,51 +1615,47 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_suspend() {
-        let (kernel, first_current, mut locked) = create_kernel_task_and_unlocked();
-        let first_task_weak = first_current.weak_task();
-        let first_task_temp = first_task_weak.upgrade().expect("Task must be alive");
-        let first_task_id = first_task_temp.id;
-        let (tx, rx) = futures::channel::oneshot::channel();
+        let (kernel, mut init_task, mut locked) = create_kernel_task_and_unlocked();
+        let init_task_weak = init_task.weak_task();
+        let (tx, rx) = std::sync::mpsc::sync_channel::<()>(0);
 
-        let thread = std::thread::spawn(move || {
+        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
             let mut locked = Unlocked::new(); // This is safe because it's on a new thread
-            let mut current_task = first_current;
-            let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
-            let user_ref = UserRef::<SigSet>::new(addr);
 
-            let sigset = !SigSet::from(SIGHUP);
-            current_task.write_object(user_ref, &sigset).expect("failed to set action");
+            let init_task_temp = init_task_weak.upgrade().expect("Task must be alive");
 
-            assert_eq!(
-                sys_rt_sigsuspend(
-                    &mut locked,
-                    &mut current_task,
-                    user_ref,
-                    std::mem::size_of::<SigSet>()
-                ),
-                error!(EINTR)
+            // Wait for the init task to be suspended.
+            let mut suspended = false;
+            while !suspended {
+                suspended = init_task_temp.read().signals.run_state.is_blocked();
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+
+            // Signal the suspended task with a signal that is not blocked (only SIGHUP in this test).
+            let _ = sys_kill(
+                &mut locked,
+                current_task,
+                init_task_temp.id,
+                UncheckedSignal::from(SIGHUP),
             );
-            tx.send(()).expect("send");
+
+            // Wait for the sigsuspend to complete.
+            rx.recv().expect("receive");
+            assert!(!init_task_temp.read().signals.run_state.is_blocked());
         });
 
-        let current_task = create_task(&kernel, "test-task-2");
+        let addr = map_memory(&init_task, UserAddress::default(), *PAGE_SIZE);
+        let user_ref = UserRef::<SigSet>::new(addr);
 
-        // Wait for the first task to be suspended.
-        let mut suspended = false;
-        while !suspended {
-            suspended = first_task_temp.read().signals.run_state.is_blocked();
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
+        let sigset = !SigSet::from(SIGHUP);
+        init_task.write_object(user_ref, &sigset).expect("failed to set action");
 
-        // Signal the suspended task with a signal that is not blocked (only SIGHUP in this test).
-        let _ = sys_kill(&mut locked, &current_task, first_task_id, UncheckedSignal::from(SIGHUP));
-
-        // Wait for the sigsuspend to complete.
-        rx.await.expect("receive");
-        assert!(!first_task_temp.read().signals.run_state.is_blocked());
-        // Drop the borrow to let the task ends.
-        std::mem::drop(first_task_temp);
-        let _ = thread.join();
+        assert_eq!(
+            sys_rt_sigsuspend(&mut locked, &mut init_task, user_ref, std::mem::size_of::<SigSet>()),
+            error!(EINTR)
+        );
+        tx.send(()).expect("send");
+        thread.await.expect("join");
     }
 
     /// Waitid does not support all options.
@@ -1781,7 +1777,8 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_waiting_for_child() {
-        let (_kernel, task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, task) = create_kernel_and_task();
+
         let child = task.clone_task_for_test(0, Some(SIGCHLD));
 
         // No child is currently terminated.
@@ -1794,29 +1791,32 @@ mod tests {
             Ok(None)
         );
 
-        let weak_task = task.weak_task();
-        let child_id = child.id;
-        let thread = std::thread::spawn(move || {
-            // Block until child is terminated.
-            let waited_child = wait_on_pid(
-                &task,
-                ProcessSelector::Any,
-                &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
-            )
-            .expect("wait_on_pid")
-            .unwrap();
-            assert_eq!(waited_child.pid, child_id);
+        let thread = std::thread::spawn({
+            let task = task.weak_task();
+            move || {
+                // Create child
+                let task = task.upgrade().expect("task must be alive");
+                // Wait for the main thread to be blocked on waiting for a child.
+                while !task.read().signals.run_state.is_blocked() {
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                child.thread_group.exit(ExitStatus::Exit(0));
+                child.id
+            }
         });
 
-        // Wait for the thread to be blocked on waiting for a child.
-        while !weak_task.upgrade().unwrap().read().signals.run_state.is_blocked() {
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        child.thread_group.exit(ExitStatus::Exit(0));
-        std::mem::drop(child);
+        // Block until child is terminated.
+        let waited_child = wait_on_pid(
+            &task,
+            ProcessSelector::Any,
+            &WaitingOptions::new_for_wait4(0, 0).expect("WaitingOptions"),
+        )
+        .expect("wait_on_pid")
+        .unwrap();
 
         // Child is deleted, the thread must be able to terminate.
-        thread.join().expect("join");
+        let child_id = thread.join().expect("join");
+        assert_eq!(waited_child.pid, child_id);
     }
 
     #[::fuchsia::test]

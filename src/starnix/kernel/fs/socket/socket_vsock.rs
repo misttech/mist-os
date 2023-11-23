@@ -378,13 +378,12 @@ mod tests {
         downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
         let socket_file = Socket::new_file(&current_task, socket, OpenFlags::RDWR);
 
-        let current_task_2 = create_task(&kernel, "task2");
         const XFER_SIZE: usize = 42;
 
         let socket_clone = socket_file.clone();
-        let thread = std::thread::spawn(move || {
+        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
             let bytes_read =
-                socket_clone.read(&current_task_2, &mut VecOutputBuffer::new(XFER_SIZE)).unwrap();
+                socket_clone.read(current_task, &mut VecOutputBuffer::new(XFER_SIZE)).unwrap();
             assert_eq!(XFER_SIZE, bytes_read);
         });
 
@@ -396,7 +395,7 @@ mod tests {
         let mut buffer = [0u8; 1024];
         assert_eq!(XFER_SIZE, fs1.read(&mut buffer).unwrap());
         assert_eq!(XFER_SIZE, fs1.write(&buffer[..XFER_SIZE]).unwrap());
-        let _ = thread.join();
+        thread.await.expect("join");
     }
 
     #[::fuchsia::test]
