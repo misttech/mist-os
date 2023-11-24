@@ -341,14 +341,14 @@ mod test {
         let info = Arc::new(Info { barrier: Barrier::new(2), queue: RwQueue::default() });
 
         let info1 = Arc::clone(&info);
-        let thread1 = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+        let thread1 = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
             let guard = info1.queue.read(&current_task).expect("shouldn't be interrupted");
             info1.barrier.wait();
             std::mem::drop(guard);
         });
 
         let info2 = Arc::clone(&info);
-        let thread2 = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+        let thread2 = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
             let guard = info2.queue.read(&current_task).expect("shouldn't be interrupted");
             info2.barrier.wait();
             std::mem::drop(guard);
@@ -380,7 +380,7 @@ mod test {
             kernel: Arc<Kernel>,
             count: usize,
         ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
-            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
                 state.gate.wait();
                 for _ in 0..count {
                     let guard = state.queue.write(current_task).expect("shouldn't be interrupted");
@@ -402,7 +402,7 @@ mod test {
             kernel: Arc<Kernel>,
             count: usize,
         ) -> Pin<Box<dyn Future<Output = Result<(), Errno>>>> {
-            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+            Box::pin(kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
                 state.gate.wait();
                 for _ in 0..count {
                     let guard = state.queue.read(current_task).expect("shouldn't be interrupted");

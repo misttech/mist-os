@@ -204,7 +204,7 @@ fn forward_to_pty(
     let mut tx = fuchsia_async::Socket::from_socket(console_out)?;
     let pty_sink = pty.clone();
     kernel.kthreads.spawn({
-        move |current_task| {
+        move |_, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = vec![0u8; BUFFER_CAPACITY];
@@ -221,7 +221,7 @@ fn forward_to_pty(
 
     let pty_source = pty;
     kernel.kthreads.spawn({
-        move |current_task| {
+        move |_, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);

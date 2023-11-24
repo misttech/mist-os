@@ -7,6 +7,7 @@ use crate::{
     task::{CurrentTask, Task},
 };
 use futures::{channel::oneshot, TryFutureExt};
+use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
 use starnix_uapi::{
     errno,
@@ -23,7 +24,7 @@ use std::{
     thread::JoinHandle,
 };
 
-type BoxedClosure = Box<dyn FnOnce(&CurrentTask) + Send + 'static>;
+type BoxedClosure = Box<dyn FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static>;
 
 /// A thread pool that immediately execute any new work sent to it and keep a maximum number of
 /// idle threads.
@@ -66,11 +67,11 @@ impl DynamicThreadSpawner {
     pub fn spawn_and_get_result<R, F>(&self, f: F) -> impl Future<Output = Result<R, Errno>>
     where
         R: Send + 'static,
-        F: FnOnce(&CurrentTask) -> R + Send + 'static,
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R + Send + 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
-        self.spawn(move |current_task| {
-            let _ = sender.send(f(current_task));
+        self.spawn(move |locked, current_task| {
+            let _ = sender.send(f(locked, current_task));
         });
         receiver.map_err(|_| errno!(EINTR))
     }
@@ -82,11 +83,11 @@ impl DynamicThreadSpawner {
     pub fn spawn_and_get_result_sync<R, F>(&self, f: F) -> Result<R, Errno>
     where
         R: Send + 'static,
-        F: FnOnce(&CurrentTask) -> R + Send + 'static,
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R + Send + 'static,
     {
         let (sender, receiver) = sync_channel::<R>(1);
-        self.spawn(move |current_task| {
-            let _ = sender.send(f(current_task));
+        self.spawn(move |locked, current_task| {
+            let _ = sender.send(f(locked, current_task));
         });
         receiver.recv().map_err(|_| errno!(EINTR))
     }
@@ -98,7 +99,7 @@ impl DynamicThreadSpawner {
     /// responsible to start running the closure.
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce(&CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
     {
         // Check whether a thread already exists to handle the request.
         let mut function: BoxedClosure = Box::new(f);
@@ -136,7 +137,7 @@ impl DynamicThreadSpawner {
         let dispatch_function: BoxedClosure = Box::new({
             let state = self.state.clone();
             let system_task = self.system_task.clone();
-            move |_| {
+            move |_, _| {
                 sender
                     .send(RunningThread::new(state, system_task, function))
                     .expect("receiver must not be dropped");
@@ -166,6 +167,7 @@ impl RunningThread {
             std::thread::Builder::new()
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
+                    let mut locked = Unlocked::new();
                     let current_task = {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
@@ -183,11 +185,10 @@ impl RunningThread {
                     };
                     release_after!(current_task, (), {
                         while let Ok(f) = receiver.recv() {
-                            f(&current_task);
+                            f(&mut locked, &current_task);
 
                             // Apply any delayed releasers.
                             current_task.trigger_delayed_releaser();
-
                             let mut state = state.lock();
                             state.idle_threads += 1;
                             if state.idle_threads > state.max_idle_threads {
@@ -221,6 +222,7 @@ impl RunningThread {
             std::thread::Builder::new()
                 .name("kthread-persistent-worker".to_string())
                 .spawn(move || {
+                    let mut locked = Unlocked::new();
                     let current_task = {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
@@ -238,7 +240,7 @@ impl RunningThread {
                     };
                     release_after!(current_task, (), {
                         while let Ok(f) = receiver.recv() {
-                            f(&current_task);
+                            f(&mut locked, &current_task);
 
                             // Apply any delayed releasers.
                             current_task.trigger_delayed_releaser();
@@ -283,14 +285,14 @@ mod tests {
     #[fuchsia::test]
     async fn run_simple_task() {
         let (_task, spawner) = build_spawner(2);
-        spawner.spawn(|_| {});
+        spawner.spawn(|_, _| {});
     }
 
     #[fuchsia::test]
     async fn run_10_tasks() {
         let (_task, spawner) = build_spawner(2);
         for _ in 0..10 {
-            spawner.spawn(|_| {});
+            spawner.spawn(|_, _| {});
         }
     }
 
@@ -301,7 +303,7 @@ mod tests {
         let pair = Arc::new((std::sync::Mutex::new(false), std::sync::Condvar::new()));
         for _ in 0..10 {
             let pair2 = Arc::clone(&pair);
-            spawner.spawn(move |_| {
+            spawner.spawn(move |_, _| {
                 let (lock, cvar) = &*pair2;
                 let mut cont = lock.lock().unwrap();
                 while !*cont {
@@ -312,7 +314,7 @@ mod tests {
 
         let executed = Arc::new(Mutex::new(false));
         let executed_clone = executed.clone();
-        spawner.spawn(move |_| {
+        spawner.spawn(move |_, _| {
             {
                 let (lock, cvar) = &*pair;
                 let mut cont = lock.lock().unwrap();
@@ -326,8 +328,8 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(10));
         // Post a couple of new tasks. As the maximum number of idle threads is 1, it should
         // ensures that finished threads will be cleaned up from the pool.
-        spawner.spawn(move |_| {});
-        spawner.spawn(move |_| {});
+        spawner.spawn(move |_, _| {});
+        spawner.spawn(move |_, _| {});
 
         // Drop the spawner. This will wait for all thread to finish.
         std::mem::drop(spawner);
@@ -337,6 +339,6 @@ mod tests {
     #[fuchsia::test]
     async fn run_spawn_and_get_result() {
         let (_task, spawner) = build_spawner(2);
-        assert_eq!(spawner.spawn_and_get_result(|_| 3).await, Ok(3));
+        assert_eq!(spawner.spawn_and_get_result(|_, _| 3).await, Ok(3));
     }
 }

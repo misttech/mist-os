@@ -12,6 +12,7 @@ use crate::{
     task::{CurrentTask, EventHandler, Kernel, Waiter},
 };
 use lock_sequence::{Locked, Unlocked};
+use once_cell::sync::OnceCell;
 use perfetto_consumer_proto::perfetto::protos::{
     ipc_frame,
     trace_config::{buffer_config::FillPolicy, BufferConfig, DataSource},
@@ -22,18 +23,13 @@ use prost::Message;
 use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
-    ffi::CString,
-    sync::{Arc, Mutex},
+    sync::{mpsc::channel, mpsc::Sender, Arc},
 };
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
 
-/// Context for the function that is called when the trace state changes.
-///
-/// Passing functions to C bindings typically requires a static function
-/// pointer, which prevents using closures.
-/// Using a mutex to guard the state allows it to be used in a static function.
-static CALLBACK_CONTEXT: Mutex<Option<(CurrentTask, CallbackState)>> = Mutex::new(None);
+/// Sender for the trace state, which sends a message each time trace state is updated.
+static TRACE_STATE_SENDER: OnceCell<Sender<TraceState>> = OnceCell::new();
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -516,35 +512,39 @@ pub fn start_perfetto_consumer_thread(
     kernel: &Arc<Kernel>,
     socket_path: &[u8],
 ) -> Result<(), Errno> {
-    let init_task_weak = kernel.pids.read().get_task(1);
-    let init_task = init_task_weak.upgrade().ok_or_else(|| errno!(EINVAL))?;
-    let task = CurrentTask::create_process_without_parent(
-        kernel,
-        CString::new("perfetto_consumer".to_string()).unwrap(),
-        // Perfetto consumer runs in a separate thread, not in the init task proper.
-        init_task.fs().fork(),
-    )?;
-    let callback_state = CallbackState {
-        prev_state: TraceState::Stopped,
-        socket_path: socket_path.to_owned(),
-        connection: None,
-        prolonged_context: None,
-        packet_data: Vec::new(),
-    };
-
-    // Store the context that on_state_change needs in a mutex for c_callback to use.
-    *CALLBACK_CONTEXT.lock().unwrap() = Some((task, callback_state));
+    let (sender, receiver) = channel::<TraceState>();
+    kernel.kthreads.spawner().spawn({
+        let socket_path = socket_path.to_owned();
+        move |locked, current_task| {
+            let mut callback_state = CallbackState {
+                prev_state: TraceState::Stopped,
+                socket_path,
+                connection: None,
+                prolonged_context: None,
+                packet_data: Vec::new(),
+            };
+            while let Ok(state) = receiver.recv() {
+                callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
+                    log_error!("perfetto_consumer callback error: {:?}", e);
+                })
+            }
+        }
+    });
+    // Store the other end of the channel so that it can be called from a static callback function
+    // when the trace is changed.
+    TRACE_STATE_SENDER.set(sender).or_else(|e| {
+        log_error!("Failed to set perfetto_consumer trace state sender: {:?}", e);
+        Err(errno!(EINVAL))
+    })?;
     fuchsia_trace_observer::start_trace_observer(c_callback);
     Ok(())
 }
 
 extern "C" fn c_callback() {
-    // This code is always executed on its own thread
-    let mut locked = Unlocked::new();
-    let (current_task, mut callback_state) = CALLBACK_CONTEXT.lock().unwrap().take().unwrap();
-
     let state = trace_state();
-    callback_state.on_state_change(&mut locked, state, &current_task).unwrap_or_else(|e| {
-        log_error!("perfetto_consumer callback error: {:?}", e);
-    })
+    if let Some(sender) = TRACE_STATE_SENDER.get() {
+        sender.send(state).unwrap_or_else(|e| log_error!("perfetto_consumer send failed: {:?}", e));
+    } else {
+        log_error!("perfetto_consumer sender was not set when the callback was called");
+    }
 }

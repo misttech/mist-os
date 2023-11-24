@@ -60,7 +60,7 @@ impl Pager {
     pub fn start_pager_threads(self: &Arc<Self>, current_task: &CurrentTask) {
         for _ in 0..PAGER_THREADS {
             let this = self.clone();
-            current_task.kernel().kthreads.spawn(move |_| {
+            current_task.kernel().kthreads.spawn(move |_, _| {
                 this.run_pager_thread();
             });
         }

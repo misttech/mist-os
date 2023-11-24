@@ -5,6 +5,7 @@
 use crate::{dynamic_thread_spawner::DynamicThreadSpawner, task::CurrentTask};
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
+use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::OnceCell;
 use starnix_uapi::{
     errno,
@@ -74,7 +75,7 @@ impl KernelThreads {
 
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce(&CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawner().spawn(f)
     }

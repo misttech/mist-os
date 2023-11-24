@@ -531,7 +531,7 @@ mod tests {
 
         let thread = kernel.kthreads.spawner().spawn_and_get_result({
             let test_string = test_string.clone();
-            move |task| {
+            move |_, task| {
                 let bytes_written =
                     pipe_in.write(&task, &mut VecInputBuffer::new(test_string.as_bytes())).unwrap();
                 assert_eq!(bytes_written, test_len);

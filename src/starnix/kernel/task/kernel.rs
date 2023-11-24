@@ -231,7 +231,7 @@ impl InterfacesHandlerImpl {
         f: F,
     ) {
         if let Some(kernel) = self.0.upgrade() {
-            kernel.kthreads.spawner().spawn(move |current_task| {
+            kernel.kthreads.spawner().spawn(move |_, current_task| {
                 let kernel = current_task.kernel();
                 f(current_task, &kernel.netstack_devices, kernel.proc_fs.get(), kernel.sys_fs.get())
             });
@@ -424,7 +424,7 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) =
                 Netlink::new(InterfacesHandlerImpl(Arc::downgrade(self)));
-            self.kthreads.spawn(move |_| {
+            self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
                 log_error!(tag = NETLINK_LOG_TAG, "Netlink async worker unexpectedly exited");
             });

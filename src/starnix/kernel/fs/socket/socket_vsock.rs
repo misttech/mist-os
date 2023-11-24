@@ -381,7 +381,7 @@ mod tests {
         const XFER_SIZE: usize = 42;
 
         let socket_clone = socket_file.clone();
-        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
+        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
             let bytes_read =
                 socket_clone.read(current_task, &mut VecOutputBuffer::new(XFER_SIZE)).unwrap();
             assert_eq!(XFER_SIZE, bytes_read);

@@ -1577,7 +1577,7 @@ mod test {
         let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)?;
 
         let thread = kernel.kthreads.spawner().spawn_and_get_result({
-            move |current_task| {
+            move |_, current_task| {
                 assert_eq!(64, pipe.read(&current_task, &mut VecOutputBuffer::new(64)).unwrap());
             }
         });
@@ -1732,7 +1732,7 @@ mod test {
                 .spawner()
                 .spawn_and_get_result({
                     let kernel = Arc::clone(&kernel);
-                    move |current_task| {
+                    move |_, current_task| {
                         current_task.set_creds(Credentials {
                             euid: 1,
                             fsuid: 1,
@@ -1790,7 +1790,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -1851,7 +1851,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -1950,7 +1950,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2017,7 +2017,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2065,7 +2065,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2110,7 +2110,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2158,7 +2158,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2197,7 +2197,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2240,7 +2240,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2289,7 +2289,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2345,7 +2345,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2412,7 +2412,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2460,7 +2460,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,
@@ -2544,7 +2544,7 @@ mod test {
             .spawner()
             .spawn_and_get_result({
                 let kernel = Arc::clone(&kernel);
-                move |current_task| {
+                move |_, current_task| {
                     let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
                     let fs = RemoteFs::new_fs(
                         &kernel,

@@ -1467,21 +1467,23 @@ mod tests {
 
         let fh = file_handle.clone();
         let done_clone = done.clone();
-        let write_thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
-            for i in 0..2000 {
-                fh.write(current_task, &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()))
-                    .expect("write failed");
-            }
-            done_clone.store(true, Ordering::SeqCst);
-        });
+        let write_thread =
+            kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
+                for i in 0..2000 {
+                    fh.write(current_task, &mut VecInputBuffer::new(U64::<LE>::new(i).as_bytes()))
+                        .expect("write failed");
+                }
+                done_clone.store(true, Ordering::SeqCst);
+            });
 
         let fh = file_handle.clone();
         let done_clone = done.clone();
-        let truncate_thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
-            while !done_clone.load(Ordering::SeqCst) {
-                fh.ftruncate(current_task, 0).expect("truncate failed");
-            }
-        });
+        let truncate_thread =
+            kernel.kthreads.spawner().spawn_and_get_result(move |_, current_task| {
+                while !done_clone.load(Ordering::SeqCst) {
+                    fh.ftruncate(current_task, 0).expect("truncate failed");
+                }
+            });
 
         // If we read from the file, we should always find an increasing sequence. If there are
         // races, then we might unexpectedly see zeroes.

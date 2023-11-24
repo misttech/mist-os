@@ -545,7 +545,7 @@ impl FileOps for LoopControlDevice {
                     .kernel()
                     .kthreads
                     .spawner()
-                    .spawn_and_get_result_sync(move |task| registry.add(task, minor))??;
+                    .spawn_and_get_result_sync(move |_, task| registry.add(task, minor))??;
                 Ok(minor.into())
             }
             LOOP_CTL_REMOVE => {

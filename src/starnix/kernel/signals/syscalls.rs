@@ -1619,9 +1619,7 @@ mod tests {
         let init_task_weak = init_task.weak_task();
         let (tx, rx) = std::sync::mpsc::sync_channel::<()>(0);
 
-        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |current_task| {
-            let mut locked = Unlocked::new(); // This is safe because it's on a new thread
-
+        let thread = kernel.kthreads.spawner().spawn_and_get_result(move |locked, current_task| {
             let init_task_temp = init_task_weak.upgrade().expect("Task must be alive");
 
             // Wait for the init task to be suspended.
@@ -1632,12 +1630,8 @@ mod tests {
             }
 
             // Signal the suspended task with a signal that is not blocked (only SIGHUP in this test).
-            let _ = sys_kill(
-                &mut locked,
-                current_task,
-                init_task_temp.id,
-                UncheckedSignal::from(SIGHUP),
-            );
+            let _ =
+                sys_kill(locked, current_task, init_task_temp.id, UncheckedSignal::from(SIGHUP));
 
             // Wait for the sigsuspend to complete.
             rx.recv().expect("receive");

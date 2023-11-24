@@ -1161,7 +1161,7 @@ mod test {
         );
 
         let mut waiter_thread =
-            kernel.kthreads.spawner().spawn_and_get_result(move |task| waiter.wait(&task));
+            kernel.kthreads.spawner().spawn_and_get_result(move |_, task| waiter.wait(&task));
         assert!(futures::poll!(&mut waiter_thread).is_pending());
 
         // Reply to first `Watch` request.

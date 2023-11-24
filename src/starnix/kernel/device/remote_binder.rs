@@ -923,7 +923,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
             })
             .map_err(|_| errno!(EINVAL))?;
         let handle = self.clone();
-        current_task.kernel().kthreads.spawner().spawn(move |_| {
+        current_task.kernel().kthreads.spawner().spawn(move |_, _| {
             let mut executor = fasync::LocalExecutor::new();
             let result = executor.run_singlethreaded({
                 let handle = handle.clone();
@@ -1101,7 +1101,7 @@ mod tests {
         let (kernel, _init_task) = create_kernel_and_task();
         let starnix_thread = kernel.kthreads.spawner().spawn_and_get_result({
             let kernel = Arc::clone(&kernel);
-            move |current_task| {
+            move |_, current_task| {
                 current_task
                     .fs()
                     .root()

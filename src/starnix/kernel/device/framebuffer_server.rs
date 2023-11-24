@@ -317,7 +317,7 @@ pub fn present_view(
     view_identity: fuiviews::ViewIdentityOnCreation,
     incoming_svc_dir: fidl_fuchsia_io::DirectorySynchronousProxy,
 ) {
-    kernel.kthreads.spawner().spawn(|_| {
+    kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
