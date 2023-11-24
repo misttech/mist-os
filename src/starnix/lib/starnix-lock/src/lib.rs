@@ -94,9 +94,8 @@ impl<T, L> LockFor<L> for OrderedMutex<T, L> {
 }
 
 impl<T, L> OrderedMutex<T, L> {
-    #[cfg(test)]
-    pub fn new(t: T) -> Self {
-        Self { mutex: Mutex::new(t), _phantom: Default::default() }
+    pub const fn new(t: T) -> Self {
+        Self { mutex: Mutex::new(t), _phantom: PhantomData }
     }
 
     pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'_, P>) -> <Self as LockFor<L>>::Guard<'a>
@@ -151,8 +150,8 @@ impl<T, L> RwLockFor<L> for OrderedRwLock<T, L> {
 }
 
 impl<T, L> OrderedRwLock<T, L> {
-    pub fn new(t: T) -> Self {
-        Self { rwlock: RwLock::new(t), _phantom: Default::default() }
+    pub const fn new(t: T) -> Self {
+        Self { rwlock: RwLock::new(t), _phantom: PhantomData }
     }
 
     pub fn read<'a, P>(

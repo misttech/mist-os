@@ -326,7 +326,7 @@ fn run_task(
                 profile_duration!("RecordCoreDump");
 
                 // Make diagnostics tooling aware of the crash.
-                current_task.kernel().core_dumps.record_core_dump(&current_task.task);
+                current_task.kernel().core_dumps.record_core_dump(locked, &current_task.task);
 
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);

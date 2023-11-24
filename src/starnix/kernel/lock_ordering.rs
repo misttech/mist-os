@@ -7,6 +7,7 @@ pub(crate) use lock_sequence::Unlocked;
 
 pub enum BpfMapEntries {}
 pub enum KernelIpTables {}
+pub enum DiagnosticsCoreDumpList {}
 
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
@@ -14,3 +15,4 @@ pub enum KernelIpTables {}
 
 impl_lock_after!(Unlocked => BpfMapEntries);
 impl_lock_after!(Unlocked => KernelIpTables);
+impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);

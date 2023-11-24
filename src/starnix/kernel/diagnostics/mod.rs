@@ -2,11 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{logging::log_debug, task::Task};
+use crate::{lock_ordering::DiagnosticsCoreDumpList, logging::log_debug, task::Task};
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use fuchsia_zircon::AsHandleRef;
-use starnix_lock::Mutex;
+use lock_sequence::{LockBefore, Locked};
+use starnix_lock::OrderedMutex;
 
 /// The maximum number of failed tasks to record.
 ///
@@ -20,16 +21,19 @@ const MAX_ARGV_LENGTH: usize = 128;
 
 /// A list of recently coredumped tasks in Inspect.
 pub struct CoreDumpList {
-    list: Mutex<BoundedListNode>,
+    list: OrderedMutex<BoundedListNode, DiagnosticsCoreDumpList>,
 }
 
 impl CoreDumpList {
     pub fn new(node: Node) -> Self {
-        Self { list: Mutex::new(BoundedListNode::new(node, MAX_NUM_COREDUMPS)) }
+        Self { list: OrderedMutex::new(BoundedListNode::new(node, MAX_NUM_COREDUMPS)) }
     }
 
-    pub fn record_core_dump(&self, task: &Task) {
-        let mut list = self.list.lock();
+    pub fn record_core_dump<L>(&self, locked: &mut Locked<'_, L>, task: &Task)
+    where
+        L: LockBefore<DiagnosticsCoreDumpList>,
+    {
+        let mut list = self.list.lock(locked);
         list.add_entry(|crash_node| {
             let process_koid = task
                 .thread_group
