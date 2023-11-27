@@ -41,7 +41,7 @@ class FidlController final : public pw::bluetooth::Controller {
   void ConfigureSco(ScoCodingFormat coding_format, ScoEncoding encoding, ScoSampleRate sample_rate,
                     pw::Callback<void(pw::Status)> callback) override {}
   void ResetSco(pw::Callback<void(pw::Status)> callback) override {}
-  void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override {}
+  void GetFeatures(pw::Callback<void(FeaturesBits)> callback) override;
   void EncodeVendorCommand(
       pw::bluetooth::VendorCommandParameters parameters,
       pw::Callback<void(pw::Result<pw::span<const std::byte>>)> callback) override {}

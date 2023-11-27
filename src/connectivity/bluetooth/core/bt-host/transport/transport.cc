@@ -23,7 +23,7 @@ Transport::~Transport() { bt_log(INFO, "hci", "Transport shutting down"); }
 void Transport::Initialize(fit::callback<void(bool /*success*/)> complete_callback) {
   BT_ASSERT(!command_channel_);
 
-  bt_log(DEBUG, "hci", "initializing Transport");
+  bt_log(DEBUG, "hci", "Initializing Transport");
   auto self = GetWeakPtr();
   auto complete_cb_wrapper = [self, cb = std::move(complete_callback)](pw::Status status) mutable {
     if (!self.is_alive()) {
@@ -49,7 +49,7 @@ void Transport::Initialize(fit::callback<void(bool /*success*/)> complete_callba
       }
       self->features_ = features;
 
-      bt_log(INFO, "hci", "Transport initialized");
+      bt_log(INFO, "hci", "Transport initialized successfully");
       cb(/*success=*/true);
     });
   };

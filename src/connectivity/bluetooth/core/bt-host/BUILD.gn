@@ -8,6 +8,73 @@ import("//build/drivers.gni")
 import("//build/fuzz.gni")
 import("//src/connectivity/bluetooth/core/bt-host/build/bt_gtest_package.gni")
 
+source_set("sources_bt_host_component") {
+  sources = [
+    "host_component.cc",
+    "host_component.h",
+    "util.cc",
+    "util.h",
+  ]
+
+  deps = [
+    "//sdk/lib/device-watcher/cpp",
+    "//src/connectivity/bluetooth/core/bt-host/common",
+    "//src/connectivity/bluetooth/core/bt-host/controllers",
+    "//src/connectivity/bluetooth/core/bt-host/fidl",
+    "//src/connectivity/bluetooth/core/bt-host/gap",
+    "//src/connectivity/bluetooth/core/bt-host/gatt",
+    "//third_party/pigweed/backends/pw_async_fuchsia:dispatcher",
+    "//third_party/pigweed/backends/pw_log:printf",
+    "//third_party/pigweed/backends/pw_random:zircon_random_generator",
+    "//zircon/system/ulib/inspect",
+  ]
+
+  public_deps = [
+    ":bt_host_config",
+    ":stack",
+    "//sdk/banjo/fuchsia.hardware.bt.vendor:fuchsia.hardware.bt.vendor_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.bluetooth:fuchsia.hardware.bluetooth_cpp",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_hlcpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/sys/cpp",
+    "//src/connectivity/bluetooth/fidl:host_hlcpp",
+    "//src/connectivity/bluetooth/lib/fidl",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/trace",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+executable("bin") {
+  output_name = "bt_host"
+  sources = [ "main.cc" ]
+  deps = [ ":sources_bt_host_component" ]
+}
+
+fuchsia_component_manifest("manifest") {
+  component_name = "bt-host"
+  manifest = "meta/bt-host.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("bt_host_config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
+  deps = [ ":bin" ]
+}
+
+# TODO(fxbug.dev/135650): Rename to "bt-host" after removing driver code
+fuchsia_package("bt-host-component") {
+  deps = [
+    # component-url: fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm
+    ":component",
+  ]
+}
+
 driver_bind_rules("bt_host_bind") {
   rules = "bt_host.bind"
   tests = "tests.json"
@@ -184,6 +251,24 @@ source_set("device_tests") {
   ]
 }
 
+source_set("component_tests") {
+  testonly = true
+
+  sources = [ "host_component_unittest.cc" ]
+
+  deps = [
+    ":sources_bt_host_component",
+    "//src/connectivity/bluetooth/core/bt-host/fidl:fake_hci_test_fixture",
+    "//src/connectivity/bluetooth/core/bt-host/testing",
+    "//src/lib/testing/loop_fixture",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+bt_gtest_package("bt-host-component-tests") {
+  deps = [ ":component_tests" ]
+}
+
 bt_gtest_package("bt-host-device-tests") {
   deps = [ ":device_tests" ]
 }
@@ -248,6 +333,7 @@ group("tests") {
   deps = [
     ":bt-host-att-tests",
     ":bt-host-common-tests",
+    ":bt-host-component-tests",
     ":bt-host-device-tests",
     ":bt-host-gap-tests",
     ":bt-host-gatt-tests",

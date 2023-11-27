@@ -1,0 +1,37 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [
+        "inspect/client.shard.cml",
+        "syslog/client.shard.cml",
+    ],
+    program: {
+        // Use the built-in ELF runner.
+        runner: "elf",
+
+        // The binary to run for this component.
+        binary: "bin/bt_host",
+
+        // Subscribe to component lifecycle events
+        lifecycle: { stop_event: "notify" },
+
+        // Enable stdout logging
+        forward_stderr_to: "log",
+        forward_stdout_to: "log",
+    },
+    use: [
+        {
+            directory: "dev-bt-hci",
+            rights: [ "r*" ],
+            path: "/dev/class/bt-hci",
+        },
+    ],
+    config: {
+        device_path: {
+            type: "string",
+            max_size: 512,
+            mutability: [ "parent" ],
+        },
+    },
+}

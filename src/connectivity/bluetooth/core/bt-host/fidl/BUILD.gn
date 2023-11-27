@@ -126,6 +126,14 @@ source_set("fake_gatt_test_fixture") {
   ]
 }
 
+source_set("fake_hci_test_fixture") {
+  testonly = true
+
+  sources = [ "fake_hci_server.h" ]
+
+  deps = [ "//src/connectivity/bluetooth/core/bt-host/transport:transport" ]
+}
+
 source_set("tests") {
   testonly = true
 
