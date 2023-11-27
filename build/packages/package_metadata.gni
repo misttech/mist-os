@@ -70,6 +70,7 @@ template("generate_package_metadata") {
 
     outputs = [ _metadata_output ]
     walk_keys = [
+      "bazel_inputs_barrier",
       "package_barrier",
       "package_names_barrier",
     ]
