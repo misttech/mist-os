@@ -32,7 +32,24 @@
         "wlan"
     ],
     "enable_dhcpv6": false,
-    "interface_name_prefix": "eth",
+    "interface_naming_policy": [
+        {
+            "matchers": [
+                {
+                    "any": true
+                }
+            ],
+            "naming_scheme": [
+                {
+                    "type": "static",
+                    "value": "eth"
+                },
+                {
+                    "type": "default"
+                }
+            ]
+        }
+    ],
     "interface_provisioning_policy": [
         {
             "matchers": [

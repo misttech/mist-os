@@ -9,5 +9,22 @@
     },
     "filter_enabled_interface_types": [],
     "interface_metrics": {},
-    "interface_name_prefix": "test"
+    "interface_naming_policy": [
+        {
+            "matchers": [
+                {
+                    "any": true
+                }
+            ],
+            "naming_scheme": [
+                {
+                    "type": "static",
+                    "value": "test"
+                },
+                {
+                    "type": "default"
+                }
+            ]
+        }
+    ]
 }
