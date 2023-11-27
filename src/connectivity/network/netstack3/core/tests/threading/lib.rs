@@ -301,7 +301,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
             &mut non_sync_ctx,
             &socket,
             Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-            REMOTE_PORT,
+            REMOTE_PORT.into(),
             Buf::new([1], ..),
         )
         .unwrap();
@@ -341,7 +341,7 @@ fn neighbor_resolution_and_send_queued_packets_atomic<I: Ip + TestIpExt>() {
                 &mut non_sync_ctx,
                 &socket,
                 Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-                REMOTE_PORT,
+                REMOTE_PORT.into(),
                 Buf::new([2], ..),
             )
             .unwrap();
@@ -449,7 +449,7 @@ fn new_incomplete_neighbor_schedule_timer_atomic<I: Ip + TestIpExt>() {
                 &mut non_sync_ctx,
                 &socket,
                 Some(ZonedAddr::Unzoned(SpecifiedAddr::new(I::NEIGHBOR_ADDR).unwrap()).into()),
-                REMOTE_PORT,
+                REMOTE_PORT.into(),
                 Buf::new([1], ..),
             )
             .unwrap();

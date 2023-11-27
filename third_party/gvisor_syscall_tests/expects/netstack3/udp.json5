@@ -49,9 +49,6 @@
         {
             type: "expect_failure",
             matchers: [
-                // TODO(https://fxbug.dev/136207): Handle connecting to port 0 correctly.
-                "AllInetTests/UdpSocketTest.ConnectToZeroPortConnected/*",
-
                 // Fails because ZXIO disallows binding to an address with
                 // family `AF_UNSPEC`.
                 "AllInetTests/UdpSocketTest.DisconnectAfterBindToUnspecAndConnect/*",

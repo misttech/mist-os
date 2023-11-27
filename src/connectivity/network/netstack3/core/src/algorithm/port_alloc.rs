@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 use core::{
     hash::{Hash, Hasher},
     marker::PhantomData,
-    num::{NonZeroU16, NonZeroUsize},
+    num::NonZeroUsize,
     ops::RangeInclusive,
 };
 
@@ -32,15 +32,15 @@ pub(crate) type PortNumber = u16;
 /// `ProtocolFlowId` provides the most common 3-tuple needed to be used with a
 /// [`PortAlloc`] structure: local IP, remote IP, and remote port number.
 #[derive(Hash, Debug)]
-pub(crate) struct ProtocolFlowId<A> {
+pub(crate) struct ProtocolFlowId<A, P> {
     local_addr: A,
     remote_addr: A,
-    remote_port: NonZeroU16,
+    remote_port: P,
 }
 
-impl<A> ProtocolFlowId<A> {
+impl<A, P> ProtocolFlowId<A, P> {
     /// Creates a new `ProtocolFlowId` with given parameters.
-    pub(crate) fn new(local_addr: A, remote_addr: A, remote_port: NonZeroU16) -> Self {
+    pub(crate) fn new(local_addr: A, remote_addr: A, remote_port: P) -> Self {
         Self { local_addr, remote_addr, remote_port }
     }
 
@@ -55,8 +55,8 @@ impl<A> ProtocolFlowId<A> {
     }
 
     /// Gets this `ProtocolFlowId`'s remote port number.
-    pub(crate) fn remote_port(&self) -> NonZeroU16 {
-        self.remote_port
+    pub(crate) fn remote_port(&self) -> &P {
+        &self.remote_port
     }
 }
 

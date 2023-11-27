@@ -10,7 +10,7 @@ use core::{
     fmt::Debug,
     hash::Hash,
     marker::PhantomData,
-    num::{NonZeroU16, NonZeroU8},
+    num::NonZeroU8,
     ops::{Deref, DerefMut},
 };
 
@@ -460,15 +460,15 @@ impl<A: Eq + Hash, D: Eq + Hash> IntoIterator for MulticastMemberships<A, D> {
     }
 }
 
-impl<A: IpAddress, D: crate::device::Id> ConnAddr<ConnIpAddr<A, NonZeroU16, NonZeroU16>, D> {
+impl<A: IpAddress, D: crate::device::Id, LI, RI: Copy> ConnAddr<ConnIpAddr<A, LI, RI>, D> {
     pub(crate) fn from_protocol_flow_and_local_port(
-        id: &ProtocolFlowId<SocketIpAddr<A>>,
-        local_port: NonZeroU16,
+        id: &ProtocolFlowId<SocketIpAddr<A>, RI>,
+        local_port: LI,
     ) -> Self {
         Self {
             ip: ConnIpAddr {
                 local: (*id.local_addr(), local_port),
-                remote: (*id.remote_addr(), id.remote_port()),
+                remote: (*id.remote_addr(), *id.remote_port()),
             },
             device: None,
         }

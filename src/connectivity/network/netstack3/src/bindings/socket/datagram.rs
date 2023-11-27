@@ -26,7 +26,7 @@ use fidl::endpoints::RequestStream as _;
 use fuchsia_zircon::{self as zx, prelude::HandleBased as _, Peered as _};
 use net_types::{
     ip::{Ip, IpVersion, Ipv4, Ipv6},
-    MulticastAddr, SpecifiedAddr, Witness as _, ZonedAddr,
+    MulticastAddr, SpecifiedAddr, ZonedAddr,
 };
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
@@ -222,7 +222,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type ShutdownError: IntoErrno;
     type SetIpTransparentError: IntoErrno;
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
-    type RemoteIdentifier: OptionFromU16 + Into<u16> + Send;
+    type RemoteIdentifier: From<u16> + Into<u16> + Send;
     type SocketInfo<C: NonSyncContext>: IntoFidl<LocalAddress<I, WeakDeviceId<C>, Self::LocalIdentifier>>
         + TryIntoFidl<
             RemoteAddress<I, WeakDeviceId<C>, Self::RemoteIdentifier>,
@@ -392,7 +392,7 @@ impl<I: IpExt> TransportState<I> for Udp {
     type SetReusePortError = ExpectedUnboundError;
     type SetIpTransparentError = Never;
     type LocalIdentifier = NonZeroU16;
-    type RemoteIdentifier = NonZeroU16;
+    type RemoteIdentifier = udp::UdpRemotePort;
     type SocketInfo<C: NonSyncContext> = udp::SocketInfo<I::Addr, WeakDeviceId<C>>;
     type GetShutdownError = fposix::Errno;
 
@@ -1670,26 +1670,7 @@ where
         let (remote_addr, remote_port) =
             sockaddr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
 
-        let remote_port = match T::RemoteIdentifier::from_u16(remote_port) {
-            Some(p) => p,
-            None => {
-                // TODO(https://fxbug.dev/136207): Appropriately handle connecting to port 0.
-                // For now, just check that a route exists to the destination address.
-                let remote_addr = remote_addr
-                    .map(|a: SocketZonedIpAddr<I::Addr, _>| a.into_inner().addr().get())
-                    .unwrap_or(I::UNSPECIFIED_ADDRESS);
-                return match netstack3_core::ip::resolve_route::<I, _>(sync_ctx, remote_addr) {
-                    Ok(route) => {
-                        // We don't care about the route, just that there exists one.
-                        let _ = route;
-                        Ok(())
-                    }
-                    Err(err) => Err(err.into_errno()),
-                };
-            }
-        };
-
-        T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port)
+        T::connect(sync_ctx, non_sync_ctx, id, remote_addr, remote_port.into())
             .map_err(IntoErrno::into_errno)?;
 
         Ok(())
@@ -1929,7 +1910,7 @@ where
                 let (remote_addr, port) =
                     TryFromFidlWithContext::try_from_fidl_with_ctx(&non_sync_ctx, remote_addr)
                         .map_err(IntoErrno::into_errno)?;
-                Ok((remote_addr, T::RemoteIdentifier::from_u16(port).ok_or(fposix::Errno::Einval)?))
+                Ok((remote_addr, port.into()))
             })
             .transpose()?;
         let len = data.len() as i64;
@@ -2276,9 +2257,11 @@ impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::A
     }
 }
 
-impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, NonZeroU16>> for udp::SocketInfo<I::Addr, D> {
+impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, udp::UdpRemotePort>>
+    for udp::SocketInfo<I::Addr, D>
+{
     type Error = fposix::Errno;
-    fn try_into_fidl(self) -> Result<RemoteAddress<I, D, NonZeroU16>, Self::Error> {
+    fn try_into_fidl(self) -> Result<RemoteAddress<I, D, udp::UdpRemotePort>, Self::Error> {
         match self {
             Self::Unbound | Self::Listener(_) => Err(fposix::Errno::Enotconn),
             Self::Connected(udp::ConnInfo {
@@ -2286,7 +2269,14 @@ impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, NonZeroU16>> for udp::SocketInfo<
                 local_port: _,
                 remote_ip,
                 remote_port,
-            }) => Ok(RemoteAddress { address: remote_ip, identifier: remote_port }),
+            }) => match remote_port {
+                // Match Linux and report `ENOTCONN` for requests to
+                // 'get_peername` when the connection's remote port is 0.
+                udp::UdpRemotePort::Unset => Err(fposix::Errno::Enotconn),
+                udp::UdpRemotePort::Set(remote_port) => {
+                    Ok(RemoteAddress { address: remote_ip, identifier: remote_port.into() })
+                }
+            },
         }
     }
 }
@@ -2388,7 +2378,10 @@ mod tests {
         },
         util::IntoFidl,
     };
-    use net_types::ip::{IpAddr, IpAddress};
+    use net_types::{
+        ip::{IpAddr, IpAddress},
+        Witness as _,
+    };
 
     async fn prepare_test<A: TestSockAddr>(
         proto: fposix_socket::DatagramSocketProtocol,

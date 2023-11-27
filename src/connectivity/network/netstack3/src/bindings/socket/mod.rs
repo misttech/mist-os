@@ -619,6 +619,7 @@ impl IntoErrno for udp::SendToError {
             Self::Mtu => Errno::Emsgsize,
             // TODO(https://fxbug.dev/21198): Support dual-stack send-to.
             Self::DualStackNotImplemented => Errno::Eopnotsupp,
+            Self::RemotePortUnset => Errno::Einval,
         }
     }
 }
@@ -630,6 +631,7 @@ impl IntoErrno for udp::SendError {
             Self::NotWriteable => Errno::Epipe,
             // TODO(https://fxbug.dev/21198): Support dual-stack send.
             Self::DualStackNotImplemented => Errno::Eopnotsupp,
+            Self::RemotePortUnset => Errno::Edestaddrreq,
         }
     }
 }
