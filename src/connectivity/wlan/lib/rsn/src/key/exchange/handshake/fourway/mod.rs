@@ -634,12 +634,9 @@ mod tests {
         rsna::{test_util, SecAssocUpdate, UpdateSink},
         rsne::RsnCapabilities,
     };
-    use wlan_common::{
-        big_endian::BigEndianU64,
-        ie::{
-            rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256},
-            wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie,
-        },
+    use wlan_common::ie::{
+        rsn::cipher::{Cipher, CIPHER_BIP_CMAC_128, CIPHER_BIP_CMAC_256},
+        wpa::fake_wpa_ies::fake_deprecated_wpa1_vendor_ie,
     };
 
     #[test]
@@ -665,7 +662,7 @@ mod tests {
     // Create an Authenticator and Supplicant and performs the entire 4-Way Handshake.
     #[test]
     fn test_supplicant_with_authenticator() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(11.into());
@@ -678,14 +675,19 @@ mod tests {
         assert_eq!(msg4.keyframe().eapol_fields.version, eapol::ProtocolVersion::IEEE802DOT1X2004);
         let (a_ptk, a_gtk) = env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
 
-        // Finally verify that Supplicant and Authenticator derived the same keys.
+        // Verify Supplicant and Authenticator derived the same PTK.
         assert_eq!(s_ptk, a_ptk);
+
+        // Verify Supplicant and Authenticator derived the same GTK and the Key Identifier and
+        // RSC are correct.
         assert_eq!(s_gtk, a_gtk);
+        assert_eq!(s_gtk.key_id(), 1);
+        assert_eq!(s_gtk.key_rsc(), 3);
     }
 
     #[test]
     fn test_wpa3_handshake_generates_igtk_real_authenticator() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa3);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa3, 1, 754);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(11.into());
@@ -701,6 +703,8 @@ mod tests {
         // Finally verify that Supplicant and Authenticator derived the same keys.
         assert_eq!(s_ptk, a_ptk);
         assert_eq!(s_gtk, a_gtk);
+        assert_eq!(s_gtk.key_id(), 1);
+        assert_eq!(s_gtk.key_rsc(), 754);
         assert!(env.supplicant.igtk().is_some());
         assert_eq!(env.supplicant.igtk(), env.authenticator.igtk());
     }
@@ -710,8 +714,12 @@ mod tests {
         igtk: Option<&[u8]>,
     ) -> (Ptk, Vec<SecAssocUpdate>) {
         let anonce = [0xab; 32];
-        let mut supplicant =
-            test_util::make_handshake(test_util::HandshakeKind::Wpa3, super::Role::Supplicant);
+        let mut supplicant = test_util::make_handshake(
+            test_util::HandshakeKind::Wpa3,
+            super::Role::Supplicant,
+            1,
+            3,
+        );
         let msg1_buf = test_util::get_wpa3_4whs_msg1(&anonce[..]);
         let msg1 = msg1_buf.keyframe();
         let updates = test_util::send_msg_to_fourway(&mut supplicant, msg1, 0.into());
@@ -774,10 +782,10 @@ mod tests {
 
     #[test]
     fn test_supplicant_replay_msg3() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         // Use arbitrarily chosen key_replay_counter.
-        let msg1 = env.initiate(12.into());
+        let msg1 = env.initiate(11.into());
         let (msg2, _) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
         let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
         let (_, s_ptk, s_gtk) = env.send_msg3_to_supplicant(msg3.keyframe(), 12.into());
@@ -804,7 +812,7 @@ mod tests {
 
     #[test]
     fn test_supplicant_replay_msg3_different_gtk() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(11.into());
@@ -831,7 +839,7 @@ mod tests {
 
     #[test]
     fn test_random_iv_msg1_v1() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(1.into());
         let mut buf = vec![];
@@ -843,7 +851,7 @@ mod tests {
 
     #[test]
     fn test_random_iv_msg1_v2() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(1.into());
         let mut buf = vec![];
@@ -860,7 +868,7 @@ mod tests {
 
     #[test]
     fn test_random_iv_msg3_v2001() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(11.into());
         let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
@@ -880,7 +888,7 @@ mod tests {
 
     #[test]
     fn test_random_iv_msg3_v2004() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(11.into());
         let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
@@ -900,7 +908,7 @@ mod tests {
 
     #[test]
     fn test_zeroed_iv_msg3_v2004() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(11.into());
         let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
@@ -920,7 +928,7 @@ mod tests {
 
     #[test]
     fn test_random_iv_msg3_v2010() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         let msg1 = env.initiate(11.into());
         let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
@@ -932,26 +940,6 @@ mod tests {
         env.finalize_key_frame(&mut msg3, Some(ptk.kck()));
 
         env.send_msg3_to_supplicant_expect_err(msg3, 12.into());
-    }
-
-    #[test]
-    fn derive_correct_gtk_rsc() {
-        const KEY_RSC: u64 = 981234;
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
-
-        let msg1 = env.initiate(11.into());
-        let (msg2, ptk) = env.send_msg1_to_supplicant(msg1.keyframe(), 11.into());
-        let msg3 = env.send_msg2_to_authenticator(msg2.keyframe(), 12.into());
-        let mut buf = vec![];
-        let mut msg3 = msg3.copy_keyframe_mut(&mut buf);
-        msg3.key_frame_fields.key_rsc = BigEndianU64::from_native(KEY_RSC);
-        env.finalize_key_frame(&mut msg3, Some(ptk.kck()));
-
-        let (msg4, _, s_gtk) = env.send_msg3_to_supplicant(msg3, 12.into());
-        env.send_msg4_to_authenticator(msg4.keyframe(), 13.into());
-
-        // Verify Supplicant picked up the Authenticator's Key RSC.
-        assert_eq!(s_gtk.key_rsc(), KEY_RSC);
     }
 
     fn make_protection_info_with_mfp_parameters(

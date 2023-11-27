@@ -9,26 +9,15 @@ use wlan_common::ie::rsn::cipher::Cipher;
 
 /// This GTK provider does not support key rotations yet.
 #[derive(Debug)]
-pub struct GtkProvider {
-    key: Box<[u8]>,
-    cipher: Cipher,
-}
-
-fn generate_random_gtk(len: usize) -> Box<[u8]> {
-    let mut key = vec![0; len];
-    bytes::rand(&mut key[..]);
-    key.into_boxed_slice()
-}
+pub struct GtkProvider(Gtk);
 
 impl GtkProvider {
-    pub fn new(cipher: Cipher) -> Result<GtkProvider, anyhow::Error> {
-        let tk_len: usize =
-            cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
-        Ok(GtkProvider { cipher, key: generate_random_gtk(tk_len) })
+    pub fn new(cipher: Cipher, key_id: u8, key_rsc: u64) -> Result<GtkProvider, Error> {
+        Ok(GtkProvider(Gtk::generate_random(cipher, key_id, key_rsc)?))
     }
 
-    pub fn get_gtk(&self) -> Result<Gtk, Error> {
-        Gtk::from_bytes(self.key.clone(), self.cipher.clone(), 0, 0)
+    pub fn get_gtk(&self) -> &Gtk {
+        &self.0
     }
 }
 
@@ -64,21 +53,44 @@ impl Hash for Gtk {
 }
 
 impl Gtk {
+    pub fn generate_random(cipher: Cipher, key_id: u8, key_rsc: u64) -> Result<Gtk, Error> {
+        // IEEE 802.11-2016 12.7.4 EAPOL-Key frame notation
+        rsn_ensure!(
+            0 < key_id && key_id < 4,
+            "GTK key ID must not be zero and must fit in a two bit field"
+        );
+
+        let tk_len: usize =
+            cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
+        let mut gtk_bytes: Box<[u8]> = vec![0; tk_len].into();
+        bytes::rand(&mut gtk_bytes[..]);
+
+        Ok(Gtk { bytes: gtk_bytes, cipher, tk_len, key_id, key_rsc })
+    }
+
     pub fn from_bytes(
-        bytes: Box<[u8]>,
+        gtk_bytes: Box<[u8]>,
         cipher: Cipher,
         key_id: u8,
         key_rsc: u64,
     ) -> Result<Gtk, Error> {
+        // IEEE 802.11-2016 12.7.4 EAPOL-Key frame notation
+        rsn_ensure!(
+            0 < key_id && key_id < 4,
+            "GTK key ID must not be zero and must fit in a two bit field"
+        );
+
         let tk_len: usize =
             cipher.tk_bytes().ok_or(Error::GtkHierarchyUnsupportedCipherError)?.into();
-        rsn_ensure!(bytes.len() >= tk_len, "GTK must be larger than the resulting TK");
-        Ok(Gtk { cipher, bytes, tk_len, key_id, key_rsc })
+        rsn_ensure!(gtk_bytes.len() >= tk_len, "GTK must be larger than the resulting TK");
+
+        Ok(Gtk { bytes: gtk_bytes, cipher, tk_len, key_id, key_rsc })
     }
 
     pub fn cipher(&self) -> &Cipher {
         &self.cipher
     }
+
     pub fn key_id(&self) -> u8 {
         self.key_id
     }
@@ -104,15 +116,38 @@ mod tests {
     fn generated_gtks_are_not_zero_and_not_constant_with_high_probability() {
         let mut gtks = HashSet::new();
         for i in 0..10 {
-            let provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 })
-                .expect("failed creating GTK Provider");
-            let gtk = provider.get_gtk().expect("could not read GTK").tk().to_vec();
-            assert!(gtk.iter().any(|&x| x != 0));
-            if i > 0 && !gtks.contains(&gtk) {
+            let provider =
+                GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 2, 5)
+                    .expect("failed creating GTK Provider");
+            let gtk_bytes: Box<[u8]> = provider.get_gtk().tk().into();
+            assert!(gtk_bytes.iter().any(|&x| x != 0));
+            if i > 0 && !gtks.contains(&gtk_bytes) {
                 return;
             }
-            gtks.insert(gtk);
+            gtks.insert(gtk_bytes);
         }
         panic!("GtkProvider::generate_gtk() generated the same GTK 10 times in a row.");
+    }
+
+    #[test]
+    fn generated_gtk_captures_key_id() {
+        let provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 1, 3)
+            .expect("failed creating GTK Provider");
+        let gtk = provider.get_gtk();
+        assert_eq!(gtk.key_id(), 1);
+    }
+
+    #[test]
+    fn generated_gtk_captures_key_rsc() {
+        let provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 1, 3)
+            .expect("failed creating GTK Provider");
+        let gtk = provider.get_gtk();
+        assert_eq!(gtk.key_rsc(), 3);
+    }
+
+    #[test]
+    fn gtk_generation_fails_with_key_id_zero() {
+        GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 0, 4)
+            .expect_err("GTK provider incorrectly accepts key ID 0");
     }
 }

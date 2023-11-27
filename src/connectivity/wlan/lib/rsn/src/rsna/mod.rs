@@ -591,7 +591,7 @@ mod tests {
     fn test_supplicant_sends_zeroed_and_non_zeroed_key_length() {
         let protection = NegotiatedProtection::from_rsne(&fake_wpa2_s_rsne())
             .expect("could not derive negotiated RSNE");
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(11.into());
@@ -619,7 +619,7 @@ mod tests {
     // the PTK's length.
     #[test]
     fn test_supplicant_sends_random_key_length() {
-        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2);
+        let mut env = test_util::FourwayTestEnv::new(test_util::HandshakeKind::Wpa2, 1, 3);
 
         // Use arbitrarily chosen key_replay_counter.
         let msg1 = env.initiate(12.into());

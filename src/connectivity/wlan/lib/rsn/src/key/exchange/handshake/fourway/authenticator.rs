@@ -227,7 +227,8 @@ fn process_message_2<B: ByteSlice>(
         .ok_or_else(|| format_err!("GtkProvider is missing"))?
         .lock()
         .unwrap()
-        .get_gtk()?;
+        .get_gtk()
+        .clone();
     let igtk = match fourway::get_group_mgmt_cipher(&cfg.s_protection, &cfg.a_protection)
         .map_err(|e| format_err!("group mgmt cipher error: {:?}", e))?
     {
@@ -429,7 +430,7 @@ fn create_message_3(
             *key_replay_counter,
             eapol::to_array(anonce),
             key_iv,
-            0, // rsc
+            gtk.key_rsc(),
         ),
         encrypted_key_data,
         protection.mic_size as usize,

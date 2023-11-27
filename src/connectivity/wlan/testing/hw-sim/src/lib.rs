@@ -283,7 +283,7 @@ pub fn create_authenticator(
 ) -> wlan_rsn::Authenticator {
     let nonce_rdr =
         wlan_rsn::nonce::NonceReader::new(&bssid.clone().into()).expect("creating nonce reader");
-    let gtk_provider = wlan_rsn::GtkProvider::new(gtk_cipher).expect("creating gtk provider");
+    let gtk_provider = wlan_rsn::GtkProvider::new(gtk_cipher, 1, 0).expect("creating gtk provider");
 
     let advertised_protection_info = match advertised_protection {
         Protection::Wpa3Personal => wlan_rsn::ProtectionInfo::Rsne(rsne::Rsne::wpa3_rsne()),

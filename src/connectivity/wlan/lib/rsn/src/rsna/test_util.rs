@@ -72,7 +72,7 @@ pub fn get_wpa2_supplicant() -> Supplicant {
 }
 
 pub fn get_wpa2_authenticator() -> Authenticator {
-    let gtk_provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 })
+    let gtk_provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 1, 0)
         .expect("error creating GtkProvider");
     let nonce_rdr = NonceReader::new(&S_ADDR).expect("error creating Reader");
     let psk = psk::compute("ThisIsAPassword".as_bytes(), &Ssid::try_from("ThisIsASSID").unwrap())
@@ -108,7 +108,7 @@ pub fn get_wpa3_supplicant() -> Supplicant {
 }
 
 pub fn get_wpa3_authenticator() -> Authenticator {
-    let gtk_provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 })
+    let gtk_provider = GtkProvider::new(Cipher { oui: OUI, suite_type: cipher::CCMP_128 }, 1, 0)
         .expect("error creating GtkProvider");
     let igtk_provider =
         IgtkProvider::new(DEFAULT_GROUP_MGMT_CIPHER).expect("error creating IgtkProvider");
@@ -429,10 +429,12 @@ fn make_fourway_cfg(
     cipher: Cipher,
     s_protection: ProtectionInfo,
     a_protection: ProtectionInfo,
+    gtk_key_id: u8,
+    gtk_key_rsc: u64,
 ) -> fourway::Config {
     let gtk_provider = match role {
         Role::Authenticator => Some(Arc::new(Mutex::new(
-            GtkProvider::new(cipher).expect("error creating GtkProvider"),
+            GtkProvider::new(cipher, gtk_key_id, gtk_key_rsc).expect("error creating GtkProvider"),
         ))),
         Role::Supplicant => None,
     };
@@ -464,25 +466,26 @@ fn make_fourway_cfg(
     .expect("could not construct PTK exchange method")
 }
 
-pub fn make_wpa2_fourway_cfg(role: Role) -> fourway::Config {
+pub fn make_wpa2_fourway_cfg(role: Role, gtk_key_id: u8, gtk_key_rsc: u64) -> fourway::Config {
     let cipher = Cipher { oui: OUI, suite_type: cipher::CCMP_128 };
     let s_protection = ProtectionInfo::Rsne(fake_wpa2_s_rsne());
     let a_protection = ProtectionInfo::Rsne(fake_wpa2_a_rsne());
-    make_fourway_cfg(role, cipher, s_protection, a_protection)
+    make_fourway_cfg(role, cipher, s_protection, a_protection, gtk_key_id, gtk_key_rsc)
 }
 
-pub fn make_wpa3_fourway_cfg(role: Role) -> fourway::Config {
+pub fn make_wpa3_fourway_cfg(role: Role, gtk_key_id: u8, gtk_key_rsc: u64) -> fourway::Config {
     let cipher = Cipher { oui: OUI, suite_type: cipher::CCMP_128 };
     let s_protection = ProtectionInfo::Rsne(fake_wpa3_s_rsne());
     let a_protection = ProtectionInfo::Rsne(fake_wpa3_a_rsne());
-    make_fourway_cfg(role, cipher, s_protection, a_protection)
+    make_fourway_cfg(role, cipher, s_protection, a_protection, gtk_key_id, gtk_key_rsc)
 }
 
 pub fn make_wpa1_fourway_cfg() -> fourway::Config {
     let cipher = Cipher { oui: Oui::MSFT, suite_type: cipher::TKIP };
     let s_protection = ProtectionInfo::LegacyWpa(fake_wpa_ie());
     let a_protection = ProtectionInfo::LegacyWpa(fake_wpa_ie());
-    make_fourway_cfg(Role::Supplicant, cipher, s_protection, a_protection)
+    // There is no WPA1 Authenticator implementation, so the key id and rsc arguments do not matter.
+    make_fourway_cfg(Role::Supplicant, cipher, s_protection, a_protection, 1, 0)
 }
 
 #[derive(Clone, Copy)]
@@ -491,12 +494,23 @@ pub enum HandshakeKind {
     Wpa3,
 }
 
-pub fn make_handshake(handshake_kind: HandshakeKind, role: Role) -> Fourway {
+pub fn make_handshake(
+    handshake_kind: HandshakeKind,
+    role: Role,
+    gtk_key_id: u8,
+    gtk_key_rsc: u64,
+) -> Fourway {
     match handshake_kind {
-        HandshakeKind::Wpa2 => Fourway::new(make_wpa2_fourway_cfg(role), PMK.clone().into_vec())
-            .expect("error while creating WPA2 4-Way Handshake"),
-        HandshakeKind::Wpa3 => Fourway::new(make_wpa3_fourway_cfg(role), PMK.clone().into_vec())
-            .expect("error while creating WPA3 4-Way Handshake"),
+        HandshakeKind::Wpa2 => Fourway::new(
+            make_wpa2_fourway_cfg(role, gtk_key_id, gtk_key_rsc),
+            PMK.clone().into_vec(),
+        )
+        .expect("error while creating WPA2 4-Way Handshake"),
+        HandshakeKind::Wpa3 => Fourway::new(
+            make_wpa3_fourway_cfg(role, gtk_key_id, gtk_key_rsc),
+            PMK.clone().into_vec(),
+        )
+        .expect("error while creating WPA3 4-Way Handshake"),
     }
 }
 
@@ -696,10 +710,15 @@ fn make_verified<B: ByteSlice + std::fmt::Debug>(
 }
 
 impl FourwayTestEnv {
-    pub fn new(handshake_kind: HandshakeKind) -> FourwayTestEnv {
+    pub fn new(handshake_kind: HandshakeKind, gtk_key_id: u8, gtk_key_rsc: u64) -> FourwayTestEnv {
         FourwayTestEnv {
-            supplicant: make_handshake(handshake_kind, Role::Supplicant),
-            authenticator: make_handshake(handshake_kind, Role::Authenticator),
+            supplicant: make_handshake(handshake_kind, Role::Supplicant, gtk_key_id, gtk_key_rsc),
+            authenticator: make_handshake(
+                handshake_kind,
+                Role::Authenticator,
+                gtk_key_id,
+                gtk_key_rsc,
+            ),
         }
     }
 

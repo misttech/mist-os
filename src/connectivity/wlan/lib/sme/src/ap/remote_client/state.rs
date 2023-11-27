@@ -79,7 +79,16 @@ fn new_authenticator_from_rsne(
     ensure!(s_rsne.is_valid_subset_of(&a_rsn.rsne)?, "incompatible client RSNE");
 
     let nonce_reader = NonceReader::new(&device_addr)?;
-    let gtk_provider = GtkProvider::new(NegotiatedProtection::from_rsne(&s_rsne)?.group_data)?;
+
+    // TODO(b/311404887): |key_id| should be based on the current rotation. This
+    // ESSSA implementation does not support GTK key rotation by an
+    // Authenticator.
+    //
+    // TODO(b/311404887): |key_rsc| should be based on the packet number of GTK
+    // encrypted packets. This ESSSA implementation does not support tracking the
+    // packet number of GTK encrypted packets.
+    let gtk_provider =
+        GtkProvider::new(NegotiatedProtection::from_rsne(&s_rsne)?.group_data, 1, 0)?;
 
     Ok(Box::new(wlan_rsn::Authenticator::new_wpa2psk_ccmp128(
         // Note: There should be one Reader per device, not per SME.
