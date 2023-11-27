@@ -136,6 +136,15 @@ where
             }
         }
     }
+
+    fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
+        let span = ctx.span(id).expect("span exists. Internal tracing bug if it doesn't");
+        let mut extensions = span.extensions_mut();
+        // TODO(b/312805612): this should update rather than overwrite.
+        if let Ok(encoded) = EncodedSpanArguments::from_record(values) {
+            extensions.replace(encoded);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -464,6 +473,51 @@ mod tests {
         expected.arguments.push(Argument {
             name: "message".into(),
             value: Value::Text("this should have outer span fields".into()),
+        });
+        assert_eq!(observed, expected);
+    }
+
+    #[fuchsia::test(logging = false)]
+    async fn update_spans() {
+        let socket = init_sink(SinkConfig::default()).await;
+        let mut buf = [0u8; MAX_DATAGRAM_LEN_BYTES as _];
+        let mut next_message = || {
+            let len = socket.read(&mut buf).unwrap();
+            let (record, _) = parse_record(&buf[..len]).unwrap();
+            assert_eq!(socket.outstanding_read_bytes().unwrap(), 0, "socket must be empty");
+            record
+        };
+
+        let span = info_span!("span 1", tag = "foo");
+        let _s1 = span.enter();
+        info!("this should have span fields");
+
+        let observed = next_message();
+        let mut expected = Record {
+            timestamp: observed.timestamp,
+            severity: Severity::Info,
+            arguments: arg_prefix(),
+        };
+        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
+        expected.arguments.push(Argument {
+            name: "message".into(),
+            value: Value::Text("this should have span fields".into()),
+        });
+        assert_eq!(observed, expected);
+
+        span.record("tag", "bar");
+        info!("this should have updated span fields");
+        let observed = next_message();
+
+        let mut expected = Record {
+            timestamp: observed.timestamp,
+            severity: Severity::Info,
+            arguments: arg_prefix(),
+        };
+        expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("bar".into()) });
+        expected.arguments.push(Argument {
+            name: "message".into(),
+            value: Value::Text("this should have updated span fields".into()),
         });
         assert_eq!(observed, expected);
     }

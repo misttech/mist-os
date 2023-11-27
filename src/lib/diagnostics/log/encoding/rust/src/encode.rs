@@ -259,6 +259,17 @@ impl EncodedSpanArguments {
         Ok(Self { encoder })
     }
 
+    /// Encodes the given span attributes, replacing existing ones.
+    // TODO(b/312805612): this should update rather than overwrite.
+    pub fn from_record(record: &span::Record<'_>) -> Result<Self, EncodingError> {
+        let mut encoder = Encoder::new(Cursor::new(ResizableBuffer(Vec::new())));
+        record.record(&mut encoder);
+        if let Some(err) = encoder.found_error {
+            return Err(err);
+        }
+        Ok(Self { encoder })
+    }
+
     fn copy_to<B: MutableBuffer>(&self, encoder: &mut Encoder<B>) -> Result<(), EncodingError> {
         let buffer = self.encoder.inner();
         let end = buffer.cursor().min(buffer.get_ref().0.len());
