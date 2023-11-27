@@ -606,9 +606,7 @@ pub struct NetCfg<'a> {
     install_only: bool,
     // Makes sure that all interfaces added by netcfg have the specified prefix.
     interface_name_prefix: String,
-    // TODO(fxbug.dev/135109): Begin using configuration based naming policy
     // Policy configuration to determine the name of an interface.
-    #[allow(unused)]
     interface_naming_policy: Vec<interface::NamingRule>,
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
@@ -1972,6 +1970,7 @@ impl<'a> NetCfg<'a> {
                 &topological_path,
                 &mac,
                 *device_class,
+                &self.interface_naming_policy,
             ) {
                 Ok(name) => name.to_string(),
                 Err(interface::NameGenerationError::FileUpdateError { name, err }) => {

@@ -96,14 +96,12 @@ impl Config {
         })
     }
 
-    // TODO(fxbug.dev/135159): Refactor this once 'default' configuration
-    // is defined and passed in from `lib.rs` as a naming fallback.
-    fn generate_name(&self, info: &DeviceInfoRef<'_>) -> Result<String, NameGenerationError> {
-        let naming_rule = NamingRule {
-            matchers: HashSet::new(),
-            naming_scheme: vec![NameCompositionRule::Default],
-        };
-        naming_rule.generate_name(&self.interfaces, &info)
+    fn generate_name(
+        &self,
+        info: &DeviceInfoRef<'_>,
+        naming_rules: &[NamingRule],
+    ) -> Result<String, NameGenerationError> {
+        generate_name_from_naming_rules(naming_rules, &self.interfaces, &info)
     }
 }
 
@@ -279,6 +277,7 @@ impl<'a> FileBackedConfig<'a> {
         topological_path: &str,
         mac: &fidl_fuchsia_net_ext::MacAddress,
         device_class: fidl_fuchsia_hardware_network::DeviceClass,
+        naming_rules: &[NamingRule],
     ) -> Result<&str, NameGenerationError> {
         let persistent_id = self.config.generate_identifier(topological_path, mac);
         let info = DeviceInfoRef { topological_path, mac, device_class };
@@ -294,7 +293,7 @@ impl<'a> FileBackedConfig<'a> {
             // name. Remove and generate a new name.
             let _interface_config = self.config.interfaces.remove(index);
         }
-        let generated_name = self.config.generate_name(&info)?;
+        let generated_name = self.config.generate_name(&info, naming_rules)?;
         let () = self.config.interfaces.push(InterfaceConfig {
             id: persistent_id,
             name: generated_name,
@@ -457,7 +456,6 @@ impl MatchingRule {
 }
 
 impl ProvisioningMatchingRule {
-    #[allow(unused)]
     fn does_interface_match(
         &self,
         info: &DeviceInfoRef<'_>,
@@ -641,7 +639,6 @@ impl NamingRule {
 
 // Find the first `NamingRule` that matches the device and attempt to
 // construct a name from the provided `NameCompositionRule`s.
-#[allow(unused)]
 fn generate_name_from_naming_rules(
     naming_rules: &[NamingRule],
     interfaces: &[InterfaceConfig],
@@ -651,13 +648,23 @@ fn generate_name_from_naming_rules(
     // fallback rules when name generation fails.
     // Use the first naming rule that matches the interface to enforce consistent
     // interface names, even if there are other matching rules.
+    let fallback_rule = fallback_naming_rule();
     let first_matching_rule =
-        naming_rules.iter().find(|rule| rule.does_interface_match(&info)).expect(
-            "There must always be at least one NamingRule that matches. \
-                 The fallback naming rules should match any interface.",
+        naming_rules.iter().find(|rule| rule.does_interface_match(&info)).unwrap_or(
+            // When there are no `NamingRule`s that match the device,
+            // use a fallback rule that has the Default naming scheme.
+            &fallback_rule,
         );
 
     first_matching_rule.generate_name(interfaces, &info)
+}
+
+// Matches any device and uses the default naming rule.
+fn fallback_naming_rule() -> NamingRule {
+    NamingRule {
+        matchers: HashSet::from([MatchingRule::Any(true)]),
+        naming_scheme: vec![NameCompositionRule::Default],
+    }
 }
 
 /// Whether the interface should be provisioned locally by netcfg, or
@@ -824,11 +831,14 @@ mod tests {
     ) {
         let config = Config { interfaces: vec![] };
         let name = config
-            .generate_name(&DeviceInfoRef {
-                device_class: device_class_from_interface_type(interface_type),
-                mac: &fidl_fuchsia_net_ext::MacAddress { octets: mac },
-                topological_path,
-            })
+            .generate_name(
+                &DeviceInfoRef {
+                    device_class: device_class_from_interface_type(interface_type),
+                    mac: &fidl_fuchsia_net_ext::MacAddress { octets: mac },
+                    topological_path,
+                },
+                &[],
+            )
             .expect("failed to generate the name");
         assert_eq!(name, want_name);
     }
@@ -913,6 +923,7 @@ mod tests {
                     topological_path,
                     &fidl_fuchsia_net_ext::MacAddress { octets: mac },
                     device_class_from_interface_type(interface_type),
+                    &[],
                 )
                 .expect("failed to get the interface name");
             assert_eq!(name, want_name);
@@ -952,11 +963,16 @@ mod tests {
                 assert_eq!(config.interfaces[index].name, format!("{}{:x}", "wlanx", n));
             } else {
                 let name = config
-                    .generate_name(&DeviceInfoRef {
-                        device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
-                        mac: &fidl_fuchsia_net_ext::MacAddress { octets },
-                        topological_path: topo_usb,
-                    })
+                    .generate_name(
+                        &DeviceInfoRef {
+                            device_class: device_class_from_interface_type(
+                                crate::InterfaceType::Wlan,
+                            ),
+                            mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                            topological_path: topo_usb,
+                        },
+                        &[],
+                    )
                     .expect("failed to generate the name");
                 assert_eq!(name, format!("{}{:x}", "wlanx", n));
                 config.interfaces.push(InterfaceConfig {
@@ -968,11 +984,14 @@ mod tests {
         }
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
         assert!(config
-            .generate_name(&DeviceInfoRef {
-                device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
-                mac: &fidl_fuchsia_net_ext::MacAddress { octets },
-                topological_path: topo_usb
-            })
+            .generate_name(
+                &DeviceInfoRef {
+                    device_class: device_class_from_interface_type(crate::InterfaceType::Wlan),
+                    mac: &fidl_fuchsia_net_ext::MacAddress { octets },
+                    topological_path: topo_usb
+                },
+                &[]
+            )
             .is_err());
     }
 
@@ -1680,11 +1699,7 @@ mod tests {
                     matchers: HashSet::from([MatchingRule::Any(match_first_rule)]),
                     naming_scheme: vec![NameCompositionRule::Static { value: String::from("x") }],
                 },
-                NamingRule {
-                    matchers: HashSet::from([MatchingRule::Any(true)]),
-                    naming_scheme: vec![NameCompositionRule::Default],
-                },
-                // Include an arbitrary rule after the catch-all fallback rule
+                // Include an arbitrary rule that matches no interface
                 // to ensure that it has no impact on the test.
                 NamingRule {
                     matchers: HashSet::from([MatchingRule::Any(false)]),
