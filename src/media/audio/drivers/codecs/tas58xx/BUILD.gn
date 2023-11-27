@@ -58,6 +58,11 @@ fuchsia_driver_component("tas58xx") {
   manifest = "meta/tas58xx.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "tas58xx"
+  driver_components = [ ":tas58xx" ]
+}
+
 test("tas58xx-test") {
   output_name = "tas58xx-test"
   configs += [ "//build/config:all_source" ]

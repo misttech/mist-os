@@ -57,6 +57,11 @@ fuchsia_driver_component("aml-thermal-s905d2g-legacy") {
   manifest = "meta/aml-thermal-s905d2g-legacy.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-thermal-s905d2g-legacy"
+  driver_components = [ ":aml-thermal-s905d2g-legacy" ]
+}
+
 test("aml-thermal-s905d2g-legacy-test-bin") {
   configs += [ "//build/config:all_source" ]
   output_name = "aml-thermal-s905d2g-legacy-test"

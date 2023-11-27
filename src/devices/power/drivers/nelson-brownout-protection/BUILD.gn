@@ -53,6 +53,11 @@ fuchsia_driver_component("nelson-brownout-protection") {
   manifest = "meta/nelson-brownout-protection.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "nelson-brownout-protection"
+  driver_components = [ ":nelson-brownout-protection" ]
+}
+
 test("nelson-brownout-protection-test-bin") {
   output_name = "nelson-brownout-protection-test"
   configs += [ "//build/config:all_source" ]

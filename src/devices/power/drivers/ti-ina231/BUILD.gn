@@ -57,6 +57,11 @@ fuchsia_driver_component("ti-ina231") {
   manifest = "meta/ti-ina231.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ti-ina231"
+  driver_components = [ ":ti-ina231" ]
+}
+
 test("ti-ina231-test-bin") {
   output_name = "ti-ina231-test"
   configs += [ "//build/config:all_source" ]

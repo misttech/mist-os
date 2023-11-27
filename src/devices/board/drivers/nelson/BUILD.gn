@@ -281,6 +281,11 @@ fuchsia_driver_component("nelson-module") {
   manifest = "meta/nelson-module.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "nelson-module"
+  driver_components = [ ":nelson-module" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

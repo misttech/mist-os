@@ -48,3 +48,8 @@ fuchsia_driver_component("nelson-usb-phy") {
   deps = [ ":nelson-usb-phy-driver" ]
   manifest = "meta/nelson-usb-phy.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "nelson-usb-phy"
+  driver_components = [ ":nelson-usb-phy" ]
+}

@@ -107,3 +107,8 @@ fuchsia_driver_component("aml-spi") {
   deps = [ ":aml-spi-driver" ]
   manifest = "meta/aml-spi.cml"
 }
+
+fuchsia_driver_package("package") {
+  package_name = "aml-spi"
+  driver_components = [ ":aml-spi" ]
+}

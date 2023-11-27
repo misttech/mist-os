@@ -48,6 +48,11 @@ fuchsia_driver_component("shtv3") {
   manifest = "meta/shtv3.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "shtv3"
+  driver_components = [ ":shtv3" ]
+}
+
 test("shtv3-test-bin") {
   output_name = "shtv3-test"
   sources = [
