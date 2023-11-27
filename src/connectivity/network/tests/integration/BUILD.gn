@@ -106,6 +106,7 @@ package_deps = [
   # netcfg integration with netstack is tested.
   ":netcfg-netemul-config",
   ":netcfg-with-dhcpv6-netemul-config",
+  ":netcfg-with-duplicate-names",
   ":netcfg-with-forwarding-netemul-config",
   ":netcfg-with-iface-name-prefix",
   ":netcfg-without-provisioning-netemul-config",
@@ -207,6 +208,12 @@ resource("netcfg-with-iface-name-prefix") {
   testonly = true
   sources = [ "management/config/iface_prefix.json" ]
   outputs = [ "netcfg/iface_prefix.json" ]
+}
+
+resource("netcfg-with-duplicate-names") {
+  testonly = true
+  sources = [ "management/config/duplicate_names.json" ]
+  outputs = [ "netcfg/duplicate_names.json" ]
 }
 
 # We keep tests that involve the virtualization stack (and especially guest

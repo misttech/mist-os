@@ -14,6 +14,8 @@
             matchers: [
                 "test_oir_interface_name_conflict_netcfg_advanced_ns3",
                 "test_oir_interface_name_conflict_netcfg_basic_ns3",
+                "test_oir_interface_name_conflict_known_by_netcfg_netcfg_basic_ns3",
+                "test_oir_interface_name_conflict_known_by_netcfg_netcfg_advanced_ns3",
                 "test_oir_netcfg_advanced_ns3::*",
                 "test_oir_netcfg_basic_ns3::*",
                 "test_prefix_provider_config_error_netcfg_advanced_ns3*",

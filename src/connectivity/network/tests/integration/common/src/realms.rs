@@ -175,6 +175,7 @@ pub enum ManagerConfig {
     Forwarding,
     AllDelegated,
     IfacePrefix,
+    DuplicateNames,
 }
 
 impl ManagerConfig {
@@ -185,6 +186,7 @@ impl ManagerConfig {
             ManagerConfig::Forwarding => "/pkg/netcfg/forwarding.json",
             ManagerConfig::AllDelegated => "/pkg/netcfg/all_delegated.json",
             ManagerConfig::IfacePrefix => "/pkg/netcfg/iface_prefix.json",
+            ManagerConfig::DuplicateNames => "/pkg/netcfg/duplicate_names.json",
         }
     }
 }
@@ -323,7 +325,8 @@ impl<'a> From<&'a KnownServiceProvider> for fnetemul::ChildDef {
                     ManagerConfig::Forwarding
                     | ManagerConfig::Empty
                     | ManagerConfig::AllDelegated
-                    | ManagerConfig::IfacePrefix => false,
+                    | ManagerConfig::IfacePrefix
+                    | ManagerConfig::DuplicateNames => false,
                 };
 
                 fnetemul::ChildDef {

@@ -394,6 +394,105 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
     let () = realm.shutdown().await.expect("failed to shutdown realm");
 }
 
+/// Tests that stable interface name conflicts are handled gracefully.
+/// Different from `test_oir_interface_name_conflict` in that this test
+/// adds two interfaces that are both known by netcfg, and attempt to
+/// use the same name for both.
+#[netstack_test]
+async fn test_oir_interface_name_conflict_known_by_netcfg<M: Manager, N: Netstack>(name: &str) {
+    let sandbox = netemul::TestSandbox::new().expect("create sandbox");
+    let realm = sandbox
+        .create_netstack_realm_with::<N, _, _>(
+            name,
+            &[
+                KnownServiceProvider::Manager {
+                    agent: M::MANAGEMENT_AGENT,
+                    use_dhcp_server: false,
+                    // Use a ManagerConfig that prescribes for each interface
+                    // installed by netcfg to have the same name.
+                    config: ManagerConfig::DuplicateNames,
+                },
+                KnownServiceProvider::DnsResolver,
+                KnownServiceProvider::FakeClock,
+            ],
+        )
+        .expect("create netstack realm");
+
+    let wait_for_netmgr =
+        wait_for_component_stopped(&realm, M::MANAGEMENT_AGENT.get_component_name(), None);
+
+    let interface_state = realm
+        .connect_to_protocol::<fnet_interfaces::StateMarker>()
+        .expect("connect to fuchsia.net.interfaces/State service");
+    let interfaces_stream = fidl_fuchsia_net_interfaces_ext::event_stream_from_state(
+        &interface_state,
+        fnet_interfaces_ext::IncludedAddresses::OnlyAssigned,
+    )
+    .expect("get interface event stream")
+    .map(|r| r.expect("watcher error"))
+    .filter_map(|event| {
+        futures::future::ready(match event {
+            fidl_fuchsia_net_interfaces::Event::Added(
+                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+            )
+            | fidl_fuchsia_net_interfaces::Event::Existing(
+                fidl_fuchsia_net_interfaces::Properties { id, name, .. },
+            ) => Some((id.expect("missing interface ID"), name.expect("missing interface name"))),
+            fidl_fuchsia_net_interfaces::Event::Removed(id) => {
+                let _: u64 = id;
+                None
+            }
+            fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
+            | fidl_fuchsia_net_interfaces::Event::Changed(
+                fidl_fuchsia_net_interfaces::Properties { .. },
+            ) => None,
+        })
+    });
+    let interfaces_stream = futures::stream::select(
+        interfaces_stream,
+        futures::stream::once(wait_for_netmgr.map(|r| panic!("network manager exited {:?}", r))),
+    )
+    .fuse();
+    futures::pin_mut!(interfaces_stream);
+    // Observe the initially existing loopback interface.
+    let _: (u64, String) = interfaces_stream.select_next_some().await;
+
+    // Add a device to the realm and wait for it to be added to the netstack.
+    // All interfaces installed through the netstack should have a name of "x".
+    let if_x = sandbox.create_endpoint("ep1").await.expect("create x");
+    let endpoint_mount_path = netemul::devfs_device_path("ep1");
+    let endpoint_mount_path = endpoint_mount_path.as_path();
+    let () = realm.add_virtual_device(&if_x, endpoint_mount_path).await.unwrap_or_else(|e| {
+        panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
+    });
+
+    let (id_if_x, name_if_x) = interfaces_stream.select_next_some().await;
+    assert_eq!(&name_if_x, "x", "first interface should use the configuration based static name");
+
+    // Add another device from the network manager with the same name and
+    // ensure that the component continues to run.
+    let if_other = sandbox.create_endpoint("ep2").await.expect("create other");
+    let endpoint_mount_path = netemul::devfs_device_path("ep2");
+    let endpoint_mount_path = endpoint_mount_path.as_path();
+    let () = realm.add_virtual_device(&if_other, endpoint_mount_path).await.unwrap_or_else(|e| {
+        panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
+    });
+
+    // TODO(fxbug.dev/56559): Update this assertion once Netcfg's temporary
+    // naming policy is removed.
+    let (id, name) = interfaces_stream.select_next_some().await;
+    assert_ne!(id, id_if_x);
+    assert_eq!(&name, "etht0", "second interface from network manager should use a temporary name");
+
+    // Wait for orderly shutdown of the test realm to complete before allowing
+    // test interfaces to be cleaned up.
+    //
+    // This is necessary to prevent test interfaces from being removed while
+    // NetCfg is still in the process of configuring them after adding them to
+    // the Netstack, which causes spurious errors.
+    let () = realm.shutdown().await.expect("failed to shutdown realm");
+}
+
 /// Make sure the DHCP server is configured to start serving requests when NetCfg discovers
 /// a WLAN AP interface and stops serving when the interface is removed.
 ///
