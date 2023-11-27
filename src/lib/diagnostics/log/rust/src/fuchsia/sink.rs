@@ -431,8 +431,28 @@ mod tests {
         let span = info_span!("span 1", tag = "foo");
         let _s1 = span.enter();
         let span2 = info_span!("span 2", key = 2);
-        let _s2 = span2.enter();
-        info!("this should have span fields");
+        {
+            let _s2 = span2.enter();
+            info!("this should have span fields");
+            let observed = next_message();
+
+            let mut expected = Record {
+                timestamp: observed.timestamp,
+                severity: Severity::Info,
+                arguments: arg_prefix(),
+            };
+            expected
+                .arguments
+                .push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
+            expected.arguments.push(Argument { name: "key".into(), value: Value::SignedInt(2) });
+            expected.arguments.push(Argument {
+                name: "message".into(),
+                value: Value::Text("this should have span fields".into()),
+            });
+            assert_eq!(observed, expected);
+        }
+
+        info!("this should have outer span fields");
         let observed = next_message();
 
         let mut expected = Record {
@@ -441,10 +461,9 @@ mod tests {
             arguments: arg_prefix(),
         };
         expected.arguments.push(Argument { name: "tag".into(), value: Value::Text("foo".into()) });
-        expected.arguments.push(Argument { name: "key".into(), value: Value::SignedInt(2) });
         expected.arguments.push(Argument {
             name: "message".into(),
-            value: Value::Text("this should have span fields".into()),
+            value: Value::Text("this should have outer span fields".into()),
         });
         assert_eq!(observed, expected);
     }

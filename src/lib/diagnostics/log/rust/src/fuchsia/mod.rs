@@ -470,7 +470,8 @@ mod tests {
     use super::*;
     use diagnostics_reader::{ArchiveReader, Logs};
     use futures::{future, StreamExt};
-    use tracing::{debug, info};
+    use itertools::Itertools;
+    use tracing::{debug, info, info_span};
 
     #[fuchsia::test(logging = false)]
     async fn verify_setting_minimum_log_severity() {
@@ -500,5 +501,134 @@ mod tests {
             .await;
         assert_eq!(results[0].msg().unwrap(), "I'm an info log");
         assert_eq!(results[1].msg().unwrap(), "I'm a debug log and I show up");
+    }
+
+    #[fuchsia::test]
+    async fn verify_nested_spans() {
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let s1 = info_span!("", key = "span1");
+        info!("Log with no span 1");
+        {
+            let _s1_guard = s1.enter();
+            info!("Log with s1");
+            {
+                let s2 = info_span!("", other = "span2");
+                let _s2_guard = s2.enter();
+                info!("Log with s1 and s2");
+            }
+            info!("Second log with s1");
+        }
+        info!("Log with no span 2");
+
+        let results = logs
+            .filter(|data| {
+                future::ready(data.tags().unwrap().iter().any(|t| t == "verify_nested_spans"))
+            })
+            .take(5)
+            .collect::<Vec<_>>()
+            .await;
+        assert_eq!(results[0].msg().unwrap(), "Log with no span 1");
+        assert!(results[0].payload_keys_strings().collect::<Vec<_>>().is_empty());
+        assert_eq!(results[1].msg().unwrap(), "Log with s1");
+        assert_eq!(
+            results[1].payload_keys_strings().collect::<Vec<_>>(),
+            vec!["key=span1".to_string()]
+        );
+        assert_eq!(results[2].msg().unwrap(), "Log with s1 and s2");
+        assert_eq!(
+            results[2].payload_keys_strings().sorted().collect::<Vec<_>>(),
+            vec!["key=span1".to_string(), "other=span2".to_string()]
+        );
+        assert_eq!(results[3].msg().unwrap(), "Second log with s1");
+        assert_eq!(
+            results[3].payload_keys_strings().collect::<Vec<_>>(),
+            vec!["key=span1".to_string()]
+        );
+        assert_eq!(results[4].msg().unwrap(), "Log with no span 2");
+        assert!(results[4].payload_keys_strings().collect::<Vec<_>>().is_empty());
+    }
+
+    #[fuchsia::test]
+    async fn verify_sibling_spans_nested_scopes() {
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+        let s1 = info_span!("", key = "span1");
+        let s2 = info_span!("", other = "span2");
+        info!("Log with no span 1");
+        {
+            let _s1_guard = s1.enter();
+            info!("Log with s1");
+            {
+                let _s2_guard = s2.enter();
+                info!("Log with s2 only");
+            }
+            info!("Second log with s1");
+        }
+        info!("Log with no span 2");
+
+        let results = logs
+            .filter(|data| {
+                future::ready(
+                    data.tags().unwrap().iter().any(|t| t == "verify_sibling_spans_nested_scopes"),
+                )
+            })
+            .take(5)
+            .collect::<Vec<_>>()
+            .await;
+        assert_eq!(results[0].msg().unwrap(), "Log with no span 1");
+        assert!(results[0].payload_keys_strings().collect::<Vec<_>>().is_empty());
+        assert_eq!(results[1].msg().unwrap(), "Log with s1");
+        assert_eq!(
+            results[1].payload_keys_strings().collect::<Vec<_>>(),
+            vec!["key=span1".to_string()]
+        );
+        assert_eq!(results[2].msg().unwrap(), "Log with s2 only");
+        assert_eq!(
+            results[2].payload_keys_strings().sorted().collect::<Vec<_>>(),
+            vec!["other=span2".to_string()]
+        );
+        assert_eq!(results[3].msg().unwrap(), "Second log with s1");
+        assert_eq!(
+            results[3].payload_keys_strings().collect::<Vec<_>>(),
+            vec!["key=span1".to_string()]
+        );
+        assert_eq!(results[4].msg().unwrap(), "Log with no span 2");
+        assert!(results[4].payload_keys_strings().collect::<Vec<_>>().is_empty());
+    }
+
+    #[fuchsia::test]
+    async fn verify_sibling_spans_multithreaded() {
+        let reader = ArchiveReader::new();
+        let (logs, _) = reader.snapshot_then_subscribe::<Logs>().unwrap().split_streams();
+
+        let total_threads = 300;
+
+        for i in 0..total_threads {
+            std::thread::spawn(move || {
+                let s = info_span!("", thread = i);
+                let _s_guard = s.enter();
+                info!("Log from thread");
+            });
+        }
+
+        let mut results = logs
+            .filter(|data| {
+                future::ready(
+                    data.tags().unwrap().iter().any(|t| t == "verify_sibling_spans_multithreaded"),
+                )
+            })
+            .take(total_threads);
+
+        let mut seen = vec![];
+        while let Some(log) = results.next().await {
+            assert_eq!(log.msg().unwrap(), "Log from thread");
+            let hierarchy = log.payload_keys().unwrap();
+            assert_eq!(hierarchy.properties.len(), 1);
+            assert_eq!(hierarchy.properties[0].name(), "thread");
+            seen.push(hierarchy.properties[0].uint().unwrap() as usize);
+        }
+        seen.sort();
+        assert_eq!(seen, (0..total_threads).collect::<Vec<_>>());
     }
 }
