@@ -14,6 +14,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"syscall"
 
@@ -498,6 +499,8 @@ func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Prefer vendor products in alphabetical order.
+	sort.Strings(dirs)
 	dirs = append(dirs, filepath.Join(checkoutDir, dirname))
 
 	for _, dir := range dirs {
