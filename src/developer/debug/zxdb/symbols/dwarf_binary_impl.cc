@@ -236,14 +236,26 @@ const std::map<std::string, uint64_t> DwarfBinaryImpl::GetPLTSymbols() const {
   return plt_symbols_;
 }
 
-size_t DwarfBinaryImpl::GetUnitCount() const {
+uint32_t DwarfBinaryImpl::GetNormalUnitCount() const {
   auto unit_range = context_->normal_units();
   return unit_range.end() - unit_range.begin();
 }
 
-fxl::RefPtr<DwarfUnit> DwarfBinaryImpl::GetUnitAtIndex(size_t i) {
-  FX_DCHECK(i < GetUnitCount());
-  return FromLLVMUnit(context_->getUnitAtIndex(i));
+uint32_t DwarfBinaryImpl::GetDWOUnitCount() const {
+  auto unit_range = context_->dwo_info_section_units();
+  return unit_range.end() - unit_range.begin();
+}
+
+fxl::RefPtr<DwarfUnit> DwarfBinaryImpl::GetUnitAtIndex(UnitIndex i) {
+  llvm::DWARFUnit* unit = nullptr;
+  if (i.is_dwo) {
+    FX_DCHECK(i.index < context_->getNumDWOCompileUnits());
+    unit = context_->getDWOUnitAtIndex(i.index);
+  } else {
+    FX_DCHECK(i.index < context_->getNumCompileUnits());
+    unit = context_->getUnitAtIndex(i.index);
+  }
+  return FromLLVMUnit(unit);
 }
 
 fxl::RefPtr<DwarfUnit> DwarfBinaryImpl::UnitForRelativeAddress(uint64_t relative_address) {

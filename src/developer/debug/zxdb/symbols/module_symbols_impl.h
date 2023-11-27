@@ -11,6 +11,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "llvm/DebugInfo/DWARF/DWARFUnit.h"
 #include "src/developer/debug/zxdb/common/err.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_symbol_factory.h"
 #include "src/developer/debug/zxdb/symbols/elf_symbol_record.h"
 #include "src/developer/debug/zxdb/symbols/index.h"
 #include "src/developer/debug/zxdb/symbols/location.h"
@@ -39,8 +40,9 @@ class Variable;
 // Represents the symbol interface for a module (executable or shared library). See ModuleSymbols.
 //
 // This provides a high-level interface on top of the DwarfBinary file (low-level stuff), the Index,
-// and the SymbolFactory.
-class ModuleSymbolsImpl final : public ModuleSymbols {
+// and the SymbolFactory. When using "Debug Fission" symbols, it manages multiple DwarfBinary
+// objects for each .dwo file.
+class ModuleSymbolsImpl final : public ModuleSymbols, public DwarfSymbolFactory::Delegate {
  public:
   DwarfBinaryImpl* binary() { return binary_.get(); }
   SymbolFactory* symbol_factory() { return symbol_factory_.get(); }
@@ -67,9 +69,18 @@ class ModuleSymbolsImpl final : public ModuleSymbols {
   bool HasBinary() const override;
   std::optional<uint64_t> GetDebugAddrEntry(uint64_t addr_base, uint64_t index) const override;
 
+  // DwarfSymbolFactory::Delegate implementation.
+  //
+  // This implementation is for the DwarfBinary of the main binary's symbol file. If there are
+  // referenced .dwo files, those will be implemented by DwoInfo.
+  DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
+  std::string GetBuildDirForSymbolFactory() override { return build_dir_; }
+  fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return GetWeakPtr(); }
+
  private:
   FRIEND_MAKE_REF_COUNTED(ModuleSymbolsImpl);
   FRIEND_REF_COUNTED_THREAD_SAFE(ModuleSymbolsImpl);
+  FRIEND_TEST(ModuleSymbols, IndexFission);
   FRIEND_TEST(ModuleSymbols, ResolveMainFunction);
 
   // The input binary must be successfully initialized already.
@@ -149,10 +160,18 @@ class ModuleSymbolsImpl final : public ModuleSymbols {
                                  std::optional<uint64_t> relative_address,
                                  const ElfSymbolRecord& record) const;
 
+  // Fills the index and populates the dwo files.
+  void CreateIndex();
+
   // Fills the forward and backward indices for ELF symbols.
   void FillElfSymbols();
 
   std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null.
+
+  // .dwo files are separate per-source symbols that are referenced by the main binary. Populated
+  // by CreateIndex().
+  class DwoInfo;
+  std::vector<std::unique_ptr<DwoInfo>> dwos_;
 
   std::string build_dir_;
 
@@ -184,6 +203,7 @@ class ModuleSymbolsImpl final : public ModuleSymbols {
   fxl::RefPtr<SymbolFactory> symbol_factory_;
 
   fxl::WeakPtrFactory<ModuleSymbolsImpl> weak_factory_;
+  fxl::WeakPtrFactory<DwarfSymbolFactory::Delegate> symbol_weak_factory_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(ModuleSymbolsImpl);
 };

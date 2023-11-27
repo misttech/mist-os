@@ -267,6 +267,15 @@ if (is_host) {
     ]
     outputs = [ "$root_out_dir/test_data/zxdb/{{source_file_part}}" ]
   }
+
+  host_test_data("fission") {
+    sources = [
+      "test_data/fission/fission",
+      "test_data/fission/main.dwo",
+      "test_data/fission/other.dwo",
+    ]
+    outputs = [ "$root_out_dir/test_data/zxdb/fission/{{source_file_part}}" ]
+  }
 }
 
 source_set("tests") {
@@ -317,6 +326,7 @@ source_set("tests") {
   if (is_host) {
     data_deps = [
       ":dot_buildid",
+      ":fission",
       ":symbol_index_files",
       ":test_elf_file",
       ":test_so",

@@ -20,6 +20,10 @@ DwarfBinary* DwarfUnitImpl::GetBinary() const { return binary_.get(); }
 
 llvm::DWARFUnit* DwarfUnitImpl::GetLLVMUnit() const { return unit_; }
 
+int DwarfUnitImpl::GetDwarfVersion() const { return unit_->getVersion(); }
+
+llvm::DWARFDie DwarfUnitImpl::GetUnitDie() const { return unit_->getUnitDIE(true); }
+
 uint64_t DwarfUnitImpl::FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const {
   if (!binary_)
     return 0;

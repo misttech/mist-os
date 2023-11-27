@@ -148,20 +148,48 @@ bool HasOnlySupportedSpecialIdentifierTypes(const Identifier& ident) {
 
 }  // namespace
 
+// Holds the per-DWO file state. Each DWO file has its own binary and associated symbol factory.
+// This class glues everything together for the DWO via the DwarfSymbolFactory::Delegate interface.
+class ModuleSymbolsImpl::DwoInfo final : public DwarfSymbolFactory::Delegate {
+ public:
+  DwoInfo(std::unique_ptr<DwarfBinaryImpl> binary, std::string build_dir,
+          fxl::WeakPtr<ModuleSymbols> module_symbols)
+      : binary_(std::move(binary)),
+        build_dir_(std::move(build_dir)),
+        module_symbols_(std::move(module_symbols)),
+        weak_factory_(this) {
+    symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(weak_factory_.GetWeakPtr(),
+                                                              DwarfSymbolFactory::kDWO);
+  }
+
+  SymbolFactory* symbol_factory() { return symbol_factory_.get(); }
+
+  // DwarfSymbolFactory::Delegate implementation.
+  DwarfBinaryImpl* GetDwarfBinaryImpl() override { return binary_.get(); }
+  std::string GetBuildDirForSymbolFactory() override { return build_dir_; }
+  fxl::WeakPtr<ModuleSymbols> GetModuleSymbols() override { return module_symbols_; }
+
+ private:
+  std::unique_ptr<DwarfBinaryImpl> binary_;  // Guaranteed non-null.
+  std::string build_dir_;
+  fxl::WeakPtr<ModuleSymbols> module_symbols_;
+  fxl::RefPtr<SymbolFactory> symbol_factory_;
+
+  fxl::WeakPtrFactory<DwarfSymbolFactory::Delegate> weak_factory_;
+};
+
 ModuleSymbolsImpl::ModuleSymbolsImpl(std::unique_ptr<DwarfBinaryImpl> binary,
                                      const std::string& build_dir, bool create_index)
-    : binary_(std::move(binary)), build_dir_(build_dir), weak_factory_(this) {
-  symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(GetWeakPtr());
+    : binary_(std::move(binary)),
+      build_dir_(build_dir),
+      weak_factory_(this),
+      symbol_weak_factory_(this) {
+  symbol_factory_ = fxl::MakeRefCounted<DwarfSymbolFactory>(symbol_weak_factory_.GetWeakPtr(),
+                                                            DwarfSymbolFactory::kMainBinary);
   FillElfSymbols();
 
   if (create_index) {
-    // We could consider creating a new binary/object file just for indexing. The indexing will page
-    // all of the binary in, and most of it won't be needed again (it will be paged back in slowly,
-    // savings may make such a change worth it for large programs as needed).
-    //
-    // Although it will be slightly slower to create, the memory savings may make such a change
-    // worth it for large programs.
-    index_.CreateIndex(*binary_);
+    CreateIndex();
   }
 }
 
@@ -324,7 +352,13 @@ LazySymbol ModuleSymbolsImpl::IndexSymbolRefToSymbol(const IndexNode::SymbolRef&
     case IndexNode::SymbolRef::kDwarf:
     case IndexNode::SymbolRef::kDwarfDeclaration:
       // Handled by the DWARF symbol factory.
-      return symbol_factory_->MakeLazy(ref.offset());
+      if (ref.dwo_index() == IndexNode::SymbolRef::kMainBinary) {
+        return symbol_factory_->MakeLazy(ref.offset());
+      } else {
+        // The dwo_index is set: it is a reference into our dwos_ array.
+        FX_CHECK(ref.dwo_index() >= 0 && ref.dwo_index() < static_cast<int32_t>(dwos_.size()));
+        return dwos_[ref.dwo_index()]->symbol_factory()->MakeLazy(ref.offset());
+      }
   }
   return LazySymbol();
 }
@@ -700,12 +734,12 @@ void ModuleSymbolsImpl::ResolveLineInputLocationForFile(const SymbolContext& sym
                                                         int line_number,
                                                         const ResolveOptions& options,
                                                         std::vector<Location>* output) const {
-  const std::vector<size_t>* units = index_.FindFileUnitIndices(canonical_file);
+  const std::vector<UnitIndex>* units = index_.FindFileUnitIndices(canonical_file);
   if (!units)
     return;
 
   std::vector<LineMatch> matches;
-  for (size_t index : *units) {
+  for (UnitIndex index : *units) {
     fxl::RefPtr<DwarfUnit> unit = binary_->GetUnitAtIndex(index);
     const LineTable& line_table = unit->GetLineTable();
 
@@ -812,6 +846,52 @@ Location ModuleSymbolsImpl::MakeElfSymbolLocation(const SymbolContext& symbol_co
   return Location(
       absolute_address, FileLine(), 0, symbol_context,
       fxl::MakeRefCounted<ElfSymbol>(const_cast<ModuleSymbolsImpl*>(this)->GetWeakPtr(), record));
+}
+
+void ModuleSymbolsImpl::CreateIndex() {
+  // Create the index for the main binary.
+  //
+  // We could consider creating a new binary/object file just for indexing. The indexing will page
+  // all of the binary in, and most of it won't be needed again (it will be paged back in slowly,
+  // savings may make such a change worth it for large programs as needed).
+  //
+  // Although it will be slightly slower to create, the memory savings may make such a change
+  // worth it for large programs.
+  index_.CreateIndex(*binary_, IndexNode::SymbolRef::kMainBinary);
+
+  // Index any referenced .dwo files.
+  dwos_.reserve(index_.dwo_refs().size());
+  for (const SkeletonUnit& skeleton : index_.dwo_refs()) {
+    // By default, the compiler will embed absolute paths to DWO files. Some builds like ours use
+    // relative ones so that symbol files are computer-independent.
+    std::filesystem::path dwo_path;
+    std::filesystem::path comp_dir = skeleton.comp_dir;
+    if (comp_dir.is_absolute()) {
+      dwo_path = comp_dir / skeleton.dwo_name;
+    } else {
+      // When the compilation directories are relative, use our notion of the build dir as the
+      // "current directory."
+      dwo_path = std::filesystem::path(build_dir_) / comp_dir / skeleton.dwo_name;
+    }
+
+    auto dwo_binary =
+        std::make_unique<DwarfBinaryImpl>(dwo_path.string(), dwo_path.string(), std::string());
+    if (Err err = dwo_binary->Load(); err.has_error()) {
+      // TODO(brettw) have a better way to report this error/warning to the frontend.
+      fprintf(stderr, "Can't load DWO binary %s\n", dwo_path.c_str());
+      continue;
+    }
+
+    // TODO(brettw) this is great opportunity for parallelizing symbol loading. Creating the index
+    // for each .dwo file can be done in a thread pool since they're independent, and only the final
+    // merging needs to be done back on the main thread.
+    Index dwo_index;
+    dwo_index.CreateIndex(*dwo_binary, static_cast<int32_t>(dwos_.size()));
+    index_.root().MergeFrom(dwo_index.root());
+
+    dwos_.push_back(
+        std::make_unique<DwoInfo>(std::move(dwo_binary), skeleton.comp_dir, GetWeakPtr()));
+  }
 }
 
 void ModuleSymbolsImpl::FillElfSymbols() {

@@ -47,6 +47,15 @@ inline std::string GetTestFilePath(const std::string& rel_path) {
     path = "./";  // Just hope the current directory works.
   } else {
     path.resize(last_slash + 1);
+
+    // When debugging the tests, the binary will often be run from the "exe.unstripped"
+    // subdirectory. If this exists, trim it because the data will be relative to the regular
+    // location. Note: the "+ 1" skips over the null at the end of the array.
+    const std::string_view kExeUnstripped("exe.unstripped/");
+    if (path.size() > std::size(kExeUnstripped) &&
+        std::equal(std::rbegin(kExeUnstripped), std::rend(kExeUnstripped), path.rbegin())) {
+      path.resize(path.size() - std::size(kExeUnstripped));
+    }
   }
   return path + rel_path;
 }

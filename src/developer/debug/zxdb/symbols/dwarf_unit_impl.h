@@ -28,6 +28,8 @@ class DwarfUnitImpl : public DwarfUnit {
   // DwarfUnit implementation.
   DwarfBinary* GetBinary() const override;
   llvm::DWARFUnit* GetLLVMUnit() const override;
+  int GetDwarfVersion() const override;
+  llvm::DWARFDie GetUnitDie() const override;
   uint64_t GetOffset() const override;
   uint64_t FunctionDieOffsetForRelativeAddress(uint64_t relative_address) const override;
   std::string GetCompilationDir() const override;

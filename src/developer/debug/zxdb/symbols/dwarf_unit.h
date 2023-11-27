@@ -48,6 +48,12 @@ class DwarfUnit : public fxl::RefCountedThreadSafe<DwarfUnit> {
   // we expose a number of LLVM DIE helpers.
   virtual llvm::DWARFUnit* GetLLVMUnit() const = 0;
 
+  // Returns the DWARF specification version of this unit (e.g. "5").
+  virtual int GetDwarfVersion() const = 0;
+
+  // Returns the DWARFDie corresponding to this unit.
+  virtual llvm::DWARFDie GetUnitDie() const = 0;
+
   // Returns the DIE offset, if possible, for the function covering the given absolute/relative
   // address. This will the most specific inlined subroutine if there are any. Returns 0 on failure.
   uint64_t FunctionDieOffsetForAddress(const SymbolContext& symbol_context,

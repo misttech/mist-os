@@ -14,7 +14,6 @@ namespace zxdb {
 
 class SymbolFactory;
 
-// An in-progress replacement for IndexNode. Not ready to use yet.
 class IndexNode {
  public:
   using Map = std::map<std::string, IndexNode>;
@@ -54,15 +53,27 @@ class IndexNode {
       kDwarfDeclaration,  // A DWARF declaration.
     };
 
+    // Special valid of dwo_index_ to indicate it's not in a separate DWO.
+    static constexpr int32_t kMainBinary = -1;
+
     SymbolRef() = default;
-    SymbolRef(Kind kind, uint64_t offset) : kind_(kind), offset_(offset) {}
+    SymbolRef(Kind kind, int32_t dwo_index, uint64_t offset)
+        : kind_(kind), dwo_index_(dwo_index), offset_(offset) {}
 
     Kind kind() const { return kind_; }
     bool is_declaration() const { return kind_ == kDwarfDeclaration; }
+
+    // The DWO index is the index into the child DWO files (when using debug fission) of this
+    // binary. Set to -1 to indicate the symbol is in the main binary instead. When nonnegative,
+    // this is an index into the ModuleSymbolsImpl::dwos_ array.
+    int32_t dwo_index() const { return dwo_index_; }
+    bool is_main_binary() const { return dwo_index_ == kMainBinary; }
+
     uint64_t offset() const { return offset_; }
 
    private:
     Kind kind_ = kNull;
+    int32_t dwo_index_ = kMainBinary;
     uint64_t offset_ = 0;
   };
 
@@ -93,6 +104,8 @@ class IndexNode {
   const Map& MapForKind(Kind kind) const;
   Map& MapForKind(Kind kind);
 
+  void MergeFrom(IndexNode& from);
+
   // AsString is useful only in small unit tests since even a small module can have many megabytes
   // of dump.
   std::string AsString(int indent_level = 0) const;
@@ -111,6 +124,9 @@ class IndexNode {
   const std::vector<SymbolRef>& dies() const { return dies_; }
 
  private:
+  // Does a recursive merge for one specific Kind. Destructively modifies "from"
+  void MergeFromKind(Kind kind, IndexNode& from);
+
   Kind kind_;
 
   // TODO(brettw) evaluate whether we can save a lot of memory using optionally-null unique_ptrs

@@ -4,12 +4,14 @@
 
 #include "src/developer/debug/zxdb/symbols/index.h"
 
+#include <filesystem>
+
 #include "llvm/DebugInfo/DWARF/DWARFContext.h"
 #include "llvm/DebugInfo/DWARF/DWARFDebugInfoEntry.h"
 #include "src/developer/debug/shared/string_util.h"
 #include "src/developer/debug/zxdb/common/adapters.h"
 #include "src/developer/debug/zxdb/common/file_util.h"
-#include "src/developer/debug/zxdb/symbols/dwarf_binary.h"
+#include "src/developer/debug/zxdb/symbols/dwarf_binary_impl.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_decoder.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_die_scanner.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_tag.h"
@@ -29,9 +31,9 @@ class NamedSymbolRef : public IndexNode::SymbolRef {
   NamedSymbolRef() = default;
 
   // Creates a SymbolRef we should index. The pointed-to string must outlive this class.
-  NamedSymbolRef(SymbolRef::Kind kind, uint64_t offset, IndexNode::Kind k, const char* name,
-                 uint64_t decl_offset, bool has_abstract_origin)
-      : SymbolRef(kind, offset),
+  NamedSymbolRef(SymbolRef::Kind kind, int32_t dwo_index, uint64_t offset, IndexNode::Kind k,
+                 const char* name, uint64_t decl_offset, bool has_abstract_origin)
+      : SymbolRef(kind, dwo_index, offset),
         kind_(k),
         name_(name),
         decl_offset_(decl_offset),
@@ -157,8 +159,8 @@ size_t RecursiveCountDies(const IndexNode& node) {
 class UnitIndexer {
  public:
   // All passed-in objects must outlive this class.
-  explicit UnitIndexer(const DwarfUnit& unit)
-      : unit_(unit), scanner_(unit), name_decoder_(*unit.GetBinary()) {
+  explicit UnitIndexer(const DwarfUnit& unit, int32_t dwo_index)
+      : unit_(unit), dwo_index_(dwo_index), scanner_(unit), name_decoder_(*unit.GetBinary()) {
     // The indexable array is 1:1 with the scanner entries.
     indexable_.resize(scanner_.die_count());
 
@@ -217,6 +219,7 @@ class UnitIndexer {
   bool GetAbstractOriginIndex(uint32_t source, uint32_t* abstract_origin_index) const;
 
   const DwarfUnit& unit_;
+  int32_t dwo_index_ = IndexNode::SymbolRef::kMainBinary;
 
   bool force_slow_path_ = false;  // See setter above.
 
@@ -340,12 +343,13 @@ void UnitIndexer::Scan(std::vector<IndexNode::SymbolRef>* main_functions) {
     auto ref_kind = is_declaration && *is_declaration ? IndexNode::SymbolRef::kDwarfDeclaration
                                                       : IndexNode::SymbolRef::kDwarf;
 
-    indexable_[scanner_.die_index()] = NamedSymbolRef(
-        ref_kind, die->getOffset(), kind, name ? *name : "", decl_offset, has_abstract_origin);
+    indexable_[scanner_.die_index()] =
+        NamedSymbolRef(ref_kind, dwo_index_, die->getOffset(), kind, name ? *name : "", decl_offset,
+                       has_abstract_origin);
 
     // Check for "main" function annotation.
     if (kind == IndexNode::Kind::kFunction && is_main_subprogram && *is_main_subprogram)
-      main_functions->emplace_back(IndexNode::SymbolRef::kDwarf, die->getOffset());
+      main_functions->emplace_back(IndexNode::SymbolRef::kDwarf, dwo_index_, die->getOffset());
   }
 }
 
@@ -624,11 +628,22 @@ void RecursiveFindExact(const IndexNode* node, const Identifier& input, size_t i
 
 }  // namespace
 
-void Index::CreateIndex(DwarfBinary& binary, bool force_slow_path) {
-  size_t unit_count = binary.GetUnitCount();
+void Index::CreateIndex(DwarfBinary& binary, int32_t dwo_index, bool force_slow_path) {
+  size_t unit_count = binary.GetNormalUnitCount();
   for (size_t i = 0; i < unit_count; i++) {
-    if (auto unit_ref_ptr = binary.GetUnitAtIndex(i))
-      IndexCompileUnit(*unit_ref_ptr, i, force_slow_path);
+    UnitIndex unit_index(false, i);
+    if (auto unit_ref_ptr = binary.GetUnitAtIndex(unit_index))
+      IndexCompileUnit(*unit_ref_ptr, dwo_index, unit_index, force_slow_path);
+  }
+
+  // Index any DWO units. .dwo files store their units in a separate DWARF section. Normally there
+  // will either be many normal units and no DWO units, or no normal units and exactly one DWO unit.
+  // But this loops over all of both for generality.
+  size_t dwo_unit_count = binary.GetDWOUnitCount();
+  for (size_t i = 0; i < dwo_unit_count; i++) {
+    UnitIndex unit_index(true, i);
+    if (auto unit_ref_ptr = binary.GetUnitAtIndex(unit_index))
+      IndexCompileUnit(*unit_ref_ptr, dwo_index, unit_index, force_slow_path);
   }
 
   IndexFileNames();
@@ -675,7 +690,7 @@ std::vector<std::string> Index::FindFilePrefixes(const std::string& prefix) cons
   return result;
 }
 
-const std::vector<size_t>* Index::FindFileUnitIndices(const std::string& name) const {
+const std::vector<UnitIndex>* Index::FindFileUnitIndices(const std::string& name) const {
   auto found = files_.find(name);
   if (found == files_.end())
     return nullptr;
@@ -684,19 +699,63 @@ const std::vector<size_t>* Index::FindFileUnitIndices(const std::string& name) c
 
 size_t Index::CountSymbolsIndexed() const { return RecursiveCountDies(root_); }
 
-void Index::IndexCompileUnit(const DwarfUnit& unit, size_t unit_index, bool force_slow_path) {
-  UnitIndexer indexer(unit);
-  indexer.set_force_slow_path(force_slow_path);
+void Index::IndexCompileUnit(const DwarfUnit& unit, int32_t dwo_index, UnitIndex unit_index,
+                             bool force_slow_path) {
+  llvm::DWARFDie unit_die = unit.GetUnitDie();
+  if (!unit_die.isValid())
+    return;
 
-  indexer.Scan(&main_functions_);
-  indexer.Index(&root_);
+  if (static_cast<int>(unit_die.getTag()) == static_cast<int>(DwarfTag::kSkeletonUnit)) {
+    IndexSkeletonCompileUnit(unit, unit_die, unit_index);
+  } else {
+    // Normal compilation unit.
+    UnitIndexer indexer(unit, dwo_index);
+    indexer.set_force_slow_path(force_slow_path);
 
+    indexer.Scan(&main_functions_);
+    indexer.Index(&root_);
+
+    IndexCompileUnitSourceFiles(unit, unit_index);
+  }
+}
+
+// Skeleton units are units in the main binary that reference a .dwo file containing the symbols
+// for just that compilation unit. The skeleton unit has the addr_base which defines how addresses
+// are relocated from the link-independent .dwo file, as well as the line table.
+void Index::IndexSkeletonCompileUnit(const DwarfUnit& unit, const llvm::DWARFDie& unit_die,
+                                     UnitIndex unit_index) {
+  DwarfDieDecoder unit_decoder(*unit.GetBinary());
+
+  std::optional<const char*> dwo_name;
+  unit_decoder.AddCString(llvm::dwarf::DW_AT_dwo_name, &dwo_name);
+
+  std::optional<const char*> gnu_dwo_name;
+  unit_decoder.AddCString(llvm::dwarf::DW_AT_GNU_dwo_name, &gnu_dwo_name);
+
+  std::optional<const char*> comp_dir;
+  unit_decoder.AddCString(llvm::dwarf::DW_AT_comp_dir, &comp_dir);
+
+  std::optional<uint64_t> addr_base;
+  unit_decoder.AddSectionOffset(llvm::dwarf::DW_AT_addr_base, &addr_base);
+
+  if (!unit_decoder.Decode(unit_die))
+    return;
+  if ((!dwo_name && !gnu_dwo_name) || !addr_base)
+    return;  // Need a name for the .dwo file to work, plus an address.
+
+  SkeletonUnit& skeleton = dwo_refs_.emplace_back();
+  skeleton.dwo_name = dwo_name ? *dwo_name : *gnu_dwo_name;
+
+  skeleton.comp_dir = comp_dir ? *comp_dir : "";
+  skeleton.addr_base = *addr_base;
+
+  // Even for skeleton units, the line table is still in the main binary.
   IndexCompileUnitSourceFiles(unit, unit_index);
 }
 
 // TODO: It might be nice if the DwarfUnit knew its own undex so it didn't need to be passed in
 // separately.
-void Index::IndexCompileUnitSourceFiles(const DwarfUnit& unit, size_t unit_index) {
+void Index::IndexCompileUnitSourceFiles(const DwarfUnit& unit, UnitIndex unit_index) {
   const llvm::DWARFDebugLine::LineTable* line_table = unit.GetLLVMLineTable();
   if (!line_table)
     return;  // No line table for this unit.

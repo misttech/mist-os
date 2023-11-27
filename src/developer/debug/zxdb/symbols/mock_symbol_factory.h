@@ -30,6 +30,7 @@ class MockSymbolFactory {
   }
 
   fxl::RefPtr<SymbolFactory> factory_ref() const { return factory_; }
+  SymbolFactory* factory() { return factory_.get(); }
   const SymbolFactory* factory() const { return factory_.get(); }
 
   void SetMockSymbol(uint64_t die_offset, fxl::RefPtr<Symbol> symbol) {

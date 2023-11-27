@@ -34,7 +34,6 @@
 #include "src/developer/debug/zxdb/symbols/inherited_from.h"
 #include "src/developer/debug/zxdb/symbols/member_ptr.h"
 #include "src/developer/debug/zxdb/symbols/modified_type.h"
-#include "src/developer/debug/zxdb/symbols/module_symbols_impl.h"
 #include "src/developer/debug/zxdb/symbols/namespace.h"
 #include "src/developer/debug/zxdb/symbols/symbol.h"
 #include "src/developer/debug/zxdb/symbols/template_parameter.h"
@@ -113,15 +112,25 @@ void DisplayDebugTypesSectionWarning() {
 
 }  // namespace
 
-DwarfSymbolFactory::DwarfSymbolFactory(fxl::WeakPtr<ModuleSymbolsImpl> symbols)
-    : symbols_(std::move(symbols)) {}
+DwarfSymbolFactory::DwarfSymbolFactory(fxl::WeakPtr<Delegate> delegate, FileType file_type)
+    : delegate_(std::move(delegate)), file_type_(file_type) {}
 DwarfSymbolFactory::~DwarfSymbolFactory() = default;
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::CreateSymbol(uint64_t die_offset) const {
-  if (!symbols_)
+  if (!delegate_)
     return fxl::MakeRefCounted<Symbol>();
 
-  llvm::DWARFDie die = GetLLVMContext()->getDIEForOffset(die_offset);
+  // LLVMContext::getDIEForOffset() only works for normal (non-DWO) units so we have to look up
+  // manually. This is basically the implementation of getDIEForOffset() with the variable unit
+  // type.
+  const llvm::DWARFUnitVector& unit_vector = file_type_ == kDWO
+                                                 ? GetLLVMContext()->getDWOUnitsVector()
+                                                 : GetLLVMContext()->getNormalUnitsVector();
+  llvm::DWARFUnit* unit = unit_vector.getUnitForOffset(die_offset);
+  if (!unit)
+    return fxl::MakeRefCounted<Symbol>();
+
+  llvm::DWARFDie die = unit->getDIEForOffset(die_offset);
   if (!die.isValid())
     return fxl::MakeRefCounted<Symbol>();
 
@@ -129,7 +138,7 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::CreateSymbol(uint64_t die_offset) const 
 }
 
 llvm::DWARFContext* DwarfSymbolFactory::GetLLVMContext() const {
-  return symbols_->binary()->GetLLVMContext();
+  return delegate_->GetDwarfBinaryImpl()->GetLLVMContext();
 }
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeSymbol(const llvm::DWARFDie& die) const {
@@ -299,11 +308,11 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeFunction(const llvm::DWARFDie& die
     function->set_linkage_name(*linkage_name);
   function->set_code_ranges(GetCodeRanges(die));
   if (decl_file) {
-    function->set_decl_line(
-        MakeFileLine(die.getDwarfUnit(), decl_file, decl_line, symbols_->GetBuildDir()));
+    function->set_decl_line(MakeFileLine(die.getDwarfUnit(), decl_file, decl_line,
+                                         delegate_->GetBuildDirForSymbolFactory()));
   }
-  function->set_call_line(
-      MakeFileLine(die.getDwarfUnit(), call_file, call_line, symbols_->GetBuildDir()));
+  function->set_call_line(MakeFileLine(die.getDwarfUnit(), call_file, call_line,
+                                       delegate_->GetBuildDirForSymbolFactory()));
   if (return_type)
     function->set_return_type(MakeLazy(return_type));
   function->set_frame_base(std::move(frame_base));
@@ -621,12 +630,11 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeCompileUnit(const llvm::DWARFDie& 
     addr_base_opt = *addr_base;
 
   fxl::RefPtr<DwarfUnit> dwarf_unit =
-      fxl::MakeRefCounted<DwarfUnitImpl>(symbols_->binary(), die.getDwarfUnit());
+      fxl::MakeRefCounted<DwarfUnitImpl>(delegate_->GetDwarfBinaryImpl(), die.getDwarfUnit());
 
-  // We know the symbols_ is valid, that was checked on entry to CreateSymbol().
-  return fxl::MakeRefCounted<CompileUnit>(static_cast<ModuleSymbols*>(symbols_.get())->GetWeakPtr(),
-                                          std::move(dwarf_unit), lang_enum, std::move(name_str),
-                                          addr_base_opt);
+  // We know the delegate_ is valid, that was checked on entry to CreateSymbol().
+  return fxl::MakeRefCounted<CompileUnit>(delegate_->GetModuleSymbols(), std::move(dwarf_unit),
+                                          lang_enum, std::move(name_str), addr_base_opt);
 }
 
 fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeDataMember(const llvm::DWARFDie& die) const {
@@ -690,8 +698,8 @@ fxl::RefPtr<Symbol> DwarfSymbolFactory::DecodeDataMember(const llvm::DWARFDie& d
     result->set_data_bit_offset(static_cast<uint32_t>(*data_bit_offset));
   result->set_const_value(std::move(const_value));
   if (decl_file) {
-    result->set_decl_line(
-        MakeFileLine(die.getDwarfUnit(), decl_file, decl_line, symbols_->GetBuildDir()));
+    result->set_decl_line(MakeFileLine(die.getDwarfUnit(), decl_file, decl_line,
+                                       delegate_->GetBuildDirForSymbolFactory()));
   }
   return result;
 }

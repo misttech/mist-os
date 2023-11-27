@@ -90,6 +90,17 @@ IndexNode::Map& IndexNode::MapForKind(Kind kind) {
   return children_[static_cast<int>(kind)];
 }
 
+void IndexNode::MergeFrom(IndexNode& from) {
+  // Append the DIEs directly on this node.
+  dies_.insert(dies_.end(), from.dies_.begin(), from.dies_.end());
+
+  // Merge each sub-type.
+  MergeFromKind(Kind::kNamespace, from);
+  MergeFromKind(Kind::kType, from);
+  MergeFromKind(Kind::kFunction, from);
+  MergeFromKind(Kind::kVar, from);
+}
+
 std::string IndexNode::AsString(int indent_level) const {
   std::ostringstream out;
   Dump(out, nullptr, indent_level);
@@ -132,6 +143,29 @@ void IndexNode::Dump(const std::string& name, std::ostream& out, SymbolFactory* 
 
   out << std::endl;
   Dump(out, factory_for_loc, indent_level);
+}
+
+void IndexNode::MergeFromKind(Kind kind, IndexNode& from) {
+  Map& from_map = from.MapForKind(kind);
+  Map& dest_map = MapForKind(kind);
+
+  auto from_iter = from_map.begin();
+  while (from_iter != from_map.end()) {
+    if (auto dest_found = dest_map.find(from_iter->first); dest_found != dest_map.end()) {
+      // Recursively merge.
+      dest_found->second.MergeFrom(from_iter->second);
+
+      ++from_iter;
+    } else {
+      // New item, can just take the IndexNode and reparent to us.
+
+      // Advance to the next item since moving the current one will invalidate the iterator.
+      auto move_iter = from_iter;
+      ++from_iter;
+
+      dest_map.insert(from_map.extract(move_iter));
+    }
+  }
 }
 
 }  // namespace zxdb

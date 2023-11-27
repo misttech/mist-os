@@ -8,6 +8,7 @@
 #include "llvm/BinaryFormat/ELF.h"
 #include "src/developer/debug/zxdb/symbols/dwarf_unit.h"
 #include "src/developer/debug/zxdb/symbols/symbol_context.h"
+#include "src/developer/debug/zxdb/symbols/unit_index.h"
 
 namespace llvm {
 
@@ -23,6 +24,14 @@ namespace zxdb {
 class SymbolContext;
 
 // Represents the low-level DWARF file. It provides a mockable wrapper around a llvm::DWARFContext.
+//
+// Unlike LLVM, a DwarfBinary represents one DWARF file on disk. In the case of Debug Fission
+// (--gsplit-dwarf mode where each compilation unit has its own symbols in a .dwo file), there will
+// be a separate DwarfBinary for each .dwo file as well as the main binary. These are linked
+// together by ModuleSymbols which represents the symbols for a .so or executable file.
+//
+// In LLVM there will be one llvm::DWARFContext that covers everything but their support for Debug
+// Fission is not complete enough for our use case so we roll our own.
 //
 // This is currently a very leaky abstraction because a lot of code was written before it was
 // created and that coded uses llvm objects directly. As a result, this has some accessors for
@@ -54,9 +63,12 @@ class DwarfBinary {
   virtual const std::map<std::string, llvm::ELF::Elf64_Sym>& GetELFSymbols() const = 0;
   virtual const std::map<std::string, uint64_t> GetPLTSymbols() const = 0;
 
-  // Allows access to compile units in this binary by 0-based index.
-  virtual size_t GetUnitCount() const = 0;
-  virtual fxl::RefPtr<DwarfUnit> GetUnitAtIndex(size_t i) = 0;
+  // Allows access to compile units in this binary. There are two categories, the "normal" units in
+  // .debug_info and the DWO units in .debug_info.dwo. Normally there are only one or the other,
+  // but this isn't guaranteed.
+  virtual uint32_t GetNormalUnitCount() const = 0;
+  virtual uint32_t GetDWOUnitCount() const = 0;
+  virtual fxl::RefPtr<DwarfUnit> GetUnitAtIndex(UnitIndex i) = 0;
 
   // Returns the DwarfUnit covering the given absolute address location. Can be null if there's
   // no unit that covers this area.
