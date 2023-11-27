@@ -15,8 +15,6 @@ import("//build/product.gni")
 
 assert(current_toolchain == default_toolchain,
        "//build/images/* are only valid in the Fuchsia toolchain")
-assert(recovery_label == "//build/images/zedboot",
-       "zedboot should only be built when necessary")
 
 _product_config = "//products/zedboot"
 if (zedboot_product_assembly_config_label != false) {
