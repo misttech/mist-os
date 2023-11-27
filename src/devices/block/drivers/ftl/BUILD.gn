@@ -44,6 +44,11 @@ fuchsia_driver_component("ftl") {
   manifest = "meta/ftl.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ftl"
+  driver_components = [ ":ftl" ]
+}
+
 # Also used by ftl-test.
 source_set("common") {
   visibility = [ "./*" ]

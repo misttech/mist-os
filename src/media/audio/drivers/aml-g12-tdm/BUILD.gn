@@ -126,6 +126,11 @@ fuchsia_driver_component("aml-g12-tdm-dai") {
   manifest = "meta/aml-g12-tdm-dai.cml"
 }
 
+fuchsia_driver_package("aml-g12-tdm-dai-package") {
+  package_name = "aml-g12-tdm-dai"
+  driver_components = [ ":aml-g12-tdm-dai" ]
+}
+
 # Composite driver (DFv2).
 
 driver_bind_rules("aml-g12-composite-bind") {

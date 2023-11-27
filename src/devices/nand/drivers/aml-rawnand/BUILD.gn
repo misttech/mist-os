@@ -20,6 +20,11 @@ fuchsia_driver_component("aml-rawnand") {
   manifest = "meta/aml-rawnand.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-rawnand"
+  driver_components = [ ":aml-rawnand" ]
+}
+
 driver_bind_rules("aml-rawnand-bind") {
   rules = "aml-rawnand.bind"
   bind_output = "aml-rawnand.bindbc"

@@ -77,6 +77,11 @@ fuchsia_driver_component("optee") {
   manifest = "meta/optee.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "optee"
+  driver_components = [ ":optee" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

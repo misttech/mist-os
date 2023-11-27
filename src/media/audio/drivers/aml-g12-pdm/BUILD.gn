@@ -57,6 +57,11 @@ fuchsia_driver_component("aml-g12-pdm") {
   manifest = "meta/aml-g12-pdm.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-g12-pdm"
+  driver_components = [ ":aml-g12-pdm" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

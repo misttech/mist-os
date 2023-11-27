@@ -55,6 +55,11 @@ fuchsia_driver_component("aml-light") {
   manifest = "meta/aml-light.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-light"
+  driver_components = [ ":aml-light" ]
+}
+
 test("aml-light-test") {
   output_name = "aml-light-test"
   sources = [

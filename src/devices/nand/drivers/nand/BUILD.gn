@@ -49,6 +49,11 @@ fuchsia_driver_component("nand") {
   manifest = "meta/nand.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "nand"
+  driver_components = [ ":nand" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

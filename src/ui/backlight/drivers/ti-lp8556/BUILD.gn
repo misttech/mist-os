@@ -64,6 +64,11 @@ fuchsia_driver_component("ti-lp8556") {
   manifest = "meta/ti-lp8556.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ti-lp8556"
+  driver_components = [ ":ti-lp8556" ]
+}
+
 test("ti-lp8556-test") {
   output_name = "ti-lp8556-test"
   sources = [

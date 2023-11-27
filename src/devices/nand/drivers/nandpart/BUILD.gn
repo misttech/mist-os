@@ -50,6 +50,11 @@ fuchsia_driver_component("nandpart") {
   manifest = "meta/nandpart.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "nandpart"
+  driver_components = [ ":nandpart" ]
+}
+
 test("nandpart-test-bin") {
   output_name = "nandpart-test"
   sources = [

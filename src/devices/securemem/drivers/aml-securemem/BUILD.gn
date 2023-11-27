@@ -69,6 +69,11 @@ fuchsia_driver_component("aml-securemem") {
   manifest = "meta/aml-securemem.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-securemem"
+  driver_components = [ ":aml-securemem" ]
+}
+
 test("aml-securemem-test-bin") {
   output_name = "aml-securemem-test"
   sources = [

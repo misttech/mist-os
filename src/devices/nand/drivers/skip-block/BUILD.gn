@@ -22,6 +22,11 @@ fuchsia_driver_component("skip-block") {
   manifest = "meta/skip-block.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "skip-block"
+  driver_components = [ ":skip-block" ]
+}
+
 driver_bind_rules("skip-block-bind") {
   rules = "skip-block.bind"
   bind_output = "skip-block.bindbc"

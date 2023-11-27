@@ -242,6 +242,11 @@ fuchsia_driver_component("astro") {
   manifest = "meta/astro.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "astro"
+  driver_components = [ ":astro" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

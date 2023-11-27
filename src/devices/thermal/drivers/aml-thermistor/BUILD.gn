@@ -47,6 +47,11 @@ fuchsia_driver_component("aml-thermistor") {
   manifest = "meta/aml-thermistor.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-thermistor"
+  driver_components = [ ":aml-thermistor" ]
+}
+
 group("tests") {
   testonly = true
   deps = [

@@ -49,6 +49,11 @@ fuchsia_driver_component("aml-usb-phy-v2") {
   manifest = "meta/aml-usb-phy-v2.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-usb-phy-v2"
+  driver_components = [ ":aml-usb-phy-v2" ]
+}
+
 test("aml-usb-phy-test-bin") {
   configs += [ "//build/config:all_source" ]
   sources = [

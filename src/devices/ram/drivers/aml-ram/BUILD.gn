@@ -42,6 +42,11 @@ fuchsia_driver_component("aml-ram") {
   manifest = "meta/aml-ram.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-ram"
+  driver_components = [ ":aml-ram" ]
+}
+
 test("aml-ram-test-bin") {
   output_name = "aml-ram-test"
   sources = [

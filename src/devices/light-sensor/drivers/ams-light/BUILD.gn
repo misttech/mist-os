@@ -56,6 +56,11 @@ fuchsia_driver_component("ams-light") {
   manifest = "meta/ams-light.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "ams-light"
+  driver_components = [ ":ams-light" ]
+}
+
 test("ams-light-test-bin") {
   configs += [ "//build/config:all_source" ]
   output_name = "ams-light-test"
