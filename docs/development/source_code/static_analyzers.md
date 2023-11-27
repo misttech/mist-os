@@ -62,7 +62,7 @@ def register_all_checks():
 Note: When implementing a new check in a file that already contains other
 checks, you may be able to register the new check within that file. For
 example, `//scripts/shac/fidl.star` has a `register_fidl_checks()` function
-that gets called from `//scripts/shac/fidl.ss/shac/main.star`. Add new FIDL
+that gets called from `//scripts/shac/main.star`. Add new FIDL
 checks to `fidl.star` and register them in the `register_fidl_checks()`
 function in the same file.
 
