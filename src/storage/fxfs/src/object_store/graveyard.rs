@@ -4,7 +4,6 @@
 
 use {
     crate::{
-        async_enter,
         errors::FxfsError,
         log::*,
         lsm_tree::{
@@ -65,6 +64,7 @@ enum Message {
     Flush(oneshot::Sender<()>),
 }
 
+#[fxfs_trace::trace]
 impl Graveyard {
     /// Creates a new instance of the graveyard manager.
     pub fn new(object_manager: Arc<ObjectManager>) -> Arc<Self> {
@@ -154,11 +154,11 @@ impl Graveyard {
     /// behaviour: the entries might or might not be immediately tombstoned, so callers should wait
     /// for this to return before changing to a state where more entries can be added.  Once this
     /// has returned, entries will be tombstoned in the background.
+    #[trace]
     pub async fn initial_reap(self: &Arc<Self>, store: &ObjectStore) -> Result<usize, Error> {
         if store.filesystem().options().skip_initial_reap {
             return Ok(0);
         }
-        async_enter!("Graveyard::initial_reap");
         let mut count = 0;
         let layer_set = store.tree().layer_set();
         let mut merger = layer_set.merger();

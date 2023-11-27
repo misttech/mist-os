@@ -262,6 +262,7 @@ impl PagerBacked for FxBlob {
             let buf = buffer.as_mut_slice();
             let decompressed_size = DECOMPRESSOR
                 .with(|decompressor| {
+                    fxfs_trace::duration!("blob-decompress", "len" => len as u64);
                     let mut decompressor = decompressor.borrow_mut();
                     decompressor.decompress_to_buffer(
                         &compressed_buf.as_slice()[compressed_buf_range],
@@ -277,12 +278,15 @@ impl PagerBacked for FxBlob {
         let hashes = &self.merkle_tree.as_ref()[0];
         let mut offset = range.start as usize;
         let bs = BLOCK_SIZE as usize;
-        for b in buffer.as_slice()[..read].chunks(bs) {
-            ensure!(
-                hash_block(b, offset) == hashes[offset / bs],
-                anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
-            );
-            offset += bs;
+        {
+            fxfs_trace::duration!("blob-verify", "len" => read as u64);
+            for b in buffer.as_slice()[..read].chunks(bs) {
+                ensure!(
+                    hash_block(b, offset) == hashes[offset / bs],
+                    anyhow!(FxfsError::Inconsistent).context("Hash mismatch")
+                );
+                offset += bs;
+            }
         }
         // Zero the tail.
         buffer.as_mut_slice()[read..].fill(0);

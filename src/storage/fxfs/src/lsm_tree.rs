@@ -14,7 +14,6 @@ use {
         log::*,
         object_handle::{ReadObjectHandle, WriteBytes},
         serialized_types::{Version, LATEST_VERSION},
-        trace_duration,
     },
     anyhow::Error,
     cache::{ObjectCache, ObjectCacheResult},
@@ -76,6 +75,7 @@ pub struct LSMTree<K, V> {
     cache: Box<dyn ObjectCache<K, V>>,
 }
 
+#[fxfs_trace::trace]
 impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     /// Creates a new empty tree.
     pub fn new(merge_fn: merge::MergeFn<K, V>, cache: Box<dyn ObjectCache<K, V>>) -> Self {
@@ -151,13 +151,13 @@ impl<'tree, K: MergeableKey, V: Value> LSMTree<K, V> {
     }
 
     /// Writes the items yielded by the iterator into the supplied object.
+    #[trace]
     pub async fn compact_with_iterator<W: WriteBytes + Send>(
         &self,
         mut iterator: impl LayerIterator<K, V>,
         writer: W,
         block_size: u64,
     ) -> Result<(), Error> {
-        trace_duration!("LSMTree::compact_with_iterator");
         let mut writer = SimplePersistentLayerWriter::<W, K, V>::new(writer, block_size).await?;
         while let Some(item_ref) = iterator.get() {
             debug!(?item_ref, "compact: writing");

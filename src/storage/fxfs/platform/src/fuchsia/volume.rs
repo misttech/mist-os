@@ -124,6 +124,7 @@ pub struct FxVolume {
     dirent_cache: DirentCache,
 }
 
+#[fxfs_trace::trace]
 impl FxVolume {
     pub fn new(
         parent: Weak<VolumesDirectory>,
@@ -381,6 +382,7 @@ impl FxVolume {
         }
     }
 
+    #[trace]
     pub async fn flush_all_files(&self) {
         let mut flushed = 0;
         for file in self.cache.files() {

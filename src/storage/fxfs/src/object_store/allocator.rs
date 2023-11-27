@@ -33,7 +33,6 @@ use {
         serialized_types::{
             Migrate, Version, Versioned, VersionedLatest, DEFAULT_MAX_SERIALIZED_RECORD_SIZE,
         },
-        trace_duration,
     },
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
@@ -907,6 +906,7 @@ impl Drop for SimpleAllocator {
     }
 }
 
+#[fxfs_trace::trace]
 #[async_trait]
 impl Allocator for SimpleAllocator {
     fn object_id(&self) -> u64 {
@@ -1123,6 +1123,7 @@ impl Allocator for SimpleAllocator {
         self.inner.lock().unwrap().info.limit_bytes.get(&owner_object_id).copied()
     }
 
+    #[trace]
     async fn deallocate(
         &self,
         transaction: &mut Transaction<'_>,
@@ -1130,7 +1131,6 @@ impl Allocator for SimpleAllocator {
         mut dealloc_range: Range<u64>,
     ) -> Result<u64, Error> {
         debug!(device_range = ?dealloc_range, "deallocate");
-        trace_duration!("SimpleAllocator::deallocate");
 
         ensure!(dealloc_range.is_valid(), FxfsError::InvalidArgs);
 

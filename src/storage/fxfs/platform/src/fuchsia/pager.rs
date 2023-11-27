@@ -16,7 +16,6 @@ use {
     },
     futures::Future,
     fxfs::{
-        async_enter,
         log::*,
         round::{round_down, round_up},
     },
@@ -412,6 +411,7 @@ pub trait PagerBacked: Sync + Send + 'static {
 
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
+    fxfs_trace::duration!("start-page-in");
     const ZERO_VMO_SIZE: u64 = 1_048_576;
     static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
@@ -447,40 +447,33 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
         range.start += read_size;
 
         let this = this.clone();
-        this.clone().pager().spawn(async move {
-            async_enter!("page_in");
-            // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
-            // solution for buffer allocation failing.
-            let _guard = this.pager().acquire_read_permit().await;
-
-            let (buffer, buffer_len) = match this.aligned_read(read_range.clone()).await {
-                Ok(v) => v,
-                Err(error) => {
-                    error!(
-                        range = ?read_range,
-                        ?aligned_size,
-                        ?error,
-                        "Failed to load range"
-                    );
-                    this.pager().report_failure(
-                        this.vmo(),
-                        read_range.clone(),
-                        map_to_status(error),
-                    );
-                    return;
-                }
-            };
-            let supply_range = read_range.start
-                ..round_up(read_range.start + buffer_len as u64, zx::system_get_page_size() as u64)
-                    .unwrap();
-            this.pager().supply_pages(
-                this.vmo(),
-                supply_range,
-                buffer.allocator().buffer_source().vmo(),
-                buffer.range().start as u64,
-            );
-        });
+        this.clone().pager().spawn(page_in_chunk(this, read_range));
     }
+}
+
+#[fxfs_trace::trace]
+async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: Range<u64>) {
+    // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
+    // solution for buffer allocation failing.
+    let _guard = this.pager().acquire_read_permit().await;
+
+    let (buffer, buffer_len) = match this.aligned_read(read_range.clone()).await {
+        Ok(v) => v,
+        Err(error) => {
+            error!(range = ?read_range, ?error, "Failed to load range");
+            this.pager().report_failure(this.vmo(), read_range.clone(), map_to_status(error));
+            return;
+        }
+    };
+    let supply_range = read_range.start
+        ..round_up(read_range.start + buffer_len as u64, zx::system_get_page_size() as u64)
+            .unwrap();
+    this.pager().supply_pages(
+        this.vmo(),
+        supply_range,
+        buffer.allocator().buffer_source().vmo(),
+        buffer.range().start as u64,
+    );
 }
 
 /// Represents a dirty range of page aligned bytes within a pager backed VMO.

@@ -55,7 +55,6 @@ use {
         range::RangeExt,
         round::{round_div, round_down, round_up},
         serialized_types::{migrate_to_version, Migrate, Version, Versioned, LATEST_VERSION},
-        trace_duration,
     },
     anyhow::{anyhow, bail, Context, Error},
     event_listener::Event,
@@ -347,6 +346,7 @@ impl<S: HandleOwner> JournalHandle for DataObjectHandle<S> {
     }
 }
 
+#[fxfs_trace::trace]
 impl Journal {
     pub fn new(objects: Arc<ObjectManager>, options: JournalOptions) -> Journal {
         let starting_checksum = rand::thread_rng().gen();
@@ -510,12 +510,12 @@ impl Journal {
     }
 
     /// Reads the latest super-block, and then replays journaled records.
+    #[trace]
     pub async fn replay(
         &self,
         filesystem: Arc<FxFilesystem>,
         on_new_allocator: Option<Box<dyn Fn(Arc<SimpleAllocator>) + Send + Sync>>,
     ) -> Result<(), Error> {
-        trace_duration!("Journal::replay");
         let block_size = filesystem.block_size();
 
         let (super_block, root_parent) =
@@ -1496,13 +1496,13 @@ impl Journal {
         Ok(())
     }
 
+    #[trace]
     async fn compact(&self) -> Result<(), Error> {
         let trace = self.trace.load(Ordering::Relaxed);
         debug!("Compaction starting");
         if trace {
             info!("J: start compaction");
         }
-        trace_duration!("Journal::compact");
         let earliest_version = self.objects.flush().await?;
         self.inner.lock().unwrap().super_block_header.earliest_version = earliest_version;
         self.write_super_block().await?;

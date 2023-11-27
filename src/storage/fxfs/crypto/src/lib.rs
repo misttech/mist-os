@@ -26,16 +26,6 @@ use {
 
 pub mod ff1;
 
-// Copied from //src/storage/fxfs/src/trace.rs.
-// TODO(fxbug.dev/117467): Consider refactoring to a common shared crate.
-#[macro_export]
-macro_rules! trace_duration {
-    ($name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing")]
-        ::fuchsia_trace::duration!("fxfs", $name $(,$key => $val)*);
-    }
-}
-
 pub const KEY_SIZE: usize = 256 / 8;
 pub const WRAPPED_KEY_SIZE: usize = KEY_SIZE + 16;
 
@@ -188,7 +178,7 @@ impl XtsCipherSet {
     ///
     /// `buffer` *must* be 16 byte aligned.
     pub fn decrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        trace_duration!("decrypt");
+        fxfs_trace::duration!("decrypt");
         assert_eq!(offset % SECTOR_SIZE, 0);
         let cipher = &self
             .0
@@ -215,7 +205,7 @@ impl XtsCipherSet {
     ///
     /// `buffer` *must* be 16 byte aligned.
     pub fn encrypt(&self, offset: u64, key_id: u64, buffer: &mut [u8]) -> Result<(), Error> {
-        trace_duration!("encrypt");
+        fxfs_trace::duration!("encrypt");
         assert_eq!(offset % SECTOR_SIZE, 0);
         let cipher = &self
             .0
@@ -249,12 +239,12 @@ impl StreamCipher {
     }
 
     pub fn encrypt(&mut self, buffer: &mut [u8]) {
-        trace_duration!("StreamCipher::encrypt");
+        fxfs_trace::duration!("StreamCipher::encrypt");
         self.0.apply_keystream(buffer);
     }
 
     pub fn decrypt(&mut self, buffer: &mut [u8]) {
-        trace_duration!("StreamCipher::decrypt");
+        fxfs_trace::duration!("StreamCipher::decrypt");
         self.0.apply_keystream(buffer);
     }
 

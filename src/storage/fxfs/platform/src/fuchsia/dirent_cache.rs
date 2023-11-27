@@ -53,6 +53,7 @@ pub struct DirentCache {
 }
 
 /// Cache for directory entry object ids.
+#[fxfs_trace::trace]
 impl DirentCache {
     /// The provided `limit` is the initial max size of the cache.
     pub fn new(limit: usize) -> Self {
@@ -123,6 +124,7 @@ impl DirentCache {
     }
 
     /// Drop entries that haven't been refreshed since the last call to this method.
+    #[trace]
     pub fn recycle_stale_files(&self) {
         // Drop outside the lock.
         let mut dropped_items = Vec::new();

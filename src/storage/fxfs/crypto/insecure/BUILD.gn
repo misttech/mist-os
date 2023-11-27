@@ -20,10 +20,5 @@ rustc_library("insecure") {
   ]
 
   sources = [ "src/lib.rs" ]
-
-  features = []
-  if (is_fuchsia) {
-    features += [ "tracing" ]
-  }
   visibility = [ "//src/storage/fxfs/*" ]
 }

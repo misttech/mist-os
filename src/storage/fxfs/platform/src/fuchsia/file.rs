@@ -18,7 +18,6 @@ use {
     fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::future::BoxFuture,
     fxfs::{
-        async_enter,
         filesystem::SyncOptions,
         log::*,
         object_handle::{ObjectHandle, ReadObjectHandle},
@@ -27,6 +26,7 @@ use {
             DataObjectHandle, ObjectDescriptor, Timestamp,
         },
     },
+    fxfs_trace::{cstr, FxfsTraceFutureExt},
     std::{
         ops::Range,
         sync::{
@@ -61,6 +61,7 @@ pub struct FxFile {
     open_count: AtomicUsize,
 }
 
+#[fxfs_trace::trace]
 impl FxFile {
     pub fn new(handle: DataObjectHandle<FxVolume>) -> Arc<Self> {
         let file = Arc::new(Self {
@@ -118,6 +119,7 @@ impl FxFile {
         self.handle.uncached_handle().verified_file()
     }
 
+    #[trace]
     pub async fn flush(&self) -> Result<(), Error> {
         self.handle.flush().await
     }
@@ -504,8 +506,7 @@ impl PagerBacked for FxFile {
 
     fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
         self.handle.owner().clone().spawn(async move {
-            async_enter!("mark_dirty");
-            self.handle.mark_dirty(range).await;
+            self.handle.mark_dirty(range).trace(cstr!("mark_dirty")).await;
         });
     }
 

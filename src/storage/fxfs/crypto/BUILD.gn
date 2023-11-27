@@ -10,6 +10,7 @@ rustc_library("crypto") {
   name = "fxfs-crypto"
 
   deps = [
+    "//src/storage/fxfs/trace:trace",
     "//src/storage/type-fprint:fprint",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
@@ -21,19 +22,11 @@ rustc_library("crypto") {
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
   ]
-  if (is_fuchsia) {
-    deps += [ "//src/lib/trace/rust:trace" ]
-  }
   sources = [
     "src/ff1.rs",
     "src/lib.rs",
   ]
   test_deps = [ "//third_party/rust_crates:rand" ]
-
-  features = []
-  if (is_fuchsia) {
-    features += [ "tracing" ]
-  }
   visibility = [ "//src/storage/fxfs/*" ]
 
   # Default optimizations are for size, but that has a noticeable impact on speed.

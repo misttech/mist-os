@@ -29,5 +29,3 @@ pub mod round;
 pub mod serialized_types;
 #[cfg(test)]
 mod testing;
-#[macro_use]
-mod trace;

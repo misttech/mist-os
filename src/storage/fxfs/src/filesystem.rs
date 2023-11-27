@@ -25,7 +25,6 @@ use {
             ObjectStore,
         },
         serialized_types::Version,
-        trace_duration,
     },
     anyhow::{bail, Context, Error},
     async_trait::async_trait,
@@ -440,6 +439,7 @@ pub struct FxFilesystem {
     device: DeviceHolder,
 }
 
+#[fxfs_trace::trace]
 impl FxFilesystem {
     pub async fn new_empty(device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
         FxFilesystemBuilder::new().format(true).open(device).await
@@ -558,12 +558,12 @@ impl FxFilesystem {
         Transaction::new(guard, options, locks).await
     }
 
+    #[trace]
     pub async fn commit_transaction(
         &self,
         transaction: &mut Transaction<'_>,
         callback: &mut (dyn FnMut(u64) + Send),
     ) -> Result<u64, Error> {
-        trace_duration!("FxFilesystem::commit_transaction");
         if let Some(hook) = self.options.pre_commit_hook.as_ref() {
             hook(transaction)?;
         }

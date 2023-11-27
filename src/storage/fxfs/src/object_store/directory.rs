@@ -19,7 +19,6 @@ use {
             DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
             StoreObjectHandle,
         },
-        trace_duration,
     },
     anyhow::{anyhow, bail, ensure, Error},
     fidl_fuchsia_io as fio,
@@ -47,6 +46,7 @@ pub struct Directory<S: HandleOwner> {
     is_deleted: AtomicBool,
 }
 
+#[fxfs_trace::trace]
 impl<S: HandleOwner> Directory<S> {
     fn new(owner: Arc<S>, object_id: u64) -> Self {
         Directory {
@@ -133,8 +133,8 @@ impl<S: HandleOwner> Directory<S> {
         Ok(Directory::new(owner.clone(), object_id))
     }
 
+    #[trace]
     pub async fn open(owner: &Arc<S>, object_id: u64) -> Result<Directory<S>, Error> {
-        trace_duration!("Directory::open");
         let store = owner.as_ref().as_ref();
         match store.tree.find(&ObjectKey::object(object_id)).await?.ok_or(FxfsError::NotFound)? {
             ObjectItem {
@@ -269,8 +269,8 @@ impl<S: HandleOwner> Directory<S> {
     }
 
     /// Returns the object ID and descriptor for the given child, or None if not found.
+    #[trace]
     pub async fn lookup(&self, name: &str) -> Result<Option<(u64, ObjectDescriptor)>, Error> {
-        trace_duration!("Directory::lookup");
         if self.is_deleted() {
             return Ok(None);
         }

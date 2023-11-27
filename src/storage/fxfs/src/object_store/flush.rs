@@ -24,7 +24,6 @@ use {
             ObjectStore, Options, StoreInfo, Transaction, MAX_ENCRYPTED_MUTATIONS_SIZE,
         },
         serialized_types::{Version, VersionedLatest},
-        trace_duration,
     },
     anyhow::Context,
     anyhow::Error,
@@ -45,9 +44,11 @@ pub enum Reason {
     Lock,
 }
 
+#[fxfs_trace::trace]
 impl ObjectStore {
+    #[trace]
     pub async fn flush_with_reason(&self, reason: Reason) -> Result<Version, Error> {
-        trace_duration!("ObjectStore::flush", "store_object_id" => self.store_object_id);
+        fxfs_trace::instant!("ObjectStore::flush", "store_object_id" => self.store_object_id);
         if self.parent_store.is_none() {
             // Early exit, but still return the earliest version used by a struct in the tree
             return Ok(self.tree.get_earliest_version());
