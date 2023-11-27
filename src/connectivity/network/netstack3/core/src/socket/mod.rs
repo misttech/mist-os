@@ -7,6 +7,7 @@
 
 pub mod address;
 pub mod datagram;
+pub(crate) mod uninstantiable;
 
 use core::{
     convert::Infallible as Never, fmt::Debug, hash::Hash, marker::PhantomData, num::NonZeroUsize,

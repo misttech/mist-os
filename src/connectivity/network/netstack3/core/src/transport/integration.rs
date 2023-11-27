@@ -303,6 +303,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::DualStackBoundStateContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
     type IpSocketsCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv6>>;
+    type OtherBufferIpSocketsCtx<'a, B: BufferMut> =
+        Locked<&'a SyncCtx<C>, crate::lock_ordering::UdpBoundMap<Ipv4>>;
 
     fn with_both_bound_sockets_mut<
         O,
@@ -332,6 +334,17 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
         let (mut bound_v4, mut locked) =
             self.write_lock_and::<crate::lock_ordering::UdpBoundMap<Ipv4>>();
         cb(&mut locked.cast_locked(), &mut bound_v4)
+    }
+
+    fn with_other_transport_context_buf<
+        O,
+        B: BufferMut,
+        F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        cb(&mut self.cast_locked::<crate::lock_ordering::UdpBoundMap<Ipv4>>())
     }
 }
 
