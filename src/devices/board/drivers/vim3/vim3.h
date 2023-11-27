@@ -90,7 +90,6 @@ class Vim3 : public Vim3Type {
   zx_status_t EmmcInit();
   zx_status_t EthInit();
   zx_status_t GpioInit();
-  zx_status_t HdmiInit();
   zx_status_t I2cInit();
   zx_status_t PowerInit();
   zx_status_t PwmInit();

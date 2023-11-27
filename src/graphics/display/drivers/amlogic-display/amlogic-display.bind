@@ -50,7 +50,3 @@ node "sysmem" {
 node "canvas" {
   fuchsia.hardware.amlogiccanvas.Service == fuchsia.hardware.amlogiccanvas.Service.ZirconTransport;
 }
-
-optional node "hdmi" {
-  true;
-}

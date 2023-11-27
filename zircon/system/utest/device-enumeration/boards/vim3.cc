@@ -37,7 +37,6 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/00:00:29",  // registers device
       "sys/platform/05:00:10/aml-canvas",
       "sys/platform/00:00:1e/dw-dsi/display/amlogic-display/display-coordinator",
-      "sys/platform/05:06:2b/aml-hdmi",
       "sys/platform/05:06:1d",  // pwm
       "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-0-regulator",
       "sys/platform/05:06:1d/aml-pwm-device/pwm-9/vreg/pwm-9-regulator",
