@@ -28,10 +28,6 @@ labels = {
     images = bazel_product_bundle_target
     recovery_images = bazel_product_bundle_target
 
-    # images_prime target is used to provide extra metadata, for Bazel assembly
-    # we consolidate metadata on the same product bundle GN wrapper.
-    images_prime = images
-
     # Path to the `package_tool_package_manifest_list_create` target defined in
     # `bazel_product_bundle`.
     bazel_package_manifests_list = "${images}_package_manifests_list"
@@ -44,9 +40,8 @@ labels = {
     images = "${_images_without_toolchain}(${default_toolchain})"
     recovery_images = recovery_label
     assembly_name = "fuchsia"
+    netboot = "//build/images/fuchsia:netboot"
   }
-
-  netboot = "//build/images/fuchsia:netboot"
 
   _qemu_deps = qemu_boot_shim.deps
   assert(_qemu_deps == [ _qemu_deps[0] ])
@@ -59,33 +54,31 @@ supports_flashing_fxfs =
 # These are the common assembly-related files.
 files = {
   if (use_bazel_images_only) {
-    bazel_target_name = get_label_info(labels.images, "name")
-    images_outdir = get_label_info(labels.images, "target_out_dir") +
-                    "/${bazel_target_name}/product_bundle"
-    assembly_outdir = images_outdir + "/system_a"
+    _bazel_target_name = get_label_info(labels.images, "name")
+    _images_outdir = get_label_info(labels.images, "target_out_dir") +
+                     "/${_bazel_target_name}/product_bundle"
+    _assembly_outdir = _images_outdir + "/system_a"
     bazel_package_manifests_list =
         get_label_info(labels.images, "target_out_dir") +
-        "/${bazel_target_name}/manifests/package_manifests.list"
+        "/${_bazel_target_name}/manifests/package_manifests.list"
   } else {
-    images_outdir = get_label_info(labels.images, "target_out_dir")
-    assembly_outdir = images_outdir + "/${labels.assembly_name}"
+    _images_outdir = get_label_info(labels.images, "target_out_dir")
+    _assembly_outdir = _images_outdir + "/${labels.assembly_name}"
   }
 
   if (!use_bringup_assembly) {
-    blobfs = "${assembly_outdir}/blob.blk"
-
     if (fxfs_blob) {
-      fxfs = "${assembly_outdir}/fxfs.blk"
+      fxfs = "${_assembly_outdir}/fxfs.blk"
       if (supports_flashing_fxfs) {
-        fxfs_sparse = "${assembly_outdir}/fxfs.sparse.blk"
+        fxfs_sparse = "${_assembly_outdir}/fxfs.sparse.blk"
       }
     } else {
-      fvm = "${assembly_outdir}/fvm.blk"
-      fvm_sparse = "${assembly_outdir}/fvm.sparse.blk"
+      fvm = "${_assembly_outdir}/fvm.blk"
+      fvm_sparse = "${_assembly_outdir}/fvm.sparse.blk"
     }
 
     if (supports_fastboot_fvm) {
-      fvm_fastboot = "${assembly_outdir}/fvm.fastboot.blk"
+      fvm_fastboot = "${_assembly_outdir}/fvm.fastboot.blk"
     }
 
     base_package_names = "$root_build_dir/base_packages.list"
@@ -105,7 +98,8 @@ files = {
     # TODO(https://fxbug.dev/123120): Audit and add the following paths when
     # only Bazel assembly is enabled.
     if (!use_bazel_images_only) {
-      flash_manifest = "${images_outdir}/flash_manifest/flash.json"
+      flash_manifest = "${_images_outdir}/flash_manifest/flash.json"
+      blobfs = "${_assembly_outdir}/blob.blk"
     }
   }
 
@@ -119,8 +113,8 @@ files = {
   }
 
   # The zbi and vbmeta created by assembly
-  zbi = "${assembly_outdir}/${labels.assembly_name}.${_image_suffix}"
-  vbmeta = "${assembly_outdir}/${labels.assembly_name}.vbmeta"
+  zbi = "${_assembly_outdir}/${labels.assembly_name}.${_image_suffix}"
+  vbmeta = "${_assembly_outdir}/${labels.assembly_name}.vbmeta"
 
   if (use_bazel_images_only) {
     # Final image and vbmeta are not copied to root in Bazel assembly.
@@ -128,20 +122,20 @@ files = {
     final_vbmeta = vbmeta
   } else {
     # Final output image and vbmeta (the files at the above paths are copied here)
-    final_zbi = "${root_out_dir}/" + rebase_path(zbi, assembly_outdir)
-    final_vbmeta = "${root_out_dir}/" + rebase_path(vbmeta, assembly_outdir)
+    final_zbi = "${root_out_dir}/" + rebase_path(zbi, _assembly_outdir)
+    final_vbmeta = "${root_out_dir}/" + rebase_path(vbmeta, _assembly_outdir)
   }
 
   # Recovery output image and vbmeta
   if (use_bazel_images_only) {
-    # GN and Bazel assembly should share the same recovry image config, so use
+    # GN and Bazel assembly should share the same recovery image config, so use
     # GN's recovery_label to determine Bazel's recovery image name.
     if (recovery_is_recovery_eng || recovery_is_recovery_fastboot) {
       _recovery_name = "fuchsia"
     } else {
       _recovery_name = get_label_info(recovery_label, "name")
     }
-    _recovery_outdir = images_outdir + "/system_r"
+    _recovery_outdir = _images_outdir + "/system_r"
     recovery_zbi = "${_recovery_outdir}/${_recovery_name}.${_image_suffix}"
     recovery_vbmeta = "${_recovery_outdir}/${_recovery_name}.vbmeta"
   } else {
