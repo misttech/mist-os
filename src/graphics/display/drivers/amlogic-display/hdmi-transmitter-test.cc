@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/amlogic-hdmitx/amlogic-hdmitx.h"
+#include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
 #include <iterator>
 #include <list>

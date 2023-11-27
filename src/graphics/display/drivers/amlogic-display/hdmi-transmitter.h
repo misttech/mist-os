@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_LIB_AMLOGIC_HDMITX_AMLOGIC_HDMITX_H_
-#define SRC_GRAPHICS_DISPLAY_LIB_AMLOGIC_HDMITX_AMLOGIC_HDMITX_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/mmio/mmio.h>
@@ -84,4 +84,4 @@ class HdmiTransmitter {
 
 }  // namespace amlogic_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_LIB_AMLOGIC_HDMITX_AMLOGIC_HDMITX_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_HDMI_TRANSMITTER_H_

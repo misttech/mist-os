@@ -5,7 +5,6 @@
 group("tests") {
   testonly = true
   deps = [
-    "amlogic-hdmitx:tests",
     "api-types-cpp:tests",
     "coordinator-getter:tests",
     "designware:tests",

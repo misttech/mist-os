@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/lib/amlogic-hdmitx/amlogic-hdmitx.h"
+#include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter.h"
 
 #include <fuchsia/hardware/i2cimpl/c/banjo.h>
 #include <lib/ddk/debug.h>
@@ -17,7 +17,7 @@
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 
-#include "src/graphics/display/lib/amlogic-hdmitx/top-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/hdmi-transmitter-top-regs.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/designware/color-param.h"
 #include "src/graphics/display/lib/designware/hdmi-transmitter-controller.h"
