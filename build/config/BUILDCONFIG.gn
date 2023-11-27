@@ -2125,6 +2125,16 @@ is_hwasan = select_variant + [
               "hwasan-ubsan",
             ] != select_variant
 
+# Whether fuzzer is enabled.
+is_fuzzer = select_variant + [
+              "asan-fuzzer",
+              "ubsan-fuzzer",
+            ] -
+            [
+              "asan-fuzzer",
+              "ubsan-fuzzer",
+            ] != select_variant
+
 # Do this only once, in the default toolchain context.    Then
 # clang_toolchain_suite will just pass the results through to every
 # other toolchain via toolchain_args so the work is not repeated.
