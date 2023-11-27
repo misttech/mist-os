@@ -190,7 +190,11 @@ pub(crate) fn devices(ctx: &Ctx) -> fuchsia_inspect::Inspector {
                             node.record_child("NetworkDevice", |node| {
                                 node.record_string("MacAddress", mac.get().to_string());
                                 info.with_dynamic_info(
-                                    |DynamicNetdeviceInfo { phy_up, common_info: _ }| {
+                                    |DynamicNetdeviceInfo {
+                                         phy_up,
+                                         common_info: _,
+                                         neighbor_event_sink: _,
+                                     }| {
                                         node.record_bool("PhyUp", *phy_up);
                                     },
                                 );

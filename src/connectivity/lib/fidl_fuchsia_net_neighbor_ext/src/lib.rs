@@ -57,3 +57,8 @@ impl std::fmt::Display for Entry {
         write!(f, " | {}", display_entry_state(state))
     }
 }
+
+/// Options for modifying the behavior of `EntryIterator`.
+#[derive(Clone, Debug, Eq, PartialEq, ValidFidlTable)]
+#[fidl_table_src(fnet_neighbor::EntryIteratorOptions)]
+pub struct EntryIteratorOptions {}

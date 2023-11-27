@@ -377,7 +377,7 @@ impl DeviceHandler {
             }
             netdevice_client::port_slab::Entry::Vacant(e) => e,
         };
-        let Netstack { interfaces_event_sink, ctx } = ns;
+        let Netstack { interfaces_event_sink, neighbor_event_sink, ctx } = ns;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
         // Check if there already exists an interface with this name.
@@ -429,6 +429,7 @@ impl DeviceHandler {
                             control_hook: control_hook,
                             addresses: HashMap::new(),
                         },
+                        neighbor_event_sink: neighbor_event_sink.clone(),
                     }
                     .into(),
                     static_common_info: devices::StaticCommonInfo {

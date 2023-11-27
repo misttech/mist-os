@@ -247,7 +247,7 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
             dynamic,
         }) => {
             let guard = dynamic.read().unwrap();
-            let DynamicNetdeviceInfo { common_info, phy_up } = &*guard;
+            let DynamicNetdeviceInfo { common_info, phy_up, neighbor_event_sink: _ } = &*guard;
             physical_up = *phy_up;
             loopback = false;
             common_info.into()

@@ -26,7 +26,9 @@ use netstack3_core::{
 };
 use tracing::warn;
 
-use crate::bindings::{interfaces_admin, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx};
+use crate::bindings::{
+    interfaces_admin, neighbor_worker, util::NeedsDataNotifier, BindingsNonSyncCtxImpl, Ctx,
+};
 
 pub(crate) const LOOPBACK_MAC: Mac = Mac::new([0, 0, 0, 0, 0, 0]);
 
@@ -131,11 +133,11 @@ impl DeviceSpecificInfo<'_> {
 
     pub(crate) fn with_common_info<O, F: FnOnce(&DynamicCommonInfo) -> O>(&self, cb: F) -> O {
         match self {
-            Self::Netdevice(i) => {
-                i.with_dynamic_info(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
+            Self::Netdevice(i) => i.with_dynamic_info(
+                |DynamicNetdeviceInfo { phy_up: _, common_info, neighbor_event_sink: _ }| {
                     cb(common_info)
-                })
-            }
+                },
+            ),
             Self::Loopback(i) => i.with_dynamic_info(cb),
         }
     }
@@ -145,11 +147,11 @@ impl DeviceSpecificInfo<'_> {
         cb: F,
     ) -> O {
         match self {
-            Self::Netdevice(i) => {
-                i.with_dynamic_info_mut(|DynamicNetdeviceInfo { phy_up: _, common_info }| {
+            Self::Netdevice(i) => i.with_dynamic_info_mut(
+                |DynamicNetdeviceInfo { phy_up: _, common_info, neighbor_event_sink: _ }| {
                     cb(common_info)
-                })
-            }
+                },
+            ),
             Self::Loopback(i) => i.with_dynamic_info_mut(cb),
         }
     }
@@ -270,10 +272,13 @@ pub(crate) struct FidlWorkerInfo<R> {
     pub(crate) cancelation_sender: Option<futures::channel::oneshot::Sender<R>>,
 }
 
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 pub(crate) struct DynamicNetdeviceInfo {
     pub(crate) phy_up: bool,
     pub(crate) common_info: DynamicCommonInfo,
+    #[derivative(Debug = "ignore")]
+    pub(crate) neighbor_event_sink: futures::channel::mpsc::UnboundedSender<neighbor_worker::Event>,
 }
 
 /// Network device information.

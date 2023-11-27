@@ -83,7 +83,7 @@ const DELAY_FIRST_PROBE_TIME: NonZeroDuration =
 /// device. When the number of entries is above this number and an entry
 /// transitions into a discardable state, a garbage collection task will be
 /// scheduled to remove any entries that are not in use.
-const MAX_ENTRIES: usize = 512;
+pub const MAX_ENTRIES: usize = 512;
 
 /// The minimum amount of time between garbage collection passes when the
 /// neighbor table grows beyond `MAX_SIZE`.

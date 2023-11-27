@@ -1726,6 +1726,7 @@ mod enabled {
                                  control_hook: _,
                                  addresses: _,
                              },
+                         neighbor_event_sink: _,
                      }| *phy_up && *admin_enabled,
                 ),
                 DeviceSpecificInfo::Loopback(i) => i.with_dynamic_info(

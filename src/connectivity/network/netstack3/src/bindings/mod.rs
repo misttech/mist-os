@@ -47,7 +47,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker as _, RequestSt
 use fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
-use futures::{pin_mut, select, FutureExt as _, StreamExt as _};
+use futures::{channel::mpsc, pin_mut, select, FutureExt as _, StreamExt as _};
 use packet::{Buf, BufferMut};
 use rand::{rngs::OsRng, CryptoRng, RngCore};
 use tracing::{error, info};
@@ -194,6 +194,8 @@ mod ctx {
         pub(crate) interfaces_worker: interfaces_watcher::Worker,
         pub(crate) interfaces_watcher_sink: interfaces_watcher::WorkerWatcherSink,
         pub(crate) routes_change_runner: routes::ChangeRunner,
+        pub(crate) neighbor_worker: neighbor_worker::Worker,
+        pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
     }
 
     impl Default for NetstackSeed {
@@ -201,11 +203,16 @@ mod ctx {
             let (interfaces_worker, interfaces_watcher_sink, interfaces_event_sink) =
                 interfaces_watcher::Worker::new();
             let (routes_change_sink, routes_change_runner) = routes::create_sink_and_runner();
+            let ctx = Ctx::new(routes_change_sink);
+            let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
+                neighbor_worker::new_worker();
             Self {
-                netstack: Netstack { ctx: Ctx::new(routes_change_sink), interfaces_event_sink },
+                netstack: Netstack { ctx, interfaces_event_sink, neighbor_event_sink },
                 interfaces_worker,
                 interfaces_watcher_sink,
                 routes_change_runner,
+                neighbor_worker,
+                neighbor_watcher_sink,
             }
         }
     }
@@ -386,6 +393,13 @@ impl netstack3_core::Instant for StackTime {
     }
 }
 
+impl std::fmt::Display for StackTime {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self(time) = *self;
+        write!(f, "{:.6}", time.into_nanos() as f64 / 1_000_000_000f64)
+    }
+}
+
 impl InstantBindingsTypes for BindingsNonSyncCtxImpl {
     type Instant = StackTime;
 }
@@ -515,6 +529,7 @@ impl DeviceLayerEventDispatcher for BindingsNonSyncCtxImpl {
                          control_hook: _,
                          addresses: _,
                      },
+                 neighbor_event_sink: _,
              }| { *admin_enabled && *phy_up },
         );
 
@@ -674,8 +689,25 @@ impl<I: Ip> EventContext<netstack3_core::ip::IpLayerEvent<DeviceId<BindingsNonSy
 impl<I: Ip> EventContext<nud::Event<Mac, EthernetDeviceId<Self>, I, StackTime>>
     for BindingsNonSyncCtxImpl
 {
-    fn on_event(&mut self, event: nud::Event<Mac, EthernetDeviceId<Self>, I, StackTime>) {
-        tracing::warn!("TODO(https://fxbug.dev/124960): NUD events are unhandled: {event:?}");
+    fn on_event(
+        &mut self,
+        nud::Event { device, kind, addr, at }: nud::Event<
+            Mac,
+            EthernetDeviceId<Self>,
+            I,
+            StackTime,
+        >,
+    ) {
+        device.external_state().with_dynamic_info(|i| {
+            i.neighbor_event_sink
+                .unbounded_send(neighbor_worker::Event {
+                    id: device.downgrade(),
+                    kind,
+                    addr: addr.into(),
+                    at,
+                })
+                .expect("should be able to send neighbor event")
+        })
     }
 }
 
@@ -886,6 +918,7 @@ async fn add_loopback_routes(
 pub(crate) struct Netstack {
     ctx: Ctx,
     interfaces_event_sink: interfaces_watcher::WorkerInterfaceSink,
+    neighbor_event_sink: mpsc::UnboundedSender<neighbor_worker::Event>,
 }
 
 fn create_interface_event_producer(
@@ -1119,6 +1152,8 @@ impl NetstackSeed {
             interfaces_worker,
             interfaces_watcher_sink,
             mut routes_change_runner,
+            neighbor_worker,
+            neighbor_watcher_sink,
         } = self;
 
         // Start servicing timers.
@@ -1161,8 +1196,13 @@ impl NetstackSeed {
             info!("all interface watchers closed, interfaces worker shutdown is complete");
         });
 
-        let no_finish_tasks =
-            loopback_tasks.into_iter().chain([interfaces_worker_task, timers_task]);
+        let neighbor_worker_task = NamedTask::spawn("neighbor worker", neighbor_worker.run());
+
+        let no_finish_tasks = loopback_tasks.into_iter().chain([
+            interfaces_worker_task,
+            timers_task,
+            neighbor_worker_task,
+        ]);
         let mut no_finish_tasks = futures::stream::FuturesUnordered::from_iter(
             no_finish_tasks.map(NamedTask::into_future),
         );
@@ -1223,6 +1263,7 @@ impl NetstackSeed {
 
         // Use a reference to the watcher sink in the services loop.
         let interfaces_watcher_sink_ref = &interfaces_watcher_sink;
+        let neighbor_watcher_sink_ref = &neighbor_watcher_sink;
 
         let (route_set_waitgroup, route_set_spawner) = TaskWaitGroup::new();
 
@@ -1384,7 +1425,12 @@ impl NetstackSeed {
                         }
                         Service::Neighbor(neighbor) => {
                             neighbor
-                                .serve_with(|rs| neighbor_worker::serve(netstack.clone(), rs))
+                                .serve_with(|rs| {
+                                    neighbor_worker::serve_view(
+                                        rs,
+                                        neighbor_watcher_sink_ref.clone(),
+                                    )
+                                })
                                 .await
                         }
                         Service::NeighborController(neighbor_controller) => {
@@ -1430,6 +1476,8 @@ impl NetstackSeed {
         ctx.non_sync_ctx().timers.stop();
         // Stop the interfaces watcher worker.
         std::mem::drop(interfaces_watcher_sink);
+        // Stop the neighbor watcher worker.
+        std::mem::drop(neighbor_watcher_sink);
 
         // Collect the routes admin waitgroup.
         route_set_waitgroup.await;
