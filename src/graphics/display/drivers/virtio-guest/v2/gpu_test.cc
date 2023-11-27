@@ -154,39 +154,6 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::Sysmem> {
- public:
-  explicit FakeSysmem(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-    EXPECT_TRUE(dispatcher_);
-  }
-
-  void ConnectServer(ConnectServerRequestView request,
-                     ConnectServerCompleter::Sync& completer) override {
-    fbl::AutoLock lock(&lock_);
-    mock_allocators_.emplace_front(dispatcher_);
-    auto it = mock_allocators_.begin();
-    fidl::BindServer(dispatcher_, std::move(request->allocator_request), &*it);
-  }
-
-  const MockAllocator* GetLatestMockAllocator() const {
-    // Note that the created MockAllocators are not destroyed until FakeSysmem
-    // is destroyed; so it's always safe to access the returned allocator in the
-    // test body.
-    fbl::AutoLock lock(&lock_);
-    return mock_allocators_.empty() ? nullptr : &mock_allocators_.front();
-  }
-
-  // FIDL methods
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) final {
-    completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-
- private:
-  mutable fbl::Mutex lock_;
-  std::list<MockAllocator> mock_allocators_ __TA_GUARDED(lock_);
-  async_dispatcher_t* dispatcher_ = nullptr;
-};
-
 class FakeGpuBackend : public virtio::FakeBackend {
  public:
   FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
@@ -196,7 +163,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
  public:
   VirtioGpuTest() = default;
   void SetUp() override {
-    fake_sysmem_ = std::make_unique<FakeSysmem>(dispatcher());
+    fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
 
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
@@ -228,7 +195,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
   }
 
  protected:
-  std::unique_ptr<FakeSysmem> fake_sysmem_;
+  std::unique_ptr<MockAllocator> fake_sysmem_;
   std::unique_ptr<virtio::GpuDevice> device_;
 };
 
@@ -313,7 +280,7 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
 TEST_F(VirtioGpuTest, ImportBufferCollection) {
   // This allocator is expected to be alive as long as the `device_` is
   // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_->GetLatestMockAllocator();
+  const MockAllocator* allocator = fake_sysmem_.get();
 
   zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
@@ -378,7 +345,7 @@ TEST_F(VirtioGpuTest, ImportBufferCollection) {
 TEST_F(VirtioGpuTest, ImportImage) {
   // This allocator is expected to be alive as long as the `device_` is
   // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_->GetLatestMockAllocator();
+  const MockAllocator* allocator = fake_sysmem_.get();
 
   zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
   ASSERT_TRUE(token1_endpoints.is_ok());
