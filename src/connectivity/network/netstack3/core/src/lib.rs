@@ -58,7 +58,6 @@ use net_types::{
     },
     SpecifiedAddr,
 };
-use packet::{Buf, BufferMut, EmptyBuf};
 use tracing::trace;
 
 #[cfg(test)]
@@ -74,7 +73,7 @@ use crate::{
             slaac::SlaacCounters, state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler,
             Ipv4DeviceTimerId, Ipv6DeviceTimerId,
         },
-        icmp::{BufferIcmpContext, IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
+        icmp::{IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerTimerId, Ipv4Counters, Ipv4State, Ipv6Counters, Ipv6State,
     },
     transport::{
@@ -304,35 +303,6 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
     visitor.visit_counters(counters);
 }
 
-/// The non synchronized context for the stack with a buffer.
-pub trait BufferNonSyncContextInner<B: BufferMut, D>:
-    transport::udp::BufferNonSyncContext<Ipv4, B, D>
-    + transport::udp::BufferNonSyncContext<Ipv6, B, D>
-    + BufferIcmpContext<Ipv4, B, D>
-    + BufferIcmpContext<Ipv6, B, D>
-{
-}
-impl<
-        B: BufferMut,
-        C: transport::udp::BufferNonSyncContext<Ipv4, B, D>
-            + transport::udp::BufferNonSyncContext<Ipv6, B, D>
-            + BufferIcmpContext<Ipv4, B, D>
-            + BufferIcmpContext<Ipv6, B, D>,
-        D,
-    > BufferNonSyncContextInner<B, D> for C
-{
-}
-
-/// The non synchronized context for the stack with a buffer.
-pub trait BufferNonSyncContext<B: BufferMut>:
-    NonSyncContext + BufferNonSyncContextInner<B, DeviceId<Self>>
-{
-}
-impl<B: BufferMut, C: NonSyncContext + BufferNonSyncContextInner<B, DeviceId<Self>>>
-    BufferNonSyncContext<B> for C
-{
-}
-
 /// A context trait determining the types to be used for reference notifications.
 pub trait ReferenceNotifiers {
     /// The receiver for shared reference destruction notifications.
@@ -358,8 +328,6 @@ impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + T
 /// The non-synchronized context for the stack.
 pub trait NonSyncContext:
     BindingsTypes
-    + BufferNonSyncContextInner<Buf<Vec<u8>>, DeviceId<Self>>
-    + BufferNonSyncContextInner<EmptyBuf, DeviceId<Self>>
     + RngContext
     + TimerContext<TimerId<Self>>
     + EventContext<
@@ -382,10 +350,10 @@ pub trait NonSyncContext:
             Ipv6,
             <Self as InstantBindingsTypes>::Instant,
         >,
-    > + transport::udp::NonSyncContext<Ipv4>
-    + transport::udp::NonSyncContext<Ipv6>
-    + IcmpContext<Ipv4>
-    + IcmpContext<Ipv6>
+    > + transport::udp::NonSyncContext<Ipv4, DeviceId<Self>>
+    + transport::udp::NonSyncContext<Ipv6, DeviceId<Self>>
+    + IcmpContext<Ipv4, DeviceId<Self>>
+    + IcmpContext<Ipv6, DeviceId<Self>>
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
@@ -396,8 +364,6 @@ pub trait NonSyncContext:
 }
 impl<
         C: BindingsTypes
-            + BufferNonSyncContextInner<Buf<Vec<u8>>, DeviceId<Self>>
-            + BufferNonSyncContextInner<EmptyBuf, DeviceId<Self>>
             + RngContext
             + TimerContext<TimerId<Self>>
             + EventContext<
@@ -428,10 +394,10 @@ impl<
                     Ipv6,
                     <Self as InstantBindingsTypes>::Instant,
                 >,
-            > + transport::udp::NonSyncContext<Ipv4>
-            + transport::udp::NonSyncContext<Ipv6>
-            + IcmpContext<Ipv4>
-            + IcmpContext<Ipv6>
+            > + transport::udp::NonSyncContext<Ipv4, DeviceId<Self>>
+            + transport::udp::NonSyncContext<Ipv6, DeviceId<Self>>
+            + IcmpContext<Ipv4, DeviceId<Self>>
+            + IcmpContext<Ipv6, DeviceId<Self>>
             + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>

@@ -89,7 +89,7 @@ use crate::{
     socket::datagram,
     sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard},
     transport::{tcp::socket::TcpIpTransportContext, udp::UdpIpTransportContext},
-    BindingsTypes, BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
+    BindingsTypes, Instant, NonSyncContext, SyncCtx,
 };
 
 /// Default IPv4 TTL.
@@ -998,7 +998,7 @@ impl<
 }
 
 impl<
-        C: BufferNonSyncContext<B>,
+        C: NonSyncContext,
         B: BufferMut,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>,
     > BufferTransportContext<Ipv4, C, B> for Locked<&SyncCtx<C>, L>
@@ -1057,7 +1057,7 @@ impl<
 }
 
 impl<
-        C: BufferNonSyncContext<B>,
+        C: NonSyncContext,
         B: BufferMut,
         L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>,
     > BufferTransportContext<Ipv6, C, B> for Locked<&SyncCtx<C>, L>
@@ -1959,7 +1959,7 @@ macro_rules! try_parse_ip_packet {
 /// `receive_ip_packet` calls [`receive_ipv4_packet`] or [`receive_ipv6_packet`]
 /// depending on the type parameter, `I`.
 #[cfg(test)]
-pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>, I: Ip>(
+pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: NonSyncContext, I: Ip>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
@@ -3283,8 +3283,8 @@ impl<
 impl<
         I: datagram::IpExt,
         B: BufferMut,
-        C: icmp::BufferIcmpNonSyncCtx<I, B, Self::DeviceId>
-            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B, Self::DeviceId>
+        C: icmp::IcmpNonSyncCtx<I, Self::DeviceId>
+            + icmp::IcmpNonSyncCtx<I::OtherVersion, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > icmp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
@@ -3298,8 +3298,8 @@ where
 impl<
         I: datagram::IpExt,
         B: BufferMut,
-        C: icmp::BufferIcmpNonSyncCtx<I, B, Self::DeviceId>
-            + icmp::BufferIcmpNonSyncCtx<I::OtherVersion, B, Self::DeviceId>
+        C: icmp::IcmpNonSyncCtx<I, Self::DeviceId>
+            + icmp::IcmpNonSyncCtx<I::OtherVersion, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > icmp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>

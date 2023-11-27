@@ -72,7 +72,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{Mutex, RwLock},
-    BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
+    Instant, NonSyncContext, SyncCtx,
 };
 
 const ETHERNET_HDR_LEN_NO_TAG_U32: u32 = ETHERNET_HDR_LEN_NO_TAG as u32;
@@ -379,7 +379,7 @@ fn send_ethernet_frame<
 
 impl<
         B: BufferMut,
-        BufferNonSyncCtx: BufferNonSyncContext<B>,
+        BufferNonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
     > BufferNudContext<B, Ipv6, EthernetLinkDevice, BufferNonSyncCtx>
     for Locked<&SyncCtx<BufferNonSyncCtx>, L>
@@ -429,7 +429,7 @@ impl<
 impl<
         'a,
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
     > BufferNudSenderContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
     for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<NonSyncCtx>, L>>
@@ -1218,11 +1218,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 impl<C: NonSyncContext, L> ArpConfigContext for Locked<&SyncCtx<C>, L> {}
 impl<SC: DeviceIdContext<EthernetLinkDevice>> ArpConfigContext for SyncCtxWithDeviceId<'_, SC> {}
 
-impl<
-        B: BufferMut,
-        C: BufferNonSyncContext<B>,
-        L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
-    > BufferArpContext<B, EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<B: BufferMut, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    BufferArpContext<B, EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
 {
     type BufferArpSenderCtx<'a> =
         SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
@@ -1256,7 +1253,7 @@ impl<
 impl<
         'a,
         B: BufferMut,
-        C: BufferNonSyncContext<B>,
+        C: NonSyncContext,
         L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
     > BufferArpSenderContext<EthernetLinkDevice, C, B>
     for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>

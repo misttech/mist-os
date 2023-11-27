@@ -66,7 +66,7 @@ use crate::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
-        icmp::{BufferIcmpContext, IcmpContext, IcmpIpExt},
+        icmp::{IcmpContext, IcmpIpExt},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -1126,16 +1126,12 @@ impl FakeNetworkContext for FakeCtx {
     type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
 }
 
-impl<I: IcmpIpExt> udp::NonSyncContext<I> for FakeNonSyncCtx {
+impl<I: IcmpIpExt> udp::NonSyncContext<I, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_error(&mut self, _id: udp::SocketId<I>, _err: <I as IcmpIpExt>::ErrorCode) {
         unimplemented!()
     }
-}
 
-impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<Self>>
-    for FakeNonSyncCtx
-{
-    fn receive_udp(
+    fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
         _device: &DeviceId<Self>,
@@ -1149,19 +1145,17 @@ impl<I: crate::ip::IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId
     }
 }
 
-impl<I: IcmpIpExt> IcmpContext<I> for FakeNonSyncCtx {
+impl IcmpContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_error(
         &mut self,
-        _conn: crate::ip::icmp::SocketId<I>,
+        _conn: crate::ip::icmp::SocketId<Ipv4>,
         _seq_num: u16,
-        _err: I::ErrorCode,
+        _err: <Ipv4 as IcmpIpExt>::ErrorCode,
     ) {
         unimplemented!()
     }
-}
 
-impl<B: BufferMut> BufferIcmpContext<Ipv4, B, DeviceId<Self>> for FakeNonSyncCtx {
-    fn receive_icmp_echo_reply(
+    fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv4>,
         _device: &DeviceId<Self>,
@@ -1176,8 +1170,17 @@ impl<B: BufferMut> BufferIcmpContext<Ipv4, B, DeviceId<Self>> for FakeNonSyncCtx
     }
 }
 
-impl<B: BufferMut> BufferIcmpContext<Ipv6, B, DeviceId<Self>> for FakeNonSyncCtx {
-    fn receive_icmp_echo_reply(
+impl IcmpContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
+    fn receive_icmp_error(
+        &mut self,
+        _conn: crate::ip::icmp::SocketId<Ipv6>,
+        _seq_num: u16,
+        _err: <Ipv6 as IcmpIpExt>::ErrorCode,
+    ) {
+        unimplemented!()
+    }
+
+    fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv6>,
         _device: &DeviceId<Self>,

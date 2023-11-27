@@ -968,7 +968,7 @@ impl<I: Ip> EntryKey for SocketId<I> {
 }
 
 /// An execution context for the UDP protocol.
-pub trait NonSyncContext<I: IcmpIpExt> {
+pub trait NonSyncContext<I: IcmpIpExt, D> {
     /// Receives an ICMP error message related to a previously-sent UDP packet.
     ///
     /// `err` is the specific error identified by the incoming ICMP error
@@ -983,20 +983,30 @@ pub trait NonSyncContext<I: IcmpIpExt> {
     /// packet corruption on the network, it may have been injected by a
     /// malicious party, etc.
     fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode);
+
+    /// Receives a UDP packet on a socket.
+    fn receive_udp<B: BufferMut>(
+        &mut self,
+        id: SocketId<I>,
+        device_id: &D,
+        dst_addr: (I::Addr, NonZeroU16),
+        src_addr: (I::Addr, Option<NonZeroU16>),
+        body: &B,
+    );
 }
 
 /// The non-synchronized context for UDP.
-pub(crate) trait StateNonSyncContext<I: IpExt>:
-    InstantContext + RngContext + TracingContext + NonSyncContext<I>
+pub(crate) trait StateNonSyncContext<I: IpExt, D>:
+    InstantContext + RngContext + TracingContext + NonSyncContext<I, D>
 {
 }
-impl<I: IpExt, C: InstantContext + RngContext + TracingContext + NonSyncContext<I>>
-    StateNonSyncContext<I> for C
+impl<I: IpExt, C: InstantContext + RngContext + TracingContext + NonSyncContext<I, D>, D>
+    StateNonSyncContext<I, D> for C
 {
 }
 
 /// An execution context for the UDP protocol which also provides access to state.
-pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
+pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice> + UdpStateContext
 {
     /// The synchronized context passed to the callback provided to methods.
@@ -1049,7 +1059,7 @@ pub(crate) trait BoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
     ) -> O;
 }
 
-pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
+pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callback.
@@ -1095,7 +1105,7 @@ pub(crate) trait StateContext<I: IpExt, C: StateNonSyncContext<I>>:
 pub(crate) trait UdpStateContext {}
 
 /// An execution context for UDP dual-stack operations.
-pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
+pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
     /// The synchronized context passed to the callbacks to methods.
@@ -1133,38 +1143,8 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>
 }
 
 /// An execution context for UDP non-dual-stack operations.
-pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I>>:
+pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
-{
-}
-
-/// An execution context for the UDP protocol when a buffer is provided.
-///
-/// `BufferNonSyncContext` is like [`UdpContext`], except that it also requires that
-/// the context be capable of receiving frames in buffers of type `B`. This is
-/// used when a buffer of type `B` is provided to UDP (in particular, in
-/// [`send_udp_conn`] and [`send_udp_listener`]), and allows any generated
-/// link-layer frames to reuse that buffer rather than needing to always
-/// allocate a new one.
-pub trait BufferNonSyncContext<I: IcmpIpExt, B: BufferMut, D>: NonSyncContext<I> {
-    /// Receives a UDP packet on a socket.
-    fn receive_udp(
-        &mut self,
-        id: SocketId<I>,
-        device_id: &D,
-        dst_addr: (I::Addr, NonZeroU16),
-        src_addr: (I::Addr, Option<NonZeroU16>),
-        body: &B,
-    );
-}
-
-/// The non-synchronized context for UDP with a buffer.
-pub(crate) trait BufferStateNonSyncContext<I: IpExt, B: BufferMut, D>:
-    StateNonSyncContext<I> + BufferNonSyncContext<I, B, D>
-{
-}
-impl<I: IpExt, B: BufferMut, C: StateNonSyncContext<I> + BufferNonSyncContext<I, B, D>, D>
-    BufferStateNonSyncContext<I, B, D> for C
 {
 }
 
@@ -1177,7 +1157,7 @@ impl<I: IpExt, B: BufferMut, C: StateNonSyncContext<I> + BufferNonSyncContext<I,
 /// also provides access to state.
 pub(crate) trait BufferStateContext<
     I: IpExt,
-    C: BufferStateNonSyncContext<I, B, Self::DeviceId>,
+    C: StateNonSyncContext<I, Self::DeviceId>,
     B: BufferMut,
 >: StateContext<I, C> where
     for<'a> Self: StateContext<I, C, SocketStateCtx<'a> = Self::BufferSocketStateCtx<'a>>,
@@ -1200,7 +1180,7 @@ pub(crate) trait BufferStateContext<
 /// also provides access to state.
 pub(crate) trait BufferBoundStateContext<
     I: IpExt,
-    C: BufferStateNonSyncContext<I, B, Self::DeviceId>,
+    C: StateNonSyncContext<I, Self::DeviceId>,
     B: BufferMut,
 > where
     for<'a> Self: BoundStateContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
@@ -1219,7 +1199,7 @@ pub(crate) enum UdpIpTransportContext {}
 
 impl<
         I: IpExt,
-        C: StateNonSyncContext<I> + StateNonSyncContext<I::OtherVersion>,
+        C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
         SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
     > IpTransportContext<I, C, SC> for UdpIpTransportContext
 {
@@ -1325,8 +1305,7 @@ impl<
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
-    C: BufferStateNonSyncContext<I, B, SC::DeviceId>
-        + BufferStateNonSyncContext<I::OtherVersion, B, SC::DeviceId>,
+    C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
     SC: BufferStateContext<I, C, B>
         + BufferStateContext<I::OtherVersion, C, B>
         + CounterContext<UdpCounters<I>>,
@@ -1444,7 +1423,7 @@ fn receive_ip_packet<
 fn try_deliver<
     I: IpExt,
     SC: BufferStateContext<I, C, B>,
-    C: BufferStateNonSyncContext<I, B, SC::DeviceId>,
+    C: StateNonSyncContext<I, SC::DeviceId>,
     B: BufferMut,
 >(
     sync_ctx: &mut SC,
@@ -1494,8 +1473,7 @@ fn try_deliver<
 fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
-    C: BufferStateNonSyncContext<I, B, SC::DeviceId>
-        + BufferStateNonSyncContext<I::OtherVersion, B, SC::DeviceId>,
+    C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
     SC: BufferStateContext<I, C, B> + BufferStateContext<I::OtherVersion, C, B>,
 >(
     sync_ctx: &mut SC,
@@ -1569,8 +1547,7 @@ fn try_dual_stack_deliver<
 impl<
         I: IpExt,
         B: BufferMut,
-        C: BufferStateNonSyncContext<I, B, SC::DeviceId>
-            + BufferStateNonSyncContext<I::OtherVersion, B, SC::DeviceId>,
+        C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
         SC: BufferStateContext<I, C, B>
             + BufferStateContext<I::OtherVersion, C, B>
             + NonTestCtxMarker
@@ -1725,7 +1702,9 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> SocketHandler<I, C> for SC {
+impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>>
+    SocketHandler<I, C> for SC
+{
     fn create_udp(&mut self) -> SocketId<I> {
         datagram::create(self)
     }
@@ -1960,7 +1939,7 @@ pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
 impl<
         I: IpExt,
         B: BufferMut,
-        C: BufferStateNonSyncContext<I, B, SC::DeviceId>,
+        C: StateNonSyncContext<I, SC::DeviceId>,
         SC: BufferStateContext<I, C, B> + CounterContext<UdpCounters<I>>,
     > BufferSocketHandler<I, C, B> for SC
 {
@@ -2038,7 +2017,7 @@ impl<
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+pub fn send_udp<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -2072,7 +2051,7 @@ pub fn send_udp<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
 /// # Panics
 ///
 /// Panics if `id` is not a valid UDP socket identifier.
-pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
+pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
@@ -2111,8 +2090,8 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::BufferNonSyncContext<B>>(
     .map_err(|IpInvariant(e)| e)
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> DatagramStateContext<I, C, Udp>
-    for SC
+impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>>
+    DatagramStateContext<I, C, Udp> for SC
 {
     type SocketsStateCtx<'a> = SC::SocketStateCtx<'a>;
 
@@ -2150,8 +2129,11 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: StateContext<I, C>> DatagramStateC
     }
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C> + UdpStateContext>
-    DatagramBoundStateContext<I, C, Udp> for SC
+impl<
+        I: IpExt,
+        C: StateNonSyncContext<I, Self::DeviceId>,
+        SC: BoundStateContext<I, C> + UdpStateContext,
+    > DatagramBoundStateContext<I, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
     // TODO(https://fxbug.dev/133884): Remove the laziness by dropping `Option`.
@@ -2205,7 +2187,7 @@ impl<I: IpExt, C: StateNonSyncContext<I>, SC: BoundStateContext<I, C> + UdpState
 }
 
 impl<
-        C: StateNonSyncContext<Ipv6> + StateNonSyncContext<Ipv4>,
+        C: StateNonSyncContext<Ipv6, SC::DeviceId> + StateNonSyncContext<Ipv4, SC::DeviceId>,
         SC: DualStackBoundStateContext<Ipv6, C> + UdpStateContext,
     > DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
 {
@@ -2273,7 +2255,7 @@ impl<
 }
 
 impl<
-        C: StateNonSyncContext<Ipv4>,
+        C: StateNonSyncContext<Ipv4, SC::DeviceId>,
         SC: BoundStateContext<Ipv4, C> + NonDualStackBoundStateContext<Ipv4, C> + UdpStateContext,
     > NonDualStackDatagramBoundStateContext<Ipv4, C, Udp> for SC
 {
@@ -2283,7 +2265,7 @@ impl<
     }
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I>, D: WeakId>
+impl<I: IpExt, C: StateNonSyncContext<I, D::Strong>, D: WeakId>
     LocalIdentifierAllocator<I, D, Udp, C, (Udp, I, D)>
     for Option<PortAlloc<UdpBoundSocketMap<I, D>>>
 {
@@ -3040,9 +3022,25 @@ mod tests {
         }
     }
 
-    impl<I: IcmpIpExt> NonSyncContext<I> for FakeUdpNonSyncCtx {
+    impl<I: IcmpIpExt, D> NonSyncContext<I, D> for FakeUdpNonSyncCtx {
         fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode) {
             self.state_mut().received_mut().entry(id).or_default().errors.push(err)
+        }
+
+        fn receive_udp<B: BufferMut>(
+            &mut self,
+            id: SocketId<I>,
+            _device: &D,
+            (dst_ip, _dst_port): (I::Addr, NonZeroU16),
+            (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
+            body: &B,
+        ) {
+            self.state_mut().received_mut::<I>().entry(id).or_default().packets.push(
+                ReceivedPacket {
+                    addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
+                    body: body.as_ref().to_owned(),
+                },
+            )
         }
     }
 
@@ -3283,24 +3281,6 @@ mod tests {
     impl<I: Ip, D: FakeStrongDeviceId> CounterContext<UdpCounters<I>> for FakeUdpSyncCtx<D> {
         fn with_counters<O, F: FnOnce(&UdpCounters<I>) -> O>(&self, cb: F) -> O {
             cb(&self.outer.udp_counters())
-        }
-    }
-
-    impl<I: TestIpExt, B: BufferMut, D> BufferNonSyncContext<I, B, D> for FakeUdpNonSyncCtx {
-        fn receive_udp(
-            &mut self,
-            id: SocketId<I>,
-            _device: &D,
-            (dst_ip, _dst_port): (I::Addr, NonZeroU16),
-            (src_ip, src_port): (I::Addr, Option<NonZeroU16>),
-            body: &B,
-        ) {
-            self.state_mut().received_mut::<I>().entry(id).or_default().packets.push(
-                ReceivedPacket {
-                    addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port },
-                    body: body.as_ref().to_owned(),
-                },
-            )
         }
     }
 
@@ -5293,8 +5273,12 @@ mod tests {
         let UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx } =
             UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::new_fake_device::<I>());
 
-        fn listen_unbound<I: Ip + TestIpExt, C: StateNonSyncContext<I>>(
-            sync_ctx: &mut impl StateContext<I, C>,
+        fn listen_unbound<
+            I: Ip + TestIpExt,
+            C: StateNonSyncContext<I, SC::DeviceId>,
+            SC: StateContext<I, C>,
+        >(
+            sync_ctx: &mut SC,
             non_sync_ctx: &mut C,
             socket: SocketId<I>,
         ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {

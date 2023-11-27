@@ -70,7 +70,7 @@ use crate::{
         types::RawMetric,
     },
     sync::{PrimaryRc, RwLock},
-    trace_duration, BufferNonSyncContext, Instant, NonSyncContext, SyncCtx,
+    trace_duration, Instant, NonSyncContext, SyncCtx,
 };
 
 pub use id::*;
@@ -847,7 +847,7 @@ where
 }
 
 /// Receive a device layer frame from the network.
-pub fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
+pub fn receive_frame<B: BufferMut, NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &EthernetDeviceId<NonSyncCtx>,
@@ -1255,7 +1255,7 @@ pub(crate) mod testutil {
 
     /// Calls [`receive_frame`], with a [`Ctx`].
     #[cfg(test)]
-    pub(crate) fn receive_frame<B: BufferMut, NonSyncCtx: BufferNonSyncContext<B>>(
+    pub(crate) fn receive_frame<B: BufferMut, NonSyncCtx: NonSyncContext>(
         Ctx { sync_ctx, non_sync_ctx }: &mut Ctx<NonSyncCtx>,
         device: EthernetDeviceId<NonSyncCtx>,
         buffer: B,

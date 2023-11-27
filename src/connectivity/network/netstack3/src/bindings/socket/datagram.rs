@@ -42,7 +42,7 @@ use netstack3_core::{
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
     transport::udp,
-    BufferNonSyncContext, NonSyncContext, SyncCtx,
+    NonSyncContext, SyncCtx,
 };
 use packet::{Buf, BufferMut};
 use tracing::{error, trace, warn};
@@ -81,13 +81,13 @@ pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
 /// Mapping from socket IDs to their receive queues.
 ///
 /// Receive queues are shared between the collections here and the tasks
-/// handling socket requests. Since `SocketCollection` implements [`udp::NonSyncContext`]
-/// and [`udp::BufferNonSyncContext`], whose trait methods may be called from
-/// within Core in a locked context, once one of the [`MessageQueue`]s is
-/// locked, no calls may be made into [`netstack3_core`]. This prevents
-/// a potential deadlock where Core is waiting for a `MessageQueue` to be
-/// available and some bindings code here holds the `MessageQueue` and
-/// attempts to lock Core state via a `netstack3_core` call.
+/// handling socket requests. Since `SocketCollection` implements
+/// [`udp::NonSyncContext`] whose trait methods may be called from within Core
+/// in a locked context, once one of the [`MessageQueue`]s is locked, no calls
+/// may be made into [`netstack3_core`]. This prevents a potential deadlock
+/// where Core is waiting for a `MessageQueue` to be available and some bindings
+/// code here holds the `MessageQueue` and attempts to lock Core state via a
+/// `netstack3_core` call.
 #[derive(Derivative)]
 #[derivative(Default(bound = "I: Ip"))]
 pub(crate) struct SocketCollection<I: Ip, T> {
@@ -352,14 +352,14 @@ pub(crate) trait BufferTransportState<I: Ip, B: BufferMut>: TransportState<I> {
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
 
-    fn send<C: BufferNonSyncContext<B>>(
+    fn send<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
         body: B,
     ) -> Result<(), Self::SendError>;
 
-    fn send_to<C: BufferNonSyncContext<B>>(
+    fn send_to<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
@@ -567,7 +567,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
     type SendError = Either<udp::SendError, fposix::Errno>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
 
-    fn send<C: BufferNonSyncContext<B>>(
+    fn send<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
@@ -577,7 +577,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
             .map_err(|e| e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq))
     }
 
-    fn send_to<C: BufferNonSyncContext<B>>(
+    fn send_to<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
@@ -591,18 +591,16 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
     }
 }
 
-impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I> for SocketCollection<I, Udp> {
+impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I, DeviceId<BindingsNonSyncCtxImpl>>
+    for SocketCollection<I, Udp>
+{
     fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
         // TODO(https://fxbug.dev/135413): Handle incoming ICMP errors in
         // Bindings.
         warn!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
     }
-}
 
-impl<I: IpExt, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
-    for SocketCollection<I, Udp>
-{
-    fn receive_udp(
+    fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
         device_id: &DeviceId<BindingsNonSyncCtxImpl>,
@@ -843,7 +841,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
         core_datagram::SendToError<packet_formats::error::ParseError>,
     >;
 
-    fn send<C: BufferNonSyncContext<B>>(
+    fn send<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
@@ -852,7 +850,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
         icmp::send(sync_ctx, ctx, id, body)
     }
 
-    fn send_to<C: BufferNonSyncContext<B>>(
+    fn send_to<C: NonSyncContext>(
         sync_ctx: &SyncCtx<C>,
         ctx: &mut C,
         id: &Self::SocketId,
@@ -866,7 +864,9 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
     }
 }
 
-impl<I: IpExt> icmp::IcmpContext<I> for SocketCollection<I, IcmpEcho> {
+impl<I: IpExt> icmp::IcmpContext<I, DeviceId<BindingsNonSyncCtxImpl>>
+    for SocketCollection<I, IcmpEcho>
+{
     fn receive_icmp_error(
         &mut self,
         conn: icmp::SocketId<I>,
@@ -877,12 +877,8 @@ impl<I: IpExt> icmp::IcmpContext<I> for SocketCollection<I, IcmpEcho> {
         // Bindings.
         warn!("unimplemented receive_icmp_error {:?} on {:?}, seq_num={}", err, conn, seq_num)
     }
-}
 
-impl<I: IpExt, B: BufferMut> icmp::BufferIcmpContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
-    for SocketCollection<I, IcmpEcho>
-{
-    fn receive_icmp_echo_reply(
+    fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,
         device: &DeviceId<BindingsNonSyncCtxImpl>,

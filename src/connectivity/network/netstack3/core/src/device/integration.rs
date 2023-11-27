@@ -48,7 +48,7 @@ use crate::{
         IpDeviceIpExt, IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
-    BufferNonSyncContext, NonSyncContext, SyncCtx,
+    NonSyncContext, SyncCtx,
 };
 
 impl<NonSyncCtx: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceLayerStateOrigin>
@@ -140,7 +140,7 @@ where
 
 impl<
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
     > BufferIpDeviceContext<Ipv4, NonSyncCtx, B> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
@@ -752,7 +752,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
 
 impl<
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
     > BufferIpDeviceContext<Ipv6, NonSyncCtx, B> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
@@ -901,7 +901,7 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
 
 impl<
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::EthernetRxDequeue>,
     > RecvFrameContext<NonSyncCtx, B, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv4>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
@@ -924,7 +924,7 @@ impl<
 
 impl<
         B: BufferMut,
-        NonSyncCtx: BufferNonSyncContext<B>,
+        NonSyncCtx: NonSyncContext,
         L: LockBefore<crate::lock_ordering::EthernetRxDequeue>,
     > RecvFrameContext<NonSyncCtx, B, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv6>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
@@ -1140,7 +1140,7 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
 
 fn send_ip_frame<
     B: BufferMut,
-    NonSyncCtx: BufferNonSyncContext<B>,
+    NonSyncCtx: NonSyncContext,
     S: Serializer<Buffer = B>,
     A: IpAddress,
     L: LockBefore<crate::lock_ordering::IpState<A::Version>>

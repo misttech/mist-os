@@ -547,21 +547,13 @@ impl<
         I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
             + icmp::IcmpIpExt
             + IpExt,
-    > icmp::IcmpContext<I> for BindingsNonSyncCtxImpl
+    > icmp::IcmpContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 {
     fn receive_icmp_error(&mut self, conn: icmp::SocketId<I>, seq_num: u16, err: I::ErrorCode) {
         I::with_collection_mut(self, |c| c.receive_icmp_error(conn, seq_num, err))
     }
-}
 
-impl<
-        I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
-            + icmp::IcmpIpExt
-            + IpExt,
-        B: BufferMut,
-    > icmp::BufferIcmpContext<I, B, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
-{
-    fn receive_icmp_echo_reply(
+    fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,
         device: &DeviceId<BindingsNonSyncCtxImpl>,
@@ -576,21 +568,15 @@ impl<
     }
 }
 
-impl<I> udp::NonSyncContext<I> for BindingsNonSyncCtxImpl
+impl<I> udp::NonSyncContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
     fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
         I::with_collection_mut(self, |c| c.receive_icmp_error(id, err))
     }
-}
 
-impl<I, B: BufferMut> udp::BufferNonSyncContext<I, B, DeviceId<BindingsNonSyncCtxImpl>>
-    for BindingsNonSyncCtxImpl
-where
-    I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + IpExt,
-{
-    fn receive_udp(
+    fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
         device: &DeviceId<BindingsNonSyncCtxImpl>,
