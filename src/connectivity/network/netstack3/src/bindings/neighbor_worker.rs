@@ -31,10 +31,7 @@ use crate::bindings::{
     BindingsNonSyncCtxImpl, Ctx, StackTime,
 };
 use netstack3_core::{
-    device::{
-        flush_neighbor_table, id::EthernetWeakDeviceId, insert_static_neighbor_entry,
-        remove_neighbor_table_entry,
-    },
+    device::id::EthernetWeakDeviceId,
     error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
     ip::device::nud,
 };
@@ -437,13 +434,13 @@ pub(super) async fn serve_controller(
                     };
                     let mac = mac.into_ext();
                     let result = match neighbor.into_ext() {
-                        IpAddr::V4(v4) => insert_static_neighbor_entry::<
+                        IpAddr::V4(v4) => netstack3_core::device::insert_static_neighbor_entry::<
                             Ipv4,
                             BindingsNonSyncCtxImpl,
                         >(
                             sync_ctx, non_sync_ctx, &device_id, v4, mac
                         ),
-                        IpAddr::V6(v6) => insert_static_neighbor_entry::<
+                        IpAddr::V6(v6) => netstack3_core::device::insert_static_neighbor_entry::<
                             Ipv6,
                             BindingsNonSyncCtxImpl,
                         >(
@@ -467,33 +464,30 @@ pub(super) async fn serve_controller(
                     else {
                         return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
                     };
-                    let result =
-                        match neighbor.into_ext() {
-                            IpAddr::V4(v4) => remove_neighbor_table_entry::<
+                    let result = match neighbor.into_ext() {
+                        IpAddr::V4(v4) => {
+                            netstack3_core::device::remove_neighbor_table_entry::<
                                 Ipv4,
                                 BindingsNonSyncCtxImpl,
-                            >(
-                                sync_ctx, non_sync_ctx, &device_id, v4
-                            ),
-                            IpAddr::V6(v6) => remove_neighbor_table_entry::<
+                            >(sync_ctx, non_sync_ctx, &device_id, v4)
+                        }
+                        IpAddr::V6(v6) => {
+                            netstack3_core::device::remove_neighbor_table_entry::<
                                 Ipv6,
                                 BindingsNonSyncCtxImpl,
-                            >(
-                                sync_ctx, non_sync_ctx, &device_id, v6
-                            ),
+                            >(sync_ctx, non_sync_ctx, &device_id, v6)
                         }
-                        .map_err(|e| {
-                            match e {
-                                NeighborRemovalError::IpAddressInvalid => zx::Status::INVALID_ARGS,
-                                NeighborRemovalError::NotFound(NotFoundError) => {
-                                    zx::Status::NOT_FOUND
-                                }
-                                NeighborRemovalError::NotSupported(NotSupportedError) => {
-                                    zx::Status::NOT_SUPPORTED
-                                }
+                    }
+                    .map_err(|e| {
+                        match e {
+                            NeighborRemovalError::IpAddressInvalid => zx::Status::INVALID_ARGS,
+                            NeighborRemovalError::NotFound(NotFoundError) => zx::Status::NOT_FOUND,
+                            NeighborRemovalError::NotSupported(NotSupportedError) => {
+                                zx::Status::NOT_SUPPORTED
                             }
-                            .into_raw()
-                        });
+                        }
+                        .into_raw()
+                    });
                     responder.send(result)
                 }
                 ControllerRequest::ClearEntries { interface, ip_version, responder } => {
@@ -505,22 +499,21 @@ pub(super) async fn serve_controller(
                             return responder.send(Err(zx::Status::NOT_FOUND.into_raw()));
                         }
                     };
-                    let result =
-                        match ip_version {
-                            fnet::IpVersion::V4 => flush_neighbor_table::<
+                    let result = match ip_version {
+                        fnet::IpVersion::V4 => {
+                            netstack3_core::device::flush_neighbor_table::<
                                 Ipv4,
                                 BindingsNonSyncCtxImpl,
-                            >(
-                                sync_ctx, non_sync_ctx, &device_id
-                            ),
-                            fnet::IpVersion::V6 => flush_neighbor_table::<
+                            >(sync_ctx, non_sync_ctx, &device_id)
+                        }
+                        fnet::IpVersion::V6 => {
+                            netstack3_core::device::flush_neighbor_table::<
                                 Ipv6,
                                 BindingsNonSyncCtxImpl,
-                            >(
-                                sync_ctx, non_sync_ctx, &device_id
-                            ),
+                            >(sync_ctx, non_sync_ctx, &device_id)
                         }
-                        .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());
+                    }
+                    .map_err(|NotSupportedError| zx::Status::NOT_SUPPORTED.into_raw());
                     responder.send(result)
                 }
                 ControllerRequest::UpdateUnreachabilityConfig {
