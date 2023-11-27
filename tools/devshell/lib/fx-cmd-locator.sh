@@ -121,7 +121,7 @@ function find_execs_and_metadata {
       exit 1
     fi
   fi
-  sort -u <<< "${cmds}"
+  echo "${cmds}"
 }
 
 
@@ -163,7 +163,7 @@ function commands {
     cmd_name=""
     dirs=("${FUCHSIA_DIR}"/vendor/${vendor}/scripts/devshell)
   else
-    dirs=("${FUCHSIA_DIR}"/tools/devshell{,/contrib} "${FUCHSIA_DIR}"/vendor/*/scripts/devshell)
+    dirs=("${FUCHSIA_DIR}"/vendor/*/scripts/devshell "${FUCHSIA_DIR}"/tools/devshell{,/contrib})
   fi
 
   find_execs_and_metadata "${cmd_name}" "${dirs[@]}"
