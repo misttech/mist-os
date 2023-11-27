@@ -1365,7 +1365,7 @@ fn receive_ip_packet<
                 sync_ctx.with_counters(|counters| {
                     counters.rx_mapped_addr.increment();
                 });
-                trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
+                trace!("udp::receive_ip_packet: mapped source address");
                 return Ok(());
             }
         }
@@ -1378,7 +1378,7 @@ fn receive_ip_packet<
             sync_ctx.with_counters(|counters| {
                 counters.rx_mapped_addr.increment();
             });
-            trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
+            trace!("udp::receive_ip_packet: mapped destination address");
             return Ok(());
         }
     };

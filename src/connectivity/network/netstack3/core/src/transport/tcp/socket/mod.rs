@@ -261,7 +261,7 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: TcpBindingsTypes>:
     /// Calls the callback once for each currently installed socket.
     fn for_each_socket<F: FnMut(&TcpSocketState<I, Self::WeakDeviceId, C>)>(&mut self, cb: F);
 
-    /// Cals the function with access to the socket state, ISN generator, and
+    /// Calls the function with access to the socket state, ISN generator, and
     /// Transport + Demux context.
     fn with_socket_mut_isn_transport_demux<
         O,
@@ -276,14 +276,14 @@ pub(crate) trait SyncContext<I: IpLayerIpExt, C: TcpBindingsTypes>:
         cb: F,
     ) -> O;
 
-    /// Cals the function with immutable access to the socket state.
+    /// Calls the function with immutable access to the socket state.
     fn with_socket<O, F: FnOnce(&TcpSocketState<I, Self::WeakDeviceId, C>) -> O>(
         &mut self,
         id: &TcpSocketId<I, Self::WeakDeviceId, C>,
         cb: F,
     ) -> O;
 
-    /// Cals the function with access to the socket state and Transport + Demux
+    /// Calls the function with access to the socket state and Transport + Demux
     /// context.
     fn with_socket_mut_transport_demux<
         O,

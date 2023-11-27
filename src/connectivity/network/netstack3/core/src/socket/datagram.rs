@@ -884,7 +884,7 @@ impl<I: Ip, D: device::Id, A: SocketMapAddrSpec, C, S: SocketMapStateSpec>
     }
 }
 
-/// An uninstantiable type that ipmlements
+/// An uninstantiable type that implements
 /// [`DualStackDatagramBoundStateContext`].
 pub(crate) struct UninstantiableContext<I, S, P>(Never, PhantomData<(I, S, P)>);
 
