@@ -32,12 +32,9 @@ use futures::{StreamExt, TryStreamExt};
 mod trace;
 
 mod arch;
-mod atomic_counter;
 mod bpf;
-mod delayed_releaser;
 mod device;
 mod diagnostics;
-mod drop_notifier;
 mod dynamic_thread_spawner;
 mod execution;
 mod fs;

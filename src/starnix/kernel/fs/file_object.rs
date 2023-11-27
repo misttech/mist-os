@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{
-    delayed_releaser::FileReleaser,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         file_server::serve_file,
         fsverity::{
             FsVerityState, {self},
         },
-        DirentSink, FallocMode, FdEvents, FdTableId, FileSystemHandle, FileWriteGuard,
-        FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, InotifyMask, NamespaceNode,
-        RecordLockCommand, RecordLockOwner,
+        DirentSink, FallocMode, FdEvents, FdTableId, FileReleaser, FileSystemHandle,
+        FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, InotifyMask,
+        NamespaceNode, RecordLockCommand, RecordLockOwner,
     },
     logging::{impossible_error, not_implemented},
     mm::{

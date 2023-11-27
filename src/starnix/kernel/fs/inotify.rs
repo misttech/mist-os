@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    delayed_releaser::FileReleaser,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
-        DirEntryHandle, FdEvents, FileHandle, FileObject, FileOps, FsNodeOps, FsStr, FsString,
-        InotifyMask, WdNumber,
+        DirEntryHandle, FdEvents, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr,
+        FsString, InotifyMask, WdNumber,
     },
     mm::{vmo::round_up_to_increment, MemoryAccessorExt},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},

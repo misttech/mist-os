@@ -5,7 +5,6 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
-    atomic_counter::AtomicU64Counter,
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
     fs::{
         buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
@@ -31,6 +30,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
+use lifecycle::AtomicU64Counter;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_sync::InterruptibleEvent;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};

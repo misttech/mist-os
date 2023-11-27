@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    atomic_counter::AtomicU64Counter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
@@ -17,6 +16,7 @@ use crate::{
     },
 };
 use bstr::ByteSlice;
+use lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{

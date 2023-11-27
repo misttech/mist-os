@@ -13,7 +13,6 @@ use super::{
     magma::{read_control_and_response, read_magma_command_and_type, StarnixPollItem},
 };
 use crate::{
-    atomic_counter::AtomicU64Counter,
     device::{
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
         wayland::image_file::{ImageFile, ImageInfo},
@@ -31,6 +30,7 @@ use crate::{
 use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
+use lifecycle::AtomicU64Counter;
 use magma::{
     magma_buffer_clean_cache, magma_buffer_get_cache_policy, magma_buffer_get_info,
     magma_buffer_id_t, magma_buffer_info_t, magma_buffer_set_cache_policy, magma_buffer_set_name,

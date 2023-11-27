@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    atomic_counter::AtomicUsizeCounter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
@@ -18,6 +17,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
+use lifecycle::AtomicUsizeCounter;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     c_char, error,

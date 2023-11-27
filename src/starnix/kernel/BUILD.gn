@@ -69,6 +69,7 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
+    ":lifecycle",
     ":perfetto_consumer_proto",
     ":starnix_kernel_config",
     ":vdso-data($bionic_linux_toolchain)",
@@ -220,9 +221,7 @@ rustc_binary("starnix_kernel_bin") {
     "arch/${current_cpu}/task.rs",
     "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
-    "atomic_counter.rs",
     "bpf.rs",
-    "delayed_releaser.rs",
     "device/binder.rs",
     "device/common.rs",
     "device/features.rs",
@@ -249,7 +248,6 @@ rustc_binary("starnix_kernel_bin") {
     "device/wayland/mod.rs",
     "device/wayland/vulkan.rs",
     "diagnostics/mod.rs",
-    "drop_notifier.rs",
     "dynamic_thread_spawner.rs",
     "execution/component_runner.rs",
     "execution/container.rs",
@@ -538,6 +536,35 @@ fuchsia_component("starnix_kernel") {
 fuchsia_structured_config_values("kernel_config") {
   cm_label = ":starnix_kernel_manifest"
   values_source = "//src/starnix/kernel/meta/config.json5"
+}
+
+rustc_library("lifecycle") {
+  name = "lifecycle"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "lifecycle/lib.rs"
+
+  sources = [
+    "lifecycle/atomic_counter.rs",
+    "lifecycle/delayed_releaser.rs",
+    "lifecycle/drop_notifier.rs",
+    "lifecycle/lib.rs",
+  ]
+
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:paste",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+}
+
+fuchsia_unittest_package("lifecycle-tests") {
+  deps = [ ":lifecycle_test" ]
 }
 
 fuchsia_package("starnix_kernel_package") {

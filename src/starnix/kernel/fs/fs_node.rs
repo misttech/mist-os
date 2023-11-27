@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    delayed_releaser::FsNodeReleaser,
     device::DeviceMode,
     fs::{
         fsverity::FsVerityState, inotify, pipe::Pipe, rw_queue::RwQueue, socket::SocketHandle,
         FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-        FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
+        FileWriteGuardState, FsNodeReleaser, FsStr, FsString, MountInfo, NamespaceNode, OPathOps,
         RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle,
     },
     logging::log_error,

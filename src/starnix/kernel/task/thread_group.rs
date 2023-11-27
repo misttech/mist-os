@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    atomic_counter::AtomicU64Counter,
     device::terminal::{ControllingSession, Terminal},
-    drop_notifier::DropNotifier,
     logging::{log_error, log_warn, not_implemented},
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::SeLinuxThreadGroupState,
@@ -23,6 +21,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
+use lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},

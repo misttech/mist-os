@@ -10,7 +10,7 @@
 //! To display the `Framebuffer` as its view, a component must add the `framebuffer` feature to its
 //! `.cml`.
 
-use crate::{atomic_counter::AtomicU64Counter, task::Kernel};
+use crate::task::Kernel;
 use anyhow::anyhow;
 use fidl::{
     endpoints::{create_proxy, create_request_stream},
@@ -34,6 +34,7 @@ use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
+use lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use std::{
     ops::DerefMut,

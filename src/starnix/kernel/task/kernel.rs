@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    atomic_counter::{AtomicU32Counter, AtomicU64Counter},
-    delayed_releaser::DelayedReleaser,
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
         BinderDriver, DeviceMode, DeviceOps, DeviceRegistry, Features,
@@ -18,7 +16,7 @@ use crate::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
         },
-        FileOps, FileSystemHandle, FsNode,
+        DelayedReleaser, FileOps, FileSystemHandle, FsNode,
     },
     lock_ordering::KernelIpTables,
     logging::log_error,
@@ -39,6 +37,7 @@ use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
+use lifecycle::{AtomicU32Counter, AtomicU64Counter};
 use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;

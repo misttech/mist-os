@@ -4,7 +4,6 @@
 
 use crate::{
     device::{DeviceOps, RemoteBinderConnection},
-    drop_notifier::DropWaiter,
     fs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
@@ -30,6 +29,7 @@ use futures::{
     task::Poll,
     Future, Stream, StreamExt, TryStreamExt,
 };
+use lifecycle::DropWaiter;
 use starnix_lock::{Mutex, MutexGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{

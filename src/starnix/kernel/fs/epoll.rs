@@ -488,7 +488,6 @@ impl FileOps for EpollFileObject {
 mod tests {
     use super::{epoll_event, EpollFileObject, EventHandler, OpenFlags};
     use crate::{
-        atomic_counter::AtomicUsizeCounter,
         fs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
@@ -503,6 +502,7 @@ mod tests {
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };
+    use lifecycle::AtomicUsizeCounter;
     use syncio::Zxio;
 
     #[::fuchsia::test]

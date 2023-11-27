@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    atomic_counter::AtomicU64Counter,
     fs::{
         DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
         WeakFsNodeHandle, XattrOp,
     },
     task::{CurrentTask, Kernel},
 };
+use lifecycle::AtomicU64Counter;
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;

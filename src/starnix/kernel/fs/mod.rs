@@ -81,3 +81,90 @@ pub use vec_directory::*;
 pub use vmo_file::*;
 pub use wd_number::*;
 pub use xattr::*;
+
+use crate::task::CurrentTask;
+use lifecycle::{ObjectReleaser, ReleaserAction};
+use starnix_uapi::ownership::{Releasable, ReleaseGuard};
+use std::{cell::RefCell, ops::DerefMut, sync::Arc};
+
+pub enum FileObjectReleaserAction {}
+impl ReleaserAction<FileObject> for FileObjectReleaserAction {
+    fn release(file_object: ReleaseGuard<FileObject>) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().closed_files.push(file_object);
+        });
+    }
+}
+pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
+
+pub enum FsNodeReleaserAction {}
+impl ReleaserAction<FsNode> for FsNodeReleaserAction {
+    fn release(fs_node: ReleaseGuard<FsNode>) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().dropped_fs_nodes.push(fs_node);
+        });
+    }
+}
+pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
+
+thread_local! {
+    /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
+    static RELEASERS: RefCell<LocalReleasers> = RefCell::new(LocalReleasers::default());
+}
+
+#[derive(Debug, Default)]
+struct LocalReleasers {
+    dropped_fs_nodes: Vec<ReleaseGuard<FsNode>>,
+    closed_files: Vec<ReleaseGuard<FileObject>>,
+    flushed_files: Vec<(FileHandle, FdTableId)>,
+}
+
+impl LocalReleasers {
+    fn is_empty(&self) -> bool {
+        self.dropped_fs_nodes.is_empty()
+            && self.closed_files.is_empty()
+            && self.flushed_files.is_empty()
+    }
+}
+
+impl Releasable for LocalReleasers {
+    type Context<'a> = &'a CurrentTask;
+
+    fn release(self, context: Self::Context<'_>) {
+        for fs_node in self.dropped_fs_nodes {
+            fs_node.release(context);
+        }
+        for file in self.closed_files {
+            file.release(context);
+        }
+        for (file, id) in self.flushed_files {
+            file.flush(context, id);
+        }
+    }
+}
+
+/// Service to handle delayed releases.
+///
+/// Delayed releases are cleanup code that is run at specific point where the lock level is
+/// known. The starnix kernel must ensure that delayed releases are run regularly.
+#[derive(Debug, Default)]
+pub struct DelayedReleaser {}
+
+impl DelayedReleaser {
+    pub fn flush_file(&self, file: &FileHandle, id: FdTableId) {
+        RELEASERS.with(|cell| {
+            cell.borrow_mut().flushed_files.push((Arc::clone(file), id));
+        });
+    }
+
+    /// Run all current delayed releases for the current thread.
+    pub fn apply(&self, current_task: &CurrentTask) {
+        loop {
+            let releasers = RELEASERS.with(|cell| std::mem::take(cell.borrow_mut().deref_mut()));
+            if releasers.is_empty() {
+                return;
+            }
+            releasers.release(current_task);
+        }
+    }
+}
