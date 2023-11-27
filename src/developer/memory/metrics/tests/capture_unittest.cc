@@ -311,38 +311,40 @@ TEST_F(CaptureUnitTest, VMORootedPartialCommit) {
 }
 
 TEST_F(CaptureUnitTest, Compression) {
-    const zx_info_kmem_stats_compression_t _kmem_compression_1 = {
-        .uncompressed_storage_bytes = 500,
-        .compressed_storage_bytes = 100,
-    };
+  const zx_info_kmem_stats_compression_t _kmem_compression_1 = {
+      .uncompressed_storage_bytes = 500,
+      .compressed_storage_bytes = 100,
+  };
 
-    const GetInfoResponse kmem_compression_info_1 = {TestUtils::kRootHandle,
-                                                          ZX_INFO_KMEM_STATS_COMPRESSION,
-                                                          &_kmem_compression_1,
-                                                          sizeof(_kmem_compression_1),
-                                                          1,
-                                                          ZX_OK};
+  const GetInfoResponse kmem_compression_info_1 = {TestUtils::kRootHandle,
+                                                   ZX_INFO_KMEM_STATS_COMPRESSION,
+                                                   &_kmem_compression_1,
+                                                   sizeof(_kmem_compression_1),
+                                                   1,
+                                                   ZX_OK};
 
   const static zx_info_vmo_t _vmo_compressed = {
-    .koid = vmo_koid,
-    .name = "V1",
-    .size_bytes = vmo_size,
-    .populated_bytes = 2*vmo_size,
+      .koid = vmo_koid,
+      .name = "V1",
+      .size_bytes = vmo_size,
+      .populated_bytes = 2 * vmo_size,
   };
-const static GetInfoResponse vmos_info_compressed = {proc_handle, ZX_INFO_PROCESS_VMOS, &_vmo_compressed, sizeof(_vmo_compressed), 1,
-                                          ZX_OK};
+  const static GetInfoResponse vmos_info_compressed = {
+      proc_handle, ZX_INFO_PROCESS_VMOS, &_vmo_compressed, sizeof(_vmo_compressed), 1, ZX_OK};
 
   // Process and VMO need to capture the same info.
   Capture c;
-  auto ret = TestUtils::GetCapture(
-      &c, CaptureLevel::VMO,
-      {.get_processes = {ZX_OK, {proc_cb}},
-       .get_property = {proc_prop},
-       .get_info = {self_info, kmem_info, kmem_compression_info_1, vmos_info_compressed, vmos_info_compressed}});
+  auto ret = TestUtils::GetCapture(&c, CaptureLevel::VMO,
+                                   {.get_processes = {ZX_OK, {proc_cb}},
+                                    .get_property = {proc_prop},
+                                    .get_info = {self_info, kmem_info, kmem_compression_info_1,
+                                                 vmos_info_compressed, vmos_info_compressed}});
   EXPECT_EQ(ZX_OK, ret);
 
-  EXPECT_EQ(_kmem_compression_1.uncompressed_storage_bytes, c.kmem_compression().uncompressed_storage_bytes);
-  EXPECT_EQ(_kmem_compression_1.compressed_storage_bytes, c.kmem_compression().compressed_storage_bytes);
+  EXPECT_EQ(_kmem_compression_1.uncompressed_storage_bytes,
+            c.kmem_compression().uncompressed_storage_bytes);
+  EXPECT_EQ(_kmem_compression_1.compressed_storage_bytes,
+            c.kmem_compression().compressed_storage_bytes);
 
   EXPECT_EQ(1U, c.koid_to_process().size());
   const auto& process = c.process_for_koid(proc_koid);
@@ -354,7 +356,7 @@ const static GetInfoResponse vmos_info_compressed = {proc_handle, ZX_INFO_PROCES
   const auto& vmo = c.vmo_for_koid(vmo_koid);
   EXPECT_EQ(vmo_koid, vmo.koid);
   EXPECT_STREQ(vmo_name, vmo.name);
-  EXPECT_EQ(2*vmo_size, vmo.populated_bytes);
+  EXPECT_EQ(2 * vmo_size, vmo.populated_bytes);
 }
 
 }  // namespace test
