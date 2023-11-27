@@ -166,6 +166,10 @@ class PciModernBackend : public PciBackend {
   void SetFeatures(uint64_t bitmap) final;
   zx_status_t ConfirmFeatures() final;
   zx_status_t ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap);
+  zx_status_t ReadVirtioCap64(uint8_t cap_config_offset, virtio_pci_cap& cap,
+                              virtio_pci_cap64* cap64_out);
+
+  zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) override;
 
   // These handle writing to/from a device's device config to allow derived
   // virtio devices to work with fields only they know about.
@@ -184,6 +188,8 @@ class PciModernBackend : public PciBackend {
   void IsrCfgCallbackLocked(const virtio_pci_cap_t& cap) __TA_REQUIRES(lock());
   void DeviceCfgCallbackLocked(const virtio_pci_cap_t& cap) __TA_REQUIRES(lock());
   void PciCfgCallbackLocked(const virtio_pci_cap_t& cap) __TA_REQUIRES(lock());
+  void SharedMemoryCfgCallbackLocked(const virtio_pci_cap_t& cap, uint64_t offset, uint64_t length)
+      __TA_REQUIRES(lock());
 
   // Handle the virtio queues for the device. Due to configuration layouts changing
   // depending on backend this has to be handled by the backend itself.
@@ -193,6 +199,7 @@ class PciModernBackend : public PciBackend {
   void RingKick(uint16_t ring_index) final;
 
  private:
+  zx_status_t GetBarVmo(uint8_t bar, zx::vmo* vmo_out);
   zx_status_t MapBar(uint8_t bar);
 
   std::optional<fdf::MmioBuffer> bar_[6];
@@ -202,6 +209,7 @@ class PciModernBackend : public PciBackend {
   uintptr_t device_cfg_ __TA_GUARDED(lock()) = 0;
   volatile virtio_pci_common_cfg_t* common_cfg_ __TA_GUARDED(lock()) = nullptr;
   uint32_t notify_off_mul_;
+  std::optional<uint8_t> shared_memory_bar_;
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PciModernBackend);
 };

@@ -60,6 +60,8 @@ class Device {
   // Accessor for bti so that Rings can map IO buffers
   const zx::bti& bti() { return bti_; }
 
+  zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) { return backend_->GetSharedMemoryVmo(vmo_out); }
+
  protected:
   // Methods for checking / acknowledging features
   uint64_t DeviceFeaturesSupported() { return backend_->ReadFeatures(); }

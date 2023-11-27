@@ -80,6 +80,8 @@ class Backend {
   // Called when the driver is shutting down.
   virtual void Terminate() {}
 
+  virtual zx_status_t GetSharedMemoryVmo(zx::vmo* vmo_out) { return ZX_ERR_NOT_SUPPORTED; }
+
   DISALLOW_COPY_ASSIGN_AND_MOVE(Backend);
 
  protected:

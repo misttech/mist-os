@@ -77,6 +77,13 @@ void MmioRead<uint64_t>(const volatile uint64_t* addr, uint64_t* value) {
   *value = static_cast<uint64_t>(lo) | (static_cast<uint64_t>(hi) << 32);
 }
 
+uint64_t GetOffset64(virtio_pci_cap64 cap64) {
+  return (static_cast<uint64_t>(cap64.offset_hi) << 32) | cap64.cap.offset;
+}
+
+uint64_t GetLength64(virtio_pci_cap64 cap64) {
+  return (static_cast<uint64_t>(cap64.length_hi) << 32) | cap64.cap.length;
+}
 }  // anonymous namespace
 
 namespace virtio {
@@ -111,6 +118,11 @@ zx_status_t PciModernBackend::ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap)
     return status;
   }
   cap->bar = value8;
+  status = pci().ReadConfig8(cap_field(offset, id), &value8);
+  if (status != ZX_OK) {
+    return status;
+  }
+  cap->id = value8;
 
   uint32_t value32;
   status = pci().ReadConfig32(cap_field(offset, offset), &value32);
@@ -126,6 +138,28 @@ zx_status_t PciModernBackend::ReadVirtioCap(uint8_t offset, virtio_pci_cap* cap)
   return ZX_OK;
 }
 #undef cap_field
+
+zx_status_t PciModernBackend::ReadVirtioCap64(uint8_t cap_config_offset, virtio_pci_cap& cap,
+                                              virtio_pci_cap64* cap64_out) {
+  uint32_t offset_hi;
+  if (zx_status_t status =
+          pci().ReadConfig32(cap_config_offset + sizeof(virtio_pci_cap_t), &offset_hi);
+      status != ZX_OK) {
+    return status;
+  }
+  uint32_t length_hi;
+  if (zx_status_t status = pci().ReadConfig32(
+          cap_config_offset + sizeof(virtio_pci_cap_t) + sizeof(offset_hi), &length_hi);
+      status != ZX_OK) {
+    return status;
+  }
+
+  cap64_out->cap = cap;
+  cap64_out->offset_hi = offset_hi;
+  cap64_out->length_hi = length_hi;
+
+  return ZX_OK;
+}
 
 zx_status_t PciModernBackend::Init() {
   fbl::AutoLock guard(&lock());
@@ -162,6 +196,16 @@ zx_status_t PciModernBackend::Init() {
       case VIRTIO_PCI_CAP_PCI_CFG:
         PciCfgCallbackLocked(cap);
         break;
+      case VIRTIO_PCI_CAP_SHARED_MEMORY_CFG: {
+        virtio_pci_cap64 cap64;
+        if ((st = ReadVirtioCap64(off, cap, &cap64)) != ZX_OK) {
+          return st;
+        }
+        uint64_t offset = GetOffset64(cap64);
+        uint64_t length = GetLength64(cap64);
+        SharedMemoryCfgCallbackLocked(cap, offset, length);
+        break;
+      }
     }
   }
 
@@ -281,6 +325,14 @@ void PciModernBackend::DeviceCfgCallbackLocked(const virtio_pci_cap_t& cap) {
   }
 
   device_cfg_ = reinterpret_cast<uintptr_t>(bar_[cap.bar]->get()) + cap.offset;
+}
+
+void PciModernBackend::SharedMemoryCfgCallbackLocked(const virtio_pci_cap_t& cap, uint64_t offset,
+                                                     uint64_t length) {
+  if (MapBar(cap.bar) != ZX_OK) {
+    return;
+  }
+  shared_memory_bar_ = cap.bar;
 }
 
 void PciModernBackend::PciCfgCallbackLocked(const virtio_pci_cap_t& cap) {
@@ -444,6 +496,24 @@ void PciModernBackend::DriverStatusAck() {
 
 uint32_t PciModernBackend::IsrStatus() {
   return (*isr_status_ & (VIRTIO_ISR_QUEUE_INT | VIRTIO_ISR_DEV_CFG_INT));
+}
+
+zx_status_t PciModernBackend::GetBarVmo(uint8_t bar_id, zx::vmo* vmo_out) {
+  fidl::Arena arena;
+  fuchsia_hardware_pci::wire::Bar bar;
+  zx_status_t status = pci().GetBar(arena, bar_id, &bar);
+  if (status != ZX_OK) {
+    return status;
+  }
+  *vmo_out = std::move(bar.result.vmo());
+  return ZX_OK;
+}
+
+zx_status_t PciModernBackend::GetSharedMemoryVmo(zx::vmo* vmo_out) {
+  if (!shared_memory_bar_) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+  return GetBarVmo(*shared_memory_bar_, vmo_out);
 }
 
 }  // namespace virtio

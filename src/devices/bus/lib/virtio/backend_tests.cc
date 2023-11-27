@@ -30,6 +30,8 @@
 // This capability configuration comes straight from a Virtio
 // device running inside FEMU.
 constexpr uint8_t kCapabilityOffsets[5] = {0x84, 0x70, 0x60, 0x50, 0x40};
+// Chosen just to avoid conflict with the above.
+constexpr uint8_t kCapabilityOffsets64[1] = {0xC0};
 // clang-format off
 constexpr virtio_pci_cap_t kCapabilities[5] = {
   {
@@ -42,7 +44,6 @@ constexpr virtio_pci_cap_t kCapabilities[5] = {
       .length = 0,
   },
   {
-
       .cap_vndr = 0x9,
       .cap_next = 0x60,
       .cap_len = 0x14,
@@ -78,8 +79,30 @@ constexpr virtio_pci_cap_t kCapabilities[5] = {
       .bar = 4,
       .offset = 0x0000,
       .length = 0x1000,
+  },
+};
+
+constexpr uint64_t kSharedMemoryOffset = 0x3000 + 0x1000;  // 0x3000 is the offset of the last capability in the bar,
+                                        // and 0x1000 is the length (before the shared memory region).
+constexpr uint64_t kSharedMemorySize = 0x20000;
+constexpr uint64_t kExpectedBarSize = kSharedMemoryOffset + kSharedMemorySize;
+
+constexpr virtio_pci_cap64_t kCapabilities64[1] = {
+  {
+    .cap = {
+      .cap_vndr = 0x9,
+      .cap_next = 0x0,
+      .cap_len = 0x18,
+      .cfg_type = VIRTIO_PCI_CAP_SHARED_MEMORY_CFG,
+      .bar = 4,
+      .offset = (kSharedMemoryOffset & 0xFFFF),
+      .length = (kSharedMemorySize & 0xFFFF),
+    },
+    .offset_hi = (kSharedMemoryOffset >> 32),
+    .length_hi = (kSharedMemorySize >> 32),
   }
 };
+
 // clang-format on
 
 class TestLegacyIoInterface : public virtio::PciLegacyIoInterface {
@@ -174,8 +197,7 @@ class VirtioTests : public zxtest::Test {
   }
 
   void SetUpModernBars() {
-    size_t bar_size = 0x3000 + 0x1000;  // 0x3000 is the offset of the last capability in the bar,
-                                        // and 0x1000 is the length.
+    size_t bar_size = kExpectedBarSize;
     async_.SyncCall([&](AsyncState* async) {
       async->fake_pci.CreateBar(kModernBar, bar_size, /*is_mmio=*/true);
     });
@@ -191,11 +213,18 @@ class VirtioTests : public zxtest::Test {
       for (uint32_t i = 0; i < std::size(kCapabilities); i++) {
         async->fake_pci.AddVendorCapability(kCapabilityOffsets[i], kCapabilities[i].cap_len);
       }
+      for (uint32_t i = 0; i < std::size(kCapabilities64); i++) {
+        async->fake_pci.AddVendorCapability(kCapabilityOffsets64[i],
+                                            kCapabilities64[i].cap.cap_len);
+      }
       return async->fake_pci.GetConfigVmo();
     });
 
     for (uint32_t i = 0; i < std::size(kCapabilities); i++) {
       config->write(&kCapabilities[i], kCapabilityOffsets[i], sizeof(virtio_pci_cap_t));
+    }
+    for (uint32_t i = 0; i < std::size(kCapabilities64); i++) {
+      config->write(&kCapabilities64[i], kCapabilityOffsets64[i], sizeof(virtio_pci_cap64_t));
     }
   }
 
@@ -290,6 +319,35 @@ class TestVirtioDevice : public virtio::Device, public DeviceType {
   virtio::Ring ring_ = {this};
 };
 
+class TestVirtioSharedMemoryDevice : public virtio::Device,
+                                     public ddk::Device<TestVirtioSharedMemoryDevice> {
+ public:
+  explicit TestVirtioSharedMemoryDevice(zx_device_t* bus_device, zx::bti bti,
+                                        std::unique_ptr<virtio::Backend> backend)
+      : virtio::Device(std::move(bti), std::move(backend)),
+        ddk::Device<TestVirtioSharedMemoryDevice>(bus_device) {}
+
+  zx_status_t Init() final {
+    zx::vmo vmo;
+    if (zx_status_t status = backend_->GetSharedMemoryVmo(&vmo); status != ZX_OK) {
+      return status;
+    }
+    uint64_t size;
+    if (zx_status_t status = vmo.get_size(&size); status != ZX_OK) {
+      return status;
+    }
+    if (size != kExpectedBarSize) {
+      return ZX_ERR_BAD_STATE;
+    }
+    return DdkAdd(tag());
+  }
+  void IrqRingUpdate() final {}
+  void IrqConfigChange() final {}
+  const char* tag() const final { return "test"; }
+
+  void DdkRelease() { delete this; }
+};
+
 TEST_F(VirtioTests, FailureNoProtocol) {
   ASSERT_EQ(ZX_ERR_NOT_FOUND, virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
 }
@@ -334,6 +392,15 @@ TEST_F(VirtioTests, TwoMsixBindSuccess) {
 
   // With everything set up this should succeed.
   ASSERT_OK(virtio::CreateAndBind<TestVirtioDevice>(nullptr, fake_parent_.get()));
+}
+
+TEST_F(VirtioTests, SharedMemoryBar) {
+  SetUpProtocol();
+  SetUpModernCapabilities();
+  SetUpModernBars();
+  SetUpModernMsiX();
+
+  ASSERT_OK(virtio::CreateAndBind<TestVirtioSharedMemoryDevice>(nullptr, fake_parent_.get()));
 }
 
 // Ensure that the Legacy interface looks for IO Bar 0 and succeeds up until it

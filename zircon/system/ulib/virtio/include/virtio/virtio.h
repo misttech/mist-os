@@ -58,6 +58,7 @@
 #define VIRTIO_PCI_CAP_ISR_CFG 3
 #define VIRTIO_PCI_CAP_DEVICE_CFG 4
 #define VIRTIO_PCI_CAP_PCI_CFG 5
+#define VIRTIO_PCI_CAP_SHARED_MEMORY_CFG 8
 
 #define VIRTIO_ISR_QUEUE_INT 0x1
 #define VIRTIO_ISR_DEV_CFG_INT 0x2
@@ -72,10 +73,17 @@ typedef struct virtio_pci_cap {
   uint8_t cap_len;
   uint8_t cfg_type;
   uint8_t bar;
-  uint8_t padding[3];
+  uint8_t id;
+  uint8_t padding[2];
   uint32_t offset;
   uint32_t length;
 } __PACKED virtio_pci_cap_t;
+
+typedef struct virtio_pci_cap64 {
+  virtio_pci_cap_t cap;
+  uint32_t offset_hi;
+  uint32_t length_hi;
+} __PACKED virtio_pci_cap64_t;
 
 typedef struct virtio_pci_notify_cap {
   virtio_pci_cap_t cap;
