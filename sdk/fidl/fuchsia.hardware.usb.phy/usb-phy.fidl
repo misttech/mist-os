@@ -1,0 +1,20 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+library fuchsia.hardware.usb.phy;
+
+using zx;
+
+@discoverable
+@transport("Driver")
+open protocol UsbPhy {
+    /// Informs the PHY when peripheral role connect status changed.
+    flexible ConnectStatusChanged(struct {
+        connected bool;
+    }) -> () error zx.Status;
+};
+
+service Service {
+    device client_end:UsbPhy;
+};
