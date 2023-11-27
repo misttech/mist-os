@@ -15,7 +15,7 @@ intel)
     magma_sys_driver_test \
     msd_intel_gen_nonhardware_tests \
     mesa_unit_tests \
-    magma-conformance-tests \
+    magma-conformance-tests# \
     msd_intel_gen_integration_tests \
     vkreadback_test \
     vkloop \

@@ -9,13 +9,10 @@ import("//src/graphics/lib/magma/gnbuild/magma.gni")
 group("tests") {
   testonly = true
   public_deps = [
-    ":magma-conformance-tests",
-    ":magma-conformance-tests-arm",
-    ":magma-conformance-tests-hermetic",
-    ":magma-conformance-tests-vsi",
     ":magma_nonhardware_tests",
     "codegen",
     "icd_strip",
+    "integration:tests",
     "//src/graphics/lib/magma/src/libmagma:verify_magma",
     "//src/graphics/lib/magma/src/tools:tests",
     "//src/graphics/magma/lib/magma_service/sys_driver/tests",
@@ -89,61 +86,6 @@ fuchsia_unittest_package("magma_nonhardware_tests") {
   manifest = "meta/magma_nonhardware_tests.cml"
   deps = [ "unit_tests" ]
   test_specs = {
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
-
-# Runs on any GPU if the only device present; if multiple
-# GPUs are present the vendor must be specified.
-fuchsia_unittest_package("magma-conformance-tests") {
-  manifest = "meta/magma-conformance-tests.cml"
-  deps = [ "integration" ]
-  test_specs = {
-    environments = magma_intel_gpu_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
-
-fuchsia_unittest_package("magma-conformance-tests-hermetic") {
-  manifest = "meta/magma-conformance-tests-hermetic.cml"
-  deps = [ "integration" ]
-  test_specs = {
-    environments = magma_intel_gpu_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
-
-# Runs only on ARM devices
-fuchsia_unittest_package("magma-conformance-tests-arm") {
-  manifest = "meta/magma-conformance-tests-arm.cml"
-  deps = [ "integration" ]
-  test_specs = {
-    environments = magma_arm_gpu_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
-
-# Runs only on VSI devices
-fuchsia_unittest_package("magma-conformance-tests-vsi") {
-  manifest = "meta/magma-conformance-tests-vsi.cml"
-  deps = [ "integration" ]
-  test_specs = {
-    environments = [
-      sherlock_env,
-      vim3_env,
-    ]
     log_settings = {
       max_severity = "ERROR"
     }
