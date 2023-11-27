@@ -4,7 +4,6 @@
 
 use std::borrow::Borrow;
 
-use async_trait::async_trait;
 use fidl_fuchsia_net_routes_admin as fnet_routes_admin;
 use fidl_fuchsia_net_routes_ext as fnet_routes_ext;
 use fnet_routes_ext::{
@@ -234,7 +233,6 @@ impl RouteSet for GlobalRouteSet {
     }
 }
 
-#[async_trait]
 pub(crate) trait RouteSet: Send + Sync {
     fn set(&self) -> routes::SetMembership<netstack3_core::sync::WeakRc<UserRouteSetId>>;
     fn ctx(&self) -> &crate::bindings::Ctx;
