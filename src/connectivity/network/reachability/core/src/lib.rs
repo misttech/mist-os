@@ -463,7 +463,7 @@ pub trait NetworkChecker {
     fn resume(
         &mut self,
         cookie: NetworkCheckCookie,
-        ping_success: bool,
+        result: NetworkCheckResult,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error>;
 }
 
@@ -530,6 +530,35 @@ impl NetworkCheckContext {
         self.discovered_state_v4 = state;
         self.discovered_state_v6 = state;
     }
+
+    fn initiate_ping(
+        &mut self,
+        id: Id,
+        interface_name: &str,
+        network_check_sender: &mpsc::UnboundedSender<(NetworkCheckAction, NetworkCheckCookie)>,
+        new_state: NetworkCheckState,
+        addrs: Vec<std::net::SocketAddr>,
+    ) {
+        self.checker_state = new_state;
+        self.ping_addrs = addrs;
+        self.pings_expected = self.ping_addrs.len();
+        self.pings_completed = 0;
+        self.ping_addrs
+            .iter()
+            .map(|addr| {
+                let action = NetworkCheckAction::Ping(PingParameters {
+                    interface_name: interface_name.to_string(),
+                    addr: addr.clone(),
+                });
+                (action, NetworkCheckCookie { id })
+            })
+            .for_each(|message| match network_check_sender.unbounded_send(message) {
+                Ok(()) => {}
+                Err(e) => {
+                    debug!("unable to send network check internet msg: {:?}", e)
+                }
+            });
+    }
 }
 
 impl Default for NetworkCheckContext {
@@ -554,19 +583,41 @@ impl Default for NetworkCheckContext {
 pub struct NetworkCheckCookie {
     /// The interface id.
     id: Id,
-    /// The action associated with this request.
-    action: NetworkCheckAction,
+}
+
+#[derive(Debug, Clone)]
+pub enum NetworkCheckResult {
+    Ping { parameters: PingParameters, success: bool },
+}
+
+#[derive(Debug, Clone)]
+pub struct PingParameters {
+    /// The name of the interface sending the ping.
+    pub interface_name: std::string::String,
+    /// The address to ping.
+    pub addr: std::net::SocketAddr,
+}
+
+impl NetworkCheckResult {
+    fn interface_name(&self) -> &str {
+        match self {
+            NetworkCheckResult::Ping {
+                parameters: PingParameters { interface_name, .. }, ..
+            } => interface_name,
+        }
+    }
+
+    fn ping_result(self) -> Option<(PingParameters, bool)> {
+        match self {
+            NetworkCheckResult::Ping { parameters, success } => Some((parameters, success)),
+        }
+    }
 }
 
 /// `NetworkCheckAction` describes the action to be completed before resuming the network check.
 #[derive(Clone)]
 pub enum NetworkCheckAction {
-    Ping {
-        /// The name of the interface sending the ping.
-        interface_name: std::string::String,
-        /// The address to ping.
-        addr: std::net::SocketAddr,
-    },
+    Ping(PingParameters),
 }
 
 /// `Monitor` monitors the reachability state.
@@ -723,96 +774,6 @@ impl Monitor {
         }
     }
 
-    fn handle_ping_action(
-        &mut self,
-        cookie: NetworkCheckCookie,
-        success: bool,
-    ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
-        let id = Id::from(cookie.id);
-        let (interface_name, addr) = match cookie.action {
-            NetworkCheckAction::Ping { interface_name, addr } => (interface_name, addr),
-        };
-        info!("handle ping: success: {}; interface id: {}; ping address: {}", success, id, addr);
-
-        let ctx = self
-            .interface_context
-            .get_mut(&id)
-            .ok_or(anyhow!("handle ping: interface id {} should already exist in map", id))?;
-
-        ctx.pings_completed = ctx.pings_completed + 1;
-
-        match ctx.checker_state {
-            NetworkCheckState::Begin | NetworkCheckState::Idle => {
-                return Err(anyhow!(
-                    "handle ping: interface id: {}; state: {:?}; {}/{} pings completed",
-                    ctx.checker_state,
-                    id,
-                    ctx.pings_completed,
-                    ctx.pings_expected
-                ));
-            }
-            NetworkCheckState::PingGateway | NetworkCheckState::PingInternet => {}
-        }
-
-        info!(
-            "handle ping: after ping response {}/{} pings completed",
-            ctx.pings_completed, ctx.pings_expected
-        );
-
-        if success {
-            let () = Self::handle_ping_success(ctx, &addr);
-        }
-
-        if ctx.pings_completed == ctx.pings_expected {
-            match ctx.checker_state {
-                NetworkCheckState::PingGateway => {
-                    // By default, attempt to ping internet whether or not gateway succeeds. With
-                    // the following flag set to false, if the gateway pings have failed, do not
-                    // attempt to ping internet.
-                    let did_gateway_succeed = ctx.discovered_state_v4 == State::Gateway
-                        || ctx.discovered_state_v6 == State::Gateway;
-                    if !did_gateway_succeed && !ctx.always_ping_internet {
-                        return self.update_state_from_context(id, &interface_name);
-                    }
-
-                    ctx.checker_state = NetworkCheckState::PingInternet;
-                    let internet_ping_addrs = [
-                        IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
-                        IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
-                    ];
-                    ctx.ping_addrs = internet_ping_addrs
-                        .iter()
-                        .map(|addr| std::net::SocketAddr::new(*addr, 0))
-                        .collect();
-                    ctx.pings_expected = internet_ping_addrs.len();
-                    ctx.pings_completed = 0;
-                    ctx.ping_addrs
-                        .iter()
-                        .map(|addr| {
-                            let action = NetworkCheckAction::Ping {
-                                interface_name: interface_name.to_string().clone(),
-                                addr: addr.clone(),
-                            };
-                            (action.clone(), NetworkCheckCookie { id, action: action.clone() })
-                        })
-                        .for_each(|message| {
-                            match self.network_check_sender.unbounded_send(message) {
-                                Ok(()) => {}
-                                Err(e) => {
-                                    debug!("unable to send network check internet msg: {:?}", e)
-                                }
-                            }
-                        });
-                }
-                NetworkCheckState::PingInternet => {
-                    return self.update_state_from_context(id, &interface_name);
-                }
-                NetworkCheckState::Begin | NetworkCheckState::Idle => {}
-            }
-        }
-        Ok(NetworkCheckerOutcome::MustResume)
-    }
-
     fn handle_ping_success(ctx: &mut NetworkCheckContext, addr: &std::net::SocketAddr) {
         match ctx.checker_state {
             NetworkCheckState::PingGateway => {
@@ -961,31 +922,19 @@ impl NetworkChecker for Monitor {
                 // Internet can be pinged when either an online router is discovered or the gateway
                 // is pingable. In this case, the discovery of a router enables the internet ping.
                 // TODO(fxbug.dev/124034): Create an occurrence metric for this case
-                ctx.checker_state = NetworkCheckState::PingInternet;
-                let internet_ping_addrs = [
-                    IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
-                    IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
-                ];
-                ctx.ping_addrs = internet_ping_addrs
-                    .iter()
-                    .map(|addr| std::net::SocketAddr::new(*addr, 0))
-                    .collect();
-                ctx.pings_expected = internet_ping_addrs.len();
-                ctx.ping_addrs
-                    .iter()
-                    .map(|addr| {
-                        let action = NetworkCheckAction::Ping {
-                            interface_name: name.clone(),
-                            addr: addr.clone(),
-                        };
-                        (action.clone(), NetworkCheckCookie { id, action: action.clone() })
-                    })
-                    .for_each(|message| match self.network_check_sender.unbounded_send(message) {
-                        Ok(()) => {}
-                        Err(e) => {
-                            debug!("begin: unable to send msg for internet ping: {:?}", e)
-                        }
-                    });
+                ctx.initiate_ping(
+                    id,
+                    name,
+                    &self.network_check_sender,
+                    NetworkCheckState::PingInternet,
+                    [
+                        IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
+                        IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
+                    ]
+                    .into_iter()
+                    .map(|ip| std::net::SocketAddr::new(ip, 0))
+                    .collect(),
+                )
             } else {
                 // The router is not online and the gateway cannot be pinged; therefore, the
                 // internet pings can be skipped and the final reachability state can be
@@ -995,30 +944,17 @@ impl NetworkChecker for Monitor {
             }
         } else {
             // Setup to ping gateway addresses.
-            ctx.checker_state = NetworkCheckState::PingGateway;
-            ctx.ping_addrs = gateway_ping_addrs;
-            ctx.pings_expected = ctx.ping_addrs.len();
-
             let discovered_state =
                 if discovered_online_router { State::Gateway } else { State::Local };
             ctx.discovered_state_v4 = discovered_state;
             ctx.discovered_state_v6 = discovered_state;
-
-            ctx.ping_addrs
-                .iter()
-                .map(|addr| {
-                    let action = NetworkCheckAction::Ping {
-                        interface_name: name.clone(),
-                        addr: addr.clone(),
-                    };
-                    (action.clone(), NetworkCheckCookie { id, action: action.clone() })
-                })
-                .for_each(|message| match self.network_check_sender.unbounded_send(message) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        debug!("begin: unable to send msg for gateway ping: {:?}", e)
-                    }
-                });
+            ctx.initiate_ping(
+                id,
+                name,
+                &self.network_check_sender,
+                NetworkCheckState::PingGateway,
+                gateway_ping_addrs,
+            );
         }
         Ok(NetworkCheckerOutcome::MustResume)
     }
@@ -1026,11 +962,59 @@ impl NetworkChecker for Monitor {
     fn resume(
         &mut self,
         cookie: NetworkCheckCookie,
-        success: bool,
+        result: NetworkCheckResult,
     ) -> Result<NetworkCheckerOutcome, anyhow::Error> {
-        match cookie.action {
-            NetworkCheckAction::Ping { .. } => self.handle_ping_action(cookie, success),
+        let ctx = self
+            .interface_context
+            .get_mut(&cookie.id)
+            .ok_or(anyhow!("resume: interface id {} should already exist in map", cookie.id))?;
+        let interface_name = result.interface_name().to_string();
+        match ctx.checker_state {
+            NetworkCheckState::Begin | NetworkCheckState::Idle => {
+                return Err(anyhow!(
+                    "skipped, idle state found in resume for interface {}",
+                    cookie.id
+                ));
+            }
+            NetworkCheckState::PingGateway | NetworkCheckState::PingInternet => {
+                let (PingParameters { interface_name, addr }, success) =
+                    result.ping_result().ok_or(anyhow!(
+                        "resume: mismatched state and result {interface_name} ({})",
+                        cookie.id
+                    ))?;
+                ctx.pings_completed = ctx.pings_completed + 1;
+
+                info!(
+                    "handle ping: after ping response {}/{} pings completed",
+                    ctx.pings_completed, ctx.pings_expected
+                );
+
+                if success {
+                    let () = Self::handle_ping_success(ctx, &addr);
+                }
+
+                if ctx.pings_completed == ctx.pings_expected {
+                    if let NetworkCheckState::PingGateway = ctx.checker_state {
+                        ctx.initiate_ping(
+                            cookie.id,
+                            &interface_name,
+                            &self.network_check_sender,
+                            NetworkCheckState::PingInternet,
+                            [
+                                IPV4_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
+                                IPV6_INTERNET_CONNECTIVITY_CHECK_ADDRESS,
+                            ]
+                            .into_iter()
+                            .map(|ip| std::net::SocketAddr::new(ip, 0))
+                            .collect(),
+                        );
+                    } else {
+                        return self.update_state_from_context(cookie.id, &interface_name);
+                    }
+                }
+            }
         }
+        Ok(NetworkCheckerOutcome::MustResume)
     }
 }
 
@@ -1259,9 +1243,11 @@ mod tests {
             loop {
                 if let Some((action, cookie)) = self.receiver.next().await {
                     match action {
-                        NetworkCheckAction::Ping { interface_name, addr } => {
-                            let ping_success = p.ping(&interface_name, addr).await;
-                            match monitor.resume(cookie, ping_success) {
+                        NetworkCheckAction::Ping(parameters) => {
+                            let success = p.ping(&parameters.interface_name, parameters.addr).await;
+                            match monitor
+                                .resume(cookie, NetworkCheckResult::Ping { parameters, success })
+                            {
                                 // Has reached final state.
                                 Ok(NetworkCheckerOutcome::Complete) => return,
                                 _ => {}

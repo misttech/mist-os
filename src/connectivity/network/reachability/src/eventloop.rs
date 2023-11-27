@@ -24,7 +24,7 @@ use {
         route_table::RouteTable,
         telemetry::{self, TelemetryEvent, TelemetrySender},
         watchdog, InterfaceView, Monitor, NeighborCache, NetworkCheckAction, NetworkCheckCookie,
-        NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
+        NetworkCheckResult, NetworkChecker, NetworkCheckerOutcome, PortType, FIDL_TIMEOUT_ID,
     },
     reachability_handler::ReachabilityHandler,
     std::collections::{HashMap, HashSet},
@@ -143,17 +143,19 @@ async fn dns_lookup(
 }
 
 async fn handle_network_check_message<'a>(
-    ping_futures: &mut futures::stream::FuturesUnordered<
-        futures::future::BoxFuture<'a, (NetworkCheckCookie, bool)>,
+    netcheck_futures: &mut futures::stream::FuturesUnordered<
+        futures::future::BoxFuture<'a, (NetworkCheckCookie, NetworkCheckResult)>,
     >,
     msg: Option<(NetworkCheckAction, NetworkCheckCookie)>,
 ) {
     let (action, cookie) = msg.expect("network check receiver unexpectedly closed");
     match action {
-        NetworkCheckAction::Ping { interface_name, addr } => {
-            ping_futures.push(Box::pin(async move {
-                let success = reachability_core::ping::Pinger.ping(&interface_name, addr).await;
-                (cookie, success)
+        NetworkCheckAction::Ping(parameters) => {
+            netcheck_futures.push(Box::pin(async move {
+                let success = reachability_core::ping::Pinger
+                    .ping(&parameters.interface_name, parameters.addr)
+                    .await;
+                (cookie, NetworkCheckResult::Ping { parameters, success })
             }));
         }
     }
@@ -282,7 +284,7 @@ impl EventLoop {
         };
 
         let mut probe_futures = futures::stream::FuturesUnordered::new();
-        let mut ping_futures = futures::stream::FuturesUnordered::new();
+        let mut netcheck_futures = futures::stream::FuturesUnordered::new();
         let report_stream = fasync::Interval::new(REPORT_PERIOD).fuse();
         let dns_interval_timer = fasync::Interval::new(DNS_PROBE_PERIOD).fuse();
 
@@ -368,10 +370,10 @@ impl EventLoop {
                     }
                 },
                 msg = self.network_check_receiver.next() => {
-                    handle_network_check_message(&mut ping_futures, msg).await;
+                    handle_network_check_message(&mut netcheck_futures, msg).await;
                 },
-                ping_res = ping_futures.select_next_some() => {
-                    self.handle_ping_response(ping_res).await;
+                netcheck_res = netcheck_futures.select_next_some() => {
+                    self.handle_netcheck_response(netcheck_res).await;
                 },
                 () = dns_interval_timer.select_next_some() => {
                     if dns_lookup_fut.is_terminated() {
@@ -600,11 +602,13 @@ impl EventLoop {
             .await;
     }
 
-    // TODO(fxbug.dev/125657): handle_ping_response and handle_network_check_message are missing
+    // TODO(fxbug.dev/125657): handle_netcheck_response and handle_network_check_message are missing
     // tests because they reply on NetworkCheckCookie, which cannot be created in the event loop.
-    async fn handle_ping_response(&mut self, ping_res: (NetworkCheckCookie, bool)) {
-        let (cookie, success) = ping_res;
-        match self.monitor.resume(cookie, success) {
+    async fn handle_netcheck_response(
+        &mut self,
+        (cookie, result): (NetworkCheckCookie, NetworkCheckResult),
+    ) {
+        match self.monitor.resume(cookie, result) {
             Ok(NetworkCheckerOutcome::MustResume) => {}
             Ok(NetworkCheckerOutcome::Complete) => {
                 let (system_internet, system_gateway) = {
