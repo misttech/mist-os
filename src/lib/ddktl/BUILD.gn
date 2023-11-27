@@ -291,7 +291,6 @@ source_set("ddktl") {
     "//src/diagnostics/validator/logs/ddk/log-test-driver:*",
     "//src/firmware/drivers/usb-fastboot-function:*",
     "//src/graphics/display/drivers/aml-canvas:*",
-    "//src/graphics/display/drivers/aml-hdmi:*",
     "//src/graphics/display/drivers/amlogic-display:*",
     "//src/graphics/display/drivers/coordinator:*",
     "//src/graphics/display/drivers/dsi-dw:*",

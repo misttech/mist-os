@@ -197,11 +197,6 @@ board_input_bundle("main_bundle") {
       driver_components = [ "meta/aml-canvas.cm" ]
     },
     {
-      package_target = "//src/graphics/display/drivers/aml-hdmi:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-hdmi.cm" ]
-    },
-    {
       package_target = "//src/graphics/display/drivers/amlogic-display:package"
       package_set = "bootfs"
       driver_components = [ "meta/amlogic-display.cm" ]

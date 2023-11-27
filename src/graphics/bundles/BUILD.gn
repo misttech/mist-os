@@ -7,7 +7,6 @@ group("drivers") {
   testonly = true
   deps = [
     "//src/graphics/display:drivers",
-    "//src/graphics/display/drivers/aml-hdmi:aml-hdmi",
     "//src/graphics/display/drivers/simple:simple.amd-kaveri",
     "//src/graphics/display/drivers/simple:simple.bochs",
     "//src/graphics/display/drivers/simple:simple.gga",

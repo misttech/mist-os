@@ -195,10 +195,6 @@ config("fidl-wire-deprecated-mutable-tables") {
 
     #------------------
     #------------------
-    "//src/graphics/display/drivers/aml-hdmi:aml-hdmi-test-bin",
-
-    #------------------
-    #------------------
     "//src/graphics/display/drivers/amlogic-display:common_srcs",
 
     #------------------

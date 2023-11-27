@@ -894,7 +894,6 @@ config("Wno-conversion") {
     "//src/diagnostics/validator/inspect/lib/cpp:*",
     "//src/firmware/gigaboot/lib",
     "//src/firmware/gigaboot/src",
-    "//src/graphics/display/drivers/aml-hdmi:*",
     "//src/graphics/display/drivers/fake:*",
     "//src/graphics/display/drivers/goldfish-display:*",
     "//src/graphics/display/drivers/ssd1306:*",
