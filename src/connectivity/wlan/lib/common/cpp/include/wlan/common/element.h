@@ -633,10 +633,6 @@ struct BasicVhtMcsNss : public common::BitField<uint16_t> {
   }
 };
 
-SupportedMcsSet IntersectMcs(const SupportedMcsSet& lhs, const SupportedMcsSet& rhs);
-HtCapabilities IntersectHtCap(const HtCapabilities& lhs, const HtCapabilities& rhs);
-VhtCapabilities IntersectVhtCap(const VhtCapabilities& lhs, const VhtCapabilities& rhs);
-
 }  // namespace wlan
 
 #endif  // SRC_CONNECTIVITY_WLAN_LIB_COMMON_CPP_INCLUDE_WLAN_COMMON_ELEMENT_H_

@@ -12,7 +12,6 @@ source_set("common") {
   sources = [
     "band.cc",
     "channel.cc",
-    "element.cc",
     "energy.cc",
     "ieee80211_codes.cc",
     "include/wlan/common/action_frame.h",
