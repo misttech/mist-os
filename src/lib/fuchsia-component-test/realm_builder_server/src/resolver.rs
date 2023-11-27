@@ -121,9 +121,11 @@ impl Registry {
     ) -> Result<Option<fmem::Data>, Error> {
         if let Some(schema) = &decl.config {
             let existing_values = match (&schema.value_source, package_dir) {
-                (Some(fcdecl::ConfigValueSource::PackagePath(path)), Some(dir)) => {
-                    Some(mem_util::open_file_data(dir, path).await?)
-                }
+                (Some(fcdecl::ConfigValueSource::PackagePath(path)), Some(dir)) => Some(
+                    mem_util::open_file_data(dir, path)
+                        .await
+                        .context(format!("Failed to load structured config file: {}", path))?,
+                ),
                 // fall back to using any overrides we got
                 _ => None,
             };
