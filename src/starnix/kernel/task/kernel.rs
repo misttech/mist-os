@@ -275,8 +275,8 @@ impl Kernel {
             _ => None,
         };
 
-        let this = Arc::new(Kernel {
-            kthreads: KernelThreads::default(),
+        let this = Arc::new_cyclic(|kernel| Kernel {
+            kthreads: KernelThreads::new(kernel.clone()),
             pids: RwLock::new(PidTable::new()),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
@@ -405,7 +405,7 @@ impl Kernel {
     pub(crate) fn generic_netlink(&self) -> &GenericNetlink<NetlinkToClientSender<GenericMessage>> {
         self.generic_netlink.get_or_init(|| {
             let (generic_netlink, generic_netlink_fut) = GenericNetlink::new();
-            self.kthreads.ehandle.spawn_local_detached(async move {
+            self.kthreads.spawn_future(async move {
                 generic_netlink_fut.await;
                 log_error!("Generic Netlink future unexpectedly exited");
             });

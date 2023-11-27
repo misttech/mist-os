@@ -7,7 +7,7 @@ use crate::{
     signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
     task::{
         timers::{ClockId, TimerId},
-        ThreadGroup,
+        Kernel, ThreadGroup,
     },
     time::utc,
 };
@@ -106,7 +106,7 @@ impl IntervalTimer {
                 if zx::Time::get_monotonic() >= target_monotonic {
                     break target_monotonic;
                 }
-                fuchsia_async::Timer::new(target_monotonic).await;
+                fasync::Timer::new(target_monotonic).await;
             };
 
             if !self.state.lock().armed {
@@ -177,8 +177,8 @@ impl IntervalTimer {
 
     pub fn arm(
         self: &IntervalTimerHandle,
+        kernel: &Kernel,
         thread_group: Weak<ThreadGroup>,
-        executor: &fasync::EHandle,
         target_time: zx::Time,
         interval: zx::Duration,
     ) {
@@ -199,7 +199,7 @@ impl IntervalTimer {
         // TODO(fxb/123084): check on clock_id to see if the clock supports creating a timer.
 
         let self_ref = self.clone();
-        executor.spawn_local_detached(async move {
+        kernel.kthreads.spawn_future(async move {
             let _ = {
                 // 1. Lock the state to update `abort_handle` when the timer is still armed.
                 // 2. MutexGuard needs to be dropped before calling await on the future task.

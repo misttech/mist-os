@@ -175,6 +175,7 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:pin-project",
     "//third_party/rust_crates:prost",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",

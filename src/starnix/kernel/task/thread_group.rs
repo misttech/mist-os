@@ -634,8 +634,8 @@ impl ThreadGroup {
         let prev_remaining = itimer_real.time_remaining();
         if value.it_value.tv_sec != 0 || value.it_value.tv_usec != 0 {
             itimer_real.arm(
+                &self.kernel,
                 Arc::downgrade(self),
-                &self.kernel.kthreads.ehandle,
                 utc::utc_now() + duration_from_timeval(value.it_value)?,
                 duration_from_timeval(value.it_interval)?,
             );

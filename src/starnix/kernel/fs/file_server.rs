@@ -53,7 +53,7 @@ pub fn serve_file_at(
     let starnix_file = StarnixNodeConnection::new(Arc::downgrade(kernel), file);
     // TODO(security): Switching to the `system_task` here loses track of the credentials from
     //                 `current_task`. Do we need to retain these credentials?
-    kernel.kthreads.ehandle.spawn_local_detached(async move {
+    kernel.kthreads.spawn_future(async move {
         let scope = execution_scope::ExecutionScope::new();
         starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
         scope.wait().await;

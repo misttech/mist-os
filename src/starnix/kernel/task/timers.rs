@@ -133,8 +133,8 @@ impl TimerTable {
                 utc::utc_now() + duration_from_timespec(new_value.it_value)?
             };
             itimer.arm(
+                &current_task.kernel(),
                 std::sync::Arc::downgrade(&current_task.thread_group),
-                &current_task.kernel().kthreads.ehandle,
                 target_time,
                 duration_from_timespec(new_value.it_interval)?,
             );
