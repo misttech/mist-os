@@ -65,6 +65,12 @@
             to: "#starnix_runner",
         },
         {
+            protocol: [ "fuchsia.settings.Privacy" ],
+            from: "#setui_service",
+            to: "#starnix_runner",
+            source_availability: "unknown",
+        },
+        {
             protocol: [ "fuchsia.wlan.wlanix.Wlanix" ],
             from: "#wlanix",
             to: "#starnix_runner",

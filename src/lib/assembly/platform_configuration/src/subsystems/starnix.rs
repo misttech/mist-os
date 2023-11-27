@@ -28,6 +28,16 @@ impl DefineSubsystemConfiguration<PlatformStarnixConfig> for StarnixSubsystem {
                 }
 
                 builder.platform_bundle("sensors_framework");
+
+                builder
+                    .package("starnix")
+                    .component("meta/starnix_runner.cm")?
+                    .field("enable_data_collection", *context.build_type == BuildType::UserDebug)?;
+            } else {
+                builder
+                    .package("starnix")
+                    .component("meta/starnix_runner.cm")?
+                    .field("enable_data_collection", false)?;
             }
         }
         Ok(())

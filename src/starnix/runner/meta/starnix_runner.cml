@@ -35,6 +35,10 @@
             protocol: "fuchsia.component.Realm",
             from: "framework",
         },
+        {
+            protocol: "fuchsia.settings.Privacy",
+            availability: "optional",
+        },
     ],
     offer: [
         {
@@ -107,4 +111,8 @@
             ],
         },
     ],
+    config: {
+        // Sets the platform's data collection bit.
+        enable_data_collection: { type: "bool" },
+    },
 }
