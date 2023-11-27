@@ -48,9 +48,6 @@ def main():
         "--ar", help="The archive linker to use", required=False, default="ar"
     )
     parser.add_argument(
-        "--dump-syms", help="The dump_syms tool to use", required=False
-    )
-    parser.add_argument(
         "--objcopy",
         help="The objcopy tool to use",
         required=False,
@@ -422,34 +419,6 @@ def main():
                 ],
                 env=env,
             ).check_returncode()
-
-    # TODO(fxbug.dev/27215): Also invoke the buildidtool in the case of linux
-    # once buildidtool knows how to deal in Go's native build ID format.
-    supports_build_id = args.current_os == "fuchsia"
-    if args.dump_syms and supports_build_id:
-        if args.current_os == "fuchsia":
-            with open(dist + ".sym", "w") as f:
-                subprocess.run(
-                    [args.dump_syms, "-r", "-o", "Fuchsia", args.output_path],
-                    stdout=f,
-                ).check_returncode()
-
-    if args.buildidtool and supports_build_id:
-        if not args.build_id_dir:
-            raise ValueError("Using --buildidtool requires --build-id-dir")
-        subprocess.run(
-            [
-                args.buildidtool,
-                "-build-id-dir",
-                args.build_id_dir,
-                "-stamp",
-                dist + ".build-id.stamp",
-                "-entry",
-                ".debug=" + args.output_path,
-                "-entry",
-                "=" + dist,
-            ]
-        ).check_returncode()
 
     # Clean up the tree of go files assembled in gopath_src to indicate to the
     # action tracer that they were intermediates and not final outputs.

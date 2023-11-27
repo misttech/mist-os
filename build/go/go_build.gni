@@ -196,6 +196,7 @@ template("go_build") {
   }
 
   variant_target("action") {
+    mnemonic = "GO"
     target_name = main_target_name
     variant_shared_redirection = false
 
@@ -380,15 +381,6 @@ template("go_build") {
     }
 
     inputs = []
-    if (is_fuchsia) {
-      if (output_breakpad_syms && host_os != "mac") {
-        args += [
-          "--dump-syms",
-          breakpad_dump_syms,
-        ]
-        inputs += [ breakpad_dump_syms_prebuilt ]
-      }
-    }
 
     # Add needed arguments for the buildidtool. We should add the stamp file
     # output by buildidtool to the list of outputs for this action but because
@@ -469,15 +461,6 @@ template("go_build") {
           } else {
             dist = debug
           }
-
-          # TODO(fxbug.dev/27215): Update when we add linux go binaries
-          # to .build-id.
-          if (is_fuchsia) {
-            elf_build_id = "$dist.build-id.stamp"
-          }
-          if (output_breakpad_syms && is_fuchsia) {
-            breakpad = "$dist.sym"
-          }
         },
       ]
 
@@ -527,11 +510,6 @@ template("go_build") {
           ]
         }
       }
-    }
-    if (output_breakpad_syms && is_fuchsia) {
-      metadata_binaries = metadata.binaries
-      b = metadata_binaries[0]
-      outputs += [ root_out_dir + "/" + b.breakpad ]
     }
 
     # The binaries embed absolute paths to the source file,
