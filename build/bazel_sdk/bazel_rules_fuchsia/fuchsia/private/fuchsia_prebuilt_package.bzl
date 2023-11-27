@@ -4,15 +4,16 @@
 
 """Implement fuchsia_prebuilt_package() rule."""
 
-load("//fuchsia/private:providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
+load(":providers.bzl", "FuchsiaComponentInfo", "FuchsiaPackageInfo", "FuchsiaPackagedComponentInfo")
 load("//fuchsia/private/workflows:fuchsia_task_publish.bzl", "fuchsia_task_publish")
 
 def _relative_file_name(ctx, filename):
     return ctx.label.name + "_expanded/" + filename
 
-def _fuchsia_prebuilt_package_impl(ctx):
+def _unpack_prebuilt_package_impl(ctx):
     sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     far_archive = ctx.files.archive[0]
+    output_files = [far_archive]
 
     # where we will collect all of the temporary files
     pkg_dir = ctx.label.name + "_pkg/"
@@ -70,7 +71,7 @@ def _fuchsia_prebuilt_package_impl(ctx):
     #          verifies it belongs to the package.
     #
     output_dir = ctx.actions.declare_directory(_relative_file_name(ctx, "content"))
-    output_files = [output_dir]
+    output_files.append(output_dir)
 
     # extract the package
     ctx.actions.run(
@@ -122,10 +123,10 @@ def _fuchsia_prebuilt_package_impl(ctx):
         ),
     ]
 
-_fuchsia_prebuilt_package = rule(
+_unpack_prebuilt_package = rule(
     doc = """Provides access to a fuchsia package from a prebuilt package archive (.far).
 """,
-    implementation = _fuchsia_prebuilt_package_impl,
+    implementation = _unpack_prebuilt_package_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "archive": attr.label(
@@ -149,14 +150,97 @@ _fuchsia_prebuilt_package = rule(
     },
 )
 
-def fuchsia_prebuilt_package(*, name, archive, components = [], drivers = [], **kwargs):
-    _fuchsia_prebuilt_package(
-        name = name,
-        archive = archive,
-        components = components,
-        drivers = drivers,
-        **kwargs
+def _pack_prebuilt_package_impl(ctx):
+    sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
+
+    # Inputs
+    manifest = ctx.files.manifest[0]
+    input_files = ctx.files.files
+
+    # Outputs
+    far_file = ctx.actions.declare_file("%s.far" % ctx.attr.name)
+    output_files = [far_file, manifest]
+
+    # An environment variable that creates an isolated FFX instance.
+    ffx_isolate_dir = ctx.actions.declare_directory(ctx.label.name + "_pkg/_package.ffx")
+
+    # Create the far file.
+    ctx.actions.run(
+        executable = sdk.ffx_package,
+        arguments = [
+            "--isolate-dir",
+            ffx_isolate_dir.path,
+            "package",
+            "archive",
+            "create",
+            manifest.path,
+            "-o",
+            far_file.path,
+        ],
+        inputs = input_files,
+        outputs = [far_file, ffx_isolate_dir],
+        mnemonic = "FuchsiaFfxPackageArchiveCreate",
+        progress_message = "Archiving package for %{label}",
     )
+
+    return [
+        DefaultInfo(files = depset(output_files)),
+        FuchsiaPackageInfo(
+            package_manifest = manifest,
+            far_file = far_file,
+            packaged_components = [FuchsiaPackagedComponentInfo(dest = d, component_info = FuchsiaComponentInfo(is_driver = True, is_test = False)) for d in ctx.attr.drivers] +
+                                  [FuchsiaPackagedComponentInfo(dest = c, component_info = FuchsiaComponentInfo(is_driver = False, is_test = False)) for c in ctx.attr.components],
+            files = output_files + input_files,
+        ),
+    ]
+
+_pack_prebuilt_package = rule(
+    doc = """Provides access to a fuchsia package from a package manifest.
+""",
+    implementation = _pack_prebuilt_package_impl,
+    toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
+    attrs = {
+        "manifest": attr.label(
+            doc = "The package's manifest file",
+            allow_single_file = True,
+            mandatory = True,
+        ),
+        "files": attr.label_list(
+            doc = "Files that are part of the package.",
+            allow_files = True,
+            mandatory = True,
+        ),
+        "components": attr.string_list(
+            doc = "components of this driver",
+            default = [],
+        ),
+        "drivers": attr.string_list(
+            doc = "drivers of this driver",
+            default = [],
+        ),
+    },
+)
+
+def fuchsia_prebuilt_package(*, name, archive = None, manifest = None, files = [], components = [], drivers = [], **kwargs):
+    if (archive and files) or bool(archive) == bool(manifest):
+        fail("Must specify exactly either `archive` or `manifest + files`.")
+    if archive:
+        _unpack_prebuilt_package(
+            name = name,
+            archive = archive,
+            components = components,
+            drivers = drivers,
+            **kwargs
+        )
+    else:
+        _pack_prebuilt_package(
+            name = name,
+            manifest = manifest,
+            files = files,
+            components = components,
+            drivers = drivers,
+            **kwargs
+        )
 
     fuchsia_task_publish(
         name = "%s.publish" % name,

@@ -70,6 +70,10 @@ load(
     _get_driver_component_manifests = "get_driver_component_manifests",
 )
 load(
+    "//fuchsia/private:fuchsia_prebuilt_package.bzl",
+    _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
+)
+load(
     "//fuchsia/private:fuchsia_rust.bzl",
     _fuchsia_wrap_rust_binary = "fuchsia_wrap_rust_binary",
 )
@@ -132,6 +136,7 @@ fuchsia_fidl_llcpp_library = _fuchsia_fidl_llcpp_library
 fuchsia_package = _fuchsia_package
 fuchsia_test_package = _fuchsia_test_package
 fuchsia_unittest_package = _fuchsia_unittest_package
+fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_package_resource = _fuchsia_package_resource
 fuchsia_package_resource_group = _fuchsia_package_resource_group
 fuchsia_package_group = _fuchsia_package_group

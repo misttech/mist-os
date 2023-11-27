@@ -17,20 +17,21 @@ def symlink_or_copy(ctx, copy_content_strategy, files_to_copy):
         files_to_copy: a dict of string to list, where the key is a string with the root path and the value is a list of string paths relative to the root
 
     """
+    unique_files_to_copy = dict([((root, file), None) for root, files in files_to_copy.items() for file in files]).keys()
+
     if copy_content_strategy == "copy":
         per_dest_dir = {}
-        for root in files_to_copy.keys():
-            for file in files_to_copy[root]:
-                dest = ctx.path(file)
-                dest_dir = str(dest.dirname)
-                origin_file = str(ctx.path("%s/%s" % (root, file)))
-                if dest_dir in per_dest_dir:
-                    for other in per_dest_dir[dest_dir]:
-                        if ctx.path(other).basename == dest.basename:
-                            fail("File is specified in two different places: in %s and in %s" % (other, origin_file))
-                    per_dest_dir[dest_dir].append(origin_file)
-                else:
-                    per_dest_dir[dest_dir] = [origin_file]
+        for root, file in unique_files_to_copy:
+            dest = ctx.path(file)
+            dest_dir = str(dest.dirname)
+            origin_file = str(ctx.path("%s/%s" % (root, file)))
+            if dest_dir in per_dest_dir:
+                for other in per_dest_dir[dest_dir]:
+                    if ctx.path(other).basename == dest.basename:
+                        fail("File is specified in two different places: in %s and in %s" % (other, origin_file))
+                per_dest_dir[dest_dir].append(origin_file)
+            else:
+                per_dest_dir[dest_dir] = [origin_file]
 
         host_os = normalize_os(ctx)
         try_hardlink = host_os == "linux"
@@ -53,9 +54,8 @@ def symlink_or_copy(ctx, copy_content_strategy, files_to_copy):
                     fail("Cannot copy files (%s):\n     %s" % (str(result.return_code), " ".join(command)))
 
     elif copy_content_strategy == "symlink":
-        for root in files_to_copy.keys():
-            for file in files_to_copy[root]:
-                ctx.symlink(ctx.path("%s/%s" % (root, file)), ctx.path(file))
+        for root, file in unique_files_to_copy:
+            ctx.symlink(ctx.path("%s/%s" % (root, file)), ctx.path(file))
     else:
         fail("Invalid value of copy_content_strategy argument: %s" % copy_content_strategy)
 

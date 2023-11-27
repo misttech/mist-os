@@ -508,7 +508,68 @@ def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_fil
     })
     _merge_template(ctx, build_file, tmpl, subs)
 
-def _merge_template(ctx, target_build_file, template_file, subs):
+# buildifier: disable=unused-variable
+def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+    export_all_files_template = ctx.path(ctx.attr._export_all_files_template)
+    package_template = ctx.path(ctx.attr._package_template)
+    constraint_template = ctx.path(ctx.attr._constraint_template)
+    select_alias = ctx.path(ctx.attr._select_alias)
+
+    _merge_template(ctx, build_file, export_all_files_template)
+
+    # Parse package variants from metadata.
+    name = _get_target_name(meta["name"])
+    package_variants = [
+        struct(
+            name = "%s_%s_api_%s" % (name, variant["arch"], _to_fuchsia_api_level_name(variant["api_level"])),
+            files = variant["files"],
+            manifest = variant["manifest_file"],
+            constraint = "is_%s_api_%s" % (variant["arch"], _to_fuchsia_api_level_name(variant["api_level"])),
+            os = "@platforms//os:fuchsia",
+            cpu = _FUCHSIA_CPU_CONSTRAINT_MAP[variant["arch"]],
+            api_level = _fuchsia_api_level_constraint(variant["api_level"]),
+        )
+        for variant in meta["variants"]
+    ]
+
+    # TODO(chandarren): Remove once variants in IDK metadata are deduplicated.
+    package_variants = [variant for i, variant in enumerate(package_variants) if variant.name not in [variant.name for variant in package_variants[:i]]]
+
+    # We can't just do f"//:{file}", since the relative dir may have a
+    # BUILD.bazel file, making that subdir its own Bazel package.
+    def _bazel_file_path(file):
+        prefix = relative_dir if file.startswith(relative_dir) else ""
+        suffix = file[len(prefix):].lstrip("/")
+        return "//%s:%s" % (prefix, suffix)
+
+    for variant in package_variants:
+        # Write build defs for each package variant.
+        _merge_template(ctx, build_file, package_template, {
+            "{{name}}": variant.name,
+            "{{files}}": _get_starlark_list([_bazel_file_path(file) for file in variant.files]),
+            "{{manifest}}": _bazel_file_path(variant.manifest),
+        })
+        process_context.files_to_copy[meta["_meta_sdk_root"]].extend(variant.files)
+
+        # Write merged constraint definitions.
+        _merge_template(ctx, build_file, constraint_template, {
+            "{{name}}": variant.constraint,
+            "{{match_all}}": _get_starlark_list([
+                variant.os,
+                variant.cpu,
+                variant.api_level,
+            ]),
+        })
+
+    _merge_template(ctx, build_file, select_alias, {
+        "{{name}}": name,
+        "{{select_map}}": _get_starlark_dict({
+            variant.constraint: variant.name
+            for variant in package_variants
+        }),
+    })
+
+def _merge_template(ctx, target_build_file, template_file, subs = {}):
     if ctx.path(target_build_file).exists:
         existing_content = ctx.read(target_build_file)
     else:
@@ -532,6 +593,7 @@ def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_conte
         "bind_library": _generate_bind_library_build_rules,
         "component_manifest": _generate_component_manifest_rules,
         "version_history": _generate_api_version_rules,
+        "package": _generate_package_build_rules,
     }
 
     build_file = ctx.path(relative_dir).get_child("BUILD.bazel")

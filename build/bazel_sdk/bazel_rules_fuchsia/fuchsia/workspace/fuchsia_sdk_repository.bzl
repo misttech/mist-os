@@ -213,6 +213,22 @@ Loads a particular version of the Fuchsia IDK.
             default = "//fuchsia/workspace/sdk_templates:companion_host_tool_template.BUILD",
             allow_single_file = True,
         ),
+        "_select_alias": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:select_alias_template.BUILD",
+            allow_single_file = True,
+        ),
+        "_constraint_template": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:constraint_template.BUILD",
+            allow_single_file = True,
+        ),
+        "_package_template": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:package_template.BUILD",
+            allow_single_file = True,
+        ),
+        "_export_all_files_template": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:export_all_files_template.BUILD",
+            allow_single_file = True,
+        ),
         "_api_version_template": attr.label(
             default = "//fuchsia/workspace/sdk_templates:api_version_template.bzl",
             allow_single_file = True,

@@ -113,7 +113,7 @@ FuchsiaPackageGroupInfo = provider(
 FuchsiaPackageInfo = provider(
     doc = "Contains information about a fuchsia package.",
     fields = {
-        "fuchsia_cpu": "The CPU target used to build this package in fuchsia format (x64, arm64, riscv64)",
+        "fuchsia_cpu": "The target CPU specified when building this package in fuchsia format (x64, arm64, riscv64)",
         "package_manifest": "JSON package manifest file representing the Fuchsia package.",
         "package_name": "The name of the package",
         "far_file": "The far archive",

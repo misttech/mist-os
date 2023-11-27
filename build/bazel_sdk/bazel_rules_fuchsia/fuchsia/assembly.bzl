@@ -5,7 +5,7 @@
 """Public definitions for Assembly related rules."""
 
 load(
-    "//fuchsia/private/assembly:fuchsia_prebuilt_package.bzl",
+    "//fuchsia/private:fuchsia_prebuilt_package.bzl",
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
