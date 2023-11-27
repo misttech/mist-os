@@ -1,38 +1,9 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use crate::config::SshConfig;
 use anyhow::{anyhow, Result};
 use std::{net::SocketAddr, path::PathBuf, process::Command};
-
-static DEFAULT_SSH_OPTIONS: &'static [&str] = &[
-    "-F",
-    "none", // Ignore user and system configuration files.
-    "-o",
-    "ControlPath=none",
-    "-o",
-    "ControlMaster=no",
-    "-o",
-    "CheckHostIP=no",
-    "-o",
-    "StrictHostKeyChecking=no",
-    "-o",
-    "UserKnownHostsFile=/dev/null",
-    "-o",
-    "ServerAliveInterval=1",
-    "-o",
-    "ServerAliveCountMax=10",
-    "-o",
-    // Emulators start listening instantly, even though there is no sshd to talk
-    // to. And sometimes (?) they don't ever establish the connection. Give an
-    // emulator enough time to spin up, but timeout so we'll retry if need be.
-    "ConnectTimeout=20",
-    "-o",
-    "ExitOnForwardFailure=yes",
-    "-o",
-    "StreamLocalBindUnlink=yes",
-    "-o",
-    "LogLevel=ERROR",
-];
 
 #[cfg(not(test))]
 pub async fn get_ssh_key_paths() -> Result<Vec<String>> {
@@ -58,10 +29,20 @@ async fn apply_auth_sock(cmd: &mut Command) {
     }
 }
 
-/// Builds the ssh command using the specified path to the ssh command.
 pub async fn build_ssh_command_with_ssh_path(
     ssh_path: &str,
     addr: SocketAddr,
+    command: Vec<&str>,
+) -> Result<Command> {
+    let config = SshConfig::new()?;
+    build_ssh_command_with_ssh_config(ssh_path, addr, &config, command).await
+}
+
+/// Builds the ssh command using the specified ssh configuration and path to the ssh command.
+pub async fn build_ssh_command_with_ssh_config(
+    ssh_path: &str,
+    addr: SocketAddr,
+    config: &SshConfig,
     command: Vec<&str>,
 ) -> Result<Command> {
     if ssh_path.is_empty() {
@@ -72,7 +53,8 @@ pub async fn build_ssh_command_with_ssh_path(
 
     let mut c = Command::new(ssh_path);
     apply_auth_sock(&mut c).await;
-    c.args(DEFAULT_SSH_OPTIONS);
+    c.args(["-F", "none"]);
+    c.args(config.to_args());
 
     for key in keys {
         c.arg("-i").arg(key);
@@ -140,37 +122,52 @@ pub async fn build_ssh_command_with_config_file(
 mod test {
     use super::*;
     use ffx_config::ConfigLevel;
-    use itertools::Itertools;
+    use pretty_assertions::assert_eq;
     use std::io::BufRead;
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_build_ssh_command_ipv4() {
+        let config = SshConfig::new().expect("default ssh config");
         let addr = "192.168.0.1:22".parse().unwrap();
 
         let result = build_ssh_command(addr, vec!["ls"]).await.unwrap();
-        let dbgstr = format!("{:?}", result);
+        let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
+        let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
+        expected_args.extend(config.to_args());
 
-        let expected = format!(
-            r#""ssh" {} "-i" "{}" "-o" "AddressFamily=inet" "-p" "22" "192.168.0.1" "ls""#,
-            DEFAULT_SSH_OPTIONS.iter().map(|s| format!("\"{}\"", s)).join(" "),
-            TEST_SSH_KEY_PATH,
+        expected_args.extend(
+            ["-i", TEST_SSH_KEY_PATH, "-o", "AddressFamily=inet", "-p", "22", "192.168.0.1", "ls"]
+                .map(String::from),
         );
-        assert!(dbgstr.contains(&expected), "ssh lines did not match:\n{}\n{}", expected, dbgstr);
+
+        assert_eq!(actual_args, expected_args);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_build_ssh_command_ipv6() {
+        let config = SshConfig::new().expect("default ssh config");
         let addr = "[fe80::12%5]:8022".parse().unwrap();
 
         let result = build_ssh_command(addr, vec!["ls"]).await.unwrap();
-        let dbgstr = format!("{:?}", result);
+        let actual_args: Vec<_> = result.get_args().map(|a| a.to_string_lossy()).collect();
+        let mut expected_args: Vec<String> = vec!["-F".into(), "none".into()];
+        expected_args.extend(config.to_args());
 
-        let expected = format!(
-            r#""ssh" {} "-i" "{}" "-o" "AddressFamily=inet6" "-p" "8022" "fe80::12%5" "ls""#,
-            DEFAULT_SSH_OPTIONS.iter().map(|s| format!("\"{}\"", s)).join(" "),
-            TEST_SSH_KEY_PATH,
+        expected_args.extend(
+            [
+                "-i",
+                TEST_SSH_KEY_PATH,
+                "-o",
+                "AddressFamily=inet6",
+                "-p",
+                "8022",
+                "fe80::12%5",
+                "ls",
+            ]
+            .map(String::from),
         );
-        assert!(dbgstr.contains(&expected), "ssh lines did not match:\n{}\n{}", expected, dbgstr);
+
+        assert_eq!(actual_args, expected_args);
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
@@ -197,5 +194,26 @@ mod test {
             expected_var,
             lines.join("\n")
         );
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_build_ssh_command_with_ssh_config() {
+        let mut config = SshConfig::new().expect("default ssh config");
+        let addr = "[fe80::12%5]:8022".parse().unwrap();
+
+        // Override some options
+        config.set("LogLevel", "DEBUG3").expect("setting loglevel");
+
+        let result =
+            build_ssh_command_with_ssh_config("ssh", addr, &config, vec!["ls"]).await.unwrap();
+        let actual_args: Vec<_> =
+            result.get_args().map(|a| a.to_string_lossy().to_string()).collect();
+
+        // Check the default
+        assert_eq!(config.get("CheckHostIP").expect("CheckHostIP value").unwrap(), "no");
+        assert!(actual_args.contains(&"CheckHostIP=no".to_string()));
+
+        // Check the override
+        assert!(actual_args.contains(&"LogLevel=DEBUG3".to_string()));
     }
 }

@@ -115,6 +115,7 @@ async fn make_ssh_command(cmd: SshCommand, addr: TargetAddr) -> Result<Command> 
 mod test {
     use super::*;
     use ffx_config::{environment::test_init, ConfigLevel};
+    use itertools::Itertools;
     use pretty_assertions::assert_eq;
     use serde_json::json;
     use std::{fs, str::FromStr};
@@ -134,44 +135,22 @@ mod test {
         let cmd = SshCommand { sshconfig: None, command: vec![] };
         let ssh_cmd = make_ssh_command(cmd, addr).await?;
         assert_eq!(ssh_cmd.get_program(), "ssh");
-        assert_eq!(
-            ssh_cmd.get_args().collect::<Vec<_>>(),
-            vec![
-                "-F",
-                "none",
-                "-o",
-                "ControlPath=none",
-                "-o",
-                "ControlMaster=no",
-                "-o",
-                "CheckHostIP=no",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "-o",
-                "ServerAliveInterval=1",
-                "-o",
-                "ServerAliveCountMax=10",
-                "-o",
-                "ConnectTimeout=20",
-                "-o",
-                "ExitOnForwardFailure=yes",
-                "-o",
-                "StreamLocalBindUnlink=yes",
-                "-o",
-                "LogLevel=ERROR",
-                "-i",
-                &keys[0].to_string_lossy(),
-                "-i",
-                &keys[1].to_string_lossy(),
-                "-o",
-                "AddressFamily=inet",
-                "-p",
-                "34522",
-                format!("{}", addr).as_str(),
-            ]
+
+        // assert that the keys are added,
+        // the address family is ipv4
+        // the port and address are correct.
+        // ignore the configuration since that is tested in the make_ssh_command, and
+        // could change over time.
+        let actual_command = ssh_cmd.get_args().filter_map(|a| a.to_str()).join(" ");
+        assert!(actual_command.contains("-o AddressFamily=inet"));
+        let key_args =
+            format!("-i {} -i {}", &keys[0].to_string_lossy(), &keys[1].to_string_lossy());
+        assert!(
+            actual_command.contains(&key_args),
+            "missing ssh keys: {actual_command} does not contain {key_args}"
         );
+        assert!(actual_command.ends_with("-p 34522 127.0.0.1"));
+
         Ok(())
     }
 
