@@ -151,13 +151,15 @@ if (use_bringup_assembly) {
   ### Amber updates.
   ###
 
-  recovery_images_list = root_build_dir + "/recovery_images_list"
-  generated_file("recovery_images_list") {
-    testonly = true
-    outputs = [ recovery_images_list ]
-    output_conversion = "list lines"
-    data_keys = [ "update_target" ]
-    deps = [ recovery_label ]
+  if (!use_bazel_images_only) {
+    recovery_images_list = root_build_dir + "/recovery_images_list"
+    generated_file("recovery_images_list") {
+      testonly = true
+      outputs = [ recovery_images_list ]
+      output_conversion = "list lines"
+      data_keys = [ "update_target" ]
+      deps = [ recovery_label ]
+    }
   }
 
   generate_epoch("epoch.json") {

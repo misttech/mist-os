@@ -32,6 +32,10 @@ assembled_system("zedboot_assembly") {
   product_assembly_config_label = _product_config
   board_config_label = board_configuration_label
 
+  # Bazel assembly should not depend on any targets from GN assembly other
+  # than the legacy AIB.
+  legacy_bundle_only = use_bazel_images_only
+
   base_packages = []
 
   additional_boot_args = [
@@ -94,7 +98,7 @@ assembled_system("zedboot_assembly") {
   }
 }
 
-if (target_cpu != "arm64" && !use_vboot) {
+if (target_cpu != "arm64" && !use_vboot && !use_bazel_images_only) {
   esp("esp") {
     output_name = "zedboot"
     cmdline = "efi_cmdline.txt"
@@ -117,9 +121,11 @@ if (target_cpu != "arm64" && !use_vboot) {
 }
 
 group("zedboot") {
-  public_deps = [ ":zedboot_assembly" ]
-  if (target_cpu != "arm64" && !use_vboot) {
-    public_deps += [ ":esp" ]
+  if (!use_bazel_images_only) {
+    public_deps = [ ":zedboot_assembly" ]
+    if (target_cpu != "arm64" && !use_vboot) {
+      public_deps += [ ":esp" ]
+    }
   }
   testonly = true
 }

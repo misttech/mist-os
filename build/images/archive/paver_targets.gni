@@ -76,7 +76,9 @@ if (recovery_is_zedboot) {
         deps += [ "//build/images/bringup" ]
         switch = "--netboot="
       } else {
-        deps += [ "//build/images/zedboot" ]
+        if (!use_bazel_images_only) {
+          deps += [ "//build/images/zedboot" ]
+        }
         switch = "--pave_zedboot="
       }
       extra_bootserver_arguments = "--allow-zedboot-version-mismatch"
