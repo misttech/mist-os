@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DISPLAY_TIMING_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DISPLAY_TIMING_H_
 
-#include <fidl/fuchsia.hardware.hdmi/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 
 #include <cstdint>
@@ -71,8 +70,7 @@ constexpr int32_t kMaxPixelClockKhz = std::numeric_limits<int32_t>::max();
 //   pages 42-52.
 // - E-EDID standard, Section 3.12 "Note Regarding Borders", pages 51-52.
 //
-// Equivalent to the banjo type [`fuchsia.hardware.display.controller/DisplayMode`]
-// and the FIDL type [`fuchsia.hardware.hdmi/StandardDisplayMode`].
+// Equivalent to the banjo type [`fuchsia.hardware.display.controller/DisplayMode`].
 //
 // The struct uses signed `int32_t` values for the timing value fields instead
 // of the unsigned `uint32` used by its FIDL / banjo counterparts.
@@ -268,15 +266,9 @@ constexpr inline bool operator!=(const DisplayTiming& lhs, const DisplayTiming& 
 }
 
 DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode);
-DisplayTiming ToDisplayTiming(
-    const fuchsia_hardware_hdmi::wire::StandardDisplayMode& fidl_display_mode);
 
 // `display_timing_params.pixel_repetition` must be 0 or 1.
 display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params);
-
-// `display_timing_params.pixel_repetition` must be 0 or 1.
-fuchsia_hardware_hdmi::wire::StandardDisplayMode ToHdmiFidlStandardDisplayMode(
-    const DisplayTiming& display_timing_params);
 
 }  // namespace display
 

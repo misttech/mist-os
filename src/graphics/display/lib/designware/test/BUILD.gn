@@ -6,13 +6,9 @@ import("//build/components.gni")
 import("//build/test.gni")
 
 test("hdmi-transmitter-controller-impl-test-bin") {
-  sources = [
-    "color-param-test.cc",
-    "hdmi-transmitter-controller-impl-test.cc",
-  ]
+  sources = [ "hdmi-transmitter-controller-impl-test.cc" ]
   deps = [
     "//sdk/banjo/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.hdmi:fuchsia.hardware.hdmi_cpp",
     "//src/devices/lib/mmio",
     "//src/devices/testing/mock-mmio-range",
     "//src/devices/testing/no_ddk",
