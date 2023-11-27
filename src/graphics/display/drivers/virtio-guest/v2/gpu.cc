@@ -278,6 +278,7 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
     auto result = Device::Create(std::move(pci_client_end.value()));
     if (result.is_error()) {
       completer(result.take_error());
+      return;
     }
 
     device_ = std::move(result.value());
@@ -291,7 +292,13 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
   });
 }
 
-void GpuDriver::Stop() { device_->Release(); }
+void GpuDriver::Stop() {
+  if (device_) {
+    device_->Release();
+  }
+}
+
+void GpuDriver::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
 }  // namespace virtio
 

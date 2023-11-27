@@ -82,26 +82,32 @@ test("virtio-gpu-test") {
     }
   }
   sources = [
-    # TODO(b/282968393): tests pending conversion to dfv2
-    #"gpu_test.cc",
+    "gpu_test.cc",
     "virtio-abi-test.cc",
   ]
   deps = [
     ":common_srcs",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp_testing",
-    "//sdk/lib/async-loop-testing/cpp",
-    "//src/devices/bus/lib/virtio",
-    "//src/devices/testing/fake-bti",
-    "//src/devices/testing/no_ddk",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/component/cpp:cpp_test",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/graphics/display/lib/api-types-cpp:api-types-cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
-    "//third_party/googletest:gtest",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
   ]
 }
 
 fuchsia_unittest_package("virtio-gpu-test-package") {
   package_name = "virtio-gpu-test"
   deps = [ ":virtio-gpu-test" ]
+
+  # TODO(fxbug.dev/134883): Remove this block when below error is resolved.
+  # There's expected error logs that happen in the integration test where
+  # GetBtiAndBackend fails in GpuDriver::Device::Create due to testing
+  # without a fake GPU backend in place.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

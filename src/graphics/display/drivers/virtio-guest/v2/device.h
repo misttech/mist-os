@@ -5,6 +5,8 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_DEVICE_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_DEVICE_H_
 
+#include <lib/fit/defer.h>
+
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
 
 namespace virtio {

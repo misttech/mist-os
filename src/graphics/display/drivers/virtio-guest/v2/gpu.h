@@ -61,13 +61,9 @@ class GpuDriver : public fdf::DriverBase {
   // Asynchronous start.
   void Start(fdf::StartCompleter completer) override;
   void Stop() override;
+  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   const virtio_abi::ScanoutInfo* pmode() const { return &pmode_; }
-
-  zx_status_t SetAndInitSysmemForTesting(fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem) {
-    sysmem_ = std::move(sysmem);
-    return ZX_OK;
-  }
 
  private:
   // Internal routines

@@ -2,36 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
-#include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/async-loop/testing/cpp/real_loop.h>
-#include <lib/fake-bti/bti.h>
-#include <lib/fidl/cpp/wire/channel.h>
-#include <zircon/compiler.h>
-
-#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
-
-#define USE_GTEST
-#include <lib/virtio/backends/fake.h>
-#undef USE_GTEST
-
-#include <list>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/fdf/env.h>
+#include <lib/fdf/testing.h>
+#include <lib/syslog/cpp/macros.h>
 
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
-#include "src/lib/fsl/handles/object_info.h"
+#include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace sysmem = fuchsia_sysmem;
 
 namespace {
+
 // Use a stub buffer collection instead of the real sysmem since some tests may
 // require things that aren't available on the current system.
 //
@@ -75,8 +68,10 @@ class StubBufferCollection : public fidl::testing::WireTestBase<fuchsia_sysmem::
 
 class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocator> {
  public:
-  explicit MockAllocator(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {
-    EXPECT_TRUE(dispatcher_);
+  zx_status_t Connect(fidl::ServerEnd<sysmem::Allocator> request) {
+    binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request),
+                              this, fidl::kIgnoreBindingClosure);
+    return ZX_OK;
   }
 
   void BindSharedCollection(BindSharedCollectionRequestView request,
@@ -90,7 +85,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
                          .mock_buffer_collection = std::make_unique<StubBufferCollection>()});
 
     auto ref = fidl::BindServer(
-        dispatcher_, std::move(request->buffer_collection_request),
+        fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+        std::move(request->buffer_collection_request),
         active_buffer_collections_.at(buffer_collection_id).mock_buffer_collection.get(),
         [this, buffer_collection_id](StubBufferCollection*, fidl::UnbindInfo,
                                      fidl::ServerEnd<fuchsia_sysmem::BufferCollection>) {
@@ -137,6 +133,8 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   }
 
  private:
+  fidl::ServerBindingGroup<sysmem::Allocator> binding_group_;
+
   struct BufferCollection {
     fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken> token_client;
     fidl::UnownedServerEnd<fuchsia_sysmem::BufferCollection> unowned_collection_server;
@@ -151,258 +149,60 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
       display::DriverBufferCollectionId(0);
-  async_dispatcher_t* dispatcher_ = nullptr;
 };
 
-class FakeGpuBackend : public virtio::FakeBackend {
- public:
-  FakeGpuBackend() : FakeBackend({{0, 1024}}) {}
-};
-
-class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
+class VirtioGpuTest : public ::testing::Test {
  public:
   VirtioGpuTest() = default;
   void SetUp() override {
-    fake_sysmem_ = std::make_unique<MockAllocator>(dispatcher());
+    // Create start args
+    zx::result start_args = node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
+    EXPECT_EQ(ZX_OK, start_args.status_value());
 
-    zx::bti bti;
-    fake_bti_create(bti.reset_and_get_address());
-    device_ = std::make_unique<virtio::GpuDevice>(nullptr, std::move(bti),
-                                                  std::make_unique<FakeGpuBackend>());
+    // Start the test environment
+    zx::result init_result =
+        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                                   std::move(start_args->incoming_directory_server));
+    EXPECT_EQ(ZX_OK, init_result.status_value());
 
-    zx::result<fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>> sysmem_endpoints =
-        fidl::CreateEndpoints<fuchsia_hardware_sysmem::Sysmem>();
-    ASSERT_OK(sysmem_endpoints.status_value());
-    auto& [sysmem_client, sysmem_server] = sysmem_endpoints.value();
-    fidl::BindServer(dispatcher(), std::move(sysmem_server), fake_sysmem_.get());
+    // TODO(fxbug.dev/134883): Connect Fake PCI Backend.
 
-    ASSERT_OK(device_->SetAndInitSysmemForTesting(fidl::WireSyncClient(std::move(sysmem_client))));
+    // TODO(fxbug.dev/134883): Connect Fake Sysmem.
 
-    RunLoopUntilIdle();
+    // Start driver
+    zx::result start_result = runtime_.RunToCompletion(
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio::GpuDriver>::Start,
+                         std::move(start_args->start_args)));
+
+    // TODO(fxbug.dev/134883): This should be ZX_OK once all the mocks are in place.
+    EXPECT_EQ(ZX_ERR_PEER_CLOSED, start_result.status_value());
   }
 
   void TearDown() override {
-    // Ensure the loop processes all queued FIDL messages.
-    loop().Shutdown();
+    zx::result stop_result = runtime_.RunToCompletion(
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio::GpuDriver>::PrepareStop));
+    EXPECT_EQ(ZX_OK, stop_result.status_value());
   }
 
-  void ImportBufferCollection(display::DriverBufferCollectionId buffer_collection_id) {
-    zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-    ASSERT_TRUE(token_endpoints.is_ok());
-    EXPECT_OK(device_->DisplayControllerImplImportBufferCollection(
-        display::ToBanjoDriverBufferCollectionId(buffer_collection_id),
-        token_endpoints->client.TakeChannel()));
-  }
+  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
 
- protected:
-  std::unique_ptr<MockAllocator> fake_sysmem_;
-  std::unique_ptr<virtio::GpuDevice> device_;
+ private:
+  // Attaches a foreground dispatcher for us automatically.
+  fdf_testing::DriverRuntime runtime_;
+
+  // Env dispatcher runs in the background because we need to make sync calls into it.
+  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
+
+  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
+      env_dispatcher(), std::in_place, std::string("root")};
+  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+      env_dispatcher(), std::in_place};
+
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio::GpuDriver>> driver_{
+      driver_dispatcher_->async_dispatcher(), std::in_place};
 };
 
-TEST_F(VirtioGpuTest, ImportVmo) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
-
-  // Import buffer collection.
-  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  ImportBufferCollection(kBufferCollectionId);
-
-  // Set buffer collection constraints.
-  const image_t kDefaultImage = {
-      .width = 4,
-      .height = 4,
-      .type = IMAGE_TYPE_SIMPLE,
-      .handle = 0,
-  };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBanjoBufferCollectionId));
-  RunLoopUntilIdle();
-
-  PerformBlockingWork([&] {
-    zx::result<virtio::GpuDevice::BufferInfo> buffer_info_result =
-        device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
-    ASSERT_OK(buffer_info_result.status_value());
-
-    const auto& buffer_info = buffer_info_result.value();
-    EXPECT_EQ(4u, buffer_info.bytes_per_pixel);
-    EXPECT_EQ(16u, buffer_info.bytes_per_row);
-  });
-}
-
-TEST_F(VirtioGpuTest, SetConstraints) {
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
-
-  // Import buffer collection.
-  zx::result token_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token_endpoints.is_ok());
-  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
-                                                token_endpoints->client.handle()->get()));
-  RunLoopUntilIdle();
-
-  // Set buffer collection constraints.
-  const image_t kDefaultImage = {
-      .width = 4,
-      .height = 4,
-      .type = IMAGE_TYPE_SIMPLE,
-      .handle = 0,
-  };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBanjoBufferCollectionId));
-  RunLoopUntilIdle();
-}
-
-void ExpectHandlesArePaired(zx_handle_t lhs, zx_handle_t rhs) {
-  auto [lhs_koid, lhs_related_koid] = fsl::GetKoids(lhs);
-  auto [rhs_koid, rhs_related_koid] = fsl::GetKoids(rhs);
-
-  EXPECT_NE(lhs_koid, ZX_KOID_INVALID);
-  EXPECT_NE(lhs_related_koid, ZX_KOID_INVALID);
-  EXPECT_NE(rhs_koid, ZX_KOID_INVALID);
-  EXPECT_NE(rhs_related_koid, ZX_KOID_INVALID);
-
-  EXPECT_EQ(lhs_koid, rhs_related_koid);
-  EXPECT_EQ(rhs_koid, lhs_related_koid);
-}
-
-template <typename T>
-void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
-  return ExpectHandlesArePaired(lhs->get(), rhs->get());
-}
-
-TEST_F(VirtioGpuTest, ImportBufferCollection) {
-  // This allocator is expected to be alive as long as the `device_` is
-  // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_.get();
-
-  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token1_endpoints.is_ok());
-  zx::result token2_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token2_endpoints.is_ok());
-
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
-
-  // Test ImportBufferCollection().
-  constexpr display::DriverBufferCollectionId kValidBufferCollectionId(1);
-  constexpr uint64_t kBanjoValidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kValidBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
-                                                token1_endpoints->client.handle()->get()));
-
-  // `collection_id` must be unused.
-  EXPECT_EQ(proto.ops->import_buffer_collection(device_.get(), kBanjoValidBufferCollectionId,
-                                                token2_endpoints->client.handle()->get()),
-            ZX_ERR_ALREADY_EXISTS);
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
-
-  // Verify that the current buffer collection token is used.
-  {
-    auto active_buffer_token_clients = allocator->GetActiveBufferCollectionTokenClients();
-    EXPECT_EQ(active_buffer_token_clients.size(), 1u);
-
-    auto inactive_buffer_token_clients = allocator->GetInactiveBufferCollectionTokenClients();
-    EXPECT_EQ(inactive_buffer_token_clients.size(), 0u);
-
-    ExpectObjectsArePaired(active_buffer_token_clients[0].channel(),
-                           token1_endpoints->server.channel().borrow());
-  }
-
-  // Test ReleaseBufferCollection().
-  constexpr display::DriverBufferCollectionId kInvalidBufferCollectionId(2);
-  constexpr uint64_t kBanjoInvalidBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidBufferCollectionId);
-  EXPECT_EQ(proto.ops->release_buffer_collection(device_.get(), kBanjoInvalidBufferCollectionId),
-            ZX_ERR_NOT_FOUND);
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoValidBufferCollectionId));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
-
-  // Verify that the current buffer collection token is released.
-  {
-    auto active_buffer_token_clients = allocator->GetActiveBufferCollectionTokenClients();
-    EXPECT_EQ(active_buffer_token_clients.size(), 0u);
-
-    auto inactive_buffer_token_clients = allocator->GetInactiveBufferCollectionTokenClients();
-    EXPECT_EQ(inactive_buffer_token_clients.size(), 1u);
-
-    ExpectObjectsArePaired(inactive_buffer_token_clients[0].channel(),
-                           token1_endpoints->server.channel().borrow());
-  }
-}
-
-TEST_F(VirtioGpuTest, ImportImage) {
-  // This allocator is expected to be alive as long as the `device_` is
-  // available, so it should outlive the test body.
-  const MockAllocator* allocator = fake_sysmem_.get();
-
-  zx::result token1_endpoints = fidl::CreateEndpoints<sysmem::BufferCollectionToken>();
-  ASSERT_TRUE(token1_endpoints.is_ok());
-
-  display_controller_impl_protocol_t proto;
-  EXPECT_OK(device_->DdkGetProtocol(ZX_PROTOCOL_DISPLAY_CONTROLLER_IMPL,
-                                    reinterpret_cast<void*>(&proto)));
-
-  // Import buffer collection.
-  constexpr display::DriverBufferCollectionId kBufferCollectionId(1);
-  constexpr uint64_t kBanjoBufferCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kBufferCollectionId);
-  EXPECT_OK(proto.ops->import_buffer_collection(device_.get(), kBanjoBufferCollectionId,
-                                                token1_endpoints->client.handle()->get()));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(!allocator->GetActiveBufferCollectionTokenClients().empty());
-
-  // Set buffer collection constraints.
-  const image_t kDefaultImage = {
-      .width = 800,
-      .height = 600,
-      .type = IMAGE_TYPE_SIMPLE,
-      .handle = 0,
-  };
-  EXPECT_OK(proto.ops->set_buffer_collection_constraints(device_.get(), &kDefaultImage,
-                                                         kBanjoBufferCollectionId));
-  RunLoopUntilIdle();
-
-  // Invalid import: bad collection id
-  image_t invalid_image = kDefaultImage;
-  constexpr display::DriverBufferCollectionId kInvalidCollectionId(100);
-  constexpr uint64_t kBanjoInvalidCollectionId =
-      display::ToBanjoDriverBufferCollectionId(kInvalidCollectionId);
-  PerformBlockingWork([&] {
-    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoInvalidCollectionId,
-                                      /*index=*/0),
-              ZX_ERR_NOT_FOUND);
-  });
-
-  // Invalid import: bad index
-  invalid_image = kDefaultImage;
-  uint32_t kInvalidIndex = 100;
-  PerformBlockingWork([&] {
-    EXPECT_EQ(proto.ops->import_image(device_.get(), &invalid_image, kBanjoBufferCollectionId,
-                                      kInvalidIndex),
-              ZX_ERR_OUT_OF_RANGE);
-  });
-
-  // TODO(fxbug.dev/122727): Implement fake ring-buffer based tests so that we
-  // can test the valid import case.
-
-  // Release buffer collection.
-  EXPECT_OK(proto.ops->release_buffer_collection(device_.get(), kBanjoBufferCollectionId));
-
-  RunLoopUntilIdle();
-  EXPECT_TRUE(allocator->GetActiveBufferCollectionTokenClients().empty());
-}
+TEST_F(VirtioGpuTest, CreateAndStartDriver) {}
 
 }  // namespace
