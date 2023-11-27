@@ -77,11 +77,11 @@ generated_licenses_spdx("all_bazel_inputs_licenses_spdx") {
 
   # Current Bazel inputs customers don't need host tool licenses.
   # TODO(132725): Revisit once each individual input has its own SPDX.
-  # We can then derive value based on whether the input target's toolchain.
+  # We can then derive value based on the input target's toolchain.
   include_host_tools = false
 
   # TODO(132725): Remove once all remaining errors are sorted out.
-  ignore_collection_errors = true
+  ignore_collection_errors = false
 }
 
 bazel_input_resource("legacy_ninja_build_outputs_licenses_spdx") {
