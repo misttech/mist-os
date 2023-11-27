@@ -280,7 +280,7 @@ template("fuchsia_package") {
                  ])
     }
 
-    # Generate package manifest
+    # Generate package .fini manifest
     package_manifest_target = "${target_name}_manifest"
     fini_manifest(package_manifest_target) {
       forward_variables_from(invoker,
@@ -345,7 +345,7 @@ template("fuchsia_package") {
 
     _package_target_name = target_name
 
-    # Build package
+    # Build package (Generates package_manifest.json).
     package_tool_package_build(_package_build_target) {
       forward_variables_from(invoker,
                              [
