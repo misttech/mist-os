@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Rule for creating product bundle for flashing Fuchsia images to target devices."""
 
+load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyConfigInfo",
@@ -12,7 +13,6 @@ load(
     "FuchsiaScrutinyConfigInfo",
     "FuchsiaVirtualDeviceInfo",
 )
-load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
 
 def _scrutiny_validation(
         ctx,
@@ -528,10 +528,6 @@ def _fuchsia_product_bundle_impl(ctx):
         " ".join(ffx_invocation),
     ]
 
-    script_lines.append("cp $BOOTSERVER $OUTDIR")
-    env["BOOTSERVER"] = fuchsia_toolchain.bootserver.path
-    inputs.append(fuchsia_toolchain.bootserver)
-
     script = "\n".join(script_lines)
     ctx.actions.run_shell(
         inputs = inputs,
@@ -622,11 +618,6 @@ fuchsia_product_bundle = rule(
         "_sdk_manifest": attr.label(
             allow_single_file = True,
             default = "@fuchsia_sdk//:meta/manifest.json",
-        ),
-        "_create_pave_script": attr.label(
-            default = "//fuchsia/tools:create_pave_script",
-            executable = True,
-            cfg = "exec",
         ),
         "_rebase_flash_manifest": attr.label(
             default = "//fuchsia/tools:rebase_flash_manifest",
