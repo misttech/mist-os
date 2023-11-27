@@ -70,6 +70,15 @@ pub fn duration_from_poll_timeout(timeout_ms: i32) -> Result<zx::Duration, Errno
     Ok(zx::Duration::from_millis(timeout_ms.into()))
 }
 
+pub fn time_from_timeval(tv: timeval) -> Result<zx::Time, Errno> {
+    let duration = duration_from_timeval(tv)?;
+    if duration.into_nanos() < 0 {
+        error!(EINVAL)
+    } else {
+        Ok(zx::Time::ZERO + duration)
+    }
+}
+
 /// Returns a `zx::Time` for the given `timespec`, treating the `timespec` as an absolute point in
 /// time (i.e., not relative to "now").
 pub fn time_from_timespec(ts: timespec) -> Result<zx::Time, Errno> {
@@ -96,6 +105,8 @@ pub fn duration_to_scheduler_clock(duration: zx::Duration) -> i64 {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    const NANOS_PER_MICRO: i64 = 1000;
 
     #[::fuchsia::test]
     fn test_itimerspec() {
@@ -124,5 +135,24 @@ mod test {
 
         let time_spec = timespec { tv_sec: -1, tv_nsec: 1 };
         assert_eq!(time_from_timespec(time_spec), error!(EINVAL));
+    }
+
+    #[::fuchsia::test]
+    fn test_time_from_timeval() {
+        let tv = timeval { tv_sec: 100, tv_usec: 100 };
+        let time = time_from_timeval(tv).expect("failed to create time from time spec");
+        assert_eq!(time.into_nanos(), 100 * NANOS_PER_SECOND + 100 * NANOS_PER_MICRO);
+    }
+
+    #[::fuchsia::test]
+    fn test_invalid_time_from_timeval() {
+        let tv = timeval { tv_sec: 100, tv_usec: MICROS_PER_SECOND * 2 };
+        assert_eq!(time_from_timeval(tv), error!(EDOM));
+
+        let tv = timeval { tv_sec: 1, tv_usec: -1 };
+        assert_eq!(time_from_timeval(tv), error!(EDOM));
+
+        let tv = timeval { tv_sec: -1, tv_usec: 1 };
+        assert_eq!(time_from_timeval(tv), error!(EINVAL));
     }
 }
