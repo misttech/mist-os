@@ -131,10 +131,10 @@ struct LoopDevice {
 impl LoopDevice {
     fn new(current_task: &CurrentTask, minor: u32) -> Arc<Self> {
         let kernel = current_task.kernel();
+        let registry = &kernel.device_registry;
         let loop_device_name = format!("loop{minor}");
-        let virtual_block_class =
-            kernel.device_registry.add_class(b"block", kernel.device_registry.virtual_bus());
-        kernel.add_device(
+        let virtual_block_class = registry.add_class(b"block", registry.virtual_bus());
+        registry.add_device(
             current_task,
             KObjectDeviceAttribute::new(
                 virtual_block_class,

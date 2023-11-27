@@ -243,9 +243,10 @@ impl FileOps for DevKmsg {
 
 pub fn mem_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
+    let registry = &kernel.device_registry;
 
-    let mem_class = kernel.device_registry.add_class(b"mem", kernel.device_registry.virtual_bus());
-    kernel.add_and_register_device(
+    let mem_class = registry.add_class(b"mem", registry.virtual_bus());
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
@@ -256,7 +257,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         ),
         simple_device_ops::<DevNull>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
@@ -267,7 +268,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         ),
         simple_device_ops::<DevZero>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
@@ -278,7 +279,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         ),
         simple_device_ops::<DevFull>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
@@ -289,7 +290,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         ),
         simple_device_ops::<DevRandom>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class.clone(),
@@ -300,7 +301,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
         ),
         simple_device_ops::<DevRandom>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
             mem_class,

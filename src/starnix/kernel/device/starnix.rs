@@ -20,16 +20,14 @@ fn create_magma_device(
 
 pub fn magma_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
+    let registry = &kernel.device_registry;
 
-    let starnix_class =
-        kernel.device_registry.add_class(b"starnix", kernel.device_registry.virtual_bus());
+    let starnix_class = registry.add_class(b"starnix", registry.virtual_bus());
 
-    let magma_type: DeviceType = kernel
-        .device_registry
-        .register_dyn_chrdev(create_magma_device)
-        .expect("magma device register failed.");
+    let magma_type: DeviceType =
+        registry.register_dyn_chrdev(create_magma_device).expect("magma device register failed.");
 
-    kernel.add_device(
+    registry.add_device(
         current_task,
         KObjectDeviceAttribute::new(
             starnix_class,

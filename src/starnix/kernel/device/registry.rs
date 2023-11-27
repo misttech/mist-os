@@ -4,6 +4,7 @@
 
 use crate::{
     fs::{
+        devtmpfs::devtmpfs_create_device,
         kobject::{
             KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
         },
@@ -218,7 +219,11 @@ impl DeviceRegistry {
         class
     }
 
-    pub fn add_device(&self, dev_attr: KObjectDeviceAttribute) -> KObjectHandle {
+    pub fn add_device(
+        &self,
+        current_task: &CurrentTask,
+        dev_attr: KObjectDeviceAttribute,
+    ) -> KObjectHandle {
         let kobj_device = match dev_attr.device.mode {
             DeviceMode::Char => dev_attr.class.get_or_create_child(
                 &dev_attr.name,
@@ -235,8 +240,38 @@ impl DeviceRegistry {
             .get_child(&dev_attr.class.name())
             .expect("no associated collection exists")
             .insert_child(kobj_device.clone());
+
+        if let Err(err) = devtmpfs_create_device(current_task, dev_attr.device.clone()) {
+            log_error!("Cannot add device {:?} in devtmpfs ({:?})", dev_attr.device, err);
+        }
+
         self.dispatch_uevent(UEventAction::Add, kobj_device.clone());
         kobj_device
+    }
+
+    pub fn add_and_register_device(
+        &self,
+        current_task: &CurrentTask,
+        dev_attr: KObjectDeviceAttribute,
+        dev_ops: impl DeviceOps,
+    ) -> KObjectHandle {
+        if let Err(err) = match dev_attr.device.mode {
+            DeviceMode::Char => self.register_chrdev(
+                dev_attr.device.device_type.major(),
+                dev_attr.device.device_type.minor(),
+                1,
+                dev_ops,
+            ),
+            DeviceMode::Block => self.register_blkdev(
+                dev_attr.device.device_type.major(),
+                dev_attr.device.device_type.minor(),
+                1,
+                dev_ops,
+            ),
+        } {
+            log_error!("Cannot register device {:?} ({:?})", dev_attr.device, err);
+        }
+        self.add_device(current_task, dev_attr)
     }
 
     pub fn register_chrdev(
@@ -476,16 +511,20 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_add_class() {
-        let registry = DeviceRegistry::default();
+        let (kernel, current_task) = create_kernel_and_task();
+        let registry = &kernel.device_registry;
 
         let input_class = registry.add_class(b"input", registry.virtual_bus());
-        registry.add_device(KObjectDeviceAttribute::new(
-            input_class,
-            b"mice",
-            b"mice",
-            DeviceType::new(INPUT_MAJOR, 0),
-            DeviceMode::Char,
-        ));
+        registry.add_device(
+            &current_task,
+            KObjectDeviceAttribute::new(
+                input_class,
+                b"mice",
+                b"mice",
+                DeviceType::new(INPUT_MAJOR, 0),
+                DeviceMode::Char,
+            ),
+        );
 
         assert!(registry.class_subsystem_kobject().has_child(b"input"));
         assert!(registry

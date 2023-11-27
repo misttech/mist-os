@@ -14,9 +14,9 @@ use starnix_uapi::device_type::DeviceType;
 
 pub fn misc_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
-    let misc_class =
-        kernel.device_registry.add_class(b"misc", kernel.device_registry.virtual_bus());
-    kernel.add_and_register_device(
+    let registry = &kernel.device_registry;
+    let misc_class = registry.add_class(b"misc", registry.virtual_bus());
+    registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
@@ -27,7 +27,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         ),
         simple_device_ops::<DevRandom>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
@@ -38,7 +38,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         ),
         simple_device_ops::<DevFuse>,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
@@ -49,7 +49,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         ),
         create_unknown_device,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
             misc_class.clone(),
@@ -60,7 +60,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
         ),
         create_loop_control_device,
     );
-    kernel.add_and_register_device(
+    registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
             misc_class,

@@ -110,7 +110,8 @@ fn init_devpts(current_task: &CurrentTask, options: FileSystemOptions) -> FileSy
 
 pub fn tty_device_init(current_task: &CurrentTask) {
     let kernel = current_task.kernel();
-    let tty_class = kernel.device_registry.add_class(b"tty", kernel.device_registry.virtual_bus());
+    let registry = &kernel.device_registry;
+    let tty_class = registry.add_class(b"tty", registry.virtual_bus());
     let tty = KObjectDeviceAttribute::new(
         tty_class.clone(),
         b"tty",
@@ -125,8 +126,8 @@ pub fn tty_device_init(current_task: &CurrentTask) {
         DeviceType::PTMX,
         DeviceMode::Char,
     );
-    kernel.add_device(current_task, tty);
-    kernel.add_device(current_task, ptmx);
+    registry.add_device(current_task, tty);
+    registry.add_device(current_task, ptmx);
 
     devtmpfs_mkdir(current_task, b"pts").unwrap();
 

@@ -867,9 +867,9 @@ fn get_next_device_id() -> u32 {
 /// - `dev_ops`: the open op handler of the device.
 pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl DeviceOps) {
     let kernel = system_task.kernel();
+    let registry = &kernel.device_registry;
 
-    let input_class =
-        kernel.device_registry.add_class(b"input", kernel.device_registry.virtual_bus());
+    let input_class = registry.add_class(b"input", registry.virtual_bus());
 
     let device_id = get_next_device_id();
     let attr = KObjectDeviceAttribute::new(
@@ -881,7 +881,7 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
         DeviceType::new(INPUT_MAJOR, device_id),
         DeviceMode::Char,
     );
-    kernel.add_and_register_device(system_task, attr, dev_ops);
+    registry.add_and_register_device(system_task, attr, dev_ops);
 }
 
 /// add and register 1 touch device and 1 keyboard device to kernel.

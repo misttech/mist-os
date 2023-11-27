@@ -5,13 +5,11 @@
 use crate::{
     device::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
-        BinderDriver, DeviceMode, DeviceOps, DeviceRegistry, Features,
+        BinderDriver, DeviceMode, DeviceRegistry, Features,
     },
     diagnostics::CoreDumpList,
     fs::{
-        devtmpfs::devtmpfs_create_device,
         inotify::InotifyLimits,
-        kobject::KObjectDeviceAttribute,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
@@ -340,50 +338,6 @@ impl Kernel {
         });
 
         Ok(this)
-    }
-
-    /// Add a device in the hierarchy tree.
-    ///
-    /// If it's a Block device, the device will be added under "block" class.
-    pub fn add_device(
-        self: &Arc<Self>,
-        current_task: &CurrentTask,
-        dev_attr: KObjectDeviceAttribute,
-    ) {
-        self.device_registry.add_device(dev_attr.clone());
-        match devtmpfs_create_device(current_task, dev_attr.device.clone()) {
-            Ok(_) => (),
-            Err(err) => {
-                log_error!("Cannot add block device {:?} in devtmpfs ({:?})", dev_attr.device, err)
-            }
-        };
-    }
-
-    /// Add a device in the hierarchy tree and register its DeviceOps.
-    pub fn add_and_register_device(
-        self: &Arc<Self>,
-        current_task: &CurrentTask,
-        dev_attr: KObjectDeviceAttribute,
-        dev_ops: impl DeviceOps,
-    ) {
-        match match dev_attr.device.mode {
-            DeviceMode::Char => self.device_registry.register_chrdev(
-                dev_attr.device.device_type.major(),
-                dev_attr.device.device_type.minor(),
-                1,
-                dev_ops,
-            ),
-            DeviceMode::Block => self.device_registry.register_blkdev(
-                dev_attr.device.device_type.major(),
-                dev_attr.device.device_type.minor(),
-                1,
-                dev_ops,
-            ),
-        } {
-            Ok(_) => (),
-            Err(err) => log_error!("Cannot register device {:?} ({:?})", dev_attr.device, err),
-        }
-        self.add_device(current_task, dev_attr);
     }
 
     /// Opens a device file (driver) identified by `dev`.
