@@ -186,14 +186,11 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
     "//third_party/rust_crates:vk-sys",
     "//third_party/rust_crates:zerocopy",
   ]
-
-  if (is_debug) {
-    deps += [ "//third_party/rust_crates:tracing-mutex" ]
-  }
 
   if (current_cpu == "arm64") {
     deps += [ ":vdso-helpers-arm" ]

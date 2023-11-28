@@ -8,6 +8,10 @@
 #![allow(unknown_lints, clippy::extra_unused_type_parameters)]
 #![warn(clippy::wildcard_imports)]
 
+// Avoid unused crate warnings on non-test/non-debug builds because this needs to be an
+// unconditional dependency for rustdoc generation.
+use tracing_mutex as _;
+
 #[macro_use]
 extern crate fuchsia_inspect_contrib;
 #[macro_use]
