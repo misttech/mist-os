@@ -17,6 +17,7 @@ group("components") {
     #"pw_rpc",
     "routing:components-routing-example",
     "routing_failed:components-routing-failed-example",
+    "runner",
     "services",
     "storage",
   ]
@@ -30,6 +31,7 @@ group("hermetic_tests") {
     "echo:hermetic_tests",
     "realm_builder:hermetic_tests",
     "routing:hermetic_tests",
+    "runner:hermetic_tests",
     "services:hermetic_tests",
     "storage:hermetic_tests",
     "subpackages:hermetic_tests",
