@@ -236,6 +236,7 @@ _sdk_partner_internal_fidl_libraries = [
   "fuchsia.memory.debug",
   "fuchsia.memory.heapdump.client",
   "fuchsia.memory.inspection",
+  "fuchsia.overnet.protocol",
   "fuchsia.posix.socket.packet",
   "fuchsia.posix.socket.raw",
   "fuchsia.posix.socket",
