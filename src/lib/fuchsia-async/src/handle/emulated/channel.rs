@@ -27,6 +27,12 @@ impl AsRef<super::Channel> for Channel {
     }
 }
 
+impl From<Channel> for super::Channel {
+    fn from(channel: Channel) -> super::Channel {
+        channel.channel
+    }
+}
+
 impl super::AsHandleRef for Channel {
     fn as_handle_ref(&self) -> super::HandleRef<'_> {
         self.channel.as_handle_ref()

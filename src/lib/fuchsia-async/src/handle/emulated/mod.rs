@@ -121,13 +121,15 @@ impl<'a> HandleRef<'a> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, Hash)]
 #[repr(transparent)]
+/// A Kernel Object ID
 pub struct Koid(u64);
 
 const INVALID_KOID: Koid = Koid(0);
 
 impl Koid {
+    /// Get the raw u64 value of the koid
     pub fn raw_koid(&self) -> u64 {
         self.0
     }
@@ -184,6 +186,15 @@ pub trait AsHandleRef {
             related_koid: Koid(koids.1),
             reserved: 0,
         })
+    }
+
+    /// Returns the koid (kernel object ID) for this handle.
+    fn get_koid(&self) -> Result<Koid, zx_status::Status> {
+        let koid = with_handle(self.raw_handle(), |mut h, side| {
+            let h = h.as_hdl_data();
+            h.koids(side).0
+        });
+        Ok(Koid(koid))
     }
 }
 
@@ -298,6 +309,11 @@ pub trait HandleBased: AsHandleRef + From<Handle> + Into<Handle> {
     /// The caller takes ownership over the raw handle, and must close it.
     fn into_raw(self) -> u32 {
         self.into_handle().raw_take()
+    }
+
+    /// Returns whether this is an invalid handle.
+    fn is_invalid_handle(&self) -> bool {
+        self.is_invalid()
     }
 }
 
@@ -1518,7 +1534,7 @@ mod inner_signals {
             /// Same rights.
             const SAME_RIGHTS = 1 << 31;
             /// A basic set of rights for most things.
-            const BASIC_RIGHTS = Rights::TRANSFER.bits() |
+            const BASIC = Rights::TRANSFER.bits() |
                                 Rights::DUPLICATE.bits() |
                                 Rights::WAIT.bits() |
                                 Rights::INSPECT.bits();
@@ -1526,12 +1542,12 @@ mod inner_signals {
             const IO = Rights::WRITE.bits() |
                     Rights::READ.bits();
             /// Rights of a new socket.
-            const SOCKET_DEFAULT = Rights::BASIC_RIGHTS.bits() |
+            const SOCKET_DEFAULT = Rights::BASIC.bits() |
                                     Rights::IO.bits() |
                                     Rights::SIGNAL.bits() |
                                     Rights::SIGNAL_PEER.bits();
             /// Rights of a new channel.
-            const CHANNEL_DEFAULT = (Rights::BASIC_RIGHTS.bits() & !Rights::DUPLICATE.bits()) |
+            const CHANNEL_DEFAULT = (Rights::BASIC.bits() & !Rights::DUPLICATE.bits()) |
                                     Rights::IO.bits() |
                                     Rights::SIGNAL.bits() |
                                     Rights::SIGNAL_PEER.bits();
@@ -1543,7 +1559,7 @@ mod inner_signals {
                                     Rights::SIGNAL.bits() |
                                     Rights::SIGNAL_PEER.bits();
             /// Rights of a new event.
-            const EVENT_DEFAULT = Rights::BASIC_RIGHTS.bits() |
+            const EVENT_DEFAULT = Rights::BASIC.bits() |
                                 Rights::SIGNAL.bits();
         }
     }

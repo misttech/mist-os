@@ -51,9 +51,13 @@ pub use self::handle::{
 pub mod emulated_handle {
     pub use super::handle::{
         shut_down_handles, AsHandleRef, Channel, ChannelProxyProtocol, EmulatedHandleRef, Event,
-        EventPair, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef,
+        EventPair, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef, Koid,
         MessageBuf, MessageBufEtc, ObjectType, Peered, Rights, Signals, Socket, SocketOpts,
     };
+
+    /// Type of raw Zircon handles.
+    #[allow(non_camel_case_types)]
+    pub type zx_handle_t = u32;
 }
 
 /// A future which can be used by multiple threads at once.
