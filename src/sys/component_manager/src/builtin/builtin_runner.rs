@@ -10,6 +10,7 @@ use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as fcrunner;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_memory_report as freport;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
@@ -202,6 +203,11 @@ impl ElfRunnerProgram {
             fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
             Box::new(elf_runner_receiver.new_sender()),
         );
+        let snapshot_provider_receiver = Receiver::new();
+        svc.entries.insert(
+            freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
+            Box::new(snapshot_provider_receiver.new_sender()),
+        );
         output.entries.insert(SVC.to_string(), Box::new(svc));
 
         let elf_runner = elf_runner::ElfRunner::new(
@@ -231,6 +237,20 @@ impl ElfRunnerProgram {
                         message.take_handle_as_stream::<fcrunner::ComponentRunnerMarker>(),
                     )
                     .boxed()
+            }),
+        );
+        this.task_group.spawn(launch.run());
+        let inner = this.inner.clone();
+        let launch = LaunchTaskOnReceive::new(
+            this.task_group.as_weak(),
+            freport::SnapshotProviderMarker::PROTOCOL_NAME,
+            snapshot_provider_receiver,
+            None,
+            Arc::new(move |message| {
+                inner.clone().elf_runner.serve_memory_reporter(
+                    message.take_handle_as_stream::<freport::SnapshotProviderMarker>(),
+                );
+                std::future::ready(Result::<(), anyhow::Error>::Ok(())).boxed()
             }),
         );
         this.task_group.spawn(launch.run());

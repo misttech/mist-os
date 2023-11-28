@@ -9,7 +9,6 @@ pub mod capability;
 pub mod cpu_resource;
 pub mod crash_introspect;
 pub mod debug_resource;
-pub mod elf_runner_memory_attribution;
 pub mod energy_info_resource;
 pub mod factory_items;
 pub mod fuchsia_boot_resolver;

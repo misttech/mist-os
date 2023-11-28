@@ -139,7 +139,7 @@
         },
         {
             protocol: [ "fuchsia.memory.report.SnapshotProvider" ],
-            from: "parent",
+            from: "#elf_runner",
             to: "#core",
         },
         {

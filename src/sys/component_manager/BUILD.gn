@@ -143,7 +143,6 @@ rustc_binary("bin") {
     "src/builtin/cpu_resource.rs",
     "src/builtin/crash_introspect.rs",
     "src/builtin/debug_resource.rs",
-    "src/builtin/elf_runner_memory_attribution.rs",
     "src/builtin/energy_info_resource.rs",
     "src/builtin/factory_items.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
