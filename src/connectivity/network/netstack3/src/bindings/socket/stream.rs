@@ -40,7 +40,7 @@ use netstack3_core::{
             set_reuseaddr, set_send_buffer_size, shutdown, with_socket_options,
             with_socket_options_mut, AcceptError, BindError, BoundInfo, ConnectError,
             ConnectionInfo, ListenError, ListenerNotifier, NoConnection, SetReuseAddrError,
-            SocketAddr, SocketInfo, TcpBindingsTypes,
+            SocketAddr, SocketInfo, TcpBindingsTypes, UnboundInfo,
         },
         state::Takeable,
         BufferSizes, ConnectionError, SocketOptions,
@@ -803,7 +803,9 @@ where
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let fidl = match get_info::<I, _>(sync_ctx, id) {
-            SocketInfo::Unbound(_) => return Err(fposix::Errno::Einval),
+            SocketInfo::Unbound(UnboundInfo { device: _ }) => {
+                Ok(<<I as IpSockAddrExt>::SocketAddress as SockAddr>::UNSPECIFIED)
+            }
             SocketInfo::Bound(BoundInfo { addr, port, device: _ }) => {
                 (addr, port).try_into_fidl_with_ctx(non_sync_ctx)
             }

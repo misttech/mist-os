@@ -299,6 +299,8 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     type AddrType: IpAddress + ScopeableAddress;
     /// The socket's domain.
     const DOMAIN: psocket::Domain;
+    /// The unspecified instance of this `SockAddr`.
+    const UNSPECIFIED: Self;
 
     /// Creates a new `SockAddr` from the provided address and port.
     ///
@@ -337,6 +339,11 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
 impl SockAddr for fnet::Ipv6SocketAddress {
     type AddrType = Ipv6Addr;
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv6;
+    const UNSPECIFIED: Self = fnet::Ipv6SocketAddress {
+        address: fnet::Ipv6Address { addr: [0; 16] },
+        port: 0,
+        zone_index: 0,
+    };
 
     /// Creates a new `SockAddr6`.
     fn new(addr: Option<SocketZonedIpAddr<Ipv6Addr, NonZeroU64>>, port: u16) -> Self {
@@ -382,6 +389,8 @@ impl SockAddr for fnet::Ipv6SocketAddress {
 impl SockAddr for fnet::Ipv4SocketAddress {
     type AddrType = Ipv4Addr;
     const DOMAIN: psocket::Domain = psocket::Domain::Ipv4;
+    const UNSPECIFIED: Self =
+        fnet::Ipv4SocketAddress { address: fnet::Ipv4Address { addr: [0; 4] }, port: 0 };
 
     /// Creates a new `SockAddr4`.
     fn new(addr: Option<SocketZonedIpAddr<Ipv4Addr, NonZeroU64>>, port: u16) -> Self {

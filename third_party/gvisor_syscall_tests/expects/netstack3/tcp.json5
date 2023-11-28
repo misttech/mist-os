@@ -148,10 +148,6 @@
                 "AllTCPSockets/TCPSocketPairTest.*/5",
                 "AllTCPSockets/TCPSocketPairTest.*/8",
                 "AllTCPSockets/TCPSocketPairTest.*/11",
-
-                // TODO(https://fxbug.dev/136998): getsockname on an unbound TCP
-                // socket should succeed.
-                "AllInetTests/SimpleTcpSocketTest.GetSockNameUnbound/[01]",
             ],
         },
         {
