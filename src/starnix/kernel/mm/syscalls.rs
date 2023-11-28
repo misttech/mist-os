@@ -227,7 +227,7 @@ pub fn sys_brk(
 }
 
 pub fn sys_process_vm_readv(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     local_iov_addr: UserAddress,
@@ -252,7 +252,7 @@ pub fn sys_process_vm_readv(
     let weak_remote_task = current_task.get_task(pid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
-    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
 
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
@@ -276,7 +276,7 @@ pub fn sys_process_vm_readv(
 }
 
 pub fn sys_process_vm_writev(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     local_iov_addr: UserAddress,
@@ -301,7 +301,7 @@ pub fn sys_process_vm_writev(
     let weak_remote_task = current_task.get_task(pid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
-    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
 
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;

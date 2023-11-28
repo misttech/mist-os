@@ -515,7 +515,9 @@ async fn wait_for_init_file(
 #[cfg(test)]
 mod test {
     use super::wait_for_init_file;
-    use crate::{fs::FdNumber, testing::create_kernel_and_task};
+    use crate::{
+        fs::FdNumber, testing::create_kernel_and_task, testing::create_kernel_task_and_unlocked,
+    };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};
     use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags, signals::SIGCHLD, CLONE_FS};
@@ -547,10 +549,11 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_file_wait_required() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task = current_task.clone_task_for_test(CLONE_FS as u64, Some(SIGCHLD));
+        let init_task =
+            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
         fasync::Task::local(async move {

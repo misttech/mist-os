@@ -1350,10 +1350,10 @@ mod test {
         fn get_process_group(task: &Task) -> Arc<ProcessGroup> {
             Arc::clone(&task.thread_group.read().process_group)
         }
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         assert_eq!(current_task.thread_group.setsid(), error!(EPERM));
 
-        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         assert_eq!(get_process_group(&current_task), get_process_group(&child_task));
 
         let old_process_group = child_task.thread_group.read().process_group.clone();
@@ -1367,8 +1367,8 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_exit_status() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let child = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         child.thread_group.exit(ExitStatus::Exit(42));
         std::mem::drop(child);
         assert_eq!(
@@ -1379,14 +1379,15 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_setgpid() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         assert_eq!(current_task.thread_group.setsid(), error!(EPERM));
 
-        let child_task1 = current_task.clone_task_for_test(0, Some(SIGCHLD));
-        let child_task2 = current_task.clone_task_for_test(0, Some(SIGCHLD));
-        let execd_child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_task1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let child_task2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let execd_child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         execd_child_task.thread_group.write().did_exec = true;
-        let other_session_child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let other_session_child_task =
+            current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         assert_eq!(other_session_child_task.thread_group.setsid(), Ok(()));
 
         assert_eq!(child_task1.thread_group.setpgid(&current_task, 0), error!(ESRCH));
@@ -1412,10 +1413,10 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_adopt_children() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let task1 = current_task.clone_task_for_test(0, None);
-        let task2 = task1.clone_task_for_test(0, None);
-        let task3 = task2.clone_task_for_test(0, None);
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let task1 = current_task.clone_task_for_test(&mut locked, 0, None);
+        let task2 = task1.clone_task_for_test(&mut locked, 0, None);
+        let task3 = task2.clone_task_for_test(&mut locked, 0, None);
 
         assert_eq!(task3.thread_group.read().get_ppid(), task2.id);
 

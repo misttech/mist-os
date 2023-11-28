@@ -9,6 +9,8 @@ pub enum BpfMapEntries {}
 pub enum KernelIpTables {}
 pub enum DiagnosticsCoreDumpList {}
 
+pub enum MmDumpable {}
+
 // This file defines a hierarchy of locks, that is, the order in which
 // the locks must be acquired. Unlocked is a highest level and represents
 // a state in which no locks are held.
@@ -16,3 +18,4 @@ pub enum DiagnosticsCoreDumpList {}
 impl_lock_after!(Unlocked => BpfMapEntries);
 impl_lock_after!(Unlocked => KernelIpTables);
 impl_lock_after!(Unlocked => DiagnosticsCoreDumpList);
+impl_lock_after!(Unlocked => MmDumpable);

@@ -4,6 +4,7 @@
 
 use crate::{
     fs::parse_unsigned_file,
+    lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
     signals::{
@@ -12,6 +13,7 @@ use crate::{
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
 };
+use lock_sequence::{LockBefore, Locked};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
@@ -358,7 +360,14 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
     }
 }
 
-pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), Errno> {
+pub fn ptrace_attach<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &mut CurrentTask,
+    pid: pid_t,
+) -> Result<(), Errno>
+where
+    L: LockBefore<MmDumpable>,
+{
     let ptrace_scope = current_task.kernel().ptrace_scope.load(Ordering::Relaxed);
     check_caps_for_attach(ptrace_scope, current_task)?;
 
@@ -369,7 +378,7 @@ pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), E
         return error!(EPERM);
     }
 
-    if *tracee.mm.dumpable.lock() == DumpPolicy::Disable {
+    if *tracee.mm.dumpable.lock(locked) == DumpPolicy::Disable {
         return error!(EPERM);
     }
 
@@ -399,7 +408,7 @@ pub fn ptrace_attach(current_task: &mut CurrentTask, pid: pid_t) -> Result<(), E
         }
     }
 
-    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
     do_attach(&current_task.thread_group, weak_task.clone())?;
     send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
     Ok(())
@@ -455,7 +464,7 @@ mod tests {
             error!(EINVAL)
         );
 
-        assert_eq!(ptrace_attach(&mut tracer, tracee.as_ref().task.id), error!(EPERM));
+        assert_eq!(ptrace_attach(&mut locked, &mut tracer, tracee.as_ref().task.id), error!(EPERM));
 
         assert!(sys_prctl(
             &mut locked,
@@ -469,9 +478,12 @@ mod tests {
         .is_ok());
 
         let mut not_tracer = create_task(&kernel, "not-tracer");
-        assert_eq!(ptrace_attach(&mut not_tracer, tracee.as_ref().task.id), error!(EPERM));
+        assert_eq!(
+            ptrace_attach(&mut locked, &mut not_tracer, tracee.as_ref().task.id),
+            error!(EPERM)
+        );
 
-        assert!(ptrace_attach(&mut tracer, tracee.as_ref().task.id).is_ok());
+        assert!(ptrace_attach(&mut locked, &mut tracer, tracee.as_ref().task.id).is_ok());
     }
 
     #[::fuchsia::test]
@@ -484,7 +496,7 @@ mod tests {
             error!(EINVAL)
         );
 
-        assert_eq!(ptrace_attach(&mut tracer, tracee.as_ref().task.id), error!(EPERM));
+        assert_eq!(ptrace_attach(&mut locked, &mut tracer, tracee.as_ref().task.id), error!(EPERM));
 
         assert!(sys_prctl(
             &mut locked,
@@ -497,6 +509,6 @@ mod tests {
         )
         .is_ok());
 
-        assert!(ptrace_attach(&mut tracer, tracee.as_ref().task.id).is_ok());
+        assert!(ptrace_attach(&mut locked, &mut tracer, tracee.as_ref().task.id).is_ok());
     }
 }

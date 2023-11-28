@@ -1654,7 +1654,7 @@ pub fn sys_pidfd_open(
 }
 
 pub fn sys_pidfd_getfd(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     pidfd: FdNumber,
     targetfd: FdNumber,
@@ -1668,7 +1668,7 @@ pub fn sys_pidfd_getfd(
     let task = current_task.get_task(file.as_pid()?);
     let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
-    current_task.check_ptrace_access_mode(PTRACE_MODE_ATTACH_REALCREDS, &task)?;
+    current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 
     let target_file = task.files.get(targetfd)?;
     current_task.add_file(target_file, FdFlags::CLOEXEC)

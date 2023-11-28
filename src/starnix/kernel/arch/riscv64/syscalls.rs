@@ -15,7 +15,7 @@ use lock_sequence::{Locked, Unlocked};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     flags: u64,
     user_stack: UserAddress,
@@ -26,6 +26,7 @@ pub fn sys_clone(
     // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
     // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
     do_clone(
+        locked,
         current_task,
         &clone_args {
             flags: flags & !(CSIGNAL as u64),

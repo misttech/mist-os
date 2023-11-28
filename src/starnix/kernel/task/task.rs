@@ -4,6 +4,7 @@
 
 use crate::{
     fs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
+    lock_ordering::MmDumpable,
     logging::{log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{SignalInfo, SignalState},
@@ -17,6 +18,7 @@ use bitflags::bitflags;
 use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
+use lock_sequence::{LockBefore, Locked};
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::{
@@ -770,11 +772,15 @@ impl Task {
     }
 
     // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html
-    pub fn check_ptrace_access_mode(
+    pub fn check_ptrace_access_mode<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         mode: PtraceAccessMode,
         target: &Task,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<MmDumpable>,
+    {
         // (1)  If the calling thread and the target thread are in the same
         //      thread group, access is always allowed.
         if self.thread_group.leader == target.thread_group.leader {
@@ -828,7 +834,7 @@ impl Task {
         //      PR_SET_DUMPABLE in prctl(2)), and the caller does not have
         //      the CAP_SYS_PTRACE capability in the user namespace of the
         //      target process.
-        let dumpable = *target.mm.dumpable.lock();
+        let dumpable = *target.mm.dumpable.lock(locked);
         if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
             return error!(EPERM);
         }
@@ -1230,14 +1236,17 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_pid_and_parent_pid() {
-        let (_kernel, current_task) = create_kernel_and_task();
-        let thread = current_task
-            .clone_task_for_test((CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64, Some(SIGCHLD));
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let thread = current_task.clone_task_for_test(
+            &mut locked,
+            (CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64,
+            Some(SIGCHLD),
+        );
         assert_eq!(current_task.get_pid(), thread.get_pid());
         assert_ne!(current_task.get_tid(), thread.get_tid());
         assert_eq!(current_task.thread_group.leader, thread.thread_group.leader);
 
-        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         assert_ne!(current_task.get_pid(), child_task.get_pid());
         assert_ne!(current_task.get_tid(), child_task.get_tid());
         assert_eq!(current_task.get_pid(), child_task.thread_group.read().get_ppid());
@@ -1253,7 +1262,7 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_rlimit() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let prev_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
         assert_ne!(prev_fsize, 10);
         current_task
@@ -1264,7 +1273,7 @@ mod test {
         let current_fsize = current_task.thread_group.get_rlimit(Resource::FSIZE);
         assert_eq!(current_fsize, 10);
 
-        let child_task = current_task.clone_task_for_test(0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
         let child_fsize = child_task.thread_group.get_rlimit(Resource::FSIZE);
         assert_eq!(child_fsize, 10)
     }

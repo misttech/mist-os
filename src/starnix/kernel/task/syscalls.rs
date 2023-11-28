@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use fuchsia_zircon as zx;
-use lock_sequence::{Locked, Unlocked};
+use lock_sequence::{LockBefore, Locked, Unlocked};
 use once_cell::sync::Lazy;
 use starnix_lock::RwLock;
 use static_assertions::const_assert;
@@ -13,6 +13,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 use crate::{
     execution::execute_task,
     fs::{FdNumber, FileHandle, MountNamespaceFile},
+    lock_ordering::MmDumpable,
     logging::{log_error, log_trace, not_implemented},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     task::{
@@ -57,7 +58,14 @@ use starnix_uapi::{
     _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 
-pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, Errno> {
+pub fn do_clone<L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    args: &clone_args,
+) -> Result<pid_t, Errno>
+where
+    L: LockBefore<MmDumpable>,
+{
     let child_exit_signal = if args.exit_signal == 0 {
         None
     } else {
@@ -65,6 +73,7 @@ pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, 
     };
 
     let mut new_task = current_task.clone_task(
+        locked,
         args.flags,
         child_exit_signal,
         UserRef::<pid_t>::new(UserAddress::from(args.parent_tid)),
@@ -101,7 +110,7 @@ pub fn do_clone(current_task: &CurrentTask, args: &clone_args) -> Result<pid_t, 
 }
 
 pub fn sys_clone3(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     user_clone_args: UserRef<clone_args>,
     user_clone_args_size: usize,
@@ -118,7 +127,7 @@ pub fn sys_clone3(
     const_assert!(std::mem::size_of::<clone_args>() == CLONE_ARGS_SIZE_VER2 as usize);
 
     let clone_args = current_task.read_object_partial(user_clone_args, user_clone_args_size)?;
-    do_clone(current_task, &clone_args)
+    do_clone(locked, current_task, &clone_args)
 }
 
 fn read_c_string_vector(
@@ -867,12 +876,12 @@ pub fn sys_prctl(
             Ok(().into())
         }
         PR_SET_DUMPABLE => {
-            let mut dumpable = current_task.mm.dumpable.lock();
+            let mut dumpable = current_task.mm.dumpable.lock(locked);
             *dumpable = if arg2 == 1 { DumpPolicy::User } else { DumpPolicy::Disable };
             Ok(().into())
         }
         PR_GET_DUMPABLE => {
-            let dumpable = current_task.mm.dumpable.lock();
+            let dumpable = current_task.mm.dumpable.lock(locked);
             Ok(match *dumpable {
                 DumpPolicy::Disable => 0.into(),
                 DumpPolicy::User => 1.into(),
@@ -1069,7 +1078,7 @@ pub fn sys_prctl(
 }
 
 pub fn sys_ptrace(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
     request: u32,
     pid: pid_t,
@@ -1078,7 +1087,7 @@ pub fn sys_ptrace(
 ) -> Result<(), Errno> {
     match request {
         PTRACE_TRACEME => ptrace_traceme(current_task),
-        PTRACE_ATTACH => ptrace_attach(current_task, pid),
+        PTRACE_ATTACH => ptrace_attach(locked, current_task, pid),
         _ => ptrace_dispatch(current_task, request, pid, addr, data),
     }
 }

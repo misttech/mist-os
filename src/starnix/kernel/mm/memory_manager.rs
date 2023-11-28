@@ -7,6 +7,7 @@ use crate::{
         DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsString, NamespaceNode,
         SequenceFileSource,
     },
+    lock_ordering::MmDumpable,
     logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
     task::{CurrentTask, Task},
@@ -17,9 +18,10 @@ use fuchsia_inspect_contrib::ProfileDuration;
 use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
+use lock_sequence::{LockBefore, Locked};
 use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
-use starnix_lock::{Mutex, RwLock};
+use starnix_lock::{OrderedMutex, RwLock};
 use starnix_uapi::{
     errno, error,
     errors::Errno,
@@ -1968,7 +1970,7 @@ pub struct MemoryManager {
     pub state: RwLock<MemoryManagerState>,
 
     /// Whether this address space is dumpable.
-    pub dumpable: Mutex<DumpPolicy>,
+    pub dumpable: OrderedMutex<DumpPolicy, MmDumpable>,
 
     /// Maximum valid user address for this vmar.
     pub maximum_valid_user_address: UserAddress,
@@ -2001,7 +2003,7 @@ impl MemoryManager {
             }),
             // TODO(security): Reset to DISABLE, or the value in the fs.suid_dumpable sysctl, under
             // certain conditions as specified in the prctl(2) man page.
-            dumpable: Mutex::new(DumpPolicy::User),
+            dumpable: OrderedMutex::new(DumpPolicy::User),
             maximum_valid_user_address: UserAddress::from_ptr(
                 user_vmar_info.base + user_vmar_info.len,
             ),
@@ -2112,7 +2114,14 @@ impl MemoryManager {
         Ok(brk.current)
     }
 
-    pub fn snapshot_to(&self, target: &MemoryManager) -> Result<(), Errno> {
+    pub fn snapshot_to<L>(
+        &self,
+        locked: &mut Locked<'_, L>,
+        target: &MemoryManager,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<MmDumpable>,
+    {
         // TODO(fxbug.dev/123742): When SNAPSHOT (or equivalent) is supported on pager-backed VMOs
         // we can remove the hack below (which also won't be performant). For now, as a workaround,
         // we use SNAPSHOT_AT_LEAST_ON_WRITE on both the child and the parent.
@@ -2244,7 +2253,9 @@ impl MemoryManager {
         }
 
         target_state.forkable_state = state.forkable_state.clone();
-        *target.dumpable.lock() = *self.dumpable.lock();
+
+        let self_dumpable = *self.dumpable.lock(locked);
+        *target.dumpable.lock(locked) = self_dumpable;
 
         Ok(())
     }
@@ -3714,7 +3725,7 @@ mod tests {
     async fn test_snapshot_paged_memory() {
         use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
-        let (kernel, current_task) = create_kernel_and_task();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = &current_task.mm;
 
         let port = Arc::new(zx::Port::create());
@@ -3771,7 +3782,7 @@ mod tests {
             .expect("map failed");
 
         let target = create_task(&kernel, "another-task");
-        mm.snapshot_to(&target.mm).expect("snapshot_to failed");
+        mm.snapshot_to(&mut locked, &target.mm).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
         let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
@@ -4006,7 +4017,7 @@ mod tests {
         );
 
         let target = create_task(&kernel, "another-task");
-        current_task.mm.snapshot_to(&target.mm).expect("snapshot_to failed");
+        current_task.mm.snapshot_to(&mut locked, &target.mm).expect("snapshot_to failed");
 
         {
             let state = target.mm.state.read();

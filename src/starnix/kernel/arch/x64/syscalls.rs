@@ -114,7 +114,7 @@ pub fn sys_chown(
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     flags: u64,
     user_stack: UserAddress,
@@ -125,6 +125,7 @@ pub fn sys_clone(
     // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
     // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
     do_clone(
+        locked,
         current_task,
         &clone_args {
             flags: flags & !(CSIGNAL as u64),
@@ -139,10 +140,14 @@ pub fn sys_clone(
 }
 
 pub fn sys_fork(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
-    do_clone(current_task, &clone_args { exit_signal: uapi::SIGCHLD.into(), ..Default::default() })
+    do_clone(
+        locked,
+        current_task,
+        &clone_args { exit_signal: uapi::SIGCHLD.into(), ..Default::default() },
+    )
 }
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
@@ -451,10 +456,11 @@ pub fn sys_signalfd(
 }
 
 pub fn sys_vfork(
-    _locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     do_clone(
+        locked,
         current_task,
         &clone_args {
             flags: (CLONE_VFORK | CLONE_VM) as u64,

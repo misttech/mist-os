@@ -7,6 +7,7 @@ use fuchsia_zircon::{
     sys::zx_thread_state_general_regs_t,
     {self as zx},
 };
+use lock_sequence::{LockBefore, Locked};
 use starnix_lock::{RwLock, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
 use starnix_uapi::signals::SIGCHLD;
@@ -23,6 +24,7 @@ use crate::{
         SymlinkTarget,
     },
     loader::{load_executable, resolve_executable, ResolvedElf},
+    lock_ordering::MmDumpable,
     logging::{log_error, log_warn, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{send_standard_signal, RunState, SignalActions, SignalDetail, SignalInfo},
@@ -1091,13 +1093,17 @@ impl CurrentTask {
     ///
     /// The exit signal is broken out from the flags parameter like clone3() rather than being
     /// bitwise-ORed like clone().
-    pub fn clone_task(
+    pub fn clone_task<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         flags: u64,
         child_exit_signal: Option<Signal>,
         user_parent_tid: UserRef<pid_t>,
         user_child_tid: UserRef<pid_t>,
-    ) -> Result<CurrentTask, Errno> {
+    ) -> Result<CurrentTask, Errno>
+    where
+        L: LockBefore<MmDumpable>,
+    {
         // TODO: Implement more flags.
         const IMPLEMENTED_FLAGS: u64 = (CLONE_VM
             | CLONE_FS
@@ -1294,7 +1300,7 @@ impl CurrentTask {
                 let state = self.read();
                 child_state.signals.alt_stack = state.signals.alt_stack;
                 child_state.signals.set_mask(state.signals.mask());
-                self.mm.snapshot_to(&child.mm)?;
+                self.mm.snapshot_to(locked, &child.mm)?;
             }
 
             if flags & (CLONE_PARENT_SETTID as u64) != 0 {
@@ -1316,13 +1322,17 @@ impl CurrentTask {
     /// The flags indicates only the flags as in clone3(), and does not use the low 8 bits for the
     /// exit signal as in clone().
     #[cfg(test)]
-    pub fn clone_task_for_test(
+    pub fn clone_task_for_test<L>(
         &self,
+        locked: &mut Locked<'_, L>,
         flags: u64,
         exit_signal: Option<Signal>,
-    ) -> crate::testing::AutoReleasableTask {
+    ) -> crate::testing::AutoReleasableTask
+    where
+        L: LockBefore<MmDumpable>,
+    {
         let result = self
-            .clone_task(flags, exit_signal, UserRef::default(), UserRef::default())
+            .clone_task(locked, flags, exit_signal, UserRef::default(), UserRef::default())
             .expect("failed to create task in test");
 
         // Take the lock on thread group and task in the correct order to ensure any wrong ordering
