@@ -193,6 +193,7 @@ impl BrokerSvc {
                 match request {
                     TopologyRequest::AddElement {
                         element_name,
+                        dependencies,
                         credentials_to_register,
                         responder,
                     } => {
@@ -205,7 +206,7 @@ impl BrokerSvc {
                             self.broker.lock().unwrap();
                         let credentials =
                             credentials_to_register.into_iter().map(|d| d.into()).collect();
-                        let res = broker.add_element(&element_name, credentials);
+                        let res = broker.add_element(&element_name, dependencies, credentials);
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(_) => responder.send(Ok(())).context("send failed"),

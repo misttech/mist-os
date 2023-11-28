@@ -311,9 +311,38 @@ impl Broker {
     pub fn add_element(
         &mut self,
         name: &str,
+        level_dependencies: Vec<fpb::LevelDependency>,
         credentials_to_register: Vec<CredentialToRegister>,
     ) -> Result<ElementID, AddElementError> {
         let id = self.catalog.topology.add_element(name)?;
+        for dependency in level_dependencies {
+            let credential = self
+                .lookup_credentials(dependency.requires.token.into())
+                .ok_or(AddElementError::NotAuthorized)?;
+            if !credential.contains(Permissions::MODIFY_DEPENDENT) {
+                return Err(AddElementError::NotAuthorized);
+            }
+            if let Err(err) = self.catalog.topology.add_direct_dep(&Dependency {
+                dependent: ElementLevel { element: id.clone(), level: dependency.dependent_level },
+                requires: ElementLevel {
+                    element: credential.get_element().clone(),
+                    level: dependency.requires.level,
+                },
+            }) {
+                // Clean up by removing the element we just added.
+                if let Err(err) = self.catalog.topology.remove_element(&id) {
+                    tracing::error!("clean up call to remove_element failed: {:?}", err);
+                    return Err(AddElementError::Internal);
+                }
+                return Err(match err {
+                    AddDependencyError::AlreadyExists => AddElementError::Invalid,
+                    AddDependencyError::ElementNotFound(_) => AddElementError::Invalid,
+                    AddDependencyError::RequiredElementNotFound(_) => AddElementError::Invalid,
+                    // Shouldn't get NotAuthorized here.
+                    AddDependencyError::NotAuthorized => AddElementError::Internal,
+                });
+            };
+        }
         for credential_to_register in credentials_to_register {
             if let Err(err) = self.register_credential(&id, credential_to_register) {
                 match err {
@@ -782,6 +811,83 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_add_element_dependency_not_authorized() {
+        let mut broker = Broker::new();
+        let (token_mithril, token_mithril_broker) = zx::EventPair::create();
+        let credential_mithril = CredentialToRegister {
+            broker_token: token_mithril_broker.into(),
+            permissions: Permissions::all(),
+        };
+        let (token_mithril_read_only, token_mithril_read_only_broker) = zx::EventPair::create();
+        let credential_mithril_read_only = CredentialToRegister {
+            broker_token: token_mithril_read_only_broker.into(),
+            permissions: Permissions::READ_POWER_LEVEL,
+        };
+        let (token_silver, token_silver_broker) = zx::EventPair::create();
+        let credential_silver = CredentialToRegister {
+            broker_token: token_silver_broker.into(),
+            permissions: Permissions::all(),
+        };
+        broker
+            .add_element("Mithril", vec![], vec![credential_mithril, credential_mithril_read_only])
+            .expect("add_element failed");
+
+        // This should fail, because token_mithril_read_only does not have
+        // Permissions::MODIFY_DEPENDENT
+        let add_element_not_authorized_res = broker.add_element(
+            "Silver",
+            vec![fpb::LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: fpb::ElementLevel {
+                    token: token_mithril_read_only
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![credential_silver],
+        );
+        assert!(matches!(add_element_not_authorized_res, Err(AddElementError::NotAuthorized)));
+
+        // This remove call should fail, because the element should not have
+        // been added and thus this token is not valid.
+        let remove_element_not_authorized_res = broker.remove_element(
+            token_silver.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+        );
+        assert!(matches!(
+            remove_element_not_authorized_res,
+            Err(RemoveElementError::NotAuthorized)
+        ));
+
+        // The same actions with a valid dependency should succeed.
+        let (token_silver, token_silver_broker) = zx::EventPair::create();
+        let credential_silver = CredentialToRegister {
+            broker_token: token_silver_broker.into(),
+            permissions: Permissions::all(),
+        };
+        broker
+            .add_element(
+                "Silver",
+                vec![fpb::LevelDependency {
+                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires: fpb::ElementLevel {
+                        token: token_mithril
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    },
+                }],
+                vec![credential_silver],
+            )
+            .expect("add_element failed");
+        broker
+            .remove_element(
+                token_silver.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
+            )
+            .expect("remove_element failed");
+    }
+
+    #[fuchsia::test]
     fn test_remove_element() {
         let mut broker = Broker::new();
         let (token_all, token_all_broker) = zx::EventPair::create();
@@ -795,7 +901,7 @@ mod tests {
             permissions: Permissions::empty(),
         };
         broker
-            .add_element("Unobtainium", vec![credential_all, credential_none])
+            .add_element("Unobtainium", vec![], vec![credential_all, credential_none])
             .expect("add_element failed");
         let remove_element_not_authorized_res = broker.remove_element(
             token_none.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
@@ -825,7 +931,7 @@ mod tests {
                 | Permissions::MODIFY_CREDENTIAL
                 | Permissions::REMOVE_ELEMENT,
         };
-        broker.add_element("element", vec![broker_credential]).expect("add_element failed");
+        broker.add_element("element", vec![], vec![broker_credential]).expect("add_element failed");
         let (token_new_owner, token_new_broker) = zx::EventPair::create();
         let credential_to_register = CredentialToRegister {
             broker_token: token_new_broker.into(),
@@ -865,6 +971,20 @@ mod tests {
         // Create a topology of a child element with two direct dependencies.
         // P1 <- C -> P2
         let mut broker = Broker::new();
+        let (parent1_token, parent1_broker_token) = zx::EventPair::create();
+        let parent1_cred = CredentialToRegister {
+            broker_token: parent1_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
+        };
+        let parent1: ElementID =
+            broker.add_element("P1", vec![], vec![parent1_cred]).expect("add_element failed");
+        let (parent2_token, parent2_broker_token) = zx::EventPair::create();
+        let parent2_cred = CredentialToRegister {
+            broker_token: parent2_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENT,
+        };
+        let parent2: ElementID =
+            broker.add_element("P2", vec![], vec![parent2_cred]).expect("add_element failed");
         let (child_no_lease_token, child_no_lease_broker_token) = zx::EventPair::create();
         let child_no_lease_cred = CredentialToRegister {
             broker_token: child_no_lease_broker_token.into(),
@@ -876,44 +996,31 @@ mod tests {
             permissions: Permissions::ACQUIRE_LEASE,
         };
         broker
-            .add_element("C", vec![child_no_lease_cred, child_lease_cred])
+            .add_element(
+                "C",
+                vec![
+                    fpb::LevelDependency {
+                        dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        requires: fpb::ElementLevel {
+                            token: parent1_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        },
+                    },
+                    fpb::LevelDependency {
+                        dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        requires: fpb::ElementLevel {
+                            token: parent2_token
+                                .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                                .expect("dup failed"),
+                            level: PowerLevel::Binary(BinaryPowerLevel::On),
+                        },
+                    },
+                ],
+                vec![child_no_lease_cred, child_lease_cred],
+            )
             .expect("add_element failed");
-        let (parent1_token, parent1_broker_token) = zx::EventPair::create();
-        let parent1_cred = CredentialToRegister {
-            broker_token: parent1_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::MODIFY_DEPENDENT,
-        };
-        let parent1: ElementID =
-            broker.add_element("P1", vec![parent1_cred]).expect("add_element failed");
-        let (parent2_token, parent2_broker_token) = zx::EventPair::create();
-        let parent2_cred = CredentialToRegister {
-            broker_token: parent2_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENT,
-        };
-        let parent2: ElementID =
-            broker.add_element("P2", vec![parent2_cred]).expect("add_element failed");
-        broker
-            .add_dependency(
-                child_no_lease_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                parent1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-            )
-            .expect("add_direct_dep failed");
-        broker
-            .add_dependency(
-                child_no_lease_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed")
-                    .into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                parent2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-            )
-            .expect("add_direct_dep failed");
         assert_eq!(
             broker.catalog.calc_min_level(&parent1.clone()),
             PowerLevel::Binary(BinaryPowerLevel::Off),
@@ -981,12 +1088,13 @@ mod tests {
         // dependencies.
         // C -> P -> GP
         let mut broker = Broker::new();
-        let (child_token, child_broker_token) = zx::EventPair::create();
-        let child_cred = CredentialToRegister {
-            broker_token: child_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
+        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
+        let grandparent_cred = CredentialToRegister {
+            broker_token: grandparent_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
         };
-        broker.add_element("C", vec![child_cred]).expect("add_element failed");
+        let grandparent: ElementID =
+            broker.add_element("GP", vec![], vec![grandparent_cred]).expect("add_element failed");
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
@@ -995,22 +1103,27 @@ mod tests {
                 | Permissions::MODIFY_DEPENDENT,
         };
         let parent: ElementID =
-            broker.add_element("P", vec![parent_cred]).expect("add_element failed");
-        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
-        let grandparent_cred = CredentialToRegister {
-            broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
+            broker.add_element("P", vec![], vec![parent_cred]).expect("add_element failed");
+        let (child_token, child_broker_token) = zx::EventPair::create();
+        let child_cred = CredentialToRegister {
+            broker_token: child_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
         };
-        let grandparent: ElementID =
-            broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
         broker
-            .add_dependency(
-                child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
+            .add_element(
+                "C",
+                vec![fpb::LevelDependency {
+                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires: fpb::ElementLevel {
+                        token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    },
+                }],
+                vec![child_cred],
             )
-            .expect("add_direct_dep failed");
+            .expect("add_element failed");
         broker
             .add_dependency(
                 parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
@@ -1117,18 +1230,13 @@ mod tests {
         //     > P -> GP
         // C2 /
         let mut broker = Broker::new();
-        let (child1_token, child1_broker_token) = zx::EventPair::create();
-        let child1_cred = CredentialToRegister {
-            broker_token: child1_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
+        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
+        let grandparent_cred = CredentialToRegister {
+            broker_token: grandparent_broker_token.into(),
+            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
         };
-        broker.add_element("C1", vec![child1_cred]).expect("add_element failed");
-        let (child2_token, child2_broker_token) = zx::EventPair::create();
-        let child2_cred = CredentialToRegister {
-            broker_token: child2_broker_token.into(),
-            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
-        };
-        broker.add_element("C2", vec![child2_cred]).expect("add_element failed");
+        let grandparent: ElementID =
+            broker.add_element("GP", vec![], vec![grandparent_cred]).expect("add_element failed");
         let (parent_token, parent_broker_token) = zx::EventPair::create();
         let parent_cred = CredentialToRegister {
             broker_token: parent_broker_token.into(),
@@ -1137,22 +1245,33 @@ mod tests {
                 | Permissions::MODIFY_DEPENDENT,
         };
         let parent: ElementID =
-            broker.add_element("P", vec![parent_cred]).expect("add_element failed");
-        let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
-        let grandparent_cred = CredentialToRegister {
-            broker_token: grandparent_broker_token.into(),
-            permissions: Permissions::MODIFY_POWER_LEVEL | Permissions::MODIFY_DEPENDENT,
+            broker.add_element("P", vec![], vec![parent_cred]).expect("add_element failed");
+        let (child1_token, child1_broker_token) = zx::EventPair::create();
+        let child1_cred = CredentialToRegister {
+            broker_token: child1_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
         };
-        let grandparent: ElementID =
-            broker.add_element("GP", vec![grandparent_cred]).expect("add_element failed");
         broker
-            .add_dependency(
-                child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
-                parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
-                PowerLevel::Binary(BinaryPowerLevel::On),
+            .add_element(
+                "C1",
+                vec![fpb::LevelDependency {
+                    dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    requires: fpb::ElementLevel {
+                        token: parent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    },
+                }],
+                vec![child1_cred],
             )
-            .expect("add_direct_dep failed");
+            .expect("add_element failed");
+        let (child2_token, child2_broker_token) = zx::EventPair::create();
+        let child2_cred = CredentialToRegister {
+            broker_token: child2_broker_token.into(),
+            permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
+        };
+        broker.add_element("C2", vec![], vec![child2_cred]).expect("add_element failed");
         broker
             .add_dependency(
                 child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed").into(),
@@ -1302,10 +1421,10 @@ mod tests {
             permissions: Permissions::all(),
         };
         broker
-            .add_element("Adamantium", vec![credential_adamantium_all])
+            .add_element("Adamantium", vec![], vec![credential_adamantium_all])
             .expect("add_element failed");
         broker
-            .add_element("Vibranium", vec![credential_vibranium_all])
+            .add_element("Vibranium", vec![], vec![credential_vibranium_all])
             .expect("add_element failed");
 
         // Only MODIFY_DEPENDENCY and MODIFY_DEPENDENT for the respective
@@ -1520,6 +1639,7 @@ mod tests {
         broker
             .add_element(
                 "Dilithium",
+                vec![],
                 vec![dilithium_cred, dilithium_missing_modify_power_level_cred],
             )
             .expect("add_element failed");
@@ -1560,6 +1680,7 @@ mod tests {
         broker
             .add_element(
                 "Dilithium",
+                vec![],
                 vec![dilithium_cred, dilithium_missing_modify_power_level_cred],
             )
             .expect("add_element failed");
@@ -1601,7 +1722,11 @@ mod tests {
             permissions: Permissions::READ_POWER_LEVEL,
         };
         broker
-            .add_element("Dilithium", vec![dilithium_modify_only_cred, dilithium_read_only_cred])
+            .add_element(
+                "Dilithium",
+                vec![],
+                vec![dilithium_modify_only_cred, dilithium_read_only_cred],
+            )
             .expect("add_element failed");
 
         // Set the current level so it can be read.
@@ -1645,7 +1770,11 @@ mod tests {
             permissions: Permissions::READ_POWER_LEVEL,
         };
         broker
-            .add_element("Dilithium", vec![dilithium_modify_only_cred, dilithium_read_only_cred])
+            .add_element(
+                "Dilithium",
+                vec![],
+                vec![dilithium_modify_only_cred, dilithium_read_only_cred],
+            )
             .expect("add_element failed");
 
         // Set the current level so it can be read.

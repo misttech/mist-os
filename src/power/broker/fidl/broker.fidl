@@ -123,6 +123,8 @@ open protocol Status {
 
 type AddElementError = flexible enum {
     INTERNAL = 1;
+    INVALID = 2;
+    NOT_AUTHORIZED = 3;
 };
 
 type RemoveElementError = flexible enum {
@@ -166,6 +168,14 @@ type Dependency = resource struct {
     requires ElementLevel;
 };
 
+/// Power dependency from an already specified element's PowerLevel to another.
+/// Only use this struct where the dependent Element is already known from
+/// context (e.g. in AddElement).
+type LevelDependency = resource struct {
+    dependent_level PowerLevel;
+    requires ElementLevel;
+};
+
 /// Offered by the Power Broker to allow Power Element owners to register
 /// Power Elements and dependencies.
 @discoverable
@@ -174,6 +184,10 @@ open protocol Topology {
     flexible AddElement(resource struct {
         /// Human-readable name for logging and debug purposes.
         element_name string:1024;
+        /// List of dependencies for this element's power levels.
+        /// dependency.requires.token must include Permissions.MODIFY_DEPENDENT.
+        /// Note: dependencies ON this element's levels cannot be added here.
+        dependencies vector<LevelDependency>:128;
         /// List of initial credentials to register for this element.
         /// You may not register credentials for other elements here.
         credentials_to_register vector<Credential>:128;

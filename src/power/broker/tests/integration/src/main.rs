@@ -5,7 +5,8 @@
 use anyhow::{Error, Result};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LessorMarker,
-    LevelControlMarker, LevelControlProxy, Permissions, PowerLevel, StatusMarker, TopologyMarker,
+    LevelControlMarker, LevelControlProxy, LevelDependency, Permissions, PowerLevel, StatusMarker,
+    TopologyMarker,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
@@ -58,14 +59,6 @@ async fn test_direct() -> Result<()> {
     // Create a topology with only two elements and a single dependency:
     // P <- C
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let (child_token, child_broker_token) = zx::EventPair::create();
-    let child_cred = Credential {
-        broker_token: child_broker_token,
-        permissions: Permissions::MODIFY_POWER_LEVEL
-            | Permissions::MODIFY_DEPENDENCY
-            | Permissions::ACQUIRE_LEASE,
-    };
-    topology.add_element("C", vec![child_cred]).await?.expect("add_element failed");
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
@@ -73,20 +66,30 @@ async fn test_direct() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
+    topology.add_element("P", vec![], vec![parent_cred]).await?.expect("add_element failed");
+    let (child_token, child_broker_token) = zx::EventPair::create();
+    let child_cred = Credential {
+        broker_token: child_broker_token,
+        permissions: Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENCY
+            | Permissions::ACQUIRE_LEASE,
+    };
     topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: child_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
+        .add_element(
+            "C",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![child_cred],
+        )
         .await?
-        .expect("add_dependency failed");
+        .expect("add_element failed");
 
     let level_control: LevelControlProxy =
         realm.root.connect_to_protocol_at_exposed_dir::<LevelControlMarker>()?;
@@ -177,7 +180,7 @@ async fn test_transitive() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("A", vec![element_a_cred]).await?.expect("add_element failed");
+    topology.add_element("A", vec![], vec![element_a_cred]).await?.expect("add_element failed");
     let (element_b_token, element_b_broker_token) = zx::EventPair::create();
     let element_b_cred = Credential {
         broker_token: element_b_broker_token,
@@ -186,53 +189,49 @@ async fn test_transitive() -> Result<()> {
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("B", vec![element_b_cred]).await?.expect("add_element failed");
+    topology
+        .add_element(
+            "B",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: element_a_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![element_b_cred],
+        )
+        .await?
+        .expect("add_element failed");
     let (element_c_token, element_c_broker_token) = zx::EventPair::create();
     let element_c_cred = Credential {
         broker_token: element_c_broker_token,
         permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
     };
-    topology.add_element("C", vec![element_c_cred]).await?.expect("add_element failed");
+    topology
+        .add_element(
+            "C",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: element_b_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![element_c_cred],
+        )
+        .await?
+        .expect("add_element failed");
     let (element_d_token, element_d_broker_token) = zx::EventPair::create();
     let element_d_cred = Credential {
         broker_token: element_d_broker_token,
         permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
     };
-    topology.add_element("D", vec![element_d_cred]).await?.expect("add_element failed");
-    topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: element_b_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: element_a_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
-        .await?
-        .expect("add_dependency failed");
-    topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: element_c_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: element_b_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
-        .await?
-        .expect("add_dependency failed");
+    topology.add_element("D", vec![], vec![element_d_cred]).await?.expect("add_element failed");
 
     let level_control: LevelControlProxy =
         realm.root.connect_to_protocol_at_exposed_dir::<LevelControlMarker>()?;
@@ -451,18 +450,14 @@ async fn test_shared() -> Result<()> {
     //     > P -> GP
     // C2 /
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
-    let (child1_token, child1_broker_token) = zx::EventPair::create();
-    let child1_cred = Credential {
-        broker_token: child1_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
+    let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
+    let grandparent_cred = Credential {
+        broker_token: grandparent_broker_token,
+        permissions: Permissions::READ_POWER_LEVEL
+            | Permissions::MODIFY_POWER_LEVEL
+            | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("C1", vec![child1_cred]).await?.expect("add_element failed");
-    let (child2_token, child2_broker_token) = zx::EventPair::create();
-    let child2_cred = Credential {
-        broker_token: child2_broker_token,
-        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
-    };
-    topology.add_element("C2", vec![child2_cred]).await?.expect("add_element failed");
+    topology.add_element("GP", vec![], vec![grandparent_cred]).await?.expect("add_element failed");
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
@@ -471,56 +466,64 @@ async fn test_shared() -> Result<()> {
             | Permissions::MODIFY_DEPENDENCY
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("P", vec![parent_cred]).await?.expect("add_element failed");
-    let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
-    let grandparent_cred = Credential {
-        broker_token: grandparent_broker_token,
-        permissions: Permissions::READ_POWER_LEVEL
-            | Permissions::MODIFY_POWER_LEVEL
-            | Permissions::MODIFY_DEPENDENT,
+    topology
+        .add_element(
+            "P",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: grandparent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![parent_cred],
+        )
+        .await?
+        .expect("add_element failed");
+    let (child1_token, child1_broker_token) = zx::EventPair::create();
+    let child1_cred = Credential {
+        broker_token: child1_broker_token,
+        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
     };
-    topology.add_element("GP", vec![grandparent_cred]).await?.expect("add_element failed");
     topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
+        .add_element(
+            "C1",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![child1_cred],
+        )
         .await?
-        .expect("add_dependency failed");
+        .expect("add_element failed");
+    let (child2_token, child2_broker_token) = zx::EventPair::create();
+    let child2_cred = Credential {
+        broker_token: child2_broker_token,
+        permissions: Permissions::MODIFY_DEPENDENCY | Permissions::ACQUIRE_LEASE,
+    };
     topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
+        .add_element(
+            "C2",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: parent_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![child2_cred],
+        )
         .await?
-        .expect("add_dependency failed");
-    topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: grandparent_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                    .expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
-        .await?
-        .expect("add_dependency failed");
+        .expect("add_element failed");
 
     let level_control: LevelControlProxy =
         realm.root.connect_to_protocol_at_exposed_dir::<LevelControlMarker>()?;
@@ -738,42 +741,44 @@ async fn test_topology() -> Result<()> {
 
     // Create a four element topology.
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+    let (earth_token, earth_broker_token) = zx::EventPair::create();
+    let earth_cred =
+        Credential { broker_token: earth_broker_token, permissions: Permissions::MODIFY_DEPENDENT };
+    topology.add_element("Earth", vec![], vec![earth_cred]).await?.expect("add_element failed");
     let (water_token, water_broker_token) = zx::EventPair::create();
     let water_cred = Credential {
         broker_token: water_broker_token,
         permissions: Permissions::MODIFY_DEPENDENCY,
     };
-    topology.add_element("Water", vec![water_cred]).await?.expect("add_element failed");
-    let (earth_token, earth_broker_token) = zx::EventPair::create();
-    let earth_cred =
-        Credential { broker_token: earth_broker_token, permissions: Permissions::MODIFY_DEPENDENT };
-    topology.add_element("Earth", vec![earth_cred]).await?.expect("add_element failed");
+    topology
+        .add_element(
+            "Water",
+            vec![LevelDependency {
+                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                requires: ElementLevel {
+                    token: earth_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                        .expect("dup failed"),
+                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                },
+            }],
+            vec![water_cred],
+        )
+        .await?
+        .expect("add_element failed");
     let (fire_token, fire_broker_token) = zx::EventPair::create();
     let fire_cred =
         Credential { broker_token: fire_broker_token, permissions: Permissions::REMOVE_ELEMENT };
-    topology.add_element("Fire", vec![fire_cred]).await?.expect("add_element failed");
+    topology.add_element("Fire", vec![], vec![fire_cred]).await?.expect("add_element failed");
     let (air_token, air_broker_token) = zx::EventPair::create();
     let air_cred = Credential { broker_token: air_broker_token, permissions: Permissions::all() };
     let (air_token_no_perms, air_broker_token_no_perms) = zx::EventPair::create();
     let air_cred_no_perms =
         Credential { broker_token: air_broker_token_no_perms, permissions: Permissions::empty() };
     topology
-        .add_element("Air", vec![air_cred, air_cred_no_perms])
+        .add_element("Air", vec![], vec![air_cred, air_cred_no_perms])
         .await?
         .expect("add_element failed");
-    topology
-        .add_dependency(Dependency {
-            dependent: ElementLevel {
-                token: water_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-            requires: ElementLevel {
-                token: earth_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                level: PowerLevel::Binary(BinaryPowerLevel::On),
-            },
-        })
-        .await?
-        .expect("add_dependency failed");
 
     let extra_add_dep_res = topology
         .add_dependency(Dependency {
@@ -884,7 +889,10 @@ async fn test_register_unregister_credentials() -> Result<()> {
             | Permissions::MODIFY_CREDENTIAL
             | Permissions::REMOVE_ELEMENT,
     };
-    topology.add_element("element", vec![broker_credential]).await?.expect("add_element failed");
+    topology
+        .add_element("element", vec![], vec![broker_credential])
+        .await?
+        .expect("add_element failed");
     let (token_new_owner, token_new_broker) = zx::EventPair::create();
     let credential_to_register = fpb::Credential {
         broker_token: token_new_broker,

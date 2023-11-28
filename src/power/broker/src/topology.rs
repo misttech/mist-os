@@ -55,12 +55,16 @@ pub struct Element {
 #[derive(Debug)]
 pub enum AddElementError {
     Internal,
+    Invalid,
+    NotAuthorized,
 }
 
 impl Into<fpb::AddElementError> for AddElementError {
     fn into(self) -> fpb::AddElementError {
         match self {
             AddElementError::Internal => fpb::AddElementError::Internal,
+            AddElementError::Invalid => fpb::AddElementError::Invalid,
+            AddElementError::NotAuthorized => fpb::AddElementError::NotAuthorized,
         }
     }
 }
