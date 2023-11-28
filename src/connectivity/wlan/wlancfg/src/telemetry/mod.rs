@@ -3079,6 +3079,7 @@ impl StatsLogger {
                 ScanReason::NetworkSelection => NetworkSelection,
                 ScanReason::BssSelection => BssSelection,
                 ScanReason::BssSelectionAugmentation => BssSelectionAugmentation,
+                ScanReason::RoamSearch => ProactiveRoaming,
             }
         };
         log_cobalt_1dot1!(

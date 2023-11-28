@@ -9,11 +9,12 @@ use {
             types::{self, Bss, InternalSavedNetworkData, SecurityType, SecurityTypeDetailed},
         },
         config_management::{
-            select_authentication_method, select_subset_potentially_hidden_networks, Credential,
-            SavedNetworksManagerApi,
+            self, network_config, select_authentication_method,
+            select_subset_potentially_hidden_networks, Credential, SavedNetworksManagerApi,
         },
         telemetry::{self, TelemetryEvent, TelemetrySender},
     },
+    anyhow::{format_err, Error},
     fidl_fuchsia_wlan_internal as fidl_internal, fuchsia_async as fasync,
     fuchsia_inspect::{Node as InspectNode, StringReference},
     fuchsia_inspect_contrib::{
@@ -32,6 +33,7 @@ use {
 };
 
 pub mod bss_selection;
+pub mod local_roam_manager;
 pub mod network_selection;
 pub mod scoring_functions;
 
@@ -303,6 +305,84 @@ impl ConnectionSelector {
             Err(()) => scanned_candidate,
         }
     }
+
+    /// Return the best AP to connect to from the network. It may be the same AP that is currently
+    /// connected to. Returning None means that no APs were seen.
+    /// Credential is required to lookup the network config and ensure that the credential matches.
+    pub async fn find_and_select_roam_candidate(
+        &self,
+        network: types::NetworkIdentifier,
+        credential: network_config::Credential,
+    ) -> Result<Option<types::ScannedCandidate>, Error> {
+        // Scan for APs in this network
+        // TODO(fxbug.dev/132103) Use an active scan in cases where a faster scan is justified.
+        let mut matching_scans = self
+            .scan_requester
+            .perform_scan(ScanReason::RoamSearch, vec![], vec![])
+            .await
+            .map_err(|e| format_err!("Error scanning: {:?}", e))?
+            .into_iter()
+            .filter(|s| {
+                s.ssid == network.ssid
+                    && network
+                        .security_type
+                        .is_compatible_with_scanned_type(&s.security_type_detailed)
+            })
+            .collect::<Vec<_>>();
+
+        // If no APs were found, do an active scan. If the network is not hidden, at least 1 scan
+        // result should be seen since the AP is close enough to be connected to.
+        if matching_scans.is_empty() {
+            match self
+                .scan_requester
+                .perform_scan(ScanReason::RoamSearch, vec![network.ssid.clone()], vec![])
+                .await
+            {
+                Ok(scan_results) => {
+                    matching_scans = scan_results
+                        .into_iter()
+                        .filter(|s| {
+                            network
+                                .security_type
+                                .is_compatible_with_scanned_type(&s.security_type_detailed)
+                        })
+                        .collect()
+                }
+                Err(e) => {
+                    info!("Active scan to find hidden APs to roam to failed: {:?}", e);
+                    return Ok(None);
+                }
+            }
+        }
+
+        let mut candidates = Vec::new();
+        // All APs should be grouped in the same scan result based on SSID and security,
+        // but combine all if there are multiple scan results.
+        for mut s in matching_scans {
+            if let Some(config) = self
+                .saved_network_manager
+                .lookup(&network)
+                .await
+                .into_iter()
+                .find(|c| c.credential == credential)
+            {
+                candidates.append(&mut merge_config_and_scan_data(config, &mut s));
+            } else {
+                // This should only happen if the network config was just removed as the scan
+                // happened.
+                warn!("Failed to find config for network to roam from");
+            }
+        }
+
+        // Choose the best AP
+        Ok(bss_selection::select_bss(
+            candidates,
+            types::ConnectReason::ProactiveNetworkSwitch,
+            self.inspect_node_for_connection_selection.clone(),
+            self.telemetry_sender.clone(),
+        )
+        .await)
+    }
 }
 
 impl types::ScannedCandidate {
@@ -428,6 +508,53 @@ fn get_authenticator(bss: &Bss, credential: &Credential) -> Option<SecurityAuthe
             None
         }
     }
+}
+
+fn merge_config_and_scan_data(
+    network_config: config_management::NetworkConfig,
+    scan_result: &mut types::ScanResult,
+) -> Vec<types::ScannedCandidate> {
+    if network_config.ssid != scan_result.ssid
+        || !network_config
+            .security_type
+            .is_compatible_with_scanned_type(&scan_result.security_type_detailed)
+    {
+        return Vec::new();
+    }
+
+    let mut merged_networks = Vec::new();
+    let multiple_bss_candidates = scan_result.entries.len() > 1;
+
+    for bss in scan_result.entries.iter() {
+        let authenticator = match get_authenticator(bss, &network_config.credential) {
+            Some(authenticator) => authenticator,
+            None => {
+                error!("Failed to create authenticator for bss candidate {:?} (SSID: {:?}). Removing from candidates.", bss.bssid, &network_config.ssid);
+                continue;
+            }
+        };
+        let scanned_candidate = types::ScannedCandidate {
+            network: types::NetworkIdentifier {
+                ssid: network_config.ssid.clone(),
+                security_type: network_config.security_type,
+            },
+            security_type_detailed: scan_result.security_type_detailed,
+            credential: network_config.credential.clone(),
+            network_has_multiple_bss: multiple_bss_candidates,
+            saved_network_info: InternalSavedNetworkData {
+                has_ever_connected: network_config.has_ever_connected,
+                recent_failures: network_config
+                    .perf_stats
+                    .connect_failures
+                    .get_recent_for_network(fasync::Time::now() - RECENT_FAILURE_WINDOW),
+                past_connections: network_config.perf_stats.past_connections.clone(),
+            },
+            bss: bss.clone(),
+            authenticator,
+        };
+        merged_networks.push(scanned_candidate)
+    }
+    return merged_networks;
 }
 
 /// Merge the saved networks and scan results into a vector of BSS candidates that correspond to a

@@ -6,7 +6,8 @@ use {
     crate::{
         client::{
             connection_selection::{
-                bss_selection, EWMA_SMOOTHING_FACTOR, EWMA_VELOCITY_SMOOTHING_FACTOR,
+                bss_selection, local_roam_manager::LocalRoamManagerApi, EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
             },
             types,
         },
@@ -35,6 +36,7 @@ use {
     futures::{
         channel::{mpsc, oneshot},
         future::FutureExt,
+        lock::Mutex,
         select,
         stream::{self, StreamExt, TryStreamExt},
     },
@@ -48,12 +50,6 @@ use {
         stats::SignalStrengthAverage,
     },
 };
-
-/// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
-/// scans. IF there isn't a change, it is unlikely that there would be a reason to roam now.
-const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::Duration = zx::Duration::from_minutes(15);
-const MIN_TIME_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_minutes(1);
-const MIN_RSSI_CHANGE_TO_ROAM_SCAN: i8 = 5;
 
 const MAX_CONNECTION_ATTEMPTS: u8 = 4; // arbitrarily chosen until we have some data
 const CONNECT_TIMEOUT: zx::Duration = zx::Duration::from_seconds(30);
@@ -138,8 +134,8 @@ pub async fn serve(
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     connect_selection: Option<types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
-    stats_sender: ConnectionStatsSender,
     defect_sender: mpsc::UnboundedSender<Defect>,
+    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
 ) {
     let next_network = connect_selection
         .map(|selection| ConnectingOptions { connect_selection: selection, attempt_counter: 0 });
@@ -156,8 +152,8 @@ pub async fn serve(
         saved_networks_manager,
         telemetry_sender,
         iface_id,
-        stats_sender,
         defect_sender,
+        roam_manager,
     };
     let state_machine =
         disconnecting_state(common_options, disconnect_options).into_state_machine();
@@ -192,22 +188,12 @@ struct CommonStateOptions {
     saved_networks_manager: Arc<dyn SavedNetworksManagerApi>,
     telemetry_sender: TelemetrySender,
     iface_id: u16,
-    /// Used to send periodic connection stats used to determine whether or not to roam.
-    stats_sender: mpsc::UnboundedSender<PeriodicConnectionStats>,
     defect_sender: mpsc::UnboundedSender<Defect>,
+    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
 }
 
-/// Data that is periodically gathered for determining whether to roam
-pub struct PeriodicConnectionStats {
-    /// ID and BSSID of the current connection, to exclude it when comparing available networks.
-    pub id: types::NetworkIdentifier,
-    /// Iface ID that the connection is on.
-    pub iface_id: u16,
-    pub quality_data: bss_selection::BssQualityData,
-}
-
-pub type ConnectionStatsSender = mpsc::UnboundedSender<PeriodicConnectionStats>;
-pub type ConnectionStatsReceiver = mpsc::UnboundedReceiver<PeriodicConnectionStats>;
+pub type ConnectionStatsSender = mpsc::UnboundedSender<fidl_internal::SignalReportIndication>;
+pub type ConnectionStatsReceiver = mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>;
 
 fn handle_none_request() -> Result<State, ExitReason> {
     return Err(ExitReason(Err(format_err!("The stream of requests ended unexpectedly"))));
@@ -569,9 +555,8 @@ async fn connected_state(
 ) -> Result<State, ExitReason> {
     debug!("Entering connected state");
     let mut connect_start_time = fasync::Time::now();
-    let mut time_prev_roam_scan = connect_start_time;
-    let mut roam_reasons_prev_scan = vec![];
-    let mut rssi_prev_roam_scan = options.ap_state.original().rssi_dbm;
+    // Used to receive roam requests. The sender is cloned to send to the RoamManager.
+    let (roam_sender, mut roam_receiver) = mpsc::unbounded::<types::ScannedCandidate>();
 
     // Initialize connection data
     let past_connections = common_options
@@ -582,7 +567,10 @@ async fn connected_state(
             &options.ap_state.original().bssid,
         )
         .await;
-    let mut bss_quality_data = bss_selection::BssQualityData::new(
+
+    // Send initial quality data to the RoamManager for tracking and getting the initial score.
+    // This should not trigger any scans since the connection just began.
+    let bss_quality_data = bss_selection::BssQualityData::new(
         SignalData::new(
             options.ap_state.tracked.signal.rssi_dbm,
             options.ap_state.tracked.signal.snr_db,
@@ -593,6 +581,12 @@ async fn connected_state(
         past_connections,
     );
     let (initial_score, _) = bss_selection::evaluate_current_bss(&bss_quality_data);
+    common_options.roam_manager.lock().await.handle_connection_start(
+        bss_quality_data,
+        connect_start_time,
+        options.currently_fulfilled_connection.target.network.clone(),
+        options.currently_fulfilled_connection.target.credential.clone(),
+    );
 
     // Keep track of the connection's average signal strength for future scoring.
     let mut avg_rssi = SignalStrengthAverage::new();
@@ -627,12 +621,13 @@ async fn connected_state(
 
                             // Record data about the connection and disconnect for future network
                             // selection.
+                            let signal_data = common_options.roam_manager.lock().await.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 types::DisconnectReason::DisconnectDetectedFromSme,
-                                bss_quality_data.signal_data,
+                                signal_data,
                             ).await;
 
                             !fidl_info.is_sme_reconnecting
@@ -663,44 +658,13 @@ async fn connected_state(
                             // Update connection data
                             options.ap_state.tracked.signal.rssi_dbm = ind.rssi_dbm;
                             options.ap_state.tracked.signal.snr_db = ind.snr_db;
-                            bss_quality_data.signal_data.update_with_new_measurement(ind.rssi_dbm, ind.snr_db);
                             avg_rssi.add(DecibelMilliWatt(ind.rssi_dbm));
-                            let current_connection = &options.currently_fulfilled_connection.target;
-                            handle_connection_stats(
-                                &common_options.telemetry_sender,
-                                &mut common_options.stats_sender,
-                                common_options.iface_id,
-                                current_connection.network.clone(),
-                                ind,
-                                bss_quality_data.clone(),
-                            ).await;
 
-                            // Evaluate current BSS, and determine if roaming future should be
-                            // triggered.
-                            let (bss_score, roam_reasons) = bss_selection::evaluate_current_bss(&bss_quality_data);
-                            options.past_connection_scores.add(TimestampedConnectionScore::new(bss_score, fasync::Time::now()));
-                            if !roam_reasons.is_empty() {
-                                let now = fasync::Time::now();
-                                if now < time_prev_roam_scan + MIN_TIME_BETWEEN_ROAM_SCANS {
-                                    continue;
-                                }
-                                // If there isn't a new reason to roam and the previous scan
-                                // happened recently, do not scan again.
-                                let is_scan_old =
-                                    now > time_prev_roam_scan + TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE;
-                                let has_new_reason =
-                                    roam_reasons.iter().any(|r| { !roam_reasons_prev_scan.contains(r) });
-                                let is_rssi_different =
-                                    (rssi_prev_roam_scan - ind.rssi_dbm).abs() > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
-                                if  is_scan_old || has_new_reason || is_rssi_different
-                                     {
-                                        // TODO(haydennix): Trigger roaming future, which must be
-                                        // idempotent since repeated calls are likely.
-                                        common_options.telemetry_sender.send(TelemetryEvent::RoamingScan);
-                                        time_prev_roam_scan = fasync::Time::now();
-                                        roam_reasons_prev_scan = roam_reasons;
-                                        rssi_prev_roam_scan = ind.rssi_dbm;
-                                    }
+                            // This await shouldn't really wait since RoamManager's functions
+                            // themselves shouldn't await on other operations.
+                            let score = common_options.roam_manager.lock().await.handle_connection_stats(ind, roam_sender.clone());
+                            if let Ok(score) = score {
+                                options.past_connection_scores.add(TimestampedConnectionScore::new(score, fasync::Time::now()));
                             }
                             false
                         }
@@ -732,12 +696,13 @@ async fn connected_state(
                 match req {
                     Some(ManualRequest::Disconnect((reason, responder))) => {
                         debug!("Disconnect requested");
+                        let signal_data = common_options.roam_manager.lock().await.get_signal_data();
                         record_disconnect(
                             &common_options,
                             &options,
                             connect_start_time,
                             reason,
-                            bss_quality_data.signal_data
+                            signal_data
                         ).await;
                         let ConnectedOptions {ap_state, past_connection_scores, currently_fulfilled_connection, ..} = options;
                         let options = DisconnectingOptions {
@@ -767,12 +732,13 @@ async fn connected_state(
                                 types::DisconnectReason::Unknown
                             });
 
+                            let signal_data = common_options.roam_manager.lock().await.get_signal_data();
                             record_disconnect(
                                 &common_options,
                                 &options,
                                 connect_start_time,
                                 disconnect_reason,
-                                bss_quality_data.signal_data
+                                signal_data
                             ).await;
 
 
@@ -815,29 +781,11 @@ async fn connected_state(
                     TelemetryEvent::LongDurationConnectionScoreAverage{ scores: options.past_connection_scores.get_before(fasync::Time::now()) }
                 );
             }
+            _roam_request = roam_receiver.next() => {
+                // TODO(nmccracken) Roam to this network once we have decided proactive roaming is ready to enable.
+            }
         }
     }
-}
-
-/// Update IfaceManager with the updated connection quality data.
-async fn handle_connection_stats(
-    telemetry_sender: &TelemetrySender,
-    stats_sender: &mut ConnectionStatsSender,
-    iface_id: u16,
-    id: types::NetworkIdentifier,
-    ind: fidl_internal::SignalReportIndication,
-    bss_quality_data: bss_selection::BssQualityData,
-) {
-    let connection_stats =
-        PeriodicConnectionStats { id, iface_id, quality_data: bss_quality_data.clone() };
-    stats_sender.unbounded_send(connection_stats).unwrap_or_else(|e| {
-        error!("Failed to send periodic connection stats from the connected state: {}", e);
-    });
-    // Send RSSI and RSSI velocity metrics
-    telemetry_sender.send(TelemetryEvent::OnSignalReport {
-        ind,
-        rssi_velocity: bss_quality_data.signal_data.ewma_rssi_velocity.get().round() as i8,
-    });
 }
 
 async fn record_disconnect(
@@ -845,29 +793,35 @@ async fn record_disconnect(
     options: &ConnectedOptions,
     connect_start_time: fasync::Time,
     reason: types::DisconnectReason,
-    signal_data: SignalData,
+    signal_data: Option<SignalData>,
 ) {
-    let curr_time = fasync::Time::now();
-    let uptime = curr_time - connect_start_time;
-    let data = PastConnectionData::new(
-        options.ap_state.original().bssid,
-        options.connection_attempt_time,
-        options.time_to_connect,
-        curr_time,
-        uptime,
-        reason,
-        signal_data,
-        // TODO: record average phy rate over connection once available
-        0,
-    );
-    common_options
-        .saved_networks_manager
-        .record_disconnect(
-            &options.currently_fulfilled_connection.target.network.clone(),
-            &options.currently_fulfilled_connection.target.credential,
-            data,
-        )
-        .await;
+    if let Some(signal_data) = signal_data {
+        let curr_time = fasync::Time::now();
+        let uptime = curr_time - connect_start_time;
+        let data = PastConnectionData::new(
+            options.ap_state.original().bssid,
+            options.connection_attempt_time,
+            options.time_to_connect,
+            curr_time,
+            uptime,
+            reason,
+            signal_data,
+            // TODO: record average phy rate over connection once available
+            0,
+        );
+        common_options
+            .saved_networks_manager
+            .record_disconnect(
+                &options.currently_fulfilled_connection.target.network.clone(),
+                &options.currently_fulfilled_connection.target.credential,
+                data,
+            )
+            .await;
+    } else {
+        // This is an unlikely error that would happen the LocalRoamManager was not informed about
+        // the beginning of the connection.
+        error!("Could not record disconnect because signal data is not available.");
+    }
 }
 
 /// Get the disconnect reason corresponding to the connect reason. Return an error if the connect
@@ -903,7 +857,7 @@ mod tests {
                 testing::{
                     generate_connect_selection, generate_disconnect_info, poll_sme_req,
                     random_connection_data, ConnectResultRecord, ConnectionRecord,
-                    FakeSavedNetworksManager,
+                    FakeLocalRoamManager, FakeSavedNetworksManager,
                 },
             },
         },
@@ -915,7 +869,6 @@ mod tests {
         lazy_static::lazy_static,
         pin_utils::pin_mut,
         std::convert::TryFrom,
-        test_util::{assert_gt, assert_lt},
         wlan_common::{assert_variant, sequestered::Sequestered},
         wlan_metrics_registry::PolicyDisconnectionMigratedMetricDimensionReason,
     };
@@ -932,8 +885,9 @@ mod tests {
         client_req_sender: mpsc::Sender<ManualRequest>,
         update_receiver: mpsc::UnboundedReceiver<listener::ClientListenerMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        stats_receiver: mpsc::UnboundedReceiver<PeriodicConnectionStats>,
         defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        /// This receives the messages sent to the FakeLocalRoamManager.
+        stats_receiver: mpsc::UnboundedReceiver<fidl_internal::SignalReportIndication>,
     }
 
     fn test_setup() -> TestValues {
@@ -946,8 +900,9 @@ mod tests {
         let saved_networks_manager = Arc::new(saved_networks);
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (stats_sender, stats_receiver) = mpsc::unbounded();
         let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let (roam_manager, stats_receiver) = FakeLocalRoamManager::new_with_stats_channel();
+        let roam_manager = Arc::new(Mutex::new(roam_manager));
 
         TestValues {
             common_options: CommonStateOptions {
@@ -957,16 +912,16 @@ mod tests {
                 saved_networks_manager: saved_networks_manager.clone(),
                 telemetry_sender,
                 iface_id: 1,
-                stats_sender,
                 defect_sender,
+                roam_manager,
             },
             sme_req_stream,
             saved_networks_manager,
             client_req_sender,
             update_receiver,
             telemetry_receiver,
-            stats_receiver,
             defect_receiver,
+            stats_receiver,
         }
     }
 
@@ -1550,8 +1505,9 @@ mod tests {
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (stats_sender, _stats_receiver) = mpsc::unbounded();
         let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
+
         let common_options = CommonStateOptions {
             proxy: sme_proxy,
             req_stream: client_req_stream.fuse(),
@@ -1559,8 +1515,8 @@ mod tests {
             saved_networks_manager: saved_networks_manager.clone(),
             telemetry_sender,
             iface_id: 1,
-            stats_sender,
             defect_sender,
+            roam_manager,
         };
 
         let connect_selection = generate_connect_selection();
@@ -1660,8 +1616,8 @@ mod tests {
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let (stats_sender, _stats_receiver) = mpsc::unbounded();
         let (defect_sender, mut defect_receiver) = mpsc::unbounded();
+        let roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
 
         let common_options = CommonStateOptions {
             proxy: sme_proxy,
@@ -1670,8 +1626,8 @@ mod tests {
             saved_networks_manager: saved_networks_manager.clone(),
             telemetry_sender,
             iface_id: 1,
-            stats_sender,
             defect_sender,
+            roam_manager,
         };
 
         let connect_selection = generate_connect_selection();
@@ -2737,7 +2693,6 @@ mod tests {
         exec.set_fake_time(fasync::Time::from_nanos(0));
 
         let mut test_values = test_setup();
-        let mut telemetry_receiver = test_values.telemetry_receiver;
 
         // Set initial RSSI and SNR values
         let mut connect_selection = generate_connect_selection();
@@ -2754,6 +2709,7 @@ mod tests {
 
         let ap_state =
             types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
+        let channel = ap_state.tracked.channel;
 
         // Add a PastConnectionData for the connected network to be send in BSS quality data.
         let mut past_connections = PastConnectionList::default();
@@ -2796,277 +2752,44 @@ mod tests {
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify telemetry event for signal report data then RSSI data.
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity})) => {
-            assert_eq!(ind, fidl_signal_report);
-            // verify that RSSI velocity is negative since the signal report RSSI is lower.
-            assert_lt!(rssi_velocity, 0);
-        });
-
         // Do a quick check that state machine does not exist and there's no disconnect to SME
         assert_variant!(poll_sme_req(&mut exec, &mut sme_fut), Poll::Pending);
 
-        // Verify that connection stats are sent out
-        let stats = test_values
-            .stats_receiver
-            .try_next()
-            .expect("failed to get connection stats")
-            .expect("next connection stats is missing");
-        // Test setup always use iface ID 1.
-        assert_eq!(stats.iface_id, 1);
-        assert_eq!(stats.id, connect_selection.target.network.clone());
-        // EWMA RSSI and SNR should be between the initial and the newest values.
-        let ewma_rssi_1 = stats.quality_data.signal_data.ewma_rssi;
-        assert_lt!(ewma_rssi_1.get(), init_rssi as f64);
-        assert_gt!(ewma_rssi_1.get(), rssi_1 as f64);
-        let ewma_snr_1 = stats.quality_data.signal_data.ewma_snr;
-        assert_lt!(ewma_snr_1.get(), init_snr as f64);
-        assert_gt!(ewma_snr_1.get(), snr_1 as f64);
-        // Check that RSSI velocity is negative.
-        let rssi_velocity_1 = stats.quality_data.signal_data.ewma_rssi_velocity.get();
-        assert_lt!(rssi_velocity_1, 0.0);
-        // Check that the BssQualityData includes the past connection data.
-        assert_eq!(stats.quality_data.past_connections_list, past_connections.clone());
-        // Check that the channel is included.
-        assert_eq!(
-            stats.quality_data.channel,
-            wlan_common::channel::Channel::try_from(bss_description.channel).unwrap()
+        // The tracked signal data uses the RSS/SNR data from the time of connection and the first
+        // stats are sent after updated with the first signal report data.
+        let mut expected_qual_data = bss_selection::BssQualityData::new(
+            SignalData::new(
+                init_rssi,
+                init_snr,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            channel,
+            past_connections,
         );
+        expected_qual_data.signal_data.update_with_new_measurement(rssi_1, snr_1);
+
+        // Verify that connection stats are sent out
+        assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
+            assert_eq!(stats.rssi_dbm, rssi_1);
+            assert_eq!(stats.snr_db, snr_1);
+        });
 
         // Send a second signal report with higher RSSI and SNR than the previous reports.
-        let rssi_1 = -30;
-        let snr_1 = 35;
+        let rssi_2 = -30;
+        let snr_2 = 35;
         let fidl_signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
+            fidl_internal::SignalReportIndication { rssi_dbm: rssi_2, snr_db: snr_2 };
         connect_txn_handle
             .send_on_signal_report(&fidl_signal_report)
             .expect("failed to send signal report");
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
-        // Verify that a telemetry event is sent
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::OnSignalReport { ind, rssi_velocity } => {
-                assert_eq!(ind, fidl_signal_report);
-                assert_gt!(rssi_velocity, 0);
-            });
+        // Verify that another connection stats is sent out with new signal data.
+        assert_variant!(test_values.stats_receiver.try_next(), Ok(Some(stats)) => {
+            assert_eq!(stats.rssi_dbm, rssi_2);
+            assert_eq!(stats.snr_db, snr_2);
         });
-
-        // Verify that the new EWMA values are higher than the previous values.
-        let stats = test_values
-            .stats_receiver
-            .try_next()
-            .expect("failed to get connection stats")
-            .expect("next connection stats is missing");
-        assert_eq!(stats.iface_id, 1);
-        assert_eq!(stats.id, connect_selection.target.network.clone());
-        // Check that EWMA RSSI and SNR values are greater than the previous values.
-        assert_gt!(stats.quality_data.signal_data.ewma_rssi.get(), ewma_rssi_1.get());
-        assert_gt!(stats.quality_data.signal_data.ewma_snr.get(), ewma_snr_1.get());
-        // Check that RSSI velocity is greater than the previous velocity.
-        assert_gt!(stats.quality_data.signal_data.ewma_rssi_velocity.get(), rssi_velocity_1);
-        // Check that the BssQualityData includes the past connection data.
-        assert_eq!(stats.quality_data.past_connections_list, past_connections);
-        // Check that the channel is included.
-        assert_eq!(
-            stats.quality_data.channel,
-            wlan_common::channel::Channel::try_from(bss_description.channel).unwrap()
-        );
-    }
-
-    #[fuchsia::test]
-    fn connected_state_should_roam() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        let start_time = fasync::Time::from_nanos(0);
-        exec.set_fake_time(start_time);
-
-        let test_values = test_setup();
-        let mut telemetry_receiver = test_values.telemetry_receiver;
-
-        let mut connect_selection = generate_connect_selection();
-        let init_rssi = -75;
-        let init_snr = 30;
-
-        // Set initial RSSI and SNR values
-        connect_selection.target.bss.rssi = init_rssi;
-        connect_selection.target.bss.snr_db = init_snr;
-
-        // Set initial RSSI and SNR values in bss description
-        let mut bss_description =
-            Sequestered::release(connect_selection.target.bss.bss_description.clone());
-        bss_description.rssi_dbm = init_rssi;
-        bss_description.snr_db = init_snr;
-        connect_selection.target.bss.bss_description = bss_description.clone().into();
-
-        let ap_state =
-            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
-
-        // Set up the state machine, starting at the connected state.
-        let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
-        };
-        let initial_state = connected_state(test_values.common_options, options);
-        let connect_txn_handle = connect_txn_stream.control_handle();
-        let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
-        // Make sure the connected state gets time of connection before sending the signal report.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Set the time to be a while after the connection started, since roams shouldn't
-        // happen immediately after connnection begins.
-        exec.set_fake_time(start_time + fasync::Duration::from_minutes(20));
-
-        // Send a signal report indicating the connection is weak.
-        let rssi_1 = -90;
-        let snr_1 = 25;
-        let fidl_signal_report =
-            fidl_internal::SignalReportIndication { rssi_dbm: rssi_1, snr_db: snr_1 };
-        connect_txn_handle
-            .send_on_signal_report(&fidl_signal_report)
-            .expect("failed to send signal report");
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Verify that telemetry events are sent for the signal report and a Roam Scan.
-        assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::OnSignalReport {ind, rssi_velocity: _})) => {
-                assert_eq!(ind, fidl_signal_report);
-            }
-        );
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
-    }
-
-    #[fuchsia::test]
-    fn connected_state_should_not_roam_scan_frequently() {
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-
-        let test_values = test_setup();
-        let mut telemetry_receiver = test_values.telemetry_receiver;
-
-        // Create helper function for sending signal reports in this test.
-        fn send_signal_report(
-            rssi: i8,
-            snr: i8,
-            connect_txn_handle: &fidl_sme::ConnectTransactionControlHandle,
-        ) {
-            let fidl_signal_report =
-                fidl_internal::SignalReportIndication { rssi_dbm: rssi, snr_db: snr };
-            connect_txn_handle
-                .send_on_signal_report(&fidl_signal_report)
-                .expect("failed to send signal report");
-        }
-
-        let mut connect_selection = generate_connect_selection();
-        let rssi_1 = -75;
-        let snr = 30;
-
-        // Set initial RSSI and SNR values
-        connect_selection.target.bss.rssi = rssi_1;
-        connect_selection.target.bss.snr_db = snr;
-
-        // Set initial RSSI and SNR values in bss description
-        let mut bss_description =
-            Sequestered::release(connect_selection.target.bss.bss_description.clone());
-        bss_description.rssi_dbm = rssi_1;
-        bss_description.snr_db = snr;
-        connect_selection.target.bss.bss_description = bss_description.clone().into();
-
-        let ap_state =
-            types::ApState::from(BssDescription::try_from(bss_description.clone()).unwrap());
-
-        // Set up the state machine, starting at the connected state.
-        let (connect_txn_proxy, connect_txn_stream) =
-            create_proxy_and_stream::<fidl_sme::ConnectTransactionMarker>()
-                .expect("failed to create a connect txn channel");
-        let options = ConnectedOptions {
-            currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(ap_state),
-            multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
-            connect_txn_stream: connect_txn_proxy.take_event_stream(),
-            network_is_likely_hidden: false,
-            connection_attempt_time: fasync::Time::now(),
-            time_to_connect: zx::Duration::from_seconds(10),
-            past_connection_scores: HistoricalList::new(NUM_PAST_SCORES),
-        };
-        let initial_state = connected_state(test_values.common_options, options);
-        let connect_txn_handle = connect_txn_stream.control_handle();
-
-        let fut = run_state_machine(initial_state);
-        pin_mut!(fut);
-
-        // Send a signal report indicating the connection is weak and unchanged.
-        send_signal_report(rssi_1, snr, &connect_txn_handle);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Check that a roam scan doesn't happen right after connection begins, even if the signal
-        // is bad and has significantly different RSSI from when the last roam scan happened.
-        poll_telemetry_signal_report_event(&mut telemetry_receiver);
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
-
-        // Run the state machine
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        // Run forward to get post connection score metrics
-        exec.set_fake_time(fasync::Time::after(AVERAGE_SCORE_DELTA_MINIMUM_DURATION + 1.second()));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::PostConnectionScores { .. });
-        });
-
-        // Run forward to get long duration score metrics
-        exec.set_fake_time(fasync::Time::after(METRICS_SHORT_CONNECT_DURATION + 1.second()));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => {
-            assert_variant!(event, TelemetryEvent::LongDurationConnectionScoreAverage { .. });
-        });
-
-        // Check that after a while even without a change in RSSI there would be a roam scan.
-        exec.set_fake_time(fasync::Time::after(20.minutes()));
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        send_signal_report(rssi_1, snr, &connect_txn_handle);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        poll_telemetry_signal_report_event(&mut telemetry_receiver);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
-
-        // Check that after more than the minimum amount of time, if the RSSI has changed
-        // significantly from the last roam scan, another scan can happen.
-        let rssi_2 = rssi_1 - 10;
-        exec.set_fake_time(fasync::Time::after(2.minutes()));
-        send_signal_report(rssi_2, snr, &connect_txn_handle);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        poll_telemetry_signal_report_event(&mut telemetry_receiver);
-        assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::RoamingScan {})));
-
-        // Check that after a moderately short amount of time without a change in RSSI, there is
-        // not another scan.
-        exec.set_fake_time(fasync::Time::after(2.minutes()));
-        send_signal_report(rssi_2, snr, &connect_txn_handle);
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
-
-        poll_telemetry_signal_report_event(&mut telemetry_receiver);
-        assert_variant!(telemetry_receiver.try_next(), Err(_));
-    }
-
-    /// Get the next signal report telemetry event without verifying the values. The purpose is to
-    /// pull the event from the channel in order to get later events that tests care about.
-    #[track_caller]
-    fn poll_telemetry_signal_report_event(telemetry_receiver: &mut mpsc::Receiver<TelemetryEvent>) {
-        assert_variant!(
-            telemetry_receiver.try_next(),
-            Ok(Some(TelemetryEvent::OnSignalReport { .. }))
-        );
     }
 
     #[fuchsia::test]
@@ -3309,8 +3032,8 @@ mod tests {
             test_values.common_options.saved_networks_manager,
             Some(connect_selection),
             test_values.common_options.telemetry_sender,
-            test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
+            test_values.common_options.roam_manager,
         );
         pin_mut!(fut);
 
@@ -3357,8 +3080,8 @@ mod tests {
             test_values.common_options.saved_networks_manager,
             Some(connect_selection),
             test_values.common_options.telemetry_sender,
-            test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
+            test_values.common_options.roam_manager,
         );
         pin_mut!(fut);
 
@@ -3401,8 +3124,8 @@ mod tests {
             test_values.common_options.saved_networks_manager,
             Some(connect_selection),
             test_values.common_options.telemetry_sender,
-            test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
+            test_values.common_options.roam_manager,
         );
         pin_mut!(fut);
 
@@ -3479,8 +3202,8 @@ mod tests {
             test_values.common_options.saved_networks_manager,
             Some(connect_selection),
             test_values.common_options.telemetry_sender,
-            test_values.common_options.stats_sender,
             test_values.common_options.defect_sender,
+            test_values.common_options.roam_manager,
         );
         pin_mut!(fut);
 

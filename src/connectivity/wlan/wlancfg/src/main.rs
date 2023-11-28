@@ -33,7 +33,14 @@ use {
     wlan_trace as wtrace,
     wlancfg_lib::{
         access_point::AccessPoint,
-        client::{self, connection_selection::ConnectionSelector, scan},
+        client::{
+            self,
+            connection_selection::{
+                local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
+                ConnectionSelector,
+            },
+            scan,
+        },
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy::{self, IfaceRef},
         mode_management::{
@@ -346,6 +353,17 @@ async fn run_all_futures() -> Result<(), Error> {
         telemetry_sender.clone(),
     ));
 
+    let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
+    let local_roam_manager =
+        Arc::new(Mutex::new(LocalRoamManager::new(roam_stats_sender, telemetry_sender.clone())));
+    let roam_manager_service = LocalRoamManagerService::new(
+        roam_stats_receiver,
+        telemetry_sender.clone(),
+        connection_selector.clone(),
+    );
+
+    let roam_manager_service_fut = roam_manager_service.serve();
+
     let phy_manager = Arc::new(Mutex::new(PhyManager::new(
         monitor_svc.clone(),
         component::inspector().root().create_child("phy_manager"),
@@ -365,6 +383,7 @@ async fn run_all_futures() -> Result<(), Error> {
         ap_sender.clone(),
         monitor_svc.clone(),
         saved_networks.clone(),
+        local_roam_manager,
         connection_selector.clone(),
         telemetry_sender.clone(),
     );
@@ -425,6 +444,7 @@ async fn run_all_futures() -> Result<(), Error> {
         low_power_fut,
         telemetry_fut.map(Ok),
         persistence_req_forwarder_fut.map(Ok),
+        roam_manager_service_fut.map(Ok),
     )?;
     Ok(())
 }

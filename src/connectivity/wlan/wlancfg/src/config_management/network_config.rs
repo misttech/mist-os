@@ -513,6 +513,35 @@ impl SecurityType {
             SecurityType::Wpa3,
         ]
     }
+
+    /// Return whether or not this saved security type can be used to connect scan results with
+    /// this detailed security type.
+    pub fn is_compatible_with_scanned_type(
+        &self,
+        scanned_type: &client_types::SecurityTypeDetailed,
+    ) -> bool {
+        match self {
+            SecurityType::None => {
+                // return true if the scanned security is open, or false otherwise.
+                scanned_type == &client_types::SecurityTypeDetailed::Open
+            }
+            SecurityType::Wep => scanned_type == &client_types::SecurityTypeDetailed::Wep,
+            SecurityType::Wpa => {
+                scanned_type == &client_types::SecurityTypeDetailed::Wpa1
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
+            }
+            SecurityType::Wpa2 => {
+                scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Wpa3Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa3Personal
+            }
+            SecurityType::Wpa3 => {
+                scanned_type == &client_types::SecurityTypeDetailed::Wpa2Wpa3Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa3Personal
+            }
+        }
+    }
 }
 
 /// The network identifier is the SSID and security policy of the network, and it is used to

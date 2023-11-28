@@ -28,7 +28,8 @@ pub enum RoamReason {
 }
 
 /// Aggregated information about the current BSS's connection quality, used for evaluation.
-#[derive(Clone, Debug)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 pub struct BssQualityData {
     pub signal_data: SignalData,
     pub channel: types::WlanChan,

@@ -12,7 +12,7 @@ use {
     fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_policy as fidl_policy,
     fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_zircon as zx,
     ieee80211::{Bssid, MacAddrBytes, Ssid},
-    rand::Rng as _,
+    rand::{Rng as _, RngCore},
     std::convert::TryFrom,
     wlan_common::{
         channel::{Cbw, Channel},
@@ -253,6 +253,25 @@ pub fn generate_random_fidl_network_config_with_ssid(ssid: &str) -> fidl_policy:
         credential: Some(fidl_policy::Credential::Password(credential_bytes)),
         ..Default::default()
     }
+}
+
+/// Generate a WPA2 network identifier with an SSID of length 2 to 32.
+pub fn generate_random_network_identifier() -> types::NetworkIdentifier {
+    let mut rng = rand::thread_rng();
+    let mut ssid = vec![0; rng.gen_range(2..33)];
+    rng.fill_bytes(&mut ssid);
+    types::NetworkIdentifier {
+        ssid: types::Ssid::from_bytes_unchecked(ssid),
+        security_type: types::SecurityType::Wpa2,
+    }
+}
+
+/// Generate a password of 8 to 64 random bytes.
+pub fn generate_random_password() -> Credential {
+    let mut rng = rand::thread_rng();
+    let mut password = vec![0; rng.gen_range(8..64)];
+    rng.fill_bytes(&mut password);
+    Credential::Password(password)
 }
 
 pub fn generate_random_authenticator() -> SecurityAuthenticator {

@@ -6,18 +6,12 @@ use {
     crate::{
         access_point::{state_machine as ap_fsm, state_machine::AccessPointApi, types as ap_types},
         client::{
-            connection_selection::{
-                scoring_functions::score_connection_quality, ConnectionSelector,
-            },
-            state_machine::{
-                self as client_fsm, ConnectionStatsReceiver, ConnectionStatsSender,
-                PeriodicConnectionStats,
-            },
-            types as client_types,
+            connection_selection::{local_roam_manager::LocalRoamManagerApi, ConnectionSelector},
+            state_machine as client_fsm, types as client_types,
         },
         config_management::SavedNetworksManagerApi,
         mode_management::{
-            iface_manager_api::{ConnectAttemptRequest, IfaceManagerApi, SmeForScan},
+            iface_manager_api::{ConnectAttemptRequest, SmeForScan},
             iface_manager_types::*,
             phy_manager::{CreateClientIfacesReason, PhyManagerApi},
             Defect,
@@ -44,13 +38,6 @@ use {
 // Maximum allowed interval between scans when attempting to reconnect client interfaces.  This
 // value is taken from legacy state machine.
 const MAX_AUTO_CONNECT_RETRY_SECONDS: i64 = 10;
-
-/// The threshold for whether or not to look for another network to roam to. The value that this
-/// is is compared against should be between 0 and 1.
-const THRESHOLD_BAD_CONNECTION: f32 = 0.0;
-
-/// The time to wait between roam scans to avoid constant scanning.
-const DURATION_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_seconds(5 * 60);
 
 /// Wraps around vital information associated with a WLAN client interface.  In all cases, a client
 /// interface will have an ID and a ClientSmeProxy to make requests of the interface.  If a client
@@ -87,8 +74,8 @@ async fn create_client_state_machine(
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
     connect_selection: Option<client_types::ConnectSelection>,
     telemetry_sender: TelemetrySender,
-    stats_sender: ConnectionStatsSender,
     defect_sender: mpsc::UnboundedSender<Defect>,
+    roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
 ) -> Result<
     (
         Box<dyn client_fsm::ClientApi + Send>,
@@ -120,8 +107,8 @@ async fn create_client_state_machine(
         saved_networks,
         connect_selection,
         telemetry_sender,
-        stats_sender,
         defect_sender,
+        roam_manager,
     );
 
     let metadata =
@@ -141,14 +128,13 @@ pub(crate) struct IfaceManagerService {
     clients: Vec<ClientIfaceContainer>,
     aps: Vec<ApIfaceContainer>,
     saved_networks: Arc<dyn SavedNetworksManagerApi>,
+    local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
     fsm_futures:
         FuturesUnordered<future_with_metadata::FutureWithMetadata<(), StateMachineMetadata>>,
     connection_selection_futures:
         FuturesUnordered<BoxFuture<'static, Option<client_types::ScannedCandidate>>>,
     bss_selection_futures: FuturesUnordered<BoxFuture<'static, BssSelectionOperation>>,
     telemetry_sender: TelemetrySender,
-    // A sender to be cloned for each connection to send periodic data about connection quality.
-    stats_sender: ConnectionStatsSender,
     // A sender to be cloned for state machines to report defects to the IfaceManager.
     defect_sender: mpsc::UnboundedSender<Defect>,
 }
@@ -160,8 +146,8 @@ impl IfaceManagerService {
         ap_update_sender: listener::ApListenerMessageSender,
         dev_monitor_proxy: fidl_fuchsia_wlan_device_service::DeviceMonitorProxy,
         saved_networks: Arc<dyn SavedNetworksManagerApi>,
+        local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
         telemetry_sender: TelemetrySender,
-        stats_sender: ConnectionStatsSender,
         defect_sender: mpsc::UnboundedSender<Defect>,
     ) -> Self {
         IfaceManagerService {
@@ -172,11 +158,11 @@ impl IfaceManagerService {
             clients: Vec::new(),
             aps: Vec::new(),
             saved_networks,
+            local_roam_manager,
             fsm_futures: FuturesUnordered::new(),
             connection_selection_futures: FuturesUnordered::new(),
             bss_selection_futures: FuturesUnordered::new(),
             telemetry_sender,
-            stats_sender,
             defect_sender,
         }
     }
@@ -500,8 +486,8 @@ impl IfaceManagerService {
                     self.saved_networks.clone(),
                     Some(selection),
                     self.telemetry_sender.clone(),
-                    self.stats_sender.clone(),
                     self.defect_sender.clone(),
+                    self.local_roam_manager.clone(),
                 )
                 .await?;
                 client_iface.client_state_machine = Some(new_client);
@@ -590,8 +576,8 @@ impl IfaceManagerService {
                     self.saved_networks.clone(),
                     Some(connect_selection.clone()),
                     self.telemetry_sender.clone(),
-                    self.stats_sender.clone(),
                     self.defect_sender.clone(),
+                    self.local_roam_manager.clone(),
                 )
                 .await?;
 
@@ -631,8 +617,8 @@ impl IfaceManagerService {
                     self.saved_networks.clone(),
                     None,
                     self.telemetry_sender.clone(),
-                    self.stats_sender.clone(),
                     self.defect_sender.clone(),
+                    self.local_roam_manager.clone(),
                 )
                 .await?;
 
@@ -909,29 +895,6 @@ impl IfaceManagerService {
         let guard = self.phy_manager.lock().await;
         return guard.has_wpa3_client_iface();
     }
-
-    /// Returns the last time this interface roamed or started a new connection, or none if the
-    /// iface is not found.
-    pub fn get_iface_roam_scan_time(&mut self, iface_id: u16) -> Option<fasync::Time> {
-        for client in self.clients.iter() {
-            if client.iface_id == iface_id {
-                return Some(client.last_roam_time);
-            }
-        }
-        None
-    }
-
-    /// Sets the last roam scan time on the iface, or does nothing if an iface with the provided
-    /// ID is not found.
-    pub fn set_iface_roam_scan_time(&mut self, iface_id: u16, time: fasync::Time) {
-        for client in self.clients.iter_mut() {
-            if client.iface_id == iface_id {
-                client.last_roam_time = time;
-                return;
-            }
-        }
-        info!("Roam scan time was not set, matching iface not found.");
-    }
 }
 
 /// Returns whether the security support indicates WPA3 support.
@@ -1183,41 +1146,6 @@ async fn restore_state_after_setting_country_code(
     }
 }
 
-fn handle_periodic_connection_stats(
-    connection_stats: PeriodicConnectionStats,
-    iface_manager: &mut IfaceManagerService,
-    _iface_manager_client: Arc<Mutex<dyn IfaceManagerApi + Send>>,
-    _connection_selector: Arc<ConnectionSelector>,
-) {
-    // If any kind of bss selection is in progress, ignore.
-    if !iface_manager.bss_selection_futures.is_empty() {
-        return;
-    }
-
-    // If a roaming scan already happened recently, ignore.
-    if let Some(last_roam_scan_time) =
-        iface_manager.get_iface_roam_scan_time(connection_stats.iface_id)
-    {
-        if fasync::Time::now() < last_roam_scan_time + DURATION_BETWEEN_ROAM_SCANS {
-            return;
-        }
-    } else {
-        warn!("Failed to find iface to get the last time of roam attempt, will not roam");
-        return;
-    }
-
-    // Decide whether the connection quality is bad enough to justify a network switch
-    // TODO(fxbug.dev/84551): determine whether a connection is considered bad enough to
-    // consider roaming. Currently this will never cause a scan.
-    let connection_quality = score_connection_quality(&connection_stats);
-    if connection_quality < THRESHOLD_BAD_CONNECTION {
-        // Record that a roam scan happened and another should not happen again for a while.
-        iface_manager.set_iface_roam_scan_time(connection_stats.iface_id, fasync::Time::now());
-
-        // TODO(fxbug.dev/116552): Add a bss selection for local roaming operation to bss selection futures.
-    }
-}
-
 // This function allows the defect recording to run in parallel with the regulatory region setting
 // routine.  For full context, see fxb/112640.
 fn initiate_record_defect(
@@ -1375,10 +1303,8 @@ fn attempt_atomic_operation<T: 'static>(
 
 pub(crate) async fn serve_iface_manager_requests(
     mut iface_manager: IfaceManagerService,
-    iface_manager_client: Arc<Mutex<dyn IfaceManagerApi + Send>>,
     connection_selector: Arc<ConnectionSelector>,
     requests: mpsc::Receiver<IfaceManagerRequest>,
-    mut stats_receiver: ConnectionStatsReceiver,
     mut defect_receiver: mpsc::UnboundedReceiver<Defect>,
 ) -> Result<Infallible, Error> {
     // Client and AP state machines need to be allowed to run in order for several operations to
@@ -1443,14 +1369,6 @@ pub(crate) async fn serve_iface_manager_requests(
                 // TODO(fxbug.dev/116552): Handle result of bss selection for local roam.
                 BssSelectionOperation::_LocalRoam(_) => {}
             },
-            connection_stats = stats_receiver.select_next_some() => {
-                handle_periodic_connection_stats(
-                    connection_stats,
-                    &mut iface_manager,
-                    iface_manager_client.clone(),
-                    connection_selector.clone(),
-                );
-            },
             defect = defect_receiver.select_next_some() => {
                 operation_futures.push(initiate_record_defect(iface_manager.phy_manager.clone(), defect))
             },
@@ -1484,7 +1402,8 @@ mod tests {
             regulatory_manager::REGION_CODE_LEN,
             telemetry::{TelemetryEvent, TelemetrySender},
             util::testing::{
-                create_inspect_persistence_channel, fakes::FakeScanRequester,
+                create_inspect_persistence_channel,
+                fakes::{FakeLocalRoamManager, FakeScanRequester},
                 generate_connect_selection, generate_random_bss, generate_random_scanned_candidate,
                 poll_sme_req,
             },
@@ -1538,13 +1457,12 @@ mod tests {
         pub ap_update_sender: listener::ApListenerMessageSender,
         pub ap_update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         pub saved_networks: Arc<dyn SavedNetworksManagerApi>,
+        pub local_roam_manager: Arc<Mutex<dyn LocalRoamManagerApi>>,
         pub connection_selector: Arc<ConnectionSelector>,
         pub scan_requester: Arc<FakeScanRequester>,
         pub node: inspect::Node,
         pub telemetry_sender: TelemetrySender,
         pub telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
-        pub stats_sender: ConnectionStatsSender,
-        pub stats_receiver: ConnectionStatsReceiver,
         pub defect_sender: mpsc::UnboundedSender<Defect>,
         pub defect_receiver: mpsc::UnboundedReceiver<Defect>,
     }
@@ -1575,8 +1493,8 @@ mod tests {
             persistence_req_sender,
             telemetry_sender.clone(),
         ));
-        let (stats_sender, stats_receiver) = mpsc::unbounded();
         let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let local_roam_manager = Arc::new(Mutex::new(FakeLocalRoamManager::new()));
 
         TestValues {
             monitor_service_proxy,
@@ -1586,13 +1504,12 @@ mod tests {
             ap_update_sender: ap_sender,
             ap_update_receiver: ap_receiver,
             saved_networks,
+            local_roam_manager,
             scan_requester,
             node,
             connection_selector,
             telemetry_sender,
             telemetry_receiver,
-            stats_sender,
-            stats_receiver,
             defect_sender,
             defect_receiver,
         }
@@ -1835,8 +1752,8 @@ mod tests {
             test_values.ap_update_sender.clone(),
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender.clone(),
-            test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
         );
 
@@ -1892,8 +1809,8 @@ mod tests {
             test_values.ap_update_sender.clone(),
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender.clone(),
-            test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
         );
 
@@ -2433,8 +2350,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -2471,8 +2388,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -2625,8 +2542,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -2760,8 +2677,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -2872,8 +2789,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3002,8 +2919,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3208,8 +3125,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3342,8 +3259,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
         let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3490,8 +3407,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3799,8 +3716,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3905,8 +3822,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -3975,8 +3892,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks,
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -4111,19 +4028,13 @@ mod tests {
         monitor_service_stream: fidl_fuchsia_wlan_device_service::DeviceMonitorRequestStream,
         test_type: TestType,
     ) {
-        // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
-
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let (_defect_sender, defect_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            stats_receiver,
             defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4188,19 +4099,13 @@ mod tests {
         mut req_receiver: oneshot::Receiver<()>,
         test_type: TestType,
     ) {
-        // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
-
         // Start the service loop
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let (_defect_sender, defect_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            stats_receiver,
             defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4335,7 +4240,6 @@ mod tests {
         }));
 
         // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let connection_selector = Arc::new(ConnectionSelector::new(
@@ -4348,13 +4252,10 @@ mod tests {
 
         // Create mpsc channel to handle requests.
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            stats_receiver,
             test_values.defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4393,7 +4294,6 @@ mod tests {
         let (iface_manager, _stream) = create_iface_manager_with_client(&test_values, true);
 
         // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let connection_selector = Arc::new(ConnectionSelector::new(
@@ -4406,13 +4306,10 @@ mod tests {
 
         // Create mpsc channel to handle requests.
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            stats_receiver,
             test_values.defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4440,7 +4337,6 @@ mod tests {
         let (iface_manager, _stream) = create_iface_manager_with_client(&test_values, true);
 
         // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let connection_selector = Arc::new(ConnectionSelector::new(
@@ -4453,13 +4349,10 @@ mod tests {
 
         // Create mpsc channel to handle requests.
         let (mut sender, receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            stats_receiver,
             test_values.defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4475,91 +4368,6 @@ mod tests {
 
         // Run the service loop and expect the request to be serviced and for the loop to not exit.
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
-    }
-
-    #[derive(Debug)]
-    struct FakeIfaceManagerRequester {}
-
-    impl FakeIfaceManagerRequester {
-        fn new() -> Self {
-            FakeIfaceManagerRequester {}
-        }
-    }
-
-    #[async_trait]
-    impl IfaceManagerApi for FakeIfaceManagerRequester {
-        async fn disconnect(
-            &mut self,
-            _network_id: types::NetworkIdentifier,
-            _reason: client_types::DisconnectReason,
-        ) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn connect(&mut self, _connect_req: ConnectAttemptRequest) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn record_idle_client(&mut self, _iface_id: u16) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn has_idle_client(&mut self) -> Result<bool, Error> {
-            unimplemented!()
-        }
-
-        async fn handle_added_iface(&mut self, _iface_id: u16) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn handle_removed_iface(&mut self, _iface_id: u16) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn get_sme_proxy_for_scan(&mut self) -> Result<SmeForScan, Error> {
-            unimplemented!()
-        }
-
-        async fn stop_client_connections(
-            &mut self,
-            _reason: client_types::DisconnectReason,
-        ) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn start_client_connections(&mut self) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn start_ap(
-            &mut self,
-            _config: ap_fsm::ApConfig,
-        ) -> Result<oneshot::Receiver<()>, Error> {
-            unimplemented!()
-        }
-
-        async fn stop_ap(
-            &mut self,
-            _ssid: ap_types::Ssid,
-            _password: Vec<u8>,
-        ) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn stop_all_aps(&mut self) -> Result<(), Error> {
-            unimplemented!()
-        }
-
-        async fn has_wpa3_capable_client(&mut self) -> Result<bool, Error> {
-            unimplemented!()
-        }
-
-        async fn set_country(
-            &mut self,
-            _country_code: Option<[u8; REGION_CODE_LEN]>,
-        ) -> Result<(), Error> {
-            unimplemented!()
-        }
     }
 
     #[fuchsia::test]
@@ -4579,13 +4387,12 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
         // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let connection_selector = Arc::new(ConnectionSelector::new(
@@ -4600,10 +4407,8 @@ mod tests {
         let (mut sender, receiver) = mpsc::channel(1);
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             connection_selector,
             receiver,
-            test_values.stats_receiver,
             test_values.defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -4712,8 +4517,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -4816,8 +4621,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -4893,8 +4698,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -5122,8 +4927,8 @@ mod tests {
             test_values.ap_update_sender,
             test_values.monitor_service_proxy,
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender,
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -5732,8 +5537,8 @@ mod tests {
             test_values.ap_update_sender.clone(),
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender.clone(),
-            test_values.stats_sender,
             test_values.defect_sender,
         );
 
@@ -5856,8 +5661,8 @@ mod tests {
             test_values.ap_update_sender.clone(),
             test_values.monitor_service_proxy.clone(),
             test_values.saved_networks.clone(),
+            test_values.local_roam_manager.clone(),
             test_values.telemetry_sender.clone(),
-            test_values.stats_sender.clone(),
             test_values.defect_sender.clone(),
         );
 
@@ -5868,14 +5673,11 @@ mod tests {
             .expect("failed to send defect notification");
 
         // Run the IfaceManager service so that it can process the defect.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
         let (_, receiver) = mpsc::channel(0);
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             test_values.connection_selector,
             receiver,
-            test_values.stats_receiver,
             test_values.defect_receiver,
         );
         pin_mut!(serve_fut);
@@ -5994,19 +5796,13 @@ mod tests {
             _ => {}
         }
 
-        // Create other components to run the service.
-        let iface_manager_client = Arc::new(Mutex::new(FakeIfaceManagerRequester::new()));
-
         // Start the service loop
         let (mut req_sender, req_receiver) = mpsc::channel(1);
-        let (_stats_sender, stats_receiver) = mpsc::unbounded();
         let (_defect_sender, defect_receiver) = mpsc::unbounded();
         let serve_fut = serve_iface_manager_requests(
             iface_manager,
-            iface_manager_client,
             test_values.connection_selector,
             req_receiver,
-            stats_receiver,
             defect_receiver,
         );
         pin_mut!(serve_fut);

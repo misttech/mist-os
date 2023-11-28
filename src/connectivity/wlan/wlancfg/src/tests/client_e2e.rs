@@ -4,7 +4,13 @@
 
 use {
     crate::{
-        client::{connection_selection, scan, serve_provider_requests, types},
+        client::{
+            connection_selection::{
+                self,
+                local_roam_manager::{LocalRoamManager, LocalRoamManagerService},
+            },
+            scan, serve_provider_requests, types,
+        },
         config_management::{SavedNetworksManager, SavedNetworksManagerApi},
         legacy,
         mode_management::{
@@ -189,6 +195,26 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         persistence_req_sender,
         telemetry_sender.clone(),
     ));
+
+    let (roam_stats_sender, roam_stats_receiver) = mpsc::unbounded();
+    let local_roam_manager =
+        Arc::new(Mutex::new(LocalRoamManager::new(roam_stats_sender, telemetry_sender.clone())));
+    let roam_manager_service = LocalRoamManagerService::new(
+        roam_stats_receiver,
+        telemetry_sender.clone(),
+        connection_selector.clone(),
+    );
+    let roam_manager_service_fut = Box::pin(
+        roam_manager_service
+            .serve()
+            // Map the output type of this future to match the other ones we want to combine with it
+            .map(|_| {
+                let result: Result<Infallible, Error> =
+                    Err(format_err!("roam_manager_service future exited unexpectedly"));
+                result
+            }),
+    );
+
     let (client_provider_proxy, client_provider_requests) =
         create_proxy::<fidl_policy::ClientProviderMarker>()
             .expect("failed to create ClientProvider proxy");
@@ -209,6 +235,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         ap_update_sender.clone(),
         monitor_service_proxy.clone(),
         saved_networks.clone(),
+        local_roam_manager,
         connection_selector.clone(),
         telemetry_sender.clone(),
     );
@@ -272,6 +299,7 @@ fn test_setup(exec: &mut TestExecutor) -> TestValues {
         iface_manager_service,
         scan_manager_service,
         serve_client_policy_listeners,
+        roam_manager_service_fut,
     ]);
 
     let internal_objects = InternalObjects {
@@ -321,6 +349,7 @@ fn add_phy(exec: &mut TestExecutor, test_values: &mut TestValues) {
             assert!(responder.send(Ok(&[fidl_common::WlanMacRole::Client])).is_ok());
         }
     );
+
     exec.run_singlethreaded(
         &mut add_phy_fut.expect_within(zx::Duration::from_seconds(5), "future didn't complete"),
     );

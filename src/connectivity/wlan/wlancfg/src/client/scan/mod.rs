@@ -55,6 +55,7 @@ pub enum ScanReason {
     NetworkSelection,
     BssSelection,
     BssSelectionAugmentation,
+    RoamSearch,
 }
 
 #[async_trait]
