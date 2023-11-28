@@ -14,6 +14,7 @@ fidl("fuchsia.kernel") {
     "energy-info-resource.fidl",
     "hypervisor-resource.fidl",
     "info-resource.fidl",
+    "iommu-resource.fidl",
     "ioport-resource.fidl",
     "irq-resource.fidl",
     "kernel-counter.fidl",

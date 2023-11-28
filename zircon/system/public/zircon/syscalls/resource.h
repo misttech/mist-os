@@ -29,8 +29,8 @@ typedef uint32_t zx_rsrc_flags_t;
 #define ZX_RSRC_FLAG_EXCLUSIVE ((zx_rsrc_flags_t)0x00010000u)
 #define ZX_RSRC_FLAGS_MASK ((zx_rsrc_flags_t)ZX_RSRC_FLAG_EXCLUSIVE)
 
-#define ZX_RSRC_EXTRACT_KIND(x) ((x)&0x0000FFFF)
-#define ZX_RSRC_EXTRACT_FLAGS(x) ((x)&0xFFFF0000)
+#define ZX_RSRC_EXTRACT_KIND(x) ((x) & 0x0000FFFF)
+#define ZX_RSRC_EXTRACT_FLAGS(x) ((x) & 0xFFFF0000)
 
 typedef uint64_t zx_rsrc_system_base_t;
 #define ZX_RSRC_SYSTEM_HYPERVISOR_BASE ((zx_rsrc_system_base_t)0u)
@@ -41,6 +41,7 @@ typedef uint64_t zx_rsrc_system_base_t;
 #define ZX_RSRC_SYSTEM_POWER_BASE ((zx_rsrc_system_base_t)5u)
 #define ZX_RSRC_SYSTEM_MEXEC_BASE ((zx_rsrc_system_base_t)6u)
 #define ZX_RSRC_SYSTEM_ENERGY_INFO_BASE ((zx_rsrc_system_base_t)7u)
-#define ZX_RSRC_SYSTEM_COUNT ((zx_rsrc_system_base_t)8u)
+#define ZX_RSRC_SYSTEM_IOMMU_BASE ((zx_rsrc_system_base_t)8u)
+#define ZX_RSRC_SYSTEM_COUNT ((zx_rsrc_system_base_t)9u)
 
 #endif  // ZIRCON_SYSCALLS_RESOURCE_H_
