@@ -61,7 +61,12 @@ def main():
     else:
         run_time = time.time()
         returncode = build_targets(
-            output_files, build_dir, args.fuchsia_dir, args.verbose, args.raw
+            output_files,
+            build_dir,
+            args.fuchsia_dir,
+            args.verbose,
+            args.quiet,
+            args.raw,
         ).returncode
 
     lints = {}
@@ -74,12 +79,15 @@ def main():
         if os.path.getmtime(clippy_output) < run_time:
             continue
         with open(clippy_output) as f:
+            error_reported = False
             for line in f:
                 try:
                     lint = json.loads(line)
                 except json.decoder.JSONDecodeError:
-                    print(f"Malformed output: {clippy_output}")
-                    returncode = 1
+                    if not error_reported:
+                        print(f"Malformed output: {clippy_output}")
+                        returncode = 1
+                        error_reported = True
                     continue
                 # filter out "n warnings emitted" messages
                 if not lint["spans"]:
@@ -130,7 +138,7 @@ def fix_paths(lint):
     return lint
 
 
-def build_targets(output_files, build_dir, fuchsia_dir, verbose, raw):
+def build_targets(output_files, build_dir, fuchsia_dir, verbose, quiet, raw):
     prebuilt = PREBUILT_THIRD_PARTY_DIR
     if fuchsia_dir:
         prebuilt = Path(fuchsia_dir) / "prebuilt" / "third_party"
@@ -142,7 +150,9 @@ def build_targets(output_files, build_dir, fuchsia_dir, verbose, raw):
         "0",
     ]
     if verbose:
-        ninja += ["-v"]
+        ninja += ["--verbose"]
+    if quiet:
+        ninja += ["--quiet"]
     output = sys.stderr if raw else None
     return subprocess.run(ninja + output_files, stdout=output)
 
@@ -164,6 +174,12 @@ def parse_args():
     )
     parser.add_argument(
         "--verbose", "-v", help="verbose", action="store_true", default=False
+    )
+    parser.add_argument(
+        "--quiet",
+        help="don't show progress status",
+        action="store_true",
+        default=False,
     )
     parser.add_argument(
         "--files",
