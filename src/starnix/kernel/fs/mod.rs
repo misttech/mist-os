@@ -30,6 +30,7 @@ mod wd_number;
 mod xattr;
 mod zxio;
 
+pub mod bpf;
 pub mod buffers;
 pub mod cgroup;
 pub mod devpts;

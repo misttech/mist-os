@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    bpf::BpfFs,
     device::BinderFs,
     fs::{
+        bpf::BpfFs,
         buffers::InputBuffer,
         devpts::dev_pts_fs,
         devtmpfs::dev_tmp_fs,

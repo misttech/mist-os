@@ -46,8 +46,8 @@ pub fn dispatch_syscall(
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
     use crate::{
-        bpf::sys_bpf,
         fs::{
+            bpf::sys_bpf,
             socket::syscalls::{
                 sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
                 sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,

@@ -32,7 +32,6 @@ use futures::{StreamExt, TryStreamExt};
 mod trace;
 
 mod arch;
-mod bpf;
 mod device;
 mod diagnostics;
 mod dynamic_thread_spawner;
