@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -26,8 +26,8 @@ type MyStruct = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupStruct("MyStruct");
-  ASSERT_NOT_NULL(type_decl);
-  EXPECT_EQ(type_decl->members.size(), 1);
+  ASSERT_NE(type_decl, nullptr);
+  EXPECT_EQ(type_decl->members.size(), 1u);
 }
 
 TEST(StructsTests, BadPrimitiveDefaultValueNoAnnotation) {

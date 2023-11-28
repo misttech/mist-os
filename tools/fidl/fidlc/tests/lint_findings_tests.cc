@@ -11,17 +11,28 @@
 #include "tools/fidl/fidlc/include/fidl/template_string.h"
 #include "tools/fidl/fidlc/include/fidl/utils.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
-#include "tools/fidl/fidlc/tests/unittest_helpers.h"
 
 namespace fidl {
 
 namespace {
 
-#define ASSERT_FINDINGS(TEST) ASSERT_NO_FAILURES(TEST.ExpectFindings())
+#define ASSERT_FINDINGS(TEST)               \
+  {                                         \
+    SCOPED_TRACE("ASSERT_FINDINGS failed"); \
+    (TEST).ExpectFindings();                \
+  }
 
-#define ASSERT_FINDINGS_IN_ANY_POSITION(TEST) ASSERT_NO_FAILURES(TEST.ExpectFindingsInAnyPosition())
+#define ASSERT_FINDINGS_IN_ANY_POSITION(TEST)               \
+  {                                                         \
+    SCOPED_TRACE("ASSERT_FINDINGS_IN_ANY_POSITION failed"); \
+    (TEST).ExpectFindingsInAnyPosition();                   \
+  }
 
-#define ASSERT_NO_FINDINGS(TEST) ASSERT_NO_FAILURES(TEST.ExpectNoFindings())
+#define ASSERT_NO_FINDINGS(TEST)               \
+  {                                            \
+    SCOPED_TRACE("ASSERT_NO_FINDINGS failed"); \
+    (TEST).ExpectNoFindings();                 \
+  }
 
 class LintTest {
  public:
@@ -191,7 +202,7 @@ class LintTest {
 
     ASSERT_FALSE((!expect_findings) && (!expected_findings_.empty()));
 
-    ASSERT_NO_FAILURES(ValidTest());
+    ASSERT_NO_FATAL_FAILURE(ValidTest());
 
     // The test looks good, so run the linter, and update the context
     // value by replacing "Bad test!" with the FIDL source code.
@@ -200,7 +211,7 @@ class LintTest {
                                   .exclude_by_default = exclude_by_default_,
                                   .excluded_checks_not_found = &excluded_check_ids_to_confirm_});
 
-    EXPECT_TRUE(passed == (library().findings().empty()));
+    EXPECT_EQ(passed, library().findings().empty());
 
     if (!excluded_check_ids_to_confirm_.empty()) {
       ss << "Excluded check-ids not found: " << std::endl;
@@ -256,19 +267,19 @@ class LintTest {
   }
 
   void ValidTest() const {
-    ASSERT_FALSE(source_template_.str().empty(), "Missing source template");
+    ASSERT_FALSE(source_template_.str().empty()) << "Missing source template";
     if (!substitutions_.empty()) {
-      ASSERT_FALSE(source_template_.Substitute(substitutions_, false) !=
-                       source_template_.Substitute(substitutions_, true),
-                   "Missing template substitutions");
+      ASSERT_EQ(source_template_.Substitute(substitutions_, false),
+                source_template_.Substitute(substitutions_, true))
+          << "Missing template substitutions";
     }
     if (expected_findings_.empty()) {
-      ASSERT_FALSE(default_check_id_.empty(), "Missing check_id");
+      ASSERT_FALSE(default_check_id_.empty()) << "Missing check_id";
     } else {
       auto& expected_finding = expected_findings_.front();
-      ASSERT_FALSE(expected_finding.subcategory().empty(), "Missing check_id");
-      ASSERT_FALSE(expected_finding.message().empty(), "Missing message");
-      ASSERT_FALSE(!expected_finding.span().valid(), "Missing position");
+      ASSERT_FALSE(expected_finding.subcategory().empty()) << "Missing check_id";
+      ASSERT_FALSE(expected_finding.message().empty()) << "Missing message";
+      ASSERT_TRUE(expected_finding.span().valid()) << "Missing position";
     }
   }
 
@@ -283,19 +294,18 @@ class LintTest {
     utils::PrintFinding(ss, finding);
     auto context = (test_context + ss.str());
     SCOPED_TRACE(context);
-    ASSERT_STRING_EQ(expectf.subcategory(), finding.subcategory());
+    ASSERT_EQ(expectf.subcategory(), finding.subcategory());
     if (assert_positions_match) {
-      ASSERT_STRING_EQ(expectf.span().position_str(), finding.span().position_str());
+      ASSERT_EQ(expectf.span().position_str(), finding.span().position_str());
     }
-    ASSERT_STRING_EQ(expectf.message(), finding.message());
+    ASSERT_EQ(expectf.message(), finding.message());
     ASSERT_EQ(expectf.suggestion().has_value(), finding.suggestion().has_value());
     if (finding.suggestion().has_value()) {
-      ASSERT_STRING_EQ(expectf.suggestion()->description(), finding.suggestion()->description());
+      ASSERT_EQ(expectf.suggestion()->description(), finding.suggestion()->description());
       ASSERT_EQ(expectf.suggestion()->replacement().has_value(),
                 finding.suggestion()->replacement().has_value());
       if (finding.suggestion()->replacement().has_value()) {
-        ASSERT_STRING_EQ(*expectf.suggestion()->replacement(),
-                         *finding.suggestion()->replacement());
+        ASSERT_EQ(*expectf.suggestion()->replacement(), *finding.suggestion()->replacement());
       }
     }
   }

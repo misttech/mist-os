@@ -9,15 +9,10 @@
 
 #include "tools/fidl/fidlc/include/fidl/findings_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
-#include "tools/fidl/fidlc/tests/unittest_helpers.h"
 
 namespace fidl {
 
 namespace {
-
-#define ASSERT_JSON(TEST, JSON)              \
-  ASSERT_NO_FAILURES(TEST.ExpectJson(JSON)); \
-  TEST.Reset()
 
 void FindingsEmitThisJson(const Findings& findings, std::string_view expected_json) {
   std::string actual_json = fidl::FindingsJson(findings).Produce().str();
@@ -32,9 +27,8 @@ void FindingsEmitThisJson(const Findings& findings, std::string_view expected_js
     output_expected.close();
   }
 
-  EXPECT_STRING_EQ(
-      expected_json, actual_json,
-      "To compare results, run:\n\n diff ./json_findings_tests_{expected,actual}.txt\n");
+  EXPECT_EQ(expected_json, actual_json)
+      << "To compare results, run:\n\n diff ./json_findings_tests_{expected,actual}.txt\n";
 }
 
 class JsonFindingsTest {
@@ -109,7 +103,7 @@ agnostic.
   test.AddFinding(
       {.check_id = "check-1", .message = "Finding message", .violation_string = "Findings"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -136,7 +130,7 @@ protocol TestProtocol {
                    .message = "OnWard seems like a silly name for an event",
                    .violation_string = "OnWard"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/on-ward-check",
     "message": "OnWard seems like a silly name for an event",
@@ -163,7 +157,7 @@ protocol TestProtocol {
                    .violation_string = "OnWard",
                    .forced_size = 0});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -188,7 +182,7 @@ protocol TestProtocol {
   test.AddFinding(
       {.check_id = "check-1", .message = "Finding message", .violation_string = "\nlibrary"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -214,7 +208,7 @@ protocol TestProtocol {
                    .message = "Finding message",
                    .violation_string = "TestProtocol {\n"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -239,7 +233,7 @@ protocol TestProtocol {
   test.AddFinding(
       {.check_id = "check-1", .message = "Finding message", .violation_string = "};\n"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -265,7 +259,7 @@ protocol TestProtocol {
           {.check_id = "check-1", .message = "Finding message", .violation_string = "TestProtocol"})
       ->SetSuggestion("Suggestion description");
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -296,7 +290,7 @@ protocol TestProtocol {
           {.check_id = "check-1", .message = "Finding message", .violation_string = "TestProtocol"})
       ->SetSuggestion("Suggestion description", "BestProtocol");
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -337,7 +331,7 @@ protocol
                    .message = "Finding message",
                    .violation_string = "protocol\n TestProtocol"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -365,7 +359,7 @@ protocol TestProtocol {
   test.AddFinding(
       {.check_id = "check-2", .message = "Finding message 2", .violation_string = "OnWard"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -407,7 +401,7 @@ protocol TestProtocol {
   test.AddFinding({.check_id = "check-5", .message = "Finding message 5", .violation_string = "->"})
       ->SetSuggestion("Suggestion description for finding 5", "Replacement string for finding 5");
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-3",
     "message": "Finding message 3",
@@ -485,7 +479,7 @@ struct TestStruct {
                    .message = "Finding message 2",
                    .violation_string = "field"});
 
-  ASSERT_JSON(test, R"JSON([
+  test.ExpectJson(R"JSON([
   {
     "category": "fidl-lint/check-1",
     "message": "Finding message",
@@ -519,7 +513,7 @@ protocol TestProtocol {
 )FIDL");
   ASSERT_FALSE(library.Lint());
 
-  ASSERT_NO_FAILURES(FindingsEmitThisJson(library.findings(), R"JSON([
+  FindingsEmitThisJson(library.findings(), R"JSON([
   {
     "category": "fidl-lint/event-names-must-start-with-on",
     "message": "Event names must start with 'On'",
@@ -544,7 +538,7 @@ protocol TestProtocol {
       }
     ]
   }
-])JSON"));
+])JSON");
 }
 
 }  // namespace

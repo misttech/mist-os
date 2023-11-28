@@ -8,13 +8,10 @@
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics_json.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
-#include "tools/fidl/fidlc/tests/unittest_helpers.h"
 
 namespace fidl {
 
 namespace {
-
-#define ASSERT_JSON(DIAGS, JSON) ASSERT_NO_FAILURES(ExpectJson(DIAGS, JSON))
 
 void ExpectJson(std::vector<Diagnostic*> diagnostics, std::string_view expected_json) {
   std::string actual_json = DiagnosticsJson(std::move(diagnostics)).Produce().str();
@@ -29,9 +26,8 @@ void ExpectJson(std::vector<Diagnostic*> diagnostics, std::string_view expected_
     output_expected.close();
   }
 
-  EXPECT_STRING_EQ(
-      expected_json, actual_json,
-      "To compare results, run:\n\n diff ./json_diagnostics_tests_{expected,actual}.txt\n");
+  EXPECT_EQ(expected_json, actual_json)
+      << "To compare results, run:\n\n diff ./json_diagnostics_tests_{expected,actual}.txt\n";
 }
 
 TEST(JsonDiagnosticsTests, BadError) {
@@ -45,7 +41,7 @@ type Table = table {
   ASSERT_FALSE(library.Compile());
   const auto& diagnostics = library.Diagnostics();
 
-  ASSERT_JSON(diagnostics, R"JSON([
+  ExpectJson(diagnostics, R"JSON([
   {
     "category": "fidlc/error",
     "error_id": "fi-0048",
@@ -71,7 +67,7 @@ protocol Protocol {
   ASSERT_TRUE(library.Compile());
   const auto& diagnostics = library.Diagnostics();
 
-  ASSERT_JSON(diagnostics, R"JSON([
+  ExpectJson(diagnostics, R"JSON([
   {
     "category": "fidlc/warning",
     "error_id": "fi-0145",
@@ -100,7 +96,7 @@ type Bar = table {
   ASSERT_FALSE(library.Compile());
   const auto& diagnostics = library.Diagnostics();
 
-  ASSERT_JSON(diagnostics, R"JSON([
+  ExpectJson(diagnostics, R"JSON([
   {
     "category": "fidlc/error",
     "error_id": "fi-0070",
@@ -135,7 +131,7 @@ type Table = table {
   ASSERT_FALSE(library.Compile());
   const auto& diagnostics = library.Diagnostics();
 
-  ASSERT_JSON(diagnostics, R"JSON([
+  ExpectJson(diagnostics, R"JSON([
   {
     "category": "fidlc/error",
     "error_id": "fi-0008",

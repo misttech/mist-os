@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
@@ -63,10 +63,10 @@ type Foo = flexible enum : uint8 {
   ASSERT_COMPILED(library);
 
   auto foo_enum = library.LookupEnum("Foo");
-  ASSERT_NOT_NULL(foo_enum);
+  ASSERT_NE(foo_enum, nullptr);
   EXPECT_FALSE(foo_enum->unknown_value_signed.has_value());
   EXPECT_TRUE(foo_enum->unknown_value_unsigned.has_value());
-  EXPECT_EQ(foo_enum->unknown_value_unsigned.value(), 1);
+  EXPECT_EQ(foo_enum->unknown_value_unsigned.value(), 1u);
 }
 
 TEST(FlexibleTests, GoodEnumCanUseMaxValueIfOtherIsUnknownSigned) {
@@ -82,9 +82,9 @@ type Foo = flexible enum : int8 {
   ASSERT_COMPILED(library);
 
   auto foo_enum = library.LookupEnum("Foo");
-  ASSERT_NOT_NULL(foo_enum);
+  ASSERT_NE(foo_enum, nullptr);
   EXPECT_TRUE(foo_enum->unknown_value_signed.has_value());
-  EXPECT_EQ(foo_enum->unknown_value_signed.value(), 1);
+  EXPECT_EQ(foo_enum->unknown_value_signed.value(), 1u);
   EXPECT_FALSE(foo_enum->unknown_value_unsigned.has_value());
 }
 
@@ -101,9 +101,9 @@ type Foo = flexible enum : int8 {
   ASSERT_COMPILED(library);
 
   auto foo_enum = library.LookupEnum("Foo");
-  ASSERT_NOT_NULL(foo_enum);
+  ASSERT_NE(foo_enum, nullptr);
   EXPECT_TRUE(foo_enum->unknown_value_signed.has_value());
-  EXPECT_EQ(foo_enum->unknown_value_signed.value(), 0);
+  EXPECT_EQ(foo_enum->unknown_value_signed.value(), 0u);
   EXPECT_FALSE(foo_enum->unknown_value_unsigned.has_value());
 }
 

@@ -98,8 +98,9 @@ test("fidlc-test") {
     ":errcat_fidl_good",
     ":errcat_md",
     ":errcat_other",
+    "//src/lib/fxl/test:gtest_main",
     "//third_party/boringssl",
+    "//third_party/googletest:gmock",
     "//tools/fidl/fidlc:fidl",
-    "//zircon/system/ulib/zxtest",
   ]
 }

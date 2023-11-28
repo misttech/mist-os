@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"

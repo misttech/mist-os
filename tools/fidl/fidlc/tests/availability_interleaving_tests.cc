@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -12,6 +13,8 @@
 // versioning_tests.cc and decomposition_tests.cc.
 
 namespace {
+
+using ::testing::Contains;
 
 struct TestCase {
   // A code describing how to order the availabilities relative to each other,
@@ -95,8 +98,7 @@ struct TestCase {
       actual_errors.insert(actual_error->def.msg);
     }
     for (auto expected_error : errors) {
-      EXPECT_TRUE(actual_errors.count(expected_error->msg), "missing error '%.*s'",
-                  static_cast<int>(expected_error->msg.size()), expected_error->msg.data());
+      EXPECT_THAT(actual_errors, Contains(expected_error->msg));
     }
   }
 };
@@ -392,23 +394,6 @@ void substitute(std::string& str, std::string_view placeholder, std::string_view
   str.replace(str.find(placeholder), placeholder.size(), replacement);
 }
 
-TEST(AvailabilityInterleavingTests, OtherLibrary) {
-  SharedAmongstLibraries shared;
-  shared.SelectVersion("foo", "HEAD");
-  shared.SelectVersion("bar", "HEAD");
-  TestLibrary dependency(&shared);
-  dependency.AddFile("bad/fi-0056-a.test.fidl");
-  ASSERT_COMPILED(dependency);
-  TestLibrary library(&shared);
-  library.AddFile("bad/fi-0056-b.test.fidl");
-  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecatedOtherPlatform, "alias 'RGB'",
-                     fidl::VersionRange(fidl::Version::From(2).value(), fidl::Version::PosInf()),
-                     fidl::Platform::Parse("foo").value(), "table member 'color'",
-                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
-                     fidl::Platform::Parse("bar").value());
-  ASSERT_COMPILER_DIAGNOSTICS(library);
-}
-
 TEST(AvailabilityInterleavingTests, SameLibrary) {
   for (auto& test_case : kTestCases) {
     auto attributes = test_case.Format();
@@ -424,22 +409,11 @@ const TARGET bool = false;
 )FIDL";
     substitute(fidl, "${source_available}", attributes.source_available);
     substitute(fidl, "${target_available}", attributes.target_available);
+    SCOPED_TRACE(testing::Message() << "code: " << test_case.code << ", fidl:\n\n" << fidl);
     TestLibrary library(fidl);
     library.SelectVersion("example", "HEAD");
-    ASSERT_NO_FAILURES(test_case.CompileAndAssert(library), "code: %.*s, fidl:\n\n%s",
-                       static_cast<int>(test_case.code.size()), test_case.code.data(),
-                       fidl.c_str());
+    test_case.CompileAndAssert(library);
   }
-}
-
-TEST(AvailabilityInterleavingTests, SameLibrarySingleInstance) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0055.test.fidl");
-  library.SelectVersion("test", "HEAD");
-  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecated, "alias 'RGB'",
-                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
-                     fidl::Platform::Parse("test").value(), "table member 'color'");
-  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 // Tests compilation of example_fidl and dependency_fidl after substituting
@@ -451,14 +425,14 @@ void TestExternalLibrary(const TestCase& test_case, std::string example_fidl,
   shared.SelectVersion("platform", "HEAD");
   auto attributes = test_case.Format();
   substitute(dependency_fidl, "${target_available}", attributes.target_available);
+  substitute(example_fidl, "${source_available}", attributes.source_available);
+  SCOPED_TRACE(testing::Message() << "code: " << test_case.code << ", dependency.fidl:\n\n"
+                                  << dependency_fidl << "\n\nexample.fidl:\n\n"
+                                  << example_fidl);
   TestLibrary dependency(&shared, "dependency.fidl", dependency_fidl);
   ASSERT_COMPILED(dependency);
-  substitute(example_fidl, "${source_available}", attributes.source_available);
   TestLibrary example(&shared, "example.fidl", example_fidl);
-  ASSERT_NO_FAILURES(test_case.CompileAndAssert(example),
-                     "code: %.*s, dependency.fidl:\n\n%s\n\nexample.fidl:\n\n%s",
-                     static_cast<int>(test_case.code.size()), test_case.code.data(),
-                     dependency_fidl.c_str(), example_fidl.c_str());
+  test_case.CompileAndAssert(example);
 }
 
 TEST(AvailabilityInterleavingTests, DeclToDeclExternal) {
@@ -479,7 +453,7 @@ ${target_available}
 const TARGET bool = false;
 )FIDL";
   for (auto& test_case : kTestCases) {
-    ASSERT_NO_FAILURES(TestExternalLibrary(test_case, example_fidl, dependency_fidl));
+    TestExternalLibrary(test_case, example_fidl, dependency_fidl);
   }
 }
 
@@ -499,7 +473,7 @@ library platform.dependency;
 const TARGET bool = false;
 )FIDL";
   for (auto& test_case : kTestCases) {
-    ASSERT_NO_FAILURES(TestExternalLibrary(test_case, example_fidl, dependency_fidl));
+    TestExternalLibrary(test_case, example_fidl, dependency_fidl);
   }
 }
 
@@ -520,7 +494,7 @@ ${target_available}
 const TARGET bool = false;
 )FIDL";
   for (auto& test_case : kTestCases) {
-    ASSERT_NO_FAILURES(TestExternalLibrary(test_case, example_fidl, dependency_fidl));
+    TestExternalLibrary(test_case, example_fidl, dependency_fidl);
   }
 }
 
@@ -541,8 +515,35 @@ library platform.dependency;
 const TARGET bool = false;
 )FIDL";
   for (auto& test_case : kTestCases) {
-    ASSERT_NO_FAILURES(TestExternalLibrary(test_case, example_fidl, dependency_fidl));
+    TestExternalLibrary(test_case, example_fidl, dependency_fidl);
   }
+}
+
+TEST(AvailabilityInterleavingTests, Error0055) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0055.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecated, "alias 'RGB'",
+                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("test").value(), "table member 'color'");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(AvailabilityInterleavingTests, Error0056) {
+  SharedAmongstLibraries shared;
+  shared.SelectVersion("foo", "HEAD");
+  shared.SelectVersion("bar", "HEAD");
+  TestLibrary dependency(&shared);
+  dependency.AddFile("bad/fi-0056-a.test.fidl");
+  ASSERT_COMPILED(dependency);
+  TestLibrary library(&shared);
+  library.AddFile("bad/fi-0056-b.test.fidl");
+  library.ExpectFail(fidl::ErrInvalidReferenceToDeprecatedOtherPlatform, "alias 'RGB'",
+                     fidl::VersionRange(fidl::Version::From(2).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("foo").value(), "table member 'color'",
+                     fidl::VersionRange(fidl::Version::From(3).value(), fidl::Version::PosInf()),
+                     fidl::Platform::Parse("bar").value());
+  ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 }  // namespace

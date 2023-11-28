@@ -4,7 +4,7 @@
 
 #include <locale.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
@@ -491,13 +491,13 @@ TEST(ParsingTests, GoodAttributeValueHasCorrectContents) {
 
   std::unique_ptr<fidl::raw::Attribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
-  ASSERT_STREQ(attribute->maybe_name->span().data(), "foo");
+  ASSERT_EQ(attribute->maybe_name->span().data(), "foo");
   ASSERT_TRUE(attribute->args.size() == 1);
 
   std::unique_ptr<fidl::raw::AttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<fidl::raw::LiteralConstant*>(arg->value.get());
-  ASSERT_STREQ(static_cast<fidl::raw::StringLiteral*>(arg_value->literal.get())->MakeContents(),
-               "Bar");
+  ASSERT_EQ(static_cast<fidl::raw::StringLiteral*>(arg_value->literal.get())->MakeContents(),
+            "Bar");
 }
 
 TEST(ParsingTests, BadAttributeWithDottedIdentifier) {
@@ -516,20 +516,20 @@ TEST(ParsingTests, GoodAttributeWithMultipleParameters) {
 
   std::unique_ptr<fidl::raw::Attribute> attribute =
       std::move(ast->type_decls.front()->attributes->attributes.front());
-  ASSERT_STREQ(attribute->maybe_name->span().data(), "foo");
+  ASSERT_EQ(attribute->maybe_name->span().data(), "foo");
   ASSERT_TRUE(attribute->args.size() == 2);
 
   std::unique_ptr<fidl::raw::AttributeArg> arg1 = std::move(attribute->args[0]);
   ASSERT_EQ(arg1->maybe_name->span().data(), "bar");
   auto arg1_value = static_cast<fidl::raw::LiteralConstant*>(arg1->value.get());
-  ASSERT_STREQ(static_cast<fidl::raw::StringLiteral*>(arg1_value->literal.get())->MakeContents(),
-               "Bar");
+  ASSERT_EQ(static_cast<fidl::raw::StringLiteral*>(arg1_value->literal.get())->MakeContents(),
+            "Bar");
 
   std::unique_ptr<fidl::raw::AttributeArg> arg2 = std::move(attribute->args[1]);
   ASSERT_EQ(arg2->maybe_name->span().data(), "zork");
   auto arg2_value = static_cast<fidl::raw::LiteralConstant*>(arg2->value.get());
-  ASSERT_STREQ(static_cast<fidl::raw::StringLiteral*>(arg2_value->literal.get())->MakeContents(),
-               "Zoom");
+  ASSERT_EQ(static_cast<fidl::raw::StringLiteral*>(arg2_value->literal.get())->MakeContents(),
+            "Zoom");
 }
 
 TEST(ParsingTests, GoodSimpleDocComment) {
@@ -544,13 +544,13 @@ TEST(ParsingTests, GoodSimpleDocComment) {
   ASSERT_EQ(attribute->provenance, fidl::raw::Attribute::Provenance::kDocComment);
 
   // We set the name to "doc" in the flat AST.
-  ASSERT_NULL(attribute->maybe_name);
+  ASSERT_EQ(attribute->maybe_name, nullptr);
   ASSERT_TRUE(attribute->args.size() == 1);
 
   std::unique_ptr<fidl::raw::AttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<fidl::raw::LiteralConstant*>(arg->value.get());
-  ASSERT_STREQ(static_cast<fidl::raw::DocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
-               " A doc comment\n");
+  ASSERT_EQ(static_cast<fidl::raw::DocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+            " A doc comment\n");
 }
 
 TEST(ParsingTests, GoodMultilineDocCommentHasCorrectContents) {
@@ -570,13 +570,13 @@ TEST(ParsingTests, GoodMultilineDocCommentHasCorrectContents) {
       std::move(ast->type_decls.front()->attributes->attributes.front());
   ASSERT_EQ(attribute->provenance, fidl::raw::Attribute::Provenance::kDocComment);
   // We set the name to "doc" in the flat AST.
-  ASSERT_NULL(attribute->maybe_name);
+  ASSERT_EQ(attribute->maybe_name, nullptr);
   ASSERT_TRUE(attribute->args.size() == 1);
 
   std::unique_ptr<fidl::raw::AttributeArg> arg = std::move(attribute->args[0]);
   auto arg_value = static_cast<fidl::raw::LiteralConstant*>(arg->value.get());
-  ASSERT_STREQ(static_cast<fidl::raw::DocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
-               " A\n multiline\n comment!\n");
+  ASSERT_EQ(static_cast<fidl::raw::DocCommentLiteral*>(arg_value->literal.get())->MakeContents(),
+            " A\n multiline\n comment!\n");
 }
 
 TEST(ParsingTests, WarnDocCommentBlankLineTest) {

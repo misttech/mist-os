@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/tests/test_library.h"
 
@@ -86,16 +86,18 @@ void AssertEquivalent(const std::string& left_fidl, const std::string& right_fid
     output_right << right_json;
     output_right.close();
   }
-  ASSERT_STREQ(left_json, right_json,
-               "To compare results, run:\n\n"
-               "diff $(cat $FUCHSIA_DIR/.fx-build-dir)/decomposition_tests_{left,right}.txt\n");
+  ASSERT_EQ(left_json, right_json)
+      << "To compare results, run:\n\n"
+         "diff $(cat $FUCHSIA_DIR/.fx-build-dir)/decomposition_tests_{left,right}.txt\n";
 }
 
 // Asserts that left_fidl and right_fidl compile to JSON IR that is identical
-// after scrubbbing (see ScrubJson) for the given version. On failure, the
-// ASSERT_NO_FAILURES ensures that we report the caller's line number.
-#define ASSERT_EQUIVALENT(left_fidl, right_fidl, version) \
-  ASSERT_NO_FAILURES(AssertEquivalent(left_fidl, right_fidl, version))
+// after scrubbbing (see ScrubJson) for the given version.
+#define ASSERT_EQUIVALENT(left_fidl, right_fidl, version)          \
+  {                                                                \
+    SCOPED_TRACE("ASSERT_EQUIVALENT failed for version " version); \
+    AssertEquivalent(left_fidl, right_fidl, version);              \
+  }
 
 TEST(DecompositionTests, EquivalentToSelf) {
   auto fidl = R"FIDL(

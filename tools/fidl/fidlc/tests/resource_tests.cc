@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -25,10 +25,10 @@ resource_definition SomeResource : uint32 {
   ASSERT_COMPILED(library);
 
   auto resource = library.LookupResource("SomeResource");
-  ASSERT_NOT_NULL(resource);
+  ASSERT_NE(resource, nullptr);
   ASSERT_EQ(resource->properties.size(), 1u);
 
-  ASSERT_NOT_NULL(resource->subtype_ctor);
+  ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -57,10 +57,10 @@ resource_definition SomeResource : uint32 {
   ASSERT_COMPILED(library);
 
   auto resource = library.LookupResource("SomeResource");
-  ASSERT_NOT_NULL(resource);
+  ASSERT_NE(resource, nullptr);
   ASSERT_EQ(resource->properties.size(), 2u);
 
-  ASSERT_NOT_NULL(resource->subtype_ctor);
+  ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -96,10 +96,10 @@ resource_definition SomeResource : via {
   ASSERT_COMPILED(library);
 
   auto resource = library.LookupResource("SomeResource");
-  ASSERT_NOT_NULL(resource);
+  ASSERT_NE(resource, nullptr);
   ASSERT_EQ(resource->properties.size(), 1u);
 
-  ASSERT_NOT_NULL(resource->subtype_ctor);
+  ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -130,10 +130,10 @@ resource_definition SomeResource : via {
   ASSERT_COMPILED(library);
 
   auto resource = library.LookupResource("SomeResource");
-  ASSERT_NOT_NULL(resource);
+  ASSERT_NE(resource, nullptr);
   ASSERT_EQ(resource->properties.size(), 2u);
 
-  ASSERT_NOT_NULL(resource->subtype_ctor);
+  ASSERT_NE(resource->subtype_ctor, nullptr);
   auto underlying = resource->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);

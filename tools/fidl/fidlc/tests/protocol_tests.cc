@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
@@ -19,11 +19,11 @@ protocol Empty {};
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Empty");
-  ASSERT_NOT_NULL(protocol);
+  ASSERT_NE(protocol, nullptr);
 
-  EXPECT_EQ(protocol->methods.size(), 0);
+  EXPECT_EQ(protocol->methods.size(), 0u);
   EXPECT_EQ(protocol->openness, fidl::types::Openness::kOpen);
-  EXPECT_EQ(protocol->all_methods.size(), 0);
+  EXPECT_EQ(protocol->all_methods.size(), 0u);
 }
 
 TEST(ProtocolTests, GoodValidEmptyOpenProtocol) {
@@ -34,11 +34,11 @@ open protocol Empty {};
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Empty");
-  ASSERT_NOT_NULL(protocol);
+  ASSERT_NE(protocol, nullptr);
 
-  EXPECT_EQ(protocol->methods.size(), 0);
+  EXPECT_EQ(protocol->methods.size(), 0u);
   EXPECT_EQ(protocol->openness, fidl::types::Openness::kOpen);
-  EXPECT_EQ(protocol->all_methods.size(), 0);
+  EXPECT_EQ(protocol->all_methods.size(), 0u);
 }
 
 TEST(ProtocolTests, GoodValidEmptyAjarProtocol) {
@@ -49,11 +49,11 @@ ajar protocol Empty {};
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Empty");
-  ASSERT_NOT_NULL(protocol);
+  ASSERT_NE(protocol, nullptr);
 
-  EXPECT_EQ(protocol->methods.size(), 0);
+  EXPECT_EQ(protocol->methods.size(), 0u);
   EXPECT_EQ(protocol->openness, fidl::types::Openness::kAjar);
-  EXPECT_EQ(protocol->all_methods.size(), 0);
+  EXPECT_EQ(protocol->all_methods.size(), 0u);
 }
 
 TEST(ProtocolTests, GoodValidEmptyClosedProtocol) {
@@ -64,11 +64,11 @@ closed protocol Empty {};
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Empty");
-  ASSERT_NOT_NULL(protocol);
+  ASSERT_NE(protocol, nullptr);
 
-  EXPECT_EQ(protocol->methods.size(), 0);
+  EXPECT_EQ(protocol->methods.size(), 0u);
   EXPECT_EQ(protocol->openness, fidl::types::Openness::kClosed);
-  EXPECT_EQ(protocol->all_methods.size(), 0);
+  EXPECT_EQ(protocol->all_methods.size(), 0u);
 }
 
 TEST(ProtocolTests, BadEmptyStrictProtocol) {
@@ -171,24 +171,24 @@ protocol D {
   ASSERT_COMPILED(library);
 
   auto protocol_a = library.LookupProtocol("A");
-  ASSERT_NOT_NULL(protocol_a);
-  EXPECT_EQ(protocol_a->methods.size(), 1);
-  EXPECT_EQ(protocol_a->all_methods.size(), 1);
+  ASSERT_NE(protocol_a, nullptr);
+  EXPECT_EQ(protocol_a->methods.size(), 1u);
+  EXPECT_EQ(protocol_a->all_methods.size(), 1u);
 
   auto protocol_b = library.LookupProtocol("B");
-  ASSERT_NOT_NULL(protocol_b);
-  EXPECT_EQ(protocol_b->methods.size(), 1);
-  EXPECT_EQ(protocol_b->all_methods.size(), 2);
+  ASSERT_NE(protocol_b, nullptr);
+  EXPECT_EQ(protocol_b->methods.size(), 1u);
+  EXPECT_EQ(protocol_b->all_methods.size(), 2u);
 
   auto protocol_c = library.LookupProtocol("C");
-  ASSERT_NOT_NULL(protocol_c);
-  EXPECT_EQ(protocol_c->methods.size(), 1);
-  EXPECT_EQ(protocol_c->all_methods.size(), 2);
+  ASSERT_NE(protocol_c, nullptr);
+  EXPECT_EQ(protocol_c->methods.size(), 1u);
+  EXPECT_EQ(protocol_c->all_methods.size(), 2u);
 
   auto protocol_d = library.LookupProtocol("D");
-  ASSERT_NOT_NULL(protocol_d);
-  EXPECT_EQ(protocol_d->methods.size(), 1);
-  EXPECT_EQ(protocol_d->all_methods.size(), 4);
+  ASSERT_NE(protocol_d, nullptr);
+  EXPECT_EQ(protocol_d->methods.size(), 1u);
+  EXPECT_EQ(protocol_d->all_methods.size(), 4u);
 }
 
 TEST(ProtocolTests, GoodValidOpenClosedProtocolComposition) {
@@ -218,16 +218,16 @@ open protocol ComposeInOpen {
   ASSERT_COMPILED(library);
 
   auto compose_in_closed = library.LookupProtocol("ComposeInClosed");
-  ASSERT_NOT_NULL(compose_in_closed);
-  EXPECT_EQ(compose_in_closed->composed_protocols.size(), 1);
+  ASSERT_NE(compose_in_closed, nullptr);
+  EXPECT_EQ(compose_in_closed->composed_protocols.size(), 1u);
 
   auto compose_in_ajar = library.LookupProtocol("ComposeInAjar");
-  ASSERT_NOT_NULL(compose_in_ajar);
-  EXPECT_EQ(compose_in_ajar->composed_protocols.size(), 2);
+  ASSERT_NE(compose_in_ajar, nullptr);
+  EXPECT_EQ(compose_in_ajar->composed_protocols.size(), 2u);
 
   auto compose_in_open = library.LookupProtocol("ComposeInOpen");
-  ASSERT_NOT_NULL(compose_in_open);
-  EXPECT_EQ(compose_in_open->composed_protocols.size(), 3);
+  ASSERT_NE(compose_in_open, nullptr);
+  EXPECT_EQ(compose_in_open->composed_protocols.size(), 3u);
 }
 
 TEST(ProtocolTests, BadInvalidComposeOpenInClosed) {
@@ -376,20 +376,20 @@ protocol Child {
   ASSERT_COMPILED(library);
 
   auto child_protocol = library.LookupProtocol("Child");
-  ASSERT_NOT_NULL(child_protocol);
-  EXPECT_EQ(child_protocol->methods.size(), 1);
-  EXPECT_EQ(child_protocol->all_methods.size(), 3);
-  ASSERT_EQ(child_protocol->composed_protocols.size(), 2);
-  EXPECT_EQ(child_protocol->composed_protocols.front().attributes->attributes.size(), 1);
+  ASSERT_NE(child_protocol, nullptr);
+  EXPECT_EQ(child_protocol->methods.size(), 1u);
+  EXPECT_EQ(child_protocol->all_methods.size(), 3u);
+  ASSERT_EQ(child_protocol->composed_protocols.size(), 2u);
+  EXPECT_EQ(child_protocol->composed_protocols.front().attributes->attributes.size(), 1u);
   EXPECT_EQ(child_protocol->composed_protocols.front().attributes->attributes.front()->name.data(),
             "this_is_allowed");
-  EXPECT_EQ(child_protocol->composed_protocols.back().attributes->attributes.size(), 1);
+  EXPECT_EQ(child_protocol->composed_protocols.back().attributes->attributes.size(), 1u);
   EXPECT_EQ(child_protocol->composed_protocols.back().attributes->attributes.front()->name.data(),
             "doc");
   EXPECT_EQ(child_protocol->composed_protocols.back().attributes->attributes.front()->span.data(),
             "/// This is also allowed.");
   ASSERT_EQ(child_protocol->composed_protocols.back().attributes->attributes.front()->args.size(),
-            1);
+            1u);
   EXPECT_TRUE(child_protocol->composed_protocols.back()
                   .attributes->attributes.front()
                   ->args.front()
@@ -687,8 +687,8 @@ type Foo = resource struct {
   ASSERT_COMPILED(library);
 
   auto container = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(container);
-  ASSERT_EQ(container->members.size(), 4);
+  ASSERT_NE(container, nullptr);
+  ASSERT_EQ(container->members.size(), 4u);
 
   size_t i = 0;
 

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -55,7 +55,7 @@ protocol CapturesDependencyThroughCompose {
     ASSERT_COMPILED(lib);
 
     auto deps = lib.direct_and_composed_dependencies();
-    ASSERT_EQ(deps.size(), 2);
+    ASSERT_EQ(deps.size(), 2u);
     auto iter = deps.cbegin();
     EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
     EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep2");
@@ -98,7 +98,7 @@ protocol CapturesDependencyThroughCompose {
   ASSERT_COMPILED(lib);
 
   auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 1);
+  ASSERT_EQ(deps.size(), 1u);
   auto iter = deps.cbegin();
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
 }
@@ -139,7 +139,7 @@ protocol CapturesDependencyThroughCompose {
   ASSERT_COMPILED(lib);
 
   auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 1);
+  ASSERT_EQ(deps.size(), 1u);
   auto iter = deps.cbegin();
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
 }
@@ -176,7 +176,7 @@ protocol CapturesDependencyThroughCompose {
   ASSERT_COMPILED(lib);
 
   auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2);
+  ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep2");
@@ -214,7 +214,7 @@ protocol CapturesDependencyThroughCompose {
   ASSERT_COMPILED(lib);
 
   auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2);
+  ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep2");
@@ -252,7 +252,7 @@ open protocol CapturesDependencyThroughCompose {
   ASSERT_COMPILED(lib);
 
   auto deps = lib.direct_and_composed_dependencies();
-  ASSERT_EQ(deps.size(), 2);
+  ASSERT_EQ(deps.size(), 2u);
   auto iter = deps.cbegin();
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep1");
   EXPECT_EQ(fidl::NameLibrary((*iter++).library->name), "dep2");

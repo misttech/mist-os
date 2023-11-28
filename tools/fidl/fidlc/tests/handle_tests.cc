@@ -4,7 +4,7 @@
 
 #include <locale.h>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
@@ -31,14 +31,14 @@ type MyStruct = resource struct {
   EXPECT_EQ("THREAD", h_type_ctor->resolved_params.subtype_raw->span.data());
 
   auto h_type = h_type_ctor->type;
-  ASSERT_NOT_NULL(h_type);
+  ASSERT_NE(h_type, nullptr);
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
   EXPECT_EQ(fidl::types::HandleSubtype::kThread, handle_type->subtype);
   EXPECT_EQ(
       static_cast<const fidl::flat::NumericConstantValue<uint32_t>*>(handle_type->rights)->value,
-      3);
+      3u);
 }
 
 TEST(HandleTests, GoodNoHandleRightsTest) {
@@ -57,7 +57,7 @@ type MyStruct = resource struct {
 
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto h_type = h_type_ctor->type;
-  ASSERT_NOT_NULL(h_type);
+  ASSERT_NE(h_type, nullptr);
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
@@ -104,7 +104,7 @@ type MyStruct = resource struct {
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
 
   auto h_type = h_type_ctor->type;
-  ASSERT_NOT_NULL(h_type);
+  ASSERT_NE(h_type, nullptr);
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 
@@ -131,7 +131,7 @@ type MyStruct = resource struct {
   ASSERT_COMPILED(library);
   const auto& a = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto a_type = a->type;
-  ASSERT_NOT_NULL(a_type);
+  ASSERT_NE(a_type, nullptr);
   ASSERT_EQ(a_type->kind, fidl::flat::Type::Kind::kHandle);
   auto a_handle_type = static_cast<const fidl::flat::HandleType*>(a_type);
   EXPECT_EQ(fidl::types::HandleSubtype::kThread, a_handle_type->subtype);
@@ -140,7 +140,7 @@ type MyStruct = resource struct {
 
   const auto& b = library.LookupStruct("MyStruct")->members[1].type_ctor;
   auto b_type = b->type;
-  ASSERT_NOT_NULL(b_type);
+  ASSERT_NE(b_type, nullptr);
   ASSERT_EQ(b_type->kind, fidl::flat::Type::Kind::kHandle);
   auto b_handle_type = static_cast<const fidl::flat::HandleType*>(b_type);
   EXPECT_EQ(fidl::types::HandleSubtype::kProcess, b_handle_type->subtype);
@@ -149,12 +149,12 @@ type MyStruct = resource struct {
 
   const auto& c = library.LookupStruct("MyStruct")->members[2].type_ctor;
   auto c_type = c->type;
-  ASSERT_NOT_NULL(c_type);
+  ASSERT_NE(c_type, nullptr);
   ASSERT_EQ(c_type->kind, fidl::flat::Type::Kind::kHandle);
   auto c_handle_type = static_cast<const fidl::flat::HandleType*>(c_type);
   EXPECT_EQ(fidl::types::HandleSubtype::kVmo, c_handle_type->subtype);
-  ASSERT_NOT_NULL(c_handle_type->rights);
-  EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(c_handle_type->rights)->value, 2);
+  ASSERT_NE(c_handle_type->rights, nullptr);
+  EXPECT_EQ(static_cast<const fidl::flat::HandleRights*>(c_handle_type->rights)->value, 2u);
 }
 
 TEST(HandleTests, BadInvalidFidlDefinedHandleSubtype) {
@@ -213,7 +213,7 @@ type MyStruct = resource struct {
 
   const auto& h_type_ctor = library.LookupStruct("MyStruct")->members[0].type_ctor;
   auto h_type = h_type_ctor->type;
-  ASSERT_NOT_NULL(h_type);
+  ASSERT_NE(h_type, nullptr);
   ASSERT_EQ(h_type->kind, fidl::flat::Type::Kind::kHandle);
   auto handle_type = static_cast<const fidl::flat::HandleType*>(h_type);
 

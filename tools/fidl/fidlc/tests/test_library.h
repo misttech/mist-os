@@ -11,6 +11,8 @@
 #include <fstream>
 #include <type_traits>
 
+#include <gtest/gtest.h>
+
 #include "tools/fidl/fidlc/include/fidl/diagnostic_types.h"
 #include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/include/fidl/findings.h"
@@ -31,15 +33,15 @@
   {                                                      \
     TestLibrary& library_ref = (library);                \
     if (!library_ref.Compile()) {                        \
-      EXPECT_EQ(library_ref.errors().size(), 0);         \
+      EXPECT_EQ(library_ref.errors().size(), 0u);        \
       for (const auto& error : library_ref.errors()) {   \
-        EXPECT_STREQ("", error->def.msg.data());         \
+        EXPECT_EQ(error->def.msg, "");                   \
       }                                                  \
-      FAIL("stopping test, compilation failed");         \
+      FAIL() << "stopping test, compilation failed";     \
     }                                                    \
-    EXPECT_EQ(library_ref.warnings().size(), 0);         \
+    EXPECT_EQ(library_ref.warnings().size(), 0u);        \
     for (const auto& warning : library_ref.warnings()) { \
-      EXPECT_STREQ("", warning->def.msg.data());         \
+      EXPECT_EQ(warning->def.msg, "");                   \
     }                                                    \
   }
 
@@ -47,7 +49,7 @@
   {                                          \
     TestLibrary& library_ref = (library);    \
     if (!library_ref.CheckCompile()) {       \
-      FAIL("Diagnostics mismatch");          \
+      FAIL() << "Diagnostics mismatch";      \
     }                                        \
   }
 

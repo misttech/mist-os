@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -20,8 +20,8 @@ type Fruit = enum : uint64 {
 )FIDL");
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupEnum("Fruit");
-  ASSERT_NOT_NULL(type_decl);
-  EXPECT_EQ(type_decl->members.size(), 3);
+  ASSERT_NE(type_decl, nullptr);
+  EXPECT_EQ(type_decl->members.size(), 3u);
   auto underlying = type_decl->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -37,7 +37,7 @@ type Fruit = enum {
 )FIDL");
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupEnum("Fruit");
-  ASSERT_NOT_NULL(type_decl);
+  ASSERT_NE(type_decl, nullptr);
   auto underlying = type_decl->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);

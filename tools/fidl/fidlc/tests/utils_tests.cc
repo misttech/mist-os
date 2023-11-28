@@ -4,8 +4,9 @@
 
 #include <lib/fit/function.h>
 
+#include <gtest/gtest.h>
+
 #include "tools/fidl/fidlc/include/fidl/utils.h"
-#include "tools/fidl/fidlc/tests/unittest_helpers.h"
 
 namespace fidl::utils {
 
@@ -19,8 +20,7 @@ void compare_id_to_words(std::string_view id, std::string_view expected_lowercas
     }
     actual << word;
   }
-  ASSERT_STRING_EQ(expected_lowercase_words, actual.str(), "Failed for %s",
-                   std::string(id).c_str());
+  ASSERT_EQ(expected_lowercase_words, actual.str()) << "Failed for " << id;
 }
 
 TEST(UtilsTests, IdToWords) {
@@ -59,22 +59,18 @@ void case_test(bool valid_conversion, std::string case_name,
                fit::function<bool(std::string)> is_case,
                fit::function<std::string(std::string)> to_case, std::string original,
                std::string expected) {
-  EXPECT_FALSE(is_case(original), "%s", (original + " is " + case_name).c_str());
+  EXPECT_FALSE(is_case(original)) << original << " is " << case_name;
   std::string converted = to_case(original);
-  EXPECT_STRING_EQ(
-      converted, expected, "%s",
-      ("from '" + original + "' to '" + converted + "' != '" + expected + "'").c_str());
+  EXPECT_EQ(converted, expected) << "from '" << original << "' to '" << converted << "' != '"
+                                 << expected << "'";
   if (valid_conversion) {
-    EXPECT_TRUE(
-        is_case(expected), "%s",
-        ("from '" + original + "' expected '" + expected + "' is not " + case_name).c_str());
-    EXPECT_TRUE(is_case(converted), "%s",
-                ("from '" + original + "' to '" + converted + "' is not " + case_name).c_str());
+    EXPECT_TRUE(is_case(expected))
+        << "from '" << original << "' expected '" << expected << "' is not " << case_name;
+    EXPECT_TRUE(is_case(converted))
+        << "from '" << original << "' to '" << converted << "' is not " << case_name;
   } else {
-    EXPECT_FALSE(is_case(converted), "%s",
-                 ("from '" + original + "' to '" + converted + "' was not expected to match " +
-                  case_name + ", but did!")
-                     .c_str());
+    EXPECT_FALSE(is_case(converted)) << "from '" << original << "' to '" << converted
+                                     << "' was not expected to match " << case_name << ", but did!";
   }
 }
 
@@ -599,104 +595,104 @@ service MyService { // C32
 }
 
 TEST(UtilsTests, CanonicalForm) {
-  EXPECT_STRING_EQ(canonicalize(""), "");
+  EXPECT_EQ(canonicalize(""), "");
 
   // Basic letter combinations.
-  EXPECT_STRING_EQ(canonicalize("a"), "a");
-  EXPECT_STRING_EQ(canonicalize("A"), "a");
-  EXPECT_STRING_EQ(canonicalize("ab"), "ab");
-  EXPECT_STRING_EQ(canonicalize("AB"), "ab");
-  EXPECT_STRING_EQ(canonicalize("Ab"), "ab");
-  EXPECT_STRING_EQ(canonicalize("aB"), "a_b");
-  EXPECT_STRING_EQ(canonicalize("a_b"), "a_b");
-  EXPECT_STRING_EQ(canonicalize("A_B"), "a_b");
-  EXPECT_STRING_EQ(canonicalize("A_b"), "a_b");
-  EXPECT_STRING_EQ(canonicalize("a_B"), "a_b");
+  EXPECT_EQ(canonicalize("a"), "a");
+  EXPECT_EQ(canonicalize("A"), "a");
+  EXPECT_EQ(canonicalize("ab"), "ab");
+  EXPECT_EQ(canonicalize("AB"), "ab");
+  EXPECT_EQ(canonicalize("Ab"), "ab");
+  EXPECT_EQ(canonicalize("aB"), "a_b");
+  EXPECT_EQ(canonicalize("a_b"), "a_b");
+  EXPECT_EQ(canonicalize("A_B"), "a_b");
+  EXPECT_EQ(canonicalize("A_b"), "a_b");
+  EXPECT_EQ(canonicalize("a_B"), "a_b");
 
   // Digits are treated like lowercase letters.
-  EXPECT_STRING_EQ(canonicalize("1"), "1");
-  EXPECT_STRING_EQ(canonicalize("a1"), "a1");
-  EXPECT_STRING_EQ(canonicalize("A1"), "a1");
+  EXPECT_EQ(canonicalize("1"), "1");
+  EXPECT_EQ(canonicalize("a1"), "a1");
+  EXPECT_EQ(canonicalize("A1"), "a1");
 
   // Leading digits are illegal in FIDL identifiers, so these do not matter.
-  EXPECT_STRING_EQ(canonicalize("1a"), "1a");
-  EXPECT_STRING_EQ(canonicalize("1A"), "1_a");
-  EXPECT_STRING_EQ(canonicalize("12"), "12");
+  EXPECT_EQ(canonicalize("1a"), "1a");
+  EXPECT_EQ(canonicalize("1A"), "1_a");
+  EXPECT_EQ(canonicalize("12"), "12");
 
   // Lower/upper snake/camel case conventions.
-  EXPECT_STRING_EQ(canonicalize("lowerCamelCase"), "lower_camel_case");
-  EXPECT_STRING_EQ(canonicalize("UpperCamelCase"), "upper_camel_case");
-  EXPECT_STRING_EQ(canonicalize("lower_snake_case"), "lower_snake_case");
-  EXPECT_STRING_EQ(canonicalize("UPPER_SNAKE_CASE"), "upper_snake_case");
-  EXPECT_STRING_EQ(canonicalize("Camel_With_Underscores"), "camel_with_underscores");
-  EXPECT_STRING_EQ(canonicalize("camelWithAOneLetterWord"), "camel_with_a_one_letter_word");
-  EXPECT_STRING_EQ(canonicalize("1_2__3___underscores"), "1_2_3_underscores");
+  EXPECT_EQ(canonicalize("lowerCamelCase"), "lower_camel_case");
+  EXPECT_EQ(canonicalize("UpperCamelCase"), "upper_camel_case");
+  EXPECT_EQ(canonicalize("lower_snake_case"), "lower_snake_case");
+  EXPECT_EQ(canonicalize("UPPER_SNAKE_CASE"), "upper_snake_case");
+  EXPECT_EQ(canonicalize("Camel_With_Underscores"), "camel_with_underscores");
+  EXPECT_EQ(canonicalize("camelWithAOneLetterWord"), "camel_with_a_one_letter_word");
+  EXPECT_EQ(canonicalize("1_2__3___underscores"), "1_2_3_underscores");
 
   // Acronym casing.
-  EXPECT_STRING_EQ(canonicalize("HTTPServer"), "http_server");
-  EXPECT_STRING_EQ(canonicalize("HttpServer"), "http_server");
-  EXPECT_STRING_EQ(canonicalize("URLIsATLA"), "url_is_atla");
-  EXPECT_STRING_EQ(canonicalize("UrlIsATla"), "url_is_a_tla");
+  EXPECT_EQ(canonicalize("HTTPServer"), "http_server");
+  EXPECT_EQ(canonicalize("HttpServer"), "http_server");
+  EXPECT_EQ(canonicalize("URLIsATLA"), "url_is_atla");
+  EXPECT_EQ(canonicalize("UrlIsATla"), "url_is_a_tla");
 
   // Words with digits: H264 encoder.
-  EXPECT_STRING_EQ(canonicalize("h264encoder"), "h264encoder");
-  EXPECT_STRING_EQ(canonicalize("H264ENCODER"), "h264_encoder");
-  EXPECT_STRING_EQ(canonicalize("h264_encoder"), "h264_encoder");
-  EXPECT_STRING_EQ(canonicalize("H264_ENCODER"), "h264_encoder");
-  EXPECT_STRING_EQ(canonicalize("h264Encoder"), "h264_encoder");
-  EXPECT_STRING_EQ(canonicalize("H264Encoder"), "h264_encoder");
+  EXPECT_EQ(canonicalize("h264encoder"), "h264encoder");
+  EXPECT_EQ(canonicalize("H264ENCODER"), "h264_encoder");
+  EXPECT_EQ(canonicalize("h264_encoder"), "h264_encoder");
+  EXPECT_EQ(canonicalize("H264_ENCODER"), "h264_encoder");
+  EXPECT_EQ(canonicalize("h264Encoder"), "h264_encoder");
+  EXPECT_EQ(canonicalize("H264Encoder"), "h264_encoder");
 
   // Words with digits: DDR4 memory.
-  EXPECT_STRING_EQ(canonicalize("ddr4memory"), "ddr4memory");
-  EXPECT_STRING_EQ(canonicalize("DDR4MEMORY"), "ddr4_memory");
-  EXPECT_STRING_EQ(canonicalize("ddr4_memory"), "ddr4_memory");
-  EXPECT_STRING_EQ(canonicalize("DDR4_MEMORY"), "ddr4_memory");
-  EXPECT_STRING_EQ(canonicalize("ddr4Memory"), "ddr4_memory");
-  EXPECT_STRING_EQ(canonicalize("Ddr4Memory"), "ddr4_memory");
-  EXPECT_STRING_EQ(canonicalize("DDR4Memory"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("ddr4memory"), "ddr4memory");
+  EXPECT_EQ(canonicalize("DDR4MEMORY"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("ddr4_memory"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("DDR4_MEMORY"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("ddr4Memory"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("Ddr4Memory"), "ddr4_memory");
+  EXPECT_EQ(canonicalize("DDR4Memory"), "ddr4_memory");
 
   // Words with digits: A2DP profile.
-  EXPECT_STRING_EQ(canonicalize("a2dpprofile"), "a2dpprofile");
-  EXPECT_STRING_EQ(canonicalize("A2DPPROFILE"), "a2_dpprofile");
-  EXPECT_STRING_EQ(canonicalize("a2dp_profile"), "a2dp_profile");
-  EXPECT_STRING_EQ(canonicalize("A2DP_PROFILE"), "a2_dp_profile");
-  EXPECT_STRING_EQ(canonicalize("a2dpProfile"), "a2dp_profile");
-  EXPECT_STRING_EQ(canonicalize("A2dpProfile"), "a2dp_profile");
-  EXPECT_STRING_EQ(canonicalize("A2DPProfile"), "a2_dp_profile");
+  EXPECT_EQ(canonicalize("a2dpprofile"), "a2dpprofile");
+  EXPECT_EQ(canonicalize("A2DPPROFILE"), "a2_dpprofile");
+  EXPECT_EQ(canonicalize("a2dp_profile"), "a2dp_profile");
+  EXPECT_EQ(canonicalize("A2DP_PROFILE"), "a2_dp_profile");
+  EXPECT_EQ(canonicalize("a2dpProfile"), "a2dp_profile");
+  EXPECT_EQ(canonicalize("A2dpProfile"), "a2dp_profile");
+  EXPECT_EQ(canonicalize("A2DPProfile"), "a2_dp_profile");
 
   // Words with digits: R2D2 is one word.
-  EXPECT_STRING_EQ(canonicalize("r2d2isoneword"), "r2d2isoneword");
-  EXPECT_STRING_EQ(canonicalize("R2D2ISONEWORD"), "r2_d2_isoneword");
-  EXPECT_STRING_EQ(canonicalize("r2d2_is_one_word"), "r2d2_is_one_word");
-  EXPECT_STRING_EQ(canonicalize("R2D2_IS_ONE_WORD"), "r2_d2_is_one_word");
-  EXPECT_STRING_EQ(canonicalize("r2d2IsOneWord"), "r2d2_is_one_word");
-  EXPECT_STRING_EQ(canonicalize("R2d2IsOneWord"), "r2d2_is_one_word");
-  EXPECT_STRING_EQ(canonicalize("R2D2IsOneWord"), "r2_d2_is_one_word");
+  EXPECT_EQ(canonicalize("r2d2isoneword"), "r2d2isoneword");
+  EXPECT_EQ(canonicalize("R2D2ISONEWORD"), "r2_d2_isoneword");
+  EXPECT_EQ(canonicalize("r2d2_is_one_word"), "r2d2_is_one_word");
+  EXPECT_EQ(canonicalize("R2D2_IS_ONE_WORD"), "r2_d2_is_one_word");
+  EXPECT_EQ(canonicalize("r2d2IsOneWord"), "r2d2_is_one_word");
+  EXPECT_EQ(canonicalize("R2d2IsOneWord"), "r2d2_is_one_word");
+  EXPECT_EQ(canonicalize("R2D2IsOneWord"), "r2_d2_is_one_word");
 
   // Leading and trailing underscores are illegal in FIDL identifiers, so these
   // do not matter.
-  EXPECT_STRING_EQ(canonicalize("_"), "");
-  EXPECT_STRING_EQ(canonicalize("_a"), "a");
-  EXPECT_STRING_EQ(canonicalize("a_"), "a_");
-  EXPECT_STRING_EQ(canonicalize("_a_"), "a_");
-  EXPECT_STRING_EQ(canonicalize("__a__"), "a_");
+  EXPECT_EQ(canonicalize("_"), "");
+  EXPECT_EQ(canonicalize("_a"), "a");
+  EXPECT_EQ(canonicalize("a_"), "a_");
+  EXPECT_EQ(canonicalize("_a_"), "a_");
+  EXPECT_EQ(canonicalize("__a__"), "a_");
 }
 
 TEST(UtilsTests, StringStripping) {
-  EXPECT_STRING_EQ(strip_konstant_k("kFoobar"), "Foobar");
-  EXPECT_STRING_EQ(strip_konstant_k("KFoobar"), "KFoobar");
+  EXPECT_EQ(strip_konstant_k("kFoobar"), "Foobar");
+  EXPECT_EQ(strip_konstant_k("KFoobar"), "KFoobar");
 
-  EXPECT_STRING_EQ(strip_string_literal_quotes("\"\""), "");
-  EXPECT_STRING_EQ(strip_string_literal_quotes("\"foobar\""), "foobar");
+  EXPECT_EQ(strip_string_literal_quotes("\"\""), "");
+  EXPECT_EQ(strip_string_literal_quotes("\"foobar\""), "foobar");
 
-  EXPECT_STRING_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
   /// A
   /// multiline
   /// comment!
 )FIDL"),
-                   "\n A\n multiline\n comment!\n");
+            "\n A\n multiline\n comment!\n");
 
-  EXPECT_STRING_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
   ///
   /// With
   ///
@@ -705,9 +701,9 @@ TEST(UtilsTests, StringStripping) {
   /// lines
   ///
 )FIDL"),
-                   "\n\n With\n\n empty\n\n lines\n\n");
+            "\n\n With\n\n empty\n\n lines\n\n");
 
-  EXPECT_STRING_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
   /// With
 
   /// blank
@@ -715,9 +711,9 @@ TEST(UtilsTests, StringStripping) {
 
   /// lines
 )FIDL"),
-                   "\n With\n\n blank\n\n\n lines\n");
+            "\n With\n\n blank\n\n\n lines\n");
 
-  EXPECT_STRING_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
 	/// With
 		/// tabs
 	 /// in
@@ -725,39 +721,39 @@ TEST(UtilsTests, StringStripping) {
  	 /// to
 	 	/// spaces
 )FIDL"),
-                   "\n With\n tabs\n in\n addition\n to\n spaces\n");
+            "\n With\n tabs\n in\n addition\n to\n spaces\n");
 
-  EXPECT_STRING_EQ(strip_doc_comment_slashes(R"FIDL(
+  EXPECT_EQ(strip_doc_comment_slashes(R"FIDL(
   /// Weird
 /// Offsets
   /// Slash///
   ///Placement ///
        /// And
   ///   Spacing   )FIDL"),
-                   "\n Weird\n Offsets\n Slash///\nPlacement ///\n And\n   Spacing   \n");
+            "\n Weird\n Offsets\n Slash///\nPlacement ///\n And\n   Spacing   \n");
 }
 
 TEST(UtilsTests, DecodeUnicodeHex) {
-  EXPECT_EQ(decode_unicode_hex("0"), 0x0);
-  EXPECT_EQ(decode_unicode_hex("a"), 0xa);
-  EXPECT_EQ(decode_unicode_hex("12"), 0x12);
-  EXPECT_EQ(decode_unicode_hex("123abc"), 0x123abc);
-  EXPECT_EQ(decode_unicode_hex("ffffff"), 0xffffff);
+  EXPECT_EQ(decode_unicode_hex("0"), 0x0u);
+  EXPECT_EQ(decode_unicode_hex("a"), 0xau);
+  EXPECT_EQ(decode_unicode_hex("12"), 0x12u);
+  EXPECT_EQ(decode_unicode_hex("123abc"), 0x123abcu);
+  EXPECT_EQ(decode_unicode_hex("ffffff"), 0xffffffu);
 }
 
 TEST(UtilsTests, StringLiteralLength) {
-  EXPECT_EQ(string_literal_length(R"("Hello")"), 5);
-  EXPECT_EQ(string_literal_length(R"("\\")"), 1);
-  EXPECT_EQ(string_literal_length(R"("\to")"), 2);
-  EXPECT_EQ(string_literal_length(R"("\n")"), 1);
-  EXPECT_EQ(string_literal_length(R"("\u{01F600}")"), 4);
-  EXPECT_EQ(string_literal_length(R"("\u{2713}")"), 3);
-  EXPECT_EQ(string_literal_length(R"("")"), 0);
-  EXPECT_EQ(string_literal_length(R"("$")"), 1);
-  EXPECT_EQ(string_literal_length(R"("¢")"), 2);
-  EXPECT_EQ(string_literal_length(R"("€")"), 3);
-  EXPECT_EQ(string_literal_length(R"("𐍈")"), 4);
-  EXPECT_EQ(string_literal_length(R"("😁")"), 4);
+  EXPECT_EQ(string_literal_length(R"("Hello")"), 5u);
+  EXPECT_EQ(string_literal_length(R"("\\")"), 1u);
+  EXPECT_EQ(string_literal_length(R"("\to")"), 2u);
+  EXPECT_EQ(string_literal_length(R"("\n")"), 1u);
+  EXPECT_EQ(string_literal_length(R"("\u{01F600}")"), 4u);
+  EXPECT_EQ(string_literal_length(R"("\u{2713}")"), 3u);
+  EXPECT_EQ(string_literal_length(R"("")"), 0u);
+  EXPECT_EQ(string_literal_length(R"("$")"), 1u);
+  EXPECT_EQ(string_literal_length(R"("¢")"), 2u);
+  EXPECT_EQ(string_literal_length(R"("€")"), 3u);
+  EXPECT_EQ(string_literal_length(R"("𐍈")"), 4u);
+  EXPECT_EQ(string_literal_length(R"("😁")"), 4u);
 }
 
 }  // namespace

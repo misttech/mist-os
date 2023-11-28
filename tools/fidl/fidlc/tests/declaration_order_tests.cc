@@ -9,21 +9,16 @@
 #include <random>
 #include <string>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
-#define DECL_NAME(D) static_cast<const std::string>(D->name.decl_name()).c_str()
-
-#define ASSERT_DECL_NAME(D, N) ASSERT_STREQ(N, DECL_NAME(D));
-
-#define ASSERT_MANGLED_DECL_NAME(D, N) ASSERT_SUBSTR(DECL_NAME(D), N);
-
-#define ASSERT_DECL_FQ_NAME(D, N) ASSERT_STREQ(N, fidl::NameFlatName(D->name).c_str());
-
 namespace {
+
+using ::testing::HasSubstr;
 
 // The calculated declaration order is a product of both the inter-type dependency relationships,
 // and an ordering among the type names. To eliminate the effect of name ordering and exclusively
@@ -95,8 +90,8 @@ protocol #Protocol# {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(1, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Protocol"));
+    ASSERT_EQ(decl_order.size(), 1u);
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Protocol"));
   }
 }
 
@@ -120,11 +115,11 @@ protocol #Protocol# {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(4, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Element"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Request"));
-    ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
-    ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
+    ASSERT_EQ(4u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Element"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Request"));
+    ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+    ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
   }
 }
 
@@ -150,7 +145,7 @@ protocol #Protocol# {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(4, decl_order.size());
+    ASSERT_EQ(4u, decl_order.size());
 
     // Since the Element struct contains a Protocol handle, it does not
     // have any dependencies, and we therefore have two independent
@@ -159,18 +154,17 @@ protocol #Protocol# {
     //   b. Request <- ProtocolSomeMethodRequest <- Protocol
     // Because of random prefixes, either (a) or (b) will be selected to
     // be first in the declaration order.
-    bool element_is_first = strcmp(DECL_NAME(decl_order[0]), namer.of("Element")) == 0;
-
+    bool element_is_first = decl_order[0]->name.decl_name() == namer.of("Element");
     if (element_is_first) {
-      ASSERT_DECL_NAME(decl_order[0], namer.of("Element"));
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Request"));
-      ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
+      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Element"));
+      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Request"));
+      ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
     } else {
-      ASSERT_DECL_NAME(decl_order[0], namer.of("Request"));
-      ASSERT_MANGLED_DECL_NAME(decl_order[1], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[2], namer.of("Protocol"));
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Element"));
+      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
+      ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
+      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Element"));
     }
   }
 }
@@ -193,10 +187,10 @@ protocol #Protocol# {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(3, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Request"));
-    ASSERT_MANGLED_DECL_NAME(decl_order[1], "ProtocolSomeMethodRequest");
-    ASSERT_DECL_NAME(decl_order[2], namer.of("Protocol"));
+    ASSERT_EQ(3u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
+    ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+    ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
   }
 }
 
@@ -223,11 +217,11 @@ type #Payload# = struct {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(4, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
-    ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
-    ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
+    ASSERT_EQ(4u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
+    ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+    ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
   }
 }
 
@@ -254,7 +248,7 @@ type #Payload# = struct {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(4, decl_order.size());
+    ASSERT_EQ(4u, decl_order.size());
 
     // Since the Union argument is nullable, Protocol does not have any
     // dependencies, and we therefore have two independent declaration
@@ -263,17 +257,17 @@ type #Payload# = struct {
     //   b. ProtocolSomeMethodRequest <- Protocol
     // Because of random prefixes, either (a) or (b) will be selected to
     // be first in the declaration order.
-    bool payload_is_first = strcmp(DECL_NAME(decl_order[0]), namer.of("Payload")) == 0;
+    bool payload_is_first = decl_order[0]->name.decl_name() == namer.of("Payload");
     if (payload_is_first) {
-      ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
-      ASSERT_MANGLED_DECL_NAME(decl_order[2], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Protocol"));
+      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
+      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
+      ASSERT_THAT(decl_order[2]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Protocol"));
     } else {
-      ASSERT_MANGLED_DECL_NAME(decl_order[0], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Protocol"));
-      ASSERT_DECL_NAME(decl_order[2], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Union"));
+      ASSERT_THAT(decl_order[0]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Protocol"));
+      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Payload"));
+      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Union"));
     }
   }
 }
@@ -304,12 +298,12 @@ type #Union# = union {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(5, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
-    ASSERT_DECL_NAME(decl_order[2], namer.of("Request"));
-    ASSERT_MANGLED_DECL_NAME(decl_order[3], "ProtocolSomeMethodRequest");
-    ASSERT_DECL_NAME(decl_order[4], namer.of("Protocol"));
+    ASSERT_EQ(5u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
+    ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Request"));
+    ASSERT_THAT(decl_order[3]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+    ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Protocol"));
   }
 }
 
@@ -339,7 +333,7 @@ type #Union# = union {
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(5, decl_order.size());
+    ASSERT_EQ(5u, decl_order.size());
 
     // Since the Union field is nullable, Request does not have any
     // dependencies, and we therefore have two independent declaration
@@ -348,19 +342,19 @@ type #Union# = union {
     //   b. Request <- ProtocolSomeMethodRequest <- Protocol
     // Because of random prefixes, either (a) or (b) will be selected to
     // be first in the declaration order.
-    bool payload_is_first = strcmp(DECL_NAME(decl_order[0]), namer.of("Payload")) == 0;
+    bool payload_is_first = decl_order[0]->name.decl_name() == namer.of("Payload");
     if (payload_is_first) {
-      ASSERT_DECL_NAME(decl_order[0], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[1], namer.of("Union"));
-      ASSERT_DECL_NAME(decl_order[2], namer.of("Request"));
-      ASSERT_MANGLED_DECL_NAME(decl_order[3], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[4], namer.of("Protocol"));
+      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Payload"));
+      ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Union"));
+      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Request"));
+      ASSERT_THAT(decl_order[3]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Protocol"));
     } else {
-      ASSERT_DECL_NAME(decl_order[0], namer.of("Request"));
-      ASSERT_MANGLED_DECL_NAME(decl_order[1], "ProtocolSomeMethodRequest");
-      ASSERT_DECL_NAME(decl_order[2], namer.of("Protocol"));
-      ASSERT_DECL_NAME(decl_order[3], namer.of("Payload"));
-      ASSERT_DECL_NAME(decl_order[4], namer.of("Union"));
+      ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Request"));
+      ASSERT_THAT(decl_order[1]->name.decl_name(), HasSubstr("ProtocolSomeMethodRequest"));
+      ASSERT_EQ(decl_order[2]->name.decl_name(), namer.of("Protocol"));
+      ASSERT_EQ(decl_order[3]->name.decl_name(), namer.of("Payload"));
+      ASSERT_EQ(decl_order[4]->name.decl_name(), namer.of("Union"));
     }
   }
 }
@@ -410,23 +404,23 @@ protocol ExampleDecl1 {
     ASSERT_COMPILED(library);
 
     auto dependency_decl_order = dependency.declaration_order();
-    ASSERT_EQ(1, dependency_decl_order.size());
-    ASSERT_DECL_FQ_NAME(dependency_decl_order[0], "dependency/ExampleDecl1");
+    ASSERT_EQ(1u, dependency_decl_order.size());
+    ASSERT_EQ(fidl::NameFlatName(dependency_decl_order[0]->name), "dependency/ExampleDecl1");
 
     auto library_decl_order = library.declaration_order();
-    ASSERT_EQ(4, library_decl_order.size());
-    ASSERT_DECL_FQ_NAME(library_decl_order[0], "example/ExampleDecl2");
-    ASSERT_DECL_FQ_NAME(library_decl_order[1], "example/ExampleDecl1MethodRequest");
-    ASSERT_DECL_FQ_NAME(library_decl_order[2], "example/ExampleDecl1");
-    ASSERT_DECL_FQ_NAME(library_decl_order[3], "example/ExampleDecl0");
+    ASSERT_EQ(4u, library_decl_order.size());
+    ASSERT_EQ(fidl::NameFlatName(library_decl_order[0]->name), "example/ExampleDecl2");
+    ASSERT_EQ(fidl::NameFlatName(library_decl_order[1]->name), "example/ExampleDecl1MethodRequest");
+    ASSERT_EQ(fidl::NameFlatName(library_decl_order[2]->name), "example/ExampleDecl1");
+    ASSERT_EQ(fidl::NameFlatName(library_decl_order[3]->name), "example/ExampleDecl0");
 
     auto all_decl_order = library.all_libraries_declaration_order();
-    ASSERT_EQ(5, all_decl_order.size());
-    ASSERT_DECL_FQ_NAME(all_decl_order[0], "dependency/ExampleDecl1");
-    ASSERT_DECL_FQ_NAME(all_decl_order[1], "example/ExampleDecl2");
-    ASSERT_DECL_FQ_NAME(all_decl_order[2], "example/ExampleDecl1MethodRequest");
-    ASSERT_DECL_FQ_NAME(all_decl_order[3], "example/ExampleDecl1");
-    ASSERT_DECL_FQ_NAME(all_decl_order[4], "example/ExampleDecl0");
+    ASSERT_EQ(5u, all_decl_order.size());
+    ASSERT_EQ(fidl::NameFlatName(all_decl_order[0]->name), "dependency/ExampleDecl1");
+    ASSERT_EQ(fidl::NameFlatName(all_decl_order[1]->name), "example/ExampleDecl2");
+    ASSERT_EQ(fidl::NameFlatName(all_decl_order[2]->name), "example/ExampleDecl1MethodRequest");
+    ASSERT_EQ(fidl::NameFlatName(all_decl_order[3]->name), "example/ExampleDecl1");
+    ASSERT_EQ(fidl::NameFlatName(all_decl_order[4]->name), "example/ExampleDecl0");
   }
 }
 
@@ -444,9 +438,9 @@ alias #Alias# = uint32;
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(2, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Alias"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Constant"));
+    ASSERT_EQ(2u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Constant"));
   }
 }
 
@@ -464,9 +458,9 @@ alias #Alias# = uint32;
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(2, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Alias"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Enum"));
+    ASSERT_EQ(2u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Enum"));
   }
 }
 
@@ -484,9 +478,9 @@ alias #Alias# = uint32;
     TestLibrary library(source);
     ASSERT_COMPILED(library);
     auto decl_order = library.declaration_order();
-    ASSERT_EQ(2, decl_order.size());
-    ASSERT_DECL_NAME(decl_order[0], namer.of("Alias"));
-    ASSERT_DECL_NAME(decl_order[1], namer.of("Bits"));
+    ASSERT_EQ(2u, decl_order.size());
+    ASSERT_EQ(decl_order[0]->name.decl_name(), namer.of("Alias"));
+    ASSERT_EQ(decl_order[1]->name.decl_name(), namer.of("Bits"));
   }
 }
 

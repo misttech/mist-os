@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/tests/test_library.h"
 
@@ -14,8 +14,8 @@ TEST(BitsTests, GoodSimple) {
 
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupBits("Fruit");
-  ASSERT_NOT_NULL(type_decl);
-  EXPECT_EQ(type_decl->members.size(), 3);
+  ASSERT_NE(type_decl, nullptr);
+  EXPECT_EQ(type_decl->members.size(), 3u);
   auto underlying = type_decl->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -31,7 +31,7 @@ type Fruit = bits {
 )FIDL");
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupBits("Fruit");
-  ASSERT_NOT_NULL(type_decl);
+  ASSERT_NE(type_decl, nullptr);
   auto underlying = type_decl->subtype_ctor->type;
   ASSERT_EQ(underlying->kind, fidl::flat::Type::Kind::kPrimitive);
   auto underlying_primitive = static_cast<const fidl::flat::PrimitiveType*>(underlying);
@@ -168,8 +168,8 @@ TEST(BitsTests, GoodWithMask) {
   ASSERT_COMPILED(library);
 
   auto bits = library.LookupBits("Life");
-  ASSERT_NOT_NULL(bits);
-  EXPECT_EQ(bits->mask, 42);
+  ASSERT_NE(bits, nullptr);
+  EXPECT_EQ(bits->mask, 42u);
 }
 
 TEST(BitsTests, BadShantBeNullable) {

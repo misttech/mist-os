@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -20,7 +20,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -36,7 +36,7 @@ type Foo = table {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupTable("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].maybe_used->type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -52,7 +52,7 @@ type Foo = union {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupUnion("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].maybe_used->type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -68,7 +68,7 @@ protocol Foo {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_request->type);
   auto request_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
@@ -86,7 +86,7 @@ protocol Foo {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
   auto response_type = static_cast<const fidl::flat::Struct*>(id->type_decl);
@@ -104,7 +104,7 @@ protocol Foo {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupProtocol("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
@@ -123,7 +123,7 @@ protocol Foo {
 )FIDL");
   ASSERT_COMPILED(library)
   auto foo = library.LookupProtocol("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(foo->methods[0].maybe_response->type);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
@@ -144,7 +144,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -162,7 +162,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -180,7 +180,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -198,7 +198,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }
@@ -216,7 +216,7 @@ type Foo = struct {
 )FIDL");
   ASSERT_COMPILED(library);
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   auto bar_type = foo->members[0].type_ctor->type;
   EXPECT_EQ(bar_type->name.decl_name(), "Good");
 }

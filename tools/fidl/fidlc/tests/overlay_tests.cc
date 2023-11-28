@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -102,8 +102,8 @@ type Foo = strict overlay {
 
   ASSERT_COMPILED(library);
   auto type_decl = library.LookupOverlay("Foo");
-  ASSERT_NOT_NULL(type_decl);
-  EXPECT_EQ(type_decl->members.size(), 5);
+  ASSERT_NE(type_decl, nullptr);
+  EXPECT_EQ(type_decl->members.size(), 5u);
 }
 
 TEST(OverlayTests, BadFlexible) {

@@ -4,7 +4,7 @@
 
 #include <optional>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
@@ -273,31 +273,31 @@ type Foo = struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -314,31 +314,31 @@ type Foo = struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -355,31 +355,31 @@ type Foo = struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -396,34 +396,34 @@ type Foo = struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
     EXPECT_FALSE(library.LookupStruct("Foo")->availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
     EXPECT_TRUE(library.LookupStruct("Foo")->availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
     EXPECT_TRUE(library.LookupStruct("Foo")->availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -440,32 +440,32 @@ type Foo = struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
     // The decl is re-added at LEGACY.
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -484,36 +484,36 @@ type Foo = struct {
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
 }
 
@@ -532,36 +532,36 @@ type Foo = struct {
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
 }
 
@@ -580,36 +580,36 @@ type Foo = struct {
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
 }
 
@@ -628,39 +628,39 @@ type Foo = struct {
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
     EXPECT_FALSE(library.LookupStruct("Foo")->members.front().availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
     EXPECT_TRUE(library.LookupStruct("Foo")->members.front().availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
     EXPECT_TRUE(library.LookupStruct("Foo")->members.front().availability.is_deprecated());
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
 }
 
@@ -679,37 +679,37 @@ type Foo = struct {
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", kMaxNumericVersion);
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "HEAD");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "LEGACY");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
     // The member is re-added at LEGACY.
-    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
   }
 }
 
@@ -848,13 +848,13 @@ type Foo = @available(added=2) struct {};
     TestLibrary library(source);
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
-    ASSERT_NULL(library.LookupStruct("Foo"));
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
-    ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
   }
 }
 
@@ -1140,7 +1140,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->availability.is_deprecated());
 }
 
@@ -1156,7 +1156,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->availability.is_deprecated());
 }
 
@@ -1209,7 +1209,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->availability.is_deprecated());
 }
 
@@ -1225,7 +1225,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->availability.is_deprecated());
 }
 
@@ -1311,7 +1311,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_FALSE(foo->availability.is_deprecated());
 }
 
@@ -1327,7 +1327,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_FALSE(foo->availability.is_deprecated());
 }
 
@@ -1343,7 +1343,7 @@ type Foo = struct {};
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
+  ASSERT_NE(foo, nullptr);
   EXPECT_TRUE(foo->availability.is_deprecated());
 }
 
@@ -1371,7 +1371,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NULL(library.LookupStruct("Foo"));
+  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
 }
 
 TEST(VersioningTests, GoodLegacyParentNotRemovedChildTrue) {
@@ -1384,7 +1384,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+  ASSERT_NE(library.LookupStruct("Foo"), nullptr);
 }
 
 TEST(VersioningTests, GoodLegacyParentFalseChildFalse) {
@@ -1397,7 +1397,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NULL(library.LookupStruct("Foo"));
+  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
 }
 
 TEST(VersioningTests, BadLegacyParentFalseChildTrue) {
@@ -1433,7 +1433,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NOT_NULL(library.LookupStruct("Foo"));
+  ASSERT_NE(library.LookupStruct("Foo"), nullptr);
 }
 
 TEST(VersioningTests, GoodLegacyParentTrueChildFalse) {
@@ -1446,7 +1446,7 @@ type Foo = struct {};
 )FIDL");
   library.SelectVersion("example", "LEGACY");
   ASSERT_COMPILED(library);
-  ASSERT_NULL(library.LookupStruct("Foo"));
+  ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
 }
 
 TEST(VersioningTests, GoodMemberInheritsFromParent) {
@@ -1464,8 +1464,8 @@ type Foo = struct {
   ASSERT_COMPILED(library);
 
   auto foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
-  EXPECT_EQ(foo->members.size(), 1);
+  ASSERT_NE(foo, nullptr);
+  EXPECT_EQ(foo->members.size(), 1u);
 }
 
 TEST(VersioningTests, GoodComplexInheritance) {
@@ -1594,7 +1594,7 @@ type Foo = struct {
       ASSERT_COMPILED(library);
 
       auto bar = library.LookupStruct("Bar");
-      ASSERT_NULL(bar);
+      ASSERT_EQ(bar, nullptr);
     }
     {
       TestLibrary library(source);
@@ -1602,7 +1602,7 @@ type Foo = struct {
       ASSERT_COMPILED(library);
 
       auto bar = library.LookupStruct("Bar");
-      ASSERT_NOT_NULL(bar);
+      ASSERT_NE(bar, nullptr);
       EXPECT_FALSE(bar->availability.is_deprecated());
     }
     {
@@ -1611,7 +1611,7 @@ type Foo = struct {
       ASSERT_COMPILED(library);
 
       auto bar = library.LookupStruct("Bar");
-      ASSERT_NOT_NULL(bar);
+      ASSERT_NE(bar, nullptr);
       EXPECT_TRUE(bar->availability.is_deprecated());
     }
     {
@@ -1620,7 +1620,7 @@ type Foo = struct {
       ASSERT_COMPILED(library);
 
       auto bar = library.LookupStruct("Bar");
-      ASSERT_NULL(bar);
+      ASSERT_EQ(bar, nullptr);
     }
     {
       TestLibrary library(source);
@@ -1628,7 +1628,7 @@ type Foo = struct {
       ASSERT_COMPILED(library);
 
       auto bar = library.LookupStruct("Bar");
-      ASSERT_NOT_NULL(bar);
+      ASSERT_NE(bar, nullptr);
     }
   }
 }
@@ -1736,16 +1736,16 @@ type Foo = table {};
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
 
-    EXPECT_NOT_NULL(library.LookupStruct("Foo"));
-    EXPECT_NULL(library.LookupTable("Foo"));
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
 
-    EXPECT_NULL(library.LookupStruct("Foo"));
-    EXPECT_NOT_NULL(library.LookupTable("Foo"));
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
   }
 }
 
@@ -1766,16 +1766,16 @@ type FOO = table {};
     library.SelectVersion("example", "1");
     ASSERT_COMPILED(library);
 
-    EXPECT_NOT_NULL(library.LookupStruct("foo"));
-    EXPECT_NULL(library.LookupTable("FOO"));
+    EXPECT_NE(library.LookupStruct("foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("FOO"), nullptr);
   }
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
     ASSERT_COMPILED(library);
 
-    EXPECT_NULL(library.LookupStruct("foo"));
-    EXPECT_NOT_NULL(library.LookupTable("FOO"));
+    EXPECT_EQ(library.LookupStruct("foo"), nullptr);
+    EXPECT_NE(library.LookupTable("FOO"), nullptr);
   }
 }
 
@@ -2410,8 +2410,8 @@ type Bar = struct {
 )FIDL");
   library.SelectVersion("example", "HEAD");
   ASSERT_COMPILED(library);
-  ASSERT_NOT_NULL(library.LookupStruct("Foo"));
-  ASSERT_NOT_NULL(library.LookupStruct("Bar"));
+  ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+  ASSERT_NE(library.LookupStruct("Bar"), nullptr);
 }
 
 TEST(VersioningTests, GoodSplitByDeclInExternalLibrary) {
@@ -2525,8 +2525,8 @@ type Foo = struct {
   ASSERT_COMPILED(example);
 
   auto foo = example.LookupStruct("Foo");
-  ASSERT_NOT_NULL(foo);
-  ASSERT_EQ(foo->members.size(), 1);
+  ASSERT_NE(foo, nullptr);
+  ASSERT_EQ(foo->members.size(), 1u);
   auto member_type = foo->members[0].type_ctor->type;
   ASSERT_EQ(member_type->kind, fidl::flat::Type::Kind::kIdentifier);
   auto identifier_type = static_cast<const fidl::flat::IdentifierType*>(member_type);
@@ -2587,7 +2587,7 @@ alias Foo = example.versioned.Foo;
   // The example.unversioned library is added=HEAD by default, but not HEAD of
   // the "example" platform -- that would confusingly result in empty IR, since
   // we selected "example" version 1 -- rather HEAD of an anonymous platform.
-  ASSERT_NOT_NULL(unversioned.LookupAlias("Foo"));
+  ASSERT_NE(unversioned.LookupAlias("Foo"), nullptr);
 }
 
 }  // namespace

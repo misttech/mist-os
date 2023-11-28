@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/type_shape.h"
@@ -40,7 +40,14 @@ struct Expected {
   bool has_flexible_envelope = false;
 };
 
-void CheckTypeShape(const fidl::TypeShape& actual, Expected expected) {
+#define EXPECT_TYPE_SHAPE(object, expected)   \
+  {                                           \
+    SCOPED_TRACE("EXPECT_TYPE_SHAPE failed"); \
+    ExpectTypeShape((object), (expected));    \
+  }
+
+void ExpectTypeShape(const fidl::flat::Object* object, Expected expected) {
+  auto actual = fidl::TypeShape(object, fidl::WireFormat::kV2);
   EXPECT_EQ(expected.inline_size, actual.inline_size);
   EXPECT_EQ(expected.alignment, actual.alignment);
   EXPECT_EQ(expected.max_out_of_line, actual.max_out_of_line);
@@ -50,25 +57,20 @@ void CheckTypeShape(const fidl::TypeShape& actual, Expected expected) {
   EXPECT_EQ(expected.has_flexible_envelope, actual.has_flexible_envelope);
 }
 
-void CheckTypeShapeWithHeader(const fidl::flat::Object* actual, Expected expected,
-                              Expected expected_header) {
-  ASSERT_NO_FAILURES(CheckTypeShape(fidl::TypeShape(actual, fidl::WireFormat::kV2), expected));
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(fidl::TypeShape(actual, fidl::WireFormat::kV2), expected_header));
-}
-
-void CheckTypeShape(const fidl::flat::Object* actual, Expected expected) {
-  ASSERT_NO_FAILURES(CheckTypeShape(fidl::TypeShape(actual, fidl::WireFormat::kV2), expected));
-}
-
 struct ExpectedField {
   uint32_t offset = 0;
   uint32_t padding = 0;
 };
 
+#define EXPECT_FIELD_SHAPE(field, expected)    \
+  {                                            \
+    SCOPED_TRACE("EXPECT_FIELD_SHAPE failed"); \
+    ExpectFieldShape((field), (expected));     \
+  }
+
 template <typename T>
-void CheckFieldShape(const T& field, ExpectedField expected) {
-  const fidl::FieldShape& actual = fidl::FieldShape(field, fidl::WireFormat::kV2);
+void ExpectFieldShape(const T& field, ExpectedField expected) {
+  auto actual = fidl::FieldShape(field, fidl::WireFormat::kV2);
   EXPECT_EQ(expected.offset, actual.offset);
   EXPECT_EQ(expected.padding, actual.padding);
 }
@@ -81,12 +83,12 @@ type Empty = struct {};
   ASSERT_COMPILED(test_library);
 
   auto empty = test_library.LookupStruct("Empty");
-  ASSERT_NOT_NULL(empty);
-  ASSERT_NO_FAILURES(CheckTypeShape(empty, Expected{
-                                               .inline_size = 1,
-                                               .alignment = 1,
-                                           }));
-  ASSERT_EQ(empty->members.size(), 0);
+  ASSERT_NE(empty, nullptr);
+  EXPECT_TYPE_SHAPE(empty, (Expected{
+                               .inline_size = 1,
+                               .alignment = 1,
+                           }));
+  ASSERT_EQ(empty->members.size(), 0u);
 }
 
 TEST(TypeshapeTests, GoodEmptyStructWithinAnotherStruct) {
@@ -128,42 +130,42 @@ type EmptyWithOtherThings = struct {
   ASSERT_COMPILED(test_library);
 
   auto empty_with_other_things = test_library.LookupStruct("EmptyWithOtherThings");
-  ASSERT_NOT_NULL(empty_with_other_things);
-  ASSERT_NO_FAILURES(CheckTypeShape(empty_with_other_things, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 4,
-                                                                 .has_padding = true,
-                                                             }));
-  ASSERT_EQ(empty_with_other_things->members.size(), 8);
+  ASSERT_NE(empty_with_other_things, nullptr);
+  EXPECT_TYPE_SHAPE(empty_with_other_things, (Expected{
+                                                 .inline_size = 16,
+                                                 .alignment = 4,
+                                                 .has_padding = true,
+                                             }));
+  ASSERT_EQ(empty_with_other_things->members.size(), 8u);
   // bool a;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[0], ExpectedField{}));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[0], (ExpectedField{}));
   // Empty b;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[1], ExpectedField{
-                                                                              .offset = 1,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[1], (ExpectedField{
+                                                              .offset = 1,
+                                                          }));
   // int16 c;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[2], ExpectedField{
-                                                                              .offset = 2,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[2], (ExpectedField{
+                                                              .offset = 2,
+                                                          }));
   // Empty d;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[3],
-                                     ExpectedField{.offset = 4, .padding = 3}));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[3],
+                     (ExpectedField{.offset = 4, .padding = 3}));
   // int32 e;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[4], ExpectedField{
-                                                                              .offset = 8,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[4], (ExpectedField{
+                                                              .offset = 8,
+                                                          }));
   // int16 f;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[5], ExpectedField{
-                                                                              .offset = 12,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[5], (ExpectedField{
+                                                              .offset = 12,
+                                                          }));
   // Empty g;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[6], ExpectedField{
-                                                                              .offset = 14,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[6], (ExpectedField{
+                                                              .offset = 14,
+                                                          }));
   // Empty h;
-  ASSERT_NO_FAILURES(CheckFieldShape(empty_with_other_things->members[7], ExpectedField{
-                                                                              .offset = 15,
-                                                                          }));
+  EXPECT_FIELD_SHAPE(empty_with_other_things->members[7], (ExpectedField{
+                                                              .offset = 15,
+                                                          }));
 }
 
 TEST(TypeshapeTests, GoodSimpleNewTypes) {
@@ -201,40 +203,40 @@ type NewUnionOfThings = UnionOfThings;
   ASSERT_COMPILED(test_library);
 
   auto new_bool_and_u32_struct = test_library.LookupNewType("NewBoolAndU32");
-  ASSERT_NOT_NULL(new_bool_and_u32_struct);
-  ASSERT_NO_FAILURES(CheckTypeShape(new_bool_and_u32_struct, Expected{
-                                                                 .inline_size = 8,
-                                                                 .alignment = 4,
-                                                                 .has_padding = true,
-                                                             }));
+  ASSERT_NE(new_bool_and_u32_struct, nullptr);
+  EXPECT_TYPE_SHAPE(new_bool_and_u32_struct, (Expected{
+                                                 .inline_size = 8,
+                                                 .alignment = 4,
+                                                 .has_padding = true,
+                                             }));
 
   auto new_bits_implicit = test_library.LookupNewType("NewBitsImplicit");
-  EXPECT_NOT_NULL(new_bits_implicit);
-  ASSERT_NO_FAILURES(CheckTypeShape(new_bits_implicit, Expected{
-                                                           .inline_size = 4,
-                                                           .alignment = 4,
-                                                       }));
+  ASSERT_NE(new_bits_implicit, nullptr);
+  EXPECT_TYPE_SHAPE(new_bits_implicit, (Expected{
+                                           .inline_size = 4,
+                                           .alignment = 4,
+                                       }));
 
   auto new_bool_and_u32_table = test_library.LookupNewType("NewTableWithBoolAndU32");
-  ASSERT_NOT_NULL(new_bool_and_u32_table);
-  ASSERT_NO_FAILURES(CheckTypeShape(new_bool_and_u32_table, Expected{
-                                                                .inline_size = 16,
-                                                                .alignment = 8,
-                                                                .max_out_of_line = 16,
-                                                                .depth = 2,
-                                                                .has_padding = true,
-                                                                .has_flexible_envelope = true,
-                                                            }));
+  ASSERT_NE(new_bool_and_u32_table, nullptr);
+  EXPECT_TYPE_SHAPE(new_bool_and_u32_table, (Expected{
+                                                .inline_size = 16,
+                                                .alignment = 8,
+                                                .max_out_of_line = 16,
+                                                .depth = 2,
+                                                .has_padding = true,
+                                                .has_flexible_envelope = true,
+                                            }));
 
   auto new_union = test_library.LookupNewType("NewUnionOfThings");
-  ASSERT_NOT_NULL(new_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(new_union, Expected{
-                                                   .inline_size = 16,
-                                                   .alignment = 8,
-                                                   .max_out_of_line = 16,
-                                                   .depth = 1,
-                                                   .has_padding = true,
-                                               }));
+  ASSERT_NE(new_union, nullptr);
+  EXPECT_TYPE_SHAPE(new_union, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = 16,
+                                   .depth = 1,
+                                   .has_padding = true,
+                               }));
 }
 
 TEST(TypeshapeTests, GoodSimpleStructs) {
@@ -262,51 +264,51 @@ type BoolAndU64 = struct {
   ASSERT_COMPILED(test_library);
 
   auto one_bool = test_library.LookupStruct("OneBool");
-  ASSERT_NOT_NULL(one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_bool, Expected{
-                                                  .inline_size = 1,
-                                                  .alignment = 1,
-                                              }));
-  ASSERT_EQ(one_bool->members.size(), 1);
-  ASSERT_NO_FAILURES(CheckFieldShape(one_bool->members[0], ExpectedField{}));
+  ASSERT_NE(one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(one_bool, (Expected{
+                                  .inline_size = 1,
+                                  .alignment = 1,
+                              }));
+  ASSERT_EQ(one_bool->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(one_bool->members[0], (ExpectedField{}));
 
   auto two_bools = test_library.LookupStruct("TwoBools");
-  ASSERT_NOT_NULL(two_bools);
-  ASSERT_NO_FAILURES(CheckTypeShape(two_bools, Expected{
-                                                   .inline_size = 2,
-                                                   .alignment = 1,
-                                               }));
-  ASSERT_EQ(two_bools->members.size(), 2);
-  ASSERT_NO_FAILURES(CheckFieldShape(two_bools->members[0], ExpectedField{}));
-  ASSERT_NO_FAILURES(CheckFieldShape(two_bools->members[1], ExpectedField{
-                                                                .offset = 1,
-                                                            }));
+  ASSERT_NE(two_bools, nullptr);
+  EXPECT_TYPE_SHAPE(two_bools, (Expected{
+                                   .inline_size = 2,
+                                   .alignment = 1,
+                               }));
+  ASSERT_EQ(two_bools->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(two_bools->members[0], (ExpectedField{}));
+  EXPECT_FIELD_SHAPE(two_bools->members[1], (ExpectedField{
+                                                .offset = 1,
+                                            }));
 
   auto bool_and_u32 = test_library.LookupStruct("BoolAndU32");
-  ASSERT_NOT_NULL(bool_and_u32);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u32, Expected{
-                                                      .inline_size = 8,
-                                                      .alignment = 4,
-                                                      .has_padding = true,
-                                                  }));
-  ASSERT_EQ(bool_and_u32->members.size(), 2);
-  ASSERT_NO_FAILURES(CheckFieldShape(bool_and_u32->members[0], ExpectedField{.padding = 3}));
-  ASSERT_NO_FAILURES(CheckFieldShape(bool_and_u32->members[1], ExpectedField{
-                                                                   .offset = 4,
-                                                               }));
+  ASSERT_NE(bool_and_u32, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u32, (Expected{
+                                      .inline_size = 8,
+                                      .alignment = 4,
+                                      .has_padding = true,
+                                  }));
+  ASSERT_EQ(bool_and_u32->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(bool_and_u32->members[0], (ExpectedField{.padding = 3}));
+  EXPECT_FIELD_SHAPE(bool_and_u32->members[1], (ExpectedField{
+                                                   .offset = 4,
+                                               }));
 
   auto bool_and_u64 = test_library.LookupStruct("BoolAndU64");
-  ASSERT_NOT_NULL(bool_and_u64);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u64, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .has_padding = true,
-                                                  }));
-  ASSERT_EQ(bool_and_u64->members.size(), 2);
-  ASSERT_NO_FAILURES(CheckFieldShape(bool_and_u64->members[0], ExpectedField{.padding = 7}));
-  ASSERT_NO_FAILURES(CheckFieldShape(bool_and_u64->members[1], ExpectedField{
-                                                                   .offset = 8,
-                                                               }));
+  ASSERT_NE(bool_and_u64, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u64, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .has_padding = true,
+                                  }));
+  ASSERT_EQ(bool_and_u64->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(bool_and_u64->members[0], (ExpectedField{.padding = 7}));
+  EXPECT_FIELD_SHAPE(bool_and_u64->members[1], (ExpectedField{
+                                                   .offset = 8,
+                                               }));
 }
 
 TEST(TypeshapeTests, GoodSimpleStructsWithHandles) {
@@ -329,43 +331,43 @@ type ThreeHandlesOneOptional = resource struct {
   ASSERT_COMPILED(test_library);
 
   auto one_handle = test_library.LookupStruct("OneHandle");
-  ASSERT_NOT_NULL(one_handle);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_handle, Expected{
-                                                    .inline_size = 4,
-                                                    .alignment = 4,
-                                                    .max_handles = 1,
-                                                }));
-  ASSERT_EQ(one_handle->members.size(), 1);
-  ASSERT_NO_FAILURES(CheckFieldShape(one_handle->members[0], ExpectedField{}));
+  ASSERT_NE(one_handle, nullptr);
+  EXPECT_TYPE_SHAPE(one_handle, (Expected{
+                                    .inline_size = 4,
+                                    .alignment = 4,
+                                    .max_handles = 1,
+                                }));
+  ASSERT_EQ(one_handle->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(one_handle->members[0], (ExpectedField{}));
 
   auto two_handles = test_library.LookupStruct("TwoHandles");
-  ASSERT_NOT_NULL(two_handles);
-  ASSERT_NO_FAILURES(CheckTypeShape(two_handles, Expected{
-                                                     .inline_size = 8,
-                                                     .alignment = 4,
-                                                     .max_handles = 2,
-                                                 }));
-  ASSERT_EQ(two_handles->members.size(), 2);
-  ASSERT_NO_FAILURES(CheckFieldShape(two_handles->members[0], ExpectedField{}));
-  ASSERT_NO_FAILURES(CheckFieldShape(two_handles->members[1], ExpectedField{
-                                                                  .offset = 4,
-                                                              }));
+  ASSERT_NE(two_handles, nullptr);
+  EXPECT_TYPE_SHAPE(two_handles, (Expected{
+                                     .inline_size = 8,
+                                     .alignment = 4,
+                                     .max_handles = 2,
+                                 }));
+  ASSERT_EQ(two_handles->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(two_handles->members[0], (ExpectedField{}));
+  EXPECT_FIELD_SHAPE(two_handles->members[1], (ExpectedField{
+                                                  .offset = 4,
+                                              }));
 
   auto three_handles_one_optional = test_library.LookupStruct("ThreeHandlesOneOptional");
-  ASSERT_NOT_NULL(three_handles_one_optional);
-  ASSERT_NO_FAILURES(CheckTypeShape(three_handles_one_optional, Expected{
-                                                                    .inline_size = 12,
-                                                                    .alignment = 4,
-                                                                    .max_handles = 3,
-                                                                }));
-  ASSERT_EQ(three_handles_one_optional->members.size(), 3);
-  ASSERT_NO_FAILURES(CheckFieldShape(three_handles_one_optional->members[0], ExpectedField{}));
-  ASSERT_NO_FAILURES(CheckFieldShape(three_handles_one_optional->members[1], ExpectedField{
-                                                                                 .offset = 4,
-                                                                             }));
-  ASSERT_NO_FAILURES(CheckFieldShape(three_handles_one_optional->members[2], ExpectedField{
-                                                                                 .offset = 8,
-                                                                             }));
+  ASSERT_NE(three_handles_one_optional, nullptr);
+  EXPECT_TYPE_SHAPE(three_handles_one_optional, (Expected{
+                                                    .inline_size = 12,
+                                                    .alignment = 4,
+                                                    .max_handles = 3,
+                                                }));
+  ASSERT_EQ(three_handles_one_optional->members.size(), 3u);
+  EXPECT_FIELD_SHAPE(three_handles_one_optional->members[0], (ExpectedField{}));
+  EXPECT_FIELD_SHAPE(three_handles_one_optional->members[1], (ExpectedField{
+                                                                 .offset = 4,
+                                                             }));
+  EXPECT_FIELD_SHAPE(three_handles_one_optional->members[2], (ExpectedField{
+                                                                 .offset = 8,
+                                                             }));
 }
 
 TEST(TypeshapeTests, GoodBits) {
@@ -382,18 +384,18 @@ type BitsImplicit = strict bits {
   ASSERT_COMPILED(test_library);
 
   auto bits16 = test_library.LookupBits("Bits16");
-  ASSERT_NOT_NULL(bits16);
-  ASSERT_NO_FAILURES(CheckTypeShape(bits16, Expected{
-                                                .inline_size = 2,
-                                                .alignment = 2,
-                                            }));
+  ASSERT_NE(bits16, nullptr);
+  EXPECT_TYPE_SHAPE(bits16, (Expected{
+                                .inline_size = 2,
+                                .alignment = 2,
+                            }));
 
   auto bits_implicit = test_library.LookupBits("BitsImplicit");
-  EXPECT_NOT_NULL(bits_implicit);
-  ASSERT_NO_FAILURES(CheckTypeShape(bits_implicit, Expected{
-                                                       .inline_size = 4,
-                                                       .alignment = 4,
-                                                   }));
+  ASSERT_NE(bits_implicit, nullptr);
+  EXPECT_TYPE_SHAPE(bits_implicit, (Expected{
+                                       .inline_size = 4,
+                                       .alignment = 4,
+                                   }));
 }
 
 TEST(TypeshapeTests, GoodSimpleTables) {
@@ -423,58 +425,58 @@ type TableWithBoolAndU64 = table {
   ASSERT_COMPILED(test_library);
 
   auto no_members = test_library.LookupTable("TableWithNoMembers");
-  ASSERT_NOT_NULL(no_members);
-  ASSERT_NO_FAILURES(CheckTypeShape(no_members, Expected{
-                                                    .inline_size = 16,
-                                                    .alignment = 8,
-                                                    .depth = 1,
-                                                    .has_padding = false,
-                                                    .has_flexible_envelope = true,
-                                                }));
+  ASSERT_NE(no_members, nullptr);
+  EXPECT_TYPE_SHAPE(no_members, (Expected{
+                                    .inline_size = 16,
+                                    .alignment = 8,
+                                    .depth = 1,
+                                    .has_padding = false,
+                                    .has_flexible_envelope = true,
+                                }));
 
   auto one_bool = test_library.LookupTable("TableWithOneBool");
-  ASSERT_NOT_NULL(one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_bool, Expected{
-                                                  .inline_size = 16,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 8,
-                                                  .depth = 2,
-                                                  .has_padding = true,
-                                                  .has_flexible_envelope = true,
-                                              }));
+  ASSERT_NE(one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(one_bool, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = 8,
+                                  .depth = 2,
+                                  .has_padding = true,
+                                  .has_flexible_envelope = true,
+                              }));
 
   auto two_bools = test_library.LookupTable("TableWithTwoBools");
-  ASSERT_NOT_NULL(two_bools);
-  ASSERT_NO_FAILURES(CheckTypeShape(two_bools, Expected{
-                                                   .inline_size = 16,
-                                                   .alignment = 8,
-                                                   .max_out_of_line = 16,
-                                                   .depth = 2,
-                                                   .has_padding = true,
-                                                   .has_flexible_envelope = true,
-                                               }));
+  ASSERT_NE(two_bools, nullptr);
+  EXPECT_TYPE_SHAPE(two_bools, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = 16,
+                                   .depth = 2,
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 
   auto bool_and_u32 = test_library.LookupTable("TableWithBoolAndU32");
-  ASSERT_NOT_NULL(bool_and_u32);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u32, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 16,
-                                                      .depth = 2,
-                                                      .has_padding = true,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(bool_and_u32, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u32, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 16,
+                                      .depth = 2,
+                                      .has_padding = true,
+                                      .has_flexible_envelope = true,
+                                  }));
 
   auto bool_and_u64 = test_library.LookupTable("TableWithBoolAndU64");
-  ASSERT_NOT_NULL(bool_and_u64);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u64, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 24,
-                                                      .depth = 2,
-                                                      .has_padding = true,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(bool_and_u64, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u64, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 24,
+                                      .depth = 2,
+                                      .has_padding = true,
+                                      .has_flexible_envelope = true,
+                                  }));
 }
 
 TEST(TypeshapeTests, GoodTablesWithReservedFields) {
@@ -513,59 +515,59 @@ type OneReserved = table {
   ASSERT_COMPILED(test_library);
 
   auto some_reserved = test_library.LookupTable("SomeReserved");
-  ASSERT_NOT_NULL(some_reserved);
-  ASSERT_NO_FAILURES(CheckTypeShape(some_reserved, Expected{
-                                                       .inline_size = 16,
-                                                       .alignment = 8,
-                                                       .max_out_of_line = 24,
-                                                       .depth = 2,
-                                                       .has_padding = true,
-                                                       .has_flexible_envelope = true,
-                                                   }));
+  ASSERT_NE(some_reserved, nullptr);
+  EXPECT_TYPE_SHAPE(some_reserved, (Expected{
+                                       .inline_size = 16,
+                                       .alignment = 8,
+                                       .max_out_of_line = 24,
+                                       .depth = 2,
+                                       .has_padding = true,
+                                       .has_flexible_envelope = true,
+                                   }));
 
   auto last_non_reserved = test_library.LookupTable("LastNonReserved");
-  ASSERT_NOT_NULL(last_non_reserved);
-  ASSERT_NO_FAILURES(CheckTypeShape(last_non_reserved, Expected{
-                                                           .inline_size = 16,
-                                                           .alignment = 8,
-                                                           .max_out_of_line = 24,
-                                                           .depth = 2,
-                                                           .has_padding = true,
-                                                           .has_flexible_envelope = true,
-                                                       }));
+  ASSERT_NE(last_non_reserved, nullptr);
+  EXPECT_TYPE_SHAPE(last_non_reserved, (Expected{
+                                           .inline_size = 16,
+                                           .alignment = 8,
+                                           .max_out_of_line = 24,
+                                           .depth = 2,
+                                           .has_padding = true,
+                                           .has_flexible_envelope = true,
+                                       }));
 
   auto last_reserved = test_library.LookupTable("LastReserved");
-  ASSERT_NOT_NULL(last_reserved);
-  ASSERT_NO_FAILURES(CheckTypeShape(last_reserved, Expected{
-                                                       .inline_size = 16,
-                                                       .alignment = 8,
-                                                       .max_out_of_line = 16,
-                                                       .depth = 2,
-                                                       .has_padding = true,
-                                                       .has_flexible_envelope = true,
-                                                   }));
+  ASSERT_NE(last_reserved, nullptr);
+  EXPECT_TYPE_SHAPE(last_reserved, (Expected{
+                                       .inline_size = 16,
+                                       .alignment = 8,
+                                       .max_out_of_line = 16,
+                                       .depth = 2,
+                                       .has_padding = true,
+                                       .has_flexible_envelope = true,
+                                   }));
 
   auto all_reserved = test_library.LookupTable("AllReserved");
-  ASSERT_NOT_NULL(all_reserved);
-  ASSERT_NO_FAILURES(CheckTypeShape(all_reserved, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 0,
-                                                      .depth = 1,
-                                                      .has_padding = false,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(all_reserved, nullptr);
+  EXPECT_TYPE_SHAPE(all_reserved, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 0,
+                                      .depth = 1,
+                                      .has_padding = false,
+                                      .has_flexible_envelope = true,
+                                  }));
 
   auto one_reserved = test_library.LookupTable("OneReserved");
-  ASSERT_NOT_NULL(one_reserved);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_reserved, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 0,
-                                                      .depth = 1,
-                                                      .has_padding = false,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(one_reserved, nullptr);
+  EXPECT_TYPE_SHAPE(one_reserved, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 0,
+                                      .depth = 1,
+                                      .has_padding = false,
+                                      .has_flexible_envelope = true,
+                                  }));
 }
 
 TEST(TypeshapeTests, GoodSimpleTablesWithHandles) {
@@ -582,16 +584,16 @@ type TableWithOneHandle = resource table {
   ASSERT_COMPILED(test_library);
 
   auto one_handle = test_library.LookupTable("TableWithOneHandle");
-  ASSERT_NOT_NULL(one_handle);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_handle, Expected{
-                                                    .inline_size = 16,
-                                                    .alignment = 8,
-                                                    .max_out_of_line = 8,
-                                                    .max_handles = 1,
-                                                    .depth = 2,
-                                                    .has_padding = true,
-                                                    .has_flexible_envelope = true,
-                                                }));
+  ASSERT_NE(one_handle, nullptr);
+  EXPECT_TYPE_SHAPE(one_handle, (Expected{
+                                    .inline_size = 16,
+                                    .alignment = 8,
+                                    .max_out_of_line = 8,
+                                    .max_handles = 1,
+                                    .depth = 2,
+                                    .has_padding = true,
+                                    .has_flexible_envelope = true,
+                                }));
 }
 
 TEST(TypeshapeTests, GoodOptionalStructs) {
@@ -635,46 +637,44 @@ type OptionalBoolAndU64 = struct {
   ASSERT_COMPILED(test_library);
 
   auto one_bool = test_library.LookupStruct("OptionalOneBool");
-  ASSERT_NOT_NULL(one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_bool, Expected{
-                                                  .inline_size = 8,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 8,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
+  ASSERT_NE(one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(one_bool, (Expected{
+                                  .inline_size = 8,
+                                  .alignment = 8,
+                                  .max_out_of_line = 8,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
 
   auto two_bools = test_library.LookupStruct("OptionalTwoBools");
-  ASSERT_NOT_NULL(two_bools);
-  ASSERT_NO_FAILURES(CheckTypeShape(two_bools, Expected{
-                                                   .inline_size = 8,
-                                                   .alignment = 8,
-                                                   .max_out_of_line = 8,
-                                                   .depth = 1,
-                                                   .has_padding = true,
-                                               }));
+  ASSERT_NE(two_bools, nullptr);
+  EXPECT_TYPE_SHAPE(two_bools, (Expected{
+                                   .inline_size = 8,
+                                   .alignment = 8,
+                                   .max_out_of_line = 8,
+                                   .depth = 1,
+                                   .has_padding = true,
+                               }));
 
   auto bool_and_u32 = test_library.LookupStruct("OptionalBoolAndU32");
-  ASSERT_NOT_NULL(bool_and_u32);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(bool_and_u32, Expected{
-                                       .inline_size = 8,
-                                       .alignment = 8,
-                                       .max_out_of_line = 8,
-                                       .depth = 1,
-                                       .has_padding = true,  // because |BoolAndU32| has padding
-                                   }));
+  ASSERT_NE(bool_and_u32, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u32, (Expected{
+                                      .inline_size = 8,
+                                      .alignment = 8,
+                                      .max_out_of_line = 8,
+                                      .depth = 1,
+                                      .has_padding = true,  // because |BoolAndU32| has padding
+                                  }));
 
   auto bool_and_u64 = test_library.LookupStruct("OptionalBoolAndU64");
-  ASSERT_NOT_NULL(bool_and_u64);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(bool_and_u64, Expected{
-                                       .inline_size = 8,
-                                       .alignment = 8,
-                                       .max_out_of_line = 16,
-                                       .depth = 1,
-                                       .has_padding = true,  // because |BoolAndU64| has padding
-                                   }));
+  ASSERT_NE(bool_and_u64, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u64, (Expected{
+                                      .inline_size = 8,
+                                      .alignment = 8,
+                                      .max_out_of_line = 16,
+                                      .depth = 1,
+                                      .has_padding = true,  // because |BoolAndU64| has padding
+                                  }));
 }
 
 TEST(TypeshapeTests, GoodOptionalTables) {
@@ -753,92 +753,92 @@ type TableWithOptionalTableWithBoolAndU64 = table {
   ASSERT_COMPILED(test_library);
 
   auto one_bool = test_library.LookupTable("TableWithOptionalOneBool");
-  ASSERT_NOT_NULL(one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_bool, Expected{
-                                                  .inline_size = 16,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 8,
-                                                  .depth = 2,
-                                                  .has_padding = true,
-                                                  .has_flexible_envelope = true,
-                                              }));
+  ASSERT_NE(one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(one_bool, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = 8,
+                                  .depth = 2,
+                                  .has_padding = true,
+                                  .has_flexible_envelope = true,
+                              }));
 
   auto table_with_one_bool = test_library.LookupTable("TableWithOptionalTableWithOneBool");
-  ASSERT_NOT_NULL(table_with_one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_one_bool, Expected{
-                                                             .inline_size = 16,
-                                                             .alignment = 8,
-                                                             .max_out_of_line = 32,
-                                                             .depth = 4,
-                                                             .has_padding = true,
-                                                             .has_flexible_envelope = true,
-                                                         }));
+  ASSERT_NE(table_with_one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_one_bool, (Expected{
+                                             .inline_size = 16,
+                                             .alignment = 8,
+                                             .max_out_of_line = 32,
+                                             .depth = 4,
+                                             .has_padding = true,
+                                             .has_flexible_envelope = true,
+                                         }));
 
   auto two_bools = test_library.LookupTable("TableWithOptionalTwoBools");
-  ASSERT_NOT_NULL(two_bools);
-  ASSERT_NO_FAILURES(CheckTypeShape(two_bools, Expected{
-                                                   .inline_size = 16,
-                                                   .alignment = 8,
-                                                   .max_out_of_line = 8,
-                                                   .depth = 2,
-                                                   .has_padding = true,
-                                                   .has_flexible_envelope = true,
-                                               }));
+  ASSERT_NE(two_bools, nullptr);
+  EXPECT_TYPE_SHAPE(two_bools, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = 8,
+                                   .depth = 2,
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 
   auto table_with_two_bools = test_library.LookupTable("TableWithOptionalTableWithTwoBools");
-  ASSERT_NOT_NULL(table_with_two_bools);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_two_bools, Expected{
-                                                              .inline_size = 16,
-                                                              .alignment = 8,
-                                                              .max_out_of_line = 40,
-                                                              .depth = 4,
-                                                              .has_padding = true,
-                                                              .has_flexible_envelope = true,
-                                                          }));
+  ASSERT_NE(table_with_two_bools, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_two_bools, (Expected{
+                                              .inline_size = 16,
+                                              .alignment = 8,
+                                              .max_out_of_line = 40,
+                                              .depth = 4,
+                                              .has_padding = true,
+                                              .has_flexible_envelope = true,
+                                          }));
 
   auto bool_and_u32 = test_library.LookupTable("TableWithOptionalBoolAndU32");
-  ASSERT_NOT_NULL(bool_and_u32);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u32, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 16,
-                                                      .depth = 2,
-                                                      .has_padding = true,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(bool_and_u32, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u32, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 16,
+                                      .depth = 2,
+                                      .has_padding = true,
+                                      .has_flexible_envelope = true,
+                                  }));
 
   auto table_with_bool_and_u32 = test_library.LookupTable("TableWithOptionalTableWithBoolAndU32");
-  ASSERT_NOT_NULL(table_with_bool_and_u32);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_bool_and_u32, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 8,
-                                                                 .max_out_of_line = 40,
-                                                                 .depth = 4,
-                                                                 .has_padding = true,
-                                                                 .has_flexible_envelope = true,
-                                                             }));
+  ASSERT_NE(table_with_bool_and_u32, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_bool_and_u32, (Expected{
+                                                 .inline_size = 16,
+                                                 .alignment = 8,
+                                                 .max_out_of_line = 40,
+                                                 .depth = 4,
+                                                 .has_padding = true,
+                                                 .has_flexible_envelope = true,
+                                             }));
 
   auto bool_and_u64 = test_library.LookupTable("TableWithOptionalBoolAndU64");
-  ASSERT_NOT_NULL(bool_and_u64);
-  ASSERT_NO_FAILURES(CheckTypeShape(bool_and_u64, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 24,
-                                                      .depth = 2,
-                                                      .has_padding = true,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(bool_and_u64, nullptr);
+  EXPECT_TYPE_SHAPE(bool_and_u64, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 24,
+                                      .depth = 2,
+                                      .has_padding = true,
+                                      .has_flexible_envelope = true,
+                                  }));
 
   auto table_with_bool_and_u64 = test_library.LookupTable("TableWithOptionalTableWithBoolAndU64");
-  ASSERT_NOT_NULL(table_with_bool_and_u64);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_bool_and_u64, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 8,
-                                                                 .max_out_of_line = 48,
-                                                                 .depth = 4,
-                                                                 .has_padding = true,
-                                                                 .has_flexible_envelope = true,
-                                                             }));
+  ASSERT_NE(table_with_bool_and_u64, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_bool_and_u64, (Expected{
+                                                 .inline_size = 16,
+                                                 .alignment = 8,
+                                                 .max_out_of_line = 48,
+                                                 .depth = 4,
+                                                 .has_padding = true,
+                                                 .has_flexible_envelope = true,
+                                             }));
 }
 
 TEST(TypeshapeTests, GoodUnions) {
@@ -877,54 +877,53 @@ type TableWithOptionalUnion = table {
   ASSERT_COMPILED(test_library);
 
   auto union_with_out_of_line = test_library.LookupUnion("UnionWithOutOfLine");
-  ASSERT_NO_FAILURES(CheckTypeShape(union_with_out_of_line, Expected{
-                                                                .inline_size = 16,
-                                                                .alignment = 8,
-                                                                .max_out_of_line = 16,
-                                                                .depth = 2,
-                                                                .has_padding = true,
-                                                            }));
+  EXPECT_TYPE_SHAPE(union_with_out_of_line, (Expected{
+                                                .inline_size = 16,
+                                                .alignment = 8,
+                                                .max_out_of_line = 16,
+                                                .depth = 2,
+                                                .has_padding = true,
+                                            }));
 
   auto a_union = test_library.LookupUnion("UnionOfThings");
-  ASSERT_NOT_NULL(a_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(a_union, Expected{
-                                                 .inline_size = 16,
-                                                 .alignment = 8,
-                                                 .max_out_of_line = 16,
-                                                 .depth = 1,
-                                                 .has_padding = true,
-                                             }));
-  ASSERT_EQ(a_union->members.size(), 2);
-  ASSERT_NOT_NULL(a_union->members[0].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*a_union->members[0].maybe_used, ExpectedField{
-                                                                          .offset = 0,
-                                                                          .padding = 7,
-                                                                      }));
-  ASSERT_NOT_NULL(a_union->members[1].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*a_union->members[1].maybe_used, ExpectedField{}));
+  ASSERT_NE(a_union, nullptr);
+  EXPECT_TYPE_SHAPE(a_union, (Expected{
+                                 .inline_size = 16,
+                                 .alignment = 8,
+                                 .max_out_of_line = 16,
+                                 .depth = 1,
+                                 .has_padding = true,
+                             }));
+  ASSERT_EQ(a_union->members.size(), 2u);
+  ASSERT_NE(a_union->members[0].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*a_union->members[0].maybe_used, (ExpectedField{
+                                                          .offset = 0,
+                                                          .padding = 7,
+                                                      }));
+  ASSERT_NE(a_union->members[1].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*a_union->members[1].maybe_used, (ExpectedField{}));
 
   auto optional_union = test_library.LookupStruct("OptionalUnion");
-  ASSERT_NOT_NULL(optional_union);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(optional_union, Expected{
-                                         // because |UnionOfThings| union header is inline
-                                         .inline_size = 16,
-                                         .alignment = 8,
-                                         .max_out_of_line = 16,
-                                         .depth = 1,
-                                         .has_padding = true,
-                                     }));
+  ASSERT_NE(optional_union, nullptr);
+  EXPECT_TYPE_SHAPE(optional_union, (Expected{
+                                        // because |UnionOfThings| union header is inline
+                                        .inline_size = 16,
+                                        .alignment = 8,
+                                        .max_out_of_line = 16,
+                                        .depth = 1,
+                                        .has_padding = true,
+                                    }));
 
   auto table_with_optional_union = test_library.LookupTable("TableWithOptionalUnion");
-  ASSERT_NOT_NULL(table_with_optional_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_optional_union, Expected{
-                                                                   .inline_size = 16,
-                                                                   .alignment = 8,
-                                                                   .max_out_of_line = 40,
-                                                                   .depth = 3,
-                                                                   .has_padding = true,
-                                                                   .has_flexible_envelope = true,
-                                                               }));
+  ASSERT_NE(table_with_optional_union, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_optional_union, (Expected{
+                                                   .inline_size = 16,
+                                                   .alignment = 8,
+                                                   .max_out_of_line = 40,
+                                                   .depth = 3,
+                                                   .has_padding = true,
+                                                   .has_flexible_envelope = true,
+                                               }));
 }
 
 TEST(TypeshapeTests, GoodUnionsWithHandles) {
@@ -949,52 +948,52 @@ type ManyHandleUnion = strict resource union {
   ASSERT_COMPILED(test_library);
 
   auto one_handle_union = test_library.LookupUnion("OneHandleUnion");
-  ASSERT_NOT_NULL(one_handle_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_handle_union, Expected{
-                                                          .inline_size = 16,
-                                                          .alignment = 8,
-                                                          .max_out_of_line = 0,
-                                                          .max_handles = 1,
-                                                          .depth = 1,
-                                                          .has_padding = true,
-                                                      }));
-  ASSERT_EQ(one_handle_union->members.size(), 3);
-  ASSERT_NOT_NULL(one_handle_union->members[0].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*one_handle_union->members[0].maybe_used, ExpectedField{
-                                                                                   .offset = 0,
-                                                                                   .padding = 4,
-                                                                               }));
-  ASSERT_NOT_NULL(one_handle_union->members[1].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*one_handle_union->members[1].maybe_used, ExpectedField{
-                                                                                   .offset = 0,
-                                                                                   .padding = 7,
-                                                                               }));
-  ASSERT_NOT_NULL(one_handle_union->members[2].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*one_handle_union->members[2].maybe_used, ExpectedField{
-                                                                                   .offset = 0,
-                                                                                   .padding = 4,
-                                                                               }));
+  ASSERT_NE(one_handle_union, nullptr);
+  EXPECT_TYPE_SHAPE(one_handle_union, (Expected{
+                                          .inline_size = 16,
+                                          .alignment = 8,
+                                          .max_out_of_line = 0,
+                                          .max_handles = 1,
+                                          .depth = 1,
+                                          .has_padding = true,
+                                      }));
+  ASSERT_EQ(one_handle_union->members.size(), 3u);
+  ASSERT_NE(one_handle_union->members[0].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*one_handle_union->members[0].maybe_used, (ExpectedField{
+                                                                   .offset = 0,
+                                                                   .padding = 4,
+                                                               }));
+  ASSERT_NE(one_handle_union->members[1].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*one_handle_union->members[1].maybe_used, (ExpectedField{
+                                                                   .offset = 0,
+                                                                   .padding = 7,
+                                                               }));
+  ASSERT_NE(one_handle_union->members[2].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*one_handle_union->members[2].maybe_used, (ExpectedField{
+                                                                   .offset = 0,
+                                                                   .padding = 4,
+                                                               }));
 
   auto many_handle_union = test_library.LookupUnion("ManyHandleUnion");
-  ASSERT_NOT_NULL(many_handle_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(many_handle_union, Expected{
-                                                           .inline_size = 16,
-                                                           .alignment = 8,
-                                                           .max_out_of_line = 48,
-                                                           .max_handles = 8,
-                                                           .depth = 2,
-                                                           .has_padding = true,
-                                                       }));
-  ASSERT_EQ(many_handle_union->members.size(), 3);
-  ASSERT_NOT_NULL(many_handle_union->members[1].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*many_handle_union->members[0].maybe_used, ExpectedField{
-                                                                                    .offset = 0,
-                                                                                    .padding = 4,
-                                                                                }));
-  ASSERT_NOT_NULL(many_handle_union->members[1].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*many_handle_union->members[1].maybe_used, ExpectedField{}));
-  ASSERT_NOT_NULL(many_handle_union->members[2].maybe_used);
-  ASSERT_NO_FAILURES(CheckFieldShape(*many_handle_union->members[2].maybe_used, ExpectedField{}));
+  ASSERT_NE(many_handle_union, nullptr);
+  EXPECT_TYPE_SHAPE(many_handle_union, (Expected{
+                                           .inline_size = 16,
+                                           .alignment = 8,
+                                           .max_out_of_line = 48,
+                                           .max_handles = 8,
+                                           .depth = 2,
+                                           .has_padding = true,
+                                       }));
+  ASSERT_EQ(many_handle_union->members.size(), 3u);
+  ASSERT_NE(many_handle_union->members[1].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*many_handle_union->members[0].maybe_used, (ExpectedField{
+                                                                    .offset = 0,
+                                                                    .padding = 4,
+                                                                }));
+  ASSERT_NE(many_handle_union->members[1].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*many_handle_union->members[1].maybe_used, (ExpectedField{}));
+  ASSERT_NE(many_handle_union->members[2].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*many_handle_union->members[2].maybe_used, (ExpectedField{}));
 }
 
 TEST(TypeshapeTests, GoodOverlays) {
@@ -1024,43 +1023,42 @@ type BoolOverlayStruct = struct {
 
   ASSERT_COMPILED(test_library);
   auto bool_or_string_or_u64 = test_library.LookupOverlay("BoolOrStringOrU64");
-  EXPECT_NO_FAILURES(CheckTypeShape(bool_or_string_or_u64, Expected{
-                                                               .inline_size = 24,
-                                                               .alignment = 8,
-                                                               .max_out_of_line = 256,
-                                                               .depth = 1,
-                                                               .has_padding = true,
-                                                           }));
-  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[0].maybe_used,
-                                     ExpectedField{.offset = 8, .padding = 15}));
-  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[1].maybe_used,
-                                     ExpectedField{.offset = 8, .padding = 0}));
-  EXPECT_NO_FAILURES(CheckFieldShape(*bool_or_string_or_u64->members[2].maybe_used,
-                                     ExpectedField{.offset = 8, .padding = 8}));
+  EXPECT_TYPE_SHAPE(bool_or_string_or_u64, (Expected{
+                                               .inline_size = 24,
+                                               .alignment = 8,
+                                               .max_out_of_line = 256,
+                                               .depth = 1,
+                                               .has_padding = true,
+                                           }));
+  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[0].maybe_used,
+                     (ExpectedField{.offset = 8, .padding = 15}));
+  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[1].maybe_used,
+                     (ExpectedField{.offset = 8, .padding = 0}));
+  EXPECT_FIELD_SHAPE(*bool_or_string_or_u64->members[2].maybe_used,
+                     (ExpectedField{.offset = 8, .padding = 8}));
 
   // BoolOverlay and U64BoolStruct should have basically the same typeshape.
   auto bool_overlay = test_library.LookupOverlay("BoolOverlay");
   auto u64_bool_struct = test_library.LookupStruct("U64BoolStruct");
-  EXPECT_NO_FAILURES(CheckTypeShape(bool_overlay, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 0,
-                                                      .depth = 0,
-                                                      .has_padding = true,
-                                                  }));
-  EXPECT_NO_FAILURES(CheckFieldShape(*bool_overlay->members[0].maybe_used,
-                                     ExpectedField{.offset = 8, .padding = 7}));
-  EXPECT_NO_FAILURES(CheckTypeShape(u64_bool_struct, Expected{
-                                                         .inline_size = 16,
-                                                         .alignment = 8,
-                                                         .max_out_of_line = 0,
-                                                         .depth = 0,
-                                                         .has_padding = true,
-                                                     }));
+  EXPECT_TYPE_SHAPE(bool_overlay, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 0,
+                                      .depth = 0,
+                                      .has_padding = true,
+                                  }));
+  EXPECT_FIELD_SHAPE(*bool_overlay->members[0].maybe_used,
+                     (ExpectedField{.offset = 8, .padding = 7}));
+  EXPECT_TYPE_SHAPE(u64_bool_struct, (Expected{
+                                         .inline_size = 16,
+                                         .alignment = 8,
+                                         .max_out_of_line = 0,
+                                         .depth = 0,
+                                         .has_padding = true,
+                                     }));
 
   auto bool_overlay_struct = test_library.LookupStruct("BoolOverlayStruct");
-  EXPECT_NO_FAILURES(
-      CheckFieldShape(bool_overlay_struct->members[0], ExpectedField{.offset = 0, .padding = 7}));
+  EXPECT_FIELD_SHAPE(bool_overlay_struct->members[0], (ExpectedField{.offset = 0, .padding = 7}));
 }
 
 TEST(TypeshapeTests, GoodVectors) {
@@ -1099,83 +1097,79 @@ type TableWithUnboundedVectors = table {
   ASSERT_COMPILED(test_library);
 
   auto padded_vector = test_library.LookupStruct("PaddedVector");
-  ASSERT_NOT_NULL(padded_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(padded_vector, Expected{
-                                                       .inline_size = 16,
-                                                       .alignment = 8,
-                                                       .max_out_of_line = 16,
-                                                       .depth = 1,
-                                                       .has_padding = true,
-                                                   }));
+  ASSERT_NE(padded_vector, nullptr);
+  EXPECT_TYPE_SHAPE(padded_vector, (Expected{
+                                       .inline_size = 16,
+                                       .alignment = 8,
+                                       .max_out_of_line = 16,
+                                       .depth = 1,
+                                       .has_padding = true,
+                                   }));
 
   auto no_padding_vector = test_library.LookupStruct("NoPaddingVector");
-  ASSERT_NOT_NULL(no_padding_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(no_padding_vector, Expected{
-                                                           .inline_size = 16,
-                                                           .alignment = 8,
-                                                           .max_out_of_line = 24,
-                                                           .depth = 1,
-                                                           .has_padding = false,
-                                                       }));
+  ASSERT_NE(no_padding_vector, nullptr);
+  EXPECT_TYPE_SHAPE(no_padding_vector, (Expected{
+                                           .inline_size = 16,
+                                           .alignment = 8,
+                                           .max_out_of_line = 24,
+                                           .depth = 1,
+                                           .has_padding = false,
+                                       }));
 
   auto unbounded_vector = test_library.LookupStruct("UnboundedVector");
-  ASSERT_NOT_NULL(unbounded_vector);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(unbounded_vector, Expected{
-                                           .inline_size = 16,
+  ASSERT_NE(unbounded_vector, nullptr);
+  EXPECT_TYPE_SHAPE(unbounded_vector, (Expected{
+                                          .inline_size = 16,
+                                          .alignment = 8,
+                                          .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                          .depth = 1,
+                                          .has_padding = true,
+                                      }));
+
+  auto unbounded_vectors = test_library.LookupStruct("UnboundedVectors");
+  ASSERT_NE(unbounded_vectors, nullptr);
+  EXPECT_TYPE_SHAPE(unbounded_vectors, (Expected{
+                                           .inline_size = 32,
                                            .alignment = 8,
                                            .max_out_of_line = std::numeric_limits<uint32_t>::max(),
                                            .depth = 1,
                                            .has_padding = true,
                                        }));
 
-  auto unbounded_vectors = test_library.LookupStruct("UnboundedVectors");
-  ASSERT_NOT_NULL(unbounded_vectors);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(unbounded_vectors, Expected{
-                                            .inline_size = 32,
-                                            .alignment = 8,
-                                            .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                            .depth = 1,
-                                            .has_padding = true,
-                                        }));
-
   auto table_with_padded_vector = test_library.LookupTable("TableWithPaddedVector");
-  ASSERT_NOT_NULL(table_with_padded_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_padded_vector,
-
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = 40,
-                                        .depth = 3,
-                                        .has_padding = true,
-                                        .has_flexible_envelope = true,
-                                    }));
+  ASSERT_NE(table_with_padded_vector, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_padded_vector, (Expected{
+                                                  .inline_size = 16,
+                                                  .alignment = 8,
+                                                  .max_out_of_line = 40,
+                                                  .depth = 3,
+                                                  .has_padding = true,
+                                                  .has_flexible_envelope = true,
+                                              }));
 
   auto table_with_unbounded_vector = test_library.LookupTable("TableWithUnboundedVector");
-  ASSERT_NOT_NULL(table_with_unbounded_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_unbounded_vector,
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                        .depth = 3,
-                                        .has_padding = true,
-                                        .has_flexible_envelope = true,
-                                    }));
+  ASSERT_NE(table_with_unbounded_vector, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_unbounded_vector,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        .depth = 3,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 
   auto table_with_unbounded_vectors = test_library.LookupTable("TableWithUnboundedVectors");
-  ASSERT_NOT_NULL(table_with_unbounded_vectors);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_unbounded_vectors,
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                        .depth = 3,
-                                        .has_padding = true,
-                                        .has_flexible_envelope = true,
-                                    }));
+  ASSERT_NE(table_with_unbounded_vectors, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_unbounded_vectors,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        .depth = 3,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 }
 
 TEST(TypeshapeTests, GoodVectorsWithHandles) {
@@ -1228,88 +1222,87 @@ type TableWithHandleStructVector = resource table {
   ASSERT_COMPILED(test_library);
 
   auto handle_vector = test_library.LookupStruct("HandleVector");
-  ASSERT_NOT_NULL(handle_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(handle_vector, Expected{
-                                                       .inline_size = 16,
-                                                       .alignment = 8,
-                                                       .max_out_of_line = 32,
-                                                       .max_handles = 8,
-                                                       .depth = 1,
-                                                       .has_padding = true,
-                                                   }));
+  ASSERT_NE(handle_vector, nullptr);
+  EXPECT_TYPE_SHAPE(handle_vector, (Expected{
+                                       .inline_size = 16,
+                                       .alignment = 8,
+                                       .max_out_of_line = 32,
+                                       .max_handles = 8,
+                                       .depth = 1,
+                                       .has_padding = true,
+                                   }));
 
   auto handle_nullable_vector = test_library.LookupStruct("HandleNullableVector");
-  ASSERT_NOT_NULL(handle_nullable_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(handle_nullable_vector, Expected{
-                                                                .inline_size = 16,
-                                                                .alignment = 8,
-                                                                .max_out_of_line = 32,
-                                                                .max_handles = 8,
-                                                                .depth = 1,
-                                                                .has_padding = true,
-                                                            }));
+  ASSERT_NE(handle_nullable_vector, nullptr);
+  EXPECT_TYPE_SHAPE(handle_nullable_vector, (Expected{
+                                                .inline_size = 16,
+                                                .alignment = 8,
+                                                .max_out_of_line = 32,
+                                                .max_handles = 8,
+                                                .depth = 1,
+                                                .has_padding = true,
+                                            }));
 
   auto unbounded_handle_vector = test_library.LookupStruct("UnboundedHandleVector");
-  ASSERT_NOT_NULL(unbounded_handle_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(unbounded_handle_vector,
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                        .max_handles = std::numeric_limits<uint32_t>::max(),
-                                        .depth = 1,
-                                        .has_padding = true,
-                                    }));
+  ASSERT_NE(unbounded_handle_vector, nullptr);
+  EXPECT_TYPE_SHAPE(unbounded_handle_vector,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        .max_handles = std::numeric_limits<uint32_t>::max(),
+                        .depth = 1,
+                        .has_padding = true,
+                    }));
 
   auto table_with_unbounded_handle_vector =
       test_library.LookupTable("TableWithUnboundedHandleVector");
-  ASSERT_NOT_NULL(table_with_unbounded_handle_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_unbounded_handle_vector,
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                        .max_handles = std::numeric_limits<uint32_t>::max(),
-                                        .depth = 3,
-                                        .has_padding = true,
-                                        .has_flexible_envelope = true,
-                                    }));
+  ASSERT_NE(table_with_unbounded_handle_vector, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_unbounded_handle_vector,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        .max_handles = std::numeric_limits<uint32_t>::max(),
+                        .depth = 3,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 
   auto handle_struct_vector = test_library.LookupStruct("HandleStructVector");
-  ASSERT_NOT_NULL(handle_struct_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(handle_struct_vector, Expected{
-                                                              .inline_size = 16,
-                                                              .alignment = 8,
-                                                              .max_out_of_line = 32,
-                                                              .max_handles = 8,
-                                                              .depth = 1,
-                                                              .has_padding = true,
-                                                          }));
+  ASSERT_NE(handle_struct_vector, nullptr);
+  EXPECT_TYPE_SHAPE(handle_struct_vector, (Expected{
+                                              .inline_size = 16,
+                                              .alignment = 8,
+                                              .max_out_of_line = 32,
+                                              .max_handles = 8,
+                                              .depth = 1,
+                                              .has_padding = true,
+                                          }));
 
   auto handle_table_vector = test_library.LookupStruct("HandleTableVector");
-  ASSERT_NOT_NULL(handle_table_vector);
-  ASSERT_NO_FAILURES(CheckTypeShape(handle_table_vector, Expected{
-                                                             .inline_size = 16,
-                                                             .alignment = 8,
-                                                             .max_out_of_line = 192,
-                                                             .max_handles = 8,
-                                                             .depth = 3,
-                                                             .has_padding = true,
-                                                             .has_flexible_envelope = true,
-                                                         }));
+  ASSERT_NE(handle_table_vector, nullptr);
+  EXPECT_TYPE_SHAPE(handle_table_vector, (Expected{
+                                             .inline_size = 16,
+                                             .alignment = 8,
+                                             .max_out_of_line = 192,
+                                             .max_handles = 8,
+                                             .depth = 3,
+                                             .has_padding = true,
+                                             .has_flexible_envelope = true,
+                                         }));
 
   auto table_with_handle_struct_vector = test_library.LookupTable("TableWithHandleStructVector");
-  ASSERT_NOT_NULL(table_with_handle_struct_vector);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(table_with_handle_struct_vector, Expected{
-                                                          .inline_size = 16,
-                                                          .alignment = 8,
-                                                          .max_out_of_line = 56,
-                                                          .max_handles = 8,
-                                                          .depth = 3,
-                                                          .has_padding = true,
-                                                          .has_flexible_envelope = true,
-                                                      }));
+  ASSERT_NE(table_with_handle_struct_vector, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_handle_struct_vector, (Expected{
+                                                         .inline_size = 16,
+                                                         .alignment = 8,
+                                                         .max_out_of_line = 56,
+                                                         .max_handles = 8,
+                                                         .depth = 3,
+                                                         .has_padding = true,
+                                                         .has_flexible_envelope = true,
+                                                     }));
 }
 
 TEST(TypeshapeTests, GoodStrings) {
@@ -1334,48 +1327,47 @@ type TableWithUnboundedString = table {
   ASSERT_COMPILED(test_library);
 
   auto short_string = test_library.LookupStruct("ShortString");
-  ASSERT_NOT_NULL(short_string);
-  ASSERT_NO_FAILURES(CheckTypeShape(short_string, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 8,
-                                                      .depth = 1,
-                                                      .has_padding = true,
-                                                  }));
+  ASSERT_NE(short_string, nullptr);
+  EXPECT_TYPE_SHAPE(short_string, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 8,
+                                      .depth = 1,
+                                      .has_padding = true,
+                                  }));
 
   auto unbounded_string = test_library.LookupStruct("UnboundedString");
-  ASSERT_NOT_NULL(unbounded_string);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(unbounded_string, Expected{
-                                           .inline_size = 16,
-                                           .alignment = 8,
-                                           .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                           .depth = 1,
-                                           .has_padding = true,
-                                       }));
+  ASSERT_NE(unbounded_string, nullptr);
+  EXPECT_TYPE_SHAPE(unbounded_string, (Expected{
+                                          .inline_size = 16,
+                                          .alignment = 8,
+                                          .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                          .depth = 1,
+                                          .has_padding = true,
+                                      }));
 
   auto table_with_short_string = test_library.LookupTable("TableWithShortString");
-  ASSERT_NOT_NULL(table_with_short_string);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_short_string, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 8,
-                                                                 .max_out_of_line = 32,
-                                                                 .depth = 3,
-                                                                 .has_padding = true,
-                                                                 .has_flexible_envelope = true,
-                                                             }));
+  ASSERT_NE(table_with_short_string, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_short_string, (Expected{
+                                                 .inline_size = 16,
+                                                 .alignment = 8,
+                                                 .max_out_of_line = 32,
+                                                 .depth = 3,
+                                                 .has_padding = true,
+                                                 .has_flexible_envelope = true,
+                                             }));
 
   auto table_with_unbounded_string = test_library.LookupTable("TableWithUnboundedString");
-  ASSERT_NOT_NULL(table_with_unbounded_string);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_unbounded_string,
-                                    Expected{
-                                        .inline_size = 16,
-                                        .alignment = 8,
-                                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                        .depth = 3,
-                                        .has_padding = true,
-                                        .has_flexible_envelope = true,
-                                    }));
+  ASSERT_NE(table_with_unbounded_string, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_unbounded_string,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                        .depth = 3,
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 }
 
 TEST(TypeshapeTests, GoodStringArrays) {
@@ -1391,14 +1383,14 @@ type StringArray = struct {
   ASSERT_COMPILED(test_library);
 
   auto string_array = test_library.LookupStruct("StringArray");
-  ASSERT_NOT_NULL(string_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(string_array, Expected{
-                                                      .inline_size = 5,
-                                                      .alignment = 1,
-                                                      .max_out_of_line = 0,
-                                                      .depth = 0,
-                                                      .has_padding = false,
-                                                  }));
+  ASSERT_NE(string_array, nullptr);
+  EXPECT_TYPE_SHAPE(string_array, (Expected{
+                                      .inline_size = 5,
+                                      .alignment = 1,
+                                      .max_out_of_line = 0,
+                                      .depth = 0,
+                                      .has_padding = false,
+                                  }));
 }
 
 TEST(TypeshapeTests, GoodArrays) {
@@ -1423,48 +1415,46 @@ type TableWithAnInt32ArrayNoPadding = table {
   ASSERT_COMPILED(test_library);
 
   auto an_array = test_library.LookupStruct("AnArray");
-  ASSERT_NOT_NULL(an_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(an_array, Expected{
-                                                  .inline_size = 40,
-                                                  .alignment = 8,
-                                              }));
+  ASSERT_NE(an_array, nullptr);
+  EXPECT_TYPE_SHAPE(an_array, (Expected{
+                                  .inline_size = 40,
+                                  .alignment = 8,
+                              }));
 
   auto table_with_an_array = test_library.LookupTable("TableWithAnArray");
-  ASSERT_NOT_NULL(table_with_an_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_an_array, Expected{
-                                                             .inline_size = 16,
-                                                             .alignment = 8,
-                                                             .max_out_of_line = 48,
-                                                             .depth = 2,
-                                                             .has_padding = false,
-                                                             .has_flexible_envelope = true,
-                                                         }));
+  ASSERT_NE(table_with_an_array, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_an_array, (Expected{
+                                             .inline_size = 16,
+                                             .alignment = 8,
+                                             .max_out_of_line = 48,
+                                             .depth = 2,
+                                             .has_padding = false,
+                                             .has_flexible_envelope = true,
+                                         }));
 
   auto table_with_an_int32_array_with_padding =
       test_library.LookupTable("TableWithAnInt32ArrayWithPadding");
-  ASSERT_NOT_NULL(table_with_an_int32_array_with_padding);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(table_with_an_int32_array_with_padding, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 8,
-                                                                 .max_out_of_line = 24,
-                                                                 .depth = 2,
-                                                                 .has_padding = true,
-                                                                 .has_flexible_envelope = true,
-                                                             }));
+  ASSERT_NE(table_with_an_int32_array_with_padding, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_an_int32_array_with_padding, (Expected{
+                                                                .inline_size = 16,
+                                                                .alignment = 8,
+                                                                .max_out_of_line = 24,
+                                                                .depth = 2,
+                                                                .has_padding = true,
+                                                                .has_flexible_envelope = true,
+                                                            }));
 
   auto table_with_an_int32_array_no_padding =
       test_library.LookupTable("TableWithAnInt32ArrayNoPadding");
-  ASSERT_NOT_NULL(table_with_an_int32_array_no_padding);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(table_with_an_int32_array_no_padding, Expected{
-                                                               .inline_size = 16,
-                                                               .alignment = 8,
-                                                               .max_out_of_line = 24,
-                                                               .depth = 2,
-                                                               .has_padding = false,
-                                                               .has_flexible_envelope = true,
-                                                           }));
+  ASSERT_NE(table_with_an_int32_array_no_padding, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_an_int32_array_no_padding, (Expected{
+                                                              .inline_size = 16,
+                                                              .alignment = 8,
+                                                              .max_out_of_line = 24,
+                                                              .depth = 2,
+                                                              .has_padding = false,
+                                                              .has_flexible_envelope = true,
+                                                          }));
 }
 
 TEST(TypeshapeTests, GoodArraysWithHandles) {
@@ -1493,45 +1483,44 @@ type TableWithNullableHandleArray = resource table {
   ASSERT_COMPILED(test_library);
 
   auto handle_array = test_library.LookupStruct("HandleArray");
-  ASSERT_NOT_NULL(handle_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(handle_array, Expected{
-                                                      .inline_size = 32,
-                                                      .alignment = 4,
-                                                      .max_handles = 8,
-                                                  }));
+  ASSERT_NE(handle_array, nullptr);
+  EXPECT_TYPE_SHAPE(handle_array, (Expected{
+                                      .inline_size = 32,
+                                      .alignment = 4,
+                                      .max_handles = 8,
+                                  }));
 
   auto table_with_handle_array = test_library.LookupTable("TableWithHandleArray");
-  ASSERT_NOT_NULL(table_with_handle_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(table_with_handle_array, Expected{
-                                                                 .inline_size = 16,
-                                                                 .alignment = 8,
-                                                                 .max_out_of_line = 40,
-                                                                 .max_handles = 8,
-                                                                 .depth = 2,
-                                                                 .has_padding = false,
-                                                                 .has_flexible_envelope = true,
-                                                             }));
+  ASSERT_NE(table_with_handle_array, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_handle_array, (Expected{
+                                                 .inline_size = 16,
+                                                 .alignment = 8,
+                                                 .max_out_of_line = 40,
+                                                 .max_handles = 8,
+                                                 .depth = 2,
+                                                 .has_padding = false,
+                                                 .has_flexible_envelope = true,
+                                             }));
 
   auto nullable_handle_array = test_library.LookupStruct("NullableHandleArray");
-  ASSERT_NOT_NULL(nullable_handle_array);
-  ASSERT_NO_FAILURES(CheckTypeShape(nullable_handle_array, Expected{
-                                                               .inline_size = 32,
-                                                               .alignment = 4,
-                                                               .max_handles = 8,
-                                                           }));
+  ASSERT_NE(nullable_handle_array, nullptr);
+  EXPECT_TYPE_SHAPE(nullable_handle_array, (Expected{
+                                               .inline_size = 32,
+                                               .alignment = 4,
+                                               .max_handles = 8,
+                                           }));
 
   auto table_with_nullable_handle_array = test_library.LookupTable("TableWithNullableHandleArray");
-  ASSERT_NOT_NULL(table_with_nullable_handle_array);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(table_with_nullable_handle_array, Expected{
-                                                           .inline_size = 16,
-                                                           .alignment = 8,
-                                                           .max_out_of_line = 40,
-                                                           .max_handles = 8,
-                                                           .depth = 2,
-                                                           .has_padding = false,
-                                                           .has_flexible_envelope = true,
-                                                       }));
+  ASSERT_NE(table_with_nullable_handle_array, nullptr);
+  EXPECT_TYPE_SHAPE(table_with_nullable_handle_array, (Expected{
+                                                          .inline_size = 16,
+                                                          .alignment = 8,
+                                                          .max_out_of_line = 40,
+                                                          .max_handles = 8,
+                                                          .depth = 2,
+                                                          .has_padding = false,
+                                                          .has_flexible_envelope = true,
+                                                      }));
 }
 
 // TODO(fxbug.dev/118282): write a "unions_with_handles" test case.
@@ -1581,85 +1570,80 @@ type PaddingCheck = flexible union {
   ASSERT_COMPILED(test_library);
 
   auto one_bool = test_library.LookupUnion("UnionWithOneBool");
-  ASSERT_NOT_NULL(one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(one_bool, Expected{
-                                                  .inline_size = 16,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                                  .has_flexible_envelope = true,
-                                              }));
-  ASSERT_EQ(one_bool->members.size(), 1);
-  ASSERT_NOT_NULL(one_bool->members[0].maybe_used);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(*one_bool->members[0].maybe_used, ExpectedField{.padding = 7}));
+  ASSERT_NE(one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(one_bool, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                                  .has_flexible_envelope = true,
+                              }));
+  ASSERT_EQ(one_bool->members.size(), 1u);
+  ASSERT_NE(one_bool->members[0].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*one_bool->members[0].maybe_used, (ExpectedField{.padding = 7}));
 
   auto opt_one_bool = test_library.LookupStruct("StructWithOptionalUnionWithOneBool");
-  ASSERT_NOT_NULL(opt_one_bool);
-  ASSERT_NO_FAILURES(CheckTypeShape(opt_one_bool, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 0,
-                                                      .depth = 1,
-                                                      .has_padding = true,
-                                                      .has_flexible_envelope = true,
-                                                  }));
+  ASSERT_NE(opt_one_bool, nullptr);
+  EXPECT_TYPE_SHAPE(opt_one_bool, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 0,
+                                      .depth = 1,
+                                      .has_padding = true,
+                                      .has_flexible_envelope = true,
+                                  }));
 
   auto xu = test_library.LookupUnion("UnionWithBoundedOutOfLineObject");
-  ASSERT_NOT_NULL(xu);
-  ASSERT_NO_FAILURES(CheckTypeShape(xu, Expected{
-                                            .inline_size = 16,
-                                            .alignment = 8,
-                                            .max_out_of_line = 256,
-                                            .depth = 3,
-                                            .has_padding = true,
-                                            .has_flexible_envelope = true,
-                                        }));
+  ASSERT_NE(xu, nullptr);
+  EXPECT_TYPE_SHAPE(xu, (Expected{
+                            .inline_size = 16,
+                            .alignment = 8,
+                            .max_out_of_line = 256,
+                            .depth = 3,
+                            .has_padding = true,
+                            .has_flexible_envelope = true,
+                        }));
 
   auto unbounded = test_library.LookupUnion("UnionWithUnboundedOutOfLineObject");
-  ASSERT_NOT_NULL(unbounded);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(unbounded, Expected{
-                                    .inline_size = 16,
-                                    .alignment = 8,
-                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                    .depth = 2,
-                                    .has_padding = true,
-                                    .has_flexible_envelope = true,
-                                }));
+  ASSERT_NE(unbounded, nullptr);
+  EXPECT_TYPE_SHAPE(unbounded, (Expected{
+                                   .inline_size = 16,
+                                   .alignment = 8,
+                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                   .depth = 2,
+                                   .has_padding = true,
+                                   .has_flexible_envelope = true,
+                               }));
 
   auto xu_no_payload_padding = test_library.LookupUnion("UnionWithoutPayloadPadding");
-  ASSERT_NOT_NULL(xu_no_payload_padding);
-  ASSERT_NO_FAILURES(CheckTypeShape(
-      xu_no_payload_padding, Expected{
-                                 .inline_size = 16,
-                                 .alignment = 8,
-                                 .max_out_of_line = 56,
-                                 .depth = 1,
-                                 // union always have padding, because its ordinal is 32 bits.
-                                 // TODO(fxbug.dev/7970): increase the ordinal size to 64 bits, such
-                                 // that there is no padding.
-                                 .has_padding = true,
-                                 .has_flexible_envelope = true,
-                             }));
+  ASSERT_NE(xu_no_payload_padding, nullptr);
+  EXPECT_TYPE_SHAPE(xu_no_payload_padding,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = 56,
+                        .depth = 1,
+                        // TODO(fxbug.dev/36332): Unions currently return true for
+                        // has_padding in all cases, which should be fixed.
+                        .has_padding = true,
+                        .has_flexible_envelope = true,
+                    }));
 
   auto padding_check = test_library.LookupUnion("PaddingCheck");
-  ASSERT_NOT_NULL(padding_check);
-  ASSERT_NO_FAILURES(CheckTypeShape(padding_check, Expected{
-                                                       .inline_size = 16,
-                                                       .alignment = 8,
-                                                       .max_out_of_line = 8,
-                                                       .depth = 1,
-                                                       .has_padding = true,
-                                                       .has_flexible_envelope = true,
-                                                   }));
-  ASSERT_EQ(padding_check->members.size(), 2);
-  ASSERT_NOT_NULL(padding_check->members[0].maybe_used);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(*padding_check->members[0].maybe_used, ExpectedField{.padding = 5}));
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(*padding_check->members[1].maybe_used, ExpectedField{.padding = 3}));
+  ASSERT_NE(padding_check, nullptr);
+  EXPECT_TYPE_SHAPE(padding_check, (Expected{
+                                       .inline_size = 16,
+                                       .alignment = 8,
+                                       .max_out_of_line = 8,
+                                       .depth = 1,
+                                       .has_padding = true,
+                                       .has_flexible_envelope = true,
+                                   }));
+  ASSERT_EQ(padding_check->members.size(), 2u);
+  ASSERT_NE(padding_check->members[0].maybe_used, nullptr);
+  EXPECT_FIELD_SHAPE(*padding_check->members[0].maybe_used, (ExpectedField{.padding = 5}));
+  EXPECT_FIELD_SHAPE(*padding_check->members[1].maybe_used, (ExpectedField{.padding = 3}));
 }
 
 TEST(TypeshapeTests, GoodEnvelopeStrictness) {
@@ -1698,91 +1682,90 @@ type StrictUnionOfFlexibleTable = strict union {
   ASSERT_COMPILED(test_library);
 
   auto strict_union = test_library.LookupUnion("StrictLeafUnion");
-  ASSERT_NOT_NULL(strict_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(strict_union, Expected{
-                                                      .inline_size = 16,
-                                                      .alignment = 8,
-                                                      .max_out_of_line = 8,
-                                                      .depth = 1,
-                                                      .has_padding = true,
-                                                  }));
+  ASSERT_NE(strict_union, nullptr);
+  EXPECT_TYPE_SHAPE(strict_union, (Expected{
+                                      .inline_size = 16,
+                                      .alignment = 8,
+                                      .max_out_of_line = 8,
+                                      .depth = 1,
+                                      .has_padding = true,
+                                  }));
 
   auto flexible_union = test_library.LookupUnion("FlexibleLeafUnion");
-  ASSERT_NOT_NULL(flexible_union);
-  ASSERT_NO_FAILURES(CheckTypeShape(flexible_union, Expected{
+  ASSERT_NE(flexible_union, nullptr);
+  EXPECT_TYPE_SHAPE(flexible_union, (Expected{
+                                        .inline_size = 16,
+                                        .alignment = 8,
+                                        .max_out_of_line = 8,
+                                        .depth = 1,
+                                        .has_padding = true,
+                                        .has_flexible_envelope = true,
+                                    }));
+
+  auto flexible_of_strict = test_library.LookupUnion("FlexibleUnionOfStrictUnion");
+  ASSERT_NE(flexible_of_strict, nullptr);
+  EXPECT_TYPE_SHAPE(flexible_of_strict, (Expected{
+                                            .inline_size = 16,
+                                            .alignment = 8,
+                                            .max_out_of_line = 24,
+                                            .depth = 2,
+                                            .has_padding = true,
+                                            .has_flexible_envelope = true,
+                                        }));
+
+  auto flexible_of_flexible = test_library.LookupUnion("FlexibleUnionOfFlexibleUnion");
+  ASSERT_NE(flexible_of_flexible, nullptr);
+  EXPECT_TYPE_SHAPE(flexible_of_flexible, (Expected{
+                                              .inline_size = 16,
+                                              .alignment = 8,
+                                              .max_out_of_line = 24,
+                                              .depth = 2,
+                                              .has_padding = true,
+                                              .has_flexible_envelope = true,
+                                          }));
+
+  auto strict_of_strict = test_library.LookupUnion("StrictUnionOfStrictUnion");
+  ASSERT_NE(strict_of_strict, nullptr);
+  EXPECT_TYPE_SHAPE(strict_of_strict, (Expected{
+                                          .inline_size = 16,
+                                          .alignment = 8,
+                                          .max_out_of_line = 24,
+                                          .depth = 2,
+                                          .has_padding = true,
+                                      }));
+
+  auto strict_of_flexible = test_library.LookupUnion("StrictUnionOfFlexibleUnion");
+  ASSERT_NE(strict_of_flexible, nullptr);
+  EXPECT_TYPE_SHAPE(strict_of_flexible, (Expected{
+                                            .inline_size = 16,
+                                            .alignment = 8,
+                                            .max_out_of_line = 24,
+                                            .depth = 2,
+                                            .has_padding = true,
+                                            .has_flexible_envelope = true,
+                                        }));
+
+  auto flexible_table = test_library.LookupTable("FlexibleLeafTable");
+  ASSERT_NE(flexible_table, nullptr);
+  EXPECT_TYPE_SHAPE(flexible_table, (Expected{
+                                        .inline_size = 16,
+                                        .alignment = 8,
+                                        .max_out_of_line = 0,
+                                        .depth = 1,
+                                        .has_padding = false,
+                                        .has_flexible_envelope = true,
+                                    }));
+
+  auto strict_union_of_flexible_table = test_library.LookupUnion("StrictUnionOfFlexibleTable");
+  ASSERT_NE(strict_union_of_flexible_table, nullptr);
+  EXPECT_TYPE_SHAPE(strict_union_of_flexible_table, (Expected{
                                                         .inline_size = 16,
                                                         .alignment = 8,
-                                                        .max_out_of_line = 8,
-                                                        .depth = 1,
+                                                        .max_out_of_line = 16,
+                                                        .depth = 2,
                                                         .has_padding = true,
                                                         .has_flexible_envelope = true,
                                                     }));
-
-  auto flexible_of_strict = test_library.LookupUnion("FlexibleUnionOfStrictUnion");
-  ASSERT_NOT_NULL(flexible_of_strict);
-  ASSERT_NO_FAILURES(CheckTypeShape(flexible_of_strict, Expected{
-                                                            .inline_size = 16,
-                                                            .alignment = 8,
-                                                            .max_out_of_line = 24,
-                                                            .depth = 2,
-                                                            .has_padding = true,
-                                                            .has_flexible_envelope = true,
-                                                        }));
-
-  auto flexible_of_flexible = test_library.LookupUnion("FlexibleUnionOfFlexibleUnion");
-  ASSERT_NOT_NULL(flexible_of_flexible);
-  ASSERT_NO_FAILURES(CheckTypeShape(flexible_of_flexible, Expected{
-                                                              .inline_size = 16,
-                                                              .alignment = 8,
-                                                              .max_out_of_line = 24,
-                                                              .depth = 2,
-                                                              .has_padding = true,
-                                                              .has_flexible_envelope = true,
-                                                          }));
-
-  auto strict_of_strict = test_library.LookupUnion("StrictUnionOfStrictUnion");
-  ASSERT_NOT_NULL(strict_of_strict);
-  ASSERT_NO_FAILURES(CheckTypeShape(strict_of_strict, Expected{
-                                                          .inline_size = 16,
-                                                          .alignment = 8,
-                                                          .max_out_of_line = 24,
-                                                          .depth = 2,
-                                                          .has_padding = true,
-                                                      }));
-
-  auto strict_of_flexible = test_library.LookupUnion("StrictUnionOfFlexibleUnion");
-  ASSERT_NOT_NULL(strict_of_flexible);
-  ASSERT_NO_FAILURES(CheckTypeShape(strict_of_flexible, Expected{
-                                                            .inline_size = 16,
-                                                            .alignment = 8,
-                                                            .max_out_of_line = 24,
-                                                            .depth = 2,
-                                                            .has_padding = true,
-                                                            .has_flexible_envelope = true,
-                                                        }));
-
-  auto flexible_table = test_library.LookupTable("FlexibleLeafTable");
-  ASSERT_NOT_NULL(flexible_table);
-  ASSERT_NO_FAILURES(CheckTypeShape(flexible_table, Expected{
-                                                        .inline_size = 16,
-                                                        .alignment = 8,
-                                                        .max_out_of_line = 0,
-                                                        .depth = 1,
-                                                        .has_padding = false,
-                                                        .has_flexible_envelope = true,
-                                                    }));
-
-  auto strict_union_of_flexible_table = test_library.LookupUnion("StrictUnionOfFlexibleTable");
-  ASSERT_NOT_NULL(strict_union_of_flexible_table);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(strict_union_of_flexible_table, Expected{
-                                                         .inline_size = 16,
-                                                         .alignment = 8,
-                                                         .max_out_of_line = 16,
-                                                         .depth = 2,
-                                                         .has_padding = true,
-                                                         .has_flexible_envelope = true,
-                                                     }));
 }
 
 TEST(TypeshapeTests, GoodProtocolsAndRequestOfProtocols) {
@@ -1809,36 +1792,36 @@ type UsingOptRequestSomeProtocol = resource struct {
   ASSERT_COMPILED(test_library);
 
   auto using_some_protocol = test_library.LookupStruct("UsingSomeProtocol");
-  ASSERT_NOT_NULL(using_some_protocol);
-  ASSERT_NO_FAILURES(CheckTypeShape(using_some_protocol, Expected{
-                                                             .inline_size = 4,
-                                                             .alignment = 4,
-                                                             .max_handles = 1,
-                                                         }));
+  ASSERT_NE(using_some_protocol, nullptr);
+  EXPECT_TYPE_SHAPE(using_some_protocol, (Expected{
+                                             .inline_size = 4,
+                                             .alignment = 4,
+                                             .max_handles = 1,
+                                         }));
 
   auto using_opt_some_protocol = test_library.LookupStruct("UsingOptSomeProtocol");
-  ASSERT_NOT_NULL(using_opt_some_protocol);
-  ASSERT_NO_FAILURES(CheckTypeShape(using_opt_some_protocol, Expected{
-                                                                 .inline_size = 4,
-                                                                 .alignment = 4,
-                                                                 .max_handles = 1,
-                                                             }));
+  ASSERT_NE(using_opt_some_protocol, nullptr);
+  EXPECT_TYPE_SHAPE(using_opt_some_protocol, (Expected{
+                                                 .inline_size = 4,
+                                                 .alignment = 4,
+                                                 .max_handles = 1,
+                                             }));
 
   auto using_request_some_protocol = test_library.LookupStruct("UsingRequestSomeProtocol");
-  ASSERT_NOT_NULL(using_request_some_protocol);
-  ASSERT_NO_FAILURES(CheckTypeShape(using_request_some_protocol, Expected{
-                                                                     .inline_size = 4,
-                                                                     .alignment = 4,
-                                                                     .max_handles = 1,
-                                                                 }));
+  ASSERT_NE(using_request_some_protocol, nullptr);
+  EXPECT_TYPE_SHAPE(using_request_some_protocol, (Expected{
+                                                     .inline_size = 4,
+                                                     .alignment = 4,
+                                                     .max_handles = 1,
+                                                 }));
 
   auto using_opt_request_some_protocol = test_library.LookupStruct("UsingOptRequestSomeProtocol");
-  ASSERT_NOT_NULL(using_opt_request_some_protocol);
-  ASSERT_NO_FAILURES(CheckTypeShape(using_opt_request_some_protocol, Expected{
-                                                                         .inline_size = 4,
-                                                                         .alignment = 4,
-                                                                         .max_handles = 1,
-                                                                     }));
+  ASSERT_NE(using_opt_request_some_protocol, nullptr);
+  EXPECT_TYPE_SHAPE(using_opt_request_some_protocol, (Expected{
+                                                         .inline_size = 4,
+                                                         .alignment = 4,
+                                                         .max_handles = 1,
+                                                     }));
 }
 
 TEST(TypeshapeTests, GoodExternalDefinitions) {
@@ -1875,39 +1858,39 @@ type ExternalSimpleStruct = struct {
   ASSERT_COMPILED(test_library);
 
   auto ext_struct = test_library.LookupStruct("ExternalSimpleStruct");
-  ASSERT_NOT_NULL(ext_struct);
-  ASSERT_NO_FAILURES(CheckTypeShape(ext_struct, Expected{
-                                                    .inline_size = 4,
-                                                    .alignment = 4,
-                                                }));
+  ASSERT_NE(ext_struct, nullptr);
+  EXPECT_TYPE_SHAPE(ext_struct, (Expected{
+                                    .inline_size = 4,
+                                    .alignment = 4,
+                                }));
 
   auto ext_arr_struct = test_library.LookupStruct("ExternalArrayStruct");
-  ASSERT_NOT_NULL(ext_arr_struct);
-  ASSERT_NO_FAILURES(CheckTypeShape(ext_arr_struct, Expected{
-                                                        .inline_size = 4 * 32,
-                                                        .alignment = 4,
-                                                    }));
+  ASSERT_NE(ext_arr_struct, nullptr);
+  EXPECT_TYPE_SHAPE(ext_arr_struct, (Expected{
+                                        .inline_size = 4 * 32,
+                                        .alignment = 4,
+                                    }));
 
   auto ext_str_struct = test_library.LookupStruct("ExternalStringSizeStruct");
-  ASSERT_NOT_NULL(ext_str_struct);
-  ASSERT_NO_FAILURES(CheckTypeShape(ext_str_struct, Expected{
-                                                        .inline_size = 16,
-                                                        .alignment = 8,
-                                                        .max_out_of_line = 32,
-                                                        .depth = 1,
-                                                        .has_padding = true,
-                                                    }));
+  ASSERT_NE(ext_str_struct, nullptr);
+  EXPECT_TYPE_SHAPE(ext_str_struct, (Expected{
+                                        .inline_size = 16,
+                                        .alignment = 8,
+                                        .max_out_of_line = 32,
+                                        .depth = 1,
+                                        .has_padding = true,
+                                    }));
 
   auto ext_vec_struct = test_library.LookupStruct("ExternalVectorSizeStruct");
-  ASSERT_NOT_NULL(ext_vec_struct);
-  ASSERT_NO_FAILURES(CheckTypeShape(ext_vec_struct, Expected{
-                                                        .inline_size = 16,
-                                                        .alignment = 8,
-                                                        .max_out_of_line = 32 * 4,
-                                                        .max_handles = 32,
-                                                        .depth = 1,
-                                                        .has_padding = true,
-                                                    }));
+  ASSERT_NE(ext_vec_struct, nullptr);
+  EXPECT_TYPE_SHAPE(ext_vec_struct, (Expected{
+                                        .inline_size = 16,
+                                        .alignment = 8,
+                                        .max_out_of_line = 32 * 4,
+                                        .max_handles = 32,
+                                        .depth = 1,
+                                        .has_padding = true,
+                                    }));
 }
 
 TEST(TypeshapeTests, GoodSimpleRequest) {
@@ -1920,36 +1903,27 @@ protocol Test {
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Test");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
   auto& method = protocol->methods[0];
   auto method_request = method.maybe_request.get();
   EXPECT_EQ(method.has_request, true);
-  ASSERT_NOT_NULL(method_request);
+  ASSERT_NE(method_request, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(method_request->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 2,
-                                                  .max_handles = 0,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 2,
-                                                  .max_handles = 0,
-                                                  .has_padding = false,
-                                              }));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 2,
+                                   .max_handles = 0,
+                                   .has_padding = false,
+                               }));
 
-  ASSERT_EQ(as_struct->members.size(), 2);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[1], ExpectedField{.offset = 2, .padding = 0}));
+  ASSERT_EQ(as_struct->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_FIELD_SHAPE(as_struct->members[1], (ExpectedField{.offset = 2, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodSimpleResponse) {
@@ -1962,36 +1936,27 @@ protocol Test {
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("Test");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
   auto& method = protocol->methods[0];
   auto method_response = method.maybe_response.get();
   EXPECT_EQ(method.has_response, true);
-  ASSERT_NOT_NULL(method_response);
+  ASSERT_NE(method_response, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(method_response->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 2,
-                                                  .max_handles = 0,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 2,
-                                                  .max_handles = 0,
-                                                  .has_padding = false,
-                                              }));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 2,
+                                   .max_handles = 0,
+                                   .has_padding = false,
+                               }));
 
-  ASSERT_EQ(as_struct->members.size(), 2);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[1], ExpectedField{.offset = 2, .padding = 0}));
+  ASSERT_EQ(as_struct->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_FIELD_SHAPE(as_struct->members[1], (ExpectedField{.offset = 2, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveRequest) {
@@ -2012,43 +1977,35 @@ protocol MessagePort {
   ASSERT_COMPILED(library);
 
   auto web_message = library.LookupStruct("WebMessage");
-  ASSERT_NOT_NULL(web_message);
-  ASSERT_NO_FAILURES(CheckTypeShape(web_message, Expected{
-                                                     .inline_size = 4,
-                                                     .alignment = 4,
-                                                     .max_handles = 1,
-                                                 }));
-  ASSERT_EQ(web_message->members.size(), 1);
-  ASSERT_NO_FAILURES(CheckFieldShape(web_message->members[0], ExpectedField{}));
+  ASSERT_NE(web_message, nullptr);
+  EXPECT_TYPE_SHAPE(web_message, (Expected{
+                                     .inline_size = 4,
+                                     .alignment = 4,
+                                     .max_handles = 1,
+                                 }));
+  ASSERT_EQ(web_message->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(web_message->members[0], (ExpectedField{}));
 
   auto message_port = library.LookupProtocol("MessagePort");
-  ASSERT_NOT_NULL(message_port);
-  ASSERT_EQ(message_port->methods.size(), 1);
+  ASSERT_NE(message_port, nullptr);
+  ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
-  ASSERT_NOT_NULL(post_message_request);
+  ASSERT_NE(post_message_request, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              }));
-  ASSERT_EQ(as_struct->members.size(), 1);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 4,
+                                   .max_handles = 1,
+                                   .has_padding = false,
+                               }));
+  ASSERT_EQ(as_struct->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveOptRequest) {
@@ -2069,40 +2026,32 @@ protocol MessagePort {
   ASSERT_COMPILED(library);
 
   auto web_message = library.LookupStruct("WebMessage");
-  ASSERT_NOT_NULL(web_message);
-  ASSERT_NO_FAILURES(CheckTypeShape(web_message, Expected{
-                                                     .inline_size = 4,
-                                                     .alignment = 4,
-                                                     .max_handles = 1,
-                                                 }));
+  ASSERT_NE(web_message, nullptr);
+  EXPECT_TYPE_SHAPE(web_message, (Expected{
+                                     .inline_size = 4,
+                                     .alignment = 4,
+                                     .max_handles = 1,
+                                 }));
 
   auto message_port = library.LookupProtocol("MessagePort");
-  ASSERT_NOT_NULL(message_port);
-  ASSERT_EQ(message_port->methods.size(), 1);
+  ASSERT_NE(message_port, nullptr);
+  ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              }));
-  ASSERT_EQ(as_struct->members.size(), 1);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 4,
+                                   .max_handles = 1,
+                                   .has_padding = false,
+                               }));
+  ASSERT_EQ(as_struct->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveProtocol) {
@@ -2123,40 +2072,32 @@ protocol MessagePort {
   ASSERT_COMPILED(library);
 
   auto web_message = library.LookupStruct("WebMessage");
-  ASSERT_NOT_NULL(web_message);
-  ASSERT_NO_FAILURES(CheckTypeShape(web_message, Expected{
-                                                     .inline_size = 4,
-                                                     .alignment = 4,
-                                                     .max_handles = 1,
-                                                 }));
+  ASSERT_NE(web_message, nullptr);
+  EXPECT_TYPE_SHAPE(web_message, (Expected{
+                                     .inline_size = 4,
+                                     .alignment = 4,
+                                     .max_handles = 1,
+                                 }));
 
   auto message_port = library.LookupProtocol("MessagePort");
-  ASSERT_NOT_NULL(message_port);
-  ASSERT_EQ(message_port->methods.size(), 1);
+  ASSERT_NE(message_port, nullptr);
+  ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              }));
-  ASSERT_EQ(as_struct->members.size(), 1);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 4,
+                                   .max_handles = 1,
+                                   .has_padding = false,
+                               }));
+  ASSERT_EQ(as_struct->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveOptProtocol) {
@@ -2177,40 +2118,32 @@ protocol MessagePort {
   ASSERT_COMPILED(library);
 
   auto web_message = library.LookupStruct("WebMessage");
-  ASSERT_NOT_NULL(web_message);
-  ASSERT_NO_FAILURES(CheckTypeShape(web_message, Expected{
-                                                     .inline_size = 4,
-                                                     .alignment = 4,
-                                                     .max_handles = 1,
-                                                 }));
+  ASSERT_NE(web_message, nullptr);
+  EXPECT_TYPE_SHAPE(web_message, (Expected{
+                                     .inline_size = 4,
+                                     .alignment = 4,
+                                     .max_handles = 1,
+                                 }));
 
   auto message_port = library.LookupProtocol("MessagePort");
-  ASSERT_NOT_NULL(message_port);
-  ASSERT_EQ(message_port->methods.size(), 1);
+  ASSERT_NE(message_port, nullptr);
+  ASSERT_EQ(message_port->methods.size(), 1u);
   auto& post_message = message_port->methods[0];
   auto post_message_request = post_message.maybe_request.get();
   EXPECT_EQ(post_message.has_request, true);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(post_message_request->type);
   auto as_struct = static_cast<const fidl::flat::Struct*>(id->type_decl);
-  EXPECT_NOT_NULL(as_struct);
+  ASSERT_NE(as_struct, nullptr);
 
-  ASSERT_NO_FAILURES(CheckTypeShapeWithHeader(as_struct,
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              },
-                                              Expected{
-                                                  .inline_size = 4,
-                                                  .alignment = 4,
-                                                  .max_handles = 1,
-                                                  .has_padding = false,
-                                              }));
-  ASSERT_EQ(as_struct->members.size(), 1);
-  ASSERT_NO_FAILURES(
-      CheckFieldShape(as_struct->members[0], ExpectedField{.offset = 0, .padding = 0}));
+  EXPECT_TYPE_SHAPE(as_struct, (Expected{
+                                   .inline_size = 4,
+                                   .alignment = 4,
+                                   .max_handles = 1,
+                                   .has_padding = false,
+                               }));
+  ASSERT_EQ(as_struct->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(as_struct->members[0], (ExpectedField{.offset = 0, .padding = 0}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveStruct) {
@@ -2223,17 +2156,16 @@ type TheStruct = struct {
   ASSERT_COMPILED(library);
 
   auto the_struct = library.LookupStruct("TheStruct");
-  ASSERT_NOT_NULL(the_struct);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(the_struct, Expected{
-                                     .inline_size = 8,
-                                     .alignment = 8,
-                                     .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                     .max_handles = 0,
-                                     .depth = std::numeric_limits<uint32_t>::max(),
-                                 }));
-  ASSERT_EQ(the_struct->members.size(), 1);
-  ASSERT_NO_FAILURES(CheckFieldShape(the_struct->members[0], ExpectedField{}));
+  ASSERT_NE(the_struct, nullptr);
+  EXPECT_TYPE_SHAPE(the_struct, (Expected{
+                                    .inline_size = 8,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = 0,
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                }));
+  ASSERT_EQ(the_struct->members.size(), 1u);
+  EXPECT_FIELD_SHAPE(the_struct->members[0], (ExpectedField{}));
 }
 
 TEST(TypeshapeTests, GoodRecursiveStructWithHandles) {
@@ -2246,23 +2178,22 @@ type TheStruct = resource struct {
   ASSERT_COMPILED(library);
 
   auto the_struct = library.LookupStruct("TheStruct");
-  ASSERT_NOT_NULL(the_struct);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(the_struct, Expected{
-                                     .inline_size = 16,
-                                     .alignment = 8,
-                                     .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                     .max_handles = std::numeric_limits<uint32_t>::max(),
-                                     .depth = std::numeric_limits<uint32_t>::max(),
-                                     .has_padding = true,
-                                 }));
-  ASSERT_EQ(the_struct->members.size(), 2);
-  ASSERT_NO_FAILURES(CheckFieldShape(the_struct->members[0], ExpectedField{
-                                                                 .padding = 4,
-                                                             }));
-  ASSERT_NO_FAILURES(CheckFieldShape(the_struct->members[1], ExpectedField{
-                                                                 .offset = 8,
-                                                             }));
+  ASSERT_NE(the_struct, nullptr);
+  EXPECT_TYPE_SHAPE(the_struct, (Expected{
+                                    .inline_size = 16,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = std::numeric_limits<uint32_t>::max(),
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                    .has_padding = true,
+                                }));
+  ASSERT_EQ(the_struct->members.size(), 2u);
+  EXPECT_FIELD_SHAPE(the_struct->members[0], (ExpectedField{
+                                                 .padding = 4,
+                                             }));
+  EXPECT_FIELD_SHAPE(the_struct->members[1], (ExpectedField{
+                                                 .offset = 8,
+                                             }));
 }
 
 TEST(TypeshapeTests, GoodCoRecursiveStruct) {
@@ -2279,26 +2210,24 @@ type B = struct {
   ASSERT_COMPILED(library);
 
   auto struct_a = library.LookupStruct("A");
-  ASSERT_NOT_NULL(struct_a);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_a, Expected{
-                                   .inline_size = 8,
-                                   .alignment = 8,
-                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                   .max_handles = 0,
-                                   .depth = std::numeric_limits<uint32_t>::max(),
-                               }));
+  ASSERT_NE(struct_a, nullptr);
+  EXPECT_TYPE_SHAPE(struct_a, (Expected{
+                                  .inline_size = 8,
+                                  .alignment = 8,
+                                  .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                  .max_handles = 0,
+                                  .depth = std::numeric_limits<uint32_t>::max(),
+                              }));
 
   auto struct_b = library.LookupStruct("B");
-  ASSERT_NOT_NULL(struct_b);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_b, Expected{
-                                   .inline_size = 8,
-                                   .alignment = 8,
-                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                   .max_handles = 0,
-                                   .depth = std::numeric_limits<uint32_t>::max(),
-                               }));
+  ASSERT_NE(struct_b, nullptr);
+  EXPECT_TYPE_SHAPE(struct_b, (Expected{
+                                  .inline_size = 8,
+                                  .alignment = 8,
+                                  .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                  .max_handles = 0,
+                                  .depth = std::numeric_limits<uint32_t>::max(),
+                              }));
 }
 
 TEST(TypeshapeTests, GoodCoRecursiveStructWithHandles) {
@@ -2320,28 +2249,26 @@ type B = resource struct {
   ASSERT_COMPILED(library);
 
   auto struct_a = library.LookupStruct("A");
-  ASSERT_NOT_NULL(struct_a);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_a, Expected{
-                                   .inline_size = 16,
-                                   .alignment = 8,
-                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                   .max_handles = std::numeric_limits<uint32_t>::max(),
-                                   .depth = std::numeric_limits<uint32_t>::max(),
-                                   .has_padding = true,
-                               }));
+  ASSERT_NE(struct_a, nullptr);
+  EXPECT_TYPE_SHAPE(struct_a, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                  .max_handles = std::numeric_limits<uint32_t>::max(),
+                                  .depth = std::numeric_limits<uint32_t>::max(),
+                                  .has_padding = true,
+                              }));
 
   auto struct_b = library.LookupStruct("B");
-  ASSERT_NOT_NULL(struct_b);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_b, Expected{
-                                   .inline_size = 16,
-                                   .alignment = 8,
-                                   .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                   .max_handles = std::numeric_limits<uint32_t>::max(),
-                                   .depth = std::numeric_limits<uint32_t>::max(),
-                                   .has_padding = true,
-                               }));
+  ASSERT_NE(struct_b, nullptr);
+  EXPECT_TYPE_SHAPE(struct_b, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                  .max_handles = std::numeric_limits<uint32_t>::max(),
+                                  .depth = std::numeric_limits<uint32_t>::max(),
+                                  .has_padding = true,
+                              }));
 }
 
 TEST(TypeshapeTests, GoodCoRecursiveStruct2) {
@@ -2358,26 +2285,24 @@ type Bar = struct {
   ASSERT_COMPILED(library);
 
   auto struct_foo = library.LookupStruct("Foo");
-  ASSERT_NOT_NULL(struct_foo);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_foo, Expected{
-                                     .inline_size = 8,
-                                     .alignment = 8,
-                                     .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                     .max_handles = 0,
-                                     .depth = std::numeric_limits<uint32_t>::max(),
-                                 }));
+  ASSERT_NE(struct_foo, nullptr);
+  EXPECT_TYPE_SHAPE(struct_foo, (Expected{
+                                    .inline_size = 8,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = 0,
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                }));
 
   auto struct_bar = library.LookupStruct("Bar");
-  ASSERT_NOT_NULL(struct_bar);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(struct_bar, Expected{
-                                     .inline_size = 8,
-                                     .alignment = 8,
-                                     .max_out_of_line = std::numeric_limits<uint32_t>::max(),
-                                     .max_handles = 0,
-                                     .depth = std::numeric_limits<uint32_t>::max(),
-                                 }));
+  ASSERT_NE(struct_bar, nullptr);
+  EXPECT_TYPE_SHAPE(struct_bar, (Expected{
+                                    .inline_size = 8,
+                                    .alignment = 8,
+                                    .max_out_of_line = std::numeric_limits<uint32_t>::max(),
+                                    .max_handles = 0,
+                                    .depth = std::numeric_limits<uint32_t>::max(),
+                                }));
 }
 
 TEST(TypeshapeTests, GoodStructTwoDeep) {
@@ -2408,37 +2333,36 @@ type Priority = enum {
   ASSERT_COMPILED(library);
 
   auto buffer = library.LookupStruct("Buffer");
-  ASSERT_NOT_NULL(buffer);
-  ASSERT_NO_FAILURES(CheckTypeShape(buffer, Expected{
-                                                .inline_size = 16,
-                                                .alignment = 8,
-                                                .max_handles = 1,
-                                                .has_padding = true,
-                                            }));
+  ASSERT_NE(buffer, nullptr);
+  EXPECT_TYPE_SHAPE(buffer, (Expected{
+                                .inline_size = 16,
+                                .alignment = 8,
+                                .max_handles = 1,
+                                .has_padding = true,
+                            }));
 
   auto value = library.LookupStruct("Value");
-  ASSERT_NOT_NULL(value);
-  ASSERT_NO_FAILURES(CheckTypeShape(
-      value, Expected{
-                 .inline_size = 16,
-                 .alignment = 8,
-                 .max_out_of_line = 16,
-                 .max_handles = 1,
-                 .depth = 1,
-                 .has_padding = true,  // because the size of |Priority| defaults to uint32
-             }));
+  ASSERT_NE(value, nullptr);
+  EXPECT_TYPE_SHAPE(value,
+                    (Expected{
+                        .inline_size = 16,
+                        .alignment = 8,
+                        .max_out_of_line = 16,
+                        .max_handles = 1,
+                        .depth = 1,
+                        .has_padding = true,  // because the size of |Priority| defaults to uint32
+                    }));
 
   auto diff_entry = library.LookupStruct("DiffEntry");
-  ASSERT_NOT_NULL(diff_entry);
-  ASSERT_NO_FAILURES(
-      CheckTypeShape(diff_entry, Expected{
-                                     .inline_size = 40,
-                                     .alignment = 8,
-                                     .max_out_of_line = 352,
-                                     .max_handles = 3,
-                                     .depth = 2,
-                                     .has_padding = true,  // because |Value| has padding
-                                 }));
+  ASSERT_NE(diff_entry, nullptr);
+  EXPECT_TYPE_SHAPE(diff_entry, (Expected{
+                                    .inline_size = 40,
+                                    .alignment = 8,
+                                    .max_out_of_line = 352,
+                                    .max_handles = 3,
+                                    .depth = 2,
+                                    .has_padding = true,  // because |Value| has padding
+                                }));
 }
 
 TEST(TypeshapeTests, GoodProtocolChildAndParent) {
@@ -2463,12 +2387,12 @@ protocol Child {
   ASSERT_COMPILED(child_library);
 
   auto child = child_library.LookupProtocol("Child");
-  ASSERT_NOT_NULL(child);
-  ASSERT_EQ(child->all_methods.size(), 1);
+  ASSERT_NE(child, nullptr);
+  ASSERT_EQ(child->all_methods.size(), 1u);
   auto& sync_with_info = child->all_methods[0];
   auto sync_request = sync_with_info.method->maybe_request.get();
   EXPECT_EQ(sync_with_info.method->has_request, true);
-  ASSERT_NULL(sync_request);
+  ASSERT_EQ(sync_request, nullptr);
 }
 
 TEST(TypeshapeTests, GoodUnionSize8Alignment4Sandwich) {
@@ -2487,31 +2411,31 @@ type Sandwich = struct {
   ASSERT_COMPILED(library);
 
   auto sandwich = library.LookupStruct("Sandwich");
-  ASSERT_NOT_NULL(sandwich);
-  ASSERT_NO_FAILURES(CheckTypeShape(sandwich, Expected{
-                                                  .inline_size = 32,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 0,
-                                                  .max_handles = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
-  ASSERT_EQ(sandwich->members.size(), 3);
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
-                                     ExpectedField{
-                                         .offset = 0,
-                                         .padding = 4,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[1],  // union
-                                     ExpectedField{
-                                         .offset = 8,
-                                         .padding = 0,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[2],  // after
-                                     ExpectedField{
-                                         .offset = 24,
-                                         .padding = 4,
-                                     }));
+  ASSERT_NE(sandwich, nullptr);
+  EXPECT_TYPE_SHAPE(sandwich, (Expected{
+                                  .inline_size = 32,
+                                  .alignment = 8,
+                                  .max_out_of_line = 0,
+                                  .max_handles = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
+  ASSERT_EQ(sandwich->members.size(), 3u);
+  EXPECT_FIELD_SHAPE(sandwich->members[0],  // before
+                     (ExpectedField{
+                         .offset = 0,
+                         .padding = 4,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[1],  // union
+                     (ExpectedField{
+                         .offset = 8,
+                         .padding = 0,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[2],  // after
+                     (ExpectedField{
+                         .offset = 24,
+                         .padding = 4,
+                     }));
 }
 
 TEST(TypeshapeTests, GoodUnionSize12Alignment4Sandwich) {
@@ -2530,31 +2454,31 @@ type Sandwich = struct {
   ASSERT_COMPILED(library);
 
   auto sandwich = library.LookupStruct("Sandwich");
-  ASSERT_NOT_NULL(sandwich);
-  ASSERT_NO_FAILURES(CheckTypeShape(sandwich, Expected{
-                                                  .inline_size = 32,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 8,
-                                                  .max_handles = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
-  ASSERT_EQ(sandwich->members.size(), 3);
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
-                                     ExpectedField{
-                                         .offset = 0,
-                                         .padding = 4,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[1],  // union
-                                     ExpectedField{
-                                         .offset = 8,
-                                         .padding = 0,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[2],  // after
-                                     ExpectedField{
-                                         .offset = 24,
-                                         .padding = 4,
-                                     }));
+  ASSERT_NE(sandwich, nullptr);
+  EXPECT_TYPE_SHAPE(sandwich, (Expected{
+                                  .inline_size = 32,
+                                  .alignment = 8,
+                                  .max_out_of_line = 8,
+                                  .max_handles = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
+  ASSERT_EQ(sandwich->members.size(), 3u);
+  EXPECT_FIELD_SHAPE(sandwich->members[0],  // before
+                     (ExpectedField{
+                         .offset = 0,
+                         .padding = 4,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[1],  // union
+                     (ExpectedField{
+                         .offset = 8,
+                         .padding = 0,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[2],  // after
+                     (ExpectedField{
+                         .offset = 24,
+                         .padding = 4,
+                     }));
 }
 
 TEST(TypeshapeTests, GoodUnionSize24Alignment8Sandwich) {
@@ -2578,31 +2502,31 @@ type Sandwich = struct {
   ASSERT_COMPILED(library);
 
   auto sandwich = library.LookupStruct("Sandwich");
-  ASSERT_NOT_NULL(sandwich);
-  ASSERT_NO_FAILURES(CheckTypeShape(sandwich, Expected{
-                                                  .inline_size = 32,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 16,
-                                                  .max_handles = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
-  ASSERT_EQ(sandwich->members.size(), 3);
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
-                                     ExpectedField{
-                                         .offset = 0,
-                                         .padding = 4,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[1],  // union
-                                     ExpectedField{
-                                         .offset = 8,
-                                         .padding = 0,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[2],  // after
-                                     ExpectedField{
-                                         .offset = 24,
-                                         .padding = 4,
-                                     }));
+  ASSERT_NE(sandwich, nullptr);
+  EXPECT_TYPE_SHAPE(sandwich, (Expected{
+                                  .inline_size = 32,
+                                  .alignment = 8,
+                                  .max_out_of_line = 16,
+                                  .max_handles = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
+  ASSERT_EQ(sandwich->members.size(), 3u);
+  EXPECT_FIELD_SHAPE(sandwich->members[0],  // before
+                     (ExpectedField{
+                         .offset = 0,
+                         .padding = 4,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[1],  // union
+                     (ExpectedField{
+                         .offset = 8,
+                         .padding = 0,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[2],  // after
+                     (ExpectedField{
+                         .offset = 24,
+                         .padding = 4,
+                     }));
 }
 
 TEST(TypeshapeTests, GoodUnionSize36Alignment4Sandwich) {
@@ -2621,31 +2545,31 @@ type Sandwich = struct {
   ASSERT_COMPILED(library);
 
   auto sandwich = library.LookupStruct("Sandwich");
-  ASSERT_NOT_NULL(sandwich);
-  ASSERT_NO_FAILURES(CheckTypeShape(sandwich, Expected{
-                                                  .inline_size = 32,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 32,
-                                                  .max_handles = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
-  ASSERT_EQ(sandwich->members.size(), 3);
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[0],  // before
-                                     ExpectedField{
-                                         .offset = 0,
-                                         .padding = 4,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[1],  // union
-                                     ExpectedField{
-                                         .offset = 8,
-                                         .padding = 0,
-                                     }));
-  ASSERT_NO_FAILURES(CheckFieldShape(sandwich->members[2],  // after
-                                     ExpectedField{
-                                         .offset = 24,
-                                         .padding = 4,
-                                     }));
+  ASSERT_NE(sandwich, nullptr);
+  EXPECT_TYPE_SHAPE(sandwich, (Expected{
+                                  .inline_size = 32,
+                                  .alignment = 8,
+                                  .max_out_of_line = 32,
+                                  .max_handles = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
+  ASSERT_EQ(sandwich->members.size(), 3u);
+  EXPECT_FIELD_SHAPE(sandwich->members[0],  // before
+                     (ExpectedField{
+                         .offset = 0,
+                         .padding = 4,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[1],  // union
+                     (ExpectedField{
+                         .offset = 8,
+                         .padding = 0,
+                     }));
+  EXPECT_FIELD_SHAPE(sandwich->members[2],  // after
+                     (ExpectedField{
+                         .offset = 24,
+                         .padding = 4,
+                     }));
 }
 
 TEST(TypeshapeTests, GoodZeroSizeVector) {
@@ -2662,15 +2586,15 @@ type A = resource struct {
   ASSERT_COMPILED(library);
 
   auto struct_a = library.LookupStruct("A");
-  ASSERT_NOT_NULL(struct_a);
-  ASSERT_NO_FAILURES(CheckTypeShape(struct_a, Expected{
-                                                  .inline_size = 16,
-                                                  .alignment = 8,
-                                                  .max_out_of_line = 0,
-                                                  .max_handles = 0,
-                                                  .depth = 1,
-                                                  .has_padding = true,
-                                              }));
+  ASSERT_NE(struct_a, nullptr);
+  EXPECT_TYPE_SHAPE(struct_a, (Expected{
+                                  .inline_size = 16,
+                                  .alignment = 8,
+                                  .max_out_of_line = 0,
+                                  .max_handles = 0,
+                                  .depth = 1,
+                                  .has_padding = true,
+                              }));
 }
 
 }  // namespace

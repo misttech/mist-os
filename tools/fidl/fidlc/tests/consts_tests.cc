@@ -4,7 +4,7 @@
 
 #include <sstream>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -16,7 +16,7 @@ void CheckConstEq(TestLibrary& library, std::string_view name, PrimitiveType exp
                   fidl::flat::Constant::Kind expected_constant_kind,
                   fidl::flat::ConstantValue::Kind expected_constant_value_kind) {
   auto const_decl = library.LookupConstant(name);
-  ASSERT_NOT_NULL(const_decl);
+  ASSERT_NE(const_decl, nullptr);
   ASSERT_EQ(expected_constant_kind, const_decl->value->kind);
   ASSERT_EQ(expected_constant_value_kind, const_decl->value->Value().kind);
   auto& numeric_const_value = static_cast<const fidl::flat::NumericConstantValue<PrimitiveType>&>(

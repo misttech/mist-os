@@ -2,34 +2,36 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
-#include "tools/fidl/fidlc/include/fidl/experimental_flags.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
 
 namespace {
 
-#define ASSERT_WARNINGS(quantity, lib, content)                  \
-  do {                                                           \
-    const auto& warnings = (lib).lints();                        \
-    if (strlen(content) != 0) {                                  \
-      bool contains_content = false;                             \
-      for (size_t i = 0; i < warnings.size(); i++) {             \
-        if (warnings[i].find(content) != std::string::npos) {    \
-          contains_content = true;                               \
-          break;                                                 \
-        }                                                        \
-      }                                                          \
-      ASSERT_TRUE(contains_content, content " not found");       \
-    }                                                            \
-    if (warnings.size() != (quantity)) {                         \
-      std::string error = "Found warning: ";                     \
-      for (size_t i = 0; i < warnings.size(); i++) {             \
-        error.append(warnings[i]);                               \
-      }                                                          \
-      ASSERT_EQ(quantity, warnings.size(), "%s", error.c_str()); \
-    }                                                            \
+using ::testing::HasSubstr;
+
+#define ASSERT_WARNINGS(quantity, lib, content)                           \
+  do {                                                                    \
+    const auto& warnings = (lib).lints();                                 \
+    if (strlen(content) != 0) {                                           \
+      bool contains_content = false;                                      \
+      for (size_t i = 0; i < warnings.size(); i++) {                      \
+        if (warnings[i].find(content) != std::string::npos) {             \
+          contains_content = true;                                        \
+          break;                                                          \
+        }                                                                 \
+      }                                                                   \
+      ASSERT_TRUE(contains_content) << (content) << " not found";         \
+    }                                                                     \
+    if (warnings.size() != (quantity)) {                                  \
+      std::string error = "Found warning: ";                              \
+      for (size_t i = 0; i < warnings.size(); i++) {                      \
+        error.append(warnings[i]);                                        \
+      }                                                                   \
+      ASSERT_EQ(static_cast<size_t>(quantity), warnings.size()) << error; \
+    }                                                                     \
   } while (0)
 
 TEST(LintTests, BadConstNames) {
@@ -51,7 +53,7 @@ const kAllIsCalm uint64 = 1234;
   ASSERT_FALSE(library.Lint());
   ASSERT_WARNINGS(1, library, "kAllIsCalm");
   const auto& warnings = library.lints();
-  ASSERT_SUBSTR(warnings[0].c_str(), "ALL_IS_CALM");
+  ASSERT_THAT(warnings[0], HasSubstr("ALL_IS_CALM"));
 }
 
 TEST(LintTests, GoodConstNames) {
@@ -73,7 +75,7 @@ protocol URLLoader {};
   ASSERT_FALSE(library.Lint());
   ASSERT_WARNINGS(1, library, "URLLoader");
   const auto& warnings = library.lints();
-  ASSERT_SUBSTR(warnings[0].c_str(), "UrlLoader");
+  ASSERT_THAT(warnings[0], HasSubstr("UrlLoader"));
 }
 
 TEST(LintTests, GoodProtocolNames) {

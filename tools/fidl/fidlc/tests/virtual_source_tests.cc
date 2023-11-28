@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/source_span.h"
 #include "tools/fidl/fidlc/include/fidl/virtual_source_file.h"
@@ -16,9 +16,9 @@ TEST(VirtualSourceTests, AddLine) {
   fidl::SourceSpan two = file.AddLine("two");
   fidl::SourceSpan three = file.AddLine("three");
 
-  EXPECT_STREQ(std::string(one.data()).c_str(), "one");
-  EXPECT_STREQ(std::string(two.data()).c_str(), "two");
-  EXPECT_STREQ(std::string(three.data()).c_str(), "three");
+  EXPECT_EQ(one.data(), "one");
+  EXPECT_EQ(two.data(), "two");
+  EXPECT_EQ(three.data(), "three");
 }
 
 TEST(VirtualSourceTests, LineContaining) {

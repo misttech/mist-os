@@ -8,7 +8,7 @@
 #include <set>
 #include <stack>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/raw_ast.h"
 #include "tools/fidl/fidlc/include/fidl/tree_visitor.h"
@@ -921,7 +921,7 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
 
   // Assert after all tests are over so that we can get output for each test
   // case even if one of them fails.
-  ASSERT_TRUE(all_passed, "At least one test case failed");
+  ASSERT_TRUE(all_passed) << "At least one test case failed";
 }
 
 TEST(SpanTests, GoodParseTest) {

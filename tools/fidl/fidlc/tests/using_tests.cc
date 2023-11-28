@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
 #include "tools/fidl/fidlc/include/fidl/names.h"
@@ -304,7 +304,7 @@ TEST(UsingTests, BadTooManyProvidedLibraries) {
   ASSERT_COMPILED(library);
 
   auto unused = shared.all_libraries()->Unused();
-  ASSERT_EQ(unused.size(), 1);
+  ASSERT_EQ(unused.size(), 1u);
   ASSERT_EQ(fidl::NameLibrary((*unused.begin())->name), "not.used");
 }
 

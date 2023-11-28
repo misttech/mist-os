@@ -5,7 +5,7 @@
 #include <limits>
 #include <string>
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
@@ -54,7 +54,7 @@ TEST(VersioningTypesTests, GoodPlatformEquality) {
 TEST(VersioningTypesTests, GoodVersionFromMinNumeric) {
   auto maybe_version = Version::From(1);
   ASSERT_TRUE(maybe_version.has_value());
-  EXPECT_EQ(maybe_version.value().ordinal(), 1);
+  EXPECT_EQ(maybe_version.value().ordinal(), 1u);
   EXPECT_EQ(maybe_version.value().ToString(), "1");
 }
 

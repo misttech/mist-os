@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
 #include "tools/fidl/fidlc/tests/test_library.h"
@@ -21,29 +21,29 @@ protocol Example {
   ASSERT_COMPILED(library);
 
   auto methods = &library.LookupProtocol("Example")->methods;
-  ASSERT_EQ(methods->size(), 1);
+  ASSERT_EQ(methods->size(), 1u);
   auto method = &methods->at(0);
   auto response = method->maybe_response.get();
-  ASSERT_NOT_NULL(response);
+  ASSERT_NE(response, nullptr);
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
-  ASSERT_NOT_NULL(result_union);
-  ASSERT_EQ(result_union->members.size(), 2);
+  ASSERT_NE(result_union, nullptr);
+  ASSERT_EQ(result_union->members.size(), 2u);
 
   auto anonymous = result_union->name.as_anonymous();
-  ASSERT_NOT_NULL(anonymous);
+  ASSERT_NE(anonymous, nullptr);
   ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NOT_NULL(success.maybe_used);
-  ASSERT_STREQ("response", std::string(success.maybe_used->name.data()).c_str());
+  ASSERT_NE(success.maybe_used, nullptr);
+  ASSERT_EQ("response", success.maybe_used->name.data());
 
   const fidl::flat::Union::Member& error = result_union->members.at(1);
-  ASSERT_NOT_NULL(error.maybe_used);
-  ASSERT_STREQ("err", std::string(error.maybe_used->name.data()).c_str());
+  ASSERT_NE(error.maybe_used, nullptr);
+  ASSERT_EQ("err", error.maybe_used->name.data());
 
-  ASSERT_NOT_NULL(error.maybe_used->type_ctor->type);
+  ASSERT_NE(error.maybe_used->type_ctor->type, nullptr);
   ASSERT_EQ(error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kPrimitive);
   auto primitive_type =
       static_cast<const fidl::flat::PrimitiveType*>(error.maybe_used->type_ctor->type);
@@ -72,22 +72,22 @@ protocol MyProtocol {
 )FIDL");
   ASSERT_COMPILED(library);
   auto protocol = library.LookupProtocol("MyProtocol");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
 
   auto& method = protocol->methods[0];
   EXPECT_TRUE(method.has_request);
-  EXPECT_NULL(method.maybe_request.get());
+  EXPECT_EQ(method.maybe_request.get(), nullptr);
   ASSERT_TRUE(method.has_response && method.maybe_response.get());
 
   auto id = static_cast<const fidl::flat::IdentifierType*>(method.maybe_response->type);
   auto response = static_cast<const fidl::flat::Union*>(id->type_decl);
   EXPECT_TRUE(response->kind == fidl::flat::Decl::Kind::kUnion);
-  ASSERT_EQ(response->members.size(), 2);
+  ASSERT_EQ(response->members.size(), 2u);
 
   auto empty_struct_name = response->members[0].maybe_used->type_ctor->type->name.decl_name();
   auto empty_struct = library.LookupStruct(empty_struct_name);
-  ASSERT_NOT_NULL(empty_struct);
+  ASSERT_NE(empty_struct, nullptr);
   auto anonymous = empty_struct->name.as_anonymous();
   ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedEmptySuccessStruct);
 }

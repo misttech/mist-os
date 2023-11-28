@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/types.h"
@@ -25,16 +25,16 @@ open protocol HasComposeMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasComposeMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasComposeMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidStrictComposeMethod) {
@@ -51,16 +51,16 @@ open protocol HasComposeMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasComposeMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasComposeMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidFlexibleComposeMethod) {
@@ -77,16 +77,16 @@ open protocol HasComposeMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasComposeMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasComposeMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidStrictMethod) {
@@ -119,40 +119,40 @@ open protocol HasStrictMethod6 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasStrictMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasStrictMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 
   auto protocol3 = library.LookupProtocol("HasStrictMethod3");
-  ASSERT_NOT_NULL(protocol3);
-  ASSERT_EQ(protocol3->methods.size(), 1);
+  ASSERT_NE(protocol3, nullptr);
+  ASSERT_EQ(protocol3->methods.size(), 1u);
   EXPECT_EQ(protocol3->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol3->all_methods.size(), 1);
+  EXPECT_EQ(protocol3->all_methods.size(), 1u);
 
   auto protocol4 = library.LookupProtocol("HasStrictMethod4");
-  ASSERT_NOT_NULL(protocol4);
-  ASSERT_EQ(protocol4->methods.size(), 1);
+  ASSERT_NE(protocol4, nullptr);
+  ASSERT_EQ(protocol4->methods.size(), 1u);
   EXPECT_EQ(protocol4->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol4->all_methods.size(), 1);
+  EXPECT_EQ(protocol4->all_methods.size(), 1u);
 
   auto protocol5 = library.LookupProtocol("HasStrictMethod5");
-  ASSERT_NOT_NULL(protocol5);
-  ASSERT_EQ(protocol5->methods.size(), 1);
+  ASSERT_NE(protocol5, nullptr);
+  ASSERT_EQ(protocol5->methods.size(), 1u);
   EXPECT_EQ(protocol5->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol5->all_methods.size(), 1);
+  EXPECT_EQ(protocol5->all_methods.size(), 1u);
 
   auto protocol6 = library.LookupProtocol("HasStrictMethod6");
-  ASSERT_NOT_NULL(protocol6);
-  ASSERT_EQ(protocol6->methods.size(), 1);
+  ASSERT_NE(protocol6, nullptr);
+  ASSERT_EQ(protocol6->methods.size(), 1u);
   EXPECT_EQ(protocol6->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol6->all_methods.size(), 1);
+  EXPECT_EQ(protocol6->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidFlexibleTwoWayMethod) {
@@ -185,40 +185,40 @@ open protocol HasFlexibleTwoWayMethod6 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasFlexibleTwoWayMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasFlexibleTwoWayMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 
   auto protocol3 = library.LookupProtocol("HasFlexibleTwoWayMethod3");
-  ASSERT_NOT_NULL(protocol3);
-  ASSERT_EQ(protocol3->methods.size(), 1);
+  ASSERT_NE(protocol3, nullptr);
+  ASSERT_EQ(protocol3->methods.size(), 1u);
   EXPECT_EQ(protocol3->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol3->all_methods.size(), 1);
+  EXPECT_EQ(protocol3->all_methods.size(), 1u);
 
   auto protocol4 = library.LookupProtocol("HasFlexibleTwoWayMethod4");
-  ASSERT_NOT_NULL(protocol4);
-  ASSERT_EQ(protocol4->methods.size(), 1);
+  ASSERT_NE(protocol4, nullptr);
+  ASSERT_EQ(protocol4->methods.size(), 1u);
   EXPECT_EQ(protocol4->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol4->all_methods.size(), 1);
+  EXPECT_EQ(protocol4->all_methods.size(), 1u);
 
   auto protocol5 = library.LookupProtocol("HasFlexibleTwoWayMethod5");
-  ASSERT_NOT_NULL(protocol5);
-  ASSERT_EQ(protocol5->methods.size(), 1);
+  ASSERT_NE(protocol5, nullptr);
+  ASSERT_EQ(protocol5->methods.size(), 1u);
   EXPECT_EQ(protocol5->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol5->all_methods.size(), 1);
+  EXPECT_EQ(protocol5->all_methods.size(), 1u);
 
   auto protocol6 = library.LookupProtocol("HasFlexibleTwoWayMethod6");
-  ASSERT_NOT_NULL(protocol6);
-  ASSERT_EQ(protocol6->methods.size(), 1);
+  ASSERT_NE(protocol6, nullptr);
+  ASSERT_EQ(protocol6->methods.size(), 1u);
   EXPECT_EQ(protocol6->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol6->all_methods.size(), 1);
+  EXPECT_EQ(protocol6->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidNormalMethod) {
@@ -235,16 +235,16 @@ open protocol HasNormalMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasNormalMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasNormalMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidStrictNormalMethod) {
@@ -261,16 +261,16 @@ open protocol HasNormalMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasNormalMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasNormalMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidFlexibleNormalMethod) {
@@ -287,16 +287,16 @@ open protocol HasNormalMethod2 {
   ASSERT_COMPILED(library);
 
   auto protocol1 = library.LookupProtocol("HasNormalMethod1");
-  ASSERT_NOT_NULL(protocol1);
-  ASSERT_EQ(protocol1->methods.size(), 1);
+  ASSERT_NE(protocol1, nullptr);
+  ASSERT_EQ(protocol1->methods.size(), 1u);
   EXPECT_EQ(protocol1->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol1->all_methods.size(), 1);
+  EXPECT_EQ(protocol1->all_methods.size(), 1u);
 
   auto protocol2 = library.LookupProtocol("HasNormalMethod2");
-  ASSERT_NOT_NULL(protocol2);
-  ASSERT_EQ(protocol2->methods.size(), 1);
+  ASSERT_NE(protocol2, nullptr);
+  ASSERT_EQ(protocol2->methods.size(), 1u);
   EXPECT_EQ(protocol2->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol2->all_methods.size(), 1);
+  EXPECT_EQ(protocol2->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidEvent) {
@@ -309,10 +309,10 @@ protocol HasEvent {
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("HasEvent");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
   EXPECT_EQ(protocol->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol->all_methods.size(), 1);
+  EXPECT_EQ(protocol->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidStrictEvent) {
@@ -325,10 +325,10 @@ protocol HasEvent {
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("HasEvent");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
   EXPECT_EQ(protocol->methods[0].strictness, fidl::types::Strictness::kStrict);
-  EXPECT_EQ(protocol->all_methods.size(), 1);
+  EXPECT_EQ(protocol->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidFlexibleEvent) {
@@ -342,10 +342,10 @@ protocol HasEvent {
   ASSERT_COMPILED(library);
 
   auto protocol = library.LookupProtocol("HasEvent");
-  ASSERT_NOT_NULL(protocol);
-  ASSERT_EQ(protocol->methods.size(), 1);
+  ASSERT_NE(protocol, nullptr);
+  ASSERT_EQ(protocol->methods.size(), 1u);
   EXPECT_EQ(protocol->methods[0].strictness, fidl::types::Strictness::kFlexible);
-  EXPECT_EQ(protocol->all_methods.size(), 1);
+  EXPECT_EQ(protocol->all_methods.size(), 1u);
 }
 
 TEST(MethodTests, GoodValidStrictnessModifiers) {
@@ -381,16 +381,16 @@ open protocol Open {
   ASSERT_COMPILED(library);
 
   auto closed = library.LookupProtocol("Closed");
-  ASSERT_NOT_NULL(closed);
-  ASSERT_EQ(closed->methods.size(), 3);
+  ASSERT_NE(closed, nullptr);
+  ASSERT_EQ(closed->methods.size(), 3u);
 
   auto ajar = library.LookupProtocol("Ajar");
-  ASSERT_NOT_NULL(ajar);
-  ASSERT_EQ(ajar->methods.size(), 5);
+  ASSERT_NE(ajar, nullptr);
+  ASSERT_EQ(ajar->methods.size(), 5u);
 
   auto open = library.LookupProtocol("Open");
-  ASSERT_NOT_NULL(open);
-  ASSERT_EQ(open->methods.size(), 6);
+  ASSERT_NE(open, nullptr);
+  ASSERT_EQ(open->methods.size(), 6u);
 }
 
 TEST(MethodTests, BadInvalidStrictnessFlexibleEventInClosed) {
@@ -457,8 +457,8 @@ open protocol Test {
   ASSERT_COMPILED(library);
 
   auto closed = library.LookupProtocol("Test");
-  ASSERT_NOT_NULL(closed);
-  ASSERT_EQ(closed->methods.size(), 4);
+  ASSERT_NE(closed, nullptr);
+  ASSERT_EQ(closed->methods.size(), 4u);
 }
 
 TEST(MethodTests, BadInvalidEmptyStructPayloadStrictNoError) {
@@ -547,35 +547,35 @@ open protocol Example {
   ASSERT_COMPILED(library);
 
   auto methods = &library.LookupProtocol("Example")->methods;
-  ASSERT_EQ(methods->size(), 1);
+  ASSERT_EQ(methods->size(), 1u);
   auto method = &methods->at(0);
   auto response = method->maybe_response.get();
-  ASSERT_NOT_NULL(response);
+  ASSERT_NE(response, nullptr);
 
   ASSERT_EQ(response->type->kind, fidl::flat::Type::Kind::kIdentifier);
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
   ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
-  ASSERT_NOT_NULL(result_union);
-  ASSERT_EQ(result_union->members.size(), 3);
+  ASSERT_NE(result_union, nullptr);
+  ASSERT_EQ(result_union->members.size(), 3u);
 
   auto anonymous = result_union->name.as_anonymous();
-  ASSERT_NOT_NULL(anonymous);
+  ASSERT_NE(anonymous, nullptr);
   ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NOT_NULL(success.maybe_used);
-  ASSERT_STREQ("response", std::string(success.maybe_used->name.data()).c_str());
+  ASSERT_NE(success.maybe_used, nullptr);
+  ASSERT_EQ("response", success.maybe_used->name.data());
 
   const fidl::flat::Union::Member& error = result_union->members.at(1);
-  ASSERT_NULL(error.maybe_used);
-  ASSERT_STREQ("err", std::string(error.span->data()).c_str());
+  ASSERT_EQ(error.maybe_used, nullptr);
+  ASSERT_EQ("err", error.span->data());
 
   const fidl::flat::Union::Member& framework_error = result_union->members.at(2);
-  ASSERT_NOT_NULL(framework_error.maybe_used);
-  ASSERT_STREQ("framework_err", std::string(framework_error.maybe_used->name.data()).c_str());
+  ASSERT_NE(framework_error.maybe_used, nullptr);
+  ASSERT_EQ("framework_err", framework_error.maybe_used->name.data());
 
-  ASSERT_NOT_NULL(framework_error.maybe_used->type_ctor->type);
+  ASSERT_NE(framework_error.maybe_used->type_ctor->type, nullptr);
   ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
   auto framework_err_internal_type =
       static_cast<const fidl::flat::InternalType*>(framework_error.maybe_used->type_ctor->type);
@@ -594,41 +594,41 @@ open protocol Example {
   ASSERT_COMPILED(library);
 
   auto methods = &library.LookupProtocol("Example")->methods;
-  ASSERT_EQ(methods->size(), 1);
+  ASSERT_EQ(methods->size(), 1u);
   auto method = &methods->at(0);
   auto response = method->maybe_response.get();
-  ASSERT_NOT_NULL(response);
+  ASSERT_NE(response, nullptr);
 
   ASSERT_EQ(response->type->kind, fidl::flat::Type::Kind::kIdentifier);
   auto id = static_cast<const fidl::flat::IdentifierType*>(response->type);
   ASSERT_EQ(id->type_decl->kind, fidl::flat::Decl::Kind::kUnion);
   auto result_union = static_cast<const fidl::flat::Union*>(id->type_decl);
-  ASSERT_NOT_NULL(result_union);
-  ASSERT_EQ(result_union->members.size(), 3);
+  ASSERT_NE(result_union, nullptr);
+  ASSERT_EQ(result_union->members.size(), 3u);
 
   auto anonymous = result_union->name.as_anonymous();
-  ASSERT_NOT_NULL(anonymous);
+  ASSERT_NE(anonymous, nullptr);
   ASSERT_EQ(anonymous->provenance, fidl::flat::Name::Provenance::kGeneratedResultUnion);
 
   const auto& success = result_union->members.at(0);
-  ASSERT_NOT_NULL(success.maybe_used);
-  ASSERT_STREQ("response", std::string(success.maybe_used->name.data()).c_str());
+  ASSERT_NE(success.maybe_used, nullptr);
+  ASSERT_EQ("response", success.maybe_used->name.data());
 
   const fidl::flat::Union::Member& error = result_union->members.at(1);
-  ASSERT_NOT_NULL(error.maybe_used);
-  ASSERT_STREQ("err", std::string(error.maybe_used->name.data()).c_str());
+  ASSERT_NE(error.maybe_used, nullptr);
+  ASSERT_EQ("err", error.maybe_used->name.data());
 
-  ASSERT_NOT_NULL(error.maybe_used->type_ctor->type);
+  ASSERT_NE(error.maybe_used->type_ctor->type, nullptr);
   ASSERT_EQ(error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kPrimitive);
   auto err_primitive_type =
       static_cast<const fidl::flat::PrimitiveType*>(error.maybe_used->type_ctor->type);
   ASSERT_EQ(err_primitive_type->subtype, fidl::types::PrimitiveSubtype::kUint32);
 
   const fidl::flat::Union::Member& framework_error = result_union->members.at(2);
-  ASSERT_NOT_NULL(framework_error.maybe_used);
-  ASSERT_STREQ("framework_err", std::string(framework_error.maybe_used->name.data()).c_str());
+  ASSERT_NE(framework_error.maybe_used, nullptr);
+  ASSERT_EQ("framework_err", framework_error.maybe_used->name.data());
 
-  ASSERT_NOT_NULL(framework_error.maybe_used->type_ctor->type);
+  ASSERT_NE(framework_error.maybe_used->type_ctor->type, nullptr);
   ASSERT_EQ(framework_error.maybe_used->type_ctor->type->kind, fidl::flat::Type::Kind::kInternal);
   auto framework_err_internal_type =
       static_cast<const fidl::flat::InternalType*>(framework_error.maybe_used->type_ctor->type);
