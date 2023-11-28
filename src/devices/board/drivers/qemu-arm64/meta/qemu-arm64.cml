@@ -15,7 +15,12 @@
         colocate: "true",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        {
+            protocol: [
+                "fuchsia.boot.RootResource",
+                "fuchsia.kernel.MmioResource",
+            ],
+        },
         { service: "fuchsia.hardware.platform.bus.Service" },
     ],
 }

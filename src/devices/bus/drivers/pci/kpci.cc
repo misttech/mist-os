@@ -166,9 +166,7 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
     return ZX_ERR_BAD_STATE;
   }
 
-  // This is a legacy function to get the 'nth' device on a bus. Please do not
-  // use get_root_resource() in new code. See fxbug.dev/31358.
-  zx_status_t status = zx_pci_get_nth_device(get_root_resource(parent), index, &info, &handle);
+  zx_status_t status = zx_pci_get_nth_device(get_mmio_resource(parent), index, &info, &handle);
   if (status != ZX_OK) {
     return status;
   }
