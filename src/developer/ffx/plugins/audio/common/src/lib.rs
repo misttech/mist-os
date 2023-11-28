@@ -250,14 +250,14 @@ pub mod tests {
                             assert_eq!(stop_signal.load(std::sync::atomic::Ordering::SeqCst), true);
                         }
                     }
-                    responder.send(Ok(RecorderRecordResponse {
+                    let _ = responder.send(Ok(RecorderRecordResponse {
                         // Calculating bytes & packets processed can be tested in controller tests.
                         // ffx tests are for I/O and command line validation.
                         bytes_processed: Some(123),
                         packets_processed: Some(123),
                         late_wakeups: None,
                         ..Default::default()
-                    }))
+                    }));
                 })
                 .detach();
             }

@@ -350,7 +350,7 @@ impl FidlProtocol for TargetCollectionProtocol {
                     fn drop(&mut self) {
                         match self.0.take() {
                             Some((mt, tc, addr)) => fuchsia_async::Task::local(async move {
-                                remove_manual_target(mt, &tc, addr.to_string()).await
+                                remove_manual_target(mt, &tc, addr.to_string()).await;
                             })
                             .detach(),
                             None => {}
