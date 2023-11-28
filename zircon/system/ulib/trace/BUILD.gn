@@ -22,12 +22,11 @@ template("trace_library") {
     # Header dependencies, not including the trace engine.
     # <trace/internal/event_internal.h> has #include <trace-engine/instrumentation.h>.
     public_deps += [
-      # <trace/internal/event_internal.h> has #include <zircon/syscalls.h>.
-
       # <trace/observer.h> has #include <trace-engine/instrumentation.h> (already
       # covered, <lib/async/cpp/wait.h>, <fit/function.h>, and <lib/zx/event.h>.
-      "//zircon/system/ulib/async:async-cpp",
+      ":trace-headersonly",
       "//sdk/lib/fit",
+      "//zircon/system/ulib/async:async-cpp",
       "//zircon/system/ulib/zx",
     ]
 
@@ -50,8 +49,15 @@ set_defaults("trace_library") {
   configs = default_common_binary_configs
 }
 
-source_set("trace-headers") {
-  sources = [
+config("trace_include") {
+  include_dirs = [ "include" ]
+}
+
+sdk_source_set("trace-headersonly") {
+  category = "partner"
+  sdk_name = "trace-headersonly"
+
+  public = [
     "include/lib/trace/event.h",
     "include/lib/trace/event_args.h",
     "include/lib/trace/internal/event_args.h",
@@ -62,6 +68,14 @@ source_set("trace-headers") {
     "include/lib/trace/observer.h",
   ]
 
+  sdk_headers_for_internal_use = [
+    "include/lib/trace/internal/event_internal.h",
+    "include/lib/trace/internal/pairs_internal.h",
+    "include/lib/trace/internal/event_args.h",
+    "include/lib/trace/internal/event_common.h",
+    "include/lib/trace/internal/string_traits.h",
+  ]
+
   public_deps = [
     "//sdk/lib/fit",
     "//zircon/system/ulib/async",
@@ -69,6 +83,7 @@ source_set("trace-headers") {
     "//zircon/system/ulib/trace-engine:trace-engine-headersonly",
     "//zircon/system/ulib/zx",
   ]
+  public_configs = [ ":trace_include" ]
 }
 
 # The default version for the normal case, and for the SDK.

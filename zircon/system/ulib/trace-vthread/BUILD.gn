@@ -28,7 +28,7 @@ source_set("trace-vthread-headers") {
   public_configs = [ ":library_headers_config" ]
   public_deps = [
     # <trace-vthread/internal/event_vthread.h> has #include <lib/trace/event_args.h>.
-    "//zircon/system/ulib/trace:trace-headers",
+    "//zircon/system/ulib/trace:trace-headersonly",
   ]
 }
 
