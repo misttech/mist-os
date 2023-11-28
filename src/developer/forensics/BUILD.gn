@@ -36,6 +36,26 @@ group("tests") {
   ]
 }
 
+# Allows userdebug configs to be used on eng builds. Note, this build target
+# cannot be used on non-eng builds because multiple targets will provide the
+# config data file and cause the build will fail.
+#
+# TODO(312749175): Remove this target once configs can be overridden on eng
+# builds.
+group("userdebug_configs_for_eng") {
+  deps = [ ":feedback_userdebug_config_for_eng" ]
+}
+
+# Allows user configs to be used on eng builds. Note, this build target cannot
+# be used on non-eng builds because multiple targets will provide the onfig data
+#file and cause the build will fail.
+#
+# TODO(312749175): Remove this target once configs can be overridden on eng
+# builds.
+group("user_configs_for_eng") {
+  deps = [ ":feedback_user_config_for_eng" ]
+}
+
 ###############################################################################
 # PACKAGES
 ###############################################################################
@@ -175,4 +195,24 @@ config_data("exceptions_enable_jitd_on_startup") {
   sources = [ "exceptions/configs/jitd_on_startup.json" ]
 
   outputs = [ "exceptions/enable_jitd_on_startup.json" ]
+}
+
+# TODO(312749175): Remove this target once configs can be overridden on eng
+# builds.
+config_data("feedback_user_config_for_eng") {
+  for_pkg = "forensics"
+
+  sources = [ "feedback/configs/build_type/user.json" ]
+
+  outputs = [ "build_type/override_config.json" ]
+}
+
+# TODO(312749175): Remove this target once configs can be overridden on eng
+# builds.
+config_data("feedback_userdebug_config_for_eng") {
+  for_pkg = "forensics"
+
+  sources = [ "feedback/configs/build_type/userdebug.json" ]
+
+  outputs = [ "build_type/override_config.json" ]
 }

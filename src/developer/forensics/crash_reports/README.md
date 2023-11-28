@@ -21,8 +21,12 @@ which enables crash report uploading and give your device consent to share data
 in its settings.
 
 ```sh
-(host)$ fx set core.x64 --with-base //src/developer/forensics:userdebug_configs
+(host)$ fx set core.x64 --with-base
+//src/developer/forensics:userdebug_configs_for_eng
 ```
+
+Note, the above config only works for eng builds and product assembly will fail
+it used on user/userdebug builds.
 
 Then, after running each one of the helper programs (see commands in sections
 below), you should then look each time for the following line in the syslog:
