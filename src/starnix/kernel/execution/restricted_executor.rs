@@ -406,6 +406,12 @@ where
     unsafe {
         thrd_set_zx_process(old_process_handle);
     };
+
+    // Now that the task has a thread handle, update the thread's role using the policy configured.
+    drop(task_thread_guard);
+    if let Err(err) = task.sync_scheduler_policy_to_role() {
+        log_warn!(?err, "Couldn't update freshly spawned thread's profile.");
+    }
 }
 
 fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {

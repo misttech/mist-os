@@ -5,13 +5,14 @@
 use crate::{
     fs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
     lock_ordering::MmDumpable,
-    logging::{log_warn, set_zx_name},
+    logging::{log_debug, log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{SignalInfo, SignalState},
     task::{
-        AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, Kernel,
-        ProcessEntryRef, PtraceState, PtraceStatus, SchedulerPolicy, SeccompFilterContainer,
-        SeccompState, SeccompStateValue, ThreadGroup, UtsNamespaceHandle, Waiter,
+        set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
+        Kernel, ProcessEntryRef, PtraceState, PtraceStatus, SchedulerPolicy,
+        SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, UtsNamespaceHandle,
+        Waiter,
     },
 };
 use bitflags::bitflags;
@@ -800,6 +801,49 @@ impl Task {
 
     pub fn fs(&self) -> &Arc<FsContext> {
         &self.fs
+    }
+
+    /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
+    pub fn set_scheduler_policy(&self, policy: SchedulerPolicy) -> Result<(), Errno> {
+        self.update_sched_policy_then_role(|sched_policy| *sched_policy = policy)
+    }
+
+    /// Update the nice value of the scheduler policy and update the task's thread's role.
+    pub fn update_scheduler_nice(&self, raw_priority: u8) -> Result<(), Errno> {
+        self.update_sched_policy_then_role(|sched_policy| sched_policy.set_raw_nice(raw_priority))
+    }
+
+    /// Update the task's thread's role based on its current scheduler policy without making any
+    /// changes to the policy.
+    ///
+    /// This should be called on tasks that have newly created threads, e.g. after cloning.
+    pub fn sync_scheduler_policy_to_role(&self) -> Result<(), Errno> {
+        self.update_sched_policy_then_role(|_| {})
+    }
+
+    fn update_sched_policy_then_role(
+        &self,
+        updater: impl FnOnce(&mut SchedulerPolicy),
+    ) -> Result<(), Errno> {
+        profile_duration!("UpdateTaskThreadRole");
+        let new_scheduler_policy = {
+            // Hold the task state lock as briefly as possible, it's not needed to update the role.
+            let mut state = self.write();
+            updater(&mut state.scheduler_policy);
+            state.scheduler_policy
+        };
+
+        let Some(profile_provider) = &self.thread_group.kernel.profile_provider else {
+            log_debug!("thread role update requested in kernel without ProfileProvider, skipping");
+            return Ok(());
+        };
+        let thread = self.thread.read();
+        let Some(thread) = thread.as_ref() else {
+            log_debug!("thread role update requested for task without thread, skipping");
+            return Ok(());
+        };
+        set_thread_role(profile_provider, thread, new_scheduler_policy)?;
+        Ok(())
     }
 
     // See "Ptrace access mode checking" in https://man7.org/linux/man-pages/man2/ptrace.2.html

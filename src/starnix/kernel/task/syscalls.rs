@@ -723,8 +723,7 @@ pub fn sys_sched_setscheduler(
 
     let param: sched_param = current_task.read_object(param.into())?;
     let policy = SchedulerPolicy::from_raw(policy, param, rlimit)?;
-    // TODO(https://fxbug.dev/123174) make zircon aware of this update
-    target_task.write().scheduler_policy = policy;
+    target_task.set_scheduler_policy(policy)?;
 
     Ok(())
 }
@@ -1469,10 +1468,7 @@ pub fn sys_setpriority(
     // be lying anymore by the time you read this.)
     let priority = 20 - priority;
     let max_priority = std::cmp::min(40, target_task.thread_group.get_rlimit(Resource::NICE));
-    target_task
-        .write()
-        .scheduler_policy
-        .set_raw_priority(priority.clamp(1, max_priority as i32) as u8);
+    target_task.update_scheduler_nice(priority.clamp(1, max_priority as i32) as u8)?;
     Ok(())
 }
 

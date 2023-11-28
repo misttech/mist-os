@@ -13,7 +13,7 @@ use crate::{
         WhatToMount,
     },
     logging::{log_error, log_info, log_warn},
-    task::{CurrentTask, ExitStatus, Kernel},
+    task::{set_thread_role, CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
 };
 use anyhow::{anyhow, bail, Error};
@@ -26,14 +26,14 @@ use fidl_fuchsia_component as fcomponent;
 use fidl_fuchsia_component_runner as frunner;
 use fidl_fuchsia_element as felement;
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_scheduler::ProfileProviderMarker;
 use fidl_fuchsia_starnix_container as fstarcontainer;
 use fuchsia_async as fasync;
 use fuchsia_async::DurationExt;
-use fuchsia_component::server::ServiceFs;
+use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
 use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
-use fuchsia_zircon as zx;
-use fuchsia_zircon::Task as _;
+use fuchsia_zircon::{self as zx, Task as _};
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
@@ -323,10 +323,29 @@ async fn create_container(
         }
     }
 
+    // Check whether we actually have access to a profile provider by trying to set our own
+    // thread's role.
+    let profile_provider = connect_to_protocol_sync::<ProfileProviderMarker>().unwrap();
+    let profile_provider = if let Err(e) =
+        set_thread_role(&profile_provider, &*fuchsia_runtime::thread_self(), Default::default())
+    {
+        log_warn!("Setting thread role failed ({e:?}), will not set thread priority.");
+        None
+    } else {
+        log_info!("Thread role set successfully.");
+        Some(profile_provider)
+    };
+
     let node = inspect::component::inspector().root().create_child("container");
-    let kernel =
-        Kernel::new(kernel_cmdline, features, svc_dir, data_dir, node.create_child("kernel"))
-            .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
+    let kernel = Kernel::new(
+        kernel_cmdline,
+        features,
+        svc_dir,
+        data_dir,
+        profile_provider,
+        node.create_child("kernel"),
+    )
+    .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context =
         create_fs_context(&kernel, config, &pkg_dir_proxy).source_context("creating FsContext")?;
     let init_pid = kernel.pids.write().allocate_pid();

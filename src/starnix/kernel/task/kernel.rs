@@ -32,6 +32,7 @@ use fidl::{
     AsHandleRef,
 };
 use fidl_fuchsia_io as fio;
+use fidl_fuchsia_scheduler::ProfileProviderSynchronousProxy;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
@@ -203,6 +204,9 @@ pub struct Kernel {
     // execute some code when released and requires a known context (both in term of lock context,
     // as well as `CurrentTask`).
     pub delayed_releaser: DelayedReleaser,
+
+    /// Proxy to the scheduler profile provider for adjusting task priorities.
+    pub profile_provider: Option<ProfileProviderSynchronousProxy>,
 }
 
 /// An implementation of [`InterfacesHandler`].
@@ -258,6 +262,7 @@ impl Kernel {
         features: Features,
         container_svc: Option<fio::DirectoryProxy>,
         container_data_dir: Option<fio::DirectorySynchronousProxy>,
+        profile_provider: Option<ProfileProviderSynchronousProxy>,
         inspect_node: fuchsia_inspect::Node,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker = Box::new(|x: Vec<u8>| -> SocketAddress { SocketAddress::Unix(x) });
@@ -323,6 +328,7 @@ impl Kernel {
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
             delayed_releaser: Default::default(),
+            profile_provider,
         });
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle

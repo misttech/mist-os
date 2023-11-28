@@ -22,4 +22,17 @@
         startup_file_path: "",
         kernel_cmdline: "test",
     },
+    capabilities: [
+        {
+            directory: "fs_root",
+            rights: [ "r*" ],
+            path: "/fs_root",
+        },
+    ],
+    expose: [
+        {
+            directory: "fs_root",
+            from: "self",
+        },
+    ],
 }

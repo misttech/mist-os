@@ -17,6 +17,7 @@ group("tests") {
     "diagnostics:tests",
     "gvisor:tests",
     "reboot:tests",
+    "scheduler:tests",
     "syscalls:tests",
     "vdso:tests",
   ]

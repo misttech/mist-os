@@ -1847,6 +1847,7 @@ assembly_input_bundle("starnix_support") {
       ]
     },
   ]
+  bootfs_files_labels = [ "//src/starnix/config:bootfs" ]
 }
 
 # This AIB enables testing support, and is meant to be used with either the

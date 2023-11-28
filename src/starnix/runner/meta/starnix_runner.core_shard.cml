@@ -59,6 +59,7 @@
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.Stats",
                 "fuchsia.kernel.VmexResource",
+                "fuchsia.scheduler.ProfileProvider",
                 "fuchsia.sysinfo.SysInfo",
             ],
             from: "parent",

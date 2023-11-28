@@ -91,6 +91,7 @@ rustc_binary("starnix_kernel_bin") {
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.starnix.binder:fuchsia.starnix.binder_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
