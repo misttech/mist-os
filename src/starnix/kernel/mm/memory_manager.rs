@@ -1847,6 +1847,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 impl MemoryAccessor for MemoryManager {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
+            profile_duration!("UsercopyRead");
             let (_read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if unread_bytes.is_empty() {
                 Ok(())
@@ -1872,6 +1873,7 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
+            profile_duration!("UsercopyReadPartialUntilNull");
             let (read_bytes, unread_bytes) = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
@@ -1892,6 +1894,7 @@ impl MemoryAccessor for MemoryManager {
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
+            profile_duration!("UsercopyReadPartial");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
@@ -1913,6 +1916,7 @@ impl MemoryAccessor for MemoryManager {
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
+            profile_duration!("UsercopyWrite");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
             if num_copied != bytes.len() {
                 error!(EFAULT)
@@ -1930,6 +1934,7 @@ impl MemoryAccessor for MemoryManager {
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
+            profile_duration!("UsercopyWritePartial");
             let num_copied = usercopy.copyout(bytes, addr.ptr());
             if num_copied == 0 && !bytes.is_empty() {
                 error!(EFAULT)
