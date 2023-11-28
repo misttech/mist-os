@@ -20,6 +20,26 @@
             url: "fuchsia-pkg://fuchsia.com/bt-fastpair-provider#meta/bt-fastpair-provider.cm",
         },
     ],
+    collections: [
+        {
+            name: "bt-host-collection",
+            durability: "single_run",
+        },
+    ],
+    use: [
+        {
+            directory: "dev-bt-hci",
+            rights: [ "r*" ],
+            path: "/dev/class/bt-hci",
+        },
+    ],
+    offer: [
+        {
+            directory: "dev-bt-hci",
+            from: "parent",
+            to: [ "#bt-host-collection" ],
+        },
+    ],
     expose: [
         // This protocol is only exposed in testonly builds (see `bt-init-testonly`).
         // Here, it's exposed from void to prevent access from the sshd shell.

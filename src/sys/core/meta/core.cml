@@ -500,12 +500,21 @@
             to: "#vulkan_loader",
             subdir: "goldfish-sync",
         },
+
+        // TODO(fxbug.dev/135645): Remove bt-host driver code
         {
             directory: "dev-class",
             from: "parent",
             as: "dev-bt-host",
             to: "#bluetooth-core",
             subdir: "bt-host",
+        },
+        {
+            directory: "dev-class",
+            from: "parent",
+            as: "dev-bt-hci",
+            to: "#bluetooth-core",
+            subdir: "bt-hci",
         },
         {
             directory: "dev-class",

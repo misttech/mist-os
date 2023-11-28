@@ -23,7 +23,7 @@ group("bluetooth") {
 group("drivers") {
   testonly = true
   deps = [
-    "core/bt-host:driver",
+    "core/bt-host:driver",  # TODO(fxbug.dev/135645): Remove bt-host driver code
     "hci/passthrough:driver",
     "hci/transport/uart:bt-transport-uart",
     "hci/transport/usb:bt-transport-usb",

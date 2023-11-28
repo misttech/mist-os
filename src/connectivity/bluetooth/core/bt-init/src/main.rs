@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{Context as _, Error};
+use anyhow::{format_err, Context as _, Error};
 use async_trait::async_trait;
 use bt_init_config::Config;
 use fdio;
@@ -10,15 +10,28 @@ use fidl::endpoints::{DiscoverableProtocolMarker, Proxy};
 use fidl_fuchsia_bluetooth_bredr::ProfileMarker;
 use fidl_fuchsia_bluetooth_snoop::SnoopMarker;
 use fidl_fuchsia_bluetooth_sys::PairingMarker;
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
+use fidl_fuchsia_component_decl::{
+    Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, StartupMode,
+};
 use fidl_fuchsia_io as fio;
 use fuchsia_async as fasync;
+use fuchsia_bluetooth::constants::{DEV_DIR, HCI_DEVICE_DIR};
 use fuchsia_component::{client, server};
-use futures::{future, StreamExt};
+use futures::{future, StreamExt, TryStreamExt};
 use tracing::{error, info, warn};
 
 const BT_GAP_CHILD_NAME: &str = "bt-gap";
 const BT_RFCOMM_CHILD_NAME: &str = "bt-rfcomm";
 const BT_FASTPAIR_PROVIDER_CHILD_NAME: &str = "bt-fastpair-provider";
+
+const BT_HOST_COLLECTION: &str = "bt-host-collection";
+const BT_HOST: &str = "bt-host";
+// TODO(fxbug.dev/135650): Eventually change to fuchsia-pkg://fuchsia.com/bt-host#meta/bt-host.cm
+const BT_HOST_URL: &str = "fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm";
+
+// TODO(fxbug.dev/135650): Remove flag once bt-host is successfully migrated to component
+const IS_BT_HOST_COMPONENT: bool = false;
 
 #[async_trait]
 trait ComponentClientAdapter {
@@ -68,9 +81,101 @@ async fn open_childs_service_directory<C: ComponentClientAdapter>(
     }
 }
 
+/// Sanitize |filename| so first character is either ASCII or '_' character
+/// and ensure |filename| only contains ASCII, '_', '-', or '.' characters
+fn sanitize_filename(filename: String) -> String {
+    let mut res: String = String::new();
+    let mut first_char = true;
+
+    for char in filename.chars() {
+        if first_char {
+            if char.is_ascii_alphanumeric() || char == '_' {
+                first_char = false;
+                res.push(char);
+            }
+        } else {
+            if char.is_ascii_alphanumeric() || char == '_' || char == '-' || char == '.' {
+                res.push(char);
+            }
+        }
+    }
+    res
+}
+
+// Use the fuchsia.component.Realm protocol to create a dynamic child instance in the collection.
+async fn create_bthost_component(realm: &RealmProxy, filename: String) -> Result<(), Error> {
+    let sanitized_filename = sanitize_filename(filename);
+    let component_name = format!("{BT_HOST}_{sanitized_filename}");
+    let device_path = format!("{DEV_DIR}/{HCI_DEVICE_DIR}/{sanitized_filename}");
+    let collection_ref = CollectionRef { name: BT_HOST_COLLECTION.to_owned() };
+
+    info!("Creating component with device_path: {:?}", device_path,);
+
+    // TODO(b/308664865): Structured config launches dynamic child component with InstanceCannotResolve error. See bug description for temporary hack.
+    let child_decl = Child {
+        name: Some(component_name),
+        url: Some(BT_HOST_URL.to_owned()),
+        startup: Some(StartupMode::Lazy),
+        config_overrides: Some(vec![ConfigOverride {
+            key: Some("device_path".to_string()),
+            value: Some(ConfigValue::Single(ConfigSingleValue::String(device_path.to_string()))),
+            ..ConfigOverride::default()
+        }]),
+        ..Default::default()
+    };
+    realm
+        .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
+        .await?
+        .map_err(|e| format_err!("{e:?}"))?;
+    Ok(())
+}
+
+/// Continuously watch the file system for bt vendor devices being added or removed
+async fn run_device_watcher() -> Result<(), Error> {
+    let dir = format!("{}/{}", DEV_DIR, HCI_DEVICE_DIR);
+    let directory = fuchsia_fs::directory::open_in_namespace(&dir, fuchsia_fs::OpenFlags::empty())?;
+    let watcher = fuchsia_fs::directory::Watcher::new(&directory).await?;
+
+    let realm = client::connect_to_protocol::<RealmMarker>()
+        .expect("failed to connect to fuchsia.component.Realm");
+    let realm_ref = &realm;
+
+    watcher
+        .map(|result| result.context("failed to watch vendor device drivers"))
+        .try_for_each(|fuchsia_fs::directory::WatchMessage { event, filename }| async move {
+            info!(
+                "Watching {DEV_DIR}/{HCI_DEVICE_DIR}. Event: {:?}; Filename: {:?}",
+                event,
+                filename.to_str().unwrap()
+            );
+            use fuchsia_fs::directory::WatchEvent;
+            match event {
+                WatchEvent::EXISTING | WatchEvent::ADD_FILE => {
+                    if filename != std::path::Path::new(".") && filename != std::path::Path::new("")
+                    {
+                        let path = filename.to_str().expect("utf-8 path");
+                        create_bthost_component(realm_ref, path.to_owned()).await?;
+                    }
+                }
+                WatchEvent::REMOVE_FILE => {
+                    info!(
+                        "Removed vendor device driver with filename: {:?}",
+                        filename.to_str().unwrap()
+                    );
+                }
+                WatchEvent::IDLE => {}
+                e => {
+                    warn!("Unrecognized vendor device driver watch event: {e:?}");
+                }
+            }
+            Ok(())
+        })
+        .await
+}
+
 #[fuchsia::main(logging_tags = ["bt-init"])]
 fn main() -> Result<(), Error> {
-    info!("starting bt-init...");
+    info!("Starting bt-init...");
 
     let mut executor = fasync::LocalExecutor::new();
     let cfg = Config::take_from_startup_handle();
@@ -86,6 +191,19 @@ fn main() -> Result<(), Error> {
             info!("snoop service started successfully");
         }
     }
+
+    let mut device_watcher_task: Option<fuchsia_async::Task<()>> = None;
+    if IS_BT_HOST_COMPONENT {
+        // Watch for vendor device drivers and spawn bt-host component if any are found
+        let task = fuchsia_async::Task::spawn(async move {
+            run_device_watcher().await.unwrap_or_else(|e| error!("Error watching devices: {:?}", e))
+        });
+        device_watcher_task = Some(task);
+    };
+    info!(
+        "Device watcher task was{} spawned",
+        if device_watcher_task.is_some() { "" } else { "not" }
+    );
 
     let run_bluetooth = async move {
         // Get the backing service directory of the `bt-rfcomm` and `bt-fastpair-provider` child

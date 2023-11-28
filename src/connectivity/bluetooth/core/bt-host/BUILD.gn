@@ -62,6 +62,13 @@ fuchsia_structured_config_cpp_elf_lib("bt_host_config") {
   cm_label = ":manifest"
 }
 
+fuchsia_structured_config_values("default_config_values") {
+  cm_label = ":manifest"
+  values = {
+    device_path = "/dev/class/bt-hci/000"
+  }
+}
+
 fuchsia_component("component") {
   cm_label = ":manifest"
   deps = [ ":bin" ]
@@ -72,6 +79,7 @@ fuchsia_package("bt-host-component") {
   deps = [
     # component-url: fuchsia-pkg://fuchsia.com/bt-host-component#meta/bt-host.cm
     ":component",
+    ":default_config_values",
   ]
 }
 

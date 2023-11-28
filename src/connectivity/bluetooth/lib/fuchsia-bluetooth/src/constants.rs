@@ -5,7 +5,7 @@ use fuchsia_zircon::Duration;
 
 pub const DEV_DIR: &str = "/dev";
 pub const HOST_DEVICE_DIR: &str = "class/bt-host";
-pub const HOST_DRIVER_PATH: &str = "/system/driver/bt-host.so";
+pub const HCI_DEVICE_DIR: &str = "class/bt-hci";
 
 // Use a timeout of 4 minutes on integration tests.
 //
