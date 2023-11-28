@@ -23,13 +23,15 @@ rustc_library("lib") {
 
   sources = [ "src/lib.rs" ]
 
-  deps = [ "//third_party/rust_crates:static_assertions" ]
+  deps = [
+    "//third_party/rust_crates:once_cell",
+    "//third_party/rust_crates:static_assertions",
+  ]
 
   test_deps = [ "//src/lib/fuchsia" ]
 
   if (target_cpu == "x64") {
     sources += [ "src/x86_64.rs" ]
-    deps += [ "//third_party/rust_crates:once_cell" ]
   } else if (target_cpu == "arm64") {
     sources += [ "src/aarch64.rs" ]
   } else if (target_cpu == "riscv64") {

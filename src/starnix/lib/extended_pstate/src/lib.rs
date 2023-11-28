@@ -5,6 +5,11 @@
 #[cfg(target_arch = "x86_64")]
 pub mod x86_64;
 
+#[cfg(not(target_arch = "x86_64"))]
+// Rustdoc struggles in our build with conditional dependencies. Allow this to be unconditionally
+// specified in BUILD.gn without triggering unused dep warnings on other architectures.
+use once_cell as _;
+
 #[cfg(target_arch = "aarch64")]
 mod aarch64;
 
