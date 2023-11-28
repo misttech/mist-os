@@ -95,14 +95,40 @@ async fn handle_command(
             address,
             interface_id,
         }) => (
-            controller.join_multicast_group(&address.into(), interface_id).await,
+            {
+                let now = std::time::Instant::now();
+                println!(
+                    "starting join_multicast_group op at {now:?}: {address:?} {interface_id:?}"
+                );
+                let result = controller.join_multicast_group(&address.into(), interface_id).await;
+
+                let elapsed = std::time::Instant::now() - now;
+                println!(
+                    "finishing join_multicast_group op from {now:?}: \
+                     {address:?} {interface_id:?}: {result:?} (after {elapsed:?})"
+                );
+                result
+            },
             "join_multicast_group",
         ),
         ntr_args::Subcommand::LeaveMulticastGroup(ntr_args::LeaveMulticastGroup {
             address,
             interface_id,
         }) => (
-            controller.leave_multicast_group(&address.into(), interface_id).await,
+            {
+                let now = std::time::Instant::now();
+                println!(
+                    "starting leave_multicast_group op at {now:?}: {address:?} {interface_id:?}"
+                );
+                let result = controller.leave_multicast_group(&address.into(), interface_id).await;
+
+                let elapsed = std::time::Instant::now() - now;
+                println!(
+                    "finishing leave_multicast_group op from {now:?}: \
+                    {address:?} {interface_id:?}: {result:?} (after {elapsed:?})"
+                );
+                result
+            },
             "leave_multicast_group",
         ),
         ntr_args::Subcommand::Ping(ntr_args::Ping {
