@@ -47,16 +47,26 @@ class VdsoProcTest : public ::testing::Test {
     // mapping size in /proc/self/maps. The latter is easier.
     std::string maps;
     ASSERT_TRUE(files::ReadFileToString("/proc/self/maps", &maps));
-    auto vdso_mapping =
-        test_helper::find_memory_mapping(reinterpret_cast<uintptr_t>(vdso_base_), maps);
+    auto vdso_mapping = test_helper::find_memory_mapping(
+        [](const test_helper::MemoryMapping& mapping) { return mapping.pathname == "[vdso]"; },
+        maps);
     ASSERT_NE(vdso_mapping, std::nullopt);
-    ASSERT_EQ(vdso_mapping->pathname, "[vdso]");
-
+    ASSERT_EQ(vdso_mapping->start, reinterpret_cast<uintptr_t>(vdso_base_));
     vdso_size_ = static_cast<size_t>(vdso_mapping->end - vdso_mapping->start);
+
+    auto vvar_mapping = test_helper::find_memory_mapping(
+        [](const test_helper::MemoryMapping& mapping) { return mapping.pathname == "[vvar]"; },
+        maps);
+    ASSERT_NE(vvar_mapping, std::nullopt);
+    vvar_base_ = reinterpret_cast<void*>(vvar_mapping->start);
+    vvar_size_ = static_cast<size_t>(vvar_mapping->end - vvar_mapping->start);
   }
 
   void* vdso_base_;
   size_t vdso_size_;
+
+  void* vvar_base_;
+  size_t vvar_size_;
 };
 }  // namespace
 
@@ -364,12 +374,42 @@ TEST_F(VdsoProcTest, VdsoModificationsBeforeForkingDontAffectOtherPrograms) {
   }
 }
 
-TEST(VdsoDeathTest, VvarCantWrite) {
+TEST_F(VdsoProcTest, VvarCantWriteDeathTest) {
   if (!test_helper::IsStarnix()) {
     GTEST_SKIP() << "We cannot assume that this test works on Linux in CQ";
   }
-  uint8_t* vdso_base = reinterpret_cast<uint8_t*>(getauxval(AT_SYSINFO_EHDR));
-  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
-  uint8_t* base_of_vvar = vdso_base - page_size;
-  ASSERT_DEATH({ *(base_of_vvar + 2) = 3; }, "");
+
+  volatile uint8_t* vvar_addr = reinterpret_cast<volatile uint8_t*>(vvar_base_);
+  ASSERT_DEATH({ vvar_addr[0] = 3; }, "");
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    // Try writing from a system call.
+    EXPECT_FALSE(test_helper::TryWrite(reinterpret_cast<uintptr_t>(vvar_base_)));
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(VdsoProcTest, VvarCannotBeMadeWritable) {
+  EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_WRITE), -1);
+  EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC), -1);
+  EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC | PROT_WRITE), -1);
+}
+
+TEST_F(VdsoProcTest, VvarCanBeUnmapped) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    EXPECT_EQ(munmap(vvar_base_, vvar_size_), 0);
+    _exit(0);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(VdsoProcTest, VvarCanBeMadeNonReadable) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_NONE), 0);
+    _exit(0);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
