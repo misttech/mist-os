@@ -56,10 +56,12 @@ impl WlanPolicyFacade {
         })
     }
 
-    /// Client controller needs to be created once per server before the client controller API
-    /// can be used. This will drop the existing client controller and attempt to get a new
-    /// controller even if the facade already has one, since errors in getting a client controller
-    /// may only happen after using the client controller.
+    /// Create a client controller and listen for client state updates. If the facade already has
+    /// a client controller, recreate it and start listening for client state updates again.
+    /// See [`WlanPolicyFacade::get_update()`] for details about listening for updates.
+    ///
+    /// A client controller is necessary to access the fuchsia.wlan.policy.ClientController API.
+    /// Only one caller can have the control channel open at a time.
     pub async fn create_client_controller(&self) -> Result<(), Error> {
         let tag = "WlanPolicyFacade::create_client_controller";
         let mut controller_guard = self.controller.write();
@@ -71,14 +73,8 @@ impl WlanPolicyFacade {
             format_err!("Error getting client controller: {}", e)
         })?;
         controller_guard.inner = Some(controller);
+        self.update_listener.set(Some(update_stream));
 
-        // Do not set value if it has already been set by getting updates or a previous call.
-        let update_listener = self.update_listener.take();
-        if update_listener.is_none() {
-            self.update_listener.set(Some(update_stream));
-        } else {
-            self.update_listener.set(update_listener);
-        }
         Ok(())
     }
 
