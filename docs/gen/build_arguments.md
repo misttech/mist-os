@@ -2571,6 +2571,14 @@ From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:194
 
 From //third_party/pigweed/src/pw_build/generated_pigweed_modules_lists.gni:195
 
+### disable_elf_checks
+
+Disables ELF checks for packages.
+
+**Current value (from the default):** `false`
+
+From //build/dist/verify_manifest_elf_binaries.gni:10
+
 ### disable_kernel_pci
 
 Disable kernel PCI driver support. A counterpart of the the build
