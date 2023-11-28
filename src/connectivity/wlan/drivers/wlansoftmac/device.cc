@@ -217,7 +217,7 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
   static constexpr bool has_value_type<T, std::void_t<typename T::value_type>> = true;
 
   template <typename FidlMethod>
-  static fidl::WireResultUnwrapType<FidlMethod> LogAndFoldResult(
+  static fidl::WireResultUnwrapType<FidlMethod> FlattenAndLogError(
       const std::string& method_name, fdf::WireUnownedResult<FidlMethod> result) {
     if (!result.ok()) {
       lerror("%s failed (FIDL error %s)", method_name.c_str(), result.status_string());
@@ -249,17 +249,8 @@ class WlanSoftmacBridgeImpl : public fidl::WireServer<fuchsia_wlan_softmac::Wlan
       return;
     }
 
-    auto result = LogAndFoldResult(method_name, dispatcher(*std::move(arena), client_));
-
-    if (result.is_error()) {
-      completer.ReplyError(result.error_value());
-      return;
-    }
-    if constexpr (has_value_type<fidl::WireResultUnwrapType<FidlMethod>>) {
-      completer.ReplySuccess(*std::move(result.value()));
-    } else {
-      completer.ReplySuccess();
-    }
+    auto result = FlattenAndLogError(method_name, dispatcher(*std::move(arena), client_));
+    completer.Reply(std::move(result));
   }
 
   fdf::WireSharedClient<fuchsia_wlan_softmac::WlanSoftmac> client_;
