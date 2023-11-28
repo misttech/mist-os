@@ -23,6 +23,7 @@ pub mod iface_manager_api;
 mod iface_manager_types;
 pub mod low_power_manager;
 pub mod phy_manager;
+pub mod recovery;
 
 pub fn create_iface_manager(
     phy_manager: Arc<Mutex<dyn phy_manager::PhyManagerApi + Send>>,

@@ -112,6 +112,7 @@ rustc_library("lib") {
     "src/mode_management/low_power_manager.rs",
     "src/mode_management/mod.rs",
     "src/mode_management/phy_manager.rs",
+    "src/mode_management/recovery.rs",
     "src/regulatory_manager.rs",
     "src/telemetry/convert.rs",
     "src/telemetry/experiment.rs",
