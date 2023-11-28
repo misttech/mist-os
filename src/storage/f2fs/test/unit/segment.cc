@@ -84,7 +84,7 @@ TEST_F(SegmentManagerTest, DirtyToFree) {
     ASSERT_TRUE(free_i->free_segmap.GetOne(pre));
   }
   // triggers checkpoint to make prefree segments transit to free ones
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   // check the bitmaps and the number of free/prefree segments
   for (auto &pre : prefree_array) {
@@ -465,7 +465,7 @@ TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
 
   ASSERT_EQ(fs->LoadSuper(std::move(*superblock)), ZX_OK);
 
-  fs->WriteCheckpoint(false, true);
+  fs->Sync();
 
   // fault injection
   fs->GetSegmentManager().SetDirtySegmentInfo(nullptr);
@@ -531,7 +531,7 @@ TEST(SegmentManagerOptionTest, ModeLfs) {
   // Test ClearPrefreeSegments()
   fs->GetSuperblockInfo().SetOpt(MountOption::kForceLfs);
   FileTester::DeleteChild(root_dir.get(), "alpha", false);
-  fs->WriteCheckpoint(false, false);
+  fs->SyncFs();
 
   EXPECT_EQ(root_dir->Close(), ZX_OK);
   root_dir = nullptr;

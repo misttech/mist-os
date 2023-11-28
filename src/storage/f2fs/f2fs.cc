@@ -196,7 +196,6 @@ void F2fs::PutSuper() {
   // StopGcThread(superblock_info_.get());
 #endif
 
-  WriteCheckpoint(false, true);
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     // In the checkpoint error case, flush the dirty vnode list.
     GetVCache().ForDirtyVnodesIf([&](fbl::RefPtr<VnodeF2fs>& vnode) {
@@ -250,7 +249,7 @@ void F2fs::ScheduleWriteback(size_t num_pages) {
   }
 }
 
-void F2fs::SyncFs(bool bShutdown) {
+zx_status_t F2fs::SyncFs(bool bShutdown) {
   // TODO:: Consider !superblock_info_.IsDirty()
   if (bShutdown) {
     FX_LOGS(INFO) << "prepare for shutdown";
@@ -262,32 +261,36 @@ void F2fs::SyncFs(bool bShutdown) {
     memory_pressure_watcher_.reset();
 
     // Flush every dirty Pages.
-    while (superblock_info_->GetPageCount(CountType::kDirtyData)) {
+    size_t target_vnodes = 0;
+    do {
       // If necessary, do gc.
       if (segment_manager_->HasNotEnoughFreeSecs()) {
-        if (auto ret = gc_manager_->F2fsGc(); ret.is_error()) {
+        if (auto ret = gc_manager_->Run(); ret.is_error()) {
           // If CpFlag::kCpErrorFlag is set, it cannot be synchronized to disk. So we will drop all
           // dirty pages.
           if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
-            break;
+            return ZX_ERR_INTERNAL;
           }
-          // F2fsGc() returns ZX_ERR_UNAVAILABLE when there is no available victim section,
+          // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section,
           // otherwise BUG
           ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
         }
       }
+      target_vnodes = 0;
       WritebackOperation op = {.to_write = kDefaultBlocksPerSegment};
-      op.if_vnode = [](fbl::RefPtr<VnodeF2fs>& vnode) {
-        if (!vnode->IsDir()) {
+      op.if_vnode = [&target_vnodes](fbl::RefPtr<VnodeF2fs>& vnode) {
+        if ((!vnode->IsDir() && vnode->GetDirtyPageCount()) || !vnode->IsValid()) {
+          ++target_vnodes;
           return ZX_OK;
         }
         return ZX_ERR_NEXT;
       };
+      fs::SharedLock lock(f2fs::GetGlobalLock());
       FlushDirtyDataPages(op);
-    }
-  } else {
-    WriteCheckpoint(false, false);
+    } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
   }
+  std::lock_guard lock(f2fs::GetGlobalLock());
+  return WriteCheckpoint(false, bShutdown);
 }
 
 #if 0  // porting needed

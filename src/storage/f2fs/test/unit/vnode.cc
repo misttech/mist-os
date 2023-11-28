@@ -19,38 +19,36 @@ using VnodeTest = F2fsFakeDevTestFixture;
 template <typename T>
 void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T fault_injection,
                               zx_status_t expected_status) {
+  // Create a child
   FileTester::CreateChild(&root_dir, S_IFDIR, name);
-  fbl::RefPtr<fs::Vnode> dir_raw_vnode;
-  FileTester::Lookup(&root_dir, name, &dir_raw_vnode);
-  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(dir_raw_vnode));
+  // Log updates on disk
+  fs.SyncFs();
+
+  // Check if the child is okay
+  fbl::RefPtr<fs::Vnode> vnode;
+  FileTester::Lookup(&root_dir, name, &vnode);
+  fbl::RefPtr<VnodeF2fs> test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(vnode));
   nid_t nid = test_vnode->GetKey();
-  ASSERT_EQ(test_vnode->Close(), ZX_OK);
-  test_vnode = nullptr;
+  ASSERT_FALSE(test_vnode->IsDirty());
+  ASSERT_EQ(name, test_vnode->GetNameView());
 
-  ASSERT_EQ(VnodeF2fs::Vget(&fs, nid, &test_vnode), ZX_OK);
-  ASSERT_EQ(
-      test_vnode->Open(test_vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
-      ZX_OK);
-  ASSERT_EQ(test_vnode->Close(), ZX_OK);
-
-  // fault injection
+  // fault injection on the inode page after evicting the child from vnode cache
+  ASSERT_EQ(fs.EvictVnode(test_vnode.get()), ZX_OK);
+  test_vnode->Close();
+  test_vnode.reset();
   {
     LockedPage node_page;
     ASSERT_EQ(fs.GetNodeManager().GetNodePage(nid, &node_page), ZX_OK);
     Node *node = node_page->GetAddress<Node>();
-
     fault_injection(node);
-
     node_page.SetDirty();
   }
 
-  ASSERT_TRUE(test_vnode->ClearDirty());
-  fs.EvictVnode(test_vnode.get());
-
-  // test vget
+  // Create the child from the faulty node page
   ASSERT_EQ(VnodeF2fs::Vget(&fs, nid, &test_vnode), expected_status);
-
-  test_vnode = nullptr;
+  if (expected_status == ZX_OK) {
+    test_vnode->Close();
+  }
 }
 
 TEST_F(VnodeTest, Time) {
@@ -154,8 +152,6 @@ TEST_F(VnodeTest, Mode) {
 
 TEST_F(VnodeTest, WriteInode) {
   fbl::RefPtr<VnodeF2fs> test_vnode;
-  NodeManager &node_manager = fs_->GetNodeManager();
-
   // 1. Check node ino exception
   ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &test_vnode),
             ZX_ERR_NOT_FOUND);
@@ -165,24 +161,10 @@ TEST_F(VnodeTest, WriteInode) {
   fbl::RefPtr<fs::Vnode> dir_raw_vnode;
   FileTester::Lookup(root_dir_.get(), "write_inode_dir", &dir_raw_vnode);
   test_vnode = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(dir_raw_vnode));
-  nid_t nid = test_vnode->GetKey();
 
-  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_OK);
-
-  block_t temp_block_address;
-  MapTester::GetCachedNatEntryBlockAddress(node_manager, nid, temp_block_address);
-
-  // Enable fault injection to dnode(vnode)
-  MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, kNullAddr);
-  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_ERR_NOT_FOUND);
-
-  // Disable fault injection
-  MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, temp_block_address);
-  ASSERT_EQ(test_vnode->UpdateInodePage(), ZX_OK);
-
-  // 3. Is clean inode
+  // 3. Write inode
   ASSERT_TRUE(test_vnode->IsDirty());
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   ASSERT_FALSE(test_vnode->IsDirty());
 
   ASSERT_EQ(test_vnode->Close(), ZX_OK);
@@ -207,8 +189,6 @@ TEST_F(VnodeTest, VgetExceptionCase) {
   // 3. Check Vget() GetNlink() exception
   auto nlink_fault_inject = [](Node *node) { node->i.i_links = 0; };
   VgetFaultInjetionAndTest(*fs_, *root_dir_, "nlink_dir", nlink_fault_inject, ZX_ERR_NOT_FOUND);
-
-  test_vnode = nullptr;
 }
 
 TEST_F(VnodeTest, SetAttributes) {
@@ -230,7 +210,7 @@ TEST_F(VnodeTest, SetAttributes) {
   dir_vnode = nullptr;
 }
 
-TEST_F(VnodeTest, TruncateExceptionCase) {
+TEST_F(VnodeTest, TruncateExceptionCase) TA_NO_THREAD_SAFETY_ANALYSIS {
   fbl::RefPtr<fs::Vnode> file_fs_vnode;
   std::string file_name("test_file");
   ASSERT_EQ(root_dir_->Create(file_name, S_IFREG, &file_fs_vnode), ZX_OK);
@@ -423,6 +403,7 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch a hole at start
   {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     file->TruncateHole(kStartOffset, kStartOffset + 1);
     removed_pages.insert(kStartOffset);
 
@@ -435,6 +416,7 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch a hole at end
   {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     file->TruncateHole(kEndOffset - 1, kEndOffset);
     removed_pages.insert(kEndOffset - 1);
 
@@ -447,6 +429,7 @@ TEST_F(VnodeTest, FindDataBlockAddrsAndPages) {
 
   // Punch holes at middle
   {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     constexpr uint32_t kPunchHoles = 10;
     file->TruncateHole(kMidOffset, kMidOffset + kPunchHoles);
     for (uint32_t i = 0; i < kPunchHoles; ++i) {

@@ -322,8 +322,8 @@ void SegmentManager::BalanceFs() {
   // If there is not enough memory, wait for writeback.
   fs_->WaitForAvailableMemory();
   if (HasNotEnoughFreeSecs()) {
-    if (auto ret = fs_->GetGcManager().F2fsGc(); ret.is_error()) {
-      // F2fsGc() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise
+    if (auto ret = fs_->GetGcManager().Run(); ret.is_error()) {
+      // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise
       // BUG
       ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
     }

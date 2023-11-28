@@ -371,9 +371,10 @@ class FileCache {
   // It tries to write out all dirty Pages from dirty_page_list_.
   pgoff_t WritebackFromDirtyList(const WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
 
-  // It invalidates Pages within the range of |start| to |end| in |page_tree_|.
-  std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax)
-      __TA_EXCLUDES(tree_lock_);
+  // It invalidates Pages within the range of |start| to |end| in |page_tree_|. If |zero| is set,
+  // the data of the corresponding pages are zeored.
+  std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
+                                          bool zero = true) __TA_EXCLUDES(tree_lock_);
   // It removes all Pages from |page_tree_|. It should be called when no one can get access to
   // |vnode_|. (e.g., fbl_recycle()) It assumes that all active Pages are under writeback.
   void Reset() __TA_EXCLUDES(tree_lock_);

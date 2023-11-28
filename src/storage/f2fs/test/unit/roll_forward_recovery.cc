@@ -385,7 +385,6 @@ TEST(FsyncRecoveryTest, FsyncCheckpoint) {
   ASSERT_EQ(pre_checkpoint_ver + 1, curr_checkpoint_ver);
   fsync_vnode->SetNlink(temp_nlink);
   fsync_vnode->SetDirty();
-  fsync_vnode->UpdateInodePage();
 
   ASSERT_EQ(fsync_vnode->Close(), ZX_OK);
   fsync_vnode = nullptr;
@@ -688,7 +687,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   File *inline_file_ptr = static_cast<File *>(inline_vnode.get());
   FileTester::CheckInlineFile(inline_vnode.get());
 
-  fs->WriteCheckpoint(false, false);
+  fs->SyncFs();
 
   // Write until entire inline data space is written
   size_t target_size = inline_file_ptr->MaxInlineData() - 1;

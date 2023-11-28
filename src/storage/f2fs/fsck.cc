@@ -838,8 +838,7 @@ zx_status_t FsckWorker::Verify() {
   if (is_free) {
     FX_LOGS(INFO) << str << "[OK]";
   } else {
-    FX_LOGS(INFO) << str << "[FAILED] : "
-                  << "corrupted cursegs(" << segnums << ")";
+    FX_LOGS(INFO) << str << "[FAILED] : " << "corrupted cursegs(" << segnums << ")";
     status = ZX_ERR_INTERNAL;
   }
 

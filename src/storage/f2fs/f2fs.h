@@ -105,11 +105,10 @@ class F2fs final {
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   DirEntryCache &GetDirEntryCache() { return dir_entry_cache_; }
   InspectTree &GetInspectTree() { return *inspect_tree_; }
-  void Sync(SyncCallback closure);
 
   VnodeCache &GetVCache() { return vnode_cache_; }
   zx_status_t InsertVnode(VnodeF2fs *vn) { return vnode_cache_.Add(vn); }
-  void EvictVnode(VnodeF2fs *vn) { vnode_cache_.Evict(vn); }
+  zx_status_t EvictVnode(VnodeF2fs *vn) { return vnode_cache_.Evict(vn); }
   zx_status_t LookupVnode(ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
     return vnode_cache_.Lookup(ino, out);
   }
@@ -161,9 +160,6 @@ class F2fs final {
   }
   void ResetGcManager() { gc_manager_.reset(); }
 
-  // f2fs.cc
-  void PutSuper();
-  void SyncFs(bool bShutdown = false);
   zx_status_t LoadSuper(std::unique_ptr<Superblock> sb);
   void Reset();
   zx_status_t GrabMetaPage(pgoff_t index, LockedPage *out);
@@ -172,20 +168,19 @@ class F2fs final {
   bool IsTearDown() const;
   void SetTearDown();
 
-  // checkpoint.cc
   zx_status_t CheckOrphanSpace();
-  void AddOrphanInode(VnodeF2fs *vnode);
   void PurgeOrphanInode(nid_t ino);
   int PurgeOrphanInodes();
   void WriteOrphanInodes(block_t start_blk);
   zx_status_t GetValidCheckpoint();
   zx_status_t ValidateCheckpoint(block_t cp_addr, uint64_t *version, LockedPage *out);
-  void BlockOperations();
-  void UnblockOperations();
-  zx_status_t DoCheckpoint(bool is_umount);
-  zx_status_t WriteCheckpoint(bool blocked, bool is_umount);
   uint32_t GetFreeSectionsForDirtyPages();
-  bool IsCheckpointAvailable();
+
+  void PutSuper();
+  void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx_status_t SyncFs(bool bShutdown = false) __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx_status_t DoCheckpoint(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
+  zx_status_t WriteCheckpoint(bool blocked, bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
 
   // recovery.cc
   // For the list of fsync inodes, used only during recovery
@@ -299,23 +294,16 @@ class F2fs final {
       __TA_EXCLUDES(vnode_set_mutex_);
   void ClearVnodeSet() __TA_EXCLUDES(vnode_set_mutex_);
 
-  fs::SharedMutex &GetFsLock(LockType type) { return fs_lock_[static_cast<int>(type)]; }
-  void mutex_lock_op(LockType t) __TA_ACQUIRE(&fs_lock_[static_cast<int>(t)]) {
-    fs_lock_[static_cast<int>(t)].lock();
-  }
-  void mutex_unlock_op(LockType t) __TA_RELEASE(&fs_lock_[static_cast<int>(t)]) {
-    fs_lock_[static_cast<int>(t)].unlock();
-  }
-
  private:
   void StartMemoryPressureWatcher();
 
-  // Flush all dirty meta Pages.
-  pgoff_t FlushDirtyMetaPages(bool is_commit);
-  // Flush all dirty data Pages that meet |operation|.if_vnode and if_page.
-  pgoff_t FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer = false);
+  void FlushDirsAndNodes() __TA_REQUIRES(f2fs::GetGlobalLock());
+  pgoff_t FlushDirtyMetaPages(bool is_commit) __TA_REQUIRES(f2fs::GetGlobalLock());
+  pgoff_t FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer = false)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx::result<pgoff_t> FlushDirtyNodePages(WritebackOperation &operation)
+      __TA_REQUIRES(f2fs::GetGlobalLock());
 
-  std::mutex checkpoint_mutex_;
   std::atomic_flag teardown_flag_ = ATOMIC_FLAG_INIT;
   std::atomic_flag stop_reclaim_flag_ = ATOMIC_FLAG_INIT;
   std::binary_semaphore writeback_flag_{1};
@@ -350,8 +338,6 @@ class F2fs final {
   size_t vnode_set_size_[static_cast<size_t>(VnodeSet::kMax)] __TA_GUARDED(vnode_set_mutex_) = {
       0,
   };
-
-  fs::SharedMutex fs_lock_[static_cast<int>(LockType::kNrLockType)];  // for blocking FS operations
 
   zx::event fs_id_;
   std::unique_ptr<InspectTree> inspect_tree_;

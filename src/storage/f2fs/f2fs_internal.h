@@ -61,14 +61,6 @@ enum class CountType {
   kNrCountType,
 };
 
-// The locking order between these classes is
-// LockType::FileOp -> LockType::kNodeOp
-enum class LockType {
-  kFileOp,  // for file op
-  kNodeOp,  // for node op
-  kNrLockType,
-};
-
 // The below are the page types.
 // The available types are:
 // kData         User data pages. It operates as async mode.
@@ -476,24 +468,6 @@ class SuperblockInfo {
   std::vector<std::string> extension_list_;
 
   fs::SharedMutex mutex_;  // for checkpoint data
-};
-
-// InodeInfo->flags keeping only in memory
-enum class InodeInfoFlag {
-  kInit = 0,      // indicate inode is being initialized
-  kActive,        // indicate open_count > 0
-  kNewInode,      // indicate newly allocated vnode
-  kNeedCp,        // need to do checkpoint during fsync
-  kIncLink,       // need to increment i_nlink
-  kAclMode,       // indicate acl mode
-  kNoAlloc,       // should not allocate any blocks
-  kUpdateDir,     // should update inode block for consistency
-  kInlineXattr,   // used for inline xattr
-  kInlineData,    // used for inline data
-  kInlineDentry,  // used for inline dentry
-  kDataExist,     // indicate data exists
-  kBad,           // should drop this inode without purging
-  kFlagSize,
 };
 
 #if 0  // porting needed

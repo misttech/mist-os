@@ -125,11 +125,10 @@ class NodeManager {
     return GetDataBlockAddresses(vnode, indices, read_only);
   }
 
-  // If an unassigned node page is encountered while following the node path, a new node page is
-  // assigned. Caller should acquire LockType:kFileOp.
+  // If the node at |index| doesn't exist, it creates and returns a new node.
   zx_status_t GetLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, LockedPage *out);
 
-  // Read-only mode of GetLockedDnodePage().
+  // It returns a node page if it succeeds to find one at |index|.
   zx_status_t FindLockedDnodePage(VnodeF2fs &vnode, pgoff_t index, LockedPage *out);
 
   zx::result<uint32_t> GetOfsInDnode(VnodeF2fs &vnode, pgoff_t index);
@@ -140,19 +139,11 @@ class NodeManager {
 
   void GetNodeInfo(nid_t nid, NodeInfo &out);
 
-  // It flushes all dirty node Pages that meet |operation|.if_page.
-  // It also removes dirty vnodes from the dirty list when there is no dirty Page for their vnodes
-  // and data. To ensure there is no access to the vnodes, it is called with LockType::kFileOp held
-  // during ckpt. This way guarantees that RecycleNode() for valid vnodes executes only at ckpt
-  // time.
-  pgoff_t FlushDirtyNodePages(WritebackOperation &operation);
-  pgoff_t FsyncNodePages(VnodeF2fs &vnode);
+  pgoff_t FsyncNodePages(VnodeF2fs &vnode) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   zx_status_t TruncateInodeBlocks(VnodeF2fs &vnode, pgoff_t from);
 
-  // Caller should acquire LockType:kFileOp.
   zx_status_t RemoveInodePage(VnodeF2fs *vnode);
-  // Caller should acquire LockType:kFileOp.
   zx::result<LockedPage> NewInodePage(VnodeF2fs &new_vnode);
 
   bool IsCheckpointedNode(nid_t nid);

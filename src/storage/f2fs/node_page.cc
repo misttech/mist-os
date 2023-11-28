@@ -181,4 +181,17 @@ void NodePage::SetBlockAddr(const size_t offset, const block_t new_addr) const {
   addrs_array()[offset] = CpuToLe(new_addr);
 }
 
+void NodePage::SetDataBlkaddr(size_t ofs_in_node, block_t new_addr) {
+  WaitOnWriteback();
+  ZX_DEBUG_ASSERT(IsLocked());
+  if (new_addr == kNewAddr) {
+    ZX_DEBUG_ASSERT(GetBlockAddr(ofs_in_node) == kNullAddr);
+  } else {
+    ZX_DEBUG_ASSERT(GetBlockAddr(ofs_in_node) != kNullAddr);
+  }
+
+  SetBlockAddr(ofs_in_node, new_addr);
+  SetDirty();
+}
+
 }  // namespace f2fs

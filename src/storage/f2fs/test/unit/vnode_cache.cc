@@ -67,7 +67,7 @@ TEST_F(VnodeCacheTest, Basic) {
   ASSERT_EQ(test_dir_ptr->GetSize(), kPageSize);
 
   // flush dirty vnodes.
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   // check if dirty vnodes are removed from dirty_list_
   ASSERT_TRUE(fs_->GetVCache().IsDirtyListEmpty());
@@ -89,7 +89,7 @@ TEST_F(VnodeCacheTest, Basic) {
   deleted_child_set.push_back("d");
 
   // free nids for b and d.
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   // check if nodemgr and vnode cache remove b and d.
   int i = 0;
@@ -140,7 +140,7 @@ TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
   ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
   // Check AddDirty() exception
-  ASSERT_EQ(fs_->GetVCache().AddDirty(&test_vnode), ZX_ERR_ALREADY_EXISTS);
+  ASSERT_EQ(fs_->GetVCache().AddDirty(test_vnode), ZX_ERR_ALREADY_EXISTS);
   ASSERT_EQ(GetDirtyVnodeCount(), 2U);
   ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
@@ -164,12 +164,7 @@ TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
             ZX_ERR_INVALID_ARGS);
 
   // Check Reset()
-  WritebackOperation op = {.bSync = true};
-  test_vnode.Writeback(op);
-  WritebackOperation op_root = {.bSync = true};
-  root_dir_->Writeback(op_root);
-  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(&test_vnode) == ZX_OK);
-  ASSERT_TRUE(fs_->GetVCache().RemoveDirty(root_dir_.get()) == ZX_OK);
+  fs_->Sync();
   ASSERT_EQ(GetDirtyVnodeCount(), 0U);
   ASSERT_EQ(GetCachedVnodeCount(), 2U);
 
@@ -196,7 +191,7 @@ TEST_F(VnodeCacheTest, VnodeActivation) {
   // "file" is active as VnodeCache::dirty_list_ keeps its ref.
   ASSERT_TRUE(raw_pointer->IsActive());
 
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   // "file" is inactive after checkpoint writes its vnode to disk.
   ASSERT_FALSE(raw_pointer->IsActive());
 

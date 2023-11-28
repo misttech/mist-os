@@ -182,7 +182,7 @@ zx_status_t Dir::ConvertInlineDir() {
     SetFlag(InodeInfoFlag::kUpdateDir);
   }
 
-  UpdateInodePage(dnode_page);
+  SetDirty();
 #if 0  // porting needed
   // stat_dec_inline_inode(dir);
 #endif
@@ -206,8 +206,8 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
       if (zx_status_t err = InitInodeMetadata(vnode); err != ZX_OK) {
         if (TestFlag(InodeInfoFlag::kUpdateDir)) {
-          UpdateInodePage(ipage);
           ClearFlag(InodeInfoFlag::kUpdateDir);
+          SetDirty();
         }
         return zx::error(err);
       }
@@ -229,8 +229,8 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
       ipage.SetDirty();
       UpdateParentMetadata(vnode, 0);
-      vnode->UpdateInodePage();
-      UpdateInodePage(ipage);
+      vnode->SetDirty();
+      SetDirty();
 
       ClearFlag(InodeInfoFlag::kUpdateDir);
       return zx::ok(false);
@@ -281,12 +281,11 @@ void Dir::DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs
       vnode->DropNlink();
       vnode->SetSize(0);
     }
-    vnode->UpdateInodePage();
     if (vnode->GetNlink() == 0) {
-      fs()->AddOrphanInode(vnode);
+      vnode->SetOrphan();
     }
   }
-  UpdateInodePage(lock_page);
+  SetDirty();
 }
 
 bool Dir::IsEmptyInlineDir() {
@@ -412,7 +411,7 @@ zx_status_t File::ConvertInlineData() {
   ClearFlag(InodeInfoFlag::kInlineData);
   ClearFlag(InodeInfoFlag::kDataExist);
 
-  UpdateInodePage(dnode_page);
+  SetDirty();
 
   return ZX_OK;
 }

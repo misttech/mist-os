@@ -129,7 +129,7 @@ TEST(CpPayloadTest, ReadWrite) {
   // 3. Reopen
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);
   test_file_vn = nullptr;
-  fs->WriteCheckpoint(false, false);
+  fs->SyncFs();
 
   FileTester::Lookup(root_dir.get(), "test", &test_file);
   test_file_vn = fbl::RefPtr<File>::Downcast(std::move(test_file));
@@ -141,7 +141,7 @@ TEST(CpPayloadTest, ReadWrite) {
   // 5. Make orphan
   FileTester::AppendToFile(test_file_vn.get(), buf, kPageSize);
   FileTester::DeleteChild(root_dir.get(), "test", false);
-  fs->WriteCheckpoint(false, false);
+  fs->SyncFs();
   ASSERT_EQ(test_file_vn->Close(), ZX_OK);
   test_file_vn = nullptr;
   ASSERT_EQ(root_dir->Close(), ZX_OK);

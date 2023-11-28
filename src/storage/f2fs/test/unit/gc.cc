@@ -53,7 +53,7 @@ class GcManagerTest : public F2fsFakeDevTestFixture {
       fs_->ScheduleWriter(&completion);
       sync_completion_wait(&completion, ZX_TIME_INFINITE);
       if (sync) {
-        fs_->WriteCheckpoint(false, false);
+        fs_->SyncFs();
       }
 
       std::shuffle(file_names.begin(), file_names.end(), prng);
@@ -65,7 +65,7 @@ class GcManagerTest : public F2fsFakeDevTestFixture {
         iter = file_names.erase(iter);
       }
       if (sync) {
-        fs_->WriteCheckpoint(false, false);
+        fs_->SyncFs();
       }
       total_file_names.insert(total_file_names.end(), file_names.begin(), file_names.end());
     }
@@ -77,7 +77,7 @@ class GcManagerTest : public F2fsFakeDevTestFixture {
 
 TEST_F(GcManagerTest, CpError) {
   fs_->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
-  auto result = fs_->GetGcManager().F2fsGc();
+  auto result = fs_->GetGcManager().Run();
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_BAD_STATE);
 }
@@ -105,7 +105,7 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnSyncFs) {
     fs_->GetSuperblockInfo().IncreasePageCount(CountType::kDirtyData);
 
     DeviceTester::SetHook(fs_.get(), hook);
-    fs_->SyncFs(true);
+    ASSERT_EQ(fs_->SyncFs(true), ZX_ERR_INTERNAL);
     ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
     DeviceTester::SetHook(fs_.get(), nullptr);
@@ -132,10 +132,10 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnGc) {
 
   MakeGcTriggerCondition();
 
-  // Check disk peer closed exception case in F2fsGc()
+  // Check disk peer closed exception case in Run()
   {
     DeviceTester::SetHook(fs_.get(), hook);
-    ASSERT_EQ(fs_->GetGcManager().F2fsGc().error_value(), ZX_ERR_PEER_CLOSED);
+    ASSERT_EQ(fs_->GetGcManager().Run().error_value(), ZX_ERR_PEER_CLOSED);
     ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
     DeviceTester::SetHook(fs_.get(), nullptr);
@@ -163,10 +163,10 @@ TEST_F(GcManagerTest, CheckpointDiskReadFailOnGcPreFree) {
 
   fs_->GetSegmentManager().LocateDirtySegment(prefree_segno + 1, DirtyType::kPre);
 
-  // Check disk peer closed exception case in F2fsGc()
+  // Check disk peer closed exception case in Run()
   {
     DeviceTester::SetHook(fs_.get(), hook);
-    ASSERT_EQ(fs_->GetGcManager().F2fsGc().error_value(), ZX_ERR_PEER_CLOSED);
+    ASSERT_EQ(fs_->GetGcManager().Run().error_value(), ZX_ERR_PEER_CLOSED);
 
     DeviceTester::SetHook(fs_.get(), nullptr);
   }
@@ -193,6 +193,7 @@ TEST_F(GcManagerTest, PageColdData) {
   ASSERT_EQ(old_blk_addr_or.is_ok(), true);
 
   {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     auto pages_or = file->WriteBegin(0, kPageSize);
     ASSERT_TRUE(pages_or.is_ok());
     ASSERT_TRUE(pages_or->front()->IsDirty());
@@ -204,6 +205,7 @@ TEST_F(GcManagerTest, PageColdData) {
   ASSERT_NE(new_blk_addr_or.value(), old_blk_addr_or.value());
 
   {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     auto pages_or = file->WriteBegin(0, kPageSize);
     ASSERT_TRUE(pages_or.is_ok());
     ASSERT_TRUE(pages_or->front()->IsDirty());
@@ -236,14 +238,14 @@ TEST_F(GcManagerTest, OrphanFileGc) {
   auto file = fbl::RefPtr<File>::Downcast(std::move(vn));
 
   uint8_t buffer[kPageSize] = {
-      0,
+      0xAA,
   };
   FileTester::AppendToFile(file.get(), buffer, kPageSize);
   WritebackOperation op = {.bSync = true};
   file->Writeback(op);
 
   fs_->GetSegmentManager().AllocateNewSegments();
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   auto block_or = file->FindDataBlkAddr(0);
   ASSERT_TRUE(block_or.is_ok());
@@ -263,6 +265,13 @@ TEST_F(GcManagerTest, OrphanFileGc) {
 
   // Check victim seg is clean
   ASSERT_FALSE(dirty_info->dirty_segmap[static_cast<int>(DirtyType::kDirty)].GetOne(target_segno));
+
+  // Check if the data is valid while the orphan |file| opens
+  uint8_t read[kPageSize] = {
+      0,
+  };
+  FileTester::ReadFromFile(file.get(), read, sizeof(read), 0);
+  ASSERT_EQ(std::memcmp(buffer, read, sizeof(read)), 0);
 
   ASSERT_EQ(file->Close(), ZX_OK);
   file = nullptr;
@@ -306,7 +315,7 @@ TEST_P(GcManagerTestWithLargeSec, SegmentDirtyInfo) {
   memcpy(prev_nr_dirty, dirty_info->nr_dirty, sizeof(prev_nr_dirty));
 
   // Trigger GC
-  auto result = fs_->GetGcManager().F2fsGc();
+  auto result = fs_->GetGcManager().Run();
   ASSERT_FALSE(result.is_error());
 
   // Check victim seg is clean
@@ -341,7 +350,7 @@ TEST_P(GcManagerTestWithLargeSec, SegmentFreeInfo) {
   ASSERT_TRUE(free_info->free_secmap.GetOne(victim_sec));
 
   // Trigger GC
-  auto result = fs_->GetGcManager().F2fsGc();
+  auto result = fs_->GetGcManager().Run();
   ASSERT_FALSE(result.is_error());
 
   // Check victim sec is freed
@@ -373,7 +382,7 @@ TEST_P(GcManagerTestWithLargeSec, GcConsistency) {
   std::vector<std::string> file_names = MakeGcTriggerCondition();
 
   // It secures enough free sections.
-  auto secs_or = fs_->GetGcManager().F2fsGc();
+  auto secs_or = fs_->GetGcManager().Run();
   ASSERT_TRUE(secs_or.is_ok());
 
   for (auto name : file_names) {

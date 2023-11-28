@@ -354,7 +354,7 @@ void FuchsiaOperator::Umount() {
   ASSERT_EQ(root_->Close(), ZX_OK);
   root_.reset();
 
-  fs_->SyncFs(true);
+  fs_->Sync();
   fs_->PutSuper();
 
   auto vfs_or = fs_->TakeVfsForTests();

@@ -54,7 +54,7 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
 
   void DoCheckpoints(CheckpointCallback &callback, uint32_t loop_cnt) {
     for (uint32_t cp_version = kFirstCheckpointVersion; cp_version <= loop_cnt + 1; ++cp_version) {
-      fs_->WriteCheckpoint(false, true);
+      fs_->Sync();
 
       callback(checkpoint_pack_, cp_version, false);
 
@@ -902,11 +902,11 @@ TEST(CheckpointUnmountTest, UmountFlag) {
   ASSERT_EQ(root->Close(), ZX_OK);
   root = nullptr;
 
-  fs->WriteCheckpoint(false, true);
+  fs->Sync();
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
-  fs->WriteCheckpoint(false, false);
+  fs->SyncFs(false);
   FileTester::SuddenPowerOff(std::move(fs), &bc);
 
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
@@ -937,7 +937,7 @@ TEST_F(CheckpointTest, CpError) {
     return ZX_OK;
   };
   DeviceTester::SetHook(fs_.get(), hook);
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
@@ -1113,7 +1113,7 @@ TEST_F(CheckpointTest, FlushSitEntriesDiskFail) {
   // Check disk peer closed exception case in WriteCheckpoint()
   {
     DeviceTester::SetHook(fs_.get(), hook);
-    ASSERT_EQ(fs_->WriteCheckpoint(false, false), ZX_ERR_PEER_CLOSED);
+    ASSERT_EQ(fs_->SyncFs(), ZX_ERR_PEER_CLOSED);
     ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
     DeviceTester::SetHook(fs_.get(), nullptr);
@@ -1138,7 +1138,7 @@ TEST_F(CheckpointTest, DoCheckpointDiskFail) {
 
   // Check disk peer closed exception case in DoCheckpoint()
   DeviceTester::SetHook(fs_.get(), hook);
-  ASSERT_NE(fs_->DoCheckpoint(false), ZX_OK);
+  ASSERT_NE(fs_->SyncFs(), ZX_OK);
   ASSERT_TRUE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 
   DeviceTester::SetHook(fs_.get(), nullptr);

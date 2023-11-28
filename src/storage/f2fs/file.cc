@@ -484,6 +484,7 @@ void File::VmoDirty(uint64_t offset, uint64_t length) {
   }
 
   fs()->GetSegmentManager().BalanceFs();
+  fs::SharedLock lock(f2fs::GetGlobalLock());
   auto pages_or = WriteBegin(offset, length);
   if (unlikely(pages_or.is_error())) {
     return ReportPagerError(ZX_PAGER_OP_DIRTY, offset, length, pages_or.error_value());

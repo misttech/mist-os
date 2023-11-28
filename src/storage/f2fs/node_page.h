@@ -36,6 +36,7 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
   void SetColdNode(const bool is_dir);
   void SetFsyncMark(const bool mark);
   void SetDentryMark(const bool mark);
+  void SetDataBlkaddr(size_t ofs_in_node, block_t new_addr);
 
   bool IsInode() const;
   block_t GetBlockAddr(const size_t offset) const;

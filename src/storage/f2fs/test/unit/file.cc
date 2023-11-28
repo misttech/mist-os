@@ -146,7 +146,7 @@ TEST_F(FileTest, NidAndBlkaddrAllocFree) {
 
   // After writing checkpoint, check if nids are removed from free nid list
   // Also, for allocated blkaddr, check if corresponding bit is set in valid bitmap of segment
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs(false);
 
   MapTester::CheckNidsInuse(fs_.get(), nid_set);
   MapTester::CheckBlkaddrsInuse(fs_.get(), blkaddr_set);
@@ -157,7 +157,7 @@ TEST_F(FileTest, NidAndBlkaddrAllocFree) {
   test_file_vn = nullptr;
 
   root_dir_->Unlink("test", false);
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs(false);
 
   MapTester::CheckNidsFree(fs_.get(), nid_set);
   MapTester::CheckBlkaddrsFree(fs_.get(), blkaddr_set);

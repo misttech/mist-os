@@ -37,6 +37,24 @@ enum class VnodeSet {
   kMax,
 };
 
+// InodeInfo->flags keeping only in memory
+enum class InodeInfoFlag {
+  kInit = 0,      // indicate inode is being initialized
+  kActive,        // indicate open_count > 0
+  kNewInode,      // indicate newly allocated vnode
+  kNeedCp,        // need to do checkpoint during fsync
+  kIncLink,       // need to increment i_nlink
+  kAclMode,       // indicate acl mode
+  kNoAlloc,       // should not allocate any blocks
+  kUpdateDir,     // should update inode block for consistency
+  kInlineXattr,   // used for inline xattr
+  kInlineData,    // used for inline data
+  kInlineDentry,  // used for inline dentry
+  kDataExist,     // indicate data exists
+  kBad,           // should drop this inode without purging
+  kFlagSize,
+};
+
 class VnodeF2fs : public fs::PagedVnode,
                   public fbl::Recyclable<VnodeF2fs>,
                   public fbl::WAVLTreeContainable<VnodeF2fs *>,
@@ -72,7 +90,7 @@ class VnodeF2fs : public fs::PagedVnode,
   ino_t GetKey() const { return ino_; }
 
   void Sync(SyncCallback closure) override;
-  zx_status_t SyncFile(loff_t start, loff_t end, int datasync);
+  zx_status_t SyncFile(loff_t start, loff_t end, int datasync) __TA_EXCLUDES(f2fs::GetGlobalLock());
 
   void fbl_recycle() { RecycleNode(); }
 
@@ -111,24 +129,22 @@ class VnodeF2fs : public fs::PagedVnode,
 #endif
 
   void UpdateInodePage(LockedPage &inode_page);
-  zx_status_t UpdateInodePage();
 
-  zx_status_t DoTruncate(size_t len);
+  zx_status_t DoTruncate(size_t len) __TA_EXCLUDES(f2fs::GetGlobalLock());
   // Caller should ensure node_page is locked.
-  int TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count);
-  // Caller should ensure node_page is locked.
-  void TruncateDataBlocks(NodePage &node_page);
-  zx_status_t TruncateBlocks(uint64_t from);
-  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end);
-  void TruncateToSize();
-  void EvictVnode();
+  int TruncateDataBlocksRange(LockedPage &node_page, uint32_t ofs_in_node, uint32_t count);
+  zx_status_t TruncateBlocks(uint64_t from) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  void TruncateToSize() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  void EvictVnode() __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
-  // Caller should ensure node_page is locked.
-  void SetDataBlkaddr(NodePage &node_page, uint32_t ofs_in_node, block_t new_addr);
-  zx::result<block_t> FindDataBlkAddr(pgoff_t index);
   // Caller should ensure node_page is locked.
   zx_status_t ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node);
 
+  zx::result<block_t> FindDataBlkAddr(pgoff_t index);
   void UpdateExtentCache(block_t blk_addr, pgoff_t file_offset);
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
@@ -139,14 +155,12 @@ class VnodeF2fs : public fs::PagedVnode,
                                                              const pgoff_t end);
   zx_status_t GetLockedDataPage(pgoff_t index, LockedPage *out);
   zx::result<std::vector<LockedPage>> GetLockedDataPages(pgoff_t start, pgoff_t end);
-  zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out);
 
   zx::result<block_t> GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim);
-  zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len);
+  zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
-  virtual zx_status_t RecoverInlineData(NodePage &node_page) __TA_EXCLUDES(info_mutex_) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
+  virtual zx_status_t RecoverInlineData(NodePage &node_page) { return ZX_ERR_NOT_SUPPORTED; }
   virtual zx::result<PageBitmap> GetBitmap(fbl::RefPtr<Page> dentry_page);
 
   void Notify(std::string_view name, fuchsia_io::wire::WatchEvent event) final;
@@ -405,16 +419,12 @@ class VnodeF2fs : public fs::PagedVnode,
 
   pgoff_t Writeback(WritebackOperation &operation) { return file_cache_->Writeback(operation); }
 
-  std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax) {
-    return file_cache_->InvalidatePages(start, end);
+  std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
+                                          bool zero = true) {
+    return file_cache_->InvalidatePages(start, end, zero);
   }
   void ResetFileCache(pgoff_t start = 0, pgoff_t end = kPgOffMax) { file_cache_->Reset(); }
-  void SetOrphan() {
-    if (!file_cache_->SetOrphan()) {
-      file_cache_->ClearDirtyPages();
-      ClearDirty();
-    }
-  }
+  void SetOrphan();
 
   PageType GetPageType() {
     if (IsNode()) {
@@ -432,20 +442,16 @@ class VnodeF2fs : public fs::PagedVnode,
     return paged_vmo().is_valid();
   }
 
-  // Overriden methods for thread safety analysis annotations.
-  zx_status_t Read(void *data, size_t len, size_t off, size_t *out_actual) override
-      __TA_EXCLUDES(mutex_) {
+  zx_status_t Read(void *data, size_t len, size_t off, size_t *out_actual) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t Write(const void *data, size_t len, size_t offset, size_t *out_actual) override
-      __TA_EXCLUDES(mutex_) {
+  zx_status_t Write(const void *data, size_t len, size_t offset, size_t *out_actual) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t Append(const void *data, size_t len, size_t *out_end, size_t *out_actual) override
-      __TA_EXCLUDES(mutex_) {
+  zx_status_t Append(const void *data, size_t len, size_t *out_end, size_t *out_actual) override {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  zx_status_t Truncate(size_t len) override __TA_EXCLUDES(mutex_) { return ZX_ERR_NOT_SUPPORTED; }
+  zx_status_t Truncate(size_t len) override { return ZX_ERR_NOT_SUPPORTED; }
   DirtyPageList &GetDirtyPageList() const { return file_cache_->GetDirtyPageList(); }
   VmoManager &GetVmoManager() const { return vmo_manager(); }
 

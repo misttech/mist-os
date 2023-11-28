@@ -152,6 +152,7 @@ TEST(F2fsTest, TakeBc) {
   ASSERT_TRUE(fs->IsValid());
   ASSERT_EQ(&fs->GetBc(), bcache_ptr);
 
+  fs->Sync();
   fs->PutSuper();
   auto bc_or = fs->TakeBc();
   ASSERT_TRUE(bc_or.is_ok());
@@ -164,6 +165,7 @@ TEST(F2fsTest, TakeBc) {
   FileTester::MkfsOnFakeDevWithOptions(&bc, {});
   FileTester::MountWithOptions(loop.dispatcher(), MountOptions{}, &bc, &fs);
 
+  fs->Sync();
   fs->PutSuper();
   ASSERT_TRUE(fs->TakeBc().is_ok());
   ASSERT_TRUE(fs->TakeBc().is_error());

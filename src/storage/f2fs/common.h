@@ -152,6 +152,25 @@ class BlockBuffer {
   void *data_ = nullptr;
 };
 
+class GlobalLock final {
+ public:
+  GlobalLock(const GlobalLock &) = delete;
+  GlobalLock &operator=(const GlobalLock &) = delete;
+  GlobalLock(GlobalLock &&) = delete;
+  GlobalLock &operator=(GlobalLock &&) = delete;
+  GlobalLock() { mutex_ = std::make_unique<fs::SharedMutex>(); }
+
+  fs::SharedMutex &get() { return *mutex_; }
+
+ private:
+  std::unique_ptr<fs::SharedMutex> mutex_;
+};
+
+inline fs::SharedMutex &GetGlobalLock() {
+  static GlobalLock mutex;
+  return mutex.get();
+}
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_COMMON_H_

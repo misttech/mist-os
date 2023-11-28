@@ -339,7 +339,7 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
 
   if (vnode->TestFlag(InodeInfoFlag::kIncLink)) {
     vnode->IncNlink();
-    vnode->UpdateInodePage();
+    vnode->SetDirty();
   }
   return ZX_OK;
 }
@@ -390,7 +390,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
   auto umount = fit::defer([&] {
     if (TestFlag(InodeInfoFlag::kUpdateDir)) {
       ClearFlag(InodeInfoFlag::kUpdateDir);
-      UpdateInodePage();
+      SetDirty();
     }
   });
 
@@ -507,7 +507,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
   if (vnode) {
     if (vnode->IsDir()) {
       DropNlink();
-      UpdateInodePage();
+      SetDirty();
     }
 
     vnode->SetDirty();
@@ -517,9 +517,8 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
       vnode->DropNlink();
       vnode->SetSize(0);
     }
-    vnode->UpdateInodePage();
     if (vnode->GetNlink() == 0) {
-      fs()->AddOrphanInode(vnode);
+      vnode->SetOrphan();
     }
   }
 
@@ -528,7 +527,7 @@ void Dir::DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnod
   page_lock.reset();
 
   if (bit_pos == kNrDentryInBlock) {
-    TruncateHole(page->GetIndex(), page->GetIndex() + 1);
+    TruncateHole(page->GetIndex(), page->GetIndex() + 1, true);
   }
 }
 

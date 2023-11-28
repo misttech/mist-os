@@ -578,7 +578,7 @@ zx::result<uint32_t> NodeManager::TruncateDnode(VnodeF2fs &vnode, nid_t nid) {
     return zx::error(err);
   }
 
-  vnode.TruncateDataBlocks(page.GetPage<NodePage>());
+  vnode.TruncateDataBlocksRange(page, 0, kAddrsPerBlock);
   TruncateNode(vnode, nid, page.GetPage<NodePage>());
   return zx::ok(1);
 }
@@ -945,30 +945,6 @@ zx::result<LockedPage> NodeManager::GetNextNodePage(LockedPage &node_page, size_
   return zx::ok(std::move(pages[0]));
 }
 
-pgoff_t NodeManager::FlushDirtyNodePages(WritebackOperation &operation) {
-  if (superblock_info_.GetPageCount(CountType::kDirtyNodes) == 0 && !operation.bReleasePages) {
-    return 0;
-  }
-  if (zx_status_t status = fs_->GetVCache().ForDirtyVnodesIf(
-          [](fbl::RefPtr<VnodeF2fs> &vnode) {
-            ZX_ASSERT(vnode->IsValid());
-            vnode->UpdateInodePage();
-            ZX_ASSERT(vnode->ClearDirty());
-            return ZX_OK;
-          },
-          [](fbl::RefPtr<VnodeF2fs> &vnode) {
-            if (vnode->GetDirtyPageCount() || !vnode->IsValid()) {
-              return ZX_ERR_NEXT;
-            }
-            return ZX_OK;
-          });
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to flush dirty vnodes ";
-    return 0;
-  }
-  return fs_->GetNodeVnode().Writeback(operation);
-}
-
 pgoff_t NodeManager::FsyncNodePages(VnodeF2fs &vnode) {
   nid_t ino = vnode.Ino();
 
@@ -994,6 +970,14 @@ pgoff_t NodeManager::FsyncNodePages(VnodeF2fs &vnode) {
     }
     return ZX_OK;
   };
+
+  {
+    LockedPage page;
+    if (zx_status_t ret = GetNodePage(vnode.GetKey(), &page); ret != ZX_OK) {
+      return ret;
+    }
+    vnode.UpdateInodePage(page);
+  }
 
   return fs_->GetNodeVnode().Writeback(op);
 }

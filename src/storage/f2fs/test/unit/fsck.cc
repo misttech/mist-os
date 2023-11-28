@@ -342,10 +342,10 @@ TEST(FsckTest, OrphanNodes) {
     FileTester::AppendToFile(file.get(), buf, kPageSize);
     WritebackOperation op = {.bSync = true};
     file->Writeback(op);
-    fs->WriteCheckpoint(false, false);
+    fs->SyncFs(false);
 
     FileTester::DeleteChild(root_dir.get(), "test", false);
-    fs->WriteCheckpoint(false, false);
+    fs->SyncFs(false);
 
     ASSERT_EQ(file->Close(), ZX_OK);
     file = nullptr;
@@ -925,7 +925,7 @@ TEST(FsckTest, AllocateFreeSegmapInfoAfterSPO) {
     fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
 
     // Checkpoint without unmount flag
-    fs->DoCheckpoint(false);
+    fs->SyncFs();
 
     ASSERT_EQ(root_dir->Close(), ZX_OK);
     root_dir = nullptr;

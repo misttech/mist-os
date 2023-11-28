@@ -36,7 +36,8 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   zx_status_t RecoverInlineData(NodePage& node_page) final;
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final
       __TA_EXCLUDES(mutex_);
-  void VmoDirty(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
+  void VmoDirty(uint64_t offset, uint64_t length) final
+      __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
   void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
   zx_status_t CreateStream(uint32_t stream_options, zx::stream* out_stream) final;
   bool SupportsClientSideStreams() final;

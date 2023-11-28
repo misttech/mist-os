@@ -559,13 +559,15 @@ std::vector<LockedPage> FileCache::CleanupPagesUnsafe(pgoff_t start, pgoff_t end
   return pages;
 }
 
-std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end) {
+std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end, bool zero) {
   std::vector<LockedPage> pages;
   {
     std::lock_guard tree_lock(tree_lock_);
     pages = CleanupPagesUnsafe(start, end);
-    // Make sure that all pages in the range are zeroed.
-    vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
+    if (zero) {
+      // Make sure that all pages in the range are zeroed.
+      vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
+    }
   }
   return pages;
 }

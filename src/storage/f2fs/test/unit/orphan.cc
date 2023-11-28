@@ -66,7 +66,7 @@ TEST(OrphanInode, RecoverOrphanInode) {
     ASSERT_EQ(iter->GetNlink(), (uint32_t)0);
   }
 
-  fs->WriteCheckpoint(false, true);
+  fs->SyncFs();
   ASSERT_EQ(fs->GetVnodeSetSize(VnodeSet::kOrphan), 0UL);
 
   // 3. Sudden power off

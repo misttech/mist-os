@@ -280,11 +280,20 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
   }
 
   Inode &inode = node_page->GetAddress<Node>()->i;
+  std::string_view name(reinterpret_cast<char *>(inode.i_name),
+                        std::min(kMaxNameLen, inode.i_namelen));
+  if (inode.i_namelen != name.length() ||
+      (ino != superblock_info.GetRootIno() && !fs::IsValidName(name))) {
+    // TODO: Need to repair the file or set NeedFsck flag when fsck supports repair feature.
+    // For now, we set kBad and clear link, so that it can be deleted without purging.
+    return ZX_ERR_NOT_FOUND;
+  }
   fbl::RefPtr<VnodeF2fs> vnode;
   if (zx_status_t status = Allocate(fs, ino, LeToCpu(inode.i_mode), &vnode); status != ZX_OK) {
     return status;
   }
 
+  vnode->SetName(name);
   vnode->SetUid(LeToCpu(inode.i_uid));
   vnode->SetGid(LeToCpu(inode.i_gid));
   vnode->SetNlink(LeToCpu(inode.i_links));
@@ -331,18 +340,6 @@ zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) 
     vnode->InitFileCache(LeToCpu(inode.i_size));
   }
 
-  std::string_view name(reinterpret_cast<char *>(inode.i_name),
-                        std::min(kMaxNameLen, inode.i_namelen));
-  if (inode.i_namelen != name.length() ||
-      (ino != superblock_info.GetRootIno() && !fs::IsValidName(name))) {
-    // TODO: Need to repair the file or set NeedFsck flag when fsck supports repair feature.
-    // For now, we set kBad and clear link, so that it can be deleted without purging.
-    vnode->ClearNlink();
-    vnode->SetFlag(InodeInfoFlag::kBad);
-    return ZX_ERR_NOT_FOUND;
-  }
-  vnode->SetName(name);
-
   *out = std::move(vnode);
   return ZX_OK;
 }
@@ -354,7 +351,7 @@ zx_status_t VnodeF2fs::OpenNode([[maybe_unused]] ValidatedOptions options,
 
 zx_status_t VnodeF2fs::CloseNode() { return ZX_OK; }
 
-void VnodeF2fs::RecycleNode() {
+void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   {
     std::lock_guard lock(mutex_);
     ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
@@ -578,51 +575,39 @@ void VnodeF2fs::UpdateInodePage(LockedPage &inode_page) {
   inode_page.SetDirty();
 }
 
-zx_status_t VnodeF2fs::UpdateInodePage() {
-  if (ino_ == superblock_info_.GetNodeIno() || ino_ == superblock_info_.GetMetaIno()) {
-    return ZX_OK;
+zx_status_t VnodeF2fs::DoTruncate(size_t len) {
+  {
+    fs::SharedLock lock(f2fs::GetGlobalLock());
+    if (zx_status_t ret = TruncateBlocks(len); ret != ZX_OK) {
+      return ret;
+    }
+  }
+  // SetSize() adjusts the size of its vmo or vmo content, and then the kernel guarantees
+  // that its vmo after |len| are zeroed. If necessary, it triggers VmoDirty() to let f2fs write
+  // changes to disk.
+  SetSize(len);
+  if (GetSize() == 0) {
+    ClearFlag(InodeInfoFlag::kDataExist);
   }
 
-  fs::SharedLock rlock(fs()->GetFsLock(LockType::kNodeOp));
-  LockedPage node_page;
-  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &node_page); ret != ZX_OK) {
-    return ret;
-  }
-  UpdateInodePage(node_page);
+  timespec cur_time;
+  clock_gettime(CLOCK_REALTIME, &cur_time);
+  SetCTime(cur_time);
+  SetMTime(cur_time);
+  SetDirty();
+  fs()->GetSegmentManager().BalanceFs();
   return ZX_OK;
 }
 
-zx_status_t VnodeF2fs::DoTruncate(size_t len) {
-  zx_status_t ret;
-
-  if (ret = TruncateBlocks(len); ret == ZX_OK) {
-    // SetSize() adjusts the size of its vmo or vmo content, and then the kernel guarantees
-    // that its vmo after |len| are zeroed. If necessary, it triggers VmoDirty() to let f2fs write
-    // changes to disk.
-    SetSize(len);
-    if (GetSize() == 0) {
-      ClearFlag(InodeInfoFlag::kDataExist);
-    }
-
-    timespec cur_time;
-    clock_gettime(CLOCK_REALTIME, &cur_time);
-    SetCTime(cur_time);
-    SetMTime(cur_time);
-    SetDirty();
-  }
-
-  fs()->GetSegmentManager().BalanceFs();
-  return ret;
-}
-
-int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node, uint32_t count) {
+int VnodeF2fs::TruncateDataBlocksRange(LockedPage &page, uint32_t ofs_in_node, uint32_t count) {
+  NodePage &node_page = page.GetPage<NodePage>();
   int nr_free = 0;
   for (; count > 0; --count, ++ofs_in_node) {
     block_t blkaddr = node_page.GetBlockAddr(ofs_in_node);
     if (blkaddr == kNullAddr) {
       continue;
     }
-    SetDataBlkaddr(node_page, ofs_in_node, kNullAddr);
+    node_page.SetDataBlkaddr(ofs_in_node, kNullAddr);
     UpdateExtentCache(kNullAddr, node_page.StartBidxOfNode(GetAddrsPerInode()) + ofs_in_node);
     fs()->GetSegmentManager().InvalidateBlocks(blkaddr);
     superblock_info_.DecValidBlockCount(1);
@@ -630,21 +615,14 @@ int VnodeF2fs::TruncateDataBlocksRange(NodePage &node_page, uint32_t ofs_in_node
     ++nr_free;
   }
   if (nr_free) {
-    LockedPage lock_page(fbl::RefPtr<Page>(&node_page), false);
-    lock_page.SetDirty();
-    lock_page.release(false);
+    page.SetDirty();
     SetDirty();
   }
   return nr_free;
 }
 
-void VnodeF2fs::TruncateDataBlocks(NodePage &node_page) {
-  TruncateDataBlocksRange(node_page, 0, kAddrsPerBlock);
-}
-
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   uint32_t blocksize = superblock_info_.GetBlocksize();
-
   if (from > GetSize()) {
     return ZX_OK;
   }
@@ -652,7 +630,6 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   pgoff_t free_from =
       safemath::CheckRsh(fbl::round_up(from, blocksize), superblock_info_.GetLogBlocksize())
           .ValueOrDie();
-  fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
   // Invalidate data pages starting from |free_from|. It safely removes any pages updating their
   // block addrs before purging the addrs in nodes.
   InvalidatePages(free_from);
@@ -676,7 +653,7 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
         } else {
           count = safemath::CheckSub(kAddrsPerBlock, ofs_in_node).ValueOrDie();
         }
-        TruncateDataBlocksRange(node, ofs_in_node, count);
+        TruncateDataBlocksRange(node_page, ofs_in_node, count);
         free_from += count;
       }
     } else if (err != ZX_ERR_NOT_FOUND) {
@@ -689,12 +666,11 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
       err != ZX_OK) {
     return err;
   }
-
   return ZX_OK;
 }
 
-zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end) {
-  InvalidatePages(pg_start, pg_end);
+zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
+  InvalidatePages(pg_start, pg_end, zero);
   for (pgoff_t index = pg_start; index < pg_end; ++index) {
     LockedPage dnode_page;
     if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, index, &dnode_page);
@@ -716,7 +692,7 @@ zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end) {
     }
 
     if (dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode) != kNullAddr) {
-      TruncateDataBlocksRange(dnode_page.GetPage<NodePage>(), ofs_in_dnode, 1);
+      TruncateDataBlocksRange(dnode_page, ofs_in_dnode, 1);
     }
   }
   return ZX_OK;
@@ -760,11 +736,7 @@ void VnodeF2fs::EvictVnode() {
   if (HasBlocks()) {
     TruncateToSize();
   }
-
-  {
-    fs::SharedLock rlock(fs()->GetFsLock(LockType::kFileOp));
-    fs()->GetNodeManager().RemoveInodePage(this);
-  }
+  fs()->GetNodeManager().RemoveInodePage(this);
   fs()->EvictVnode(this);
 }
 
@@ -800,14 +772,14 @@ void VnodeF2fs::Init() {
 }
 
 bool VnodeF2fs::SetDirty() {
-  if (IsNode() || IsMeta() || !HasLink()) {
+  if (IsNode() || IsMeta() || !IsValid()) {
     return false;
   }
   std::lock_guard lock(info_mutex_);
   if (fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
     return false;
   }
-  return fs()->GetVCache().AddDirty(this) == ZX_OK;
+  return fs()->GetVCache().AddDirty(*this) == ZX_OK;
 }
 
 bool VnodeF2fs::ClearDirty() {
@@ -878,7 +850,6 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
   Writeback(op);
 
   // Currently, only POSIX mode is supported.
-  UpdateInodePage();
   bool need_cp = NeedToCheckpoint();
 
   if (need_cp) {
@@ -890,6 +861,7 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
     }
   } else {
     // Write dnode pages
+    fs::SharedLock lock(f2fs::GetGlobalLock());
     fs()->GetNodeManager().FsyncNodePages(*this);
 
     // TODO: Add flags to log recovery information to NAT entries and decide whether to write
@@ -945,6 +917,22 @@ bool VnodeF2fs::IsActive() const { return TestFlag(InodeInfoFlag::kActive); }
 
 zx::result<PageBitmap> VnodeF2fs::GetBitmap(fbl::RefPtr<Page> page) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
+}
+
+void VnodeF2fs::SetOrphan() {
+  // Clean the current dirty pages and set the orphan flag that prevents additional dirty pages.
+  if (!file_cache_->SetOrphan()) {
+    file_cache_->ClearDirtyPages();
+    fs()->AddToVnodeSet(VnodeSet::kOrphan, GetKey());
+    if (IsDir()) {
+      Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
+    }
+    ClearDirty();
+    // Update the inode pages of orphans to be logged on disk.
+    LockedPage node_page;
+    ZX_ASSERT(fs()->GetNodeManager().GetNodePage(GetKey(), &node_page) == ZX_OK);
+    UpdateInodePage(node_page);
+  }
 }
 
 }  // namespace f2fs

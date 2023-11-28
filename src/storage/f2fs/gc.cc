@@ -161,7 +161,7 @@ zx::result<uint32_t> GcManager::GetGcVictim(GcType gc_type, CursegType type) {
   return fs_->GetSegmentManager().GetVictimByDefault(gc_type, type, AllocMode::kLFS);
 }
 
-zx::result<uint32_t> GcManager::F2fsGc() {
+zx::result<uint32_t> GcManager::Run() {
   // For testing
   if (disable_gc_for_test_) {
     return zx::ok(0);
@@ -171,7 +171,11 @@ zx::result<uint32_t> GcManager::F2fsGc() {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  std::lock_guard gc_lock(gc_mutex_);
+  if (!run_.try_acquire_for(std::chrono::seconds(kWriteTimeOut))) {
+    return zx::error(ZX_ERR_TIMED_OUT);
+  }
+  auto release = fit::defer([&] { run_.release(); });
+  std::lock_guard gc_lock(f2fs::GetGlobalLock());
 
   // TODO: Default gc_type should be kBgGc when background gc is implemented.
   GcType gc_type = GcType::kFgGc;
@@ -368,20 +372,6 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       continue;
     }
 
-    if (gc_type == GcType::kFgGc && fs_->FindVnodeSet(VnodeSet::kOrphan, ino)) {
-      // Here, GC already uploaded victim data block to the filecache.
-      // Once a page of an orphan file is uploaded to the filecache, the page is not reclaimed until
-      // the vnode is recycled. Therefore, even if we truncate it here, orphan files that are
-      // already opened can access data. If SPO occurs during the truncation, f2fs rolls back to the
-      // previous checkpoint, so that the orphan file can be purged normally.
-      LockedPage node_page;
-      if (auto err = fs_->GetNodeManager().GetNodePage(entry->nid, &node_page); err != ZX_OK) {
-        return err;
-      }
-      vnode->TruncateDataBlocksRange(node_page.GetPage<NodePage>(), ofs_in_node, 1);
-      continue;
-    }
-
     LockedPage data_page;
     const size_t block_index = start_bidx + ofs_in_node;
     // Keeps as long as dir vnodes use discardable vmos.
@@ -394,11 +384,19 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     }
 
     data_page->WaitOnWriteback();
+    pgoff_t offset = safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie();
     // Ask kernel to dirty the vmo area for |data_page|. If the regarding pages are not present, we
     // supply a vmo and dirty it again.
     if (auto dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
-      vnode->VmoRead(safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie(), kBlockSize);
-      ZX_ASSERT(data_page.SetVmoDirty().is_ok());
+      vnode->VmoRead(offset, kBlockSize);
+    }
+    ZX_ASSERT(data_page.SetVmoDirty().is_ok());
+    if (!vnode->IsValid()) {
+      // When victim blocks belongs to orphans, we load and keep them on paged_vmo until the orphans
+      // close or kernel reclaims the pages.
+      data_page.reset();
+      vnode->TruncateHole(offset, offset + kBlockSize, false);
+      continue;
     }
     // No need to add |data_page| to F2fs::dirty_data_page_list_ as it will be flushed
     // just after this loop.

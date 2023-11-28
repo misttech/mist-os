@@ -72,15 +72,6 @@ zx_status_t F2fs::CheckOrphanSpace() {
   return ZX_OK;
 }
 
-void F2fs::AddOrphanInode(VnodeF2fs *vnode) {
-  AddToVnodeSet(VnodeSet::kOrphan, vnode->GetKey());
-  if (vnode->IsDir()) {
-    vnode->Notify(".", fuchsia_io::wire::WatchEvent::kDeleted);
-  }
-  // Clean the current dirty pages and set the orphan flag that prevents additional dirty pages.
-  vnode->SetOrphan();
-}
-
 void F2fs::PurgeOrphanInode(nid_t ino) {
   fbl::RefPtr<VnodeF2fs> vnode;
   ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode) == ZX_OK);
@@ -305,9 +296,34 @@ pgoff_t F2fs::FlushDirtyDataPages(WritebackOperation &operation, bool wait_write
   return total_nwritten;
 }
 
-// Freeze all the FS-operations for checkpoint.
-void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
-  while (true) {
+zx::result<pgoff_t> F2fs::FlushDirtyNodePages(WritebackOperation &operation) {
+  if (zx_status_t status = GetVCache().ForDirtyVnodesIf(
+          [](fbl::RefPtr<VnodeF2fs> &vnode) {
+            ZX_ASSERT(vnode->IsValid());
+            ZX_ASSERT(vnode->ClearDirty());
+            return ZX_OK;
+          },
+          [this](fbl::RefPtr<VnodeF2fs> &vnode) {
+            // Update the node page of every dirty vnode before writeback.
+            LockedPage node_page;
+            if (zx_status_t ret = node_manager_->GetNodePage(vnode->GetKey(), &node_page);
+                ret != ZX_OK) {
+              return ret;
+            }
+            if (vnode->GetDirtyPageCount()) {
+              return ZX_ERR_NEXT;
+            }
+            vnode->UpdateInodePage(node_page);
+            return ZX_OK;
+          });
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  return zx::ok(GetNodeVnode().Writeback(operation));
+}
+
+void F2fs::FlushDirsAndNodes() {
+  do {
     // Write out all dirty dentry pages and remove orphans from dirty list.
     WritebackOperation op;
     op.if_vnode = [](fbl::RefPtr<VnodeF2fs> &vnode) {
@@ -317,32 +333,16 @@ void F2fs::BlockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
       return ZX_ERR_NEXT;
     };
     FlushDirtyDataPages(op, true);
-
-    // Stop file operation
-    mutex_lock_op(LockType::kFileOp);
-    if (!superblock_info_->GetPageCount(CountType::kDirtyDents)) {
-      break;
-    }
-    mutex_unlock_op(LockType::kFileOp);
-  }
+  } while (superblock_info_->GetPageCount(CountType::kDirtyDents));
 
   // POR: we should ensure that there is no dirty node pages
   // until finishing nat/sit flush.
-  while (true) {
+  do {
     WritebackOperation op;
-    GetNodeManager().FlushDirtyNodePages(op);
-
-    mutex_lock_op(LockType::kNodeOp);
-    if (!superblock_info_->GetPageCount(CountType::kDirtyNodes)) {
-      break;
-    }
-    mutex_unlock_op(LockType::kNodeOp);
-  }
-}
-
-void F2fs::UnblockOperations() __TA_NO_THREAD_SAFETY_ANALYSIS {
-  mutex_unlock_op(LockType::kNodeOp);
-  mutex_unlock_op(LockType::kFileOp);
+    auto ret = FlushDirtyNodePages(op);
+    ZX_ASSERT_MSG(ret.is_ok(), "Failed to flush node pages (%ul) %s",
+                  superblock_info_->GetPageCount(CountType::kDirtyNodes), ret.status_string());
+  } while (superblock_info_->GetPageCount(CountType::kDirtyNodes));
 }
 
 zx_status_t F2fs::DoCheckpoint(bool is_umount) {
@@ -502,10 +502,6 @@ uint32_t F2fs::GetFreeSectionsForDirtyPages() {
   return (node_secs + safemath::CheckMul<uint32_t>(dent_secs, 2)).ValueOrDie();
 }
 
-bool F2fs::IsCheckpointAvailable() {
-  return segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages();
-}
-
 // Release-acquire ordering between the writeback (loader) and others such as checkpoint and gc.
 bool F2fs::CanReclaim() const { return !stop_reclaim_flag_.test(std::memory_order_acquire); }
 bool F2fs::IsTearDown() const { return teardown_flag_.test(std::memory_order_relaxed); }
@@ -517,15 +513,13 @@ zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
     return ZX_ERR_BAD_STATE;
   }
 
-  std::lock_guard cp_lock(checkpoint_mutex_);
   // Stop writeback during checkpoint.
   FlagAcquireGuard flag(&stop_reclaim_flag_);
   if (flag.IsAcquired()) {
     ZX_ASSERT(WaitForWriteback().is_ok());
   }
-  ZX_DEBUG_ASSERT(IsCheckpointAvailable());
-  BlockOperations();
-  auto unblock_operations = fit::defer([&] { UnblockOperations(); });
+  ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());
+  FlushDirsAndNodes();
 
   // update checkpoint pack index
   // Increase the version number so that

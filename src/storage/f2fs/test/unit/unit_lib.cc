@@ -91,7 +91,7 @@ void FileTester::MountWithOptions(async_dispatcher_t *dispatcher, const MountOpt
 }
 
 void FileTester::Unmount(std::unique_ptr<F2fs> fs, std::unique_ptr<BcacheMapper> *bc) {
-  fs->SyncFs(true);
+  fs->Sync();
   fs->PutSuper();
   auto vfs_or = fs->TakeVfsForTests();
   ASSERT_TRUE(vfs_or.is_ok());
@@ -513,7 +513,7 @@ zx::result<std::unique_ptr<BcacheMapper>> MkfsTester::FormatDevice(MkfsWorker &m
 }
 
 zx_status_t GcTester::DoGarbageCollect(GcManager &manager, uint32_t segno, GcType gc_type) {
-  std::lock_guard gc_lock(manager.gc_mutex_);
+  std::lock_guard lock(f2fs::GetGlobalLock());
   return manager.DoGarbageCollect(segno, gc_type);
 }
 

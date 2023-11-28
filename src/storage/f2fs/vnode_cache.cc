@@ -198,19 +198,23 @@ zx_status_t VnodeCache::Add(VnodeF2fs* vnode) {
   return ZX_OK;
 }
 
-zx_status_t VnodeCache::AddDirty(VnodeF2fs* vnode) {
-  std::lock_guard lock(list_lock_);
-  ZX_ASSERT(vnode != nullptr);
-  if ((*vnode).fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer()) {
+zx_status_t VnodeCache::AddDirty(VnodeF2fs& vnode) {
+  if (IsDirty(vnode)) {
     return ZX_ERR_ALREADY_EXISTS;
   }
-  fbl::RefPtr<VnodeF2fs> vnode_refptr = fbl::MakeRefPtrUpgradeFromRaw(vnode, list_lock_);
+  std::lock_guard lock(list_lock_);
+  fbl::RefPtr<VnodeF2fs> vnode_refptr = fbl::MakeRefPtrUpgradeFromRaw(&vnode, list_lock_);
   dirty_list_.push_back(std::move(vnode_refptr));
-  if (vnode->IsDir()) {
+  if (vnode.IsDir()) {
     ++ndirty_dir_;
   }
   ++ndirty_;
   return ZX_OK;
+}
+
+bool VnodeCache::IsDirty(VnodeF2fs& vnode) {
+  fs::SharedLock lock(list_lock_);
+  return vnode.fbl::DoublyLinkedListable<fbl::RefPtr<VnodeF2fs>>::InContainer();
 }
 
 zx_status_t VnodeCache::RemoveDirty(VnodeF2fs* vnode) {

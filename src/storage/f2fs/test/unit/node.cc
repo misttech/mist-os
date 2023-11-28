@@ -90,7 +90,7 @@ TEST_F(NodeManagerTest, NatCache) {
   }
 
   // Move dirty entries to clean entries
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   // 3. Check NAT entry is cached in clean NAT entries list
   MapTester::GetNatCacheEntryCount(node_manager, num_tree, num_clean, num_dirty);
@@ -142,7 +142,7 @@ TEST_F(NodeManagerTest, NatCache) {
   ASSERT_EQ(inos.size() + journal_inos.size(), kNatJournalEntries - 2);
 
   // Fill NAT journal
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   ASSERT_EQ(NatsInCursum(sum), static_cast<int>(kNatJournalEntries - 1));
 
   // Fill NAT cache over journal size
@@ -151,7 +151,7 @@ TEST_F(NodeManagerTest, NatCache) {
   ASSERT_EQ(inos.size() + journal_inos.size(), kNatJournalEntries);
 
   // Flush NAT journal
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   ASSERT_EQ(NatsInCursum(sum), static_cast<int>(0));
 
   // Flush NAT cache
@@ -181,7 +181,7 @@ TEST_F(NodeManagerTest, NatCache) {
 
   // Shrink nat cache to reduce memory usage (test TryToFreeNats())
   MapTester::SetNatCount(node_manager, node_manager.GetNatCount() + kNmWoutThreshold * 3);
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   MapTester::GetNatCacheEntryCount(node_manager, num_tree, num_clean, num_dirty);
   ASSERT_EQ(num_tree, static_cast<size_t>(0));
@@ -387,7 +387,7 @@ TEST_F(NodeManagerTest, NodePageExceptionCase) {
   }
 
   // fault injection for GetNodePage()
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   MapTester::SetCachedNatEntryBlockAddress(node_manager, nid, kNullAddr);
 
@@ -505,7 +505,7 @@ TEST_F(NodeManagerTest, TruncateDoubleIndirect) {
   ASSERT_EQ(nids.size(), 0UL);
 
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt - alloc_node_cnt);
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   // After checkpoint, we can reuse the removed nodes
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt);
 
@@ -577,7 +577,7 @@ TEST_F(NodeManagerTest, TruncateIndirect) {
   ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
 
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt - alloc_node_cnt);
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
   // After checkpoint, we can reuse the removed nodes
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt);
 
@@ -669,7 +669,7 @@ TEST_F(NodeManagerTest, TruncateExceptionCase) {
 
   ASSERT_EQ(superblock_info.GetValidInodeCount(), inode_cnt);
 
-  fs_->WriteCheckpoint(false, false);
+  fs_->SyncFs();
 
   // After checkpoint, we can reuse the removed nodes
   ASSERT_EQ(node_manager.GetFreeNidCount(), initial_free_nid_cnt);
@@ -760,7 +760,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   const pgoff_t direct_index = 0;
   pgoff_t file_offset = direct_index * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), direct_index, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -778,7 +778,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   const pgoff_t indirect_index_lv1 = direct_index + kAddrsPerInode;
   file_offset = indirect_index_lv1 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -799,7 +799,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   const pgoff_t indirect_index_lv2 = indirect_index_lv1 + direct_blks * 2;
   file_offset = indirect_index_lv2 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -819,7 +819,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   const pgoff_t indirect_blks = static_cast<const pgoff_t>(kAddrsPerBlock) * kNidsPerBlock;
   file_offset = (indirect_index_lv2 + indirect_blks) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -840,7 +840,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesSinglePage) {
   pgoff_t indirect_index_lv3 = indirect_index_lv2 + indirect_blks * 2;
   file_offset = indirect_index_lv3 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -888,7 +888,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   const pgoff_t direct_index = 0;
   pgoff_t file_offset = direct_index * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -909,7 +909,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   const pgoff_t indirect_index_lv1 = direct_index + kAddrsPerInode;
   file_offset = indirect_index_lv1 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -933,7 +933,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   const pgoff_t indirect_index_lv2 = indirect_index_lv1 + direct_blks * 2;
   file_offset = indirect_index_lv2 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -956,7 +956,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   const pgoff_t indirect_blks = static_cast<const pgoff_t>(kAddrsPerBlock) * kNidsPerBlock;
   file_offset = (indirect_index_lv2 + indirect_blks) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -980,7 +980,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesMultiPage) {
   pgoff_t indirect_index_lv3 = indirect_index_lv2 + indirect_blks * 2;
   file_offset = indirect_index_lv3 * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1031,7 +1031,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   // Check inode + direct node (level 0 ~ 1)
   pgoff_t file_offset = static_cast<pgoff_t>((kAddrsPerInode - 1)) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1057,7 +1057,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   const pgoff_t indirect_index_lv1 = kAddrsPerInode;
   file_offset = (indirect_index_lv1 + direct_blks - 1) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1084,7 +1084,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   // Check direct node + indirect node (level 1 ~ 2)
   file_offset = (indirect_index_lv1 + direct_blks * 2 - 1) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1112,7 +1112,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   const pgoff_t indirect_index_lv2 = indirect_index_lv1 + direct_blks * kAddrsPerBlock;
   file_offset = (indirect_index_lv2 - 1) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1138,7 +1138,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   const pgoff_t indirect_blks = static_cast<const pgoff_t>(kAddrsPerBlock) * kNidsPerBlock;
   file_offset = (indirect_index_lv2 + indirect_blks + direct_blks - 1) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 
@@ -1167,7 +1167,7 @@ TEST_F(NodeManagerTest, GetDataBlockAddressesCrossMultiPage) {
   pgoff_t indirect_index_lv3 = indirect_index_lv2 + indirect_blks * 2;
   file_offset = (indirect_index_lv3 + direct_blks - 1) * kBlockSize;
   {
-    vnode->TruncateBlocks(file_offset);
+    vnode->Truncate(file_offset);
     ASSERT_EQ(vnode->Write(buf, sizeof(buf), file_offset, &out_actual), ZX_OK);
     ASSERT_EQ(vnode->SyncFile(0, safemath::checked_cast<loff_t>(vnode->GetSize()), 0), ZX_OK);
 

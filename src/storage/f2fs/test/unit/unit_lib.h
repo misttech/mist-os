@@ -180,8 +180,7 @@ class MkfsTester {
 
 class GcTester {
  public:
-  static zx_status_t DoGarbageCollect(GcManager &manager, uint32_t segno, GcType gc_type)
-      __TA_EXCLUDES(manager.gc_mutex_);
+  static zx_status_t DoGarbageCollect(GcManager &manager, uint32_t segno, GcType gc_type);
 };
 
 class DeviceTester {

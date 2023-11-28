@@ -139,6 +139,7 @@ TEST(Teardown, ShutdownOnNoConnections) {
   // Sleep for a while until filesystem shutdown completes.
   zx::nanosleep(zx::deadline_after(zx::sec(1)));
   ASSERT_TRUE(vfs_or->IsTerminating());
+  fs->Sync();
   fs->PutSuper();
 }
 

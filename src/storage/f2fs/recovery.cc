@@ -174,7 +174,8 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   }
 
   // Deallocate previous index in the node page
-  vnode_refptr->TruncateHole(bidx, bidx + 1);
+  fs::SharedLock lock(f2fs::GetGlobalLock());
+  vnode_refptr->TruncateHole(bidx, bidx + 1, true);
 }
 
 void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
@@ -230,7 +231,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
 
       // Write dummy data page
       GetSegmentManager().RecoverDataPage(sum, src, dest);
-      vnode.SetDataBlkaddr(dnode_page.GetPage<NodePage>(), offset_in_dnode, dest);
+      dnode_page.GetPage<NodePage>().SetDataBlkaddr(offset_in_dnode, dest);
       vnode.UpdateExtentCache(dest, page.StartBidxOfNode(vnode.GetAddrsPerInode()));
     }
     ++offset_in_dnode;
@@ -292,7 +293,7 @@ void F2fs::RecoverFsyncData() {
       RecoverData(inode_list, CursegType::kCursegWarmNode);
       ZX_DEBUG_ASSERT(inode_list.is_empty());
       GetMetaVnode().InvalidatePages(GetSegmentManager().GetMainAreaStartBlock());
-      WriteCheckpoint(false, false);
+      SyncFs(false);
     }
   }
   // TODO: Handle error cases

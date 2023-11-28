@@ -47,44 +47,52 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // rename
   zx_status_t Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname,
                      std::string_view newname, bool src_must_be_dir, bool dst_must_be_dir) final
-      __TA_EXCLUDES(dir_mutex_);
+      __TA_EXCLUDES(dir_mutex_, f2fs::GetGlobalLock());
   void SetLink(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
   DirEntry *ParentDir(fbl::RefPtr<Page> *out) __TA_EXCLUDES(dir_mutex_);
   DirEntry *ParentInlineDir(fbl::RefPtr<Page> *out) __TA_REQUIRES_SHARED(dir_mutex_);
 
   // create and link
   zx_status_t Link(std::string_view name, fbl::RefPtr<fs::Vnode> new_child) final
-      __TA_EXCLUDES(dir_mutex_);
+      __TA_EXCLUDES(dir_mutex_, f2fs::GetGlobalLock());
   zx_status_t Create(std::string_view name, uint32_t mode, fbl::RefPtr<fs::Vnode> *out) final
-      __TA_EXCLUDES(dir_mutex_);
+      __TA_EXCLUDES(dir_mutex_, f2fs::GetGlobalLock());
   zx_status_t DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out)
-      __TA_REQUIRES(dir_mutex_);
+      __TA_REQUIRES(dir_mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) __TA_REQUIRES(dir_mutex_);
   zx_status_t Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out)
-      __TA_REQUIRES(dir_mutex_);
-  zx_status_t AddLink(std::string_view name, VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
-  zx::result<bool> AddInlineEntry(std::string_view name, VnodeF2fs *vnode)
-      __TA_REQUIRES(dir_mutex_);
-  zx_status_t ConvertInlineDir() __TA_REQUIRES(dir_mutex_);
+      __TA_REQUIRES(dir_mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t AddLink(std::string_view name, VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx::result<bool> AddInlineEntry(std::string_view name, VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t ConvertInlineDir() __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void UpdateParentMetadata(VnodeF2fs *vnode, unsigned int current_depth) __TA_REQUIRES(dir_mutex_);
-  zx_status_t InitInodeMetadata(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
-  zx_status_t MakeEmpty(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
-  zx_status_t MakeEmptyInlineDir(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_);
+  zx_status_t InitInodeMetadata(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t MakeEmpty(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t MakeEmptyInlineDir(VnodeF2fs *vnode) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void InitDentInode(VnodeF2fs *vnode, NodePage &page) __TA_REQUIRES(dir_mutex_);
   size_t RoomInInlineDir(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(dir_mutex_);
   size_t RoomForFilename(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(dir_mutex_);
 
   // delete
-  zx_status_t Unlink(std::string_view name, bool must_be_dir) final __TA_EXCLUDES(dir_mutex_);
-  zx_status_t Rmdir(Dir *vnode, std::string_view name) __TA_REQUIRES(dir_mutex_);
-  zx_status_t DoUnlink(VnodeF2fs *vnode, std::string_view name) __TA_REQUIRES(dir_mutex_);
+  zx_status_t Unlink(std::string_view name, bool must_be_dir) final
+      __TA_EXCLUDES(dir_mutex_, f2fs::GetGlobalLock());
+  zx_status_t Rmdir(Dir *vnode, std::string_view name) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
+  zx_status_t DoUnlink(VnodeF2fs *vnode, std::string_view name) __TA_REQUIRES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void DeleteEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
-      __TA_REQUIRES(dir_mutex_);
+      __TA_REQUIRES(dir_mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void DeleteInlineEntry(DirEntry *dentry, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
-      __TA_REQUIRES(dir_mutex_);
+      __TA_REQUIRES(dir_mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   // recovery
-  zx::result<> RecoverLink(VnodeF2fs &vnode) __TA_EXCLUDES(dir_mutex_);
+  zx::result<> RecoverLink(VnodeF2fs &vnode) __TA_EXCLUDES(dir_mutex_, f2fs::GetGlobalLock());
 
   // helper
   static uint32_t DirBuckets(uint32_t level, uint8_t dir_level);
@@ -117,9 +125,10 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
   // link helper to update link information in Rename()
   DirEntry *FindEntrySafe(std::string_view name, fbl::RefPtr<Page> *res_page)
       __TA_EXCLUDES(dir_mutex_);
-  zx_status_t AddLinkSafe(std::string_view name, VnodeF2fs *vnode) __TA_EXCLUDES(dir_mutex_);
+  zx_status_t AddLinkSafe(std::string_view name, VnodeF2fs *vnode) __TA_EXCLUDES(dir_mutex_)
+      __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   void SetLinkSafe(DirEntry *de, fbl::RefPtr<Page> &page, VnodeF2fs *vnode)
-      __TA_EXCLUDES(dir_mutex_);
+      __TA_EXCLUDES(dir_mutex_) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   // It must be acquired only by link helpers or overriding methods from fs::vnode.
   fs::SharedMutex dir_mutex_;

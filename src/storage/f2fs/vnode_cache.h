@@ -35,7 +35,8 @@ class VnodeCache {
 
   // It tries to add |vnode| to vnode_list_.
   // It returns ZX_ERR_ALREADY_EXISTS if |vnode| is already in the list.
-  zx_status_t AddDirty(VnodeF2fs* vnode);
+  zx_status_t AddDirty(VnodeF2fs& vnode);
+  bool IsDirty(VnodeF2fs& vnode) __TA_EXCLUDES(list_lock_);
   // It tries to remove |vnode| from dirty_list_.
   zx_status_t RemoveDirty(VnodeF2fs* vnode) __TA_EXCLUDES(list_lock_);
   zx_status_t RemoveDirtyUnsafe(VnodeF2fs* vnode) __TA_REQUIRES(list_lock_);
@@ -68,10 +69,9 @@ class VnodeCache {
   using VnodeTable = fbl::WAVLTree<ino_t, VnodeF2fs*, VnodeTableTraits>;
 
   // |dirty_list_| intentionally keeps the reference of dirty vnodes until all the regarding
-  // dirty pages are flushed. Once a dirty vnode is inserted in dirty_list_, it never happen that
-  // their ref_count reaches zero. Checkpoint traverses dirty_list_ and evicts clean vnodes. Then
-  // linked vnodes continue to be kept in vnode_tables_ in the form of raw pointers wheares unlinked
-  // vnodes are deleted in Vnode::Recycle() in which LockType::kFileOp is acquired.
+  // dirty pages are flushed. During checkpoint, clean vnodes are evicted from the list and
+  // keep alive in vnode_tables_ in the form of weak pointers if they are still valid. Orphans
+  // are deleted when they are evicted from the list.
   using DirtyVnodeList = fbl::DoublyLinkedList<fbl::RefPtr<VnodeF2fs>>;
 
   std::mutex table_lock_{};

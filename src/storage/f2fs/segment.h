@@ -211,7 +211,7 @@ class SegmentManager {
   block_t SumBlkAddr(int base, int type);
   bool SecUsageCheck(uint32_t secno);
 
-  void BalanceFs();
+  void BalanceFs() __TA_EXCLUDES(f2fs::GetGlobalLock());
   void LocateDirtySegment(uint32_t segno, enum DirtyType dirty_type);
   void RemoveDirtySegment(uint32_t segno, enum DirtyType dirty_type);
   void LocateDirtySegment(uint32_t segno);
