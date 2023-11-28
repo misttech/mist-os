@@ -18,7 +18,6 @@ import("//build/testing/perf/test.gni")
 
 test_list = [
   # keep-sorted start
-  "fidlc_microbenchmarks_test",
   "flatland_benchmarks_test",
   "input_latency_benchmarks_test",
   "netstack3_benchmarks_test",
@@ -206,7 +205,6 @@ if (is_host) {
     "fuchsia.fidl_microbenchmarks.reference.txt",
     "fuchsia.fidl_microbenchmarks.rust.txt",
     "fuchsia.fidl_microbenchmarks.walker.txt",
-    "fuchsia.fidlc_microbenchmarks.txt",
     "fuchsia.flatland_latency.txt",
     "fuchsia.input_latency.simplest_app.txt",
     "fuchsia.microbenchmarks.tracing.txt",
@@ -297,6 +295,7 @@ group("package_deps") {
     "//src/media/audio/audio_core/shared/mixer/tools:benchmarks",
     "//src/starnix:benchmarks",
     "//src/tests/benchmarks",
+    "//src/tests/benchmarks/fidl/fidlc:benchmarks",
     "//src/tests/microbenchmarks:fuchsia_microbenchmarks_test",
     "//third_party/sbase:sbase-pkgs",
 
