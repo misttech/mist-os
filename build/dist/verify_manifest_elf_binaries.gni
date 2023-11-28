@@ -5,6 +5,11 @@
 import("//build/config/clang/clang.gni")
 import("//build/rust/config.gni")
 
+declare_args() {
+  # Disables ELF checks for packages.
+  disable_elf_checks = false
+}
+
 # Run a command that verifies that the ELF binaries listed in a given
 # FINI manifest. More specifically, this checks that:
 #
@@ -39,37 +44,54 @@ template("verify_manifest_elf_binaries") {
     assert(defined(invoker.manifest) || defined(invoker.partial_manifest),
            "Missing 'manifest' or 'partial_manifest' argument!")
   }
-  action(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "applicable_licenses",
-                             "testonly",
-                             "visibility",
-                           ])
-    script = "//build/dist/verify_manifest_elf_binaries.py"
-    inputs = [ "//build/images/elfinfo.py" ]
-    sources = [ input_manifest ]
-    outputs = [ "$target_gen_dir/${target_name}" ]
-    depfile = outputs[0] + ".d"
-    args = [
-      "--check-stripped",
-      "--depfile=" + rebase_path(depfile, root_build_dir),
-      "--stamp=" + rebase_path(outputs[0], root_build_dir),
-    ]
-    if (defined(invoker.manifest)) {
-      args += [ "--fini-manifest=" + rebase_path(sources[0], root_build_dir) ]
-    } else {
-      args +=
-          [ "--partial-manifest=" + rebase_path(sources[0], root_build_dir) ]
+  if (disable_elf_checks) {
+    group(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      deps = invoker.deps
+      not_needed(invoker,
+                 [
+                   "applicable_licenses",
+                   "check_unstripped_files",
+                 ])
+      not_needed([ "input_manifest" ])
     }
-    if (defined(invoker.check_unstripped_files) &&
-        invoker.check_unstripped_files) {
-      args += [
-        "--check-unstripped-files",
-        "--toolchain-lib-dir=${rebased_clang_prefix}/../lib",
-        "--toolchain-lib-dir=${rebased_rustc_prefix}/lib",
+  } else {
+    action(target_name) {
+      forward_variables_from(invoker,
+                             [
+                               "applicable_licenses",
+                               "testonly",
+                               "visibility",
+                             ])
+      script = "//build/dist/verify_manifest_elf_binaries.py"
+      inputs = [ "//build/images/elfinfo.py" ]
+      sources = [ input_manifest ]
+      outputs = [ "$target_gen_dir/${target_name}" ]
+      depfile = outputs[0] + ".d"
+      args = [
+        "--check-stripped",
+        "--depfile=" + rebase_path(depfile, root_build_dir),
+        "--stamp=" + rebase_path(outputs[0], root_build_dir),
       ]
+      if (defined(invoker.manifest)) {
+        args += [ "--fini-manifest=" + rebase_path(sources[0], root_build_dir) ]
+      } else {
+        args +=
+            [ "--partial-manifest=" + rebase_path(sources[0], root_build_dir) ]
+      }
+      if (defined(invoker.check_unstripped_files) &&
+          invoker.check_unstripped_files) {
+        args += [
+          "--check-unstripped-files",
+          "--toolchain-lib-dir=${rebased_clang_prefix}/../lib",
+          "--toolchain-lib-dir=${rebased_rustc_prefix}/lib",
+        ]
+      }
+      deps = invoker.deps
     }
-    deps = invoker.deps
   }
 }
