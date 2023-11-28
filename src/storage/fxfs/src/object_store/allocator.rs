@@ -1357,14 +1357,10 @@ impl JournalingObject for SimpleAllocator {
                     entry.allocated_bytes = 0;
                 }
                 if let Some(old_bytes) = old_allocated_bytes {
-                    if context.mode.is_replay() {
-                        inner.info.marked_for_deletion.insert(owner_object_id);
-                    } else {
-                        inner.committed_marked_for_deletion.insert(
-                            owner_object_id,
-                            (context.checkpoint.file_offset, old_bytes as u64),
-                        );
-                    }
+                    inner.committed_marked_for_deletion.insert(
+                        owner_object_id,
+                        (context.checkpoint.file_offset, old_bytes as u64),
+                    );
                 }
                 inner.info.limit_bytes.remove(&owner_object_id);
             }

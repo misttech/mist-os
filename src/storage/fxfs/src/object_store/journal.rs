@@ -62,7 +62,6 @@ use {
     futures::{self, future::poll_fn, FutureExt as _},
     once_cell::sync::OnceCell,
     rand::Rng,
-    rustc_hash::FxHashMap as HashMap,
     serde::{Deserialize, Serialize},
     static_assertions::const_assert,
     std::{
@@ -305,9 +304,6 @@ impl Default for JournalOptions {
 
 struct JournaledTransactions {
     transactions: Vec<JournaledTransaction>,
-    // Maps from owner_object_id to offset at which it was deleted. Required for checksum
-    // validation.
-    marked_for_deletion: HashMap<u64, u64>,
     device_flushed_offset: u64,
 }
 
@@ -616,7 +612,7 @@ impl Journal {
         }
 
         let mut reader = JournalReader::new(handle, &super_block.journal_checkpoint);
-        let JournaledTransactions { transactions, marked_for_deletion, device_flushed_offset } =
+        let JournaledTransactions { transactions, device_flushed_offset } =
             self.read_transactions(&mut reader, None).await?;
 
         // Validate all the mutations.
@@ -641,7 +637,7 @@ impl Journal {
 
         // Validate the checksums.
         let valid_to = checksum_list
-            .verify(device.as_ref(), marked_for_deletion, valid_to)
+            .verify(device.as_ref(), valid_to)
             .await
             .context("Failed to validate checksums")?;
 
@@ -720,6 +716,9 @@ impl Journal {
             .await
             .context("Failed to complete replay for object manager")?;
 
+        // Tell the allocator where we know the device has been flushed to.
+        self.objects.allocator().did_flush_device(device_flushed_offset).await;
+
         if last_checkpoint.file_offset != reader.journal_file_checkpoint().file_offset {
             info!(
                 checkpoint = last_checkpoint.file_offset,
@@ -738,7 +737,6 @@ impl Journal {
         end_offset: Option<u64>,
     ) -> Result<JournaledTransactions, Error> {
         let mut transactions = Vec::new();
-        let mut marked_for_deletion = HashMap::default();
         let (mut device_flushed_offset, root_parent_store_object_id) = {
             let super_block = &self.inner.lock().unwrap().super_block_header;
             (super_block.super_block_journal_file_offset, super_block.root_parent_store_object_id)
@@ -853,17 +851,6 @@ impl Journal {
                                             );
                                         }
                                     }
-                                    // If a MarkForDeletion mutation is found, we want to skip
-                                    // checksum validation of prior writes.
-                                    if let Mutation::Allocator(
-                                        AllocatorMutation::MarkForDeletion(owner_object_id),
-                                    ) = mutation
-                                    {
-                                        marked_for_deletion.insert(
-                                            *owner_object_id,
-                                            reader.journal_file_checkpoint().file_offset,
-                                        );
-                                    }
                                 }
                                 *end_offset = reader.journal_file_checkpoint().file_offset;
                             }
@@ -901,7 +888,7 @@ impl Journal {
             transactions.pop();
         }
 
-        Ok(JournaledTransactions { transactions, marked_for_deletion, device_flushed_offset })
+        Ok(JournaledTransactions { transactions, device_flushed_offset })
     }
 
     /// Creates an empty filesystem with the minimum viable objects (including a root parent and
