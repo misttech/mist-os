@@ -133,7 +133,7 @@ macro_rules! page_in_benchmark {
                 trace_duration!(
                     "benchmark",
                     stringify!($benchmark),
-                    "blob_size" => self.blob_size as u64
+                    "blob_size" => self.blob_size
                 );
                 let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
                 let blob = $data_gen_fn(self.blob_size, &mut rng);
@@ -173,7 +173,7 @@ impl<T: BlobFilesystem> Benchmark<T> for WriteBlob {
         trace_duration!(
             "benchmark",
             "WriteBlob",
-            "blob_size" => self.blob_size as u64
+            "blob_size" => self.blob_size
         );
         const SAMPLES: usize = 5;
         let mut rng = XorShiftRng::seed_from_u64(RNG_SEED);
@@ -358,7 +358,7 @@ async fn page_in_blob_benchmark(
     let data = mapped_blob.data();
     let mut durations = Vec::new();
     for i in page_iter {
-        trace_duration!("benchmark", "page_in", "offset" => i as u64);
+        trace_duration!("benchmark", "page_in", "offset" => i);
         let timer = OperationTimer::start();
         std::hint::black_box(data[i]);
         durations.push(timer.stop());

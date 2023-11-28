@@ -601,7 +601,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                 let () = responder.send(result.as_deref().map_err(|s| s.into_raw()))?;
             }
             fio::FileRequest::Write { data, responder } => {
-                fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len() as u64);
+                fuchsia_trace::duration!("storage", "File::Write", "bytes" => data.len());
                 let result = self.handle_write(data).await;
                 responder.send(result.map_err(zx::Status::into_raw))?;
             }
@@ -610,7 +610,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     "storage",
                     "File::WriteAt",
                     "offset" => offset,
-                    "bytes" => data.len() as u64
+                    "bytes" => data.len()
                 );
                 let result = self.handle_write_at(offset, data).await;
                 responder.send(result.map_err(zx::Status::into_raw))?;

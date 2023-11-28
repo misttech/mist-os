@@ -153,6 +153,8 @@ arg_from!(val,
     (u32, sys::TRACE_ARG_UINT32, sys::trace_arg_union_t { uint32_value: val })
     (i64, sys::TRACE_ARG_INT64, sys::trace_arg_union_t { int64_value: val })
     (u64, sys::TRACE_ARG_UINT64, sys::trace_arg_union_t { uint64_value: val })
+    (isize, sys::TRACE_ARG_INT64, sys::trace_arg_union_t { int64_value: val as i64 })
+    (usize, sys::TRACE_ARG_UINT64, sys::trace_arg_union_t { uint64_value: val as u64 })
     (f64, sys::TRACE_ARG_DOUBLE, sys::trace_arg_union_t { double_value: val })
     (zx::Koid, sys::TRACE_ARG_KOID, sys::trace_arg_union_t { koid_value: val.raw_koid() })
 );

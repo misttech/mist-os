@@ -43,8 +43,8 @@ impl<T: CacheClearableFilesystem> Benchmark<T> for ReadSequentialCold {
         trace_duration!(
             "benchmark",
             "ReadSequentialCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -84,8 +84,8 @@ impl<T: Filesystem> Benchmark<T> for ReadSequentialWarm {
         trace_duration!(
             "benchmark",
             "ReadSequentialWarm",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -124,8 +124,8 @@ impl<T: CacheClearableFilesystem> Benchmark<T> for ReadRandomCold {
         trace_duration!(
             "benchmark",
             "ReadRandomCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -167,8 +167,8 @@ impl<T: CacheClearableFilesystem> Benchmark<T> for ReadSparseCold {
         trace_duration!(
             "benchmark",
             "ReadSparseCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -208,8 +208,8 @@ impl<T: Filesystem> Benchmark<T> for ReadRandomWarm {
         trace_duration!(
             "benchmark",
             "ReadRandomWarm",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -247,8 +247,8 @@ impl<T: Filesystem> Benchmark<T> for WriteSequentialCold {
         trace_duration!(
             "benchmark",
             "WriteSequentialCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
         let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
@@ -280,8 +280,8 @@ impl<T: Filesystem> Benchmark<T> for WriteSequentialWarm {
         trace_duration!(
             "benchmark",
             "WriteSequentialWarm",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -318,8 +318,8 @@ impl<T: Filesystem> Benchmark<T> for WriteRandomCold {
         trace_duration!(
             "benchmark",
             "WriteRandomCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
         let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
@@ -352,8 +352,8 @@ impl<T: Filesystem> Benchmark<T> for WriteRandomWarm {
         trace_duration!(
             "benchmark",
             "WriteRandomWarm",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -390,8 +390,8 @@ impl<T: Filesystem> Benchmark<T> for WriteSequentialFsyncCold {
         trace_duration!(
             "benchmark",
             "WriteSequentialFsyncCold",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
         let mut file = OpenOptions::new().write(true).create_new(true).open(&file_path).unwrap();
@@ -423,8 +423,8 @@ impl<T: Filesystem> Benchmark<T> for WriteSequentialFsyncWarm {
         trace_duration!(
             "benchmark",
             "WriteSequentialFsyncWarm",
-            "op_size" => self.op_size as u64,
-            "op_count" => self.op_count as u64
+            "op_size" => self.op_size,
+            "op_count" => self.op_count
         );
         let file_path = fs.benchmark_dir().join("file");
 
@@ -472,7 +472,7 @@ fn read_sequential<F: AsRawFd>(
     let mut durations = Vec::new();
     let fd = file.as_raw_fd();
     for i in 0..op_count {
-        trace_duration!("benchmark", "read", "op_number" => i as u64);
+        trace_duration!("benchmark", "read", "op_number" => i);
         let timer = OperationTimer::start();
         let result = unsafe { libc::read(fd, data.as_mut_ptr() as *mut libc::c_void, data.len()) };
         durations.push(timer.stop());
@@ -494,7 +494,7 @@ fn read_sparse<F: AsRawFd>(
     let fd = file.as_raw_fd();
     let sparse_offset = ((1 + block_skip) * op_size) as i64;
     for i in 0..op_count as i64 {
-        trace_duration!("benchmark", "pread", "op_number" => i as u64);
+        trace_duration!("benchmark", "pread", "op_number" => i);
         let timer = OperationTimer::start();
         let result = unsafe {
             libc::pread(fd, data.as_mut_ptr() as *mut libc::c_void, data.len(), i * sparse_offset)
@@ -515,7 +515,7 @@ fn write_sequential<F: AsRawFd>(
     let mut durations = Vec::new();
     let fd = file.as_raw_fd();
     for i in 0..op_count {
-        trace_duration!("benchmark", "write", "op_number" => i as u64);
+        trace_duration!("benchmark", "write", "op_number" => i);
         let timer = OperationTimer::start();
         let result = unsafe { libc::write(fd, data.as_ptr() as *const libc::c_void, data.len()) };
         durations.push(timer.stop());
@@ -535,7 +535,7 @@ fn write_sequential_fsync<F: AsRawFd>(
     let mut durations = Vec::new();
     let fd = file.as_raw_fd();
     for i in 0..op_count {
-        trace_duration!("benchmark", "write", "op_number" => i as u64);
+        trace_duration!("benchmark", "write", "op_number" => i);
         let timer = OperationTimer::start();
         let write_result =
             unsafe { libc::write(fd, data.as_ptr() as *const libc::c_void, data.len()) };
@@ -569,7 +569,7 @@ fn read_random<F: AsRawFd, R: Rng>(
     let mut durations = Vec::new();
     let fd = file.as_raw_fd();
     for (i, offset) in offsets.iter().enumerate() {
-        trace_duration!("benchmark", "pread", "op_number" => i as u64, "offset" => *offset);
+        trace_duration!("benchmark", "pread", "op_number" => i, "offset" => *offset);
         let timer = OperationTimer::start();
         let result =
             unsafe { libc::pread(fd, data.as_mut_ptr() as *mut libc::c_void, data.len(), *offset) };
@@ -593,7 +593,7 @@ fn write_random<F: AsRawFd, R: Rng>(
     let mut durations = Vec::new();
     let fd = file.as_raw_fd();
     for (i, offset) in offsets.iter().enumerate() {
-        trace_duration!("benchmark", "pwrite", "op_number" => i as u64, "offset" => *offset);
+        trace_duration!("benchmark", "pwrite", "op_number" => i, "offset" => *offset);
         let timer = OperationTimer::start();
         let result =
             unsafe { libc::pwrite(fd, data.as_ptr() as *const libc::c_void, data.len(), *offset) };
