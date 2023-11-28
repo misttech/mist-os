@@ -11,6 +11,7 @@ config("magma_include") {
 source_set("magma_headers") {
   sources = [
     "include/lib/magma/magma.h",
+    "include/lib/magma/magma_logging.h",
     "include/lib/magma/magma_sysmem.h",
   ]
   public_deps = [ "//sdk/lib/magma_common" ]

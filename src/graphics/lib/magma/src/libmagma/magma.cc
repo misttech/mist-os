@@ -4,6 +4,7 @@
 
 #include <lib/magma/magma.h>
 #include <lib/magma/magma_common_defs.h>
+#include <lib/magma/magma_logging.h>
 #include <lib/magma/platform/platform_connection_client.h>
 #include <lib/magma/platform/platform_device_client.h>
 #include <lib/magma/platform/platform_handle.h>
@@ -199,6 +200,25 @@ magma_status_t magma_buffer_export(magma_buffer_t buffer, uint32_t* buffer_handl
     return DRET(MAGMA_STATUS_INVALID_ARGS);
 
   return MAGMA_STATUS_OK;
+}
+
+void magma_fuchsia_log(int8_t severity, const char* tag, const char* file, int line,
+                       const char* format, va_list va) {
+  magma::PlatformLogger::LogLevel level;
+  switch (severity) {
+    case 0x30:
+      level = magma::PlatformLogger::LOG_INFO;
+      break;
+    case 0x40:
+      level = magma::PlatformLogger::LOG_WARNING;
+      break;
+    case 0x50:
+      level = magma::PlatformLogger::LOG_ERROR;
+      break;
+    default:
+      level = magma::PlatformLogger::LOG_INFO;
+  }
+  magma::PlatformLogger::LogVa(level, file, line, format, va);
 }
 
 magma_status_t magma_connection_map_buffer(magma_connection_t connection, uint64_t hw_va,
