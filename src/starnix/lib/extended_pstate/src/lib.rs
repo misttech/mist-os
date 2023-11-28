@@ -74,7 +74,7 @@ impl ExtendedPstateState {
 
     #[cfg(target_arch = "aarch64")]
     pub fn get_arm64_qregs(&self) -> &[u128; 32] {
-        unsafe { std::mem::transmute::<&[aarch64::AlignedU128; 32], &[u128; 32]>(&self.state.q) }
+        &self.state.q
     }
 
     #[cfg(target_arch = "aarch64")]
@@ -89,9 +89,7 @@ impl ExtendedPstateState {
 
     #[cfg(target_arch = "aarch64")]
     pub fn set_arm64_state(&mut self, qregs: &[u128; 32], fpsr: u32, fpcr: u32) {
-        for i in 0..qregs.len() {
-            self.state.q[i] = aarch64::AlignedU128(qregs[i]);
-        }
+        self.state.q = *qregs;
         self.state.fpsr = fpsr;
         self.state.fpcr = fpcr;
     }

@@ -5,22 +5,21 @@
 use core::arch::asm;
 use static_assertions::const_assert_eq;
 
-// Aarch64 supports aligned and unaligned stores to/from vector registers. Aligned accesses may be faster.
-#[repr(align(16))]
-#[derive(Clone, Copy, Default)]
-pub struct AlignedU128(pub u128);
-
 #[derive(Default)]
 pub struct State {
     // [arm/v8]: A1.3.1 Execution state
     // 32 registers, 128 bits each
-    pub q: [AlignedU128; 32],
+    pub q: [u128; 32],
     // [arm/v8]: A1.5 Advanced SIMD and floating-point support
     pub fpcr: u32,
     pub fpsr: u32,
 }
 
 const_assert_eq!(std::mem::size_of::<State>(), 512 + 16);
+
+// Aarch64 supports aligned and unaligned stores to/from vector registers. Aligned accesses may be
+// faster.
+const_assert_eq!(std::mem::align_of::<u128>(), 16);
 
 impl State {
     #[inline(always)]
