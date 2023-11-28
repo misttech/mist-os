@@ -13,7 +13,7 @@ use crate::{
 use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall,
-    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
+    errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
     sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
@@ -81,7 +81,10 @@ impl SignalStackFrame {
     }
 }
 
-pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &SignalStackFrame) {
+pub fn restore_registers(
+    current_task: &mut CurrentTask,
+    signal_stack_frame: &SignalStackFrame,
+) -> Result<(), Errno> {
     let regs = &signal_stack_frame.context.uc_mcontext.sc_regs;
     // Restore the register state from before executing the signal handler.
     current_task.registers = zx::sys::zx_thread_state_general_regs_t {
@@ -122,6 +125,8 @@ pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &Si
 
     let d_state = unsafe { &signal_stack_frame.context.uc_mcontext.sc_fpregs.d };
     current_task.extended_pstate.set_riscv64_fp(&d_state.f, d_state.fcsr);
+
+    Ok(())
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {

@@ -364,7 +364,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
 
     // Grab the registers state from the stack frame.
     let signal_stack_frame = SignalStackFrame::from_bytes(signal_stack_bytes);
-    restore_registers(current_task, &signal_stack_frame);
+    restore_registers(current_task, &signal_stack_frame)?;
 
     // Restore the stored signal mask.
     current_task.write().signals.set_mask(SigSet::from(signal_stack_frame.context.uc_sigmask));

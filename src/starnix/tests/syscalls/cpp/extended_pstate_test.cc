@@ -74,6 +74,7 @@ RegistersValue GetTestRegistersFromUcontext(ucontext_t* ucontext) {
 #elif defined(__aarch64__)
   fpsimd_context* fp_context = reinterpret_cast<fpsimd_context*>(ucontext->uc_mcontext.__reserved);
   EXPECT_EQ(fp_context->head.magic, static_cast<uint32_t>(FPSIMD_MAGIC));
+  EXPECT_EQ(fp_context->head.size, sizeof(fpsimd_context));
   memcpy(&result, fp_context->vregs, sizeof(result));
 #elif defined(__riscv)
   memcpy(&result, reinterpret_cast<void*>(ucontext->uc_mcontext.__fpregs.__d.__f), sizeof(result));
@@ -180,7 +181,7 @@ TEST(ExtendedPstate, Signals) {
       // Raise another signal.
       raise(SIGUSR1);
 
-      // Nested signal handled should preserve all registers.
+      // Nested signal handler should preserve all registers.
       EXPECT_EQ(GetTestRegisters(), kNestedRegs);
 
       // Nested signal handler should receive values at the time it was invoked.

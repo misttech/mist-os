@@ -202,9 +202,6 @@
                 "CloneTest.NewUserNamespacePermitsAllOtherNamespaces",
                 "CloneTest.NonCanonicalTLS",
 
-                // fpsig_nested_test
-                "FPSigTest.NestedSignals",
-
                 // futex_test - https://fxbug.dev/79277 Needs atomic ops on restricted memory.
                 "PrivateFutexTest.WakeOp0Set",
                 "PrivateFutexTest.WakeOp0Add",
@@ -1127,6 +1124,9 @@
                 // TODO(fxbug.dev/129161): Fix flake.
                 "VforkTest.ExecedChildExitDoesntUnstopParent",
                 "VforkTest.ParentStopsUntilChildExits",
+
+                // TODO(b/302340440): Save XMM registers in signal handlers on x64.
+                "FPSigTest.NestedSignals",
             ],
         },
     ],

@@ -8,16 +8,16 @@ use static_assertions::const_assert_eq;
 // Aarch64 supports aligned and unaligned stores to/from vector registers. Aligned accesses may be faster.
 #[repr(align(16))]
 #[derive(Clone, Copy, Default)]
-struct AlignedU128(u128);
+pub struct AlignedU128(pub u128);
 
 #[derive(Default)]
 pub struct State {
     // [arm/v8]: A1.3.1 Execution state
     // 32 registers, 128 bits each
-    q: [AlignedU128; 32],
+    pub q: [AlignedU128; 32],
     // [arm/v8]: A1.5 Advanced SIMD and floating-point support
-    fpcr: u64,
-    fpsr: u64,
+    pub fpcr: u32,
+    pub fpsr: u32,
 }
 
 const_assert_eq!(std::mem::size_of::<State>(), 512 + 16);
@@ -46,8 +46,8 @@ impl State {
               q = in(reg) &self.q,
             );
             asm!(
-              "mrs {fpcr}, fpcr",
-              "mrs {fpsr}, fpsr",
+              "mrs {fpcr:x}, fpcr",
+              "mrs {fpsr:x}, fpsr",
               fpcr = out(reg) self.fpcr,
               fpsr = out(reg) self.fpsr,
             );
@@ -74,8 +74,8 @@ impl State {
           "ldp q26, q27, [{q}, #(13 * 32)]",
           "ldp q28, q29, [{q}, #(14 * 32)]",
           "ldp q30, q31, [{q}, #(15 * 32)]",
-          "msr fpcr, {fpcr}",
-          "msr fpsr, {fpsr}",
+          "msr fpcr, {fpcr:x}",
+          "msr fpsr, {fpsr:x}",
           q = in(reg) &self.q,
           fpcr = in(reg) self.fpcr,
           fpsr = in(reg) self.fpsr,

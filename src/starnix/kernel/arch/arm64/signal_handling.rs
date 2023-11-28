@@ -6,16 +6,20 @@ use fuchsia_zircon as zx;
 
 use crate::{
     arch::registers::RegisterState,
+    log_debug,
     mm::vmo::round_up_to_increment,
+    not_implemented,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
 };
 use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
-    __NR_restart_syscall,
-    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
-    sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
+    __NR_restart_syscall, _aarch64_ctx, error,
+    errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
+    esr_context, fpsimd_context, sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
+    ESR_MAGIC, EXTRA_MAGIC, FPSIMD_MAGIC,
 };
+use zerocopy::{AsBytes, FromBytes};
 
 /// The size of the red zone.
 // TODO(fxbug.dev/121659): Determine whether or not this is the correct red zone size for aarch64.
@@ -39,7 +43,7 @@ impl SignalStackFrame {
     pub fn new(
         task: &Task,
         registers: &mut RegisterState,
-        _extended_pstate: &ExtendedPstateState,
+        extended_pstate: &ExtendedPstateState,
         signal_state: &SignalState,
         siginfo: &SignalInfo,
         _action: sigaction_t,
@@ -67,7 +71,7 @@ impl SignalStackFrame {
                 // TODO(fxbug.dev/121659): Should actually contain the fault address for SIGBUS and
                 // SIGSEGV.
                 fault_address: 0,
-                // TODO(b/311770726): Save `extended_pstate`.
+                __reserved: get_sigcontext_data(extended_pstate),
                 ..Default::default()
             },
             ..Default::default()
@@ -89,7 +93,10 @@ impl SignalStackFrame {
     }
 }
 
-pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &SignalStackFrame) {
+pub fn restore_registers(
+    current_task: &mut CurrentTask,
+    signal_stack_frame: &SignalStackFrame,
+) -> Result<(), Errno> {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // `zx_thread_state_general_regs_t` stores the link register separately from the other general
     // purpose registers, but the uapi struct does not. Thus we just need to copy out the first 30
@@ -108,6 +115,8 @@ pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &Si
         tpidr: current_task.registers.tpidr,
     }
     .into();
+
+    parse_sigcontext_data(&uctx.__reserved, &mut current_task.extended_pstate)
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {
@@ -122,4 +131,109 @@ pub fn update_register_state_for_restart(registers: &mut RegisterState, err: Err
     // Reset the x0 register value to what it was when the original syscall trap occurred. This
     // needs to be done because x0 may have been overwritten in the syscall dispatch loop.
     registers.r[0] = registers.orig_x0;
+}
+
+// Size of `sigcontext::__reserved`.
+const SIGCONTEXT_RESERVED_DATA_SIZE: usize = 4096;
+
+// Returns the array to be saved in `sigcontext.__reserved`. It contains a sequence of sections
+// each identified with a `_aarch64_ctx` header. The end is indicated with both fields in the
+// header set to 0.
+fn get_sigcontext_data(
+    extended_pstate: &ExtendedPstateState,
+) -> [u8; SIGCONTEXT_RESERVED_DATA_SIZE] {
+    let mut result = [0u8; SIGCONTEXT_RESERVED_DATA_SIZE];
+
+    let fpsimd = fpsimd_context {
+        head: _aarch64_ctx {
+            magic: FPSIMD_MAGIC,
+            size: std::mem::size_of::<fpsimd_context>() as u32,
+        },
+        fpsr: extended_pstate.get_arm64_fpsr(),
+        fpcr: extended_pstate.get_arm64_fpcr(),
+        vregs: *extended_pstate.get_arm64_qregs(),
+    };
+    fpsimd.write_to_prefix(&mut result);
+
+    // TODO(b/313465152): Save ESR with `esr_context` and `ESR_MAGIC`. The register is read-only,
+    // but the signal handler may still need to read it from `sigcontext`.
+
+    result
+}
+
+fn parse_sigcontext_data(
+    data: &[u8; SIGCONTEXT_RESERVED_DATA_SIZE],
+    extended_pstate: &mut ExtendedPstateState,
+) -> Result<(), Errno> {
+    const FPSIMD_CONTEXT_SIZE: u32 = std::mem::size_of::<fpsimd_context>() as u32;
+    const ESR_CONTEXT_SIZE: u32 = std::mem::size_of::<esr_context>() as u32;
+
+    let mut found_fpsimd = false;
+    let mut offset: usize = 0;
+    loop {
+        match _aarch64_ctx::read_from_prefix(&data[offset..]) {
+            Some(_aarch64_ctx { magic: 0, size: 0 }) => break,
+
+            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE })
+                if found_fpsimd =>
+            {
+                log_debug!("Found duplicate `fpsimd_context` in `sigcontext`");
+                return error!(EINVAL);
+            }
+
+            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size: FPSIMD_CONTEXT_SIZE }) => {
+                found_fpsimd = true;
+
+                // Set Q registers.
+                let fpsimd = fpsimd_context::read_from_prefix(&data[offset..])
+                    .expect("Failed to get fpsimd_context from array");
+                extended_pstate.set_arm64_state(&fpsimd.vregs, fpsimd.fpsr, fpsimd.fpcr);
+
+                offset += FPSIMD_CONTEXT_SIZE as usize;
+            }
+
+            Some(_aarch64_ctx { magic: FPSIMD_MAGIC, size }) => {
+                log_debug!("Invalid size for `fpsimd_context` in `sigcontext`: {}", size);
+                return error!(EINVAL);
+            }
+
+            Some(_aarch64_ctx { magic: ESR_MAGIC, size: ESR_CONTEXT_SIZE }) => {
+                // ESR register is read-only so we can skip it.
+                offset += ESR_CONTEXT_SIZE as usize;
+            }
+
+            Some(_aarch64_ctx { magic: ESR_MAGIC, size }) => {
+                log_debug!("Invalid size for `fpsimd_context` in `sigcontext`: {}", size);
+                return error!(EINVAL);
+            }
+
+            Some(_aarch64_ctx { magic: EXTRA_MAGIC, size }) => {
+                if size as usize <= std::mem::size_of::<_aarch64_ctx>() {
+                    log_debug!("Invalid size for `EXTRA_MAGIC` section in `sigcontext`");
+                    return error!(EINVAL);
+                }
+
+                not_implemented!("Skipping `EXTRA_MAGIC` section in `sigcontext`");
+                offset += ESR_CONTEXT_SIZE as usize;
+            }
+
+            Some(_aarch64_ctx { magic, size }) => {
+                log_debug!(
+                    "Unrecognized sectionin `sigcontext` (magic: 0x{:x}. size: {})",
+                    magic,
+                    size
+                );
+                return error!(EINVAL);
+            }
+
+            None => return error!(EINVAL),
+        };
+    }
+
+    if !found_fpsimd {
+        log_debug!("Couldn't find `fpsimd_context` in `sigcontext`");
+        return error!(EINVAL);
+    }
+
+    Ok(())
 }

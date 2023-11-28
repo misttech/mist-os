@@ -366,6 +366,33 @@ TEST(SignalHandlingDeathTest, SIGSEGVWithHanderFailsCausesSIGSEGV) {
       testing::KilledBySignal(SIGSEGV), "");
 }
 
+// Currently sigcontext restore may fail only on ARM64.
+#if defined(__aarch64__)
+TEST(SignalHandlingDeathTest, InvalidSigcontextCausesSIGSEGV) {
+  EXPECT_EXIT(
+      []() {
+        // Set a handler for SIGUSR1.
+        struct sigaction sigusr1_action = {};
+        sigusr1_action.sa_sigaction = [](int sig, siginfo_t *info, void *ucontext_ptr) {
+          ucontext_t *ucontext = reinterpret_cast<ucontext_t *>(ucontext_ptr);
+          _aarch64_ctx *first_hdr =
+              reinterpret_cast<_aarch64_ctx *>(ucontext->uc_mcontext.__reserved);
+
+          // Set size of the first section to and invalid value. This should result in SIGSEGV when
+          // returning from the signal handler.
+          first_hdr->size = 5123;
+        };
+
+        if (sigaction(SIGUSR1, &sigusr1_action, 0)) {
+          exit(kExitTestFailure);
+        }
+
+        kill(getpid(), SIGUSR1);
+      }(),
+      testing::KilledBySignal(SIGSEGV), "");
+}
+#endif  // defined(__aarch64__)
+
 TEST(SignalHandlingDeathTest, SignalStackUnmappedDeliversSIGSEGV) {
   constexpr size_t kStackSize = 0x20000;
   void *temp_stack = mmap(NULL, kStackSize, PROT_READ | PROT_WRITE,

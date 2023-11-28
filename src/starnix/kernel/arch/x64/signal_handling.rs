@@ -12,7 +12,7 @@ use crate::{
 use extended_pstate::ExtendedPstateState;
 use starnix_uapi::{
     __NR_restart_syscall, _fpstate_64,
-    errors::{ErrnoCode, ERESTART_RESTARTBLOCK},
+    errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},
     sigaction_t, sigaltstack, sigcontext, siginfo_t, ucontext,
 };
 
@@ -128,7 +128,10 @@ pub fn align_stack_pointer(pointer: u64) -> u64 {
     pointer - (pointer % 16 + 8)
 }
 
-pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &SignalStackFrame) {
+pub fn restore_registers(
+    current_task: &mut CurrentTask,
+    signal_stack_frame: &SignalStackFrame,
+) -> Result<(), Errno> {
     let uctx = &signal_stack_frame.context.uc_mcontext;
     // Restore the register state from before executing the signal handler.
     current_task.registers = zx::sys::zx_thread_state_general_regs_t {
@@ -154,6 +157,8 @@ pub fn restore_registers(current_task: &mut CurrentTask, signal_stack_frame: &Si
         gs_base: current_task.registers.gs_base,
     }
     .into();
+
+    Ok(())
 }
 
 pub fn update_register_state_for_restart(registers: &mut RegisterState, err: ErrnoCode) {

@@ -20,7 +20,7 @@ pub struct ExtendedPstateState {
     state: aarch64::State,
 
     #[cfg(target_arch = "riscv64")]
-    pub state: riscv64::State,
+    state: riscv64::State,
 }
 
 impl ExtendedPstateState {
@@ -65,6 +65,30 @@ impl ExtendedPstateState {
 
     pub fn reset(&mut self) {
         self.state.reset()
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn get_arm64_qregs(&self) -> &[u128; 32] {
+        unsafe { std::mem::transmute::<&[aarch64::AlignedU128; 32], &[u128; 32]>(&self.state.q) }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn get_arm64_fpsr(&self) -> u32 {
+        self.state.fpsr
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn get_arm64_fpcr(&self) -> u32 {
+        self.state.fpcr
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    pub fn set_arm64_state(&mut self, qregs: &[u128; 32], fpsr: u32, fpcr: u32) {
+        for i in 0..qregs.len() {
+            self.state.q[i] = aarch64::AlignedU128(qregs[i]);
+        }
+        self.state.fpsr = fpsr;
+        self.state.fpcr = fpcr;
     }
 
     #[cfg(target_arch = "riscv64")]
