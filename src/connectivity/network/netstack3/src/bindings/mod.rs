@@ -22,7 +22,6 @@ mod neighbor_worker;
 mod netdevice_worker;
 mod root_fidl_worker;
 mod routes;
-mod routes_fidl_worker;
 mod socket;
 mod stack_fidl_worker;
 mod timers;
@@ -1307,15 +1306,13 @@ impl NetstackSeed {
                                 .await
                         }
                         Service::RoutesState(rs) => {
-                            routes_fidl_worker::serve_state(rs, netstack.ctx.clone()).await
+                            routes::state::serve_state(rs, netstack.ctx.clone()).await
                         }
                         Service::RoutesStateV4(rs) => {
-                            routes_fidl_worker::serve_state_v4(rs, &route_update_dispatcher_v4)
-                                .await
+                            routes::state::serve_state_v4(rs, &route_update_dispatcher_v4).await
                         }
                         Service::RoutesStateV6(rs) => {
-                            routes_fidl_worker::serve_state_v6(rs, &route_update_dispatcher_v6)
-                                .await
+                            routes::state::serve_state_v6(rs, &route_update_dispatcher_v6).await
                         }
                         Service::RoutesAdminV4(rs) => routes::admin::serve_provider_v4(
                             rs,

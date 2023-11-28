@@ -37,6 +37,8 @@ use netstack3_core::ip::types::AddableMetric;
 pub(crate) mod admin;
 use admin::{StrongUserRouteSet, WeakUserRouteSet};
 
+pub(crate) mod state;
+
 type WeakDeviceId = netstack3_core::device::WeakDeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
 type DeviceId = netstack3_core::device::DeviceId<crate::bindings::BindingsNonSyncCtxImpl>;
 
@@ -363,7 +365,7 @@ impl EntryData {
 pub(crate) struct State<I: Ip> {
     receiver: mpsc::UnboundedReceiver<WorkItem<I::Addr>>,
     table: Table<I::Addr>,
-    update_dispatcher: crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
+    update_dispatcher: crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 }
 
 #[derive(derivative::Derivative)]
@@ -416,7 +418,7 @@ async fn handle_change<I: Ip>(
     table: &mut Table<I::Addr>,
     ctx: &mut Ctx,
     change: Change<I::Addr>,
-    route_update_dispatcher: &crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
+    route_update_dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
 ) -> Result<ChangeOutcome, Error> {
     let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
@@ -552,7 +554,7 @@ async fn handle_change<I: Ip>(
                 .try_into_fidl_with_ctx(non_sync_ctx)
                 .expect("failed to convert route to FIDL");
             route_update_dispatcher
-                .notify(crate::bindings::routes_fidl_worker::RoutingTableUpdate::<I>::RouteAdded(
+                .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteAdded(
                     installed_route,
                 ))
                 .await
@@ -568,7 +570,7 @@ async fn handle_change<I: Ip>(
 
 async fn notify_removed_routes<I: Ip>(
     non_sync_ctx: &mut crate::bindings::BindingsNonSyncCtxImpl,
-    dispatcher: &crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<I>,
+    dispatcher: &crate::bindings::routes::state::RouteUpdateDispatcher<I>,
     removed_routes: impl IntoIterator<Item = netstack3_core::ip::types::Entry<I::Addr, DeviceId>>,
     table: &Table<I::Addr>,
 ) {
@@ -604,7 +606,7 @@ async fn notify_removed_routes<I: Ip>(
         let installed_route =
             entry.try_into_fidl_with_ctx(non_sync_ctx).expect("failed to convert route to FIDL");
         dispatcher
-            .notify(crate::bindings::routes_fidl_worker::RoutingTableUpdate::<I>::RouteRemoved(
+            .notify(crate::bindings::routes::state::RoutingTableUpdate::<I>::RouteRemoved(
                 installed_route,
             ))
             .await
@@ -628,8 +630,8 @@ impl ChangeRunner {
     pub(crate) fn route_update_dispatchers(
         &self,
     ) -> (
-        crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<Ipv4>,
-        crate::bindings::routes_fidl_worker::RouteUpdateDispatcher<Ipv6>,
+        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv4>,
+        crate::bindings::routes::state::RouteUpdateDispatcher<Ipv6>,
     ) {
         let Self { v4, v6 } = self;
         (v4.update_dispatcher.clone(), v6.update_dispatcher.clone())
