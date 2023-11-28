@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <lib/magma/magma.h>
+#include <lib/magma/magma_logging.h>
 #include <lib/magma/magma_sysmem.h>
 #include <lib/magma/platform/platform_buffer.h>
 #include <lib/magma/platform/platform_semaphore.h>
@@ -152,6 +153,25 @@ magma_status_t magma_sysmem_connection_import_buffer_collection(
 magma_status_t magma_sysmem_connection_import(magma_handle_t channel,
                                               magma_sysmem_connection_t* connection_out) {
   return MAGMA_STATUS_UNIMPLEMENTED;
+}
+
+void magma_fuchsia_log(int8_t severity, const char* tag, const char* file, int line,
+                       const char* format, va_list va) {
+  magma::PlatformLogger::LogLevel level;
+  switch (severity) {
+    case 0x30:
+      level = magma::PlatformLogger::LOG_INFO;
+      break;
+    case 0x40:
+      level = magma::PlatformLogger::LOG_WARNING;
+      break;
+    case 0x50:
+      level = magma::PlatformLogger::LOG_ERROR;
+      break;
+    default:
+      level = magma::PlatformLogger::LOG_INFO;
+  }
+  magma::PlatformLogger::LogVa(level, file, line, format, va);
 }
 
 void magma_sysmem_connection_release(magma_sysmem_connection_t connection) {}
