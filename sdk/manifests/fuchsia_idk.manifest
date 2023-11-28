@@ -13,6 +13,7 @@ cc_prebuilt_library://pkg/sync
 cc_prebuilt_library://pkg/syslog
 cc_prebuilt_library://pkg/trace-engine
 cc_prebuilt_library://pkg/trace-provider-so
+cc_prebuilt_library://pkg/trace-vthread
 cc_prebuilt_library://pkg/vulkan
 cc_source_library://pkg/async
 cc_source_library://pkg/async-cpp
@@ -72,6 +73,7 @@ cc_source_library://pkg/syslog_structured_backend
 cc_source_library://pkg/trace
 cc_source_library://pkg/trace-engine-headersonly
 cc_source_library://pkg/trace-headersonly
+cc_source_library://pkg/trace-vthread-headersonly
 cc_source_library://pkg/utf-utils
 cc_source_library://pkg/vfs_cpp
 cc_source_library://pkg/zx

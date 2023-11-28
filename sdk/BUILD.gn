@@ -515,6 +515,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//zircon/system/ulib/async-testing:async-testing_sdk",
     "//zircon/system/ulib/inspect:inspect_sdk",
     "//zircon/system/ulib/trace:trace_sdk",
+    "//zircon/system/ulib/trace-vthread:trace-vthread_sdk",
   ]
 }
 
