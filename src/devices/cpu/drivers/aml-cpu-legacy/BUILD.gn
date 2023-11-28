@@ -55,6 +55,11 @@ fuchsia_driver_component("aml-cpu-legacy") {
   manifest = "meta/aml-cpu-legacy.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "aml-cpu-legacy"
+  driver_components = [ ":aml-cpu-legacy" ]
+}
+
 test("aml-cpu-legacy-test-bin") {
   sources = [
     "aml-cpu-test.cc",

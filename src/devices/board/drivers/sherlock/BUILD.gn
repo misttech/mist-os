@@ -344,6 +344,11 @@ template("sherlock_driver") {
     info = "${target_name}-info.json"
     manifest = "meta/${target_name}.cml"
   }
+
+  fuchsia_driver_package("${invoker.target_name}-package") {
+    package_name = "${invoker.target_name}"
+    driver_components = [ ":${invoker.target_name}" ]
+  }
 }
 
 sherlock_driver("sherlock") {

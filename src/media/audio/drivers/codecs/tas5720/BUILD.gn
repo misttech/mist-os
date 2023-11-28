@@ -46,6 +46,11 @@ fuchsia_driver_component("tas5720") {
   manifest = "meta/tas5720.cml"
 }
 
+fuchsia_driver_package("package") {
+  package_name = "tas5720"
+  driver_components = [ ":tas5720" ]
+}
+
 test("tas5720-test-bin") {
   defines = [ "_ALL_SOURCE" ]
   output_name = "tas5720-test"

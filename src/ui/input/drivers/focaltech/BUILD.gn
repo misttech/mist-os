@@ -109,6 +109,11 @@ fuchsia_driver_component("focaltech-sherlock") {
   manifest = "meta/focaltech-sherlock.cml"
 }
 
+fuchsia_driver_package("focaltech-sherlock-package") {
+  package_name = "focaltech-sherlock"
+  driver_components = [ ":focaltech-sherlock" ]
+}
+
 test("focaltech-test-bin") {
   output_name = "focaltech-test"
   configs += [ "//build/config:all_source" ]
