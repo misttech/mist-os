@@ -184,28 +184,6 @@ impl<
     }
 }
 
-/// A shorthand for `BufferIpLinkDeviceContext` with all of the appropriate type
-/// arguments fixed to their Ethernet values.
-pub(super) trait BufferEthernetIpLinkDeviceDynamicStateContext<
-    C: EthernetIpLinkDeviceNonSyncContext<Self::DeviceId>,
-    B: BufferMut,
->:
-    EthernetIpLinkDeviceDynamicStateContext<C>
-    + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv4>>
-    + RecvFrameContext<C, B, RecvIpFrameMeta<Self::DeviceId, Ipv6>>
-{
-}
-
-impl<
-        C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-        B: BufferMut,
-        SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
-            + RecvFrameContext<C, B, RecvIpFrameMeta<SC::DeviceId, Ipv6>>,
-    > BufferEthernetIpLinkDeviceDynamicStateContext<C, B> for SC
-{
-}
-
 pub(crate) struct SyncCtxWithDeviceId<'a, SC: DeviceIdContext<EthernetLinkDevice>> {
     pub(crate) sync_ctx: &'a mut SC,
     pub(crate) device_id: &'a SC::DeviceId,
@@ -883,7 +861,9 @@ where
 pub(super) fn receive_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     B: BufferMut,
-    SC: BufferEthernetIpLinkDeviceDynamicStateContext<C, B>
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
+        + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
+        + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv6>>
         + ArpPacketHandler<B, EthernetLinkDevice, C>
         + BufferSocketHandler<EthernetLinkDevice, C>,
 >(

@@ -899,14 +899,11 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<AnyDevice> for Locked<&SyncC
     }
 }
 
-impl<
-        B: BufferMut,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::EthernetRxDequeue>,
-    > RecvFrameContext<NonSyncCtx, B, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv4>>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
+    RecvFrameContext<NonSyncCtx, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv4>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn receive_frame(
+    fn receive_frame<B: BufferMut>(
         &mut self,
         ctx: &mut NonSyncCtx,
         metadata: RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv4>,
@@ -922,14 +919,11 @@ impl<
     }
 }
 
-impl<
-        B: BufferMut,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::EthernetRxDequeue>,
-    > RecvFrameContext<NonSyncCtx, B, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv6>>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::EthernetRxDequeue>>
+    RecvFrameContext<NonSyncCtx, RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv6>>
     for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn receive_frame(
+    fn receive_frame<B: BufferMut>(
         &mut self,
         ctx: &mut NonSyncCtx,
         metadata: RecvIpFrameMeta<EthernetDeviceId<NonSyncCtx>, Ipv6>,

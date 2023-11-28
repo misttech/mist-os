@@ -245,11 +245,11 @@ pub trait RngContext {
 }
 
 /// A context for receiving frames.
-pub trait RecvFrameContext<C, B: BufferMut, Meta> {
+pub trait RecvFrameContext<C, Meta> {
     /// Receive a frame.
     ///
     /// `receive_frame` receives a frame with the given metadata.
-    fn receive_frame(&mut self, ctx: &mut C, metadata: Meta, frame: B);
+    fn receive_frame<B: BufferMut>(&mut self, ctx: &mut C, metadata: Meta, frame: B);
 }
 
 /// A context for sending frames.
