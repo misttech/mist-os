@@ -101,7 +101,9 @@ protocol Foo {
 
 type FooSomeMethodRequest = struct {};
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, "FooSomeMethodRequest", "example.fidl:5:14");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStruct,
+                     "FooSomeMethodRequest", fidl::flat::Element::Kind::kStruct,
+                     "example.fidl:5:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

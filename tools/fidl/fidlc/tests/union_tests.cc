@@ -204,8 +204,8 @@ type MyUnion = strict union {
     2: my_variant int32;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kUnionMember,
-                     "my_variant", "example.fidl:5:8");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kUnionMember, "my_variant",
+                     fidl::flat::Element::Kind::kUnionMember, "example.fidl:5:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

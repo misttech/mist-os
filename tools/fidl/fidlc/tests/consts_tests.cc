@@ -545,7 +545,8 @@ TEST(ConstsTests, BadConstTestAssignBuiltinNonType) {
 TEST(ConstsTests, BadNameCollision) {
   TestLibrary library;
   library.AddFile("bad/fi-0034.test.fidl");
-  library.ExpectFail(fidl::ErrNameCollision, "COLOR", "bad/fi-0034.test.fidl:6:7");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kConst, "COLOR",
+                     fidl::flat::Element::Kind::kConst, "bad/fi-0034.test.fidl:6:7");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

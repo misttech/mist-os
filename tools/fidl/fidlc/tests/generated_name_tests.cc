@@ -340,7 +340,8 @@ type Foo = struct {
 type Baz = struct {};
 
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, "Baz", "example.fidl:5:30");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStruct, "Baz",
+                     fidl::flat::Element::Kind::kStruct, "example.fidl:5:30");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

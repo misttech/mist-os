@@ -215,8 +215,9 @@ type MyStruct = struct {
     my_struct_member uint8;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember,
-                     "my_struct_member", "example.fidl:5:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStructMember,
+                     "my_struct_member", fidl::flat::Element::Kind::kStructMember,
+                     "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

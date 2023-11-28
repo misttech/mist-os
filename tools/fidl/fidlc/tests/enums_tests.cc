@@ -128,8 +128,8 @@ type Fruit = flexible enum {
     ORANGE = 3;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kEnumMember,
-                     "ORANGE", "example.fidl:5:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kEnumMember, "ORANGE",
+                     fidl::flat::Element::Kind::kEnumMember, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

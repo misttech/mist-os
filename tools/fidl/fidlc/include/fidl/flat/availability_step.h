@@ -9,12 +9,10 @@
 
 namespace fidl::flat {
 
-// The AvailabilityStep sets element->availability for every element in the
-// library based on @available attributes and inheritance rules. If the library
-// is versioned, it sets library->platform. Otherwise, it leaves it null, and
-// all element availabilities will be unbounded. This step also checks for name
-// collisions on overlapping availabilities for top level declarations (but not
-// their members; they are checked in the CompileStep).
+// The AvailabilityStep sets library->platform and element->availability for
+// every element based on @available attributes. If there are none, the platform
+// with be Platform::Anonymous() and all availabilities will be added=HEAD. This
+// step also checks for name collisions on overlapping availabilities.
 class AvailabilityStep : public Compiler::Step {
  public:
   using Step::Step;
@@ -80,8 +78,8 @@ class AvailabilityStep : public Compiler::Step {
   // lexical parent, the member `bar` (added at version 3).
   Element* LexicalParent(const Element* element);
 
-  // Reports errors for all decl name collisions on overlapping availabilities.
-  void VerifyNoDeclOverlaps();
+  // Validates that overlapping availabilities do not have name collisions.
+  void ValidateAvailabilities();
 
   // Maps members to the Decl they occur in, and anonymous layouts to the
   // struct/table/union member whose type constructor they occur in.

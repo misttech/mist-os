@@ -112,6 +112,56 @@ std::optional<std::string_view> Element::GetName() const {
   }
 }
 
+SourceSpan Element::GetNameSource() const {
+  switch (kind) {
+    case Kind::kLibrary:
+      ZX_PANIC("should not call GetName() on a library element");
+    case Kind::kBits:
+    case Kind::kBuiltin:
+    case Kind::kConst:
+    case Kind::kEnum:
+    case Kind::kProtocol:
+    case Kind::kResource:
+    case Kind::kService:
+    case Kind::kStruct:
+    case Kind::kTable:
+    case Kind::kAlias:
+    case Kind::kUnion:
+    case Kind::kNewType:
+    case Kind::kOverlay:
+      return static_cast<const Decl*>(this)->name.span().value();
+    case Kind::kBitsMember:
+      return static_cast<const Bits::Member*>(this)->name;
+    case Kind::kEnumMember:
+      return static_cast<const Enum::Member*>(this)->name;
+    case Kind::kProtocolCompose:
+      ZX_PANIC("protocol composition has no name");
+    case Kind::kProtocolMethod:
+      return static_cast<const Protocol::Method*>(this)->name;
+    case Kind::kResourceProperty:
+      return static_cast<const Resource::Property*>(this)->name;
+    case Kind::kServiceMember:
+      return static_cast<const Service::Member*>(this)->name;
+    case Kind::kStructMember:
+      return static_cast<const Struct::Member*>(this)->name;
+    case Kind::kTableMember:
+      if (auto& used = static_cast<const Table::Member*>(this)->maybe_used) {
+        return used->name;
+      }
+      ZX_PANIC("reserved table field has no name");
+    case Kind::kUnionMember:
+      if (auto& used = static_cast<const Union::Member*>(this)->maybe_used) {
+        return used->name;
+      }
+      ZX_PANIC("reserved union field has no name");
+    case Kind::kOverlayMember:
+      if (auto& used = static_cast<const Overlay::Member*>(this)->maybe_used) {
+        return used->name;
+      }
+      ZX_PANIC("reserved overlay field has no name");
+  }
+}
+
 bool Builtin::IsInternal() const {
   switch (id) {
     case Identity::kBool:

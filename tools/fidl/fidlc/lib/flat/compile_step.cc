@@ -890,8 +890,6 @@ void CompileStep::CompileEnum(Enum* enum_declaration) {
 }
 
 void CompileStep::CompileResource(Resource* resource_declaration) {
-  Scope<std::string> scope;
-
   CompileAttributeList(resource_declaration->attributes.get());
   CompileTypeConstructor(resource_declaration->subtype_ctor.get());
   if (!resource_declaration->subtype_ctor->type) {
@@ -907,20 +905,6 @@ void CompileStep::CompileResource(Resource* resource_declaration) {
 
   for (auto& property : resource_declaration->properties) {
     CompileAttributeList(property.attributes.get());
-    const auto original_name = property.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = scope.Insert(canonical_name, property.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, property.name, Element::Kind::kResourceProperty,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, property.name,
-                         Element::Kind::kResourceProperty, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
     CompileTypeConstructor(property.type_ctor.get());
   }
 
@@ -984,11 +968,11 @@ void CompileStep::CompileProtocol(Protocol* protocol_declaration) {
       if (!name_result.ok()) {
         const auto previous_span = name_result.previous_occurrence();
         if (original_name == previous_span.data()) {
-          reporter()->Fail(ErrDuplicateElementName, method.name, Element::Kind::kProtocolMethod,
-                           original_name, previous_span);
+          reporter()->Fail(ErrNameCollision, method.name, Element::Kind::kProtocolMethod,
+                           original_name, Element::Kind::kProtocolMethod, previous_span);
         } else {
-          reporter()->Fail(ErrDuplicateElementNameCanonical, method.name,
-                           Element::Kind::kProtocolMethod, original_name, previous_span.data(),
+          reporter()->Fail(ErrNameCollisionCanonical, method.name, Element::Kind::kProtocolMethod,
+                           original_name, Element::Kind::kProtocolMethod, previous_span.data(),
                            previous_span, canonical_name);
         }
       }
@@ -1336,27 +1320,12 @@ void CompileStep::ValidateDomainErrorType(const Union* result_union) {
 }
 
 void CompileStep::CompileService(Service* service_decl) {
-  Scope<std::string> scope;
   std::string_view associated_transport;
   std::string_view first_member_with_that_transport;
 
   CompileAttributeList(service_decl->attributes.get());
   for (auto& member : service_decl->members) {
     CompileAttributeList(member.attributes.get());
-    const auto original_name = member.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = scope.Insert(canonical_name, member.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, member.name, Element::Kind::kServiceMember,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member.name,
-                         Element::Kind::kServiceMember, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
     CompileTypeConstructor(member.type_ctor.get());
     if (!member.type_ctor->type) {
       continue;
@@ -1389,27 +1358,11 @@ void CompileStep::CompileService(Service* service_decl) {
 }
 
 void CompileStep::CompileStruct(Struct* struct_declaration) {
-  Scope<std::string> scope;
   DeriveResourceness derive_resourceness(&struct_declaration->resourceness);
 
   CompileAttributeList(struct_declaration->attributes.get());
   for (auto& member : struct_declaration->members) {
     CompileAttributeList(member.attributes.get());
-    const auto original_name = member.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = scope.Insert(canonical_name, member.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, member.name, Element::Kind::kStructMember,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member.name,
-                         Element::Kind::kStructMember, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
-
     CompileTypeConstructor(member.type_ctor.get());
     if (!member.type_ctor->type) {
       continue;
@@ -1428,7 +1381,6 @@ void CompileStep::CompileStruct(Struct* struct_declaration) {
 }
 
 void CompileStep::CompileTable(Table* table_declaration) {
-  Scope<std::string> name_scope;
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(table_declaration->attributes.get());
@@ -1448,20 +1400,6 @@ void CompileStep::CompileTable(Table* table_declaration) {
       continue;
     }
     auto& member_used = *member.maybe_used;
-    const auto original_name = member_used.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = name_scope.Insert(canonical_name, member_used.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, member_used.name, Element::Kind::kTableMember,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member_used.name,
-                         Element::Kind::kTableMember, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
     CompileTypeConstructor(member_used.type_ctor.get());
     if (!member_used.type_ctor->type) {
       continue;
@@ -1488,7 +1426,6 @@ void CompileStep::CompileTable(Table* table_declaration) {
 }
 
 void CompileStep::CompileUnion(Union* union_declaration) {
-  Scope<std::string> scope;
   Ordinal64Scope ordinal_scope;
   DeriveResourceness derive_resourceness(&union_declaration->resourceness);
 
@@ -1507,21 +1444,6 @@ void CompileStep::CompileUnion(Union* union_declaration) {
 
     contains_non_reserved_member = true;
     const auto& member_used = *member.maybe_used;
-    const auto original_name = member_used.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = scope.Insert(canonical_name, member_used.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, member_used.name, Element::Kind::kUnionMember,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member_used.name,
-                         Element::Kind::kUnionMember, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
-
     CompileTypeConstructor(member_used.type_ctor.get());
     if (!member_used.type_ctor->type) {
       continue;
@@ -1551,7 +1473,6 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
   if (overlay_declaration->resourceness == types::Resourceness::kResource) {
     reporter()->Fail(ErrOverlayMustBeValue, overlay_declaration->name.span().value());
   }
-  Scope<std::string> scope;
   Ordinal64Scope ordinal_scope;
 
   CompileAttributeList(overlay_declaration->attributes.get());
@@ -1567,23 +1488,7 @@ void CompileStep::CompileOverlay(Overlay* overlay_declaration) {
       reporter()->Fail(ErrOverlayMustNotContainReserved, member.span.value());
       continue;
     }
-
     const auto& member_used = *member.maybe_used;
-    const auto original_name = member_used.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = scope.Insert(canonical_name, member_used.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      if (original_name == previous_span.data()) {
-        reporter()->Fail(ErrDuplicateElementName, member_used.name, Element::Kind::kOverlayMember,
-                         original_name, previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member_used.name,
-                         Element::Kind::kOverlayMember, original_name, previous_span.data(),
-                         previous_span, canonical_name);
-      }
-    }
-
     CompileTypeConstructor(member_used.type_ctor.get());
     if (!member_used.type_ctor->type) {
       continue;
@@ -1679,27 +1584,9 @@ bool CompileStep::ValidateMembers(DeclType* decl, MemberValidator<MemberType> va
   ZX_ASSERT(decl != nullptr);
   auto checkpoint = reporter()->Checkpoint();
 
-  Scope<std::string> name_scope;
   Scope<MemberType> value_scope;
   for (const auto& member : decl->members) {
     ZX_ASSERT_MSG(member.value != nullptr, "member value is null");
-
-    // Check that the member identifier hasn't been used yet
-    const auto original_name = member.name.data();
-    const auto canonical_name = utils::canonicalize(original_name);
-    const auto name_result = name_scope.Insert(canonical_name, member.name);
-    if (!name_result.ok()) {
-      const auto previous_span = name_result.previous_occurrence();
-      // We can log the error and then continue validating for other issues in the decl
-      if (original_name == name_result.previous_occurrence().data()) {
-        reporter()->Fail(ErrDuplicateElementName, member.name, member.kind, original_name,
-                         previous_span);
-      } else {
-        reporter()->Fail(ErrDuplicateElementNameCanonical, member.name, member.kind, original_name,
-                         previous_span.data(), previous_span, canonical_name);
-      }
-    }
-
     if (!ResolveConstant(member.value.get(), decl->subtype_ctor->type)) {
       reporter()->Fail(ErrCouldNotResolveMember, member.name, decl->kind);
       continue;
@@ -1711,7 +1598,7 @@ bool CompileStep::ValidateMembers(DeclType* decl, MemberValidator<MemberType> va
     if (!value_result.ok()) {
       const auto previous_span = value_result.previous_occurrence();
       // We can log the error and then continue validating other members for other bugs
-      reporter()->Fail(ErrDuplicateMemberValue, member.name, decl->kind, original_name,
+      reporter()->Fail(ErrDuplicateMemberValue, member.name, decl->kind, member.name.data(),
                        previous_span.data(), previous_span);
     }
 

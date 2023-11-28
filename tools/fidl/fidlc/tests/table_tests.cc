@@ -107,8 +107,8 @@ type MyTable = table {
     2: my_field uint32;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kTableMember,
-                     "my_field", "example.fidl:5:8");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kTableMember, "my_field",
+                     fidl::flat::Element::Kind::kTableMember, "example.fidl:5:8");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

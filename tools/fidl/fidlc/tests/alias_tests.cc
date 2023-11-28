@@ -21,7 +21,8 @@ type Message = struct {
 alias alias_of_int16 = int16;
 alias alias_of_int16 = int16;
 )FIDL");
-  library.ExpectFail(fidl::ErrNameCollision, "alias_of_int16", "example.fidl:8:7");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kAlias, "alias_of_int16",
+                     fidl::flat::Element::Kind::kAlias, "example.fidl:8:7");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

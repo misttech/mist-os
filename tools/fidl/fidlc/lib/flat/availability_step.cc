@@ -16,7 +16,7 @@ namespace fidl::flat {
 void AvailabilityStep::RunImpl() {
   PopulateLexicalParents();
   library()->TraverseElements([&](Element* element) { CompileAvailability(element); });
-  VerifyNoDeclOverlaps();
+  ValidateAvailabilities();
 }
 
 void AvailabilityStep::PopulateLexicalParents() {
@@ -337,56 +337,76 @@ struct CmpAvailability {
   }
 };
 
-}  // namespace
+// Helper that checks for canonical name collisions on overlapping elements.
+class NameValidator {
+ public:
+  explicit NameValidator(Reporter* reporter, const Platform& platform)
+      : reporter_(reporter), platform_(platform) {}
 
-void AvailabilityStep::VerifyNoDeclOverlaps() {
-  // Here we check for (canonical) name collisions on availabilities that
-  // overlap. We report at most one error per element, even if it overlaps with
-  // multiple elements, to allow the same code to work gracefully with libraries
-  // that don't use @available (i.e. avoid too many redundant errors).
+  void Insert(const Element* element) {
+    // TODO(fxbug.dev/67858): This algorithm is worst-case O(n^2) in the number
+    // of elements having the same name. It can be optimized to O(n*log(n)).
 
-  std::map<std::string, std::set<const Decl*, CmpAvailability>> by_canonical_name;
-  for (auto& [name, decl] : library()->declarations.all) {
-    // Skip decls whose availabilities we failed to compile.
-    if (decl->availability.state() != Availability::State::kInherited) {
-      continue;
+    // Skip elements whose availabilities we failed to compile.
+    if (element->availability.state() != Availability::State::kInherited) {
+      return;
     }
-
-    // TODO(fxbug.dev/67858): This is worst-case quadratic in the number of
-    // declarations having the same name. It can be optimized to O(n*log(n)).
+    auto maybe_name = element->GetName();
+    if (!maybe_name.has_value()) {
+      // This is a reserved field or a protocol composition.
+      return;
+    }
+    auto name = maybe_name.value();
     auto canonical_name = utils::canonicalize(name);
-    auto set = decl->availability.set();
-    auto& same_canonical_name = by_canonical_name[canonical_name];
-    for (auto other_decl : same_canonical_name) {
-      auto other_set = other_decl->availability.set();
+    auto set = element->availability.set();
+    auto& same_canonical_name = by_canonical_name_[canonical_name];
+    for (auto other : same_canonical_name) {
+      auto other_set = other->availability.set();
       auto overlap = VersionSet::Intersect(set, other_set);
       if (!overlap) {
         continue;
       }
-      auto span = decl->name.span().value();
-      auto other_name = other_decl->name.decl_name();
-      auto other_span = other_decl->name.span().value();
-      // Use a simplified error message for unversioned libraries, or for
-      // versioned libraries where the version sets match exactly.
+      auto span = element->GetNameSource();
+      auto other_name = other->GetName().value();
+      auto other_span = other->GetNameSource();
+      // Use a simplified error message when availabilities are the identical.
       if (set == other_set) {
         if (name == other_name) {
-          reporter()->Fail(ErrNameCollision, span, name, other_span);
+          reporter_->Fail(ErrNameCollision, span, element->kind, name, other->kind, other_span);
         } else {
-          reporter()->Fail(ErrNameCollisionCanonical, span, name, other_name, other_span,
-                           canonical_name);
+          reporter_->Fail(ErrNameCollisionCanonical, span, element->kind, name, other->kind,
+                          other_name, other_span, canonical_name);
         }
       } else {
         if (name == other_name) {
-          reporter()->Fail(ErrNameOverlap, span, name, other_span, overlap.value(),
-                           library()->platform.value());
+          reporter_->Fail(ErrNameOverlap, span, element->kind, name, other->kind, other_span,
+                          overlap.value(), platform_);
         } else {
-          reporter()->Fail(ErrNameOverlapCanonical, span, name, other_name, other_span,
-                           canonical_name, overlap.value(), library()->platform.value());
+          reporter_->Fail(ErrNameOverlapCanonical, span, element->kind, name, other->kind,
+                          other_name, other_span, canonical_name, overlap.value(), platform_);
         }
       }
+      // Report at most one error per element to avoid noisy redundant errors.
       break;
     }
-    same_canonical_name.insert(decl);
+    same_canonical_name.insert(element);
+  }
+
+ private:
+  Reporter* reporter_;
+  const Platform& platform_;
+  std::map<std::string, std::set<const Element*, CmpAvailability>> by_canonical_name_;
+};
+
+}  // namespace
+
+void AvailabilityStep::ValidateAvailabilities() {
+  auto& platform = library()->platform.value();
+  NameValidator decl_validator(reporter(), platform);
+  for (auto& [name, decl] : library()->declarations.all) {
+    decl_validator.Insert(decl);
+    NameValidator member_validator(reporter(), platform);
+    decl->ForEachMember([&](const Element* member) { member_validator.Insert(member); });
   }
 }
 

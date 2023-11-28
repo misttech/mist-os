@@ -105,6 +105,10 @@ struct Element {
   // The name is unqualified, e.g. "MyProtocol" or "MyMethod".
   std::optional<std::string_view> GetName() const;
 
+  // Returns the source where GetName() comes from, to use in error messages.
+  // Its contents are different from GetName() is the case of anonymous layouts.
+  SourceSpan GetNameSource() const;
+
   Kind kind;
   std::unique_ptr<AttributeList> attributes;
   Availability availability;

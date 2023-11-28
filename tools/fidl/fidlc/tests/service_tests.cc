@@ -67,8 +67,9 @@ service MyService {
     my_service_member client_end:MyProtocol;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kServiceMember,
-                     "my_service_member", "example.fidl:7:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kServiceMember,
+                     "my_service_member", fidl::flat::Element::Kind::kServiceMember,
+                     "example.fidl:7:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

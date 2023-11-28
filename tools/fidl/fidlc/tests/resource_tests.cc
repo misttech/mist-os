@@ -184,8 +184,8 @@ resource_definition MyResource : uint32 {
     };
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kResourceProperty,
-                     "rights", "example.fidl:7:9");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kResourceProperty, "rights",
+                     fidl::flat::Element::Kind::kResourceProperty, "example.fidl:7:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

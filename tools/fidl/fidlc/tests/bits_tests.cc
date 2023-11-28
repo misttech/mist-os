@@ -108,8 +108,8 @@ type Fruit = bits : uint64 {
     ORANGE = 4;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kBitsMember,
-                     "ORANGE", "example.fidl:5:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kBitsMember, "ORANGE",
+                     fidl::flat::Element::Kind::kBitsMember, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

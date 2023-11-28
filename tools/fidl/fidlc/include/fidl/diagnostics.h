@@ -65,20 +65,24 @@ constexpr ErrorDef<32, Token::KindAndSubkind> ErrDuplicateModifier(
     "duplicate occurrence of modifier {0}");
 constexpr ErrorDef<33, Token::KindAndSubkind, Token::KindAndSubkind> ErrConflictingModifier(
     "modifier {0} conflicts with modifier {1}");
-constexpr ErrorDef<34, std::string_view, SourceSpan> ErrNameCollision(
-    "the name '{0}' conflicts with another declaration at {1}");
-constexpr ErrorDef<35, std::string_view, std::string_view, SourceSpan, std::string_view>
+constexpr ErrorDef<34, flat::Element::Kind, std::string_view, flat::Element::Kind, SourceSpan>
+    ErrNameCollision("{0} '{1}' has the same name as the {2} declared at {3}");
+constexpr ErrorDef<35, flat::Element::Kind, std::string_view, flat::Element::Kind, std::string_view,
+                   SourceSpan, std::string_view>
     ErrNameCollisionCanonical(
-        "the name '{0}' conflicts with '{1}' from {2}; both are represented by "
-        "the canonical form '{3}'");
-constexpr ErrorDef<36, std::string_view, SourceSpan, VersionSet, Platform> ErrNameOverlap(
-    "the name '{0}' conflicts with another declaration at {1}; both are "
-    "available {2} of platform '{3}'");
-constexpr ErrorDef<37, std::string_view, std::string_view, SourceSpan, std::string_view, VersionSet,
-                   Platform>
+        "{0} '{1}' conflicts with {2} '{3}' declared at {4}; both names are "
+        "represented by the canonical form '{5}'");
+constexpr ErrorDef<36, flat::Element::Kind, std::string_view, flat::Element::Kind, SourceSpan,
+                   VersionSet, Platform>
+    ErrNameOverlap(
+        "{0} '{1}' has the same name as the {2} declared at {3}; both are "
+        "available {4} of platform '{5}'");
+constexpr ErrorDef<37, flat::Element::Kind, std::string_view, flat::Element::Kind, std::string_view,
+                   SourceSpan, std::string_view, VersionSet, Platform>
     ErrNameOverlapCanonical(
-        "the name '{0}' conflicts with '{1}' from {2}; both are represented "
-        "by the canonical form '{3}' and are available {4} of platform '{5}'");
+        "{0} '{1}' conflicts with {2} '{3}' declared at {4}; both names are "
+        "represented by the canonical form '{5}' and are available {6} of "
+        "platform '{7}'");
 constexpr ErrorDef<38, flat::Name> ErrDeclNameConflictsWithLibraryImport(
     "Declaration name '{0}' conflicts with a library import. Consider using the "
     "'as' keyword to import the library under a different name.");
@@ -170,13 +174,8 @@ constexpr RetiredDef<76> ErrResponsesWithErrorsMustNotBeEmpty;
 constexpr ErrorDef<77, std::string_view> ErrEmptyPayloadStructs(
     "method '{0}' cannot have an empty struct as a payload, prefer omitting "
     "the payload altogether");
-constexpr ErrorDef<78, flat::Element::Kind, std::string_view, SourceSpan> ErrDuplicateElementName(
-    "duplicate {0} named '{1}'; previous was at {2}");
-constexpr ErrorDef<79, flat::Element::Kind, std::string_view, std::string_view, SourceSpan,
-                   std::string_view>
-    ErrDuplicateElementNameCanonical(
-        "{0} '{1}' conflicts with '{2}' from {3}; both are represented by the "
-        "canonical form '{4}'");
+constexpr RetiredDef<78> ErrDuplicateElementName;
+constexpr RetiredDef<79> ErrDuplicateElementNameCanonical;
 constexpr ErrorDef<80> ErrGeneratedZeroValueOrdinal("Ordinal value 0 disallowed.");
 constexpr ErrorDef<81, SourceSpan> ErrDuplicateMethodOrdinal(
     "Multiple methods with the same ordinal in a protocol; previous was at {0}.");
@@ -628,7 +627,7 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0199 */ &ErrOverlayMemberMustBeValue,
     /* fi-0200 */ &ErrOverlayMustNotContainReserved,
     /* fi-0201 */ &ErrPlatformVersionNotSelected,
-    /* fi-0202*/ &ErrTransitionalNotAllowed,
+    /* fi-0202 */ &ErrTransitionalNotAllowed,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

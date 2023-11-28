@@ -478,19 +478,34 @@ protocol Wrong {
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNames) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0078-a.test.fidl");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
-                     "MyMethod", "bad/fi-0078-a.test.fidl:7:5");
-  library.ExpectFail(fidl::ErrDuplicateMethodOrdinal, "bad/fi-0078-a.test.fidl:7:5");
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyProtocol {
+    MyMethod();
+    MyMethod();
+};
+)FIDL");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kProtocolMethod, "MyMethod",
+                     fidl::flat::Element::Kind::kProtocolMethod, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
 TEST(ProtocolTests, BadDuplicateMethodNamesFromImmediateComposition) {
-  TestLibrary library;
-  library.AddFile("bad/fi-0078-b.test.fidl");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
-                     "MyMethod", "bad/fi-0078-b.test.fidl:7:5");
+  TestLibrary library(R"FIDL(
+library example;
+
+protocol MyChildProtocol {
+    MyMethod();
+};
+
+protocol MyProtocol {
+    compose MyChildProtocol;
+    MyMethod();
+};
+)FIDL");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kProtocolMethod, "MyMethod",
+                     fidl::flat::Element::Kind::kProtocolMethod, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -511,8 +526,8 @@ protocol C {
     compose B;
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
-                     "Method", "example.fidl:5:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kProtocolMethod, "Method",
+                     fidl::flat::Element::Kind::kProtocolMethod, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -541,8 +556,8 @@ protocol D {
     MethodA();
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kProtocolMethod,
-                     "MethodA", "example.fidl:5:5");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kProtocolMethod, "MethodA",
+                     fidl::flat::Element::Kind::kProtocolMethod, "example.fidl:5:5");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -624,8 +639,8 @@ protocol P {
   MethodWithDuplicateParams(struct {foo uint8; foo uint8; });
 };
 )FIDL");
-  library.ExpectFail(fidl::ErrDuplicateElementName, fidl::flat::Element::Kind::kStructMember, "foo",
-                     "example.fidl:5:37");
+  library.ExpectFail(fidl::ErrNameCollision, fidl::flat::Element::Kind::kStructMember, "foo",
+                     fidl::flat::Element::Kind::kStructMember, "example.fidl:5:37");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 

@@ -410,7 +410,8 @@ type Foo = resource struct {};
 )FIDL");
   library.SelectVersion("foo", "1");
   library.ExpectWarn(fidl::WarnAttributeTypo, "availabe", "available");
-  library.ExpectFail(fidl::ErrNameOverlap, "Foo", "example.fidl:6:6",
+  library.ExpectFail(fidl::ErrNameOverlap, fidl::flat::Element::Kind::kStruct, "Foo",
+                     fidl::flat::Element::Kind::kStruct, "example.fidl:6:6",
                      fidl::VersionSet(fidl::VersionRange(fidl::Version::From(1).value(),
                                                          fidl::Version::From(2).value())),
                      fidl::Platform::Parse("foo").value());
