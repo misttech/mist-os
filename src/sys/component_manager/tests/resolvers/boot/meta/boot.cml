@@ -9,12 +9,19 @@
             url: "fuchsia-boot:///#meta/trigger.cm",
             environment: "#env",
         },
+        {
+            name: "elf_runner",
+            url: "fuchsia-builtin://#elf_runner.cm",
+        },
     ],
     offer: [
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [ "#component" ],
+            to: [
+                "#component",
+                "#elf_runner",
+            ],
         },
     ],
     expose: [
@@ -30,7 +37,7 @@
             runners: [
                 {
                     runner: "elf",
-                    from: "parent",
+                    from: "#elf_runner",
                 },
             ],
             resolvers: [

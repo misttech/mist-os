@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/storage_realm_coll",
     },
     children: [
@@ -15,11 +15,13 @@
             name: "memfs",
             url: "#meta/memfs.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
     collections: [
         {
             name: "coll",
+            environment: "#elf-env",
             durability: "transient",
         },
     ],

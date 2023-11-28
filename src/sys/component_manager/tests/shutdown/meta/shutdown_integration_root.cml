@@ -4,12 +4,16 @@
 
 // Realm for the shutdown integration test, it requests the SystemController protocol
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     children: [
         {
             name: "power_switch",
             url: "#meta/system_controller_consumer.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
     offer: [

@@ -9,7 +9,6 @@
         args: [
             "--config",
             "/pkg/data/component_manager_config",
-            "--add_builtin_runner",
         ],
     },
     use: [

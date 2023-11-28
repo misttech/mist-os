@@ -3,22 +3,24 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/storage_realm_admin",
     },
     children: [
         {
             name: "memfs",
             url: "#meta/memfs.cm",
+            environment: "#elf-env",
         },
         {
             name: "storage_user_with_instance_id",
             url: "#meta/storage_user_with_instance_id.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
     capabilities: [

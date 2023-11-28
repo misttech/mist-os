@@ -3,15 +3,20 @@
 // found in the LICENSE file.
 // Passes a valid read write storage capability to a child, this is valid.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     children: [
         {
             name: "use_storage",
             url: "#meta/use_storage.cm",
+            environment: "#elf-env",
         },
         {
             name: "expose_dir_rights",
             url: "#meta/expose_dir_rights.cm",
+            environment: "#elf-env",
         },
     ],
     capabilities: [

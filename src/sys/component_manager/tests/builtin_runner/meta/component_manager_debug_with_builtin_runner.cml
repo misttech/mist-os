@@ -7,7 +7,6 @@
         args: [
             "--config",
             "/pkg/data/component_manager_realm_builder_debug_config",
-            "--add_builtin_runner",
         ],
     },
 }

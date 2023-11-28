@@ -5,11 +5,11 @@
 // manager's namespace.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/namespace_capabilities_integration_test_root",
     },
 
@@ -19,6 +19,7 @@
         {
             name: "trigger",
             url: "#meta/trigger.cm",
+            environment: "#elf-env",
         },
     ],
     use: [

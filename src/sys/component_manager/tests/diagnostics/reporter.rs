@@ -97,10 +97,14 @@ async fn main() {
                 time: AnyProperty,
             },
             "2": {
-                moniker: "root/reporter",
+                moniker: "root/elf_runner",
                 time: AnyProperty,
             },
             "3": {
+                moniker: "root/reporter",
+                time: AnyProperty,
+            },
+            "4": {
                 moniker: "root/archivist",
                 time: AnyProperty,
             },

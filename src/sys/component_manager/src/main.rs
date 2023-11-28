@@ -90,14 +90,13 @@ fn main() {
     }
 
     let run_root_fut = async move {
-        let mut builtin_environment =
-            match build_environment(&args, runtime_config, bootfs_svc).await {
-                Ok(environment) => environment,
-                Err(error) => {
-                    error!(%error, "Component manager setup failed");
-                    process::exit(1);
-                }
-            };
+        let mut builtin_environment = match build_environment(runtime_config, bootfs_svc).await {
+            Ok(environment) => environment,
+            Err(error) => {
+                error!(%error, "Component manager setup failed");
+                process::exit(1);
+            }
+        };
 
         if let Err(error) = builtin_environment.run_root().await {
             error!(%error, "Failed to start root component");
@@ -155,7 +154,6 @@ fn build_runtime_config(args: &startup::Arguments) -> (RuntimeConfig, Option<Boo
 }
 
 async fn build_environment(
-    args: &startup::Arguments,
     config: RuntimeConfig,
     bootfs_svc: Option<BootfsSvc>,
 ) -> Result<BuiltinEnvironment, Error> {
@@ -164,14 +162,11 @@ async fn build_environment(
         .create_utc_clock(&bootfs_svc)
         .await?
         .add_elf_runner()?
+        .add_builtin_runner()?
         .include_namespace_resolvers();
 
     if let Some(bootfs_svc) = bootfs_svc {
         builder = builder.set_bootfs_svc(bootfs_svc);
-    }
-
-    if args.add_builtin_runner {
-        builder = builder.add_builtin_runner()?;
     }
 
     builder.build().await

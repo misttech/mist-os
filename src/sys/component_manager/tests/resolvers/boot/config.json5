@@ -26,7 +26,7 @@
             ],
         },
         {
-            runner: "elf",
+            runner: "builtin",
         },
         {
             resolver: "boot_resolver",

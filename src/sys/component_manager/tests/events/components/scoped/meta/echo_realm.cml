@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
 
     // Two children: a server and client. "echo_client" has "eager" startup so it
     // will be started along with the realm.
@@ -11,11 +14,13 @@
             name: "echo_reporter",
             url: "#meta/echo_reporter.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
         {
             name: "echo_client",
             url: "#meta/echo_client.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
 

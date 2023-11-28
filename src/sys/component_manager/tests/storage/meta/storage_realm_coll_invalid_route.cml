@@ -3,16 +3,17 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/storage_realm_coll_invalid_route",
     },
     collections: [
         {
             name: "coll_bad_route",
+            environment: "#elf-env",
             durability: "transient",
         },
     ],

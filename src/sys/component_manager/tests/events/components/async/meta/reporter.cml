@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/async_reporter",
     },
     collections: [
         {
             name: "coll",
+            environment: "#elf-env",
             durability: "transient",
         },
     ],

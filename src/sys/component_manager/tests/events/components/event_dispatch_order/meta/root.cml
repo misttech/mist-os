@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/stub_component",
     },
     children: [
@@ -15,6 +15,7 @@
             name: "child",
             url: "#meta/stub_component.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
 }

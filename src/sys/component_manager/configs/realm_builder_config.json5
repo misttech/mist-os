@@ -21,7 +21,7 @@
             ],
         },
         {
-            runner: "elf",
+            runner: "builtin",
         },
         {
             runner: "realm_builder",

@@ -5,18 +5,19 @@
 // This realm contains the test cases for fuchsia_component_v2_test.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
         "inspect/offer.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
-        runner: "elf",
         binary: "bin/realm",
         args: [ "--wait" ],
     },
     collections: [
         {
             name: "coll",
+            environment: "#elf-env",
             durability: "transient",
         },
     ],

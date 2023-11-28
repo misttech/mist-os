@@ -4,7 +4,18 @@
 {
     include: [ "syslog/client.shard.cml" ],
     program: {
-        runner: "elf",
         binary: "bin/hello_world_v1",
     },
+    children: [
+        {
+            name: "elf_runner",
+            url: "fuchsia-builtin://#elf_runner.cm",
+        },
+    ],
+    use: [
+        {
+            runner: "elf",
+            from: "#elf_runner",
+        },
+    ],
 }

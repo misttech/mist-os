@@ -2,16 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     children: [
         {
             name: "archivist",
             url: "#meta/archivist-for-embedding.cm",
+            environment: "#elf-env",
         },
         {
             name: "cleanup",
             url: "#meta/cleanup.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
     ],
     offer: [

@@ -4,15 +4,20 @@
 // Passes routes from the expose across to a child which does the restriction in an
 // intermidate set of offers before passing it down to the use_decl.
 {
-    include: [ "inspect/offer.shard.cml" ],
+    include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
+        "inspect/offer.shard.cml",
+    ],
     children: [
         {
             name: "use_dir_rights",
             url: "#meta/intermediate_offer_dir_rights.cm",
+            environment: "#elf-env",
         },
         {
             name: "expose_dir_rights",
             url: "#meta/expose_dir_rights.cm",
+            environment: "#elf-env",
         },
     ],
     offer: [

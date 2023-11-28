@@ -78,6 +78,4 @@ fuchsia_unittest_package("crash-introspect-test") {
     ":report_then_panic_on_start",
     "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
-
-  #test_components = [ ":crash_introspect_test_bin" ]
 }

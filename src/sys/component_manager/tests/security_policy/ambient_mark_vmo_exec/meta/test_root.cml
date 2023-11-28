@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
@@ -13,14 +14,17 @@
         {
             name: "policy_allowed",
             url: "#meta/protected_ops.cm",
+            environment: "#elf-env",
         },
         {
             name: "policy_denied",
             url: "#meta/protected_ops.cm",
+            environment: "#elf-env",
         },
         {
             name: "policy_not_requested",
             url: "#meta/protected_ops_no_request.cm",
+            environment: "#elf-env",
         },
     ],
     expose: [

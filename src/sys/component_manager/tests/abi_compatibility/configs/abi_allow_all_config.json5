@@ -20,9 +20,6 @@
             ],
         },
         {
-            runner: "elf",
-        },
-        {
             runner: "realm_builder",
         },
         {

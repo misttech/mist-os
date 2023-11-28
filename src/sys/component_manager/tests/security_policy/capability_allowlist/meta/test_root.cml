@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
         "inspect/offer.shard.cml",
         "syslog/offer.shard.cml",
     ],
@@ -11,10 +12,12 @@
         {
             name: "policy_service",
             url: "#meta/policy_service.cm",
+            environment: "#elf-env",
         },
         {
             name: "dir_service",
             url: "#meta/dir_service.cm",
+            environment: "#elf-env",
         },
 
         // Three children which are all identical except for their identity
@@ -24,14 +27,17 @@
         {
             name: "policy_allowed",
             url: "#meta/cap_getter.cm",
+            environment: "#elf-env",
         },
         {
             name: "policy_denied",
             url: "#meta/cap_getter.cm",
+            environment: "#elf-env",
         },
         {
             name: "policy_not_violated",
             url: "#meta/cap_getter.cm",
+            environment: "#elf-env",
         },
     ],
     offer: [
