@@ -20,7 +20,7 @@ use fuchsia_pkg::PackageManifest;
 use num::bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use url::Url;
 
 /// Blob information. Entry of the "blobs.json" file.
@@ -118,7 +118,7 @@ struct BudgetResult {
     /// Number of bytes used by the packages this budget applies to.
     pub used_bytes: u64,
     /// Breakdown of storage consumption by package.
-    pub package_breakdown: HashMap<Utf8PathBuf, PackageSizeInfo>,
+    pub package_breakdown: BTreeMap<Utf8PathBuf, PackageSizeInfo>,
 }
 
 /// Verifies that no package budget is exceeded.
@@ -190,7 +190,7 @@ fn verify_budgets_with_tools(
     }
 
     if let Some(verbose_json_output) = args.verbose_json_output {
-        let output: HashMap<&str, &BudgetResult> =
+        let output: BTreeMap<&str, &BudgetResult> =
             results.iter().map(|v| (v.name.as_str(), v)).collect();
         write_json_file(verbose_json_output, &output)?;
     }
@@ -265,7 +265,7 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
                 budget_bytes: budget.budget_bytes,
                 creep_budget_bytes: budget.creep_budget_bytes,
                 used_bytes: 0,
-                package_breakdown: HashMap::new(),
+                package_breakdown: BTreeMap::new(),
             },
             blobs: Vec::new(),
         };
@@ -284,7 +284,7 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
         }
 
         if budget.merge {
-            let mut map: HashMap<_, _> = budget_blob
+            let map: BTreeMap<_, _> = budget_blob
                 .blobs
                 .drain(..)
                 .filter_map(|b| match b.path.as_str() {
@@ -294,7 +294,7 @@ fn load_manifests_blobs_match_budgets(budgets: &Vec<PackageSetBudget>) -> Result
                     _ => Some((b.hash, b)),
                 })
                 .collect();
-            budget_blob.blobs = map.drain().map(|(_k, v)| v).collect();
+            budget_blob.blobs = map.into_iter().map(|(_k, v)| v).collect();
 
             // Add additional space for the meta.far.
             budget_blob.budget.used_bytes = 32768;
@@ -321,7 +321,7 @@ fn load_blob_info(blob_size_paths: &Vec<Utf8PathBuf>) -> Result<Vec<BlobJsonEntr
 #[allow(clippy::ptr_arg)]
 fn index_blobs_by_hash(
     blob_sizes: &Vec<BlobJsonEntry>,
-    blob_count_by_hash: &mut HashMap<Hash, BlobSizeAndCount>,
+    blob_count_by_hash: &mut BTreeMap<Hash, BlobSizeAndCount>,
 ) -> Result<()> {
     for blob_entry in blob_sizes.iter() {
         if let Some(previous) = blob_count_by_hash
@@ -344,9 +344,9 @@ fn count_blobs(
     blob_sizes: &Vec<BlobJsonEntry>,
     blob_usages: &Vec<BudgetBlobs>,
     blobfs_builder: &BlobJsonGenerator,
-) -> Result<HashMap<Hash, BlobSizeAndCount>> {
+) -> Result<BTreeMap<Hash, BlobSizeAndCount>> {
     // Index blobs by hash.
-    let mut blob_count_by_hash: HashMap<Hash, BlobSizeAndCount> = HashMap::new();
+    let mut blob_count_by_hash: BTreeMap<Hash, BlobSizeAndCount> = BTreeMap::new();
     index_blobs_by_hash(blob_sizes, &mut blob_count_by_hash)?;
 
     // Select packages for which one or more blob is missing.
@@ -416,7 +416,7 @@ fn compute_resources_budget_blobs(
                 budget_bytes: budget.budget_bytes,
                 creep_budget_bytes: budget.creep_budget_bytes,
                 used_bytes: 0,
-                package_breakdown: HashMap::new(),
+                package_breakdown: BTreeMap::new(),
             },
             blobs: package_budget_blobs
                 .iter()
@@ -433,7 +433,7 @@ fn compute_resources_budget_blobs(
 #[allow(clippy::ptr_arg)]
 fn compute_budget_results(
     budget_usages: &Vec<BudgetBlobs>,
-    blob_count_by_hash: &HashMap<Hash, BlobSizeAndCount>,
+    blob_count_by_hash: &BTreeMap<Hash, BlobSizeAndCount>,
     ignore_hashes: &HashSet<&Hash>,
 ) -> Result<Vec<BudgetResult>> {
     let mut result = vec![];
@@ -453,7 +453,7 @@ fn compute_budget_results(
             })
             .sum::<u64>();
 
-        let mut package_breakdown = HashMap::new();
+        let mut package_breakdown = BTreeMap::new();
         for blob in filtered_blobs {
             let count = blob_count_by_hash.get(&blob.hash).ok_or_else(|| {
                 format_err!(
@@ -528,7 +528,7 @@ mod tests {
     use ffx_assembly_args::PackageSizeCheckArgs;
     use fuchsia_hash::Hash;
     use serde_json::json;
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeMap, HashSet};
     use std::fs;
     use std::path::Path;
     use std::str::FromStr;
@@ -1444,7 +1444,7 @@ mod tests {
                     budget_bytes: 123,
                     creep_budget_bytes: 3245,
                     used_bytes: 0,
-                    package_breakdown: HashMap::new(),
+                    package_breakdown: BTreeMap::new(),
                 },
                 blobs: vec![
                     BlobInstance {
@@ -1479,7 +1479,7 @@ mod tests {
                     budget_bytes: 456,
                     creep_budget_bytes: 111,
                     used_bytes: 6,
-                    package_breakdown: HashMap::new(),
+                    package_breakdown: BTreeMap::new(),
                 },
                 blobs: vec![BlobInstance {
                     hash: blob2_hash,
@@ -1489,7 +1489,7 @@ mod tests {
                 }],
             },
         ];
-        let blob_count_by_hash: HashMap<Hash, BlobSizeAndCount> = HashMap::from([
+        let blob_count_by_hash: BTreeMap<Hash, BlobSizeAndCount> = BTreeMap::from([
             (blob1_hash, BlobSizeAndCount { size: 90, share_count: 2 }),
             (blob2_hash, BlobSizeAndCount { size: 50, share_count: 2 }),
             (blob3_hash, BlobSizeAndCount { size: 1000, share_count: 1 }),
@@ -1503,7 +1503,7 @@ mod tests {
                 budget_bytes: 123,
                 creep_budget_bytes: 3245,
                 used_bytes: 115,
-                package_breakdown: HashMap::from([
+                package_breakdown: BTreeMap::from([
                     (
                         package2_path,
                         PackageSizeInfo {
@@ -1550,7 +1550,7 @@ mod tests {
                 budget_bytes: 456,
                 creep_budget_bytes: 111,
                 used_bytes: 31, /* 25 + 6 */
-                package_breakdown: HashMap::from([(
+                package_breakdown: BTreeMap::from([(
                     package3_path,
                     PackageSizeInfo {
                         name: "package3".into(),
