@@ -598,12 +598,6 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
 impl<I: icmp::IcmpIpExt> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
     for SocketCollection<I, Udp>
 {
-    fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
-        // TODO(https://fxbug.dev/135413): Handle incoming ICMP errors in
-        // Bindings.
-        warn!("unimplemented receive_icmp_error {:?} on {:?}", err, id)
-    }
-
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
@@ -871,17 +865,6 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
 impl<I: IpExt> IcmpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
     for SocketCollection<I, IcmpEcho>
 {
-    fn receive_icmp_error(
-        &mut self,
-        conn: icmp::SocketId<I>,
-        seq_num: u16,
-        err: <I as icmp::IcmpIpExt>::ErrorCode,
-    ) {
-        // TODO(https://fxbug.dev/135413): Handle incoming ICMP errors in
-        // Bindings.
-        warn!("unimplemented receive_icmp_error {:?} on {:?}, seq_num={}", err, conn, seq_num)
-    }
-
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,

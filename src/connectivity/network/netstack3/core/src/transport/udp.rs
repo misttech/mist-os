@@ -23,14 +23,13 @@ use net_types::{
     },
     MulticastAddr, SpecifiedAddr, Witness,
 };
-use packet::{BufferMut, Nested, ParsablePacket, ParseBuffer, Serializer};
+use packet::{BufferMut, Nested, ParsablePacket, Serializer};
 use packet_formats::{
-    error::ParseError,
     ip::{IpProto, IpProtoExt},
-    udp::{UdpPacket, UdpPacketBuilder, UdpPacketRaw, UdpParseArgs},
+    udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs},
 };
 use thiserror::Error;
-use tracing::trace;
+use tracing::{debug, trace};
 
 pub(crate) use crate::socket::datagram::IpExt;
 use crate::{
@@ -57,12 +56,12 @@ use crate::{
             BoundSocketStateType as DatagramBoundSocketStateType,
             BoundSockets as DatagramBoundSockets, ConnectError, DatagramBoundStateContext,
             DatagramFlowId, DatagramSocketMapSpec, DatagramSocketSpec, DatagramStateContext,
-            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt,
-            DualStackIpSocket, EitherIpSocket, ExpectedConnError, ExpectedUnboundError,
-            FoundSockets, InUseError, IpOptions, LocalIdentifierAllocator, MaybeDualStack,
-            MulticastMembershipInterfaceSelector, NonDualStackDatagramBoundStateContext,
-            SendError as DatagramSendError, SetMulticastMembershipError, ShutdownType,
-            SocketHopLimits, SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
+            DualStackConnState, DualStackDatagramBoundStateContext, DualStackIpExt, EitherIpSocket,
+            ExpectedConnError, ExpectedUnboundError, FoundSockets, InUseError, IpOptions,
+            LocalIdentifierAllocator, MaybeDualStack, MulticastMembershipInterfaceSelector,
+            NonDualStackDatagramBoundStateContext, SendError as DatagramSendError,
+            SetMulticastMembershipError, ShutdownType, SocketHopLimits,
+            SocketInfo as DatagramSocketInfo, SocketState as DatagramSocketState,
             SocketsState as DatagramSocketsState,
         },
         AddrVec, Bound, IncompatibleError, InsertError, ListenerAddrInfo, RemoveResult,
@@ -1047,21 +1046,6 @@ impl<I: Ip> EntryKey for SocketId<I> {
 
 /// An execution context for the UDP protocol.
 pub trait UdpBindingsContext<I: IcmpIpExt, D> {
-    /// Receives an ICMP error message related to a previously-sent UDP packet.
-    ///
-    /// `err` is the specific error identified by the incoming ICMP error
-    /// message.
-    ///
-    /// Concretely, this method is called when an ICMP error message is received
-    /// which contains an original packet which - based on its source and
-    /// destination IPs and ports - most likely originated from the given
-    /// socket. Note that the offending packet is not guaranteed to have
-    /// originated from the given socket. For example, it may have originated
-    /// from a previous socket with the same addresses, it may be the result of
-    /// packet corruption on the network, it may have been injected by a
-    /// malicious party, etc.
-    fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode);
-
     /// Receives a UDP packet on a socket.
     fn receive_udp<B: BufferMut>(
         &mut self,
@@ -1306,100 +1290,22 @@ impl<
 {
     fn receive_icmp_error(
         sync_ctx: &mut SC,
-        ctx: &mut C,
-        device: &SC::DeviceId,
-        src_ip: Option<SpecifiedAddr<I::Addr>>,
-        dst_ip: SpecifiedAddr<I::Addr>,
-        mut original_udp_packet: &[u8],
+        _ctx: &mut C,
+        _device: &SC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+        original_dst_ip: SpecifiedAddr<I::Addr>,
+        _original_udp_packet: &[u8],
         err: I::ErrorCode,
     ) {
         sync_ctx.with_counters(|counters| {
             counters.rx_icmp_error.increment();
         });
-        trace!("UdpIpTransportContext::receive_icmp_error({:?})", err);
-
-        let udp_packet = match original_udp_packet
-            .parse_with::<_, UdpPacketRaw<_>>(IpVersionMarker::<I>::default())
-        {
-            Ok(packet) => packet,
-            Err(e) => {
-                let _: ParseError = e;
-                sync_ctx.with_counters(|counters| {
-                    counters.rx_malformed.increment();
-                });
-                // TODO(joshlf): Do something with this error.
-                return;
-            }
-        };
-
-        if let (Some(src_ip), Some(src_port), Some(dst_port)) =
-            (src_ip, udp_packet.src_port(), udp_packet.dst_port())
-        {
-            let src_ip = match src_ip.try_into() {
-                Ok(addr) => addr,
-                Err(AddrIsMappedError {}) => {
-                    sync_ctx.with_counters(|counters| {
-                        counters.rx_mapped_addr.increment();
-                    });
-                    trace!("UdpIpTransportContext::receive_icmp_error: mapped source address");
-                    return;
-                }
-            };
-            let dst_ip = match dst_ip.try_into() {
-                Ok(addr) => addr,
-                Err(AddrIsMappedError {}) => {
-                    sync_ctx.with_counters(|counters| {
-                        counters.rx_mapped_addr.increment();
-                    });
-                    trace!("UdpIpTransportContext::receive_icmp_error: mapped destination address");
-                    return;
-                }
-            };
-            sync_ctx.with_bound_state_context(|sync_ctx| {
-                BoundStateContext::<I, _>::with_bound_sockets(
-                    sync_ctx,
-                    |sync_ctx, BoundSockets { bound_sockets, lazy_port_alloc: _ }| {
-                        let receiver = lookup(
-                            bound_sockets,
-                            (Some(dst_ip), Some(dst_port)),
-                            (src_ip, src_port),
-                            sync_ctx.downgrade_device_id(device),
-                        )
-                        .next();
-
-                        if let Some(id) = receiver {
-                            let id = match id {
-                                LookupResult::Listener(id, _) | LookupResult::Conn(id, _) => id,
-                            };
-                            match I::as_dual_stack_ip_socket(id) {
-                                DualStackIpSocket::CurrentStack(id) => {
-                                    ctx.receive_icmp_error(*id, err)
-                                }
-                                DualStackIpSocket::OtherStack(_id) => {
-                                    // TODO(https://fxbug.dev/21198): Handle
-                                    // ICMPv4 error codes on DualStack IPv6
-                                    // sockets.
-                                    trace!(
-                                        "UdpIpTransportContext::receive_icmp_error: Support for
-                                        ICMPv4 error codes on IPv6 Dual Stack sockets is
-                                        unimplemented."
-                                    );
-                                }
-                            }
-                        } else {
-                            trace!(
-                                "UdpIpTransportContext::receive_icmp_error: Got ICMP error
-                                message for nonexistent UDP socket; either the socket
-                                responsible has since been removed, or the error message
-                                was sent in error or corrupted"
-                            );
-                        }
-                    },
-                )
-            });
-        } else {
-            trace!("UdpIpTransportContext::receive_icmp_error: Got ICMP error message for IP packet with an invalid source or destination IP or port");
-        }
+        // NB: At the moment bindings has no need to consume ICMP errors, so we
+        // swallow them here.
+        debug!(
+            "UDP received ICMP error {:?} from {:?} to {:?}",
+            err, original_dst_ip, original_src_ip
+        );
     }
 }
 
@@ -2968,13 +2874,7 @@ mod tests {
         ip::{IpAddr, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr},
         AddrAndZone, LinkLocalAddr, MulticastAddr, Scope as _, ScopeableAddress as _, ZonedAddr,
     };
-    use packet::{Buf, InnerPacketBuilder, ParsablePacket, Serializer};
-    use packet_formats::{
-        icmp::{Icmpv4DestUnreachableCode, Icmpv6DestUnreachableCode},
-        ip::IpPacketBuilder,
-        ipv4::{Ipv4Header, Ipv4PacketRaw},
-        ipv6::{Ipv6Header, Ipv6PacketRaw},
-    };
+    use packet::{Buf, ParsablePacket, Serializer};
     use test_case::test_case;
 
     use super::*;
@@ -2987,7 +2887,6 @@ mod tests {
         error::RemoteAddressError,
         ip::{
             device::state::IpDeviceStateIpExt,
-            icmp::{Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx},
             testutil::{DualStackSendIpPacketMeta, FakeIpDeviceIdCtx},
             ResolveRouteError, SendIpPacketMeta,
@@ -3004,7 +2903,6 @@ mod tests {
     #[derivative(Default(bound = ""))]
     struct SocketReceived<I: IcmpIpExt> {
         packets: Vec<ReceivedPacket<I>>,
-        errors: Vec<I::ErrorCode>,
     }
 
     #[derive(Debug, PartialEq)]
@@ -3139,7 +3037,7 @@ mod tests {
         fn socket_data<I: TestIpExt>(&self) -> HashMap<SocketId<I>, Vec<&'_ [u8]>> {
             self.received::<I>()
                 .iter()
-                .map(|(id, SocketReceived { errors: _, packets })| {
+                .map(|(id, SocketReceived { packets })| {
                     (
                         id.clone(),
                         packets.iter().map(|ReceivedPacket { addr: _, body }| &body[..]).collect(),
@@ -3147,20 +3045,9 @@ mod tests {
                 })
                 .collect()
         }
-
-        fn errors<I: TestIpExt>(&self) -> HashMap<SocketId<I>, Vec<I::ErrorCode>> {
-            self.received::<I>()
-                .iter()
-                .map(|(id, SocketReceived { errors, packets: _ })| (id.clone(), errors.clone()))
-                .collect()
-        }
     }
 
     impl<I: IcmpIpExt, D> UdpBindingsContext<I, D> for FakeUdpNonSyncCtx {
-        fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode) {
-            self.state_mut().received_mut().entry(id).or_default().errors.push(err)
-        }
-
         fn receive_udp<B: BufferMut>(
             &mut self,
             id: SocketId<I>,
@@ -3637,7 +3524,6 @@ mod tests {
             &HashMap::from([(
                 socket,
                 SocketReceived {
-                    errors: vec![],
                     packets: vec![ReceivedPacket {
                         body: body.into(),
                         addr: ReceivedPacketAddrs {
@@ -4720,7 +4606,6 @@ mod tests {
             &HashMap::from([(
                 listener,
                 SocketReceived {
-                    errors: vec![],
                     packets: vec![
                         ReceivedPacket {
                             addr: ReceivedPacketAddrs {
@@ -4783,7 +4668,6 @@ mod tests {
                         body: vec![],
                         addr: ReceivedPacketAddrs { src_ip, dst_ip, src_port: None },
                     }],
-                    errors: vec![]
                 }
             )])
         );
@@ -7106,7 +6990,6 @@ mod tests {
             &HashMap::from([(
                 listener,
                 SocketReceived {
-                    errors: vec![],
                     packets: vec![ReceivedPacket {
                         body: BODY.into(),
                         addr: ReceivedPacketAddrs {
@@ -7709,225 +7592,6 @@ mod tests {
         assert_eq!(
             SocketHandler::get_udp_info(&mut sync_ctx, &mut non_sync_ctx, socket),
             SocketInfo::Unbound
-        );
-    }
-
-    #[test]
-    fn test_icmp_error() {
-        struct InitializedContext<I: TestIpExt> {
-            ctx: UdpFakeDeviceCtx,
-            wildcard_listener: SocketId<I>,
-            specific_listener: SocketId<I>,
-            connection: SocketId<I>,
-        }
-        // Create a context with:
-        // - A wildcard listener on port 1
-        // - A listener on the local IP and port 2
-        // - A connection from the local IP to the remote IP on local port 2 and
-        //   remote port 3
-        fn initialize_context<I: TestIpExt>() -> InitializedContext<I> {
-            let mut ctx =
-                UdpFakeDeviceCtx::with_sync_ctx(UdpFakeDeviceSyncCtx::new_fake_device::<I>());
-            let UdpFakeDeviceCtx { sync_ctx, non_sync_ctx } = &mut ctx;
-            let wildcard_listener = SocketHandler::create_udp(sync_ctx);
-            SocketHandler::listen_udp(
-                sync_ctx,
-                non_sync_ctx,
-                wildcard_listener,
-                None,
-                Some(NonZeroU16::new(1).unwrap()),
-            )
-            .unwrap();
-
-            let specific_listener = SocketHandler::create_udp(sync_ctx);
-            SocketHandler::listen_udp(
-                sync_ctx,
-                non_sync_ctx,
-                specific_listener,
-                Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
-                Some(NonZeroU16::new(2).unwrap()),
-            )
-            .unwrap();
-
-            let connection = SocketHandler::create_udp(sync_ctx);
-            SocketHandler::listen_udp(
-                sync_ctx,
-                non_sync_ctx,
-                connection,
-                Some(ZonedAddr::Unzoned(local_ip::<I>()).into()),
-                Some(NonZeroU16::new(3).unwrap()),
-            )
-            .unwrap();
-            SocketHandler::connect(
-                sync_ctx,
-                non_sync_ctx,
-                connection,
-                Some(ZonedAddr::Unzoned(remote_ip::<I>()).into()),
-                NonZeroU16::new(4).unwrap().into(),
-            )
-            .unwrap();
-            InitializedContext { ctx, wildcard_listener, specific_listener, connection }
-        }
-
-        // Serialize a UDP-in-IP packet with the given values, and then receive
-        // an ICMP error message with that packet as the original packet.
-        fn receive_icmp_error<
-            I: TestIpExt,
-            F: Fn(&mut UdpFakeDeviceSyncCtx, &mut UdpFakeDeviceNonSyncCtx, &[u8], I::ErrorCode),
-        >(
-            sync_ctx: &mut UdpFakeDeviceSyncCtx,
-            ctx: &mut UdpFakeDeviceNonSyncCtx,
-            src_ip: I::Addr,
-            dst_ip: I::Addr,
-            src_port: u16,
-            dst_port: u16,
-            err: I::ErrorCode,
-            f: F,
-        ) where
-            I::PacketBuilder: core::fmt::Debug,
-        {
-            let packet = (&[0u8][..])
-                .into_serializer()
-                .encapsulate(UdpPacketBuilder::new(
-                    src_ip,
-                    dst_ip,
-                    NonZeroU16::new(src_port),
-                    NonZeroU16::new(dst_port).unwrap(),
-                ))
-                .encapsulate(I::PacketBuilder::new(src_ip, dst_ip, 64, IpProto::Udp.into()))
-                .serialize_vec_outer()
-                .unwrap();
-            f(sync_ctx, ctx, packet.as_ref(), err);
-        }
-
-        fn test<
-            I: TestIpExt + PartialEq,
-            F: Copy + Fn(&mut UdpFakeDeviceSyncCtx, &mut UdpFakeDeviceNonSyncCtx, &[u8], I::ErrorCode),
-        >(
-            err: I::ErrorCode,
-            f: F,
-            other_remote_ip: I::Addr,
-        ) where
-            I::PacketBuilder: core::fmt::Debug,
-            I::ErrorCode: Copy + core::fmt::Debug + PartialEq,
-        {
-            let InitializedContext {
-                ctx: UdpFakeDeviceCtx { mut sync_ctx, mut non_sync_ctx },
-                wildcard_listener,
-                specific_listener,
-                connection,
-            } = initialize_context::<I>();
-
-            let src_ip = local_ip::<I>();
-            let dst_ip = remote_ip::<I>();
-            let mut expected_errors = HashMap::<SocketId<I>, Vec<_>>::new();
-
-            // Test that we receive an error for the connection.
-            receive_icmp_error::<I, _>(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                src_ip.get(),
-                dst_ip.get(),
-                3,
-                4,
-                err,
-                f,
-            );
-            expected_errors.entry(connection).or_default().push(err);
-            assert_eq!(non_sync_ctx.state().errors(), expected_errors);
-
-            // Test that we receive an error for the listener.
-            receive_icmp_error::<I, _>(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                src_ip.get(),
-                dst_ip.get(),
-                2,
-                4,
-                err,
-                f,
-            );
-            expected_errors.entry(specific_listener).or_default().push(err);
-            assert_eq!(non_sync_ctx.state().errors(), expected_errors);
-
-            // Test that we receive an error for the wildcard listener.
-            receive_icmp_error::<I, _>(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                src_ip.get(),
-                dst_ip.get(),
-                1,
-                4,
-                err,
-                f,
-            );
-            expected_errors.entry(wildcard_listener).or_default().push(err);
-            assert_eq!(non_sync_ctx.state().errors(), expected_errors);
-
-            // Test that we receive an error for the wildcard listener even if
-            // the original packet was sent to a different remote IP/port.
-            receive_icmp_error::<I, _>(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                src_ip.get(),
-                other_remote_ip,
-                1,
-                5,
-                err,
-                f,
-            );
-            expected_errors.entry(wildcard_listener).or_default().push(err);
-            assert_eq!(non_sync_ctx.state().errors(), expected_errors);
-
-            // Test that an error that doesn't correspond to any connection or
-            // listener isn't received.
-            receive_icmp_error::<I, _>(
-                &mut sync_ctx,
-                &mut non_sync_ctx,
-                src_ip.get(),
-                dst_ip.get(),
-                3,
-                5,
-                err,
-                f,
-            );
-            assert_eq!(non_sync_ctx.state().errors(), expected_errors);
-        }
-
-        test::<Ipv4, _>(
-            Icmpv4ErrorCode::DestUnreachable(Icmpv4DestUnreachableCode::DestNetworkUnreachable),
-            |sync_ctx: &mut UdpFakeDeviceSyncCtx,
-             ctx: &mut UdpFakeDeviceNonSyncCtx,
-             mut packet,
-             error_code| {
-                let packet = packet.parse::<Ipv4PacketRaw<_>>().unwrap();
-                let device = FakeDeviceId;
-                let src_ip = SpecifiedAddr::new(packet.src_ip());
-                let dst_ip = SpecifiedAddr::new(packet.dst_ip()).unwrap();
-                let body = packet.body().into_inner();
-                <UdpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_icmp_error(
-                    sync_ctx, ctx, &device, src_ip, dst_ip, body, error_code,
-                )
-            },
-            Ipv4Addr::new([1, 2, 3, 4]),
-        );
-
-        test::<Ipv6, _>(
-            Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute),
-            |sync_ctx: &mut UdpFakeDeviceSyncCtx,
-             ctx: &mut UdpFakeDeviceNonSyncCtx,
-             mut packet,
-             error_code| {
-                let packet = packet.parse::<Ipv6PacketRaw<_>>().unwrap();
-                let device = FakeDeviceId;
-                let src_ip = SpecifiedAddr::new(packet.src_ip());
-                let dst_ip = SpecifiedAddr::new(packet.dst_ip()).unwrap();
-                let body = packet.body().unwrap().into_inner();
-                <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_icmp_error(
-                    sync_ctx, ctx, &device, src_ip, dst_ip, body, error_code,
-                )
-            },
-            Ipv6Addr::from_bytes([1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7, 8]),
         );
     }
 

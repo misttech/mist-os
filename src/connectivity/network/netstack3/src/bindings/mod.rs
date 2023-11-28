@@ -549,10 +549,6 @@ impl<
             + IpExt,
     > IcmpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 {
-    fn receive_icmp_error(&mut self, conn: icmp::SocketId<I>, seq_num: u16, err: I::ErrorCode) {
-        I::with_collection_mut(self, |c| c.receive_icmp_error(conn, seq_num, err))
-    }
-
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: icmp::SocketId<I>,
@@ -572,10 +568,6 @@ impl<I> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonS
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {
-    fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
-        I::with_collection_mut(self, |c| c.receive_icmp_error(id, err))
-    }
-
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,

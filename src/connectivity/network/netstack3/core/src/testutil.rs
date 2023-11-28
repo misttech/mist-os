@@ -1127,10 +1127,6 @@ impl FakeNetworkContext for FakeCtx {
 }
 
 impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
-    fn receive_icmp_error(&mut self, _id: udp::SocketId<I>, _err: <I as IcmpIpExt>::ErrorCode) {
-        unimplemented!()
-    }
-
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: udp::SocketId<I>,
@@ -1146,15 +1142,6 @@ impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
 }
 
 impl IcmpBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
-    fn receive_icmp_error(
-        &mut self,
-        _conn: crate::ip::icmp::SocketId<Ipv4>,
-        _seq_num: u16,
-        _err: <Ipv4 as IcmpIpExt>::ErrorCode,
-    ) {
-        unimplemented!()
-    }
-
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv4>,
@@ -1171,15 +1158,6 @@ impl IcmpBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
 }
 
 impl IcmpBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
-    fn receive_icmp_error(
-        &mut self,
-        _conn: crate::ip::icmp::SocketId<Ipv6>,
-        _seq_num: u16,
-        _err: <Ipv6 as IcmpIpExt>::ErrorCode,
-    ) {
-        unimplemented!()
-    }
-
     fn receive_icmp_echo_reply<B: BufferMut>(
         &mut self,
         conn: crate::ip::icmp::SocketId<Ipv6>,
