@@ -636,6 +636,24 @@ func spamFToSerial(ctx context.Context, serialSocketPath string) {
 		return
 	}
 	defer socket.Close()
+
+	// Start a routine to read from the socket we opened in the background,
+	// lest the socket that never drains the kernel buffer eventually cause
+	// the mux to block on writes, causing all other mux readers to stop
+	// getting any new data as the channel buffers fill
+	go func() {
+		buf := make([]byte, 1024)
+		for {
+			if ctx.Err() != nil {
+				return
+			}
+			_, err := socket.Read(buf)
+			if err != nil {
+				return
+			}
+		}
+	}()
+
 WriteLoop:
 	for {
 		select {
