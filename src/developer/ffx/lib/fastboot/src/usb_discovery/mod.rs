@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use fastboot::{
     command::{ClientVariable, Command},
     reply::Reply,
     send,
 };
+use fuchsia_async::{Task, Timer};
+use std::collections::BTreeSet;
+use std::time::Duration;
 use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
 
 // USB fastboot interface IDs
@@ -93,5 +96,196 @@ pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
         }
     } else {
         bail!(format!("USB serial {serial}: could not get version"))
+    }
+}
+
+pub struct FastbootUsbWatcher {
+    // Task for the discovery loop
+    discovery_task: Option<Task<()>>,
+    // Task for the drain loop
+    drain_task: Option<Task<()>>,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum FastbootEvent {
+    Discovered(String),
+    Lost(String),
+}
+
+pub trait FastbootEventHandler: Send + 'static {
+    /// Handles an event.
+    fn handle_event(&mut self, event: Result<FastbootEvent>);
+}
+
+impl<F> FastbootEventHandler for F
+where
+    F: FnMut(Result<FastbootEvent>) -> () + Send + 'static,
+{
+    fn handle_event(&mut self, x: Result<FastbootEvent>) -> () {
+        self(x)
+    }
+}
+
+trait SerialNumberFinder: Send + 'static {
+    fn find_serial_numbers(&mut self) -> Vec<String>;
+}
+
+impl<F> SerialNumberFinder for F
+where
+    F: FnMut() -> Vec<String> + Send + 'static,
+{
+    fn find_serial_numbers(&mut self) -> Vec<String> {
+        self()
+    }
+}
+
+pub fn recommended_watcher<F>(event_handler: F) -> Result<FastbootUsbWatcher>
+where
+    F: FastbootEventHandler,
+{
+    Ok(FastbootUsbWatcher::new(event_handler, find_serial_numbers, Duration::from_secs(1)))
+}
+
+impl FastbootUsbWatcher {
+    fn new<F, W>(event_handler: F, finder: W, interval: Duration) -> Self
+    where
+        F: FastbootEventHandler,
+        W: SerialNumberFinder,
+    {
+        let mut res = Self { discovery_task: None, drain_task: None };
+
+        let (sender, receiver) = async_channel::bounded::<FastbootEvent>(1);
+
+        res.discovery_task.replace(Task::local(discovery_loop(sender, finder, interval)));
+        res.drain_task.replace(Task::local(handle_events_loop(receiver, event_handler)));
+
+        res
+    }
+}
+
+async fn discovery_loop<F>(
+    events_out: async_channel::Sender<FastbootEvent>,
+    mut finder: F,
+    discovery_interval: Duration,
+) -> ()
+where
+    F: SerialNumberFinder,
+{
+    let mut serials = BTreeSet::<String>::new();
+    loop {
+        // Enumerate interfaces
+        let new_serials = finder.find_serial_numbers();
+        let new_serials = BTreeSet::from_iter(new_serials);
+        tracing::trace!("found serials: {:#?}", new_serials);
+        // Update Cache
+        for serial in &new_serials {
+            tracing::trace!("Inserting new serial: {}", serial);
+            if serials.insert(serial.clone()) {
+                tracing::trace!("Sending discovered event for serial: {}", serial);
+                let _ = events_out.send(FastbootEvent::Discovered(serial.clone())).await;
+                tracing::trace!("Sent discovered event for serial: {}", serial);
+            }
+        }
+
+        // Check for any missing Serials
+        let missing_serials: Vec<_> = serials.difference(&new_serials).cloned().collect();
+        tracing::trace!("missing serials: {:#?}", missing_serials);
+        for serial in missing_serials {
+            serials.remove(&serial);
+            tracing::trace!("Sening lost event for serial: {}", serial);
+            let _ = events_out.send(FastbootEvent::Lost(serial.clone())).await;
+            tracing::trace!("Sent lost event for serial: {}", serial);
+        }
+
+        tracing::trace!("discovery loop... waiting for {:#?}", discovery_interval);
+        Timer::new(discovery_interval).await;
+    }
+}
+
+async fn handle_events_loop<F>(receiver: async_channel::Receiver<FastbootEvent>, mut handler: F)
+where
+    F: FastbootEventHandler,
+{
+    loop {
+        let event = receiver.recv().await.map_err(|e| anyhow!(e));
+        tracing::trace!("Event loop received event: {:#?}", event);
+        handler.handle_event(event);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use futures::channel::mpsc::unbounded;
+    use pretty_assertions::assert_eq;
+    use std::sync::{Arc, Mutex};
+
+    struct TestSerialNumberFinder {
+        responses: Vec<Vec<String>>,
+        is_empty: Arc<Mutex<bool>>,
+    }
+
+    impl SerialNumberFinder for TestSerialNumberFinder {
+        fn find_serial_numbers(&mut self) -> Vec<String> {
+            if let Some(res) = self.responses.pop() {
+                if self.responses.len() == 0 {
+                    let mut lock = self.is_empty.lock().unwrap();
+                    *lock = true;
+                }
+                res
+            } else {
+                vec![]
+            }
+        }
+    }
+
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_usb_watcher() -> Result<()> {
+        let empty_signal = Arc::new(Mutex::new(false));
+        let serial_finder = TestSerialNumberFinder {
+            responses: vec![
+                vec!["1234".to_string(), "2345".to_string()],
+                vec!["1234".to_string(), "5678".to_string()],
+            ],
+            is_empty: empty_signal.clone(),
+        };
+        let (sender, mut queue) = unbounded();
+        let watcher = FastbootUsbWatcher::new(
+            move |res: Result<FastbootEvent>| {
+                let _ = sender.unbounded_send(res);
+            },
+            serial_finder,
+            Duration::from_millis(50),
+        );
+
+        while !*empty_signal.lock().unwrap() {
+            // Wait for 200 millis so the watcher can drain the finder queue
+            Timer::new(Duration::from_millis(200)).await;
+        }
+
+        drop(watcher);
+        let mut events = Vec::<FastbootEvent>::new();
+        while let Ok(Some(event)) = queue.try_next() {
+            events.push(event.unwrap());
+        }
+
+        // Assert state of events
+        assert_eq!(events.len(), 6);
+        assert_eq!(
+            &events,
+            &vec![
+                // First set of discovery events
+                FastbootEvent::Discovered("1234".to_string()),
+                FastbootEvent::Discovered("5678".to_string()),
+                // Second set of discovery events
+                FastbootEvent::Discovered("2345".to_string()),
+                FastbootEvent::Lost("5678".to_string()),
+                // Last set... there are no more items left in the queue
+                // so we lose all serials.
+                FastbootEvent::Lost("1234".to_string()),
+                FastbootEvent::Lost("2345".to_string()),
+            ]
+        );
+        Ok(())
     }
 }

@@ -31,6 +31,7 @@ if (is_host) {
       "//src/lib/usb_bulk/rust:lib",
       "//src/storage/lib/sparse/rust:lib",
       "//third_party/rust_crates:anyhow",
+      "//third_party/rust_crates:async-channel",
       "//third_party/rust_crates:async-fs",
       "//third_party/rust_crates:async-io",
       "//third_party/rust_crates:async-net",
