@@ -9,6 +9,7 @@ use fuchsia_zircon::{
 };
 use starnix_lock::{RwLock, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
+use starnix_uapi::signals::SIGCHLD;
 use std::{ffi::CString, fmt, mem::MaybeUninit, sync::Arc};
 
 use crate::{
@@ -1008,7 +1009,7 @@ impl CurrentTask {
             Credentials::root(),
             Arc::clone(&kernel.default_abstract_socket_namespace),
             Arc::clone(&kernel.default_abstract_vsock_namespace),
-            None,
+            Some(SIGCHLD),
             Default::default(),
             None,
             Default::default(),

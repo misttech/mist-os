@@ -601,6 +601,7 @@ where
 }
 
 /// The generic options for both waitid and wait4.
+#[derive(Debug)]
 pub struct WaitingOptions {
     /// Wait for a process that has exited.
     pub wait_for_exited: bool,
