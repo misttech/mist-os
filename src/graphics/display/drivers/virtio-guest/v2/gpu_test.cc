@@ -18,12 +18,23 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/devices/testing/fake-bti/include/lib/fake-bti/bti.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace sysmem = fuchsia_sysmem;
 
 namespace {
+
+// The GPU Virtual Device ID is 0x1040 + 16 = 0x1050, in accordance with
+// Section 4.1.2.1 and Section 5 of the VIRTIO V1.2 Spec:
+// https://docs.oasis-open.org/virtio/virtio/v1.2/csd01/virtio-v1.2-csd01.html#x1-2160005
+// This also matches the definition at
+// //zircon/system/ulib/virtio/include/virtio/virtio.h
+constexpr int kTestDeviceId = 0x1050;
+
+// The PCI Subsystem Vendor ID according to the same spec linked above.
+constexpr int kTestSubsysDeviceId = 0x1af4;
 
 // Use a stub buffer collection instead of the real sysmem since some tests may
 // require things that aren't available on the current system.
@@ -151,6 +162,101 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
       display::DriverBufferCollectionId(0);
 };
 
+// Implement all the WireServer handlers of fuchsia_hardware_pci::Device as protocol as required by
+// FIDL.
+class FakePciParent : public fidl::WireServer<fuchsia_hardware_pci::Device> {
+ public:
+  fuchsia_hardware_pci::Service::InstanceHandler GetInstanceHandler() {
+    return fuchsia_hardware_pci::Service::InstanceHandler({
+        .device = binding_group_.CreateHandler(
+            this, fdf_dispatcher_get_async_dispatcher(fdf_dispatcher_get_current_dispatcher()),
+            fidl::kIgnoreBindingClosure),
+    });
+  }
+  void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::DeviceInfo info;
+    info.device_id = kTestDeviceId;
+    completer.Reply(info);
+  }
+  void GetBar(GetBarRequestView request, GetBarCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::Bar bar;
+    completer.ReplySuccess(std::move(bar));
+  }
+  void SetBusMastering(SetBusMasteringRequestView request,
+                       SetBusMasteringCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void ResetDevice(ResetDeviceCompleter::Sync& completer) override { completer.ReplySuccess(); }
+  void AckInterrupt(AckInterruptCompleter::Sync& completer) override { completer.ReplySuccess(); }
+  void MapInterrupt(MapInterruptRequestView request,
+                    MapInterruptCompleter::Sync& completer) override {
+    zx::interrupt interrupt;
+    completer.ReplySuccess(std::move(interrupt));
+  }
+  void GetInterruptModes(GetInterruptModesCompleter::Sync& completer) override {
+    fuchsia_hardware_pci::wire::InterruptModes modes;
+    completer.Reply(modes);
+  }
+  void SetInterruptMode(SetInterruptModeRequestView request,
+                        SetInterruptModeCompleter::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void ReadConfig8(ReadConfig8RequestView request, ReadConfig8Completer::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
+  void ReadConfig16(ReadConfig16RequestView request,
+                    ReadConfig16Completer::Sync& completer) override {
+    completer.ReplySuccess(kTestSubsysDeviceId);
+  }
+  void ReadConfig32(ReadConfig32RequestView request,
+                    ReadConfig32Completer::Sync& completer) override {
+    completer.ReplySuccess(0);
+  }
+  void WriteConfig8(WriteConfig8RequestView request,
+                    WriteConfig8Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void WriteConfig16(WriteConfig16RequestView request,
+                     WriteConfig16Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void WriteConfig32(WriteConfig32RequestView request,
+                     WriteConfig32Completer::Sync& completer) override {
+    completer.ReplySuccess();
+  }
+  void GetCapabilities(GetCapabilitiesRequestView request,
+                       GetCapabilitiesCompleter::Sync& completer) override {
+    std::vector<uint8_t> empty_vec;
+    auto empty_vec_view = fidl::VectorView<uint8_t>::FromExternal(empty_vec);
+    completer.Reply(empty_vec_view);
+  }
+  void GetExtendedCapabilities(GetExtendedCapabilitiesRequestView request,
+                               GetExtendedCapabilitiesCompleter::Sync& completer) override {
+    std::vector<uint16_t> empty_vec;
+    auto empty_vec_view = fidl::VectorView<uint16_t>::FromExternal(empty_vec);
+    completer.Reply(empty_vec_view);
+  }
+  void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override {
+    zx_handle_t fake_handle;
+    fake_bti_create(&fake_handle);
+    zx::bti bti(fake_handle);
+    completer.ReplySuccess(std::move(bti));
+  }
+  fidl::ServerBindingGroup<fuchsia_hardware_pci::Device> binding_group_;
+};
+
+class TestEnvironmentLocal : public fdf_testing::TestEnvironment {
+ public:
+  zx::result<> Initialize(fidl::ServerEnd<fuchsia_io::Directory> incoming_directory_server_end) {
+    return fdf_testing::TestEnvironment::Initialize(std::move(incoming_directory_server_end));
+  }
+  void AddService(fuchsia_hardware_pci::Service::InstanceHandler&& handler) {
+    zx::result result =
+        incoming_directory().AddService<fuchsia_hardware_pci::Service>(std::move(handler));
+    EXPECT_TRUE(result.is_ok());
+  }
+};
+
 class VirtioGpuTest : public ::testing::Test {
  public:
   VirtioGpuTest() = default;
@@ -160,12 +266,12 @@ class VirtioGpuTest : public ::testing::Test {
     EXPECT_EQ(ZX_OK, start_args.status_value());
 
     // Start the test environment
-    zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                   std::move(start_args->incoming_directory_server));
+    zx::result init_result = test_environment_.SyncCall(
+        &TestEnvironmentLocal::Initialize, std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
-    // TODO(fxbug.dev/134883): Connect Fake PCI Backend.
+    auto handler = fake_pci_parent_.SyncCall(&FakePciParent::GetInstanceHandler);
+    test_environment_.SyncCall(&TestEnvironmentLocal::AddService, std::move(handler));
 
     // TODO(fxbug.dev/134883): Connect Fake Sysmem.
 
@@ -196,11 +302,13 @@ class VirtioGpuTest : public ::testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
-      env_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
+                                                                              std::in_place};
 
   async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio::GpuDriver>> driver_{
       driver_dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<FakePciParent> fake_pci_parent_{env_dispatcher(),
+                                                                      std::in_place};
 };
 
 TEST_F(VirtioGpuTest, CreateAndStartDriver) {}
