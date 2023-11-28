@@ -13,16 +13,17 @@
 namespace wlan::brcmfmac {
 namespace {
 fidl::Array<uint8_t, 3> kIeeeOui = {0x00, 0x0F, 0xAC};
+fidl::Array<uint8_t, 3> kMsftOui = {0x00, 0x50, 0xF2};
 }  // namespace
 
 class SetKeysTest : public SimTest {
  public:
   SetKeysTest() = default;
   void SetUp() override {
-    ASSERT_EQ(ZX_OK, SimTest::Init());
-    ASSERT_EQ(ZX_OK, StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_));
+    ASSERT_OK(SimTest::Init());
+    ASSERT_OK(StartInterface(wlan_common::WlanMacRole::kClient, &client_ifc_));
   }
-  void TearDown() override { EXPECT_EQ(SimTest::DeleteInterface(&client_ifc_), ZX_OK); }
+  void TearDown() override { EXPECT_OK(SimTest::DeleteInterface(&client_ifc_)); }
 
   SimInterface client_ifc_;
 };
@@ -61,10 +62,12 @@ TEST_F(SetKeysTest, MultipleKeys) {
   std::vector<brcmf_wsec_key_le> firmware_keys =
       device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
   ASSERT_EQ(firmware_keys.size(), wlan_fullmac_wire::kWlanMaxKeylistSize);
-  EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[0].data), "One");
-  EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[1].data), "Two");
-  EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[2].data), "Three");
-  EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[3].data), "Four");
+
+  for (size_t i = 0; i < firmware_keys.size(); i++) {
+    EXPECT_EQ(strlen(reinterpret_cast<const char*>(keys[i])), firmware_keys[i].len);
+    EXPECT_BYTES_EQ(firmware_keys[i].data, keys[i], firmware_keys[i].len);
+  }
+
   ASSERT_EQ(set_keys_resp.num_keys, wlan_fullmac_wire::kWlanMaxKeylistSize);
   for (auto status : set_keys_resp.statuslist.data_) {
     ASSERT_EQ(status, ZX_OK);
@@ -74,36 +77,36 @@ TEST_F(SetKeysTest, MultipleKeys) {
 // Ensure that group key is set correctly by the driver in firmware.
 TEST_F(SetKeysTest, SetGroupKey) {
   const uint8_t group_key[wlan_ieee80211::kMaxKeyLen] = "Group Key";
+  const size_t group_keylen = strlen(reinterpret_cast<const char*>(group_key));
   const uint8_t ucast_key[wlan_ieee80211::kMaxKeyLen] = "My Key";
+  const size_t ucast_keylen = strlen(reinterpret_cast<const char*>(ucast_key));
   const size_t kKeyNum = 2;
 
   fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
       key_list;
-  key_list[0] =
-      fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-          .key(fidl::VectorView<uint8_t>::FromExternal(
-              const_cast<uint8_t*>(group_key), strlen(reinterpret_cast<const char*>(group_key))))
-          .key_idx(static_cast<uint8_t>(0))
-          .key_type(fuchsia_wlan_common::wire::WlanKeyType::kGroup)
-          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-          .cipher_oui(kIeeeOui)
-          .rsc({})
-          .peer_addr({0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
-          .protection({})
-          .Build();
+  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
+                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(group_key),
+                                                                 group_keylen))
+                    .key_idx(static_cast<uint8_t>(0))
+                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kGroup)
+                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+                    .cipher_oui(kIeeeOui)
+                    .rsc({})
+                    .peer_addr({0xff, 0xff, 0xff, 0xff, 0xff, 0xff})
+                    .protection({})
+                    .Build();
 
-  key_list[1] =
-      fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-          .key(fidl::VectorView<uint8_t>::FromExternal(
-              const_cast<uint8_t*>(ucast_key), strlen(reinterpret_cast<const char*>(ucast_key))))
-          .key_idx(static_cast<uint8_t>(1))
-          .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
-          .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
-          .cipher_oui(kIeeeOui)
-          .rsc({})
-          .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
-          .protection({})
-          .Build();
+  key_list[1] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
+                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(ucast_key),
+                                                                 ucast_keylen))
+                    .key_idx(static_cast<uint8_t>(1))
+                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
+                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+                    .cipher_oui(kIeeeOui)
+                    .rsc({})
+                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+                    .protection({})
+                    .Build();
 
   wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
       .num_keys = kKeyNum,
@@ -111,12 +114,12 @@ TEST_F(SetKeysTest, SetGroupKey) {
   };
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
   ASSERT_EQ(set_keys_resp.num_keys, 2ul);
-  ASSERT_EQ(set_keys_resp.statuslist.data()[0], ZX_OK);
-  ASSERT_EQ(set_keys_resp.statuslist.data()[1], ZX_OK);
+  ASSERT_OK(set_keys_resp.statuslist.data()[0]);
+  ASSERT_OK(set_keys_resp.statuslist.data()[1]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys =
       device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
@@ -155,7 +158,7 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
   };
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
   ASSERT_EQ(set_keys_resp.num_keys, 1ul);
@@ -168,12 +171,12 @@ TEST_F(SetKeysTest, CustomOuiNotSupported) {
 
 TEST_F(SetKeysTest, OptionalOuiSupported) {
   const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
+  const size_t keylen = strlen(reinterpret_cast<const char*>(key));
 
   fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
       key_list;
   key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
-                    .key(fidl::VectorView<uint8_t>::FromExternal(
-                        const_cast<uint8_t*>(key), strlen(reinterpret_cast<const char*>(key))))
+                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
                     .key_idx(static_cast<uint8_t>(0))
                     .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
                     .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
@@ -188,18 +191,55 @@ TEST_F(SetKeysTest, OptionalOuiSupported) {
   };
 
   auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
-  EXPECT_TRUE(result.ok());
+  EXPECT_OK(result);
 
   auto& set_keys_resp = result->resp;
   ASSERT_EQ(set_keys_resp.num_keys, 1ul);
-  ASSERT_EQ(set_keys_resp.statuslist.data()[0], ZX_OK);
+  ASSERT_OK(set_keys_resp.statuslist.data()[0]);
 
   std::vector<brcmf_wsec_key_le> firmware_keys =
       device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
   ASSERT_EQ(firmware_keys.size(), 1U);
 
-  EXPECT_STREQ(reinterpret_cast<const char*>(firmware_keys[0].data),
-               reinterpret_cast<const char*>(key));
+  EXPECT_EQ(keylen, firmware_keys[0].len);
+  EXPECT_BYTES_EQ(firmware_keys[0].data, key, firmware_keys[0].len);
+}
+
+TEST_F(SetKeysTest, MsftOuiSupported) {
+  const uint8_t key[wlan_ieee80211::kMaxKeyLen] = "My Key";
+  const size_t keylen = strlen(reinterpret_cast<const char*>(key));
+
+  fidl::Array<fuchsia_wlan_common::wire::WlanKeyConfig, wlan_fullmac_wire::kWlanMaxKeylistSize>
+      key_list;
+  key_list[0] = fuchsia_wlan_common::wire::WlanKeyConfig::Builder(client_ifc_.test_arena_)
+                    .key(fidl::VectorView<uint8_t>::FromExternal(const_cast<uint8_t*>(key), keylen))
+                    .key_idx(static_cast<uint8_t>(0))
+                    .key_type(fuchsia_wlan_common::wire::WlanKeyType::kPairwise)
+                    .cipher_type(wlan_ieee80211::CipherSuiteType::kCcmp128)
+                    .cipher_oui(kMsftOui)
+                    .rsc({})
+                    .peer_addr({0xde, 0xad, 0xbe, 0xef, 0xab, 0xcd})
+                    .protection({})
+                    .Build();
+
+  wlan_fullmac_wire::WlanFullmacSetKeysReq key_req = {
+      .num_keys = 1,
+      .keylist = {key_list},
+  };
+
+  auto result = client_ifc_.client_.buffer(client_ifc_.test_arena_)->SetKeysReq(key_req);
+  EXPECT_OK(result);
+
+  auto& set_keys_resp = result->resp;
+  ASSERT_EQ(set_keys_resp.num_keys, 1ul);
+  ASSERT_OK(set_keys_resp.statuslist.data()[0]);
+
+  std::vector<brcmf_wsec_key_le> firmware_keys =
+      device_->GetSim()->sim_fw->GetKeyList(client_ifc_.iface_id_);
+  ASSERT_EQ(firmware_keys.size(), 1U);
+
+  EXPECT_EQ(keylen, firmware_keys[0].len);
+  EXPECT_BYTES_EQ(firmware_keys[0].data, key, firmware_keys[0].len);
 }
 
 }  // namespace wlan::brcmfmac
