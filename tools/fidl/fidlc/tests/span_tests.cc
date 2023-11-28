@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 #include <algorithm>
-#include <iomanip>
-#include <iostream>
 #include <set>
 #include <stack>
 
@@ -88,8 +86,8 @@ const char* element_type_str(ElementType type) { return kElementTypeNames[type];
 
 // Used to delineate spans in source code. E.g.,
 // const uint32 «three» = 3;
-constexpr std::string_view kMarkerLeft = "«";
-constexpr std::string_view kMarkerRight = "»";
+const std::string kMarkerLeft = "«";
+const std::string kMarkerRight = "»";
 
 class SourceSpanVisitor : public fidl::raw::TreeVisitor {
  public:
@@ -322,8 +320,7 @@ std::string remove_markers(std::string_view source) { return replace_markers(sou
 // |cleaned_source|. If source spans are incorrectly marked (missing or extra markers), returns
 // empty set; otherwise, returns a multiset of expected spans.
 std::multiset<std::string_view> extract_expected_span_views(std::string_view marked_source,
-                                                            std::string_view clean_source,
-                                                            std::vector<std::string>* errors) {
+                                                            std::string_view clean_source) {
   std::stack<size_t> stack;
   std::multiset<std::string_view> spans;
   size_t left_marker_size = kMarkerLeft.length();
@@ -344,10 +341,8 @@ std::multiset<std::string_view> extract_expected_span_views(std::string_view mar
       i += left_marker_size;
     } else if (match(i, kMarkerRight)) {
       if (stack.empty()) {
-        std::stringstream error_msg;
-        error_msg << "unexpected closing marker '" << kMarkerRight << "' at position " << i
-                  << " in source string";
-        errors->push_back(error_msg.str());
+        ADD_FAILURE() << "unexpected closing marker '" << kMarkerRight << "' at position " << i
+                      << "  in source string";
         // Return an empty set if errors
         spans.clear();
         break;
@@ -368,9 +363,7 @@ std::multiset<std::string_view> extract_expected_span_views(std::string_view mar
   }
 
   if (!stack.empty()) {
-    std::stringstream error_msg;
-    error_msg << "expected closing marker '" << kMarkerRight << "'";
-    errors->push_back(error_msg.str());
+    ADD_FAILURE() << "expected closing marker '" << kMarkerRight << "'";
     // Return an empty set if errors
     spans.clear();
   }
@@ -383,7 +376,7 @@ struct TestCase {
   std::vector<std::string> marked_sources;
 };
 
-const std::vector<TestCase> test_cases = {
+const std::vector<TestCase> kTestCases = {
     {ElementType::kAliasDeclaration,
      {
          R"FIDL(library x; «alias Foo = uint8»;)FIDL",
@@ -827,42 +820,31 @@ const std::vector<TestCase> test_cases = {
      }},
 };
 
-constexpr std::string_view kPassedMsg = "\x1B[32mPassed\033[0m";
-constexpr std::string_view kFailedMsg = "\x1B[31mFailed\033[0m";
-constexpr std::string_view kErrorMsg = "\x1B[31mERROR:\033[0m";
-
-void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert_left_padding,
-                   const std::string& insert_right_padding, std::set<ElementType> exclude) {
-  std::cerr << '\n'
-            << std::left << '\t' << "\x1B[34mWhere left padding = \"" << insert_left_padding
-            << "\" and right padding = \"" << insert_right_padding << "\":\033[0m\n";
-
-  bool all_passed = true;
-  for (const auto& test_case : cases) {
+class SpanTest : public testing::TestWithParam<TestCase> {
+ public:
+  void RunTest(const std::string& insert_left_padding, const std::string& insert_right_padding,
+               const std::set<ElementType>& exclude) {
+    const TestCase& test_case = GetParam();
     if (exclude.find(test_case.element_type) != exclude.end()) {
-      continue;
+      return;
     }
-    std::cerr << std::left << '\t' << std::setw(48) << element_type_str(test_case.element_type);
-    std::vector<std::string> errors;
 
     for (const auto& unpadded_source : test_case.marked_sources) {
       // Insert the specified left/right padding.
-      std::string marked_source =
-          replace_markers(unpadded_source, insert_left_padding + kMarkerLeft.data(),
-                          kMarkerRight.data() + insert_right_padding);
+      std::string marked_source = replace_markers(
+          unpadded_source, insert_left_padding + kMarkerLeft, kMarkerRight + insert_right_padding);
       std::string clean_source = remove_markers(marked_source);
 
       // Parse the source with markers removed
       TestLibrary library(clean_source);
       std::unique_ptr<fidl::raw::File> ast;
       if (!library.Parse(&ast)) {
-        errors.push_back("failed to parse");
-        break;
+        FAIL() << "Failed to parse fidl:\n\n" << clean_source;
       }
 
       // Get the expected spans from the marked source
       std::multiset<std::string_view> span_views =
-          extract_expected_span_views(marked_source, library.source_file().data(), &errors);
+          extract_expected_span_views(marked_source, library.source_file().data());
       // Returns an empty set when there are errors
       if (span_views.empty()) {
         break;
@@ -886,11 +868,9 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
           actual_spans.begin(), actual_spans.end(), expected_spans.begin(), expected_spans.end(),
           std::inserter(actual_spans_minus_expected, actual_spans_minus_expected.begin()));
       for (const auto& span : actual_spans_minus_expected) {
-        std::stringstream error_msg;
-        error_msg << "unexpected occurrence of spans of type "
-                  << element_type_str(test_case.element_type) << ": " << kMarkerLeft << span
-                  << kMarkerRight;
-        errors.push_back(error_msg.str());
+        ADD_FAILURE() << "unexpected occurrence of spans of type "
+                      << element_type_str(test_case.element_type) << ": " << kMarkerLeft << span
+                      << kMarkerRight;
       }
 
       // Report errors where the checker failed to find expected spans (spans in expected but not
@@ -900,35 +880,22 @@ void RunParseTests(const std::vector<TestCase>& cases, const std::string& insert
           expected_spans.begin(), expected_spans.end(), actual_spans.begin(), actual_spans.end(),
           std::inserter(expected_spans_minus_actual, expected_spans_minus_actual.begin()));
       for (const auto& span : expected_spans_minus_actual) {
-        std::stringstream error_msg;
-        error_msg << "expected (but didn't find) spans of type "
-                  << element_type_str(test_case.element_type) << ": " << kMarkerLeft << span
-                  << kMarkerRight;
-        errors.push_back(error_msg.str());
-      }
-    }
-
-    if (errors.empty()) {
-      std::cerr << kPassedMsg << '\n';
-    } else {
-      std::cerr << kFailedMsg << '\n';
-      all_passed = false;
-      for (const auto& error : errors) {
-        std::cerr << "\t  " << kErrorMsg << ' ' << error << '\n';
+        ADD_FAILURE() << "expected (but didn't find) spans of type "
+                      << element_type_str(test_case.element_type) << ": " << kMarkerLeft << span
+                      << kMarkerRight;
       }
     }
   }
+};
 
-  // Assert after all tests are over so that we can get output for each test
-  // case even if one of them fails.
-  ASSERT_TRUE(all_passed) << "At least one test case failed";
-}
+TEST_P(SpanTest, GoodNoPadding) { RunTest("", "", {}); }
+TEST_P(SpanTest, GoodLeftPadding) { RunTest(" ", "", {}); }
+TEST_P(SpanTest, GoodRightPadding) { RunTest("", " ", {ElementType::kDocCommentLiteral}); }
+TEST_P(SpanTest, GoodLeftRightPadding) { RunTest(" ", " ", {ElementType::kDocCommentLiteral}); }
 
-TEST(SpanTests, GoodParseTest) {
-  RunParseTests(test_cases, "", "", {});
-  RunParseTests(test_cases, " ", "", {});
-  RunParseTests(test_cases, "", " ", {ElementType::kDocCommentLiteral});
-  RunParseTests(test_cases, " ", " ", {ElementType::kDocCommentLiteral});
-}
+INSTANTIATE_TEST_SUITE_P(SpanTests, SpanTest, testing::ValuesIn(kTestCases),
+                         [](const testing::TestParamInfo<TestCase>& info) {
+                           return element_type_str(info.param.element_type);
+                         });
 
 }  // namespace
