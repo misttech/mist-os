@@ -110,7 +110,7 @@ pub trait File: Node {
     async fn truncate(&self, length: u64) -> Result<(), Status>;
 
     /// Get a VMO representing this file.
-    /// If not supported by the underlying filesystem, should return Error(NOT_SUPPORTED).
+    /// If not supported by the underlying filesystem, should return Err(NOT_SUPPORTED).
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status>;
 
     /// Get the size of this file.

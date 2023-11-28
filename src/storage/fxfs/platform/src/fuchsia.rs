@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod component;
+mod debug;
 mod device;
 pub mod directory;
 mod dirent_cache;

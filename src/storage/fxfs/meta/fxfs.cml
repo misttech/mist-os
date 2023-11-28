@@ -15,6 +15,11 @@
     },
     capabilities: [
         {
+            directory: "debug",
+            rights: [ "rw*" ],
+            path: "/debug",
+        },
+        {
             directory: "volumes",
             rights: [ "rw*" ],
             path: "/volumes",
@@ -43,6 +48,10 @@
         },
     ],
     expose: [
+        {
+            directory: "debug",
+            from: "self",
+        },
         {
             directory: "volumes",
             from: "self",

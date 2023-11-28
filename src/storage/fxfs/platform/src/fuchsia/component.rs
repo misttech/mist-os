@@ -4,7 +4,7 @@
 
 use {
     crate::fuchsia::{
-        errors::map_to_status, memory_pressure::MemoryPressureMonitor,
+        debug::FxfsDebug, errors::map_to_status, memory_pressure::MemoryPressureMonitor,
         volumes_directory::VolumesDirectory,
     },
     anyhow::{Context, Error},
@@ -152,6 +152,7 @@ impl Component {
     ) -> Result<(), Error> {
         let svc_dir = vfs::directory::immutable::simple();
         self.outgoing_dir.add_entry("svc", svc_dir.clone()).expect("Unable to create svc dir");
+
         let weak = Arc::downgrade(&self);
         svc_dir.add_entry(
             StartupMarker::PROTOCOL_NAME,
@@ -288,6 +289,9 @@ impl Component {
             volumes.directory_node().clone(),
             /* overwrite: */ true,
         )?;
+
+        let debug = FxfsDebug::new(&**fs).await?;
+        self.outgoing_dir.add_entry_may_overwrite("debug", debug.root(), true)?;
 
         fs.allocator().track_statistics(&metrics::detail(), "allocator");
         fs.journal().track_statistics(&metrics::detail(), "journal");

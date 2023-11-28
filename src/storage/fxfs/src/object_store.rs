@@ -187,7 +187,7 @@ pub const MAX_ENCRYPTED_MUTATIONS_SIZE: usize = 8 * journal::DEFAULT_RECLAIM_SIZ
 #[derive(Default)]
 pub struct HandleOptions {
     /// If true, transactions used by this handle will skip journal space checks.
-    skip_journal_checks: bool,
+    pub skip_journal_checks: bool,
 }
 
 #[derive(Default)]
