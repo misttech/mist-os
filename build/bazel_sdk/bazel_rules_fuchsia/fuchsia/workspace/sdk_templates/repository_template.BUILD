@@ -84,6 +84,8 @@ fuchsia_toolchain_info(
     pm = "//tools:{{HOST_CPU}}/pm",
     sdk_id = "{{SDK_ID}}",
     sdk_manifest = "//:meta/manifest.json",
+    symbolizer = "//tools:{{HOST_CPU}}/symbolizer",
+    symbolizer_manifest = "//tools:{{HOST_CPU}}/symbolizer-meta.json",
     zbi = "//tools:{{HOST_CPU}}/zbi",
     zbi_manifest = "//tools:{{HOST_CPU}}/zbi-meta.json",
 )

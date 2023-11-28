@@ -44,6 +44,8 @@ def _fuchsia_toolchain_info_impl(ctx):
         minfs = ctx.executable.minfs,
         minfs_manifest = ctx.file.minfs_manifest,
         pm = ctx.executable.pm,
+        symbolizer = ctx.executable.symbolizer,
+        symbolizer_manifest = ctx.file.symbolizer_manifest,
         zbi = ctx.executable.zbi,
         zbi_manifest = ctx.file.zbi_manifest,
         default_api_level = ctx.attr.default_target_api,
@@ -262,6 +264,19 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
             executable = True,
+            allow_single_file = True,
+        ),
+        "symbolizer": attr.label(
+            doc = "symbolizer tool executable.",
+            mandatory = True,
+            cfg = "exec",
+            executable = True,
+            allow_single_file = True,
+        ),
+        "symbolizer_manifest": attr.label(
+            doc = "symbolizer tool's manifest, required by ffx.",
+            mandatory = True,
+            cfg = "exec",
             allow_single_file = True,
         ),
         "zbi": attr.label(
