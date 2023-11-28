@@ -2,6 +2,7 @@
 #define __MY_CONFIG_LIB_H__
 
 #include <lib/inspect/cpp/inspect.h>
+#include <lib/zx/vmo.h>
 
 #include <string>
 #include <vector>
@@ -11,6 +12,7 @@ struct Config {
  public:
   static constexpr bool kIsStructuredConfig = true;
   static Config TakeFromStartupHandle() noexcept;
+  static Config CreateFromVmo(zx::vmo config_vmo) noexcept;
   const std::string ToString() noexcept;
 
  private:

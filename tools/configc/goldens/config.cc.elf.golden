@@ -228,7 +228,10 @@ Config Config::TakeFromStartupHandle() noexcept {
       config_vmo_handle != ZX_HANDLE_INVALID,
       "Config VMO handle must be provided and cannot already have been taken.");
   zx::vmo config_vmo(config_vmo_handle);
+  return Config::CreateFromVmo(std::move(config_vmo));
+}
 
+Config Config::CreateFromVmo(zx::vmo config_vmo) noexcept {
   // Get the size of the VMO
   uint64_t content_size_prop = 0;
   zx_status_t status = config_vmo.get_prop_content_size(&content_size_prop);
