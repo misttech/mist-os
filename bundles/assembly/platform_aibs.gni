@@ -63,6 +63,7 @@ bootstrap_userdebug_platform_aib_names = [
   "clock_development_tools",
 
   # Kernel args
+  "kernel_args_eng",
   "kernel_args_userdebug",
 ]
 
@@ -74,7 +75,6 @@ bootstrap_eng_platform_aib_names = [
   "bootstrap_eng",
 
   # Kernel args
-  "kernel_args_eng",
   "kernel_pmm_checker_enabled",
 ]
 

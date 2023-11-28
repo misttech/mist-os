@@ -39,6 +39,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
 BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
     "bootstrap_userdebug",
     "clock_development_tools",
+    "kernel_args_eng",
     "kernel_args_userdebug",
 ]
 
@@ -47,7 +48,6 @@ BOOTSTRAP_USERDEBUG_PLATFORM_AIB_NAMES = [
 # so that these systems (e.g. bringup) don't need to build the entire platform.
 BOOTSTRAP_ENG_PLATFORM_AIB_NAMES = [
     "bootstrap_eng",
-    "kernel_args_eng",
     "kernel_pmm_checker_enabled",
 ]
 
