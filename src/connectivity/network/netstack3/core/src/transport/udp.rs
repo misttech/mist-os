@@ -1046,7 +1046,7 @@ impl<I: Ip> EntryKey for SocketId<I> {
 }
 
 /// An execution context for the UDP protocol.
-pub trait NonSyncContext<I: IcmpIpExt, D> {
+pub trait UdpBindingsContext<I: IcmpIpExt, D> {
     /// Receives an ICMP error message related to a previously-sent UDP packet.
     ///
     /// `err` is the specific error identified by the incoming ICMP error
@@ -1075,10 +1075,10 @@ pub trait NonSyncContext<I: IcmpIpExt, D> {
 
 /// The non-synchronized context for UDP.
 pub(crate) trait StateNonSyncContext<I: IpExt, D>:
-    InstantContext + RngContext + TracingContext + NonSyncContext<I, D>
+    InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>
 {
 }
-impl<I: IpExt, C: InstantContext + RngContext + TracingContext + NonSyncContext<I, D>, D>
+impl<I: IpExt, C: InstantContext + RngContext + TracingContext + UdpBindingsContext<I, D>, D>
     StateNonSyncContext<I, D> for C
 {
 }
@@ -3152,7 +3152,7 @@ mod tests {
         }
     }
 
-    impl<I: IcmpIpExt, D> NonSyncContext<I, D> for FakeUdpNonSyncCtx {
+    impl<I: IcmpIpExt, D> UdpBindingsContext<I, D> for FakeUdpNonSyncCtx {
         fn receive_icmp_error(&mut self, id: SocketId<I>, err: I::ErrorCode) {
             self.state_mut().received_mut().entry(id).or_default().errors.push(err)
         }

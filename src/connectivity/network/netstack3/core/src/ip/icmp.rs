@@ -738,7 +738,7 @@ impl<
 
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
-pub trait IcmpContext<I: IcmpIpExt, D> {
+pub trait IcmpBindingsContext<I: IcmpIpExt, D> {
     /// Receives an ICMP error message related to a previously-sent ICMP echo
     /// request.
     ///
@@ -761,11 +761,11 @@ pub trait IcmpContext<I: IcmpIpExt, D> {
 
 /// The non-synchronized execution context shared by both ICMPv4 and ICMPv6.
 pub(crate) trait IcmpNonSyncCtx<I: IcmpIpExt, D>:
-    InstantContext + IcmpContext<I, D> + RngContext
+    InstantContext + IcmpBindingsContext<I, D> + RngContext
 {
 }
-impl<I: IcmpIpExt, C: InstantContext + IcmpContext<I, D> + RngContext, D> IcmpNonSyncCtx<I, D>
-    for C
+impl<I: IcmpIpExt, C: InstantContext + IcmpBindingsContext<I, D> + RngContext, D>
+    IcmpNonSyncCtx<I, D> for C
 {
 }
 
@@ -781,8 +781,8 @@ pub(crate) trait IcmpStateContext {}
 /// The execution context shared by ICMP(v4) and ICMPv6 for the internal
 /// operations of the IP stack.
 ///
-/// Unlike [`IcmpContext`], `InnerIcmpContext` is not exposed outside of this
-/// crate.
+/// Unlike [`IcmpBindingsContext`], `InnerIcmpContext` is not exposed outside of
+/// this crate.
 pub(crate) trait InnerIcmpContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I, Self::DeviceId>>:
     DeviceIdContext<AnyDevice>
 {
@@ -1511,7 +1511,7 @@ impl<
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<I>| {
                     counters.error_at_socket.increment();
                 });
-                IcmpContext::receive_icmp_error(ctx, *conn, seq, err);
+                IcmpBindingsContext::receive_icmp_error(ctx, *conn, seq, err);
             } else {
                 trace!("IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for nonexistent ICMP echo socket; either the socket responsible has since been removed, or the error message was sent in error or corrupted");
             }
@@ -4443,7 +4443,7 @@ mod tests {
         type BufferIpSocketsCtx<'a> = FakeBufferSyncCtx;
     }
 
-    impl<I: IcmpIpExt, D> IcmpContext<I, D> for FakeIcmpNonSyncCtx<I> {
+    impl<I: IcmpIpExt, D> IcmpBindingsContext<I, D> for FakeIcmpNonSyncCtx<I> {
         fn receive_icmp_error(&mut self, conn: SocketId<I>, seq_num: u16, err: I::ErrorCode) {
             self.state_mut().receive_icmp_socket_error.push(ReceiveIcmpSocketErrorArgs {
                 conn,
@@ -5261,7 +5261,7 @@ mod tests {
         data: Vec<u8>,
     }
 
-    // The arguments to `IcmpContext::receive_icmp_error`.
+    // The arguments to `IcmpBindingsContext::receive_icmp_error`.
     #[derive(Debug, PartialEq)]
     struct ReceiveIcmpSocketErrorArgs<I: IcmpIpExt> {
         conn: SocketId<I>,
@@ -5546,7 +5546,7 @@ mod tests {
                         .icmp_rx_counters::<Ipv4>()
                         .error_at_transport_layer
                         .get(),
-                    "IcmpContext::receive_icmp_error" => {
+                    "IcmpBindingsContext::receive_icmp_error" => {
                         sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv4>().error_at_socket.get()
                     }
                     c => panic!("unrecognized counter: {c}"),
@@ -5590,7 +5590,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
@@ -5611,7 +5611,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
@@ -5630,7 +5630,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
@@ -5649,7 +5649,7 @@ mod tests {
         // should process this packet in
         // `IcmpIpTransportContext::receive_icmp_error`, but we should go no
         // further - in particular, we should not call
-        // `IcmpContext::receive_icmp_error`.
+        // `IcmpBindingsContext::receive_icmp_error`.
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
@@ -5668,7 +5668,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
@@ -5686,7 +5686,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
@@ -5702,7 +5702,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
@@ -5735,7 +5735,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::DestUnreachable(
@@ -5753,7 +5753,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::TimeExceeded(Icmpv4TimeExceededCode::TtlExpired);
@@ -5769,7 +5769,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv4ErrorCode::ParameterProblem(
@@ -5871,7 +5871,7 @@ mod tests {
                         *count,
                         "wrong count for counter {ctr}",
                     ),
-                    "IcmpContext::receive_icmp_error" => assert_eq!(
+                    "IcmpBindingsContext::receive_icmp_error" => assert_eq!(
                         sync_ctx.inner.inner.state.icmp_rx_counters::<Ipv6>().error_at_socket.get(),
                         *count,
                         "wrong count for counter {ctr}",
@@ -5916,7 +5916,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
@@ -5935,7 +5935,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
@@ -5954,7 +5954,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 1),
+                ("IcmpBindingsContext::receive_icmp_error", 1),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
@@ -5973,7 +5973,7 @@ mod tests {
         // should process this packet in
         // `IcmpIpTransportContext::receive_icmp_error`, but we should go no
         // further - in particular, we should not call
-        // `IcmpContext::receive_icmp_error`.
+        // `IcmpBindingsContext::receive_icmp_error`.
 
         let mut buffer = Buf::new(&mut [], ..)
             .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
@@ -5992,7 +5992,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
@@ -6008,7 +6008,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
@@ -6024,7 +6024,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 1),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(
@@ -6057,7 +6057,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::DestUnreachable(Icmpv6DestUnreachableCode::NoRoute);
@@ -6073,7 +6073,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::TimeExceeded(Icmpv6TimeExceededCode::HopLimitExceeded);
@@ -6089,7 +6089,7 @@ mod tests {
             &[
                 ("InnerIcmpContext::receive_icmp_error", 1),
                 ("IcmpIpTransportContext::receive_icmp_error", 0),
-                ("IcmpContext::receive_icmp_error", 0),
+                ("IcmpBindingsContext::receive_icmp_error", 0),
             ],
             |FakeCtxWithSyncCtx { sync_ctx, non_sync_ctx }| {
                 let err = Icmpv6ErrorCode::ParameterProblem(

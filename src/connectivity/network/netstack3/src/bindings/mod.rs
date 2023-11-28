@@ -86,11 +86,11 @@ use netstack3_core::{
             IpDeviceConfigurationUpdate, IpDeviceEvent, Ipv4DeviceConfigurationUpdate,
             Ipv6DeviceConfigurationUpdate, RemovedReason,
         },
-        icmp,
+        icmp::{self, IcmpBindingsContext},
         types::RawMetric,
         IpExt,
     },
-    transport::udp,
+    transport::udp::{self, UdpBindingsContext},
     NonSyncContext, SyncCtx, TimerId,
 };
 
@@ -547,7 +547,7 @@ impl<
         I: socket::datagram::SocketCollectionIpExt<socket::datagram::IcmpEcho>
             + icmp::IcmpIpExt
             + IpExt,
-    > icmp::IcmpContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
+    > IcmpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 {
     fn receive_icmp_error(&mut self, conn: icmp::SocketId<I>, seq_num: u16, err: I::ErrorCode) {
         I::with_collection_mut(self, |c| c.receive_icmp_error(conn, seq_num, err))
@@ -568,7 +568,7 @@ impl<
     }
 }
 
-impl<I> udp::NonSyncContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
+impl<I> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>> for BindingsNonSyncCtxImpl
 where
     I: socket::datagram::SocketCollectionIpExt<socket::datagram::Udp> + icmp::IcmpIpExt,
 {

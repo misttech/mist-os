@@ -66,7 +66,7 @@ use crate::{
             nud::{self, LinkResolutionContext, LinkResolutionNotifier},
             IpDeviceEvent, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
-        icmp::{IcmpContext, IcmpIpExt},
+        icmp::{IcmpBindingsContext, IcmpIpExt},
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
@@ -80,7 +80,7 @@ use crate::{
             socket::TcpBindingsTypes,
             BufferSizes,
         },
-        udp,
+        udp::{self, UdpBindingsContext},
     },
     StackStateBuilder, SyncCtx, TimerId,
 };
@@ -1126,7 +1126,7 @@ impl FakeNetworkContext for FakeCtx {
     type SendMeta = EthernetWeakDeviceId<FakeNonSyncCtx>;
 }
 
-impl<I: IcmpIpExt> udp::NonSyncContext<I, DeviceId<Self>> for FakeNonSyncCtx {
+impl<I: IcmpIpExt> UdpBindingsContext<I, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_error(&mut self, _id: udp::SocketId<I>, _err: <I as IcmpIpExt>::ErrorCode) {
         unimplemented!()
     }
@@ -1145,7 +1145,7 @@ impl<I: IcmpIpExt> udp::NonSyncContext<I, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpBindingsContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_error(
         &mut self,
         _conn: crate::ip::icmp::SocketId<Ipv4>,
@@ -1170,7 +1170,7 @@ impl IcmpContext<Ipv4, DeviceId<Self>> for FakeNonSyncCtx {
     }
 }
 
-impl IcmpContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
+impl IcmpBindingsContext<Ipv6, DeviceId<Self>> for FakeNonSyncCtx {
     fn receive_icmp_error(
         &mut self,
         _conn: crate::ip::icmp::SocketId<Ipv6>,

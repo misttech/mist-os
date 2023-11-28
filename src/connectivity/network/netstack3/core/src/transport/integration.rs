@@ -21,7 +21,7 @@ use crate::{
                 isn::IsnGenerator, TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
             },
         },
-        udp::{self},
+        udp::{self, UdpBindingsContext},
     },
     NonSyncContext, SyncCtx,
 };
@@ -356,8 +356,8 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::NonSyncContext<I, Self::DeviceId>
-            + udp::NonSyncContext<I::OtherVersion, Self::DeviceId>
+        C: UdpBindingsContext<I, Self::DeviceId>
+            + UdpBindingsContext<I::OtherVersion, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
@@ -371,8 +371,8 @@ where
 impl<
         I: udp::IpExt,
         B: BufferMut,
-        C: udp::NonSyncContext<I, Self::DeviceId>
-            + udp::NonSyncContext<I::OtherVersion, Self::DeviceId>
+        C: UdpBindingsContext<I, Self::DeviceId>
+            + UdpBindingsContext<I::OtherVersion, Self::DeviceId>
             + crate::NonSyncContext,
         L,
     > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>

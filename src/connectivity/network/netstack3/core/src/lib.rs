@@ -73,11 +73,13 @@ use crate::{
             slaac::SlaacCounters, state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler,
             Ipv4DeviceTimerId, Ipv6DeviceTimerId,
         },
-        icmp::{IcmpContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
+        icmp::{IcmpBindingsContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
         IpCounters, IpLayerTimerId, Ipv4Counters, Ipv4State, Ipv6Counters, Ipv6State,
     },
     transport::{
-        tcp::socket::TcpBindingsTypes, udp::UdpCounters, TransportLayerState, TransportLayerTimerId,
+        tcp::socket::TcpBindingsTypes,
+        udp::{UdpBindingsContext, UdpCounters},
+        TransportLayerState, TransportLayerTimerId,
     },
 };
 pub(crate) use trace::trace_duration;
@@ -350,10 +352,10 @@ pub trait NonSyncContext:
             Ipv6,
             <Self as InstantBindingsTypes>::Instant,
         >,
-    > + transport::udp::NonSyncContext<Ipv4, DeviceId<Self>>
-    + transport::udp::NonSyncContext<Ipv6, DeviceId<Self>>
-    + IcmpContext<Ipv4, DeviceId<Self>>
-    + IcmpContext<Ipv6, DeviceId<Self>>
+    > + UdpBindingsContext<Ipv4, DeviceId<Self>>
+    + UdpBindingsContext<Ipv6, DeviceId<Self>>
+    + IcmpBindingsContext<Ipv4, DeviceId<Self>>
+    + IcmpBindingsContext<Ipv6, DeviceId<Self>>
     + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
     + device::DeviceLayerEventDispatcher
     + device::socket::NonSyncContext<DeviceId<Self>>
@@ -394,10 +396,10 @@ impl<
                     Ipv6,
                     <Self as InstantBindingsTypes>::Instant,
                 >,
-            > + transport::udp::NonSyncContext<Ipv4, DeviceId<Self>>
-            + transport::udp::NonSyncContext<Ipv6, DeviceId<Self>>
-            + IcmpContext<Ipv4, DeviceId<Self>>
-            + IcmpContext<Ipv6, DeviceId<Self>>
+            > + UdpBindingsContext<Ipv4, DeviceId<Self>>
+            + UdpBindingsContext<Ipv6, DeviceId<Self>>
+            + IcmpBindingsContext<Ipv4, DeviceId<Self>>
+            + IcmpBindingsContext<Ipv6, DeviceId<Self>>
             + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
             + device::DeviceLayerEventDispatcher
             + device::socket::NonSyncContext<DeviceId<Self>>

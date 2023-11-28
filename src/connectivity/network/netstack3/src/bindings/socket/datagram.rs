@@ -31,7 +31,11 @@ use net_types::{
 use netstack3_core::{
     device::{DeviceId, WeakDeviceId},
     error::{LocalAddressError, NotSupportedError, SocketError},
-    ip::{icmp, socket::IpSockCreateAndSendError, IpExt},
+    ip::{
+        icmp::{self, IcmpBindingsContext},
+        socket::IpSockCreateAndSendError,
+        IpExt,
+    },
     socket::{
         address::SocketZonedIpAddr,
         datagram::{
@@ -41,7 +45,7 @@ use netstack3_core::{
         },
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
-    transport::udp,
+    transport::udp::{self, UdpBindingsContext},
     NonSyncContext, SyncCtx,
 };
 use packet::{Buf, BufferMut};
@@ -82,7 +86,7 @@ pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
 ///
 /// Receive queues are shared between the collections here and the tasks
 /// handling socket requests. Since `SocketCollection` implements
-/// [`udp::NonSyncContext`] whose trait methods may be called from within Core
+/// [`UdpBindingsContext`] whose trait methods may be called from within Core
 /// in a locked context, once one of the [`MessageQueue`]s is locked, no calls
 /// may be made into [`netstack3_core`]. This prevents a potential deadlock
 /// where Core is waiting for a `MessageQueue` to be available and some bindings
@@ -591,7 +595,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Udp 
     }
 }
 
-impl<I: icmp::IcmpIpExt> udp::NonSyncContext<I, DeviceId<BindingsNonSyncCtxImpl>>
+impl<I: icmp::IcmpIpExt> UdpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
     for SocketCollection<I, Udp>
 {
     fn receive_icmp_error(&mut self, id: udp::SocketId<I>, err: I::ErrorCode) {
@@ -864,7 +868,7 @@ impl<I: IpExt + IpSockAddrExt, B: BufferMut> BufferTransportState<I, B> for Icmp
     }
 }
 
-impl<I: IpExt> icmp::IcmpContext<I, DeviceId<BindingsNonSyncCtxImpl>>
+impl<I: IpExt> IcmpBindingsContext<I, DeviceId<BindingsNonSyncCtxImpl>>
     for SocketCollection<I, IcmpEcho>
 {
     fn receive_icmp_error(
