@@ -81,12 +81,6 @@
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackConnectSendToBind",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToBindConnect",
                 "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToConnectBind",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackBindConnectSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackBindSendToConnect",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackConnectBindSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackConnectSendToBind",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackSendToBindConnect",
-                "All/DualStackSocketTest.AddressOperations/V4MappedLoopbackSendToConnectBind",
 
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
                 "All/DualStackAfMismatchTest.*/TCP",

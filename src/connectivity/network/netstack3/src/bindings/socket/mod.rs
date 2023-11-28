@@ -617,9 +617,10 @@ impl IntoErrno for udp::SendToError {
             Self::CreateSock(err) => err.into_errno(),
             Self::Zone(err) => err.into_errno(),
             Self::Mtu => Errno::Emsgsize,
-            // TODO(https://fxbug.dev/21198): Support dual-stack send-to.
-            Self::DualStackNotImplemented => Errno::Eopnotsupp,
             Self::RemotePortUnset => Errno::Einval,
+            // TODO(https://fxbug.dev/21198): Verify the errnos with syscall tests.
+            Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
+            Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
         }
     }
 }

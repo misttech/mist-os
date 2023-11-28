@@ -20,7 +20,7 @@ use either::Either;
 use explicit::UnreachableExt as _;
 use net_types::{
     ip::{GenericOverIp, Ip, IpAddress, Ipv4, Ipv6},
-    MulticastAddr, MulticastAddress as _, NonMappedAddr, SpecifiedAddr, ZonedAddr,
+    MulticastAddr, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
 };
 use packet::{BufferMut, Serializer};
 use packet_formats::ip::IpProtoExt;
@@ -381,9 +381,19 @@ impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
     }
 }
 
+impl<I: IpExt, D, S: DatagramSocketSpec> SendOptions<I> for IpOptions<I, D, S> {
+    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+        <SocketHopLimits as SendOptions<I>>::hop_limit(&self.hop_limits, destination)
+    }
+}
+
 impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
     pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I> {
         &self.other_stack
+    }
+
+    pub(crate) fn hop_limits(&self) -> &SocketHopLimits {
+        &self.hop_limits
     }
 }
 
@@ -413,12 +423,12 @@ impl SocketHopLimits {
     }
 }
 
-impl<I: IpExt, D, S: DatagramSocketSpec> SendOptions<I> for IpOptions<I, D, S> {
+impl<I: IpExt> SendOptions<I> for SocketHopLimits {
     fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
         if destination.is_multicast() {
-            self.hop_limits.multicast
+            self.multicast
         } else {
-            self.hop_limits.unicast
+            self.unicast
         }
     }
 }
@@ -3982,10 +3992,11 @@ pub enum SendToError<SE> {
     /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
     /// socket is not dual-stack enabled.
     RemoteUnexpectedlyMapped,
+    /// The remote address is non-mapped (i.e not an ipv4-mapped-ipv6 address),
+    /// but the socket is dual stack enabled and bound to a mapped address.
+    RemoteUnexpectedlyNonMapped,
     /// The provided buffer is not vailid.
     SerializeError(SE),
-    /// TODO(https://fxbug.dev/21198) Support dual-stack send-to.
-    DualStackNotImplemented,
 }
 
 pub(crate) fn send_to<
@@ -4013,111 +4024,263 @@ pub(crate) fn send_to<
                 state
             }
         };
-        let (local, device, ip_options) = match state {
-            BoundSocketStateType::Connected { state, sharing: _ } => {
-                let ConnState {
-                    socket,
-                    clear_device_on_disconnect: _,
-                    shutdown,
-                    addr: ConnAddr { ip: ConnIpAddr { local, remote: _ }, device },
-                    extra: _,
-                } = match sync_ctx.dual_stack_context() {
-                    MaybeDualStack::DualStack(dual_stack) => {
-                        match dual_stack.converter().convert(state) {
-                            DualStackConnState::ThisStack(state) => state,
-                            DualStackConnState::OtherStack(state) => {
-                                dual_stack.assert_dual_stack_enabled(&state);
-                                // TODO(https://fxbug.dev/21198): Support
-                                // send-to from dual-stack connected.
-                                warn!("sendto not supported from a dualstack connected socket");
-                                return Err(Either::Right(SendToError::DualStackNotImplemented));
-                            }
-                        }
-                    }
-                    MaybeDualStack::NotDualStack(not_dual_stack) => {
-                        not_dual_stack.converter().convert(state)
-                    }
-                };
 
-                let Shutdown { send: shutdown_write, receive: _ } = shutdown;
-                if *shutdown_write {
-                    return Err(Either::Right(SendToError::NotWriteable));
-                }
-                let (local_ip, local_id) = local;
+        enum Operation<
+            'a,
+            I: DualStackIpExt,
+            S: DatagramSocketSpec,
+            D: WeakId,
+            B: BufferMut,
+            C: DatagramStateNonSyncContext<I, S>,
+            DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
+            SC: BufferDatagramBoundStateContext<I, C, S, B>,
+        > {
+            SendToThisStack((SendOneshotParameters<'a, I, S, D>, &'a mut SC)),
+            SendToOtherStack(
+                (SendOneshotParameters<'a, I::OtherVersion, S, D>, &'a mut DualStackSC),
+            ),
+            // Allow `Operation` to be generic over `B` and `C` so that they can
+            // be used in trait bounds for `DualStackSC` and `SC`.
+            _Phantom((Never, PhantomData<(B, C)>)),
+        }
 
-                ((Some(*local_ip), local_id.clone()), device, socket.options())
+        let (operation, shutdown) = match (
+            sync_ctx.dual_stack_context(),
+            dual_stack_remote_ip::<I, _>(remote_ip.clone()),
+        ) {
+            (MaybeDualStack::NotDualStack(_), DualStackRemoteIp::OtherStack(_)) => {
+                return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
             }
-            BoundSocketStateType::Listener { state, sharing: _ } => {
-                let ListenerState { ip_options, addr: ListenerAddr { ip, device } } = state;
-
-                let (local_ip, local_port) = match sync_ctx.dual_stack_context() {
-                    MaybeDualStack::DualStack(dual_stack) => {
-                        match dual_stack.converter().convert(ip.clone()) {
-                            DualStackListenerIpAddr::ThisStack(ListenerIpAddr {
-                                addr,
-                                identifier,
-                            }) => (addr, identifier),
-                            DualStackListenerIpAddr::BothStacks(identifier) => {
-                                // TODO(https://fxbug.dev/135204): Use the
-                                // `remote_ip` to dictate which stack to send
-                                // to.
-                                dual_stack.assert_dual_stack_enabled(state);
-                                (None, identifier)
-                            }
-                            DualStackListenerIpAddr::OtherStack(_) => {
-                                dual_stack.assert_dual_stack_enabled(state);
-                                // TODO(https://fxbug.dev/21198): Support
-                                // send-to from dual-stack listener.
-                                warn!("sendto not supported from a dualstack listener socket");
-                                return Err(Either::Right(SendToError::DualStackNotImplemented));
-                            }
-                        }
-                    }
-                    MaybeDualStack::NotDualStack(non_dual) => {
+            (MaybeDualStack::NotDualStack(nds), DualStackRemoteIp::ThisStack(remote_ip)) => {
+                match state {
+                    BoundSocketStateType::Listener {
+                        state: ListenerState { ip_options, addr: ListenerAddr { ip, device } },
+                        sharing: _,
+                    } => {
                         let ListenerIpAddr { addr, identifier } =
-                            non_dual.converter().convert(ip.clone());
-                        (addr, identifier)
+                            nds.converter().convert(ip.clone());
+                        (
+                            Operation::SendToThisStack((
+                                SendOneshotParameters {
+                                    local_ip: addr,
+                                    local_id: identifier,
+                                    remote_ip,
+                                    remote_id: remote_identifier,
+                                    device: &device,
+                                    send_options: &ip_options.hop_limits(),
+                                },
+                                sync_ctx,
+                            )),
+                            None,
+                        )
                     }
-                };
-
-                ((local_ip, local_port), device, ip_options)
+                    BoundSocketStateType::Connected { state, sharing: _ } => {
+                        let ConnState {
+                            socket,
+                            clear_device_on_disconnect: _,
+                            shutdown,
+                            addr:
+                                ConnAddr {
+                                    ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                    device,
+                                },
+                            extra: _,
+                        } = nds.converter().convert(state);
+                        (
+                            Operation::SendToThisStack((
+                                SendOneshotParameters {
+                                    local_ip: Some(*local_ip),
+                                    local_id: *local_id,
+                                    remote_ip,
+                                    remote_id: remote_identifier,
+                                    device: &device,
+                                    send_options: &socket.options().hop_limits(),
+                                },
+                                sync_ctx,
+                            )),
+                            Some(shutdown),
+                        )
+                    }
+                }
             }
+            (MaybeDualStack::DualStack(ds), remote_ip) => match state {
+                BoundSocketStateType::Listener {
+                    state: ListenerState { ip_options, addr: ListenerAddr { ip, device } },
+                    sharing: _,
+                } => match (ds.converter().convert(ip), remote_ip) {
+                    (DualStackListenerIpAddr::ThisStack(_), DualStackRemoteIp::OtherStack(_)) => {
+                        return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
+                    }
+                    (DualStackListenerIpAddr::OtherStack(_), DualStackRemoteIp::ThisStack(_)) => {
+                        return Err(Either::Right(SendToError::RemoteUnexpectedlyNonMapped))
+                    }
+                    (
+                        DualStackListenerIpAddr::ThisStack(ListenerIpAddr { addr, identifier }),
+                        DualStackRemoteIp::ThisStack(remote_ip),
+                    ) => (
+                        Operation::SendToThisStack((
+                            SendOneshotParameters {
+                                local_ip: *addr,
+                                local_id: *identifier,
+                                remote_ip,
+                                remote_id: remote_identifier,
+                                device: &device,
+                                send_options: &ip_options.hop_limits(),
+                            },
+                            sync_ctx,
+                        )),
+                        None,
+                    ),
+                    (
+                        DualStackListenerIpAddr::BothStacks(identifier),
+                        DualStackRemoteIp::ThisStack(remote_ip),
+                    ) => (
+                        Operation::SendToThisStack((
+                            SendOneshotParameters {
+                                local_ip: None,
+                                local_id: *identifier,
+                                remote_ip,
+                                remote_id: remote_identifier,
+                                device: &device,
+                                send_options: &ip_options.hop_limits(),
+                            },
+                            sync_ctx,
+                        )),
+                        None,
+                    ),
+                    (
+                        DualStackListenerIpAddr::OtherStack(ListenerIpAddr { addr, identifier }),
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                    ) => (
+                        Operation::SendToOtherStack((
+                            SendOneshotParameters {
+                                local_ip: *addr,
+                                local_id: *identifier,
+                                remote_ip,
+                                remote_id: remote_identifier,
+                                device: &device,
+                                send_options: &ip_options.hop_limits(),
+                            },
+                            ds,
+                        )),
+                        None,
+                    ),
+                    (
+                        DualStackListenerIpAddr::BothStacks(identifier),
+                        DualStackRemoteIp::OtherStack(remote_ip),
+                    ) => (
+                        Operation::SendToOtherStack((
+                            SendOneshotParameters {
+                                local_ip: None,
+                                local_id: *identifier,
+                                remote_ip,
+                                remote_id: remote_identifier,
+                                device: &device,
+                                send_options: &ip_options.hop_limits(),
+                            },
+                            ds,
+                        )),
+                        None,
+                    ),
+                },
+                BoundSocketStateType::Connected { state, sharing: _ } => {
+                    match (ds.converter().convert(state), remote_ip) {
+                        (DualStackConnState::ThisStack(_), DualStackRemoteIp::OtherStack(_)) => {
+                            return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped))
+                        }
+                        (DualStackConnState::OtherStack(_), DualStackRemoteIp::ThisStack(_)) => {
+                            return Err(Either::Right(SendToError::RemoteUnexpectedlyNonMapped))
+                        }
+                        (
+                            DualStackConnState::ThisStack(ConnState {
+                                socket,
+                                clear_device_on_disconnect: _,
+                                shutdown,
+                                addr:
+                                    ConnAddr {
+                                        ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                        device,
+                                    },
+                                extra: _,
+                            }),
+                            DualStackRemoteIp::ThisStack(remote_ip),
+                        ) => (
+                            Operation::SendToThisStack((
+                                SendOneshotParameters {
+                                    local_ip: Some(*local_ip),
+                                    local_id: *local_id,
+                                    remote_ip,
+                                    remote_id: remote_identifier,
+                                    device: &device,
+                                    send_options: &socket.options().hop_limits(),
+                                },
+                                sync_ctx,
+                            )),
+                            Some(shutdown),
+                        ),
+                        (
+                            DualStackConnState::OtherStack(ConnState {
+                                socket,
+                                clear_device_on_disconnect: _,
+                                shutdown,
+                                addr:
+                                    ConnAddr {
+                                        ip: ConnIpAddr { local: (local_ip, local_id), remote: _ },
+                                        device,
+                                    },
+                                extra: _,
+                            }),
+                            DualStackRemoteIp::OtherStack(remote_ip),
+                        ) => (
+                            Operation::SendToOtherStack((
+                                SendOneshotParameters {
+                                    local_ip: Some(*local_ip),
+                                    local_id: *local_id,
+                                    remote_ip,
+                                    remote_id: remote_identifier,
+                                    device: &device,
+                                    send_options: &socket.options().hop_limits(),
+                                },
+                                ds,
+                            )),
+                            Some(shutdown),
+                        ),
+                    }
+                }
+            },
         };
 
-        let remote_ip = crate::socket::specify_unspecified_remote::<I, _, _>(
-            remote_ip.map(SocketZonedIpAddr::into_inner),
-        );
-
-        // TODO(https://fxbug.dev/21198): For now, short circuit when asked to
-        // send to a mapped remote address, which prevents panics further in the
-        // send pipeline when converting remote to a `SocketIpAddr`.
-        //
-        // This should eventually translate the remote to its non-mapped form,
-        // or fail if the socket doesn't support dual-stack operations.
-        match NonMappedAddr::new(remote_ip.addr()) {
-            Some(_addr) => {}
-            None => {
-                // Prevent sending to ipv4-mapped-ipv6 addrs for now.
-                warn!("dualstack sendto ipv4-mapped-ipv6 not supported");
-                return Err(Either::Right(SendToError::RemoteUnexpectedlyMapped));
+        if let Some(Shutdown { send: shutdown_write, receive: _ }) = shutdown {
+            if *shutdown_write {
+                return Err(Either::Right(SendToError::NotWriteable));
             }
         }
 
-        sync_ctx
-            .with_transport_context_buf(|sync_ctx| {
-                send_oneshot::<_, S, _, _, _>(
+        match operation {
+            Operation::SendToThisStack((params, sync_ctx)) => {
+                BufferDatagramBoundStateContext::with_transport_context_buf(sync_ctx, |sync_ctx| {
+                    send_oneshot::<_, S, _, _, _>(sync_ctx, ctx, params, body)
+                })
+            }
+            Operation::SendToOtherStack((params, sync_ctx)) => {
+                DualStackDatagramBoundStateContext::with_other_transport_context_buf(
                     sync_ctx,
-                    ctx,
-                    local,
-                    remote_ip.into(),
-                    remote_identifier,
-                    device,
-                    ip_options,
-                    body,
+                    |sync_ctx| send_oneshot::<_, S, _, _, _>(sync_ctx, ctx, params, body),
                 )
-            })
-            .map_err(Either::Right)
+            }
+            Operation::_Phantom((never, _)) => match never {},
+        }
+        .map_err(Either::Right)
     })
+}
+
+struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId> {
+    local_ip: Option<SocketIpAddr<I::Addr>>,
+    local_id: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+    remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
+    remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+    device: &'a Option<D>,
+    send_options: &'a SocketHopLimits,
 }
 
 fn send_oneshot<
@@ -4129,27 +4292,23 @@ fn send_oneshot<
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    (local_ip, local_id): (
-        Option<SocketIpAddr<I::Addr>>,
-        <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
-    ),
-    remote_ip: SocketZonedIpAddr<I::Addr, SC::DeviceId>,
-    remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
-    device: &Option<SC::WeakDeviceId>,
-    ip_options: &IpOptions<I, SC::WeakDeviceId, S>,
+    SendOneshotParameters {
+        local_ip,
+        local_id,
+        remote_ip,
+        remote_id,
+        device,
+        send_options,
+    }: SendOneshotParameters<'_, I, S, SC::WeakDeviceId>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(
-        remote_ip.into_inner(),
+        remote_ip,
         device.clone(),
     ) {
         Ok(addr) => addr,
         Err(e) => return Err(SendToError::Zone(e)),
     };
-
-    // TODO(https://fxbug.dev/132092): Delete conversion once
-    // `SocketZonedIpAddr` holds `SocketIpAddr`.
-    let remote_ip: SocketIpAddr<_> = remote_ip.try_into().unwrap();
 
     sync_ctx
         .send_oneshot_ip_packet_with_fallible_serializer(
@@ -4158,7 +4317,7 @@ fn send_oneshot<
             local_ip,
             remote_ip,
             S::ip_proto::<I>(),
-            ip_options,
+            send_options,
             |local_ip| {
                 S::make_packet::<I, _>(
                     body,

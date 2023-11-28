@@ -19,12 +19,6 @@
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddrReusePort/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReusePort/*",
                 "UdpInet6SocketTest.ConnectInet4Sockaddr",
-                "UdpBindTest/SendtoTest.Sendto/0",
-                "UdpBindTest/SendtoTest.Sendto/3",
-                "UdpBindTest/SendtoTest.Sendto/5",
-                "UdpBindTest/SendtoTest.Sendto/6",
-                "UdpBindTest/SendtoTest.Sendto/8",
-                "UdpBindTest/SendtoTest.Sendto/9",
             ],
         },
         {

@@ -45,7 +45,7 @@ use crate::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
         BufferIpTransportContext, BufferTransportIpContext, IpTransportContext,
-        MulticastMembershipHandler, ResolveRouteError, TransportIpContext, TransportReceiveError,
+        MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -1683,14 +1683,18 @@ pub enum SendToError {
     /// There was a problem with the remote address relating to its zone.
     #[error("zone error: {}", _0)]
     Zone(ZonedAddressError),
-    /// TODO(https://fxbug.dev/21198): Remove once dual-stack send-to is
-    /// supported.
-    #[error("dual-stack send-to is not yet supported")]
-    DualStackNotImplemented,
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
     #[error("the remote port was unset")]
     RemotePortUnset,
+    /// The remote address is mapped (i.e. an ipv4-mapped-ipv6 address), but the
+    /// socket is not dual-stack enabled.
+    #[error("the remote ip was unexpectedly an ipv4-mapped-ipv6 address")]
+    RemoteUnexpectedlyMapped,
+    /// The remote address is non-mapped (i.e not an ipv4-mapped-ipv6 address),
+    /// but the socket is dual stack enabled and bound to a mapped address.
+    #[error("the remote ip was unexpectedly not an ipv4-mapped-ipv6 address")]
+    RemoteUnexpectedlyNonMapped,
 }
 
 /// An error encountered while enabling or disabling dual-stack operation.
@@ -2104,11 +2108,11 @@ impl<
                             IpSockCreateAndSendError::Mtu => SendToError::Mtu,
                             IpSockCreateAndSendError::Create(e) => SendToError::CreateSock(e),
                         },
-                        datagram::SendToError::RemoteUnexpectedlyMapped => SendToError::CreateSock(
-                            IpSockCreationError::Route(ResolveRouteError::Unreachable),
-                        ),
-                        datagram::SendToError::DualStackNotImplemented => {
-                            SendToError::DualStackNotImplemented
+                        datagram::SendToError::RemoteUnexpectedlyMapped => {
+                            SendToError::RemoteUnexpectedlyMapped
+                        }
+                        datagram::SendToError::RemoteUnexpectedlyNonMapped => {
+                            SendToError::RemoteUnexpectedlyNonMapped
                         }
                     };
                     Either::Right(err)
