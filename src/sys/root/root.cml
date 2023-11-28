@@ -7,17 +7,23 @@
             name: "bootstrap",
             url: "fuchsia-boot:///bootstrap#meta/bootstrap.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
         {
             name: "startup",
             url: "fuchsia-boot:///startup#meta/startup.cm",
             startup: "eager",
+            environment: "#elf-env",
         },
         {
             name: "core",
             url: "fuchsia-pkg://fuchsia.com/core#meta/core.cm",
             environment: "#core-env",
             on_terminate: "reboot",
+        },
+        {
+            name: "elf_runner",
+            url: "fuchsia-builtin://#elf_runner.cm",
         },
     ],
     offer: [
@@ -34,6 +40,15 @@
             ],
             from: "#bootstrap",
             to: "#startup",
+        },
+
+        // The LogSink capability comes from an ELF component, but running ELF components
+        // requires an ELF runner. Therefore the ELF runner can't get the LogSink capability.
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "void",
+            to: "#elf_runner",
+            availability: "optional",
         },
 
         // We route these from void to bootstrap to satisfy the requirement
@@ -340,11 +355,27 @@
         {
             name: "core-env",
             extends: "realm",
+            runners: [
+                {
+                    runner: "elf",
+                    from: "#elf_runner",
+                },
+            ],
             resolvers: [
                 {
                     resolver: "base_resolver",
                     from: "#bootstrap",
                     scheme: "fuchsia-pkg",
+                },
+            ],
+        },
+        {
+            name: "elf-env",
+            extends: "realm",
+            runners: [
+                {
+                    runner: "elf",
+                    from: "#elf_runner",
                 },
             ],
         },

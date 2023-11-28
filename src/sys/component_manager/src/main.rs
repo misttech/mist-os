@@ -161,7 +161,6 @@ async fn build_environment(
         .set_runtime_config(config)
         .create_utc_clock(&bootfs_svc)
         .await?
-        .add_elf_runner()?
         .add_builtin_runner()?
         .include_namespace_resolvers();
 

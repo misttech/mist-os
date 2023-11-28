@@ -47,9 +47,6 @@
             ],
         },
         {
-            runner: "elf",
-        },
-        {
             runner: "builtin",
         },
         {

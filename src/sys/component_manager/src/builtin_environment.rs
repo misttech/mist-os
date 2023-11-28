@@ -192,29 +192,6 @@ impl BuiltinEnvironmentBuilder {
         Ok(self)
     }
 
-    /// TODO(fxbug.dev/305862055): Remove the builtin elf runner capability.
-    pub fn add_elf_runner(mut self) -> Result<Self, Error> {
-        let runtime_config = self
-            .runtime_config
-            .as_ref()
-            .ok_or(format_err!("Runtime config should be set to add elf runner."))?;
-
-        let launcher_connector: elf_runner::process_launcher::Connector =
-            if runtime_config.use_builtin_process_launcher {
-                Box::new(elf_runner::process_launcher::BuiltInConnector {})
-            } else {
-                Box::new(elf_runner::process_launcher::NamespaceConnector {})
-            };
-        let runner = Arc::new(ElfRunner::new(
-            fuchsia_runtime::job_default().duplicate(zx::Rights::SAME_RIGHTS).unwrap(),
-            launcher_connector,
-            self.utc_clock.clone(),
-            self.crash_records.clone(),
-        ));
-        self.elf_runner = Some(runner.clone());
-        Ok(self.add_runner("elf".parse().unwrap(), runner))
-    }
-
     pub fn add_builtin_runner(self) -> Result<Self, Error> {
         use crate::builtin::builtin_runner::BuiltinRunner;
         use crate::builtin::builtin_runner::ElfRunnerResources;
