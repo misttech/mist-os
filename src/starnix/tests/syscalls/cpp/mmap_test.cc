@@ -764,32 +764,6 @@ TEST(Mprotect, ProtGrowsdownOnNonGrowsdownMapping) {
   EXPECT_EQ(errno, EINVAL);
 }
 
-inline int MemFdCreate(const char* name, unsigned int flags) {
-  return static_cast<int>(syscall(SYS_memfd_create, name, flags));
-}
-
-// Attempts to read a byte from the given memory address.
-// Returns whether the read succeeded or not.
-bool TryRead(uintptr_t addr) {
-  test_helper::ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
-  if (!mem_fd) {
-    return false;
-  }
-
-  return write(mem_fd.get(), reinterpret_cast<void*>(addr), 1) == 1;
-}
-
-// Attempts to write a zero byte to the given memory address.
-// Returns whether the write succeeded or not.
-bool TryWrite(uintptr_t addr) {
-  test_helper::ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
-  if (!zero_fd) {
-    return false;
-  }
-
-  return read(zero_fd.get(), reinterpret_cast<void*>(addr), 1) == 1;
-}
-
 TEST_F(MMapProcTest, MProtectIsThreadSafe) {
   test_helper::ForkHelper helper;
   helper.RunInForkedProcess([&] {
@@ -797,8 +771,8 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
     void* mmap1 = mmap(NULL, page_size, PROT_READ, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     ASSERT_NE(mmap1, MAP_FAILED);
     uintptr_t addr = reinterpret_cast<uintptr_t>(mmap1);
-    ASSERT_TRUE(TryRead(addr));
-    ASSERT_FALSE(TryWrite(addr));
+    ASSERT_TRUE(test_helper::TryRead(addr));
+    ASSERT_FALSE(test_helper::TryWrite(addr));
 
     std::atomic<bool> start = false;
     std::atomic<int> count = 2;
@@ -835,13 +809,13 @@ TEST_F(MMapProcTest, MProtectIsThreadSafe) {
     if (cpp20::starts_with(std::string_view(perms), "---p")) {
       // protect_none was the last one. We should not be able to read nor
       // write in this mapping.
-      EXPECT_FALSE(TryRead(addr));
-      EXPECT_FALSE(TryWrite(addr));
+      EXPECT_FALSE(test_helper::TryRead(addr));
+      EXPECT_FALSE(test_helper::TryWrite(addr));
     } else if (cpp20::starts_with(std::string_view(perms), "rw-p")) {
       // protect_rw was the last one. We should be able to read and write
       // in this mapping.
-      EXPECT_TRUE(TryRead(addr));
-      EXPECT_TRUE(TryWrite(addr));
+      EXPECT_TRUE(test_helper::TryRead(addr));
+      EXPECT_TRUE(test_helper::TryWrite(addr));
       volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(addr);
       *ptr = 5;
       EXPECT_EQ(*ptr, 5);
@@ -922,22 +896,22 @@ TEST_F(MMapProcTest, MprotectFailureIsConsistent) {
   auto second_page = test_helper::find_memory_mapping(ptr_addr + page_size, maps);
   ASSERT_NE(second_page, std::nullopt);
   EXPECT_EQ(second_page->perms, "r--s");
-  EXPECT_TRUE(TryRead(ptr_addr + page_size));
-  EXPECT_FALSE(TryWrite(ptr_addr + page_size));
+  EXPECT_TRUE(test_helper::TryRead(ptr_addr + page_size));
+  EXPECT_FALSE(test_helper::TryWrite(ptr_addr + page_size));
 
   auto test_consistency = [](const auto& mapping, uintptr_t addr) {
     auto new_perms = "rwxp";
     auto old_perms = "---p";
     if (mapping->perms == new_perms) {
-      EXPECT_TRUE(TryRead(addr));
-      EXPECT_TRUE(TryWrite(addr));
+      EXPECT_TRUE(test_helper::TryRead(addr));
+      EXPECT_TRUE(test_helper::TryWrite(addr));
 
       volatile uint8_t* ptr = reinterpret_cast<volatile uint8_t*>(addr);
       *ptr = 5;
       EXPECT_EQ(*ptr, 5);
     } else if (mapping->perms == old_perms) {
-      EXPECT_FALSE(TryRead(addr));
-      EXPECT_FALSE(TryWrite(addr));
+      EXPECT_FALSE(test_helper::TryRead(addr));
+      EXPECT_FALSE(test_helper::TryWrite(addr));
     } else {
       ASSERT_FALSE(true) << "invalid perms for mapping: " << mapping->perms;
     }

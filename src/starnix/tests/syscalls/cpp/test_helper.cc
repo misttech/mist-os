@@ -27,6 +27,14 @@
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 
+namespace {
+
+inline int MemFdCreate(const char *name, unsigned int flags) {
+  return static_cast<int>(syscall(SYS_memfd_create, name, flags));
+}
+
+}  // namespace
+
 namespace test_helper {
 
 ::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
@@ -206,7 +214,8 @@ std::string get_tmp_path() {
   return tmp_path;
 }
 
-std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps) {
+std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
+                                                 std::string_view maps) {
   std::vector<std::string_view> lines =
       fxl::SplitString(maps, "\n", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
   // format:
@@ -231,28 +240,34 @@ std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_vie
       return std::nullopt;
     }
 
-    if (addr >= start && addr < end) {
-      size_t offset;
-      size_t inode;
-      if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
-          !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
-        return std::nullopt;
-      }
+    size_t offset;
+    size_t inode;
+    if (!fxl::StringToNumberWithError(parts[2], &offset, fxl::Base::k16) ||
+        !fxl::StringToNumberWithError(parts[4], &inode, fxl::Base::k10)) {
+      return std::nullopt;
+    }
 
-      std::string pathname;
-      if (parts.size() > 5) {
-        // The pathname always starts at pos 73.
-        pathname = line.substr(73);
-      }
+    std::string pathname;
+    if (parts.size() > 5) {
+      // The pathname always starts at pos 73.
+      pathname = line.substr(73);
+    }
 
-      MemoryMapping mapping = {
-          start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
-      };
+    MemoryMapping mapping = {
+        start, end, std::string(parts[1]), offset, std::string(parts[3]), inode, pathname,
+    };
 
+    if (match(mapping)) {
       return mapping;
     }
   }
   return std::nullopt;
+}
+
+std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps) {
+  return find_memory_mapping(
+      [addr](const MemoryMapping &mapping) { return mapping.start <= addr && addr < mapping.end; },
+      maps);
 }
 
 bool HasCapability(uint32_t cap) {
@@ -297,6 +312,24 @@ void RecursiveUnmountAndRemove(const std::string &path) {
   }
 
   EXPECT_THAT(rmdir(path.c_str()), SyscallSucceeds());
+}
+
+// Attempts to read a byte from the given memory address.
+// Returns whether the read succeeded or not.
+bool TryRead(uintptr_t addr) {
+  test_helper::ScopedFD mem_fd(MemFdCreate("try_read", O_WRONLY));
+  EXPECT_TRUE(mem_fd.is_valid());
+
+  return write(mem_fd.get(), reinterpret_cast<void *>(addr), 1) == 1;
+}
+
+// Attempts to write a zero byte to the given memory address.
+// Returns whether the write succeeded or not.
+bool TryWrite(uintptr_t addr) {
+  test_helper::ScopedFD zero_fd(open("/dev/zero", O_RDONLY));
+  EXPECT_TRUE(zero_fd.is_valid());
+
+  return read(zero_fd.get(), reinterpret_cast<void *>(addr), 1) == 1;
 }
 
 }  // namespace test_helper

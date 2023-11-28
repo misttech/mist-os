@@ -205,6 +205,10 @@ struct MemoryMapping {
   std::string pathname;
 };
 
+// Returns the first memory mapping that matches the given predicate.
+std::optional<MemoryMapping> find_memory_mapping(std::function<bool(const MemoryMapping &)> match,
+                                                 std::string_view maps);
+
 std::optional<MemoryMapping> find_memory_mapping(uintptr_t addr, std::string_view maps);
 
 // Returns true if running with sysadmin capabilities.
@@ -218,6 +222,14 @@ bool IsStarnix();
 
 /// Unmount anything mounted at or under `path` and remove it.
 void RecursiveUnmountAndRemove(const std::string &path);
+
+// Attempts to read a byte from the given memory address.
+// Returns whether the read succeeded or not.
+bool TryRead(uintptr_t addr);
+
+// Attempts to write a zero byte to the given memory address.
+// Returns whether the write succeeded or not.
+bool TryWrite(uintptr_t addr);
 
 }  // namespace test_helper
 
