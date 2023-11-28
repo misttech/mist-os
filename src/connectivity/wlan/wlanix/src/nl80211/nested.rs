@@ -10,7 +10,7 @@
 
 use netlink_packet_utils::{
     byteorder::{ByteOrder, NativeEndian},
-    nla::{Nla, NlaBuffer},
+    nla::Nla,
     Emitable,
 };
 use std::mem::size_of_val;

@@ -6,7 +6,7 @@ use anyhow::Context;
 use netlink_packet_utils::{
     byteorder::{ByteOrder, NativeEndian},
     nla::{Nla, NlaBuffer, NlasIterator},
-    parsers::{parse_mac, parse_string, parse_u32},
+    parsers::{parse_mac, parse_string, parse_u16, parse_u32},
     DecodeError, Emitable, Parseable,
 };
 use std::mem::size_of_val;
@@ -34,6 +34,7 @@ pub enum Nl80211Attr {
     WiphyBands(Vec<Vec<Nl80211BandAttr>>),
     MaxScanSsids(u8),
     Bss(Vec<Nl80211BssAttr>),
+    StatusCode(u16),
     ScanFrequencies(Vec<u32>),
     ScanSsids(Vec<Vec<u8>>),
     MaxScheduledScanSsids(u8),
@@ -62,6 +63,7 @@ impl Nla for Nl80211Attr {
             ScanFrequencies(val) => to_nested_values(val).as_slice().buffer_len(),
             ScanSsids(val) => to_nested_values(val).as_slice().buffer_len(),
             Bss(val) => val.as_slice().buffer_len(),
+            StatusCode(val) => size_of_val(val),
             MaxScheduledScanSsids(val) => size_of_val(val),
             MaxMatchSets(val) => size_of_val(val),
             FeatureFlags(val) => size_of_val(val),
@@ -87,7 +89,8 @@ impl Nla for Nl80211Attr {
             MaxScanSsids(_) => NL80211_ATTR_MAX_NUM_SCAN_SSIDS,
             ScanFrequencies(_) => NL80211_ATTR_SCAN_FREQUENCIES,
             ScanSsids(_) => NL80211_ATTR_SCAN_SSIDS,
-            Bss(val) => NL80211_ATTR_BSS,
+            Bss(_) => NL80211_ATTR_BSS,
+            StatusCode(_) => NL80211_ATTR_STATUS_CODE,
             MaxScheduledScanSsids(_) => NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS,
             MaxMatchSets(_) => NL80211_ATTR_MAX_MATCH_SETS,
             FeatureFlags(_) => NL80211_ATTR_FEATURE_FLAGS,
@@ -123,6 +126,7 @@ impl Nla for Nl80211Attr {
             ScanFrequencies(val) => to_nested_values(val).as_slice().emit(buffer),
             ScanSsids(val) => to_nested_values(val).as_slice().emit(buffer),
             Bss(val) => val.as_slice().emit(buffer),
+            StatusCode(val) => NativeEndian::write_u16(buffer, *val),
             MaxScheduledScanSsids(val) => buffer[0] = *val,
             MaxMatchSets(val) => buffer[0] = *val,
             FeatureFlags(val) => NativeEndian::write_u32(buffer, *val),
@@ -177,6 +181,9 @@ impl<'a, T: AsRef<[u8]> + ?Sized> Parseable<NlaBuffer<&'a T>> for Nl80211Attr {
                 .collect::<Result<Vec<_>, _>>()
                 .map(Self::ScanSsids)
                 .context("Invalid NL80211_ATTR_SCAN_SSIDS value")?,
+            NL80211_ATTR_STATUS_CODE => Self::StatusCode(
+                parse_u16(payload).context("Invalid NL80211_ATTR_STATUS_CODE value")?,
+            ),
             NL80211_ATTR_MAX_NUM_SCHED_SCAN_SSIDS => Self::MaxScheduledScanSsids(payload[0]),
             NL80211_ATTR_MAX_MATCH_SETS => Self::MaxMatchSets(payload[0]),
             NL80211_ATTR_FEATURE_FLAGS => Self::FeatureFlags(

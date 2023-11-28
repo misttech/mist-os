@@ -7,7 +7,7 @@ use netlink_packet_utils::{
     nla::Nla,
     Emitable,
 };
-use std::mem::{size_of, size_of_val};
+use std::mem::size_of_val;
 
 use crate::nl80211::constants::*;
 

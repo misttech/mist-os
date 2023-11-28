@@ -11,6 +11,7 @@ use std::mem::{size_of, size_of_val};
 
 use crate::nl80211::constants::*;
 
+#[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Nl80211FrequencyAttr {
     Frequency(u32),
@@ -65,6 +66,7 @@ impl From<&Nl80211DfsState> for u32 {
     }
 }
 
+#[allow(unused)]
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub enum Nl80211BandAttr {
     Frequencies(Vec<Vec<Nl80211FrequencyAttr>>),

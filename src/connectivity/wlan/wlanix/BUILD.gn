@@ -41,6 +41,9 @@ rustc_binary("wlanix_bin") {
     "//third_party/rust_crates:netlink-packet-core",
     "//third_party/rust_crates:netlink-packet-generic",
     "//third_party/rust_crates:netlink-packet-utils",
+    "//third_party/rust_crates:num",
+    "//third_party/rust_crates:num-derive",
+    "//third_party/rust_crates:num-traits",
     "//third_party/rust_crates:parking_lot",
     "//third_party/rust_crates:tracing",
   ]

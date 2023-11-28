@@ -12,6 +12,7 @@ use netlink_packet_utils::{
 use std::convert::TryInto;
 
 mod attr;
+#[allow(unused)]
 mod cmd;
 #[allow(unused)]
 mod constants;
@@ -32,7 +33,7 @@ impl GenlFamily for Nl80211 {
     }
 
     fn command(&self) -> u8 {
-        self.cmd.into()
+        self.cmd as u8
     }
 
     fn version(&self) -> u8 {
