@@ -43,7 +43,7 @@ use starnix_uapi::{
     errors::{SourceContext, ENOENT},
     mount_flags::MountFlags,
     open_flags::OpenFlags,
-    ownership::{release_on_error, OwnedRefByRef, ReleasableByRef},
+    ownership::{release_on_error, ReleasableByRef},
     pid_t,
     resource_limits::Resource,
     rlimit,
@@ -332,22 +332,20 @@ async fn create_container(
     let init_pid = kernel.pids.write().allocate_pid();
     debug_assert!(init_pid == 1);
 
-    let system_task = OwnedRefByRef::new(
-        CurrentTask::create_system_task(&kernel, Arc::clone(&fs_context))
-            .source_context("create system task")?,
-    );
+    let system_task = CurrentTask::create_system_task(&kernel, Arc::clone(&fs_context))
+        .source_context("create system task")?;
 
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
 
     // Register common devices and add them in sysfs and devtmpfs.
-    init_common_devices(system_task);
+    init_common_devices(&system_task);
 
-    mount_filesystems(system_task, config, &pkg_dir_proxy)
+    mount_filesystems(&system_task, config, &pkg_dir_proxy)
         .source_context("mounting filesystems")?;
 
     // Run all common features that were specified in the .cml.
-    run_container_features(system_task)?;
+    run_container_features(&system_task)?;
 
     // If there is an init binary path, run it, optionally waiting for the
     // startup_file_path to be created. The task struct is still used
@@ -377,7 +375,7 @@ async fn create_container(
     });
 
     if !config.startup_file_path.is_empty() {
-        wait_for_init_file(&config.startup_file_path, kernel.kthreads.system_task()).await?;
+        wait_for_init_file(&config.startup_file_path, &system_task).await?;
     };
 
     Ok(Container { kernel, _node: node, _thread_bound: Default::default() })

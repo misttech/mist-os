@@ -4,22 +4,19 @@
 
 use crate::{
     dynamic_thread_spawner::DynamicThreadSpawner,
-    task::{CurrentTask, Kernel},
+    task::{CurrentTask, Kernel, ThreadGroup},
 };
+use fragile::Fragile;
 use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::OnceCell;
 use pin_project::pin_project;
-use starnix_uapi::{
-    errno,
-    errors::Errno,
-    ownership::{OwnedRefByRef, ReleasableByRef},
-};
+use starnix_uapi::{errno, errors::Errno, ownership::ReleasableByRef};
 use std::{
     future::Future,
     pin::Pin,
-    sync::Weak,
+    sync::{Arc, Weak},
     task::{Context, Poll},
 };
 
@@ -40,19 +37,11 @@ pub struct KernelThreads {
     /// The thread pool to spawn blocking calls to.
     spawner: OnceCell<DynamicThreadSpawner>,
 
-    /// A task object for the kernel threads.
-    system_task: OnceCell<OwnedRefByRef<CurrentTask>>,
+    /// Information about the main system task that is bound to the kernel main thread.
+    system_task: OnceCell<SystemTask>,
 
-    /// A weak reference to the kernel owing this struct.
+    /// A weak reference to the kernel owning this struct.
     kernel: Weak<Kernel>,
-}
-
-impl Drop for KernelThreads {
-    fn drop(&mut self) {
-        if let Some(system_task) = self.system_task.take() {
-            system_task.release(());
-        }
-    }
 }
 
 impl KernelThreads {
@@ -62,13 +51,13 @@ impl KernelThreads {
                 .duplicate(zx::Rights::SAME_RIGHTS)
                 .expect("Failed to duplicate process self"),
             ehandle: fasync::EHandle::local(),
-            spawner: OnceCell::new(),
-            system_task: OnceCell::new(),
+            spawner: Default::default(),
+            system_task: Default::default(),
             kernel,
         }
     }
-    pub fn init(&self, system_task: OwnedRefByRef<CurrentTask>) -> Result<(), Errno> {
-        self.system_task.set(system_task).map_err(|_| errno!(EEXIST))?;
+    pub fn init(&self, system_task: CurrentTask) -> Result<(), Errno> {
+        self.system_task.set(SystemTask::new(system_task)).map_err(|_| errno!(EEXIST))?;
         self.spawner
             .set(DynamicThreadSpawner::new(2, self.system_task().weak_task()))
             .map_err(|_| errno!(EEXIST))?;
@@ -83,8 +72,16 @@ impl KernelThreads {
         self.spawner.get().as_ref().unwrap()
     }
 
+    /// Access the `CurrentTask` for the kernel main thread. This can only be called from the
+    /// kernel main thread itself.
     pub fn system_task(&self) -> &CurrentTask {
-        self.system_task.get().as_ref().unwrap()
+        self.system_task.get().expect("KernelThreads::init must be called").system_task.get()
+    }
+
+    /// Access the `ThreadGroup` for the system tasks. This can be safely called from anywhere as
+    /// soon as KernelThreads::init has been called.
+    pub fn system_thread_group(&self) -> &Arc<ThreadGroup> {
+        &self.system_task.get().expect("KernelThreads::init must be called").system_thread_group
     }
 
     pub fn spawn<F>(&self, f: F)
@@ -92,6 +89,30 @@ impl KernelThreads {
         F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawner().spawn(f)
+    }
+}
+
+impl Drop for KernelThreads {
+    fn drop(&mut self) {
+        if let Some(system_task) = self.system_task.take() {
+            system_task.system_task.into_inner().release(());
+        }
+    }
+}
+
+struct SystemTask {
+    /// The system task is bound to the kernel main thread. `Fragile` ensures a runtime crash if it
+    /// is accessed from any other thread.
+    system_task: Fragile<CurrentTask>,
+
+    /// The system `ThreadGroup` is accessible from everywhere.
+    system_thread_group: Arc<ThreadGroup>,
+}
+
+impl SystemTask {
+    fn new(system_task: CurrentTask) -> Self {
+        let system_thread_group = Arc::clone(&system_task.thread_group);
+        Self { system_task: system_task.into(), system_thread_group }
     }
 }
 

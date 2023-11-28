@@ -26,10 +26,7 @@ use crate::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    errors::Errno,
-    open_flags::OpenFlags,
-    ownership::{OwnedRefByRef, ReleasableByRef},
-    user_address::UserAddress,
+    errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef, user_address::UserAddress,
     MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 
@@ -85,12 +82,10 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
         fs.clone(),
     )
     .expect("failed to create first task");
-    let system_task = OwnedRefByRef::new(
-        CurrentTask::create_system_task(&kernel, fs).expect("create system task"),
-    );
+    let system_task = CurrentTask::create_system_task(&kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
-    init_common_devices(kernel.kthreads.system_task());
+    init_common_devices(&kernel.kthreads.system_task());
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

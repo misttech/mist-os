@@ -927,7 +927,7 @@ impl ThreadGroup {
             // stats from starnix process.
             assert_eq!(
                 self as *const ThreadGroup,
-                Arc::as_ptr(&self.kernel.kthreads.system_task().task.thread_group)
+                Arc::as_ptr(self.kernel.kthreads.system_thread_group()),
             );
             &self.kernel.kthreads.starnix_process
         } else {

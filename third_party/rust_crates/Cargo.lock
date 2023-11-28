@@ -1333,6 +1333,7 @@ dependencies = [
  "fancy-regex",
  "fatfs",
  "flate2",
+ "fragile",
  "fs_extra",
  "fuse3",
  "futures",
