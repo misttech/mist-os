@@ -249,6 +249,49 @@ impl<L> Locked<'_, L> {
         (data, Locked::<'a, M>(PhantomData::default()))
     }
 
+    /// Acquire two locks that are on the same level, in a consistent order (sorted by memory address) and return both guards
+    /// as well as the new locked context.
+    ///
+    /// This requires that `M` can be locked after `L`.
+    pub fn lock_both_and<'a, M, S>(
+        &'a mut self,
+        source1: &'a S,
+        source2: &'a S,
+    ) -> (S::Guard<'a>, S::Guard<'a>, Locked<'a, M>)
+    where
+        M: 'a,
+        S: LockFor<M>,
+        L: LockBefore<M>,
+    {
+        let ptr1: *const S = source1;
+        let ptr2: *const S = source2;
+        if ptr1 < ptr2 {
+            let data1 = S::lock(source1);
+            let data2 = S::lock(source2);
+            (data1, data2, Locked::<'a, M>(PhantomData::default()))
+        } else {
+            let data2 = S::lock(source2);
+            let data1 = S::lock(source1);
+            (data1, data2, Locked::<'a, M>(PhantomData::default()))
+        }
+    }
+    /// Acquire two locks that are on the same level, in a consistent order (sorted by memory address) and return both guards.
+    ///
+    /// This requires that `M` can be locked after `L`.
+    pub fn lock_both<'a, M, S>(
+        &'a mut self,
+        source1: &'a S,
+        source2: &'a S,
+    ) -> (S::Guard<'a>, S::Guard<'a>)
+    where
+        M: 'a,
+        S: LockFor<M>,
+        L: LockBefore<M>,
+    {
+        let (data1, data2, _) = self.lock_both_and(source1, source2);
+        (data1, data2)
+    }
+
     /// Attempt to acquire the given read lock and a new locked context.
     ///
     /// For accessing state via reader/writer locks. This requires that `M` can
@@ -556,5 +599,25 @@ mod test {
         let (g, mut next_locked) = locked.lock_and::<G, _>(&data);
         let v = next_locked.lock::<H, _>(&g[1]);
         assert_eq!(*v, 1);
+    }
+
+    #[test]
+    fn lock_same_level() {
+        let data1 = Data { a: Mutex::new(5), b: Mutex::new(15), ..Data::default() };
+        let data2 = Data { a: Mutex::new(10), b: Mutex::new(20), ..Data::default() };
+        let mut locked = Unlocked::new();
+        {
+            let (a1, a2, mut new_locked) = locked.lock_both_and::<A, _>(&data1, &data2);
+            assert_eq!(*a1, 5);
+            assert_eq!(*a2, 10);
+            let (b1, b2) = new_locked.lock_both::<B, _>(&data1, &data2);
+            assert_eq!(*b1, 15);
+            assert_eq!(*b2, 20);
+        }
+        {
+            let (a2, a1) = locked.lock_both::<A, _>(&data2, &data1);
+            assert_eq!(*a1, 5);
+            assert_eq!(*a2, 10);
+        }
     }
 }

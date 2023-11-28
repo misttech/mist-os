@@ -118,6 +118,19 @@ impl<T, L> OrderedMutex<T, L> {
     }
 }
 
+/// Lock two OrderedMutex of the same level in the consistent order. Returns both
+/// guards and a new locked context.
+pub fn lock_both<'a, T, L, P>(
+    locked: &'a mut Locked<'_, P>,
+    m1: &'a OrderedMutex<T, L>,
+    m2: &'a OrderedMutex<T, L>,
+) -> (MutexGuard<'a, T>, MutexGuard<'a, T>, Locked<'a, L>)
+where
+    P: LockBefore<L>,
+{
+    locked.lock_both_and(m1, m2)
+}
+
 /// A wrapper for an RwLock that requires a `Locked` context to acquire.
 /// This context must be of a level that precedes `L` in the lock ordering graph
 /// where `L` is a level associated with this RwLock.
@@ -291,6 +304,23 @@ mod test {
 
             assert_eq!(&*d_data, &15);
             assert_eq!(&*f_data, &45);
+        }
+    }
+
+    #[test]
+    fn test_lock_both() {
+        let a1: OrderedMutex<u8, A> = OrderedMutex::new(15);
+        let a2: OrderedMutex<u8, A> = OrderedMutex::new(30);
+        let mut locked = Unlocked::new();
+        {
+            let (a1_data, a2_data, _) = lock_both(&mut locked, &a1, &a2);
+            assert_eq!(&*a1_data, &15);
+            assert_eq!(&*a2_data, &30);
+        }
+        {
+            let (a2_data, a1_data, _) = lock_both(&mut locked, &a2, &a1);
+            assert_eq!(&*a1_data, &15);
+            assert_eq!(&*a2_data, &30);
         }
     }
 }
