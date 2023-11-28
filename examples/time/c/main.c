@@ -26,10 +26,32 @@ void utc_examples(void) {
   zx_handle_t utc_clock = zx_utc_reference_get();
 
   if (utc_clock != ZX_HANDLE_INVALID) {
-    // Wait for the UTC clock to start.
+    // Wait for the UTC clock to start.  The clock may never start on a device
+    // that does not have a RTC or a network connection.
+    // A started clock may, but also may not have a valid UTC actual.
     zx_status_t status = zx_object_wait_one(utc_clock, ZX_CLOCK_STARTED, ZX_TIME_INFINITE, NULL);
     if (status == ZX_OK) {
       printf("UTC clock is started.\n");
+    } else {
+      printf("zx_object_wait_one syscall failed (status = %d).\n", status);
+    }
+
+    // Wait for the UTC clock to be externally synchronized.  Once that happens,
+    // the clock is known to correspond to UTC actual (with error bounds available through
+    // zx_clock_get_details).
+    status = zx_object_wait_one(utc_clock, ZX_USER_SIGNAL_0, ZX_TIME_INFINITE, NULL);
+    if (status == ZX_OK) {
+      printf("UTC clock is externally synchronized.\n");
+    } else {
+      printf("zx_object_wait_one syscall failed (status = %d).\n", status);
+    }
+
+    // Wait for the UTC clock to be of "logging quality".  Logging quality UTC
+    // clock is started, but not necessarily corresponding to UTC actual. This
+    // clock is to be used only for logging timestamps.
+    status = zx_object_wait_one(utc_clock, ZX_USER_SIGNAL_1, ZX_TIME_INFINITE, NULL);
+    if (status == ZX_OK) {
+      printf("UTC clock is of logging quality.\n");
     } else {
       printf("zx_object_wait_one syscall failed (status = %d).\n", status);
     }
