@@ -636,10 +636,11 @@ func spamFToSerial(ctx context.Context, serialSocketPath string) {
 		return
 	}
 	defer socket.Close()
+WriteLoop:
 	for {
 		select {
 		case <-ctx.Done():
-			break
+			break WriteLoop
 		case <-ticker.C:
 			msg := []byte{'\r', '\n', 'f', '\r', '\n'}
 			socket.Write(msg)
