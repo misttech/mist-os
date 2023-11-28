@@ -255,8 +255,10 @@ impl SeccompFilterContainer {
 
         // Filters are executed in reverse order of addition
         for filter in self.filters.iter().rev() {
-            let mut data =
-                make_seccomp_data(syscall, current_task.registers.instruction_pointer_register());
+            let mut data = make_seccomp_data(
+                syscall,
+                current_task.thread_state.registers.instruction_pointer_register(),
+            );
 
             let new_result = filter.run(&mut data);
 
@@ -390,7 +392,7 @@ impl SeccompState {
             task.thread_group.leader,
             comm,
             syscall.decl.number,
-            task.registers.instruction_pointer_register(),
+            task.thread_state.registers.instruction_pointer_register(),
             arch,
             syscall.decl.name
         );
@@ -462,7 +464,11 @@ impl SeccompState {
                     errno: errno as i32,
                     code: SYS_SECCOMP as i32,
                     detail: SignalDetail::SIGSYS {
-                        call_addr: current_task.registers.instruction_pointer_register().into(),
+                        call_addr: current_task
+                            .thread_state
+                            .registers
+                            .instruction_pointer_register()
+                            .into(),
                         syscall: syscall.decl.number as i32,
                         arch: arch_val,
                     },
@@ -481,7 +487,7 @@ impl SeccompState {
                         flags: 0,
                         data: make_seccomp_data(
                             syscall,
-                            current_task.registers.instruction_pointer_register(),
+                            current_task.thread_state.registers.instruction_pointer_register(),
                         ),
                     };
                     // First, add a pending notification, and wake up the supervisor waiting for it.

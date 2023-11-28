@@ -67,11 +67,11 @@ pub(crate) use restore_cfi_directives;
 pub fn new_syscall(syscall_decl: SyscallDecl, current_task: &CurrentTask) -> Syscall {
     Syscall {
         decl: syscall_decl,
-        arg0: SyscallArg::from_raw(current_task.registers.rdi),
-        arg1: SyscallArg::from_raw(current_task.registers.rsi),
-        arg2: SyscallArg::from_raw(current_task.registers.rdx),
-        arg3: SyscallArg::from_raw(current_task.registers.r10),
-        arg4: SyscallArg::from_raw(current_task.registers.r8),
-        arg5: SyscallArg::from_raw(current_task.registers.r9),
+        arg0: SyscallArg::from_raw(current_task.thread_state.registers.rdi),
+        arg1: SyscallArg::from_raw(current_task.thread_state.registers.rsi),
+        arg2: SyscallArg::from_raw(current_task.thread_state.registers.rdx),
+        arg3: SyscallArg::from_raw(current_task.thread_state.registers.r10),
+        arg4: SyscallArg::from_raw(current_task.thread_state.registers.r8),
+        arg5: SyscallArg::from_raw(current_task.thread_state.registers.r9),
     }
 }

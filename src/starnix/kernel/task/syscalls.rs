@@ -84,17 +84,20 @@ where
 
         // Clone the registers, setting the result register to 0 for the return value from clone in the
         // cloned process.
-        new_task.registers = current_task.registers;
-        new_task.registers.set_return_register(0);
+        new_task.thread_state.registers = current_task.thread_state.registers;
+        new_task.thread_state.registers.set_return_register(0);
 
         if args.stack != 0 {
             // In clone() the `stack` argument points to the top of the stack, while in clone3()
             // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
             // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
-            new_task.registers.set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
+            new_task
+                .thread_state
+                .registers
+                .set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
         }
         if args.flags & (CLONE_SETTLS as u64) != 0 {
-            new_task.registers.set_thread_pointer_register(args.tls);
+            new_task.thread_state.registers.set_thread_pointer_register(args.tls);
         }
 
         let task_ref = WeakRef::from(&new_task.task); // Keep reference for later waiting.

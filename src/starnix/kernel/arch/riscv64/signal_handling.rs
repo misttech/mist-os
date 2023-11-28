@@ -87,7 +87,7 @@ pub fn restore_registers(
 ) -> Result<(), Errno> {
     let regs = &signal_stack_frame.context.uc_mcontext.sc_regs;
     // Restore the register state from before executing the signal handler.
-    current_task.registers = zx::sys::zx_thread_state_general_regs_t {
+    current_task.thread_state.registers = zx::sys::zx_thread_state_general_regs_t {
         pc: regs.pc,
         ra: regs.ra,
         sp: regs.sp,
@@ -124,7 +124,7 @@ pub fn restore_registers(
     .into();
 
     let d_state = unsafe { &signal_stack_frame.context.uc_mcontext.sc_fpregs.d };
-    current_task.extended_pstate.set_riscv64_fp(&d_state.f, d_state.fcsr);
+    current_task.thread_state.extended_pstate.set_riscv64_fp(&d_state.f, d_state.fcsr);
 
     Ok(())
 }

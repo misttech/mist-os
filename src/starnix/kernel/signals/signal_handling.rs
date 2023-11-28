@@ -357,7 +357,8 @@ pub fn dispatch_signal_handler(
 
 pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(), Errno> {
     // Read the signal stack frame from memory.
-    let signal_frame_address = align_stack_pointer(current_task.registers.stack_pointer_register());
+    let signal_frame_address =
+        align_stack_pointer(current_task.thread_state.registers.stack_pointer_register());
     let signal_stack_bytes = current_task
         .mm
         .read_memory_to_array::<SIG_STACK_SIZE>(UserAddress::from(signal_frame_address))?;
@@ -407,7 +408,7 @@ pub fn sys_restart_syscall(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &mut CurrentTask,
 ) -> Result<SyscallResult, Errno> {
-    match current_task.syscall_restart_func.take() {
+    match current_task.thread_state.syscall_restart_func.take() {
         Some(f) => f(current_task),
         None => {
             // This may indicate a bug where a syscall returns ERESTART_RESTARTBLOCK without
@@ -422,12 +423,16 @@ pub fn sys_restart_syscall(
 /// Test utilities for signal handling.
 #[cfg(test)]
 pub(crate) mod testing {
+    use crate::{
+        signals::dequeue_signal,
+        task::{CurrentTask, ThreadState},
+        testing::AutoReleasableTask,
+    };
     use std::ops::DerefMut as _;
 
-    use crate::{signals::dequeue_signal, task::CurrentTask, testing::AutoReleasableTask};
-
     pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
-        let CurrentTask { task, registers, extended_pstate, .. } = current_task.deref_mut();
+        let CurrentTask { task, thread_state: ThreadState { registers, extended_pstate, .. } } =
+            current_task.deref_mut();
         let task_state = task.write();
         dequeue_signal(task, task_state, registers, extended_pstate);
     }

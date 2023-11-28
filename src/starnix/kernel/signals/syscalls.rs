@@ -142,7 +142,8 @@ pub fn sys_sigaltstack(
     let on_signal_stack = signal_state
         .alt_stack
         .map(|signal_stack| {
-            signal_stack.contains_pointer(current_task.registers.stack_pointer_register())
+            signal_stack
+                .contains_pointer(current_task.thread_state.registers.stack_pointer_register())
         })
         .unwrap_or(false);
 
@@ -480,7 +481,7 @@ pub fn sys_rt_sigreturn(
     current_task: &mut CurrentTask,
 ) -> Result<SyscallResult, Errno> {
     restore_from_signal_handler(current_task)?;
-    Ok(current_task.registers.return_register().into())
+    Ok(current_task.thread_state.registers.return_register().into())
 }
 
 fn read_siginfo(
@@ -972,14 +973,15 @@ mod tests {
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
-        current_task.registers.rsp = (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        current_task.thread_state.registers.rsp =
+            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
 
         // However, setting the rsp to a different value outside the alt stack should allow us to
         // disable it.
-        current_task.registers.rsp =
+        current_task.thread_state.registers.rsp =
             (sigaltstack_addr + sigaltstack_addr_size + 0x1000usize).ptr() as u64;
         let ss = sigaltstack_t { ss_flags: SS_DISABLE, ..sigaltstack_t::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
@@ -1015,13 +1017,14 @@ mod tests {
             .expect("failed to call sigaltstack");
 
         // Changing the sigaltstack while we are there should be an error.
-        current_task.registers.rsp = (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
+        current_task.thread_state.registers.rsp =
+            (sigaltstack_addr + sigaltstack_addr_size).ptr() as u64;
         ss.ss_flags = SS_DISABLE;
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         assert_eq!(sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr), error!(EPERM));
 
         // However, setting the rsp to a low value should work (it doesn't wrap-around).
-        current_task.registers.rsp = 0u64;
+        current_task.thread_state.registers.rsp = 0u64;
         let ss = sigaltstack_t { ss_flags: SS_DISABLE, ..sigaltstack_t::default() };
         current_task.write_object(user_ss, &ss).expect("failed to write struct");
         sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)

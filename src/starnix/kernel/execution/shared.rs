@@ -14,7 +14,7 @@ use crate::{
     syscalls::table::dispatch_syscall,
     task::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
-        Waiter,
+        ThreadState, Waiter,
     },
 };
 use anyhow::{anyhow, Error};
@@ -70,7 +70,7 @@ pub fn execute_syscall(
 
     let syscall = new_syscall(syscall_decl, current_task);
 
-    current_task.registers.save_registers_for_restart(syscall.decl.number);
+    current_task.thread_state.registers.save_registers_for_restart(syscall.decl.number);
 
     log_trace!("{:?}", syscall);
 
@@ -92,12 +92,12 @@ pub fn execute_syscall(
     match result {
         Ok(return_value) => {
             log_trace!("-> {:#x}", return_value.value());
-            current_task.registers.set_return_register(return_value.value());
+            current_task.thread_state.registers.set_return_register(return_value.value());
             None
         }
         Err(errno) => {
             log_trace!("!-> {:?}", errno);
-            current_task.registers.set_return_register(errno.return_value());
+            current_task.thread_state.registers.set_return_register(errno.return_value());
             Some(ErrorContext { error: errno, syscall })
         }
     }
@@ -116,7 +116,8 @@ pub fn process_completed_restricted_exit(
         if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
             || (!flags.contains(TaskFlags::EXITED) && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
         {
-            let CurrentTask { task, registers, extended_pstate, .. } = current_task;
+            let CurrentTask { task, thread_state: ThreadState { registers, extended_pstate, .. } } =
+                current_task;
             let task_state = task.write();
             if !task.is_exitted() {
                 dequeue_signal(task, task_state, registers, extended_pstate);

@@ -70,9 +70,16 @@ pub struct CurrentTask {
     /// The underlying task object.
     pub task: OwnedRefByRef<Task>,
 
+    pub thread_state: ThreadState,
+}
+
+/// The thread related information of a `CurrentTask`. The information should never be used  outside
+/// of the thread owning the `CurrentTask`.
+#[derive(Default)]
+pub struct ThreadState {
     /// A copy of the registers associated with the Zircon thread. Up-to-date values can be read
     /// from `self.handle.read_state_general_regs()`. To write these values back to the thread, call
-    /// `self.handle.write_state_general_regs(self.registers.into())`.
+    /// `self.handle.write_state_general_regs(self.thread_state.registers.into())`.
     pub registers: RegisterState,
 
     /// Copy of the current extended processor state including floating point and vector registers.
@@ -112,12 +119,7 @@ impl fmt::Debug for CurrentTask {
 
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
-        CurrentTask {
-            task: OwnedRefByRef::new(task),
-            registers: RegisterState::default(),
-            extended_pstate: ExtendedPstateState::default(),
-            syscall_restart_func: None,
-        }
+        CurrentTask { task: OwnedRefByRef::new(task), thread_state: Default::default() }
     }
 
     pub fn trigger_delayed_releaser(&self) {
@@ -136,7 +138,8 @@ impl CurrentTask {
         &mut self,
         f: impl FnOnce(&mut CurrentTask) -> Result<R, Errno> + Send + Sync + 'static,
     ) {
-        self.syscall_restart_func = Some(Box::new(|current_task| Ok(f(current_task)?.into())));
+        self.thread_state.syscall_restart_func =
+            Some(Box::new(|current_task| Ok(f(current_task)?.into())));
     }
 
     /// Sets the task's signal mask to `signal_mask` and runs `wait_function`.
@@ -571,7 +574,7 @@ impl CurrentTask {
             .map_err(|status| from_status_like_fdio!(status))?;
         let start_info = load_executable(self, resolved_elf, &path)?;
         let regs: zx_thread_state_general_regs_t = start_info.into();
-        self.registers = regs.into();
+        self.thread_state.registers = regs.into();
 
         {
             let mut state = self.write();
@@ -583,7 +586,7 @@ impl CurrentTask {
             // capabilities accordingly.
             persistent_info.creds_mut().exec();
         }
-        self.extended_pstate.reset();
+        self.thread_state.extended_pstate.reset();
 
         self.thread_group.signal_actions.reset_for_exec();
 

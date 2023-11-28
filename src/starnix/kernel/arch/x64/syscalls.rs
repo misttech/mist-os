@@ -79,11 +79,11 @@ pub fn sys_arch_prctl(
 ) -> Result<(), Errno> {
     match code {
         ARCH_SET_FS => {
-            current_task.registers.fs_base = addr.ptr() as u64;
+            current_task.thread_state.registers.fs_base = addr.ptr() as u64;
             Ok(())
         }
         ARCH_SET_GS => {
-            current_task.registers.gs_base = addr.ptr() as u64;
+            current_task.thread_state.registers.gs_base = addr.ptr() as u64;
             Ok(())
         }
         _ => {

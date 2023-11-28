@@ -106,17 +106,17 @@ pub fn restore_registers(
     registers.copy_from_slice(&uctx.regs[..NUM_REGS_WITHOUT_LINK_REGISTER]);
 
     // Restore the register state from before executing the signal handler.
-    current_task.registers = zx::sys::zx_thread_state_general_regs_t {
+    current_task.thread_state.registers = zx::sys::zx_thread_state_general_regs_t {
         r: registers,
         lr: uctx.regs[NUM_REGS_WITHOUT_LINK_REGISTER],
         sp: uctx.sp,
         pc: uctx.pc,
         cpsr: uctx.pstate,
-        tpidr: current_task.registers.tpidr,
+        tpidr: current_task.thread_state.registers.tpidr,
     }
     .into();
 
-    parse_sigcontext_data(&uctx.__reserved, &mut current_task.extended_pstate)
+    parse_sigcontext_data(&uctx.__reserved, &mut current_task.thread_state.extended_pstate)
 }
 
 pub fn align_stack_pointer(pointer: u64) -> u64 {

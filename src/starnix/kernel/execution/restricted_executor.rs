@@ -218,7 +218,7 @@ fn run_task(
     // Map the restricted state VMO and arrange for it to be unmapped later.
     let mut restricted_state = RestrictedState::from_vmo(state_vmo)?;
     loop {
-        let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.registers);
+        let mut state = zx::sys::zx_restricted_state_t::from(&*current_task.thread_state.registers);
 
         // Copy the register state into the mapped VMO.
         restricted_state.write_state(&state);
@@ -231,7 +231,7 @@ fn run_task(
             // The closure provided to run_with_saved_state must be minimal to avoid using
             // floating point or vector state. In particular, the zx::Status conversion compiles
             // to a vector register operation by default and must happen outside this closure.
-            current_task.extended_pstate.run_with_saved_state(|| {
+            current_task.thread_state.extended_pstate.run_with_saved_state(|| {
                 restricted_enter(
                     RESTRICTED_ENTER_OPTIONS,
                     restricted_return_ptr as usize,
@@ -260,10 +260,11 @@ fn run_task(
                 trace_duration_begin!(trace_category_starnix!(), trace_name_execute_syscall!());
 
                 // Store the new register state in the current task before dispatching the system call.
-                current_task.registers =
+                current_task.thread_state.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
-                let syscall_decl =
-                    SyscallDecl::from_number(current_task.registers.syscall_register());
+                let syscall_decl = SyscallDecl::from_number(
+                    current_task.thread_state.registers.syscall_register(),
+                );
 
                 // Generate CFI directives so the unwinder will be redirected to unwind the restricted
                 // stack.
@@ -288,7 +289,7 @@ fn run_task(
                 profile_duration!("HandleException");
                 let restricted_exception = restricted_state.read_exception();
 
-                current_task.registers =
+                current_task.thread_state.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&restricted_exception.state)
                         .into();
                 let exception_result =
@@ -304,7 +305,7 @@ fn run_task(
                 profile_duration!("RestrictedKick");
 
                 // Update the task's register state.
-                current_task.registers =
+                current_task.thread_state.registers =
                     zx::sys::zx_thread_state_general_regs_t::from(&state).into();
 
                 // Fall through to the post-syscall / post-exception handling logic. We were likely kicked because a
@@ -412,7 +413,7 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
         ExceptionResult::Handled => {}
         ExceptionResult::Signal(signal) => {
             // TODO: Verify that the rip is actually in restricted code.
-            let mut registers = current_task.registers;
+            let mut registers = current_task.thread_state.registers;
             registers.reset_flags();
             let task = &current_task.task;
             deliver_signal(
@@ -420,9 +421,9 @@ fn process_completed_exception(current_task: &mut CurrentTask, exception_result:
                 task.write(),
                 signal,
                 &mut registers,
-                &current_task.extended_pstate,
+                &current_task.thread_state.extended_pstate,
             );
-            current_task.registers = registers;
+            current_task.thread_state.registers = registers;
         }
     }
 }
