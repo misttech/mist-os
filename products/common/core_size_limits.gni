@@ -139,7 +139,12 @@ size_checker_input = {
     },
     {
       component = "Fonts"
-      pkgs = [ "fonts" ]
+      pkgs = [
+        "fonts",
+        "font-server",
+        "open-fonts-collection.asset-provider.package",
+        "small-open-fonts-collection.asset-provider.package",
+      ]
       limit = 10485760  # 10.000 MiB
       creep_limit = 2097152  # 200.000 KiB
     },

@@ -77,9 +77,8 @@ product_assembly_configuration("terminal") {
     }
 
     fonts = {
-      enabled = true
-      # TODO(fxbug.dev/122855): Add `fonts_collection` once OOT is ready to
-      # use the updated fonts provisioning methods.
+      # See base_packages below.
+      font_collection = "open-fonts-collection"
     }
 
     session = {
@@ -94,5 +93,13 @@ product_assembly_configuration("terminal") {
         "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm"
     build_info = default_product_build_info
   }
+
+  base_packages = [
+    {
+      # Provides font assets for `platform.fonts.font_collection` above.
+      package_target = "//src/fonts/asset_providers:open-fonts-collection.asset-provider.package"
+    },
+  ]
+
   deps = [ "//build/info:build_info_files" ]
 }

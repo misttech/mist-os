@@ -30,7 +30,8 @@ _platform_configuration_base = {
   }
 
   fonts = {
-    enabled = true
+    # See base_packages below.
+    font_collection = "small-open-fonts-collection"
   }
 
   intl = {
@@ -129,6 +130,13 @@ _storage_fxfs = {
   }
 }
 
+_base_packages = [
+  {
+    # Provides font assets for `platform.fonts.font_collection` above.
+    package_target = "//src/fonts/asset_providers:small-open-fonts-collection.asset-provider.package"
+  },
+]
+
 product_assembly_configuration("core") {
   testonly = true
   platform = {
@@ -140,6 +148,7 @@ product_assembly_configuration("core") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -154,6 +163,7 @@ product_assembly_configuration("core_with_f2fs") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -168,6 +178,7 @@ product_assembly_configuration("core_with_minfs") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -182,6 +193,7 @@ product_assembly_configuration("core_with_fxfs") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -202,6 +214,7 @@ product_assembly_configuration("core_with_netstack3") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }
 
@@ -224,5 +237,6 @@ product_assembly_configuration("core_with_dfv2_fuzzing") {
   }
 
   base_driver_packages = _base_driver_packages
+  base_packages = _base_packages
   deps = [ "//build/info:build_info_files" ]
 }

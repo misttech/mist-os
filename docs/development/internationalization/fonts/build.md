@@ -3,7 +3,7 @@
 There are three basic layers to the build configuration for fonts:
 
 1.  [Common infrastructure and metadata](#common-infra)
-1.  [Reusable font bundles and groups](#reusable)
+1.  [Reusable font bundles](#reusable)
 1.  [Product-specific configurations](#product-specific)
 
 ## Background
@@ -244,13 +244,6 @@ All possible font packages are predeclared in
     `fuchsia-pkg://fuchsia.com/<package-name>`, e.g.
     `fuchsia-pkg://fuchsia.com/font-package-roboto-regular-ttf`.
 
-## Reusable font bundles and groups {#reusable}
-
-The second layer is optional; it is mainly intended to save some repetition.
-Instead of having to refer to font assets and packages individually, reusable
-groups are declared in
-[`//src/fonts/groups/BUILD.gn`](/src/fonts/groups/BUILD.gn).
-
 ### `local_font_bundle` {#local_font_bundle}
 
 _Defined in [fonts.gni](/src/fonts/build/fonts.gni)_
@@ -269,22 +262,6 @@ Example:
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/fonts/collections/BUILD.gn"
  indented_block="local_font_bundle\(\"small-open-fonts-local\"\)" adjust_indentation="auto" %}
 ```
-
-### `font_package_group` {#font_package_group}
-
-_Defined in [fonts.gni](/src/fonts/build/fonts.gni)_
-
-When referring to multiple font packages, the GN template `font_package_group`
-obviates the need to derive or look up fonts assets' package names. Just list
-the names of the assets, as in this example in
-[`//src/fonts/groups/BUILD.gn`](/src/fonts/groups/BUILD.gn):
-
-```gn
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/fonts/groups/BUILD.gn" indented_block="font_package_group\(\"roboto-slab\"\)" adjust_indentation="auto" %}
-```
-
-The target `//src/fonts/groups:roboto-slab` contains a `group` of all of the
-`package`s corresponding to the listed asset names.
 
 ## Product-specific font configurations {#product-specific}
 
@@ -337,19 +314,17 @@ The fallback chain is defined manually. Some guidelines to follow:
 
 _Defined in [fonts.gni](/src/fonts/build/fonts.gni)_
 
-After any needed `local_font_bundle`s, font `packages`, and/or
-`font_package_group`s have been declared, they are assembled into a
-`font_collection`.
+After any needed `local_font_bundle`s, and/or font `packages` have been
+declared, they are assembled into a `font_collection`.
 
 #### Inputs {#font_collection-inputs}
 
 (See fonts.gni for complete documentation.)
 
-*   `font_packages`: GN labels of font `package`s and/or `font_package_group`s
+*   `font_packages`: GN labels of font `package`s
     that are in `universe_package_labels` for the target product.
-*   `local_font_bundles`: GN labels of `local_font_bundle`s (or `group`s
-    thereof) for the target product. These will be included in the font
-    provider's config data.
+*   `local_font_bundles`: GN labels of `local_font_bundle`s for the target
+    product. These will be included in the font provider's config data.
 *   `local_asset_names`: List of local font asset names (creates an ad-hoc
     `local_font_bundle`).
 *   `product_config_path`: Path to a JSON file containing
@@ -360,11 +335,10 @@ After any needed `local_font_bundle`s, font `packages`, and/or
 
 #### Internals
 
-A `font_collection` traverses the transitive closure all of the font assets,
-packages, and groups that it contains. It collects their
-[GN metadata](https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#var_metadata)
-to build lists of fonts that map to font packages in local
-files.
+A `font_collection` traverses the transitive closure all of the font assets and
+packages, that it contains. It collects their [GN
+metadata](https://gn.googlesource.com/gn/+/HEAD/docs/reference.md#var_metadata)
+to build lists of fonts that map to font packages in local files.
 
 The template passes this information to the font manifest generator
 ([GN template](/src/fonts/build/font_manifest.gni),
@@ -397,8 +371,8 @@ If a product only uses _local_ fonts, it is sufficient to add the
 `font_collection` target to the product's dependency labels (usually to
 [`base_package_labels`](/docs/gen/build_arguments.md#base_package_labels)).
 
-If a product also uses font `package`s and/or `font_package_group`s, those
-targets must be added explicitly to either
+If a product also uses font `package`s,  those targets must be added explicitly
+to either
 [`base_package_labels`](/docs/gen/build_arguments.md#base_package_labels) or
 [`universe_package_labels`](/docs/gen/build_arguments.md#universe_package_labels),
 depending on whether the packages are meant to be ephemeral.
