@@ -169,6 +169,11 @@ pub fn dequeue_signal(
     registers: &mut RegisterState,
     extended_pstate: &ExtendedPstateState,
 ) {
+    // This code is occasionally executed as the task is stopping. Stopping /
+    // stopped threads should not get signals.
+    if task.load_stopped().is_stopping_or_stopped() {
+        return;
+    }
     let mask = task_state.signals.mask();
     let siginfo =
         task_state.signals.take_next_where(|sig| !mask.has_signal(sig.signal) || sig.force);
@@ -375,7 +380,7 @@ pub fn restore_from_signal_handler(current_task: &mut CurrentTask) -> Result<(),
 
 /// Maybe adjust a task's registers to restart a syscall once the task switches back to userspace,
 /// based on whether the return value is one of the restartable error codes such as ERESTARTSYS.
-fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Option<sigaction_t>) {
+pub fn prepare_to_restart_syscall(registers: &mut RegisterState, sigaction: Option<sigaction_t>) {
     let err = ErrnoCode::from_return_value(registers.return_register());
     // If sigaction is None, the syscall must be restarted if it is restartable. The default
     // sigaction will not have a sighandler, which will guarantee a restart.

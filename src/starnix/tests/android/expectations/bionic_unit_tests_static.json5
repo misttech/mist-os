@@ -44,9 +44,6 @@
                 "MemtagStackTest.*",
                 "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
 
-                // Ptrace
-                "PtraceResumptionTest.*",
-
                 // Our test runner doesn't understand DISABLED
                 "android_mallopt.DISABLED_multiple_enable_gwp_asan",
                 "malloc.DISABLED_alloc_after_fork",

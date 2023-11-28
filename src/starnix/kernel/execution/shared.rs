@@ -2,21 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    arch::execution::new_syscall,
-    fs::{
-        fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-        FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions,
-    },
-    logging::log_trace,
-    mm::MemoryManager,
-    signals::dequeue_signal,
-    syscalls::table::dispatch_syscall,
-    task::{
-        CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
-        ThreadState, Waiter,
-    },
-};
 use anyhow::{anyhow, Error};
 use fidl_fuchsia_io as fio;
 use fidl_fuchsia_process as fprocess;
@@ -25,12 +10,28 @@ use fuchsia_inspect::NumericProperty;
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use lock_sequence::{Locked, Unlocked};
+use std::{convert::TryFrom, sync::Arc};
+
+use crate::{
+    arch::execution::new_syscall,
+    fs::{
+        fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
+        FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions,
+    },
+    logging::log_trace,
+    mm::MemoryManager,
+    signals::{dequeue_signal, prepare_to_restart_syscall},
+    syscalls::table::dispatch_syscall,
+    task::{
+        CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
+        ThreadState, Waiter,
+    },
+};
 use starnix_syscalls::{
     decls::{Syscall, SyscallDecl},
     SyscallResult,
 };
 use starnix_uapi::{errno, errors::Errno, mount_flags::MountFlags};
-use std::{convert::TryFrom, sync::Arc};
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -113,15 +114,21 @@ pub fn process_completed_restricted_exit(
     // Checking for a signal might cause the task to exit, so check before processing exit
     {
         let flags = current_task.flags();
-        if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
-            || (!flags.contains(TaskFlags::EXITED) && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
         {
             let CurrentTask { task, thread_state: ThreadState { registers, extended_pstate, .. } } =
                 current_task;
             let task_state = task.write();
-            if !task.is_exitted() {
-                dequeue_signal(task, task_state, registers, extended_pstate);
+            if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
+                || (!flags.contains(TaskFlags::EXITED)
+                    && flags.contains(TaskFlags::SIGNALS_AVAILABLE))
+            {
+                if !task.is_exitted() {
+                    dequeue_signal(task, task_state, registers, extended_pstate);
+                }
             }
+            // The syscall may need to restart for a non-signal-related
+            // reason. This call does nothing if we aren't restarting.
+            prepare_to_restart_syscall(registers, None);
         }
     }
 

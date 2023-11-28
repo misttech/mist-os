@@ -183,7 +183,9 @@ impl CurrentTask {
         {
             let mut state = self.write();
             assert!(!state.signals.run_state.is_blocked());
-            if state.signals.is_any_pending() {
+            // A note on PTRACE_LISTEN - the thread cannot be scheduled
+            // regardless of pending signals.
+            if state.signals.is_any_pending() && !state.is_ptrace_listening() {
                 return error!(EINTR);
             }
             state.signals.run_state = run_state.clone();
