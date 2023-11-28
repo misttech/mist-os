@@ -41,7 +41,7 @@ State         | Description | Clock behavior
 --------------|-------------|---------------
 Fixed | Time has never been synchronized and is unreliable | Time is fixed at backstop.
 Running, not synchronized | Time has not been synchronized | Time is running, starting from the backstop. In this state the UTC clock on Fuchsia behaves similar to clocks on other OSs. On entry into this state `ZX_CLOCK_STARTED` signal is asserted.
-Running, synchronized | Time has been synchronized at least once | Time is running. In this state the UTC clock reading is tracking an external time source. On entry into this state, `ZX_SIGNAL_USER_0` is asserted.
+Running, synchronized | Time has been synchronized at least once | Time is running. In this state the UTC clock reading is tracking an external time source. On entry into this state, `ZX_USER_SIGNAL_0` is asserted.
 
 ## Properties
 
