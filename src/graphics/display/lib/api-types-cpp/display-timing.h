@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_DISPLAY_TIMING_H_
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <zircon/assert.h>
 
 #include <cstdint>
 #include <limits>
@@ -61,6 +62,9 @@ constexpr int32_t kMaxTimingValue = (1 << 16) - 1;
 
 // Maximum value of display pixel clock in kHz.
 constexpr int32_t kMaxPixelClockKhz = std::numeric_limits<int32_t>::max();
+
+// Maximum value of display refresh rate in millihertz (0.001 Hz).
+constexpr int32_t kMaxRefreshRateMillihertz = ((1 << 16) - 1) * 1000;
 
 // Display timing parameters as defined in:
 //
@@ -206,6 +210,12 @@ struct DisplayTiming {
   // Must be 0 or 1.
   int pixel_repetition = 0;
 
+  constexpr bool IsValid() const;
+
+  // Functionally equivalent to asserting on the return value from IsValid(),
+  // but provides more actionable errors on failure.
+  constexpr void DebugAssertIsValid() const;
+
   // Number of blanking pixels in a video line.
   //
   // Also known as "Hblank" and "horizontal blank time".
@@ -213,7 +223,7 @@ struct DisplayTiming {
   // For legacy DMT standard formats with non-zero borders, this is the sum of
   // the horizontal left border, horizontal right border and the horizontal
   // blank.
-  int horizontal_blank_px() const {
+  constexpr int horizontal_blank_px() const {
     return horizontal_front_porch_px + horizontal_sync_width_px + horizontal_back_porch_px;
   }
 
@@ -223,19 +233,25 @@ struct DisplayTiming {
   //
   // For legacy DMT standard formats with non-zero borders, this is the sum of
   // the vertical top border, vertical bottom bordea cvr and the vertical blank.
-  int vertical_blank_lines() const {
+  constexpr int vertical_blank_lines() const {
     return vertical_front_porch_lines + vertical_sync_width_lines + vertical_back_porch_lines;
   }
 
   // Number of all pixels in a video line.
   //
   // Also known as "Htotal".
-  int horizontal_total_px() const { return horizontal_active_px + horizontal_blank_px(); }
+  //
+  // TODO(fxbug.dev/136948): The current display limits may not support some
+  // timings allowed by the VESA DisplayID standard.
+  constexpr int horizontal_total_px() const { return horizontal_active_px + horizontal_blank_px(); }
 
   // Number of all lines on the display.
   //
   // Also known as "Vtotal".
-  int vertical_total_lines() const {
+  //
+  // TODO(fxbug.dev/136948): The current display limits may not support some
+  // timings allowed by the VESA DisplayID standard.
+  constexpr int vertical_total_lines() const {
     // Interlaced display mode has 2 blanks.
     if (fields_per_frame == FieldsPerFrame::kInterlaced) {
       int total_vblanks = 2 * vertical_blank_lines() + (vblank_alternates ? 1 : 0);
@@ -244,6 +260,72 @@ struct DisplayTiming {
     return vertical_active_lines + vertical_blank_lines();
   }
 };
+
+constexpr bool DisplayTiming::IsValid() const {
+  if (horizontal_active_px < 0 || horizontal_active_px > kMaxTimingValue) {
+    return false;
+  }
+  if (horizontal_front_porch_px < 0 || horizontal_front_porch_px > kMaxTimingValue) {
+    return false;
+  }
+  if (horizontal_sync_width_px < 0 || horizontal_sync_width_px > kMaxTimingValue) {
+    return false;
+  }
+  if (horizontal_back_porch_px < 0 || horizontal_back_porch_px > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_active_lines < 0 || vertical_active_lines > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_front_porch_lines < 0 || vertical_front_porch_lines > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_sync_width_lines < 0 || vertical_sync_width_lines > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_back_porch_lines < 0 || vertical_back_porch_lines > kMaxTimingValue) {
+    return false;
+  }
+  if (pixel_clock_frequency_khz < 0 || pixel_clock_frequency_khz > kMaxPixelClockKhz) {
+    return false;
+  }
+  if (pixel_repetition < 0 || pixel_repetition > 1) {
+    return false;
+  }
+  return true;
+}
+
+constexpr void DisplayTiming::DebugAssertIsValid() const {
+  ZX_DEBUG_ASSERT(horizontal_active_px >= 0);
+  ZX_DEBUG_ASSERT(horizontal_active_px <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(horizontal_front_porch_px >= 0);
+  ZX_DEBUG_ASSERT(horizontal_front_porch_px <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(horizontal_sync_width_px >= 0);
+  ZX_DEBUG_ASSERT(horizontal_sync_width_px <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(horizontal_back_porch_px >= 0);
+  ZX_DEBUG_ASSERT(horizontal_back_porch_px <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_active_lines >= 0);
+  ZX_DEBUG_ASSERT(vertical_active_lines <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_front_porch_lines >= 0);
+  ZX_DEBUG_ASSERT(vertical_front_porch_lines <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_sync_width_lines >= 0);
+  ZX_DEBUG_ASSERT(vertical_sync_width_lines <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_back_porch_lines >= 0);
+  ZX_DEBUG_ASSERT(vertical_back_porch_lines <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(pixel_clock_frequency_khz >= 0);
+  ZX_DEBUG_ASSERT(pixel_clock_frequency_khz <= kMaxPixelClockKhz);
+
+  ZX_DEBUG_ASSERT(pixel_repetition >= 0);
+  ZX_DEBUG_ASSERT(pixel_repetition <= 1);
+}
 
 constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {
   return lhs.horizontal_active_px == rhs.horizontal_active_px &&

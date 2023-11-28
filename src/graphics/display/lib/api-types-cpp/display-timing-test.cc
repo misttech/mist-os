@@ -493,6 +493,388 @@ TEST(DisplayTiming, AggregateHelpersInterlaced) {
   EXPECT_EQ(kDisplayTimingWithAlternatingVblank.vertical_total_lines(), 0x23'24);
 }
 
+TEST(DisplayTimingIsValid, Valid) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_TRUE(kParam.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidHorizontalActive) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0xff'ff'ff,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = -1,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidHorizontalFrontPorch) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0xff'ff'ff,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = -1,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidHorizontalSyncWidth) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0xff'ff'ff,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = -1,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidHorizontalBackPorch) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0xff'ff'ff,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = -1,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidVerticalActive) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0xff'ff'ff,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = -1,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidVerticalFrontPorch) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0xff'ff'ff,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = -1,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidVerticalSyncWidth) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0xff'ff'ff,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = -1,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidVerticalBackPorch) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0xff'ff'ff,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = -1,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidPixelClockFrequencyKhz) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = -1,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidPixelRepetition) {
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 10,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+
+  constexpr DisplayTiming kParam2 = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = -1,
+  };
+  EXPECT_FALSE(kParam2.IsValid());
+}
+
 }  // namespace
 
 }  // namespace display

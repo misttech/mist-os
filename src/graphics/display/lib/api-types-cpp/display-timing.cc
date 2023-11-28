@@ -34,38 +34,6 @@ constexpr uint32_t ToBanjoModeFlag(const DisplayTiming& display_timing_params) {
   return banjo_mode_flag;
 }
 
-constexpr void DebugAssertDisplayTimingIsValid(const DisplayTiming& timing_params) {
-  ZX_DEBUG_ASSERT(timing_params.horizontal_active_px >= 0);
-  ZX_DEBUG_ASSERT(timing_params.horizontal_active_px <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.horizontal_front_porch_px >= 0);
-  ZX_DEBUG_ASSERT(timing_params.horizontal_front_porch_px <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.horizontal_sync_width_px >= 0);
-  ZX_DEBUG_ASSERT(timing_params.horizontal_sync_width_px <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.horizontal_back_porch_px >= 0);
-  ZX_DEBUG_ASSERT(timing_params.horizontal_back_porch_px <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.vertical_active_lines >= 0);
-  ZX_DEBUG_ASSERT(timing_params.vertical_active_lines <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.vertical_front_porch_lines >= 0);
-  ZX_DEBUG_ASSERT(timing_params.vertical_front_porch_lines <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.vertical_sync_width_lines >= 0);
-  ZX_DEBUG_ASSERT(timing_params.vertical_sync_width_lines <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.vertical_back_porch_lines >= 0);
-  ZX_DEBUG_ASSERT(timing_params.vertical_back_porch_lines <= kMaxTimingValue);
-
-  ZX_DEBUG_ASSERT(timing_params.pixel_clock_frequency_khz >= 0);
-  ZX_DEBUG_ASSERT(timing_params.pixel_clock_frequency_khz <= kMaxPixelClockKhz);
-
-  ZX_DEBUG_ASSERT(timing_params.pixel_repetition >= 0);
-  ZX_DEBUG_ASSERT(timing_params.pixel_repetition <= 9);
-}
-
 constexpr void DebugAssertBanjoDisplayModeIsValid(const display_mode_t& display_mode) {
   // The >= 0 assertions are always true for uint32_t members in the
   // `display_mode_t` struct and will be eventually optimized by the compiler.
@@ -165,7 +133,7 @@ DisplayTiming ToDisplayTiming(const display_mode_t& banjo_display_mode) {
 }
 
 display_mode_t ToBanjoDisplayMode(const DisplayTiming& display_timing_params) {
-  DebugAssertDisplayTimingIsValid(display_timing_params);
+  display_timing_params.DebugAssertIsValid();
   return display_mode_t{
       .pixel_clock_khz = static_cast<uint32_t>(display_timing_params.pixel_clock_frequency_khz),
       .h_addressable = static_cast<uint32_t>(display_timing_params.horizontal_active_px),
