@@ -17,11 +17,10 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/devices/bin/driver_host2/driver_client.h"
-#include "src/devices/bin/driver_host2/legacy_lifecycle_shim.h"
 
 namespace dfv2 {
 
-using DriverHooks = std::variant<const DriverRegistration*, std::unique_ptr<LegacyLifecycleShim>>;
+using DriverHooks = const DriverRegistration*;
 
 class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
                public fbl::RefCounted<Driver>,
@@ -61,8 +60,7 @@ class Driver : public fidl::Server<fuchsia_driver_host::Driver>,
 
   fbl::Mutex lock_;
 
-  // The hooks to initialize and destroy the driver. Currently backed by either the registration
-  // symbol or the legacy lifecycle shim.
+  // The hooks to initialize and destroy the driver. Backed by the registration symbol.
   DriverHooks hooks_ __TA_GUARDED(lock_);
 
   // The binding is set from the driver_host using |set_binding|.

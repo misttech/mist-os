@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_SYMBOLS_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_SYMBOLS_H_
 
-#if __Fuchsia_API_level__ >= 13
+#if __Fuchsia_API_level__ >= 15
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 

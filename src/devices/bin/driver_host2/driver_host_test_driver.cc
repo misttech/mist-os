@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.driver.framework/cpp/driver/fidl.h>
 #include <fidl/fuchsia.driverhost.test/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -16,37 +17,46 @@ using namespace fuchsia_driver_framework;
 }  // namespace fdf
 namespace ftest = fuchsia_driverhost_test;
 
-class TestDriver {
+class TestDriver : public fdf::Server<fuchsia_driver_framework::Driver> {
  public:
-  explicit TestDriver(fdf_dispatcher_t* dispatcher)
-      : dispatcher_(dispatcher), outgoing_(fdf_dispatcher_get_async_dispatcher(dispatcher)) {}
+  explicit TestDriver(fdf_dispatcher_t* dispatcher, fdf_handle_t server_handle)
+      : dispatcher_(dispatcher), outgoing_(fdf_dispatcher_get_async_dispatcher(dispatcher)) {
+    driver_binding_.emplace(
+        dispatcher, fdf::ServerEnd<fuchsia_driver_framework::Driver>(fdf::Channel(server_handle)),
+        this, fidl::kIgnoreBindingClosure);
+  }
 
-  zx::result<> Init(fdf::wire::DriverStartArgs& start_args) {
-    auto error = fdf_internal::SymbolValue<zx_status_t*>(start_args, "error");
+  void Start(StartRequest& request, StartCompleter::Sync& completer) override {
+    auto& start_args = request.start_args();
+    auto error = fdf_internal::SymbolValue<zx_status_t*>(start_args.symbols(), "error");
     if (error.is_ok()) {
-      return zx::error(**error);
+      completer.Reply(zx::error(**error));
+      return;
     }
 
     // Call the "func" driver symbol.
-    auto func = fdf_internal::SymbolValue<void (*)()>(start_args, "func");
+    auto func = fdf_internal::SymbolValue<void (*)()>(start_args.symbols(), "func");
     if (func.is_ok()) {
       (*func)();
     }
 
     // Set the "dispatcher" driver symbol.
-    auto dispatcher = fdf_internal::SymbolValue<fdf_dispatcher_t**>(start_args, "dispatcher");
+    auto dispatcher =
+        fdf_internal::SymbolValue<fdf_dispatcher_t**>(start_args.symbols(), "dispatcher");
     if (dispatcher.is_ok()) {
       **dispatcher = dispatcher_;
     }
 
     // Connect to the incoming service.
-    auto svc_dir = fdf_internal::NsValue(start_args.incoming(), "/svc");
+    auto svc_dir = fdf_internal::NsValue(start_args.incoming().value(), "/svc");
     if (svc_dir.is_error()) {
-      return svc_dir.take_error();
+      completer.Reply(svc_dir.take_error());
+      return;
     }
     auto client_end = component::ConnectAt<ftest::Incoming>(svc_dir.value());
     if (!client_end.is_ok()) {
-      return client_end.take_error();
+      completer.Reply(client_end.take_error());
+      return;
     }
 
     // Setup the outgoing service.
@@ -55,50 +65,34 @@ class TestDriver {
           fidl_epitaph_write(request.channel().get(), ZX_ERR_STOP);
         });
     if (status.is_error()) {
-      return status;
+      completer.Reply(status);
+      return;
     }
 
-    return outgoing_.Serve(std::move(start_args.outgoing_dir()));
+    completer.Reply(outgoing_.Serve(std::move(start_args.outgoing_dir().value())));
   }
+
+  void Stop(StopCompleter::Sync& completer) override { driver_binding_.reset(); }
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Driver> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
   fdf_dispatcher_t* dispatcher_;
   component::OutgoingDirectory outgoing_;
+  std::optional<fdf::ServerBinding<fuchsia_driver_framework::Driver>> driver_binding_;
 };
 
-void test_driver_start(EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher,
-                       StartCompleteCallback* complete, void* complete_cookie) {
-  auto wire_format_metadata =
-      fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-  fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
-  fit::result decoded = fidl::StandaloneInplaceDecode<fdf::wire::DriverStartArgs>(
-      encoded.TakeMessage(), wire_format_metadata);
-  if (!decoded.is_ok()) {
-    complete(complete_cookie, decoded.error_value().status(), nullptr);
-    return;
-  }
-
-  auto test_driver = std::make_unique<TestDriver>(dispatcher);
-  auto init = test_driver->Init(*decoded.value());
-  if (init.is_error()) {
-    complete(complete_cookie, init.error_value(), nullptr);
-    return;
-  }
-
-  complete(complete_cookie, ZX_OK, test_driver.release());
+void* init(fdf_handle_t server_handle) {
+  fdf_dispatcher_t* dispatcher = fdf_dispatcher_get_current_dispatcher();
+  auto test_driver = std::make_unique<TestDriver>(dispatcher, server_handle);
+  return test_driver.release();
 }
 
-void test_driver_prepare_stop(void* driver, PrepareStopCompleteCallback* complete,
-                              void* complete_cookie) {
-  complete(complete_cookie, ZX_OK);
-}
-
-zx_status_t test_driver_stop(void* driver) {
-  if (driver != nullptr) {
-    delete static_cast<TestDriver*>(driver);
+void destroy(void* token) {
+  if (token != nullptr) {
+    delete static_cast<TestDriver*>(token);
   }
-  return ZX_OK;
 }
 
-FUCHSIA_DRIVER_LIFECYCLE_V3(.start = test_driver_start, .prepare_stop = test_driver_prepare_stop,
-                            .stop = test_driver_stop);
+EXPORT_FUCHSIA_DRIVER_REGISTRATION_V1(.initialize = init, .destroy = destroy);

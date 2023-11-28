@@ -5,7 +5,7 @@
 #ifndef LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
 #define LIB_DRIVER_COMPONENT_CPP_INTERNAL_START_ARGS_H_
 
-#if __Fuchsia_API_level__ >= 13
+#if __Fuchsia_API_level__ >= 15
 
 #include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.data/cpp/fidl.h>
@@ -16,52 +16,6 @@
 #include <vector>
 
 namespace fdf_internal {
-
-// |AdoptEncodedFidlMessage| adopts ownership of the handles in the message
-// referenced by an |EncodedFidlMessage| C object. Once constructed, one may
-// pass the result from |TakeMessage| into a FIDL decoding function to decode
-// into the desired domain object.
-//
-// On start, drivers may use |AdoptEncodedFidlMessage| to convert an ABI stable
-// |EncodedFidlMessage| type into an |EncodedMessage| C++ object expected by the
-// FIDL bindings. Example:
-//
-//     static zx_status_t Start(
-//         EncodedDriverStartArgs encoded_start_args, fdf_dispatcher_t* dispatcher, void** driver) {
-//       auto wire_format_metadata =
-//           fidl::WireFormatMetadata::FromOpaque(encoded_start_args.wire_format_metadata);
-//       fdf_internal::AdoptEncodedFidlMessage encoded{encoded_start_args.msg};
-//       fit::result start_args = fidl::StandaloneDecode<fuchsia_driver_framework::DriverStartArgs>(
-//           encoded.TakeMessage(), wire_format_metadata);
-//       // ...
-//     }
-//
-class AdoptEncodedFidlMessage {
- public:
-  explicit AdoptEncodedFidlMessage(const EncodedFidlMessage& msg) {
-    metadata_.reserve(msg.num_handles);
-    for (size_t i = 0; i < msg.num_handles; i++) {
-      // Skip handle type and rights validation since the handles are coming
-      // from the driver framework.
-      metadata_.emplace_back(fidl_channel_handle_metadata{
-          .obj_type = ZX_OBJ_TYPE_NONE,
-          .rights = ZX_RIGHT_SAME_RIGHTS,
-      });
-    }
-    message_.emplace(fidl::EncodedMessage::Create({msg.bytes, msg.num_bytes}, msg.handles,
-                                                  metadata_.data(), msg.num_handles));
-  }
-
-  fidl::EncodedMessage TakeMessage() {
-    ZX_ASSERT(message_.has_value());
-    // NOLINTNEXTLINE
-    return *std::exchange(message_, std::nullopt);
-  }
-
- private:
-  std::vector<fidl_channel_handle_metadata_t> metadata_;
-  std::optional<fidl::EncodedMessage> message_;
-};
 
 inline zx::result<std::string> ProgramValue(const fuchsia_data::wire::Dictionary& program,
                                             std::string_view key) {

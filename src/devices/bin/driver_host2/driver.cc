@@ -15,7 +15,6 @@
 #include <fbl/auto_lock.h>
 #include <fbl/string_printf.h>
 
-#include "src/devices/bin/driver_host2/legacy_lifecycle_shim.h"
 #include "src/devices/lib/log/log.h"
 #include "src/lib/driver_symbols/symbols.h"
 
@@ -119,24 +118,10 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
 
   if (registration == nullptr) {
     LOGF(
-        INFO,
+        ERROR,
         "__fuchsia_driver_registration__ symbol not available, falling back to __fuchsia_driver_lifecycle__.",
         url.data());
-    auto lifecycle =
-        static_cast<const DriverLifecycle*>(dlsym(library, "__fuchsia_driver_lifecycle__"));
-    if (lifecycle == nullptr) {
-      LOGF(ERROR, "Failed to start driver '%s', driver lifecycle not found", url.data());
-      return zx::error(ZX_ERR_NOT_FOUND);
-    }
-    if (lifecycle->version < 1 || lifecycle->version > DRIVER_LIFECYCLE_VERSION_MAX) {
-      LOGF(ERROR, "Failed to start driver '%s', unknown driver lifecycle version: %lu", url.data(),
-           lifecycle->version);
-      return zx::error(ZX_ERR_WRONG_TYPE);
-    }
-
-    auto legacy_lifecycle_shim = std::make_unique<LegacyLifecycleShim>(lifecycle, url);
-    return zx::ok(
-        fbl::MakeRefCounted<Driver>(std::move(url), library, std::move(legacy_lifecycle_shim)));
+    return zx::error(ZX_ERR_NOT_FOUND);
   }
 
   if (registration->version < 1 || registration->version > DRIVER_REGISTRATION_VERSION_MAX) {
@@ -149,26 +134,13 @@ zx::result<fbl::RefPtr<Driver>> Driver::Load(std::string url, zx::vmo vmo,
 }
 
 Driver::Driver(std::string url, void* library, DriverHooks hooks)
-    : url_(std::move(url)), library_(library), hooks_(std::move(hooks)) {}
+    : url_(std::move(url)), library_(library), hooks_(hooks) {}
 
 Driver::~Driver() {
-  if (auto* registration = std::get_if<const DriverRegistration*>(&hooks_)) {
-    if (token_.has_value()) {
-      (*registration)->v1.destroy(token_.value());
-    } else {
-      LOGF(WARNING, "Failed to Destroy driver '%s', initialize was not completed.", url_.c_str());
-    }
-  } else if (auto* legacy_lifecycle_shim =
-                 std::get_if<std::unique_ptr<LegacyLifecycleShim>>(&hooks_)) {
-    zx_status_t destroy_status = (*legacy_lifecycle_shim)->Destroy();
-    if (destroy_status != ZX_OK) {
-      LOGF(WARNING, "Failed to Destroy driver '%s', %s.", url_.c_str(),
-           zx_status_get_string(destroy_status));
-    }
-
-    (*legacy_lifecycle_shim).reset();
+  if (token_.has_value()) {
+    hooks_->v1.destroy(token_.value());
   } else {
-    ZX_ASSERT_MSG(false, "Unknown hook variant, index %lu.", hooks_.index());
+    LOGF(WARNING, "Failed to Destroy driver '%s', initialize was not completed.", url_.c_str());
   }
 
   dlclose(library_);
@@ -199,19 +171,12 @@ void Driver::Start(fbl::RefPtr<Driver> self, fuchsia_driver_framework::DriverSta
     return;
   }
 
-  if (auto* registration = std::get_if<const DriverRegistration*>(&hooks_)) {
-    async::PostTask(initial_dispatcher_.async_dispatcher(),
-                    [this, registration, server = std::move(endpoints->server)]() mutable {
-                      void* token = (*registration)->v1.initialize(server.TakeHandle().release());
-                      fbl::AutoLock al(&lock_);
-                      token_.emplace(token);
-                    });
-  } else if (auto* legacy_lifecycle_shim =
-                 std::get_if<std::unique_ptr<LegacyLifecycleShim>>(&hooks_)) {
-    (*legacy_lifecycle_shim)->Initialize(initial_dispatcher_.get(), std::move(endpoints->server));
-  } else {
-    ZX_ASSERT_MSG(false, "Unknown hook variant, index %lu.", hooks_.index());
-  }
+  async::PostTask(initial_dispatcher_.async_dispatcher(),
+                  [this, hooks = hooks_, server = std::move(endpoints->server)]() mutable {
+                    void* token = hooks->v1.initialize(server.TakeHandle().release());
+                    fbl::AutoLock al(&lock_);
+                    token_.emplace(token);
+                  });
 
   zx::result client_dispatcher_result = fdf_env::DispatcherBuilder::CreateSynchronizedWithOwner(
       this, {}, "fdf-driver-client-dispatcher",

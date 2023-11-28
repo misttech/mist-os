@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#if __Fuchsia_API_level__ >= 13
+#if __Fuchsia_API_level__ >= 15
 
 #include <lib/driver/component/cpp/node_add_args.h>
 

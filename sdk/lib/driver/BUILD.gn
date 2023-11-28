@@ -11,6 +11,5 @@ group("tests") {
     "component/cpp:tests",
     "devfs:tests",
     "devicetree:tests",
-    "symbols:tests",
   ]
 }

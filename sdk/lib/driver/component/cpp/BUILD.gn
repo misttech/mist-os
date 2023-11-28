@@ -10,7 +10,7 @@ group("tests") {
   deps = [ ":driver-component-cpp-tests" ]
 }
 
-# This library is available on Fuchsia API level 13 and above.
+# This library is available on Fuchsia API level 15 and above.
 sdk_source_set("cpp") {
   category = "partner"
   sdk_name = "driver_component_cpp"
@@ -23,15 +23,11 @@ sdk_source_set("cpp") {
     "driver_base.cc",
     "driver_base.h",
     "driver_export.h",
-    "internal/basic_factory.h",
     "internal/driver_server.h",
-    "internal/lifecycle.cc",
-    "internal/lifecycle.h",
     "internal/start_args.h",
     "internal/symbols.h",
     "node_add_args.cc",
     "node_add_args.h",
-    "prepare_stop_completer.cc",
     "prepare_stop_completer.h",
     "start_completer.cc",
     "start_completer.h",
