@@ -2,47 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// Use these crates so that we don't need to make the dependency conditional.
+// Use these crates so that we don't need to make the dependencies conditional.
 use fuchsia_sync as _;
 use lock_api as _;
 use lock_sequence as _;
+use tracing_mutex as _;
 
 use core::marker::PhantomData;
 use lock_sequence::*;
 use std::{any, fmt};
 
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type Mutex<T> = fuchsia_sync::Mutex<T>;
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type MutexGuard<'a, T> = fuchsia_sync::MutexGuard<'a, T>;
 #[allow(unused)]
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type MappedMutexGuard<'a, T> = fuchsia_sync::MappedMutexGuard<'a, T>;
 
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type RwLock<T> = fuchsia_sync::RwLock<T>;
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type RwLockReadGuard<'a, T> = fuchsia_sync::RwLockReadGuard<'a, T>;
-#[cfg(not(any(test, debug_assertions)))]
+#[cfg(not(debug_assertions))]
 pub type RwLockWriteGuard<'a, T> = fuchsia_sync::RwLockWriteGuard<'a, T>;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 type RawTracingMutex = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncMutex>;
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type Mutex<T> = lock_api::Mutex<RawTracingMutex, T>;
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, RawTracingMutex, T>;
 #[allow(unused)]
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawTracingMutex, T>;
 
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 type RawTracingRwLock = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncRwLock>;
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type RwLock<T> = lock_api::RwLock<RawTracingRwLock, T>;
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type RwLockReadGuard<'a, T> = lock_api::RwLockReadGuard<'a, RawTracingRwLock, T>;
-#[cfg(any(test, debug_assertions))]
+#[cfg(debug_assertions)]
 pub type RwLockWriteGuard<'a, T> = lock_api::RwLockWriteGuard<'a, RawTracingRwLock, T>;
 
 /// Lock `m1` and `m2` in a consistent order (using the memory address of m1 and m2 and returns the

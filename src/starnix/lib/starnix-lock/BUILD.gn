@@ -15,11 +15,8 @@ rustc_library("starnix-lock") {
     "//src/lib/fuchsia-sync",
     "//src/starnix/lib/lock-sequence",
     "//third_party/rust_crates:lock_api",
+    "//third_party/rust_crates:tracing-mutex",
   ]
-
-  if (is_debug) {
-    deps += [ "//third_party/rust_crates:tracing-mutex" ]
-  }
 
   test_deps = [
     "//src/lib/fuchsia",
