@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/cpp/library_headers.gni")
 import("//build/zircon/zx_library.gni")
 
 # Three copies of libtrace-engine are built:
@@ -14,12 +15,14 @@ import("//build/zircon/zx_library.gni")
 # libtrace-engine.so is not available.
 
 trace_engine_headers = [
-  # buffer_internal.h is not here on purpose.
+  # keep-sorted: begin
   "lib/trace-engine/context.h",
   "lib/trace-engine/fields.h",
   "lib/trace-engine/handler.h",
   "lib/trace-engine/instrumentation.h",
   "lib/trace-engine/types.h",
+
+  # keep-sorted: end
 ]
 
 trace_engine_header_deps = [
@@ -36,7 +39,9 @@ template("trace_engine_library") {
     }
 
     sdk_headers = trace_engine_headers
-    public_deps = trace_engine_header_deps
+
+    public_deps = [ ":trace-engine-headersonly" ]
+    public_deps += trace_engine_header_deps
 
     sources = [
       "context.cc",
@@ -44,6 +49,7 @@ template("trace_engine_library") {
       "context_impl.h",
       "engine.cc",
       "hash_table.h",
+      "include/lib/trace-engine/buffer_internal.h",
       "nonce.cc",
     ]
     deps = [
@@ -54,11 +60,25 @@ template("trace_engine_library") {
   }
 }
 
-source_set("trace-engine-headers") {
-  sources = []
+config("trace_engine_include") {
+  include_dirs = [ "include" ]
+}
+
+# Header-only source package for use by trace-provider:handler,
+# which is engine-agnostic.
+sdk_source_set("trace-engine-headersonly") {
+  sdk_name = "trace-engine-headersonly"
+  category = "partner"
+
+  sources = [ "include/lib/trace-engine/buffer_internal.h" ]
+
+  public = []
   foreach(header, trace_engine_headers) {
-    sources += [ "include/" + header ]
+    public += [ "include/" + header ]
   }
+
+  public_deps = trace_engine_header_deps
+  public_configs = [ ":trace_engine_include" ]
 }
 
 # The default version for the normal case.
@@ -82,15 +102,6 @@ trace_engine_library("trace-engine-static") {
   extra_configs = [ "//build/config:Wno-conversion" ]
 }
 
-# Header-only source package for use by trace-provider:handler,
-# which is engine-agnostic.
-zx_library("trace-engine-headers-for-handler") {
-  sdk = "source"
-  sdk_headers = trace_engine_headers
-  public_deps = trace_engine_header_deps
-  sources = []
-}
-
 # Header-only source package for use by exported trace-reader package.
 # This code also runs on the host.
 zx_library("trace-engine-headers-for-reader") {
@@ -98,6 +109,8 @@ zx_library("trace-engine-headers-for-reader") {
   sdk_headers = [
     "lib/trace-engine/fields.h",
     "lib/trace-engine/types.h",
+    "lib/trace-engine/buffer_internal.h",
+    "lib/trace-engine/context.h",
   ]
   sources = []
 }

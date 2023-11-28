@@ -66,7 +66,7 @@ source_set("trace-headers") {
     "//sdk/lib/fit",
     "//zircon/system/ulib/async",
     "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/trace-engine:trace-engine-headers-for-handler",
+    "//zircon/system/ulib/trace-engine:trace-engine-headersonly",
     "//zircon/system/ulib/zx",
   ]
 }

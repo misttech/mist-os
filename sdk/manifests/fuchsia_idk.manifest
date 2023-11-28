@@ -70,6 +70,7 @@ cc_source_library://pkg/sys_inspect_cpp
 cc_source_library://pkg/sys_service_cpp
 cc_source_library://pkg/syslog_structured_backend
 cc_source_library://pkg/trace
+cc_source_library://pkg/trace-engine-headersonly
 cc_source_library://pkg/utf-utils
 cc_source_library://pkg/vfs_cpp
 cc_source_library://pkg/zx

@@ -165,7 +165,7 @@ zx_library("trace-handler") {
   public_deps = [
     # It is up to the client to choose which engine (shared, static),
     # just reference the headers here.
-    "//zircon/system/ulib/trace-engine:trace-engine-headers-for-handler",
+    "//zircon/system/ulib/trace-engine:trace-engine-headersonly",
   ]
   sources = [ "handler.cc" ]
 }
