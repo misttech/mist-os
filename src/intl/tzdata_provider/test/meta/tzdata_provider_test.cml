@@ -18,10 +18,46 @@
     ],
     use: [
         {
+            // This approach exposes only the leaf directory, and it installs
+            // it into a leaf directory of the `/config/tzdata`.
+            //
+            // The resulting structure is assumed to be:
+            // /config/tzdata/icu/44/le (the routed capability)
+            //  `- metaZones.res ...
             directory: "tzdata-icu-44-le",
             from: "#tzdata-provider",
             rights: [ "r*" ],
-            path: "/tzdata-icu-44-le",
+            path: "/config/tzdata/icu/44/le",
+        },
+        {
+            // This approach exposes the `icu` directory, implicitly revealing
+            // its versioned directory structure.
+            //
+            // The resulting structure is assumed to be:
+            // /config/tzdata/icu (the routed capability)
+            //  `- 44
+            //     `- le
+            //        `- metaZones.res ...
+            directory: "tzdata-icu",
+            from: "#tzdata-provider",
+            rights: [ "r*" ],
+
+            // Note: using config*2* for this route.
+            path: "/config2/tzdata/icu",
+        },
+        {
+            // This approach ignores the versioned structure of the tzdata
+            // capability.
+            //
+            // The resulting structure is assumed to be:
+            // /config/tzdata (the routed capability)
+            //  `- metaZones.res ...
+            directory: "tzdata-icu-44-le",
+            from: "#tzdata-provider",
+            rights: [ "r*" ],
+
+            // Note: using config*3* for this route.
+            path: "/config3/tzdata",
         },
     ],
 }

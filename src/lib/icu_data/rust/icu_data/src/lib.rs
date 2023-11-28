@@ -25,7 +25,7 @@
 use std::path::PathBuf;
 
 use {
-    anyhow::format_err,
+    anyhow::{format_err, Context},
     fuchsia_zircon as zx,
     lazy_static::lazy_static,
     rust_icu_common as icu, rust_icu_ucal as ucal, rust_icu_udata as udata,
@@ -144,8 +144,12 @@ impl Loader {
             None => {
                 // Load up the TZ files directory.
                 if let Some(p) = tzdata_dir_path {
-                    let for_path = fs::File::open(p)?;
-                    let meta = for_path.metadata()?;
+                    let for_path = fs::File::open(p)
+                        .map_err(|e| Error::Fail(format_err!("io error: {}", e)))
+                        .with_context(|| format!("error while opening: {:?}", &tzdata_dir_path))?;
+                    let meta = for_path
+                        .metadata()
+                        .with_context(|| format!("while getting metadata for: {:?}", &p))?;
                     if !meta.is_dir() {
                         return Err(Error::Fail(format_err!("not a directory: {}", p)));
                     }
@@ -174,7 +178,10 @@ impl Loader {
         match tz_revision_file_path {
             None => Ok(()),
             Some(tz_revision_file_path) => {
-                let expected_revision_id = std::fs::read_to_string(tz_revision_file_path)?;
+                let expected_revision_id = std::fs::read_to_string(tz_revision_file_path)
+                    .with_context(|| {
+                        format!("could not read file: {:?}", &tz_revision_file_path)
+                    })?;
                 if !(MIN_TZ_REVISION_ID_LENGTH..=MAX_TZ_REVISION_ID_LENGTH)
                     .contains(&expected_revision_id.len())
                 {
@@ -190,7 +197,9 @@ impl Loader {
                     ));
                 }
 
-                let actual_revision_id = ucal::get_tz_data_version()?;
+                let actual_revision_id = ucal::get_tz_data_version().with_context(|| {
+                    format!("while getting data version from: {:?}", &tz_revision_file_path)
+                })?;
                 if expected_revision_id != actual_revision_id {
                     return Err(Error::Status(
                         zx::Status::IO_DATA_INTEGRITY,
