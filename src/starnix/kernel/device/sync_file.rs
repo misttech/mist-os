@@ -5,10 +5,12 @@
 use crate::{
     fs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
+        fileops_impl_nonseekable,
+        fuchsia::RemoteFileObject,
+        Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
     },
     logging::{impossible_error, log_warn},
-    mm::MemoryAccessorExt,
+    mm::{MemoryAccessorExt, ProtectionFlags},
     task::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
         WaitCanceler, Waiter,
@@ -125,7 +127,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _file: &FileObject,
+        file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
         arg: SyscallArg,
@@ -148,18 +150,25 @@ impl FileOps for SyncFile {
                 let mut fence = SyncFence { sync_points: vec![] };
                 let mut set = HashSet::<zx::Koid>::new();
 
-                if let Some(file2) = file2.downcast_file::<SyncFile>() {
-                    for sync_point in &self.fence.sync_points {
-                        let koid = sync_point.handle.get_koid().unwrap();
-                        if set.insert(koid) {
-                            fence.sync_points.push(sync_point.clone());
-                        }
+                for sync_point in &self.fence.sync_points {
+                    let koid = sync_point.handle.get_koid().unwrap();
+                    if set.insert(koid) {
+                        fence.sync_points.push(sync_point.clone());
                     }
+                }
+
+                if let Some(file2) = file2.downcast_file::<SyncFile>() {
                     for sync_point in &file2.fence.sync_points {
                         let koid = sync_point.handle.get_koid().unwrap();
                         if set.insert(koid) {
                             fence.sync_points.push(sync_point.clone());
                         }
+                    }
+                } else if let Some(file2) = file2.downcast_file::<RemoteFileObject>() {
+                    let vmo = file2.get_vmo(file, current_task, None, ProtectionFlags::READ)?;
+                    let koid = vmo.get_koid().unwrap();
+                    if set.insert(koid) {
+                        fence.sync_points.push(SyncPoint { timeline: Timeline::Hwc, handle: vmo });
                     }
                 } else {
                     return error!(EINVAL);
