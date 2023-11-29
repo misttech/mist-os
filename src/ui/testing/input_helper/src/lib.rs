@@ -426,6 +426,20 @@ fn handle_keyboard_request_stream(
                         warn!("SimulateTextEntry request missing text");
                     }
                 }
+                Ok(KeyboardRequest::SimulateKeyEvent { payload, responder }) => {
+                    let keyboard_report = payload.report.expect("no report");
+                    let input_report = InputReport {
+                        event_time: Some(fasync::Time::now().into_nanos()),
+                        keyboard: Some(keyboard_report),
+                        ..Default::default()
+                    };
+
+                    keyboard_device
+                        .send_input_report(input_report)
+                        .expect("Failed to send key event report");
+
+                    responder.send().expect("Failed to send SimulateKeyEvent response");
+                }
                 Err(e) => {
                     error!("Error on keyboard device channel: {}", e);
                     return;

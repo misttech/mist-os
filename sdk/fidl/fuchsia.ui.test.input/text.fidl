@@ -4,6 +4,8 @@
 
 library fuchsia.ui.test.input;
 
+using fuchsia.input.report;
+
 /// A tool to inject keyboard events into Input Pipeline.
 ///
 /// Please extend as necessary.
@@ -21,6 +23,16 @@ closed protocol Keyboard {
     /// keys respectively.
     strict SimulateUsAsciiTextEntry(table {
         1: text string:1024;
+    }) -> ();
+
+    /// Simulate a key event by a keyboard input report.
+    ///
+    /// KeyboardInputReport includes a list of keys that are currently pressing
+    /// down. The report can represent key down / up by comparing with previous
+    /// reports received.
+    @available(added=16)
+    strict SimulateKeyEvent(table {
+        1: report fuchsia.input.report.KeyboardInputReport;
     }) -> ();
 };
 
