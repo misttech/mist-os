@@ -73,6 +73,18 @@ pub trait Proxy: Sized + Send + Sync {
     /// this proxy.
     fn into_channel(self) -> Result<AsyncChannel, Self>;
 
+    /// Attempt to convert the proxy back into a client end.
+    ///
+    /// This will only succeed if there are no active clones of this proxy
+    /// and no currently-alive `EventStream` or response futures that came from
+    /// this proxy.
+    fn into_client_end(self) -> Result<ClientEnd<Self::Protocol>, Self> {
+        match self.into_channel() {
+            Ok(channel) => Ok(ClientEnd::new(channel.into_zx_channel())),
+            Err(proxy) => Err(proxy),
+        }
+    }
+
     /// Get a reference to the proxy's underlying channel.
     ///
     /// This should only be used for non-effectful operations. Reading or
