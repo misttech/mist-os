@@ -364,8 +364,6 @@ struct Config {
     #[serde(default)]
     pub forwarded_device_classes: ForwardedDeviceClasses,
     #[serde(default)]
-    pub interface_name_prefix: String,
-    #[serde(default)]
     pub interface_naming_policy: Vec<interface::NamingRule>,
     #[serde(default)]
     pub interface_provisioning_policy: Vec<interface::ProvisioningRule>,
@@ -597,8 +595,6 @@ pub struct NetCfg<'a> {
     dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
     dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
 
-    // Makes sure that all interfaces added by netcfg have the specified prefix.
-    interface_name_prefix: String,
     // Policy configuration to determine the name of an interface.
     interface_naming_policy: Vec<interface::NamingRule>,
     // Policy configuration to determine whether to provision an interface.
@@ -794,7 +790,6 @@ impl<'a> NetCfg<'a> {
         enable_dhcpv6: bool,
         forwarded_device_classes: ForwardedDeviceClasses,
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
-        interface_name_prefix: String,
         interface_naming_policy: Vec<interface::NamingRule>,
         interface_provisioning_policy: Vec<interface::ProvisioningRule>,
     ) -> Result<NetCfg<'a>, anyhow::Error> {
@@ -858,7 +853,6 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefix_provider_handler: None,
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
-            interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
         })
@@ -1993,12 +1987,6 @@ impl<'a> NetCfg<'a> {
             self.persisted_interface_config.generate_temporary_name(interface_type)
         };
 
-        let interface_name = if interface_name.starts_with(&self.interface_name_prefix) {
-            interface_name
-        } else {
-            format!("{}{}", self.interface_name_prefix, interface_name)
-        };
-
         info!("adding {:?} to stack with name = {}", device_instance, interface_name);
 
         let (interface_id, control) = device_instance
@@ -2844,7 +2832,6 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
             AllowedDeviceClasses(allowed_bridge_upstream_device_classes),
         enable_dhcpv6,
         forwarded_device_classes,
-        interface_name_prefix,
         interface_naming_policy,
         interface_provisioning_policy,
     } = Config::load(config_data)?;
@@ -2855,7 +2842,6 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         enable_dhcpv6,
         forwarded_device_classes,
         &allowed_upstream_device_classes,
-        interface_name_prefix,
         interface_naming_policy,
         interface_provisioning_policy,
     )
@@ -3114,7 +3100,6 @@ mod tests {
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
                 dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
-                interface_name_prefix: String::new(),
                 interface_naming_policy: Default::default(),
                 interface_provisioning_policy: Default::default(),
             },
@@ -4633,7 +4618,6 @@ mod tests {
   "allowed_bridge_upstream_device_classes": ["ethernet"],
   "enable_dhcpv6": true,
   "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
-  "interface_name_prefix": "hello",
   "interface_naming_policy": [ { "matchers": [
         {"bus_types": ["usb", "pci", "sdio"]},
         {"device_classes": ["ethernet", "wlan", "wlanap"]},
@@ -4666,7 +4650,6 @@ mod tests {
             allowed_bridge_upstream_device_classes,
             enable_dhcpv6,
             forwarded_device_classes,
-            interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
         } = Config::load_str(config_str).unwrap();
@@ -4699,8 +4682,6 @@ mod tests {
             ipv6: HashSet::from([DeviceClass::Wlan]),
         };
         assert_eq!(forwarded_device_classes, expected_classes);
-
-        assert_eq!(interface_name_prefix, "hello".to_string());
 
         let expected_naming_policy = Vec::from([interface::NamingRule {
             matchers: HashSet::from([
@@ -4776,7 +4757,6 @@ mod tests {
             interface_metrics,
             enable_dhcpv6,
             forwarded_device_classes: _,
-            interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
         } = Config::load_str(config_str).unwrap();
@@ -4785,7 +4765,6 @@ mod tests {
         assert_eq!(allowed_bridge_upstream_device_classes, Default::default());
         assert_eq!(interface_metrics, Default::default());
         assert_eq!(enable_dhcpv6, true);
-        assert_eq!(interface_name_prefix, "".to_string());
         assert_eq!(interface_naming_policy.len(), 0);
         assert_eq!(interface_provisioning_policy.len(), 0);
     }
@@ -4826,7 +4805,6 @@ mod tests {
             enable_dhcpv6: _,
             interface_metrics,
             forwarded_device_classes: _,
-            interface_name_prefix: _,
             interface_naming_policy: _,
             interface_provisioning_policy: _,
         } = Config::load_str(&config_str).unwrap();
