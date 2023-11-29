@@ -143,9 +143,23 @@ pub enum JournalRecord {
     // to defensively flush the device before replaying the journal (if possible, i.e. not
     // read-only) in case the block device connection was reused.
     DidFlushDevice(u64),
+    // Checksums for a data range written by this transaction, for a particular store identified by
+    // the u64 object id. A transaction is only valid if these checksums are right. The range is
+    // the device offset the checksums are for.
+    DataChecksums(Range<u64>, Vec<Checksum>),
 }
 
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+pub enum JournalRecordV32 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: Mutation },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
+}
+
+#[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
+#[migrate_to_version(JournalRecordV32)]
 pub enum JournalRecordV31 {
     EndBlock,
     Mutation { object_id: u64, mutation: MutationV31 },
@@ -153,6 +167,7 @@ pub enum JournalRecordV31 {
     Discard(u64),
     DidFlushDevice(u64),
 }
+
 #[derive(Debug, Deserialize, Migrate, Serialize, Versioned, TypeFingerprint)]
 #[migrate_to_version(JournalRecordV31)]
 pub enum JournalRecordV30 {
@@ -313,6 +328,13 @@ pub struct JournaledTransaction {
     // List of (store_object_id, mutation).
     pub mutations: Vec<(u64, Mutation)>,
     pub end_offset: u64,
+    pub checksums: Vec<JournaledChecksums>,
+}
+
+#[derive(Debug)]
+pub struct JournaledChecksums {
+    pub device_range: Range<u64>,
+    pub checksums: Vec<Checksum>,
 }
 
 /// Handles for journal-like objects have some additional functionality to manage their extents,
@@ -462,11 +484,13 @@ impl Journal {
     fn update_checksum_list(
         &self,
         journal_offset: u64,
-        owner_object_id: u64,
         mutation: &Mutation,
         checksum_list: &mut ChecksumList,
     ) -> Result<(), Error> {
         match mutation {
+            // TODO(fxbug.dev/313678158): This can be removed the next time we bump
+            // EARLIEST_SUPPORTED_VERSION, because the latest journal code writes all the checksums
+            // out in a separate record.
             Mutation::ObjectStore(ObjectStoreMutation {
                 item:
                     Item {
@@ -491,7 +515,6 @@ impl Journal {
             }) => {
                 checksum_list.push(
                     journal_offset,
-                    owner_object_id,
                     *device_offset..*device_offset + range.length().unwrap(),
                     checksums,
                 )?;
@@ -619,19 +642,19 @@ impl Journal {
         let mut checksum_list = ChecksumList::new(device_flushed_offset);
         let mut valid_to = reader.journal_file_checkpoint().file_offset;
         let device_size = device.size();
-        'bad_replay: for JournaledTransaction { checkpoint, mutations, .. } in &transactions {
-            for (object_id, mutation) in mutations {
+        'bad_replay: for JournaledTransaction { checkpoint, mutations, checksums, .. } in
+            &transactions
+        {
+            for JournaledChecksums { device_range, checksums } in checksums {
+                checksum_list.push(checkpoint.file_offset, device_range.clone(), &checksums)?;
+            }
+            for (_, mutation) in mutations {
                 if !self.validate_mutation(&mutation, block_size, device_size) {
                     info!(?mutation, "Stopping replay at bad mutation");
                     valid_to = checkpoint.file_offset;
                     break 'bad_replay;
                 }
-                self.update_checksum_list(
-                    checkpoint.file_offset,
-                    *object_id,
-                    &mutation,
-                    &mut checksum_list,
-                )?;
+                self.update_checksum_list(checkpoint.file_offset, &mutation, &mut checksum_list)?;
             }
         }
 
@@ -648,7 +671,7 @@ impl Journal {
             // Loop used here in place of for {} else {}
             #[allow(clippy::never_loop)]
             'outer: loop {
-                for JournaledTransaction { checkpoint, mutations, end_offset } in transactions {
+                for JournaledTransaction { checkpoint, mutations, end_offset, .. } in transactions {
                     if checkpoint.file_offset >= valid_to {
                         break 'outer checkpoint;
                     }
@@ -775,6 +798,7 @@ impl Journal {
                                         checkpoint,
                                         mutations: Vec::new(),
                                         end_offset: 0,
+                                        checksums: Vec::new(),
                                     });
                                     current_transaction = transactions.last_mut();
                                     current_transaction.as_mut().unwrap()
@@ -787,11 +811,30 @@ impl Journal {
                                 current_transaction.mutations.push((object_id, mutation));
                             }
                         }
+                        JournalRecord::DataChecksums(device_range, checksums) => {
+                            let current_transaction = match current_transaction.as_mut() {
+                                None => {
+                                    transactions.push(JournaledTransaction {
+                                        checkpoint,
+                                        mutations: Vec::new(),
+                                        end_offset: 0,
+                                        checksums: Vec::new(),
+                                    });
+                                    current_transaction = transactions.last_mut();
+                                    current_transaction.as_mut().unwrap()
+                                }
+                                Some(transaction) => transaction,
+                            };
+                            current_transaction
+                                .checksums
+                                .push(JournaledChecksums { device_range, checksums });
+                        }
                         JournalRecord::Commit => {
                             if let Some(JournaledTransaction {
                                 checkpoint: _,
                                 mutations,
                                 ref mut end_offset,
+                                checksums: _,
                             }) = current_transaction.take()
                             {
                                 for (store_object_id, mutation) in mutations {
@@ -1384,6 +1427,12 @@ impl Journal {
                     inner
                         .writer
                         .write_record(&JournalRecord::Mutation { object_id: 0, mutation })
+                        .unwrap();
+                }
+                for (device_range, checksums) in transaction.take_checksums().into_iter() {
+                    inner
+                        .writer
+                        .write_record(&JournalRecord::DataChecksums(device_range, checksums))
                         .unwrap();
                 }
                 inner.writer.write_record(&JournalRecord::Commit).unwrap();

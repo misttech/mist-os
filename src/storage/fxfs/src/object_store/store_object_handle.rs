@@ -925,10 +925,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             });
         }
 
-        let (mutations, deallocated) = try_join!(
+        let ((mutations, checksums), deallocated) = try_join!(
             async {
                 let mut current_range = 0..0;
                 let mut mutations = Vec::new();
+                let mut out_checksums = Vec::new();
                 let mut ranges = ranges.iter();
                 while let Some((mut device_offset, mut len, mut checksums)) =
                     writes.try_next().await?
@@ -939,6 +940,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         }
                         let chunk_len = std::cmp::min(len, current_range.end - current_range.start);
                         let tail = checksums.split_off((chunk_len / block_size) as usize);
+                        match &checksums {
+                            Checksums::None => (),
+                            Checksums::Fletcher(c) => out_checksums
+                                .push((device_offset..device_offset + chunk_len, c.clone())),
+                        }
                         mutations.push(Mutation::merge_object(
                             ObjectKey::extent(
                                 self.object_id(),
@@ -956,7 +962,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         current_range.start += chunk_len;
                     }
                 }
-                Result::<_, Error>::Ok(mutations)
+                Result::<_, Error>::Ok((mutations, out_checksums))
             },
             async {
                 let mut deallocated = 0;
@@ -969,6 +975,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         )?;
         for m in mutations {
             transaction.add(store_id, m);
+        }
+        for (r, c) in checksums {
+            transaction.add_checksum(r, c);
         }
         self.update_allocated_size(transaction, allocated, deallocated).await
     }

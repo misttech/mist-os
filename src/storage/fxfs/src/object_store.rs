@@ -89,8 +89,8 @@ pub use extent_record::{
 };
 pub use journal::{
     JournalRecord, JournalRecordV20, JournalRecordV25, JournalRecordV29, JournalRecordV30,
-    JournalRecordV31, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25, SuperBlockRecordV29,
-    SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
+    JournalRecordV31, JournalRecordV32, SuperBlockHeader, SuperBlockRecord, SuperBlockRecordV25,
+    SuperBlockRecordV29, SuperBlockRecordV30, SuperBlockRecordV31, SuperBlockRecordV5,
 };
 pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,

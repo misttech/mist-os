@@ -452,7 +452,7 @@ impl ObjectManager {
         let mutations = transaction.take_mutations();
         let context =
             ApplyContext { mode: ApplyMode::Live(transaction), checkpoint: checkpoint.clone() };
-        for TxnMutation { object_id, mutation, associated_object } in mutations {
+        for TxnMutation { object_id, mutation, associated_object, .. } in mutations {
             self.apply_mutation(object_id, mutation, &context, associated_object).await?;
         }
         debug!("END TXN");

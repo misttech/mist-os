@@ -34,7 +34,6 @@ impl ChecksumState {
 struct ChecksumEntry {
     // |start| is the journal_offset at which this range was written.
     start_journal_offset: u64,
-    owner_object_id: u64,
     device_range: Range<u64>,
     // Holds checksums that cover |device_range| that should hold valid from
     // start_journal_offset..end_journal_offset.
@@ -70,7 +69,6 @@ impl ChecksumList {
     pub fn push(
         &mut self,
         journal_offset: u64,
-        owner_object_id: u64,
         mut device_range: Range<u64>,
         mut checksums: &[u64],
     ) -> Result<(), Error> {
@@ -114,7 +112,6 @@ impl ChecksumList {
                     == chunk_size,
                 FxfsError::Inconsistent
             );
-            ensure!(entry.owner_object_id == owner_object_id, FxfsError::Inconsistent);
 
             let overlap = std::cmp::max(device_range.start, entry.device_range.start)
                 ..std::cmp::min(device_range.end, entry.device_range.end);
@@ -136,7 +133,6 @@ impl ChecksumList {
                 gap_entries.push((gap.end, self.checksum_entries.len()));
                 self.checksum_entries.push(ChecksumEntry {
                     start_journal_offset: journal_offset,
-                    owner_object_id,
                     device_range: gap,
                     checksums: gap_checksums
                         .into_iter()
@@ -159,7 +155,6 @@ impl ChecksumList {
                 .insert(device_range.end, self.checksum_entries.len());
             self.checksum_entries.push(ChecksumEntry {
                 start_journal_offset: journal_offset,
-                owner_object_id,
                 device_range,
                 checksums: checksums
                     .iter()
@@ -273,7 +268,6 @@ mod tests {
         device.write(512, buffer.as_ref()).await.expect("write failed");
         list.push(
             1,
-            1,
             512..2048,
             &[fletcher64(&[1; 512], 0), fletcher64(&[2; 512], 0), fletcher64(&[3; 512], 0)],
         )
@@ -294,7 +288,7 @@ mod tests {
         assert_eq!(list.clone().verify(&device, 10).await.expect("verify failed"), 10);
 
         // Add another entry followed by a deallocation.
-        list.push(3, 1, 2048..2560, &[fletcher64(&[4; 512], 0)]).unwrap();
+        list.push(3, 2048..2560, &[fletcher64(&[4; 512], 0)]).unwrap();
         list.mark_deallocated(4, 1536..2048);
 
         // All entries should validate.
@@ -328,9 +322,9 @@ mod tests {
 
         // This entry has the wrong checksum will fail, but it should be ignored anyway because it
         // is prior to the flushed offset.
-        list.push(1, 1, 512..1024, &[fletcher64(&[2; 512], 0)]).unwrap();
+        list.push(1, 512..1024, &[fletcher64(&[2; 512], 0)]).unwrap();
 
-        list.push(2, 1, 1024..1536, &[fletcher64(&[2; 512], 0)]).unwrap();
+        list.push(2, 1024..1536, &[fletcher64(&[2; 512], 0)]).unwrap();
 
         assert_eq!(list.verify(&device, 10).await.expect("verify failed"), 10);
     }
@@ -344,9 +338,9 @@ mod tests {
         buffer.as_mut_slice().copy_from_slice(&[2; 512]);
         device.write(2560, buffer.as_ref()).await.expect("write failed");
 
-        list.push(2, 1, 512..1024, &[fletcher64(&[1; 512], 0)]).unwrap();
+        list.push(2, 512..1024, &[fletcher64(&[1; 512], 0)]).unwrap();
         list.mark_deallocated(3, 0..1024);
-        list.push(4, 1, 2048..3072, &[fletcher64(&[2; 512], 0); 2]).unwrap();
+        list.push(4, 2048..3072, &[fletcher64(&[2; 512], 0); 2]).unwrap();
         list.mark_deallocated(5, 1536..2560);
 
         assert_eq!(list.verify(&device, 10).await.expect("verify failed"), 10);
@@ -365,25 +359,21 @@ mod tests {
         let c1 = fletcher64(&[1; 512], 0);
         let c2 = fletcher64(&[2; 512], 0);
 
-        list.push(1, 1, 1024..2048, &[c2, c2]).unwrap();
+        list.push(1, 1024..2048, &[c2, c2]).unwrap();
 
         // Different checksum.
-        list.push(2, 1, 1536..2048, &[c1]).expect_err("Expected failure due to checksum mismatch");
+        list.push(2, 1536..2048, &[c1]).expect_err("Expected failure due to checksum mismatch");
 
         // Overlapping head.
-        list.push(3, 1, 512..1536, &[c0, c2]).expect("push failed");
-        list.push(4, 1, 512..1024, &[c1]).expect_err("Expected failure due to checksum mismatch");
+        list.push(3, 512..1536, &[c0, c2]).expect("push failed");
+        list.push(4, 512..1024, &[c1]).expect_err("Expected failure due to checksum mismatch");
 
         // Overlapping tail.
-        list.push(5, 1, 1536..2560, &[c2, c0]).expect("push failed");
-        list.push(6, 1, 2048..2560, &[c1]).expect_err("Expected failure due to checksum mismatch");
+        list.push(5, 1536..2560, &[c2, c0]).expect("push failed");
+        list.push(6, 2048..2560, &[c1]).expect_err("Expected failure due to checksum mismatch");
 
         // Different chunk size.
-        list.push(7, 1, 0..1024, &[c0]).expect_err("Expected failure due to different chunk size");
-
-        // Different owner object.
-        list.push(8, 2, 512..1024, &[c0])
-            .expect_err("Expected failure due to different owner object");
+        list.push(7, 0..1024, &[c0]).expect_err("Expected failure due to different chunk size");
 
         assert_eq!(list.verify(&device, 6).await.expect("verify failed"), 6);
     }

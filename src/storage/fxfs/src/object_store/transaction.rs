@@ -4,6 +4,7 @@
 
 use {
     crate::{
+        checksum::Checksum,
         debug_assert_not_too_long,
         filesystem::TxnGuard,
         log::*,
@@ -625,7 +626,7 @@ pub struct TxnMutation<'a> {
 }
 
 // We store TxnMutation in a set, and for that, we only use object_id and mutation and not the
-// associated object.
+// associated object or checksum.
 impl Ord for TxnMutation<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.object_id.cmp(&other.object_id).then_with(|| self.mutation.cmp(&other.mutation))
@@ -689,6 +690,9 @@ pub struct Transaction<'a> {
     // Keep track of objects explicitly created by this transaction. No locks are required for them.
     // Addressed by (owner_object_id, object_id).
     new_objects: BTreeSet<(u64, u64)>,
+
+    /// Any data checksums which should be evaluated when replaying this transaction.
+    checksums: Vec<(Range<u64>, Vec<Checksum>)>,
 }
 
 impl<'a> Transaction<'a> {
@@ -717,6 +721,7 @@ impl<'a> Transaction<'a> {
             allocator_reservation: None,
             metadata_reservation,
             new_objects: BTreeSet::new(),
+            checksums: Vec::new(),
         };
 
         ScopeGuard::into_inner(guard);
@@ -774,6 +779,14 @@ impl<'a> Transaction<'a> {
         let txn_mutation = TxnMutation { object_id, mutation, associated_object };
         self.verify_locks(&txn_mutation);
         self.mutations.replace(txn_mutation).map(|m| m.mutation)
+    }
+
+    pub fn add_checksum(&mut self, range: Range<u64>, checksums: Vec<Checksum>) {
+        self.checksums.push((range, checksums));
+    }
+
+    pub fn take_checksums(&mut self) -> Vec<(Range<u64>, Vec<Checksum>)> {
+        std::mem::replace(&mut self.checksums, Vec::new())
     }
 
     fn verify_locks(&mut self, mutation: &TxnMutation<'_>) {
