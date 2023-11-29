@@ -103,6 +103,7 @@ pub fn new_fuse_fs(
         .ok_or_else(|| errno!(EINVAL))?
         .connection
         .clone();
+    connection.state.lock().connect();
 
     let fs = FileSystem::new(
         current_task.kernel(),
@@ -880,7 +881,7 @@ impl FsNodeOps for Arc<FuseNode> {
     }
 
     fn forget(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<(), Errno> {
-        if self.connection.state.lock().disconnected {
+        if !self.connection.state.lock().is_connected() {
             return Ok(());
         }
         let nlookup = self.state.lock().nlookup;
@@ -893,6 +894,18 @@ impl FsNodeOps for Arc<FuseNode> {
         };
         Ok(())
     }
+}
+
+/// The state of the connection to the /dev/fuse file descriptor.
+#[derive(Debug, Default)]
+enum FuseConnectionState {
+    #[default]
+    /// The /dev/fuse device has been opened, but the filesystem has not been mounted yet.
+    Waiting,
+    /// The file system is mounted.
+    Connected,
+    /// The file system has been unmounted.
+    Disconnected,
 }
 
 #[derive(Debug, Default)]
@@ -915,7 +928,7 @@ impl FuseConnection {
             return Ok(configuration.clone());
         }
         loop {
-            if state.disconnected {
+            if !state.is_connected() {
                 return error!(EINTR);
             }
             let waiter = Waiter::new();
@@ -1042,8 +1055,8 @@ type OperationsState = HashMap<uapi::fuse_opcode, Result<FuseResponse, Errno>>;
 
 #[derive(Debug, Default)]
 struct FuseMutableState {
-    /// Whether the mount has been disconnected.
-    disconnected: bool,
+    /// The state of the mount.
+    state: FuseConnectionState,
 
     /// Last unique id used to identify messages between the kernel and user space.
     last_unique_id: u64,
@@ -1067,6 +1080,10 @@ struct FuseMutableState {
 }
 
 impl FuseMutableState {
+    fn is_connected(&self) -> bool {
+        matches!(self.state, FuseConnectionState::Connected)
+    }
+
     fn set_configuration(&mut self, configuration: FuseConfiguration) {
         debug_assert!(self.configuration.is_none());
         log_trace!("Fuse configuration: {configuration:?}");
@@ -1074,13 +1091,18 @@ impl FuseMutableState {
         self.waiters.notify_value(CONFIGURATION_AVAILABLE_EVENT);
     }
 
+    fn connect(&mut self) {
+        debug_assert!(matches!(self.state, FuseConnectionState::Waiting));
+        self.state = FuseConnectionState::Connected;
+    }
+
     /// Disconnect the mount. Happens on unmount. Every filesystem operation will fail with EINTR,
     /// and every read/write on the /dev/fuse fd will fail with ENODEV.
     fn disconnect(&mut self) {
-        if self.disconnected {
+        if matches!(self.state, FuseConnectionState::Disconnected) {
             return;
         }
-        self.disconnected = true;
+        self.state = FuseConnectionState::Disconnected;
         self.message_queue.clear();
         for operation in &mut self.operations {
             operation.1.response = Some(error!(EINTR));
@@ -1100,7 +1122,7 @@ impl FuseMutableState {
         waiter: Option<&Waiter>,
     ) -> Result<u64, Errno> {
         debug_assert!(waiter.is_some() == operation.has_response(), "{operation:?}");
-        if self.disconnected {
+        if !self.is_connected() {
             return error!(EINTR);
         }
         let operation = Arc::new(operation);
@@ -1179,18 +1201,20 @@ impl FuseMutableState {
 
     fn query_events(&self) -> FdEvents {
         let mut events = FdEvents::POLLOUT;
-        if self.disconnected || !self.message_queue.is_empty() {
+        if !self.is_connected() || !self.message_queue.is_empty() {
             events |= FdEvents::POLLIN
         };
-        if self.disconnected {
+        if !self.is_connected() {
             events |= FdEvents::POLLERR;
         }
         events
     }
 
     fn read(&mut self, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        if self.disconnected {
-            return error!(ENODEV);
+        match self.state {
+            FuseConnectionState::Waiting => return error!(EPERM),
+            FuseConnectionState::Disconnected => return error!(ENODEV),
+            _ => {}
         }
         if let Some(message) = self.message_queue.pop_front() {
             message.serialize(data, &message.configuration)
@@ -1200,8 +1224,10 @@ impl FuseMutableState {
     }
 
     fn write(&mut self, data: &mut dyn InputBuffer) -> Result<usize, Errno> {
-        if self.disconnected {
-            return error!(ENODEV);
+        match self.state {
+            FuseConnectionState::Waiting => return error!(EPERM),
+            FuseConnectionState::Disconnected => return error!(ENODEV),
+            _ => {}
         }
         let mut header = uapi::fuse_out_header::new_zeroed();
         if data.read(header.as_bytes_mut())? != std::mem::size_of::<uapi::fuse_out_header>() {

@@ -16,6 +16,7 @@
 #include <sys/xattr.h>
 #include <unistd.h>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/fuse.h>
 #include <linux/magic.h>
@@ -123,6 +124,16 @@ class FuseTest : public ::testing::Test {
   test_helper::ForkHelper fork_helper_;
   std::optional<std::string> base_dir_;
 };
+
+TEST_F(FuseTest, ReadWriteUnMountedDevFuse) {
+  fbl::unique_fd fuse_fd(open("/dev/fuse", O_RDWR));
+  ASSERT_TRUE(fuse_fd.is_valid());
+  char buffer[1024];
+  ASSERT_EQ(read(fuse_fd.get(), buffer, 1024), -1);
+  ASSERT_EQ(errno, EPERM);
+  ASSERT_EQ(write(fuse_fd.get(), buffer, 1024), -1);
+  ASSERT_EQ(errno, EPERM);
+}
 
 TEST_F(FuseTest, Mount) { ASSERT_TRUE(Mount()); }
 

@@ -21,5 +21,12 @@
                 "SndRcvBufSockOpt/SndRcvBufSockOpt.DoubledOnGet/*",
             ],
         },
+        {
+            type: "expect_pass",
+            matchers: [
+                // TODO(b/307352876): ReadWriteUnMountedDevFuse doesn't require fuse-overlayfs
+                "FuseTest.ReadWriteUnMountedDevFuse",
+            ],
+        },
     ],
 }
