@@ -84,7 +84,7 @@ _usercopy_non_rust_deps = []
 
 if (target_cpu == "x64") {
   static_library("hermetic_copy_error") {
-    sources = [ "hermetic_copy_error.S" ]
+    sources = [ "hermetic_copy_error_${target_cpu}.S" ]
   }
   _hermetic_code_blob("hermetic_copy") {
   }
