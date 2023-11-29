@@ -8,6 +8,7 @@
 #include <zircon/assert.h>
 
 #include <cinttypes>
+#include <cstdint>
 #include <optional>
 #include <utility>
 
@@ -86,7 +87,7 @@ PowerRequestData SinkPolicy::GetPowerRequest() const {
       }
       default:
         FDF_LOG(WARNING, "Skipping unsupported power type %" PRIu8,
-                static_cast<unsigned char>(power_data.supply_type()));
+                static_cast<uint8_t>(power_data.supply_type()));
         break;
     }
   }

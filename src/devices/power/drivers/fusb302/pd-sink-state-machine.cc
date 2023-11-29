@@ -127,7 +127,7 @@ void SinkPolicyEngineStateMachine::EnterState(SinkPolicyEngineState state) {
       return;
   }
 
-  FDF_LOG(ERROR, "Invalid state: %d", static_cast<int>(state));
+  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int32_t>(state));
 }
 
 SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineInput input,
@@ -221,7 +221,7 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineIn
       return SinkPolicyEngineState::kWaitForCapabilities;
   }
 
-  FDF_LOG(ERROR, "Invalid state: %d", static_cast<int>(current_state));
+  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int32_t>(current_state));
   return current_state;
 }
 
@@ -248,7 +248,7 @@ void SinkPolicyEngineStateMachine::ExitState(SinkPolicyEngineState state) {
       return;
   }
 
-  FDF_LOG(ERROR, "Invalid state: %d", static_cast<int>(state));
+  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int32_t>(state));
 }
 
 void SinkPolicyEngineStateMachine::InitializeProtocolLayer() {
@@ -407,8 +407,9 @@ const char* SinkPolicyEngineStateMachine::StateToString(SinkPolicyEngineState st
       return "SoftReset";
   }
 
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid SinkPolicyEngineState: %" PRId32, static_cast<int>(state));
-  return nullptr;
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid SinkPolicyEngineState: %" PRId32,
+                      static_cast<int32_t>(state));
+  return "(invalid)";
 }
 
 }  // namespace fusb302

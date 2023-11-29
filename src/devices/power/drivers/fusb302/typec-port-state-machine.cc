@@ -24,7 +24,7 @@ void TypeCPortStateMachine::EnterState(TypeCPortState state) {
       return;
   }
 
-  FDF_LOG(ERROR, "Invalid state: %d", static_cast<int>(state));
+  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int32_t>(state));
 }
 
 void TypeCPortStateMachine::ExitState(TypeCPortState state) {}
@@ -60,7 +60,7 @@ TypeCPortState TypeCPortStateMachine::NextState(TypeCPortInput input,
       return current_state;
   }
 
-  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int>(current_state));
+  FDF_LOG(ERROR, "Invalid state: %" PRId32, static_cast<int32_t>(current_state));
 }
 
 const char* TypeCPortStateMachine::StateToString(TypeCPortState state) const {
@@ -73,8 +73,8 @@ const char* TypeCPortStateMachine::StateToString(TypeCPortState state) const {
       return "SourceAttached";
   }
 
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid TypeCPortStateMachine: %" PRId32, static_cast<int>(state));
-  return nullptr;
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid TypeCPortState: %" PRId32, static_cast<int32_t>(state));
+  return "(invalid)";
 }
 
 }  // namespace fusb302

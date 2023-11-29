@@ -94,8 +94,8 @@ void Fusb302Sensors::SyncDerivedPowerRoleDetectionState() {
   const usb_pd::PowerRole power_role = PowerRoleFromDetectionState(power_role_detection_state);
   detected_power_role_.set(power_role);
 
-  FDF_LOG(TRACE, "Power role detection result: state 0x%02x, power %s, Config Channel on %s",
-          static_cast<unsigned int>(power_role_detection_state),
+  FDF_LOG(TRACE, "Power role detection result: state %s, power %s, Config Channel on %s",
+          PowerRoleDetectionStateToString(power_role_detection_state),
           usb_pd::PowerRoleToString(power_role),
           usb_pd::ConfigChannelPinSwitchToString(wired_cc_pin));
 }

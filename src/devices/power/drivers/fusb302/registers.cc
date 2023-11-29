@@ -4,6 +4,8 @@
 
 #include "src/devices/power/drivers/fusb302/registers.h"
 
+#include <cstdint>
+
 namespace fusb302 {
 
 const char* SwitchBlockConfigToString(SwitchBlockConfig config) {
@@ -17,8 +19,8 @@ const char* SwitchBlockConfigToString(SwitchBlockConfig config) {
     case SwitchBlockConfig::kConnectorVoltage:
       return "VCONN";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid SwitchBlockConfig: %" PRId8, static_cast<char>(config));
-  return nullptr;
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid SwitchBlockConfig: %" PRId8, static_cast<int8_t>(config));
+  return "(invalid)";
 }
 
 const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode) {
@@ -32,8 +34,9 @@ const char* Fusb302RoleDetectionModeToString(Fusb302RoleDetectionMode mode) {
     case Fusb302RoleDetectionMode::kSourceOnly:
       return "only Source";
   }
-  ZX_DEBUG_ASSERT_MSG(false, "Invalid Fusb302RoleDetectionMode: %" PRId8, static_cast<char>(mode));
-  return nullptr;
+  ZX_DEBUG_ASSERT_MSG(false, "Invalid Fusb302RoleDetectionMode: %" PRId8,
+                      static_cast<int8_t>(mode));
+  return "(invalid)";
 }
 
 const char* PowerRoleDetectionStateToString(PowerRoleDetectionState state) {
