@@ -208,9 +208,6 @@
                 "PrivateFutexTest.WakeOp0Or",
                 "PrivateFutexTest.WakeOp0Andn",
                 "PrivateFutexTest.WakeOp0Xor",
-                "SharedPrivate/PrivateAndSharedFutexTest.PIBasic/*",
-                "SharedPrivate/PrivateAndSharedFutexTest.PIConcurrency/*",
-                "SharedPrivate/PrivateAndSharedFutexTest.PIWaiters/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.PITryLock/*",
 
                 // getcpu_host_test and getcpu_test

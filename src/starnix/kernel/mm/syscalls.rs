@@ -27,10 +27,10 @@ use starnix_uapi::{
     time::{duration_from_timespec, time_from_timespec},
     timespec, uapi,
     user_address::{UserAddress, UserRef},
-    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_PRIVATE_FLAG,
-    FUTEX_REQUEUE, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE, FUTEX_WAKE_BITSET, MAP_ANONYMOUS,
-    MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN, MAP_NORESERVE, MAP_POPULATE,
-    MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
+    FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME, FUTEX_CMD_MASK, FUTEX_LOCK_PI,
+    FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_UNLOCK_PI, FUTEX_WAIT, FUTEX_WAIT_BITSET, FUTEX_WAKE,
+    FUTEX_WAKE_BITSET, MAP_ANONYMOUS, MAP_DENYWRITE, MAP_FIXED, MAP_FIXED_NOREPLACE, MAP_GROWSDOWN,
+    MAP_NORESERVE, MAP_POPULATE, MAP_PRIVATE, MAP_SHARED, MAP_STACK, PROT_EXEC,
 };
 
 #[cfg(target_arch = "x86_64")]
@@ -364,17 +364,21 @@ fn do_futex<Key: FutexKey>(
 ) -> Result<usize, Errno> {
     let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
+
+    let read_deadline = |current_task: &CurrentTask| {
+        if utime.is_null() {
+            Ok(zx::Time::INFINITE)
+        } else {
+            // In theory, we should adjust this for a realtime
+            // futex when the system gets suspended, but Zircon
+            // does not give us a way to do this.
+            let duration = current_task.read_object(utime)?;
+            Ok(zx::Time::after(duration_from_timespec(duration)?))
+        }
+    };
     match cmd {
         FUTEX_WAIT => {
-            let deadline = if utime.is_null() {
-                zx::Time::INFINITE
-            } else {
-                // In theory, we should adjust this for a realtime
-                // futex when the system gets suspended, but Zircon
-                // does  not give us a way to do this.
-                let duration = current_task.read_object(utime)?;
-                zx::Time::after(duration_from_timespec(duration)?)
-            };
+            let deadline = read_deadline(current_task)?;
             futexes.wait(current_task, addr, value, FUTEX_BITSET_MATCH_ANY, deadline)?;
             Ok(0)
         }
@@ -403,6 +407,15 @@ fn do_futex<Key: FutexKey>(
             futexes.wake(current_task, addr, value as usize, value3)
         }
         FUTEX_REQUEUE => futexes.requeue(current_task, addr, value as usize, addr2),
+        FUTEX_LOCK_PI => {
+            let deadline = read_deadline(current_task)?;
+            futexes.lock_pi(current_task, addr, deadline)?;
+            Ok(0)
+        }
+        FUTEX_UNLOCK_PI => {
+            futexes.unlock_pi(current_task, addr)?;
+            Ok(0)
+        }
         _ => {
             not_implemented!("futex: command 0x{:x} not implemented.", cmd);
             error!(ENOSYS)
