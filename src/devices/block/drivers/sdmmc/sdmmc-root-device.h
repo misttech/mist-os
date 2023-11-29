@@ -38,9 +38,8 @@ class SdmmcRootDevice : public fdf::DriverBase {
 
   // Returns the SDMMC metadata with default values for any fields that are not present (or if the
   // metadata itself is not present). Returns an error if the metadata could not be decoded.
-  zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> ParseMetadata(
-      const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector,
-      fidl::AnyArena& allocator);
+  zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> GetMetadata(
+      fidl::AnyArena& arena);
 
   template <class DeviceType>
   zx::result<std::unique_ptr<SdmmcDevice>> MaybeAddDevice(

@@ -6,6 +6,7 @@
 
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 
 #include <memory>
@@ -23,26 +24,9 @@ zx::result<> SdmmcRootDevice::Start() {
   fidl::Arena arena;
   fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> sdmmc_metadata;
   {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>();
-    if (result.is_error() || !result->is_valid()) {
-      FDF_LOG(ERROR, "Failed to connect to compat service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto parent_compat = fidl::WireSyncClient(std::move(result.value()));
-
-    fidl::WireResult metadata = parent_compat->GetMetadata();
-    if (!metadata.ok()) {
-      FDF_LOG(ERROR, "Call to GetMetadata failed: %s", metadata.status_string());
-      return zx::error(metadata.status());
-    }
-    if (metadata->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata: %s", zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
-    }
-
-    zx::result parsed_metadata = ParseMetadata(metadata.value()->metadata, arena);
+    zx::result parsed_metadata = GetMetadata(arena);
     if (parsed_metadata.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata: %s",
+      FDF_LOG(ERROR, "Failed to GetMetadata: %s",
               zx_status_get_string(parsed_metadata.error_value()));
       return parsed_metadata.take_error();
     }
@@ -109,64 +93,32 @@ zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
 }
 
 zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>>
-SdmmcRootDevice::ParseMetadata(
-    const fidl::VectorView<::fuchsia_driver_compat::wire::Metadata>& metadata_vector,
-    fidl::AnyArena& allocator) {
-  std::vector<uint8_t> sdmmc_metadata_bytes;  // Storage for fidl::ObjectView returned by lambda.
-  zx::result decoded =
-      [&]() -> zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> {
-    for (const auto& metadata : metadata_vector) {
-      if (metadata.type == DEVICE_METADATA_SDMMC) {
-        size_t size;
-        auto status = metadata.data.get_prop_content_size(&size);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to get_prop_content_size: %s", zx_status_get_string(status));
-          return zx::error(status);
-        }
-
-        sdmmc_metadata_bytes.resize(size);
-        status = metadata.data.read(sdmmc_metadata_bytes.data(), 0, size);
-        if (status != ZX_OK) {
-          FDF_LOG(ERROR, "Failed to read metadata: %s", zx_status_get_string(status));
-          return zx::error(status);
-        }
-
-        auto result = fidl::InplaceUnpersist<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
-            cpp20::span(sdmmc_metadata_bytes));
-        if (result.is_error()) {
-          FDF_LOG(ERROR, "Failed to unpersist metadata: %s",
-                  result.error_value().FormatDescription().c_str());
-          return zx::error(result.error_value().status());
-        }
-        return zx::ok(*result);
-      }
-    }
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }();
+SdmmcRootDevice::GetMetadata(fidl::AnyArena& arena) {
+  zx::result decoded = compat::GetMetadata<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>(
+      incoming(), arena, DEVICE_METADATA_SDMMC);
 
   constexpr uint32_t kMaxCommandPacking = 16;
 
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
       FDF_LOG(INFO, "No metadata provided");
-      return zx::ok(fidl::ObjectView(allocator,
-                                     fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
-                                         .enable_trim(true)
-                                         .enable_cache(true)
-                                         .removable(false)
-                                         .max_command_packing(kMaxCommandPacking)
-                                         .use_fidl(true)
-                                         .Build()));
-    } else {
-      FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
-      return decoded.take_error();
+      return zx::ok(
+          fidl::ObjectView(arena, fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
+                                      .enable_trim(true)
+                                      .enable_cache(true)
+                                      .removable(false)
+                                      .max_command_packing(kMaxCommandPacking)
+                                      .use_fidl(true)
+                                      .Build()));
     }
+    FDF_LOG(ERROR, "Failed to decode metadata: %s", decoded.status_string());
+    return decoded.take_error();
   }
 
   // Default to trim and cache enabled, non-removable.
   return zx::ok(fidl::ObjectView(
-      allocator,
-      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(allocator)
+      arena,
+      fuchsia_hardware_sdmmc::wire::SdmmcMetadata::Builder(arena)
           .enable_trim(!decoded->has_enable_trim() || decoded->enable_trim())
           .enable_cache(!decoded->has_enable_cache() || decoded->enable_cache())
           .removable(decoded->has_removable() && decoded->removable())
