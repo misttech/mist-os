@@ -14,6 +14,7 @@
 #include <future>
 #include <latch>
 
+#include <fbl/unaligned.h>
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 
@@ -2668,15 +2669,12 @@ TEST_P(NetDatagramSocketsCmsgTimestampTest, RecvCmsgUnalignedControlBuffer) {
 
         // Do not access the unaligned control header directly as that would be an undefined
         // behavior. Copy the content to a properly aligned variable first.
-        char aligned_cmsg[CMSG_SPACE(sizeof(timeval))];
-        memcpy(&aligned_cmsg, reinterpret_cast<std::byte*>(unaligned_cmsg), sizeof(aligned_cmsg));
-        cmsghdr* cmsg = reinterpret_cast<cmsghdr*>(aligned_cmsg);
-        EXPECT_EQ(cmsg->cmsg_len, CMSG_LEN(sizeof(timeval)));
-        EXPECT_EQ(cmsg->cmsg_level, SOL_SOCKET);
-        EXPECT_EQ(cmsg->cmsg_type, SO_TIMESTAMP);
+        cmsghdr header = fbl::UnalignedLoad<cmsghdr>(unaligned_cmsg);
+        EXPECT_EQ(header.cmsg_len, CMSG_LEN(sizeof(timeval)));
+        EXPECT_EQ(header.cmsg_level, SOL_SOCKET);
+        EXPECT_EQ(header.cmsg_type, SO_TIMESTAMP);
 
-        timeval received_tv;
-        memcpy(&received_tv, CMSG_DATA(cmsg), sizeof(received_tv));
+        timeval received_tv = fbl::UnalignedLoad<timeval>(CMSG_DATA(unaligned_cmsg));
         const std::chrono::duration received = std::chrono::seconds(received_tv.tv_sec) +
                                                std::chrono::microseconds(received_tv.tv_usec);
         const std::chrono::duration after = std::chrono::system_clock::now().time_since_epoch();
