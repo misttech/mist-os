@@ -6,13 +6,15 @@
 #define SRC_DEVICES_USB_DRIVERS_VIM3_USB_PHY_VIM3_USB_PHY_H_
 
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/usb/phy/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.usb.phy/cpp/driver/fidl.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 #include <threads.h>
 
 #include <ddktl/device.h>
+#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
 #include <soc/aml-common/aml-registers.h>
@@ -26,7 +28,8 @@ using Vim3UsbPhyType =
 
 // This is the main class for the platform bus driver.
 class Vim3UsbPhy : public Vim3UsbPhyType,
-                   public ddk::UsbPhyProtocol<Vim3UsbPhy, ddk::base_protocol> {
+                   public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy>,
+                   public ddk::EmptyProtocol<ZX_PROTOCOL_USB_PHY> {
  public:
   // Public for testing.
   enum class UsbMode {
@@ -39,8 +42,13 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
-  // USB PHY protocol implementation.
-  void UsbPhyConnectStatusChanged(bool connected);
+  // fuchsia_hardware_usb_phy::UsbPhy required methods
+  void ConnectStatusChanged(ConnectStatusChangedRequest& request,
+                            ConnectStatusChangedCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_phy::UsbPhy> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
+  }
 
   // Device protocol implementation.
   void DdkInit(ddk::InitTxn txn);

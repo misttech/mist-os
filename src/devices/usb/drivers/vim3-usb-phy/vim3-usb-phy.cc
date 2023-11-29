@@ -709,22 +709,23 @@ void Vim3UsbPhy::DdkInit(ddk::InitTxn txn) {
 }
 
 // PHY tuning based on connection state
-void Vim3UsbPhy::UsbPhyConnectStatusChanged(bool connected) {
+void Vim3UsbPhy::ConnectStatusChanged(ConnectStatusChangedRequest& request,
+                                      ConnectStatusChangedCompleter::Sync& completer) {
   fbl::AutoLock lock(&lock_);
 
-  if (dwc2_connected_ == connected)
+  if (dwc2_connected_ == request.connected())
     return;
 
   auto* mmio = &*usbphy21_mmio_;
 
-  if (connected) {
+  if (request.connected()) {
     PLL_REGISTER::Get(0x38).FromValue(pll_settings_[7]).WriteTo(mmio);
     PLL_REGISTER::Get(0x34).FromValue(pll_settings_[5]).WriteTo(mmio);
   } else {
     InitPll(mmio);
   }
 
-  dwc2_connected_ = connected;
+  dwc2_connected_ = request.connected();
 }
 
 void Vim3UsbPhy::DdkUnbind(ddk::UnbindTxn txn) {
