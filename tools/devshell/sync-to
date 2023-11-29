@@ -134,7 +134,6 @@ def colorize(text: str, color: Color) -> str:
 
 
 class SyncToCommand:
-
     def __init__(self, args: argparse.Namespace, fuchsia_dir: str):
         self.fuchsia_dir = pathlib.Path(fuchsia_dir)
         self.help: bool = args.help
@@ -152,7 +151,8 @@ class SyncToCommand:
         if not gsutil:
             raise Error(
                 "Cannot find gsutil. Please install gcloud and run 'gcloud init'.\n"
-                "See https://cloud.google.com/storage/docs/gsutil_install")
+                "See https://cloud.google.com/storage/docs/gsutil_install"
+            )
         return gsutil
 
     def run(self) -> None:
@@ -168,7 +168,9 @@ class SyncToCommand:
             print(
                 colorize(
                     "Running in dry-run mode. No changes will be made to your checkout.",
-                    Color.GREEN))
+                    Color.GREEN,
+                )
+            )
 
         self.confirm_ok_to_change_source_code()
 
@@ -183,7 +185,8 @@ class SyncToCommand:
             "--quiet",
             "origin",
             stderr=subprocess.PIPE,
-            dry_run_safe=True)
+            dry_run_safe=True,
+        )
 
         # Force-checkout every repository at JIRI_HEAD to ensure subsequent
         # `jiri update` calls won't skip repos not at JIRI_HEAD. This will
@@ -191,8 +194,10 @@ class SyncToCommand:
         # have been detected by `confirm_ok_to_change_source_code` anyway) to
         # avoid permanently deleting code.
         self.jiri(
-            "runp", f"-exit-on-error={str(not self.force).lower()}",
-            "git checkout --quiet JIRI_HEAD")
+            "runp",
+            f"-exit-on-error={str(not self.force).lower()}",
+            "git checkout --quiet JIRI_HEAD",
+        )
 
         if self.state == "reset":
             self.reset_checkout()
@@ -202,8 +207,9 @@ class SyncToCommand:
             self.sync_to_release_tag()
         elif re.match(TIMESTAMP_REGEX, self.state):
             self.sync_to_timestamp()
-        elif not self.state.startswith("git:") and re.match(BUILD_ID_REGEX,
-                                                            self.state):
+        elif not self.state.startswith("git:") and re.match(
+            BUILD_ID_REGEX, self.state
+        ):
             self.sync_to_build_id()
         # Git short SHA-1s can be any length up to 40, but assume at least three
         # characters.
@@ -212,7 +218,8 @@ class SyncToCommand:
         else:
             raise Error(
                 f"Unsupported state definition format: {self.state!r}.\n"
-                "Use -h for help.")
+                "Use -h for help."
+            )
 
         if not self.dry_run:
             self.print_synced_revision()
@@ -233,7 +240,8 @@ class SyncToCommand:
                 f"Invalid remote branch, is {self.state!r} a valid head in"
                 " an integration repo other than the one your source is using?\n\n"
                 "See valid branches by running:\n\n"
-                "  git -C ${FUCHSIA_DIR}/integration ls-remote --heads")
+                "  git -C ${FUCHSIA_DIR}/integration ls-remote --heads"
+            )
         self.sync_to_integration_ref(branch)
 
     def sync_to_release_tag(self) -> None:
@@ -243,7 +251,8 @@ class SyncToCommand:
                 f"Invalid release tag, is {self.state!r} a tag from"
                 " an integration repo other than the one your source is using?\n\n"
                 "See valid tags by running:\n\n"
-                "  git -C ${FUCHSIA_DIR}/integration tag -l")
+                "  git -C ${FUCHSIA_DIR}/integration tag -l"
+            )
         self.sync_to_integration_ref(f"tags/{self.state}")
 
     def sync_to_integration_commit(self) -> None:
@@ -254,30 +263,37 @@ class SyncToCommand:
                 f"Commit not found, is {self.state!r} a commit from a repo other"
                 " than your local integration repo?"
                 "See valid commits by running:\n"
-                "  git -C ${FUCHSIA_DIR}/integration log --oneline")
+                "  git -C ${FUCHSIA_DIR}/integration log --oneline"
+            )
         self.sync_to_integration_ref(revision)
 
     def sync_to_timestamp(self) -> None:
         """Sync the checkout based on a Jiri snapshot XML file from a past timestamp."""
         print(f"{self.state!r} looks like a local Jiri update timestamp")
         update_history_dir = self.fuchsia_dir.joinpath(
-            ".jiri_root", "update_history")
+            ".jiri_root", "update_history"
+        )
         snapshot_file = update_history_dir.joinpath(self.state)
         if not os.path.exists(snapshot_file):
             raise Error(
                 "Invalid Jiri history timestamp. See valid options by running:\n"
-                f"  ls {update_history_dir}")
+                f"  ls {update_history_dir}"
+            )
         self.sync_to_snapshot(snapshot_file)
 
     def sync_to_snapshot(self, snapshot_file: pathlib.Path) -> None:
-        integration_remote = self.jiri(
-            "manifest",
-            "-element=integration",
-            "-template={{.Remote}}",
-            snapshot_file,
-            dry_run_safe=True,
-            stdout=subprocess.PIPE,
-        ).stdout.strip().splitlines()[-1]
+        integration_remote = (
+            self.jiri(
+                "manifest",
+                "-element=integration",
+                "-template={{.Remote}}",
+                snapshot_file,
+                dry_run_safe=True,
+                stdout=subprocess.PIPE,
+            )
+            .stdout.strip()
+            .splitlines()[-1]
+        )
         self.assert_correct_integration_repo(integration_remote)
         print(f"Syncing to Jiri snapshot {str(snapshot_file)!r}")
         self.jiri("update", "-local-manifest", "-gc", snapshot_file)
@@ -306,7 +322,8 @@ class SyncToCommand:
         except subprocess.CalledProcessError:
             print("Sync failed, restoring the integration repo to JIRI_HEAD")
             self.run_command(
-                "git", "-C", self.integration_dir, "checkout", "JIRI_HEAD")
+                "git", "-C", self.integration_dir, "checkout", "JIRI_HEAD"
+            )
             raise
 
     def is_valid_integration_rev(self, rev: str) -> bool:
@@ -322,18 +339,24 @@ class SyncToCommand:
                 rev,
                 check=False,
                 dry_run_safe=True,
-            ).returncode == 0)
+            ).returncode
+            == 0
+        )
 
     def assert_correct_integration_repo(self, remote: str) -> None:
         jiri_manifest = self.fuchsia_dir.joinpath(".jiri_manifest")
-        local_remote = self.jiri(
-            "manifest",
-            "-element=integration",
-            "-template={{.Remote}}",
-            jiri_manifest,
-            dry_run_safe=True,
-            stdout=subprocess.PIPE,
-        ).stdout.strip().splitlines()[-1]
+        local_remote = (
+            self.jiri(
+                "manifest",
+                "-element=integration",
+                "-template={{.Remote}}",
+                jiri_manifest,
+                dry_run_safe=True,
+                stdout=subprocess.PIPE,
+            )
+            .stdout.strip()
+            .splitlines()[-1]
+        )
         if local_remote != remote:
             raise Error(
                 f"Integration remote {remote!r} does not match local"
@@ -349,14 +372,18 @@ class SyncToCommand:
 
     def assert_correct_integration_manifest(self, checkout_info: dict) -> None:
         jiri_manifest = self.fuchsia_dir.joinpath(".jiri_manifest")
-        local_manifest = self.jiri(
-            "manifest",
-            "-element=integration",
-            "-template={{.Manifest}}",
-            jiri_manifest,
-            dry_run_safe=True,
-            stdout=subprocess.PIPE,
-        ).stdout.strip().splitlines()[-1]
+        local_manifest = (
+            self.jiri(
+                "manifest",
+                "-element=integration",
+                "-template={{.Manifest}}",
+                jiri_manifest,
+                dry_run_safe=True,
+                stdout=subprocess.PIPE,
+            )
+            .stdout.strip()
+            .splitlines()[-1]
+        )
         manifest = checkout_info["manifest"]
         if local_manifest != manifest:
             workaround = (
@@ -391,7 +418,8 @@ class SyncToCommand:
             check=False,
             # Silence stdout to avoid printing the auth info. We
             # only care whether the command passes or fails.
-            stdout=subprocess.DEVNULL)
+            stdout=subprocess.DEVNULL,
+        )
         if proc.returncode:
             print("Please login to Buildbucket first.")
             self.run_command(bb, "auth-login")
@@ -434,12 +462,14 @@ class SyncToCommand:
             # close enough in most cases.
             if "base_revision" in patch:
                 args.extend(
-                    ["-rebase", "-rebase-revision", patch["base_revision"]])
+                    ["-rebase", "-rebase-revision", patch["base_revision"]]
+                )
             else:
                 warning = colorize("WARNING", Color.YELLOW)
                 print(
                     f"{warning}: No base revision available for project {project},"
-                    " rebasing on current main branch instead.")
+                    " rebasing on current main branch instead."
+                )
             args.extend(
                 [
                     "-host",
@@ -447,7 +477,8 @@ class SyncToCommand:
                     "-project",
                     project,
                     patch["ref"],
-                ])
+                ]
+            )
             self.jiri(*args)
         # If we patched in a change to the integration repo, we have to `jiri
         # update` again to make sure we respect any project/package pin updates.
@@ -464,7 +495,8 @@ class SyncToCommand:
         tempdir = tempfile.TemporaryDirectory()
         try:
             snapshot_file = self.download_build_snapshot(
-                pathlib.Path(tempdir.name), build_id)
+                pathlib.Path(tempdir.name), build_id
+            )
         except Exception:
             tempdir.cleanup()
             raise
@@ -478,7 +510,8 @@ class SyncToCommand:
         tempdir.cleanup()
 
     def download_build_snapshot(
-            self, dest_dir: pathlib.Path, build_id: str) -> pathlib.Path:
+        self, dest_dir: pathlib.Path, build_id: str
+    ) -> pathlib.Path:
         """Download a Jiri snapshot produced by an infra build from GCS.
 
         Depending on the nature of the infra build, the snapshot file may come
@@ -490,7 +523,8 @@ class SyncToCommand:
         ] + [
             # Buckets where each build is a folder with a jiri_snapshot.xml
             # inside.
-            f"gs://{bucket}/builds/{build_id}/jiri_snapshot.xml" for bucket in [
+            f"gs://{bucket}/builds/{build_id}/jiri_snapshot.xml"
+            for bucket in [
                 "fuchsia-artifacts-release",
                 "fuchsia-artifacts-internal",
                 "fuchsia-artifacts",
@@ -505,7 +539,8 @@ class SyncToCommand:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 check=False,
-                dry_run_safe=True)
+                dry_run_safe=True,
+            )
             if proc.returncode == 0:
                 # Found the bucket that contains the snapshot, so no need to
                 # check the remaining buckets.
@@ -523,7 +558,8 @@ class SyncToCommand:
                 f"    uploads its artifacts to GCS did not execute.\n"
                 f"    Compare https://ci.chromium.org/b/{build_id} with a successful\n"
                 f"    build of the same builder and see if the failed build stopped before\n"
-                f"    running a step like 'upload artifacts'")
+                f"    running a step like 'upload artifacts'"
+            )
 
         bucket = urllib.parse.urlparse(snapshot_url).hostname
         print(f"Downloading Jiri snapshot from {bucket}...")
@@ -535,7 +571,8 @@ class SyncToCommand:
             "cp",
             snapshot_url,
             snapshot_file,
-            dry_run_safe=True)
+            dry_run_safe=True,
+        )
         return snapshot_file
 
     def print_synced_revision(self) -> None:
@@ -543,7 +580,9 @@ class SyncToCommand:
         if self.state == "reset":
             print("Reset success! You are now tracking JIRI_HEAD.")
         else:
-            print("Success! To switch back to the latest, use `fx sync-to reset`.")
+            print(
+                "Success! To switch back to the latest, use `fx sync-to reset`."
+            )
         print("//integration HEAD is now at:")
         self.run_command(
             "git",
@@ -601,7 +640,9 @@ class SyncToCommand:
         # local checkout if it's not on $PATH.
         jiri_path = "jiri"
         if not shutil.which(jiri_path):
-            jiri_path = os.path.join(self.fuchsia_dir, ".jiri_root", "bin", "jiri")
+            jiri_path = os.path.join(
+                self.fuchsia_dir, ".jiri_root", "bin", "jiri"
+            )
         return self.run_command(jiri_path, "-color=always", *args, **kwargs)
 
     def confirm_ok_to_change_source_code(self) -> None:
@@ -618,17 +659,20 @@ class SyncToCommand:
         # First we must update all indexes; otherwise `diff-index` might report
         # false positive diffs.
         self.jiri("runp", "git update-index -q --refresh")
-        output = self.jiri(
-            "runp", "git diff-index --quiet HEAD",
-            capture_output=True).stdout or ""
+        output = (
+            self.jiri(
+                "runp", "git diff-index --quiet HEAD", capture_output=True
+            ).stdout
+            or ""
+        )
         dirty_repos = self.jiri_runp_failures(output)
         if dirty_repos:
             repos_list = "\n".join(f" - {repo}" for repo in dirty_repos)
             if self.force:
                 warning = colorize("WARNING", Color.YELLOW)
                 print(
-                    f"{warning}: "
-                    " rebasing on current main branch instead.")
+                    f"{warning}: " " rebasing on current main branch instead."
+                )
             else:
                 discard_cmd = f"jiri runp 'git checkout -f HEAD'"
                 force_cmd = f"fx sync-to --force {self.state!r}"
@@ -648,7 +692,8 @@ class SyncToCommand:
                     f"\n  {colorize(discard_cmd, Color.RED)}"
                     f"\nOr if that still doesn't work, run:"
                     f"\n  {colorize(force_cmd, Color.RED)}"
-                    f"\n  {colorize(fixup_cmd, Color.RED)}")
+                    f"\n  {colorize(fixup_cmd, Color.RED)}"
+                )
 
         while True:  # Loop until we get a valid input.
             if self.force:
@@ -660,7 +705,8 @@ class SyncToCommand:
                 uncomitted_info = (
                     "No untracked changes will be discarded, but any"
                     " repos not currently on JIRI_HEAD will not be"
-                    " automatically restored to their original revisions.")
+                    " automatically restored to their original revisions."
+                )
             print(
                 f"I'm about to change the state of your source code.\n{uncomitted_info}"
             )
@@ -684,7 +730,7 @@ class SyncToCommand:
 
 def remove_prefix(s, prefix: str) -> str:
     if s.startswith(prefix):
-        return s[len(prefix):]
+        return s[len(prefix) :]
     return s
 
 
