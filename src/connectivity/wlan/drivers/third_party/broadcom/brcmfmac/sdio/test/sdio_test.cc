@@ -644,7 +644,9 @@ struct MinimalBrcmfSdio {
       : wq(workqueue_name),
         loop(std::make_unique<::async::Loop>(&kAsyncLoopConfigNeverAttachToThread)),
         timer(std::make_unique<Timer>(loop->dispatcher(), []() {}, false)) {
-    sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .state = sdiod_state};
+    sdio_dev = {.ctl_done_timeout = ctl_done_timeout, .drvr = &drvr, .state = sdiod_state};
+
+    drvr.recovery_trigger = std::make_unique<wlan::brcmfmac::RecoveryTrigger>(nullptr);
 
     pthread_mutex_init(&func1.lock, nullptr);
     sdio_dev.func1 = &func1;
@@ -663,6 +665,7 @@ struct MinimalBrcmfSdio {
     bus.dpc_triggered.store(false);
   }
 
+  struct brcmf_pub drvr {};
   brcmf_sdio_dev sdio_dev{};
   sdio_func func1{};
   sdio_func func2{};

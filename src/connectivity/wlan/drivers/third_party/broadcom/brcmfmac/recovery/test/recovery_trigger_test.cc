@@ -42,14 +42,19 @@ class RecoveryTriggerTest : public testing::Test {
   // is executed, but the boolean "recovery_trigger_" is false, we know that the recovery worker was
   // not added into WorkQueue.
   static void TestRecoveryDummyWorker(WorkItem* work_item);
-  zx_status_t WaitForTrigger(uint32_t delay);
-  zx_status_t WaitForDummy(uint32_t delay);
+  zx_status_t WaitForTrigger(int64_t delay);
+  zx_status_t WaitForDummy(int64_t delay);
   // Clear the states of all async protections variable to ensure next trigger's success.
   void ResetAsync();
 
   std::unique_ptr<brcmf_bus> bus_if_;
   // Test object
   std::unique_ptr<RecoveryTrigger> trigger_;
+
+  // The WorkItem here should live as long as the default workqueue thread, so that after the test
+  // case function returns, the workqueue thread can still use the |signaler| inside this WorkItem
+  // to indicate that it has finished the task in this WorkItem.
+  static WorkItem dummy_worker_;
 
   static uint16_t recovery_trigger_count_;
   // Mark that the dummy worker is executed.
@@ -61,6 +66,8 @@ class RecoveryTriggerTest : public testing::Test {
   std::unique_ptr<brcmf_pub> fake_drvr_;
 };
 
+WorkItem RecoveryTriggerTest::dummy_worker_ =
+    WorkItem(RecoveryTriggerTest::TestRecoveryDummyWorker);
 uint16_t RecoveryTriggerTest::recovery_trigger_count_ = 0;
 bool RecoveryTriggerTest::recovery_not_triggered_ = false;
 sync_completion_t RecoveryTriggerTest::wait_for_worker_;
@@ -76,11 +83,11 @@ void RecoveryTriggerTest::TestRecoveryDummyWorker(WorkItem* work_item) {
   sync_completion_signal(&wait_for_dummy_worker_);
 }
 
-zx_status_t RecoveryTriggerTest::WaitForTrigger(uint32_t delay) {
+zx_status_t RecoveryTriggerTest::WaitForTrigger(int64_t delay) {
   return sync_completion_wait(&wait_for_worker_, delay);
 }
 
-zx_status_t RecoveryTriggerTest::WaitForDummy(uint32_t delay) {
+zx_status_t RecoveryTriggerTest::WaitForDummy(int64_t delay) {
   return sync_completion_wait(&wait_for_dummy_worker_, delay);
 }
 
@@ -132,8 +139,7 @@ TEST_F(RecoveryTriggerTest, SdioTimeoutTriggerNegative) {
   EXPECT_EQ(trigger_->sdio_timeout_.Inc(), ZX_OK);
 
   // Schedule dummy worker to the default WorkQueue.
-  WorkItem dummy_worker(RecoveryTriggerTest::TestRecoveryDummyWorker);
-  WorkQueue::ScheduleDefault(&dummy_worker);
+  WorkQueue::ScheduleDefault(&dummy_worker_);
   zx_status_t status = WaitForDummy(ZX_TIME_INFINITE);
   EXPECT_EQ(status, ZX_OK);
   EXPECT_TRUE(RecoveryTriggerTest::recovery_not_triggered_);
@@ -166,6 +172,30 @@ TEST_F(RecoveryTriggerTest, FirmwareCrashTriggerTest) {
 TEST_F(RecoveryTriggerTest, NoCallbackFunction) {
   RecoveryTrigger no_callback_trigger(nullptr);
   EXPECT_EQ(no_callback_trigger.firmware_crash_.Inc(), ZX_ERR_NOT_FOUND);
+}
+
+TEST_F(RecoveryTriggerTest, CtrlFrameResponseTimeoutTriggerTest) {
+  for (uint16_t i = 0; i < RecoveryTrigger::kCtrlFrameResponseTimeoutThreshold; i++) {
+    EXPECT_EQ(trigger_->ctrl_frame_response_timeout_.Inc(), ZX_OK);
+  }
+  zx_status_t status = WaitForTrigger(ZX_TIME_INFINITE);
+  EXPECT_EQ(status, ZX_OK);
+  EXPECT_EQ(RecoveryTriggerTest::recovery_trigger_count_, 1U);
+}
+
+TEST_F(RecoveryTriggerTest, CtrlFrameResponseTimeoutTriggerNegative) {
+  for (uint16_t i = 0; i < RecoveryTrigger::kCtrlFrameResponseTimeoutThreshold - 1; i++) {
+    EXPECT_EQ(trigger_->ctrl_frame_response_timeout_.Inc(), ZX_OK);
+  }
+  trigger_->ClearStatistics();
+  EXPECT_EQ(trigger_->ctrl_frame_response_timeout_.Inc(), ZX_OK);
+
+  // Schedule the empty worker to the default WorkQueue.
+  WorkQueue::ScheduleDefault(&dummy_worker_);
+  zx_status_t status = WaitForDummy(ZX_TIME_INFINITE);
+  EXPECT_EQ(status, ZX_OK);
+  EXPECT_TRUE(RecoveryTriggerTest::recovery_not_triggered_);
+  EXPECT_EQ(RecoveryTriggerTest::recovery_trigger_count_, 0U);
 }
 
 }  // namespace wlan::brcmfmac
