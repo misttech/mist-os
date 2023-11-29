@@ -77,9 +77,27 @@ pub(crate) enum DatagramProtocol {
 }
 
 /// A minimal abstraction over transport protocols that allows bindings-side state to be stored.
-pub(crate) trait Transport<I>: Debug + Sized + Send + Sync + 'static {
+pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
     const PROTOCOL: DatagramProtocol;
+    /// Whether the Transport Protocol supports dualstack sockets.
+    const SUPPORTS_DUALSTACK: bool;
     type SocketId: Debug + Copy + EntryKey + Send + Sync;
+
+    /// Match Linux and implicitly map IPv4 addresses to IPv6 addresses for
+    /// dual-stack capable protocols.
+    fn maybe_map_sock_addr(addr: fnet::SocketAddress) -> fnet::SocketAddress {
+        match (I::VERSION, addr, Self::SUPPORTS_DUALSTACK) {
+            (IpVersion::V6, fnet::SocketAddress::Ipv4(v4_addr), true) => {
+                let port = v4_addr.port();
+                let address = v4_addr.addr().to_ipv6_mapped();
+                fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress::new(
+                    Some(ZonedAddr::Unzoned(address).into()),
+                    port,
+                ))
+            }
+            (_, _, _) => addr,
+        }
+    }
 }
 
 /// Mapping from socket IDs to their receive queues.
@@ -377,6 +395,7 @@ pub(crate) enum Udp {}
 
 impl<I: Ip> Transport<I> for Udp {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::Udp;
+    const SUPPORTS_DUALSTACK: bool = true;
     type SocketId = udp::SocketId<I>;
 }
 
@@ -624,6 +643,7 @@ pub(crate) enum IcmpEcho {}
 
 impl<I: Ip> Transport<I> for IcmpEcho {
     const PROTOCOL: DatagramProtocol = DatagramProtocol::IcmpEcho;
+    const SUPPORTS_DUALSTACK: bool = false;
     type SocketId = icmp::SocketId<I>;
 }
 
@@ -1651,7 +1671,8 @@ where
                 },
         } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
+        let sockaddr =
+            I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))?;
         trace!("connect sockaddr: {:?}", sockaddr);
         let (remote_addr, remote_port) =
             sockaddr.try_into_core_with_ctx(&non_sync_ctx).map_err(IntoErrno::into_errno)?;
@@ -1666,7 +1687,12 @@ where
     ///
     /// [POSIX socket bind request]: fposix_socket::SynchronousDatagramSocketRequest::Bind
     fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
-        let sockaddr = I::SocketAddress::from_sock_addr(addr)?;
+        // Match Linux and return `Einval` when asked to bind an IPv6 socket to
+        // an Ipv4 address. This Errno is unique to bind.
+        let sockaddr = match (I::VERSION, &addr) {
+            (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(fposix::Errno::Einval),
+            (_, _) => I::SocketAddress::from_sock_addr(addr),
+        }?;
         trace!("bind sockaddr: {:?}", sockaddr);
 
         let Self {
@@ -1878,8 +1904,11 @@ where
         data: Vec<u8>,
     ) -> Result<i64, fposix::Errno> {
         trace_duration!("datagram::send_msg");
-
-        let remote_addr = addr.map(I::SocketAddress::from_sock_addr).transpose()?;
+        let remote_addr = addr
+            .map(|addr| {
+                I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))
+            })
+            .transpose()?;
         let Self {
             ctx,
             data:
@@ -2372,11 +2401,18 @@ mod tests {
     async fn prepare_test<A: TestSockAddr>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) -> (TestSetup, fposix_socket::SynchronousDatagramSocketProxy, zx::EventPair) {
+        // Setup the test with two endpoints, one in `A`'s domain, and the other
+        // in `A::DifferentDomain` (e.g. IPv4 and IPv6).
         let mut t = TestSetupBuilder::new()
+            .add_endpoint()
             .add_endpoint()
             .add_stack(
                 StackSetupBuilder::new()
-                    .add_named_endpoint(test_ep_name(1), Some(A::config_addr_subnet())),
+                    .add_named_endpoint(test_ep_name(1), Some(A::config_addr_subnet()))
+                    .add_named_endpoint(
+                        test_ep_name(2),
+                        Some(A::DifferentDomain::config_addr_subnet()),
+                    ),
             )
             .build()
             .await;
@@ -2468,13 +2504,22 @@ mod tests {
     async fn connect_failure<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (t, proxy, _event) = prepare_test::<A>(proto).await;
 
-        // Pass a bad domain.
+        // Pass a socket address of the wrong domain, which should fail for IPv4
+        // but pass for IPv6 on UDP (as it's implicitly converted to an
+        // IPv4-mapped-IPv6 address).
         let res = proxy
-            .connect(&A::DifferentDomain::create(A::DifferentDomain::LOCAL_ADDR, 1010))
+            .connect(&A::DifferentDomain::create(A::DifferentDomain::REMOTE_ADDR, 1010))
             .await
-            .unwrap()
-            .expect_err("connect fails");
-        assert_eq!(res, fposix::Errno::Eafnosupport);
+            .unwrap();
+        match (proto, <<<A as SockAddr>::AddrType as IpAddress>::Version as Ip>::VERSION) {
+            (fposix_socket::DatagramSocketProtocol::Udp, IpVersion::V6) => {
+                assert_eq!(res, Ok(()));
+                // NB: The socket is connected in the IPv4 stack; disconnect it
+                // so that we can connect it in the IPv6 stack below.
+                proxy.disconnect().await.unwrap().expect("disconnect should succeed");
+            }
+            (_, _) => assert_eq!(res, Err(fposix::Errno::Eafnosupport)),
+        }
 
         // Pass a zero port. UDP and ICMP both allow it.
         let res = proxy.connect(&A::create(A::LOCAL_ADDR, 0)).await.unwrap();

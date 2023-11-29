@@ -18,7 +18,6 @@
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddr/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReuseAddrReusePort/*",
                 "AllUDPSockets/UDPSocketPairTest.SetReusePort/*",
-                "UdpInet6SocketTest.ConnectInet4Sockaddr",
             ],
         },
         {

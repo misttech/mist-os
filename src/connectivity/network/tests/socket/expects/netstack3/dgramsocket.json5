@@ -12,7 +12,6 @@
         {
             type: "expect_failure",
             matchers: [
-                "LocalhostTest.ConnectAFMismatchINET6",
                 "NetDatagramTest.ConnectUnspecV*",
                 "NetDatagramTest.PingIpv4LoopbackAddresses",
                 "IOSendingMethodTests/IOSendingMethodTest*",

@@ -67,21 +67,6 @@
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6EphemeralPortReserved/TCP",
                 "AllFamilies/SocketMultiProtocolInetLoopbackTest.V6OnlyV6AnyReservesV6/*",
 
-                // TODO(https://fxbug.dev/21198): Netstack3 doesn't fully support dual-stack
-                // datagramsockets.
-                "All/DualStackSocketTest.AddressOperations/V4AnyBindConnectSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4AnyBindSendToConnect",
-                "All/DualStackSocketTest.AddressOperations/V4AnyConnectBindSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4AnyConnectSendToBind",
-                "All/DualStackSocketTest.AddressOperations/V4AnySendToBindConnect",
-                "All/DualStackSocketTest.AddressOperations/V4AnySendToConnectBind",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindConnectSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackBindSendToConnect",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackConnectBindSendTo",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackConnectSendToBind",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToBindConnect",
-                "All/DualStackSocketTest.AddressOperations/V4LoopbackSendToConnectBind",
-
                 // TODO(https://fxbug.dev/21198): Netstack3 doesn't have dual-stack sockets.
                 "All/DualStackAfMismatchTest.*/TCP",
                 "All/SocketInetLoopbackTest.TCPListenShutdown/ListenV6Any_ConnectV4MappedAny",
