@@ -376,10 +376,6 @@ TEST_F(VdsoProcTest, VdsoModificationsBeforeForkingDontAffectOtherPrograms) {
 }
 
 TEST_F(VdsoProcTest, VvarCantWriteDeathTest) {
-  if (!test_helper::IsStarnix()) {
-    GTEST_SKIP() << "We cannot assume that this test works on Linux in CQ";
-  }
-
   volatile uint8_t* vvar_addr = reinterpret_cast<volatile uint8_t*>(vvar_base_);
   ASSERT_DEATH({ vvar_addr[0] = 3; }, "");
 
