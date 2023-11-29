@@ -15,7 +15,10 @@ use netemul::RealmUdpSocket as _;
 use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
-use packet::{FragmentedBuffer as _, InnerPacketBuilder as _, ParseBuffer as _, Serializer};
+use packet::{
+    FragmentedBuffer as _, InnerPacketBuilder as _, MaybeReuseBufferProvider, ParseBuffer as _,
+    Serializer,
+};
 use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
 use std::num::NonZeroU16;
@@ -647,10 +650,10 @@ where
     S::Buffer: packet::ReusableBuffer + std::fmt::Debug + AsRef<[u8]>,
 {
     let b = ser
-        .serialize_outer(|length| {
+        .serialize_outer(MaybeReuseBufferProvider(|length| {
             assert!(length <= BUFFER_SIZE, "{} > {}", length, BUFFER_SIZE);
             Result::<_, std::convert::Infallible>::Ok(packet::Buf::new([0u8; BUFFER_SIZE], ..))
-        })
+        }))
         .expect("failed to serialize");
     let sent = sock.send_to(b.as_ref(), to).await.expect("send to failed");
     assert_eq!(sent, b.len());
