@@ -23,7 +23,7 @@ use fuchsia_zircon::{
 use lock_sequence::{Locked, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
-    errors::Errno, from_status_like_fdio, ownership::ReleasableByRef, pid_t, signals::SIGKILL,
+    errors::Errno, from_status_like_fdio, ownership::Releasable, pid_t, signals::SIGKILL,
 };
 use std::{os::unix::thread::JoinHandleExt, sync::Arc};
 

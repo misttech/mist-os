@@ -11,8 +11,8 @@ use crate::{
     task::{
         set_thread_role, AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask,
         Kernel, ProcessEntryRef, PtraceState, PtraceStatus, SchedulerPolicy,
-        SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, UtsNamespaceHandle,
-        Waiter,
+        SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadState,
+        UtsNamespaceHandle, Waiter,
     },
 };
 use bitflags::bitflags;
@@ -29,7 +29,7 @@ use starnix_uapi::{
     errno, error,
     errors::Errno,
     from_status_like_fdio,
-    ownership::{ReleasableByRef, TempRef, WeakRef},
+    ownership::{OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef},
     pid_t, robust_list_head,
     signals::{SigSet, Signal, UncheckedSignal, SIGCONT, SIGTRAP},
     stats::TaskTimeStats,
@@ -1194,12 +1194,12 @@ impl Task {
     }
 }
 
-impl ReleasableByRef for Task {
-    type Context<'a> = &'a CurrentTask;
+impl Releasable for Task {
+    type Context<'a> = ThreadState;
 
-    fn release(&self, current_task: &CurrentTask) {
+    fn release(mut self, thread_state: ThreadState) {
         // Disconnect from tracer, if one is present.
-        let ptracer_pid = self.read().ptrace.as_ref().map_or(None, |ptrace| Some(ptrace.pid));
+        let ptracer_pid = self.mutable_state.get_mut().ptrace.as_ref().map(|ptrace| ptrace.pid);
         if let Some(ptracer_pid) = ptracer_pid {
             if let Some(ProcessEntryRef::Process(tg)) =
                 self.kernel().pids.read().get_process(ptracer_pid)
@@ -1207,18 +1207,30 @@ impl ReleasableByRef for Task {
                 let pid = self.get_pid();
                 tg.ptracees.lock().remove(&pid);
             }
-            let _ = self.write().set_ptrace(None);
+            let _ = self.mutable_state.get_mut().set_ptrace(None);
         }
 
-        self.thread_group.remove(self);
+        self.thread_group.remove(&self);
 
         // Release the fd table.
         self.files.release(());
 
+        self.signal_vfork();
+
+        // Rebuild a temporary CurrentTask to run the release actions that requires a CurrentState.
+        let current_task = CurrentTask { task: OwnedRef::new(self), thread_state };
+
         // Apply any delayed releasers left.
         current_task.trigger_delayed_releaser();
 
-        self.signal_vfork();
+        // Drop the task now that is has been released. This requires to take it fro the OwnedRef
+        // and from the resulting ReleaseGuard.
+        let CurrentTask { mut task, .. } = current_task;
+        let task = OwnedRef::take(&mut task).expect("task should not have been re-owned");
+        let task: Self = ReleaseGuard::take(task);
+
+        // It is safe to drop the task, as it has been release by this method.
+        std::mem::drop(task);
     }
 }
 

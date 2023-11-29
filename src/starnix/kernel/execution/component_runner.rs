@@ -30,7 +30,7 @@ use starnix_uapi::{
     file_mode::mode,
     mount_flags::MountFlags,
     open_flags::OpenFlags,
-    ownership::{release_on_error, ReleasableByRef, WeakRef},
+    ownership::{release_on_error, Releasable, WeakRef},
     signals::{SIGINT, SIGKILL},
 };
 use std::{ffi::CString, os::unix::ffi::OsStrExt, path::Path};

@@ -44,7 +44,7 @@ use std::{
 /// Macro to build a specific Releasable and OwnedRef.
 #[macro_export]
 macro_rules! make_ownership_types {
-    ($($suffix:ident)?, $self:ty, $take_self:ty) => { paste::paste! {
+    ($($suffix:ident)?, $self:ty, $take_self:ty, $take_res:ty) => { paste::paste! {
 
 /// The base trait for explicit ownership. Any `Releasable` object must call `release` before
 /// being dropped.
@@ -146,7 +146,7 @@ impl<T> [< OwnedRef $($suffix)? >]<T> {
 impl<T: [< Releasable $($suffix)? >]> [< OwnedRef $($suffix)? >]<T> {
     /// Take the releasable from the `OwnedRef`. Returns None if the `OwnedRef` is not the last
     /// reference to the data.
-    pub fn take(this: $take_self) -> Option<impl for<'a> [< Releasable $($suffix)? >]<Context<'a> = T::Context<'a>>> {
+    pub fn take(this: $take_self) -> Option<$take_res> {
         this.drop_guard.disarm();
         let inner = Self::inner(&this);
         let previous_count = inner.owned_refs_count.fetch_sub(1, Ordering::Release);
@@ -444,6 +444,16 @@ impl<T> ReleaseGuard<T> {
     }
 }
 
+impl<T> ReleaseGuard<T> {
+    /// Disarm this release guard.
+    ///
+    /// This will prevent any runtime check that the `value` has been correctly released.
+    pub fn take(this: ReleaseGuard<T>) -> T {
+        this.drop_guard.disarm();
+        this.value
+    }
+}
+
 #[cfg(test)]
 impl<T: Default> ReleaseGuard<T> {
     pub fn default_released() -> Self {
@@ -728,9 +738,14 @@ impl<T> OwnedRef<T> {
     }
 }
 
-make_ownership_types!(ByRef, &Self, &Self);
-make_ownership_types!(ByMut, &mut Self, &mut Self);
-make_ownership_types!(, Self, &mut Self);
+make_ownership_types!(
+    ByRef,
+    &Self,
+    &Self,
+    impl for<'a> ReleasableByRef<Context<'a> = T::Context<'a>>
+);
+make_ownership_types!(ByMut, &mut Self, &mut Self, ReleaseGuard<T>);
+make_ownership_types!(, Self, &mut Self, ReleaseGuard<T>);
 
 /// Macro that ensure the releasable is released with the given context if the body returns an
 /// error.

@@ -12,7 +12,7 @@ use starnix_lock::Mutex;
 use starnix_uapi::{
     errno,
     errors::Errno,
-    ownership::{release_after, ReleasableByRef, WeakRef},
+    ownership::{release_after, Releasable, WeakRef},
 };
 use std::{
     ffi::CString,

@@ -29,7 +29,7 @@ use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use starnix_uapi::{
     errors::Errno,
     open_flags::OpenFlags,
-    ownership::{release_on_error, ReleasableByRef},
+    ownership::{release_on_error, Releasable},
     uapi,
 };
 use std::{ffi::CString, sync::Arc};

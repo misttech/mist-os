@@ -26,7 +26,7 @@ use crate::{
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    errors::Errno, open_flags::OpenFlags, ownership::ReleasableByRef, user_address::UserAddress,
+    errors::Errno, open_flags::OpenFlags, ownership::Releasable, user_address::UserAddress,
     MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 

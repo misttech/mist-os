@@ -36,7 +36,7 @@ use starnix_uapi::{
     gid_t,
     kcmp::KcmpResource,
     open_flags::OpenFlags,
-    ownership::{release_on_error, ReleasableByRef, WeakRef},
+    ownership::{release_on_error, Releasable, WeakRef},
     pid_t,
     resource_limits::Resource,
     rlimit, rusage, sched_param,

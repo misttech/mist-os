@@ -43,7 +43,7 @@ use starnix_uapi::{
     errors::{SourceContext, ENOENT},
     mount_flags::MountFlags,
     open_flags::OpenFlags,
-    ownership::{release_on_error, ReleasableByRef},
+    ownership::{release_on_error, Releasable},
     pid_t,
     resource_limits::Resource,
     rlimit,
@@ -535,7 +535,8 @@ async fn wait_for_init_file(
 mod test {
     use super::wait_for_init_file;
     use crate::{
-        fs::FdNumber, testing::create_kernel_and_task, testing::create_kernel_task_and_unlocked,
+        fs::FdNumber,
+        testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
     };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};

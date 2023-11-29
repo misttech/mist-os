@@ -18,7 +18,7 @@ use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
     errors::Errno,
-    ownership::{OwnedRefByRef, WeakRef},
+    ownership::{OwnedRef, WeakRef},
     pid_t,
     signals::{SigSet, Signal, UncheckedSignal, SIGKILL, SIGSTOP, SIGTRAP},
     user_address::{UserAddress, UserRef},
@@ -447,7 +447,7 @@ pub fn ptrace_traceme(current_task: &mut CurrentTask) -> Result<(), Errno> {
 
     let parent = current_task.thread_group.read().parent.clone();
     if let Some(parent) = parent {
-        let task_ref = OwnedRefByRef::temp(&current_task.task);
+        let task_ref = OwnedRef::temp(&current_task.task);
         do_attach(&parent, (&task_ref).into(), PtraceAttachType::Attach)
     } else {
         error!(EPERM)

@@ -42,7 +42,7 @@ use starnix_uapi::{
     file_mode::{Access, FileMode},
     from_status_like_fdio,
     open_flags::OpenFlags,
-    ownership::{release_on_error, OwnedRefByRef, ReleasableByRef, TempRef, WeakRef},
+    ownership::{release_on_error, OwnedRef, Releasable, TempRef, WeakRef},
     pid_t,
     signals::{SigSet, Signal, SIGBUS, SIGILL, SIGSEGV, SIGTRAP},
     sock_filter, sock_fprog,
@@ -68,7 +68,7 @@ use starnix_uapi::{
 /// See also `Task` for more information about tasks.
 pub struct CurrentTask {
     /// The underlying task object.
-    pub task: OwnedRefByRef<Task>,
+    pub task: OwnedRef<Task>,
 
     pub thread_state: ThreadState,
 }
@@ -94,13 +94,13 @@ pub struct ThreadState {
 type SyscallRestartFunc =
     dyn FnOnce(&mut CurrentTask) -> Result<SyscallResult, Errno> + Send + Sync;
 
-impl ReleasableByRef for CurrentTask {
+impl Releasable for CurrentTask {
     type Context<'a> = ();
 
-    fn release(&self, _: ()) {
+    fn release(self, _: ()) {
         self.notify_robust_list();
         let _ignored = self.clear_child_tid_if_needed();
-        self.task.release(self);
+        self.task.release(self.thread_state);
     }
 }
 
@@ -119,7 +119,7 @@ impl fmt::Debug for CurrentTask {
 
 impl CurrentTask {
     fn new(task: Task) -> CurrentTask {
-        CurrentTask { task: OwnedRefByRef::new(task), thread_state: Default::default() }
+        CurrentTask { task: OwnedRef::new(task), thread_state: Default::default() }
     }
 
     pub fn trigger_delayed_releaser(&self) {
