@@ -645,7 +645,7 @@ pub fn default_ioctl(
 
 pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {
     not_implemented!("fcntl: command=0x{:x}", cmd);
-    error!(EOPNOTSUPP)
+    error!(EINVAL)
 }
 
 pub struct OPathOps {}
