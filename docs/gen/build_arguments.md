@@ -2586,7 +2586,7 @@ flag platform_enable_user_pci in //src/devices/bus/drivers/pci/pci.gni.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:85
+From //zircon/kernel/params.gni:94
 
 ### discoverable_package_labels
 
@@ -2704,7 +2704,7 @@ disabled.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:147
+From //zircon/kernel/params.gni:156
 
 ### enable_mdns_trace
 
@@ -2966,7 +2966,7 @@ memory usage overheads, but will not exhaust due to fragmentation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:109
+From //zircon/kernel/params.gni:118
 
 ### escher_test_for_glsl_spirv_mismatch
 
@@ -3257,13 +3257,21 @@ non-SDK buildroots.
 
 From //build/fuchsia/sdk.gni:17
 
+### futex_block_tracing_enabled
+
+TODO(johngro): document
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:73
+
 ### futex_tracing_enabled
 
 Enables kernel tracing of futex interactions
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:67
+From //zircon/kernel/params.gni:76
 
 ### fvm_partition
 
@@ -3911,25 +3919,25 @@ value regardless of whether persistent tracing is enabled or not.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:126
+From //zircon/kernel/params.gni:135
 
 ### jtrace_last_entry_storage
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:127
+From //zircon/kernel/params.gni:136
 
 ### jtrace_target_buffer_size
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:128
+From //zircon/kernel/params.gni:137
 
 ### jtrace_use_large_entries
 
 **Current value (from the default):** `"auto"`
 
-From //zircon/kernel/params.gni:129
+From //zircon/kernel/params.gni:138
 
 ### kernel_base
 
@@ -3944,7 +3952,7 @@ on ProcessDispatcher creation.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:133
+From //zircon/kernel/params.gni:142
 
 ### kernel_debug_level
 
@@ -3957,7 +3965,7 @@ the two and set kernel_debug_level independently.
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:97
+From //zircon/kernel/params.gni:106
 
 ### kernel_debug_print_level
 
@@ -3969,7 +3977,7 @@ the more dprintf messages emitted. Valid values are 0-2 (inclusive):
 
 **Current value (from the default):** `2`
 
-From //zircon/kernel/params.gni:104
+From //zircon/kernel/params.gni:113
 
 ### kernel_extra_defines
 
@@ -3978,7 +3986,7 @@ Extra macro definitions for kernel code, e.g. "DISABLE_KASLR",
 
 **Current value (from the default):** `[]`
 
-From //zircon/kernel/params.gni:89
+From //zircon/kernel/params.gni:98
 
 ### kernel_extra_deps
 
@@ -3997,7 +4005,7 @@ Build a kernel with no user-space support, for development only.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:136
+From //zircon/kernel/params.gni:145
 
 ### kernel_version_string
 
@@ -5310,7 +5318,7 @@ cacheline size of the target architecture.
 
 **Current value (from the default):** `128`
 
-From //zircon/kernel/params.gni:116
+From //zircon/kernel/params.gni:125
 
 ### platform_enable_user_pci
 
@@ -7393,6 +7401,17 @@ debugging changes to the scheduler's behavior.
 
 From //zircon/kernel/params.gni:60
 
+### scheduler_lock_spin_tracing_compressed
+
+Enables compressed records when tracing lock-spin events.  The events will
+be more difficult to interpret in a trace visualizer, but will take less
+space and provide the same information to scripts which parse lock trace
+data.
+
+**Current value (from the default):** `false`
+
+From //zircon/kernel/params.gni:70
+
 ### scheduler_lock_spin_tracing_enabled
 
 Enables scheduler lock-spinning trace events for trace-based scheduler
@@ -8386,7 +8405,7 @@ Build an ELF kernel rather than a ZBI image kernel.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:139
+From //zircon/kernel/params.gni:148
 
 ### use_gigaboot
 
@@ -8731,7 +8750,7 @@ zero add increasing details at the cost of increased trace buffer use.
 
 **Current value (from the default):** `0`
 
-From //zircon/kernel/params.gni:81
+From //zircon/kernel/params.gni:90
 
 ### vulkan_host_runtime_dir
 
@@ -8770,7 +8789,7 @@ frequently the change depth.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/params.gni:72
+From //zircon/kernel/params.gni:81
 
 ### warn_on_sdk_changes
 
