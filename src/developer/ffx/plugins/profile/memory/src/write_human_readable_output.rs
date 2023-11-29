@@ -42,19 +42,40 @@ fn print_processes_digest<W: Write>(
     size_formatter: fn(u64) -> String,
 ) -> Result<()> {
     for process in processes {
-        writeln!(w, "Process name: {}", process.name)?;
-        writeln!(w, "Process koid: {}", process.koid)?;
-        writeln!(w, "Private:      {}", size_formatter(process.memory.private))?;
+        writeln!(w, "Process name:         {}", process.name)?;
+        writeln!(w, "Process koid:         {}", process.koid)?;
+        writeln!(w, "Private:              {}", size_formatter(process.memory.private))?;
+        if process.memory.private != process.memory.private_populated {
+            writeln!(
+                w,
+                "Private uncompressed: {}",
+                size_formatter(process.memory.private_populated)
+            )?;
+        }
         writeln!(
             w,
-            "PSS:          {} (Proportional Set Size)",
+            "PSS:                  {} (Proportional Set Size)",
             size_formatter(process.memory.scaled)
         )?;
+        if process.memory.scaled != process.memory.scaled_populated {
+            writeln!(
+                w,
+                "PSS uncompressed:     {}",
+                size_formatter(process.memory.scaled_populated)
+            )?;
+        }
         writeln!(
             w,
-            "Total:        {} (Private + Shared unscaled)",
+            "Total:                {} (Private + Shared unscaled)",
             size_formatter(process.memory.total)
         )?;
+        if process.memory.total != process.memory.total_populated {
+            writeln!(
+                w,
+                "Total uncompressed:   {}",
+                size_formatter(process.memory.total_populated)
+            )?;
+        }
 
         let vmo_names = filter_and_order_vmo_groups_names_for_printing(&process.name_to_vmo_memory);
         // Find the longest name. Use that length during formatting to align the column after
@@ -105,9 +126,6 @@ fn print_complete_digest<W: Write>(
 ) -> Result<()> {
     writeln!(w, "Time:  {} ns", digest.time)?;
     writeln!(w, "VMO:   {}", size_formatter(digest.total_committed_bytes_in_vmos))?;
-    if let Some(zram_compressed) = digest.kernel.zram_compressed_total {
-        writeln!(w, "ZRAM:  {}", size_formatter(zram_compressed))?;
-    }
     writeln!(w, "Free:  {}", size_formatter(digest.kernel.free))?;
     writeln!(w)?;
     writeln!(w, "Task:      kernel")?;
@@ -123,6 +141,12 @@ fn print_complete_digest<W: Write>(
     writeln!(w, "    heap:  {}", size_formatter(digest.kernel.total_heap))?;
     writeln!(w, "    mmu:   {}", size_formatter(digest.kernel.mmu))?;
     writeln!(w, "    ipc:   {}", size_formatter(digest.kernel.ipc))?;
+    if let Some(zram) = digest.kernel.zram_compressed_total {
+        writeln!(w, "    zram:  {}", size_formatter(zram))?;
+        writeln!(w, "    other: {}", size_formatter(digest.kernel.other - zram))?;
+    } else {
+        writeln!(w, "    other: {}", size_formatter(digest.kernel.other))?;
+    }
     writeln!(w)?;
 
     let sorted_buckets = {
@@ -292,16 +316,76 @@ mod tests {
         })
     }
 
+    fn data_for_test_with_compression() -> crate::ProfileMemoryOutput {
+        ProcessDigest(ProcessesMemoryUsage {
+            capture_time: 123,
+            process_data: vec![processed::Process {
+                koid: 4,
+                name: "P".to_string(),
+                memory: RetainedMemory {
+                    private: 11,
+                    scaled: 22,
+                    total: 33,
+                    private_populated: 1100,
+                    scaled_populated: 2200,
+                    total_populated: 3300,
+                    vmos: vec![],
+                },
+                name_to_vmo_memory: {
+                    let mut result = HashMap::new();
+                    result.insert(
+                        "vmoC".to_string(),
+                        processed::RetainedMemory {
+                            private: 4444,
+                            scaled: 55555,
+                            total: 666666,
+                            private_populated: 44440,
+                            scaled_populated: 555550,
+                            total_populated: 6666660,
+                            vmos: vec![],
+                        },
+                    );
+                    result.insert(
+                        "vmoB".to_string(),
+                        processed::RetainedMemory {
+                            private: 4444,
+                            scaled: 55555,
+                            total: 666666,
+                            private_populated: 44440,
+                            scaled_populated: 555550,
+                            total_populated: 6666660,
+                            vmos: vec![],
+                        },
+                    );
+                    result.insert(
+                        "vmoA".to_string(),
+                        processed::RetainedMemory {
+                            private: 44444,
+                            scaled: 555555,
+                            total: 6666666,
+                            private_populated: 44440,
+                            scaled_populated: 555550,
+                            total_populated: 6666660,
+                            vmos: vec![],
+                        },
+                    );
+                    result
+                },
+                vmos: HashSet::new(),
+            }],
+        })
+    }
+
     #[test]
     fn write_human_readable_output_exact_sizes_test() {
         let mut writer = Vec::new();
         let _ = write_human_readable_output(&mut writer, data_for_test(), true);
         let actual_output = std::str::from_utf8(&writer).unwrap();
-        let expected_output = r#"Process name: P
-Process koid: 4
-Private:      11 B
-PSS:          22 B (Proportional Set Size)
-Total:        33 B (Private + Shared unscaled)
+        let expected_output = r#"Process name:         P
+Process koid:         4
+Private:              11 B
+PSS:                  22 B (Proportional Set Size)
+Total:                33 B (Private + Shared unscaled)
               Private       Scaled        Total
     vmoA      44444 B     555555 B    6666666 B     (shared)
     vmoB       4444 B      55555 B     666666 B     (shared)
@@ -316,11 +400,33 @@ Total:        33 B (Private + Shared unscaled)
         let mut writer = Vec::new();
         let _ = write_human_readable_output(&mut writer, data_for_test(), false);
         let actual_output = std::str::from_utf8(&writer).unwrap();
-        let expected_output = r#"Process name: P
-Process koid: 4
-Private:      11 B
-PSS:          22 B (Proportional Set Size)
-Total:        33 B (Private + Shared unscaled)
+        let expected_output = r#"Process name:         P
+Process koid:         4
+Private:              11 B
+PSS:                  22 B (Proportional Set Size)
+Total:                33 B (Private + Shared unscaled)
+              Private       Scaled        Total
+    vmoA    43.40 KiB   542.53 KiB     6.36 MiB     (shared)
+    vmoB     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
+    vmoC     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
+
+"#;
+        pretty_assertions::assert_eq!(actual_output, expected_output);
+    }
+
+    #[test]
+    fn write_human_readable_output_human_friendly_sizes_with_compression_test() {
+        let mut writer = Vec::new();
+        let _ = write_human_readable_output(&mut writer, data_for_test_with_compression(), false);
+        let actual_output = std::str::from_utf8(&writer).unwrap();
+        let expected_output = r#"Process name:         P
+Process koid:         4
+Private:              11 B
+Private uncompressed: 1.07 KiB
+PSS:                  22 B (Proportional Set Size)
+PSS uncompressed:     2.15 KiB
+Total:                33 B (Private + Shared unscaled)
+Total uncompressed:   3.22 KiB
               Private       Scaled        Total
     vmoA    43.40 KiB   542.53 KiB     6.36 MiB     (shared)
     vmoB     4.34 KiB    54.25 KiB   651.04 KiB     (shared)
