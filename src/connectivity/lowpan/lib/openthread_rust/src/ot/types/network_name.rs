@@ -47,17 +47,14 @@ impl Ord for NetworkName {
 impl NetworkName {
     /// Tries to create a network name instance from the given byte slice.
     pub fn try_from_slice(slice: &[u8]) -> Result<Self, ot::WrongSize> {
-        use std::mem::transmute;
-
         let len = slice.len();
         if len > OT_NETWORK_NAME_MAX_SIZE as usize {
             return Err(ot::WrongSize);
         }
 
         sa::assert_eq_size!(u8, ::std::os::raw::c_char);
-
-        // SAFETY: Casting signed bytes to unsigned bytes is defined behavior.
-        let slice = unsafe { transmute::<&[u8], &[::std::os::raw::c_char]>(slice) };
+        let slice =
+            zerocopy::Ref::<_, [::std::os::raw::c_char]>::new_slice(slice).unwrap().into_slice();
 
         let mut ret = NetworkName::default();
         ret.0.m8[0..len].clone_from_slice(slice);
@@ -73,13 +70,10 @@ impl NetworkName {
 
     /// Returns the network name as a byte slice with no trailing zeros.
     pub fn as_slice(&self) -> &[u8] {
-        use std::mem::transmute;
-        sa::assert_eq_size!(u8, ::std::os::raw::c_char);
+        use zerocopy::AsBytes as _;
 
-        unsafe {
-            // SAFETY: Casting signed bytes to unsigned bytes is defined behavior.
-            transmute::<&[::std::os::raw::c_char], &[u8]>(&self.0.m8[0..self.len()])
-        }
+        sa::assert_eq_size!(u8, ::std::os::raw::c_char);
+        self.0.m8[0..self.len()].as_bytes()
     }
 
     /// Creates a `Vec<u8>` from the raw bytes of this network name.

@@ -5,7 +5,6 @@
 use super::*;
 
 use std::marker::PhantomData;
-use std::mem::transmute;
 use std::task::{Context, Waker};
 
 /// OpenThread instance.
@@ -42,7 +41,7 @@ unsafe impl ot::Boxable for Instance {
             //         `otPlatUdp*` methods will simply fail with an error,
             //         including `otPlatUdpClose`. In general, we only get away
             //         with this because we are finalizing.
-            otPlatUdpClose(transmute(socket.as_ot_ptr()));
+            otPlatUdpClose(socket.as_ot_ptr() as *mut _);
         }
 
         debug!("Instance::finalize(): Finalizing otInstance...");

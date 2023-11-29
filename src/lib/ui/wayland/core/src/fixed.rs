@@ -65,7 +65,7 @@ impl Into<f32> for Fixed {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
+    use zerocopy::transmute;
 
     use super::*;
 
@@ -77,13 +77,13 @@ mod tests {
         let fixed: Fixed = 257.into();
         assert_eq!(1.00390625, fixed.to_float());
 
-        unsafe {
-            let fixed: Fixed = mem::transmute::<u32, i32>(0xffffff00).into();
-            assert_eq!(-1.0, fixed.to_float());
+        let i: i32 = transmute!(0xffffff00u32);
+        let fixed: Fixed = i.into();
+        assert_eq!(-1.0, fixed.to_float());
 
-            let fixed: Fixed = mem::transmute::<u32, i32>(0xfffffeff).into();
-            assert_eq!(-1.00390625, fixed.to_float());
-        }
+        let i: i32 = transmute!(0xfffffeffu32);
+        let fixed: Fixed = i.into();
+        assert_eq!(-1.00390625, fixed.to_float());
     }
 
     #[test]
@@ -94,12 +94,12 @@ mod tests {
         let fixed: Fixed = 1.00390625.into();
         assert_eq!(257, fixed.bits());
 
-        unsafe {
-            let fixed: Fixed = (-1.0).into();
-            assert_eq!(mem::transmute::<u32, i32>(0xffffff00), fixed.bits());
+        let fixed: Fixed = (-1.0).into();
+        let i: i32 = transmute!(0xffffff00u32);
+        assert_eq!(i, fixed.bits());
 
-            let fixed: Fixed = (-1.00390625).into();
-            assert_eq!(mem::transmute::<u32, i32>(0xfffffeff), fixed.bits());
-        }
+        let fixed: Fixed = (-1.00390625).into();
+        let i: i32 = transmute!(0xfffffeffu32);
+        assert_eq!(i, fixed.bits());
     }
 }
