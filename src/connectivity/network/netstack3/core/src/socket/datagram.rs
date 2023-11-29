@@ -5594,7 +5594,7 @@ mod test {
         }
 
         fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
-            addr.to_ipv6_mapped()
+            addr.to_ipv6_mapped().get()
         }
 
         fn to_other_bound_socket_id(&self, id: Id) -> Id {
@@ -6069,8 +6069,7 @@ mod test {
         local_ip: Ipv6Addr,
         remote_ip: Ipv4Addr,
     ) {
-        // Safe to unwrap as ipv4-mapped-ipv6 addresses are always specified.
-        let remote_ip = SpecifiedAddr::new(remote_ip.to_ipv6_mapped()).unwrap();
+        let remote_ip = remote_ip.to_ipv6_mapped();
         connect_reinserts_on_failure_inner::<Ipv6>(original, local_ip, remote_ip);
     }
 

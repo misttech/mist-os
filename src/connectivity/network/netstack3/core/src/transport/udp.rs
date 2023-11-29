@@ -907,8 +907,7 @@ where
 {
     fn from(c: ConnAddr<<A::Version as DualStackIpExt>::DualStackConnIpAddr<Udp>, D>) -> Self {
         fn to_ipv6_mapped(a: SpecifiedAddr<Ipv4Addr>) -> SpecifiedAddr<Ipv6Addr> {
-            // Safe to unwrap; ipv4-mapped-ipv6 addresses are always specified.
-            SpecifiedAddr::new(a.get().to_ipv6_mapped()).unwrap()
+            a.get().to_ipv6_mapped()
         }
 
         let ConnAddr { ip, device } = c;
@@ -1002,7 +1001,9 @@ where
                 }
                 DualStackListenerIpAddr::OtherStack(ListenerIpAddr { addr, identifier }) => (
                     SpecifiedAddr::new(
-                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr).to_ipv6_mapped(),
+                        addr.map_or(Ipv4::UNSPECIFIED_ADDRESS, SocketIpAddr::addr)
+                            .to_ipv6_mapped()
+                            .get(),
                     ),
                     IpInvariant(identifier),
                 ),
@@ -1519,8 +1520,8 @@ fn try_dual_stack_deliver<
                 DualStackOutputs::CurrentStack(Outputs { src_ip, dst_ip, socket })
             }
             EitherIpSocket::V6(socket) => DualStackOutputs::OtherStack(Outputs {
-                src_ip: src_ip.to_ipv6_mapped(),
-                dst_ip: dst_ip.to_ipv6_mapped(),
+                src_ip: src_ip.to_ipv6_mapped().get(),
+                dst_ip: dst_ip.to_ipv6_mapped().get(),
                 socket,
             }),
         },
@@ -2235,7 +2236,7 @@ impl<
     }
 
     fn from_other_ip_addr(&self, addr: Ipv4Addr) -> Ipv6Addr {
-        addr.to_ipv6_mapped()
+        *addr.to_ipv6_mapped()
     }
 
     fn to_other_bound_socket_id(&self, id: SocketId<Ipv6>) -> EitherIpSocket<Udp> {

@@ -1643,9 +1643,10 @@ impl Ipv4Addr {
     ///
     /// [RFC 4291 Section 2.5.5.2]: https://tools.ietf.org/html/rfc4291#section-2.5.5.2
     #[inline]
-    pub fn to_ipv6_mapped(self) -> Ipv6Addr {
+    pub fn to_ipv6_mapped(self) -> SpecifiedAddr<Ipv6Addr> {
         let Self([a, b, c, d]) = self;
-        Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, a, b, c, d])
+        SpecifiedAddr::new(Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, a, b, c, d]))
+            .unwrap()
     }
 
     /// Returns the address's class according to the obsoleted classful
@@ -1980,7 +1981,7 @@ impl sealed::Sealed for Ipv6Addr {}
 /// [`Ipv4Addr::to_ipv6_mapped`].
 impl From<Ipv4Addr> for Ipv6Addr {
     fn from(addr: Ipv4Addr) -> Ipv6Addr {
-        addr.to_ipv6_mapped()
+        *addr.to_ipv6_mapped()
     }
 }
 
@@ -3969,7 +3970,7 @@ mod tests {
             Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4])
         );
         assert_eq!(
-            Ipv4Addr::new([1, 2, 3, 4]).to_ipv6_mapped(),
+            Ipv4Addr::new([1, 2, 3, 4]).to_ipv6_mapped().get(),
             Ipv6Addr::from([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, 1, 2, 3, 4]),
         );
 
