@@ -81,8 +81,7 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
 
   void Stop(fdf::Arena& arena, StopCompleter::Sync& completer) override {
     ZX_ASSERT(driver_);
-    driver_->PrepareStop(
-        fdf::PrepareStopCompleter([this](zx::result<> result) { binding_.reset(); }));
+    driver_->PrepareStop(fdf::PrepareStopCompleter([this](zx::result<> result) { StopBinding(); }));
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_framework::Driver> metadata,
@@ -101,6 +100,16 @@ class DriverServer : public fdf::WireServer<fuchsia_driver_framework::Driver> {
   }
 
  private:
+  void StopBinding() {
+    if (fdf_dispatcher_get_current_dispatcher() == dispatcher_) {
+      binding_.reset();
+      return;
+    }
+
+    async::PostTask(fdf_dispatcher_get_async_dispatcher(dispatcher_),
+                    [this]() { binding_.reset(); });
+  }
+
   fdf_dispatcher_t* dispatcher_;
   std::optional<fdf::ServerBinding<fuchsia_driver_framework::Driver>> binding_;
   std::unique_ptr<fdf::DriverBase> driver_;
