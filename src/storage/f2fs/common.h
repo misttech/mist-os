@@ -9,6 +9,7 @@
 #include <zircon/listnode.h>
 #include <zircon/types.h>
 
+#include <fbl/no_destructor.h>
 #include <safemath/checked_math.h>
 
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
@@ -152,23 +153,9 @@ class BlockBuffer {
   void *data_ = nullptr;
 };
 
-class GlobalLock final {
- public:
-  GlobalLock(const GlobalLock &) = delete;
-  GlobalLock &operator=(const GlobalLock &) = delete;
-  GlobalLock(GlobalLock &&) = delete;
-  GlobalLock &operator=(GlobalLock &&) = delete;
-  GlobalLock() { mutex_ = std::make_unique<fs::SharedMutex>(); }
-
-  fs::SharedMutex &get() { return *mutex_; }
-
- private:
-  std::unique_ptr<fs::SharedMutex> mutex_;
-};
-
 inline fs::SharedMutex &GetGlobalLock() {
-  static GlobalLock mutex;
-  return mutex.get();
+  static fbl::NoDestructor<fs::SharedMutex> global_lock;
+  return *global_lock;
 }
 
 }  // namespace f2fs
