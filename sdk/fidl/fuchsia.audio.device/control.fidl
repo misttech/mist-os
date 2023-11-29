@@ -56,9 +56,9 @@ type DelayInfo = table {
 
     /// The amount of pipeline delay beyond the interconnect (subsequent to the
     /// DMA "read" position for output devices, or prior to the DMA "write"
-    /// position for input devices). This duration must be non-negative.
+    /// position for input devices). If present, this duration must be non-negative.
     ///
-    /// Required.
+    /// Optional.
     2: external_delay zx.Duration;
 };
 

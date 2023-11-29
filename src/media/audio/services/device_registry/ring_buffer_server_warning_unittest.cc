@@ -399,7 +399,7 @@ TEST_F(RingBufferServerWarningTest, WatchDelayInfoWhileAlreadyWatching) {
         ASSERT_TRUE(result.is_ok()) << result.error_value().FormatDescription();
         ASSERT_TRUE(result->delay_info());
         ASSERT_TRUE(result->delay_info()->internal_delay());
-        ASSERT_FALSE(result->delay_info()->external_delay());
+        EXPECT_FALSE(result->delay_info()->external_delay());
         EXPECT_THAT(result->delay_info()->internal_delay(), Optional(0u));
         received_callback = true;
       });

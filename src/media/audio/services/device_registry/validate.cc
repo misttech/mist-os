@@ -10,9 +10,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <string>
 
-#include "fidl/fuchsia.hardware.audio/cpp/common_types.h"
-#include "src/media/audio/services/device_registry/device.h"
 #include "src/media/audio/services/device_registry/logging.h"
 
 namespace media_audio {
@@ -591,20 +590,19 @@ zx_status_t ValidateDelayInfo(const fuchsia_hardware_audio::DelayInfo& delay_inf
   ADR_LOG(kLogDeviceMethods);
 
   if (!delay_info.internal_delay()) {
-    FX_LOGS(WARNING) << "DelayInfo must set internal_delay";
+    FX_LOGS(WARNING) << "Reported DelayInfo.internal_delay is missing";
     return ZX_ERR_INVALID_ARGS;
   }
-  const auto int_delay = *delay_info.internal_delay();
-  const auto ext_delay = delay_info.external_delay().value_or(0);
-  if (int_delay < 0) {
-    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'internal_delay' (" << int_delay
+  const auto internal_delay = *delay_info.internal_delay();
+  if (internal_delay < 0) {
+    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'internal_delay' (" << internal_delay
                      << " ns) cannot be negative";
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (ext_delay < 0) {
-    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'external_delay' (" << ext_delay
-                     << " ns) cannot be negative";
+  if (delay_info.external_delay() && *delay_info.external_delay() < 0) {
+    FX_LOGS(WARNING) << "WatchDelayInfo: reported 'external_delay' ("
+                     << *delay_info.external_delay() << " ns) cannot be negative";
     return ZX_ERR_OUT_OF_RANGE;
   }
 
