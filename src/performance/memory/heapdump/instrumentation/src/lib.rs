@@ -22,11 +22,11 @@ use crate::recursion_guard::with_recursion_guard;
 // WARNING! Do not change this to use once_cell: once_cell uses parking_lot, which may allocate in
 // the contended case.
 lazy_static! {
-    pub static ref PROFILER: Profiler = with_recursion_guard(Default::default);
+    static ref PROFILER: Profiler = with_recursion_guard(Default::default);
 }
 
 thread_local! {
-    pub static THREAD_DATA: RefCell<PerThreadData> = with_recursion_guard(Default::default);
+    static THREAD_DATA: RefCell<PerThreadData> = with_recursion_guard(Default::default);
 }
 
 #[derive(Clone, Copy, Default)]
@@ -41,6 +41,17 @@ pub struct heapdump_global_stats {
 pub struct heapdump_thread_local_stats {
     pub total_allocated_bytes: u64,
     pub total_deallocated_bytes: u64,
+}
+
+// Calls `f` under a recursion guard, giving it access to the Profiler and the current thread's
+// PerThreadData.
+pub fn with_profiler(f: impl FnOnce(&Profiler, &mut PerThreadData)) {
+    let profiler = &*PROFILER;
+    THREAD_DATA.with(|thread_data| {
+        with_recursion_guard(|| {
+            f(profiler, &mut thread_data.borrow_mut());
+        })
+    })
 }
 
 /// # Safety
@@ -62,16 +73,13 @@ pub unsafe extern "C" fn heapdump_get_stats(
     global: *mut heapdump_global_stats,
     local: *mut heapdump_thread_local_stats,
 ) {
-    let profiler = &*PROFILER;
-    THREAD_DATA.with(|thread_data| {
-        with_recursion_guard(|| {
-            if global != std::ptr::null_mut() {
-                *global = profiler.get_global_stats();
-            }
-            if local != std::ptr::null_mut() {
-                *local = thread_data.borrow().get_local_stats();
-            }
-        });
+    with_profiler(|profiler, thread_data| {
+        if global != std::ptr::null_mut() {
+            *global = profiler.get_global_stats();
+        }
+        if local != std::ptr::null_mut() {
+            *local = thread_data.get_local_stats();
+        }
     });
 }
 

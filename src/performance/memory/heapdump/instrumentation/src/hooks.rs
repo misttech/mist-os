@@ -6,8 +6,7 @@ use fuchsia_zircon as zx;
 use heapdump_vmo::stack_trace_compression;
 use std::ffi::c_void;
 
-use crate::recursion_guard::with_recursion_guard;
-use crate::{PROFILER, THREAD_DATA};
+use crate::{with_profiler, PerThreadData, Profiler};
 
 const STACK_TRACE_MAXIMUM_DEPTH: usize = 64;
 const STACK_TRACE_MAXIMUM_COMPRESSED_SIZE: usize =
@@ -17,8 +16,11 @@ extern "C" {
     fn __sanitizer_fast_backtrace(buffer: *mut u64, buffer_size: usize) -> usize;
 }
 
-#[no_mangle]
-pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
+// Like `with_profiler`, but pass the current timestamp and the compressed call stack too.
+//
+// Note: This is function is `inline(always)` so that it doesn't appear in the stack trace.
+#[inline(always)]
+fn with_profiler_and_call_site(f: impl FnOnce(&Profiler, &mut PerThreadData, zx::Time, &[u8])) {
     // Collect the timestamp as early as possible.
     let timestamp = zx::Time::get_monotonic();
 
@@ -28,34 +30,37 @@ pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
         unsafe { __sanitizer_fast_backtrace(stack_buf.as_mut_ptr(), STACK_TRACE_MAXIMUM_DEPTH) };
     let stack = &stack_buf[..stack_len];
 
-    let profiler = &*PROFILER;
-    THREAD_DATA.with(|thread_data| {
-        with_recursion_guard(|| {
-            // Compress the stack trace.
-            let mut compressed_stack_buf = [0; STACK_TRACE_MAXIMUM_COMPRESSED_SIZE];
-            let compressed_stack_len =
-                stack_trace_compression::compress_into(stack, &mut compressed_stack_buf);
-            let compressed_stack = &compressed_stack_buf[..compressed_stack_len];
+    with_profiler(|profiler, thread_data| {
+        // Compress the stack trace.
+        let mut compressed_stack_buf = [0; STACK_TRACE_MAXIMUM_COMPRESSED_SIZE];
+        let compressed_stack_len =
+            stack_trace_compression::compress_into(stack, &mut compressed_stack_buf);
+        let compressed_stack = &compressed_stack_buf[..compressed_stack_len];
 
+        f(profiler, thread_data, timestamp, compressed_stack)
+    })
+}
+
+#[no_mangle]
+pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
+    with_profiler_and_call_site(|profiler, thread_data, timestamp, compressed_stack_trace| {
+        if ptr != std::ptr::null_mut() {
             profiler.record_allocation(
-                &mut thread_data.borrow_mut(),
+                thread_data,
                 ptr as u64,
                 size as u64,
-                compressed_stack,
+                compressed_stack_trace,
                 timestamp.into_nanos(),
             );
-        });
+        }
     });
 }
 
 #[no_mangle]
 pub extern "C" fn __scudo_deallocate_hook(ptr: *mut c_void) {
-    let profiler = &*PROFILER;
-    THREAD_DATA.with(|thread_data| {
-        with_recursion_guard(|| {
-            if ptr != std::ptr::null_mut() {
-                profiler.forget_allocation(&mut thread_data.borrow_mut(), ptr as u64);
-            }
-        });
+    with_profiler(|profiler, thread_data| {
+        if ptr != std::ptr::null_mut() {
+            profiler.forget_allocation(thread_data, ptr as u64);
+        }
     });
 }
