@@ -18,7 +18,7 @@ use std::convert::TryFrom;
 
 impl ErrorResponder for AccessibilitySetResponder {
     fn id(&self) -> &'static str {
-        "Privacy_Set"
+        "Accessibility_Set"
     }
 
     fn respond(self: Box<Self>, error: fidl_fuchsia_settings::Error) -> Result<(), fidl::Error> {
