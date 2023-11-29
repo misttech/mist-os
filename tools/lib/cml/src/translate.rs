@@ -1823,7 +1823,8 @@ pub fn translate_capabilities(
                 ..Default::default()
             }));
         } else if let Some(c) = &capability.config {
-            let value = configuration_to_value(c, &capability.config_type, &capability.value)?;
+            let value =
+                configuration_to_value(c, &capability, &capability.config_type, &capability.value)?;
             out_capabilities.push(fdecl::Capability::Config(fdecl::Configuration {
                 name: Some(c.clone().into()),
                 value: Some(value),
@@ -1923,6 +1924,7 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
 
 fn configuration_to_value(
     name: &Name,
+    capability: &Capability,
     config_type: &Option<cm::ConfigType>,
     value: &Option<serde_json::Value>,
 ) -> Result<fdecl::ConfigValue, Error> {
@@ -1949,6 +1951,44 @@ fn configuration_to_value(
         cm::ConfigType::Int16 => cm_rust::ConfigValueType::Int16,
         cm::ConfigType::Int32 => cm_rust::ConfigValueType::Int32,
         cm::ConfigType::Int64 => cm_rust::ConfigValueType::Int64,
+        cm::ConfigType::String => {
+            let Some(max_size) = capability.config_max_size else {
+                return Err(Error::InvalidArgs(format!(
+                    "Configuration field '{}' must have 'max_size' set",
+                    name
+                )));
+            };
+            cm_rust::ConfigValueType::String { max_size: max_size.into() }
+        }
+        cm::ConfigType::Vector => {
+            let Some(ref element) = capability.config_element_type else {
+                return Err(Error::InvalidArgs(format!(
+                    "Configuration field '{}' must have 'element_type' set",
+                    name
+                )));
+            };
+            let Some(max_count) = capability.config_max_count else {
+                return Err(Error::InvalidArgs(format!(
+                    "Configuration field '{}' must have 'max_count' set",
+                    name
+                )));
+            };
+            let nested_type = match element {
+                ConfigNestedValueType::Bool { .. } => cm_rust::ConfigNestedValueType::Bool,
+                ConfigNestedValueType::Uint8 { .. } => cm_rust::ConfigNestedValueType::Uint8,
+                ConfigNestedValueType::Uint16 { .. } => cm_rust::ConfigNestedValueType::Uint16,
+                ConfigNestedValueType::Uint32 { .. } => cm_rust::ConfigNestedValueType::Uint32,
+                ConfigNestedValueType::Uint64 { .. } => cm_rust::ConfigNestedValueType::Uint64,
+                ConfigNestedValueType::Int8 { .. } => cm_rust::ConfigNestedValueType::Int8,
+                ConfigNestedValueType::Int16 { .. } => cm_rust::ConfigNestedValueType::Int16,
+                ConfigNestedValueType::Int32 { .. } => cm_rust::ConfigNestedValueType::Int32,
+                ConfigNestedValueType::Int64 { .. } => cm_rust::ConfigNestedValueType::Int64,
+                ConfigNestedValueType::String { max_size } => {
+                    cm_rust::ConfigNestedValueType::String { max_size: (*max_size).into() }
+                }
+            };
+            cm_rust::ConfigValueType::Vector { max_count: max_count.into(), nested_type }
+        }
     };
     let value = config_value_file::field::config_value_from_json_value(value, &config_type)
         .map_err(|e| Error::InvalidArgs(format!("Error parsing config '{}': {}", name, e)))?;

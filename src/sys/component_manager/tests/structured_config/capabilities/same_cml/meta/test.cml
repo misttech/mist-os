@@ -55,6 +55,36 @@
             type: "int64",
             value: -64,
         },
+        {
+            config: "fuchsia.config.MyString",
+            type: "string",
+            max_size: 100,
+            value: "test",
+        },
+        {
+            config: "fuchsia.config.MyUint8Vector",
+            type: "vector",
+            element: { type: "uint8" },
+            max_count: 100,
+            value: [
+                1,
+                2,
+                3,
+            ],
+        },
+        {
+            config: "fuchsia.config.MyStringVector",
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            max_count: 100,
+            value: [
+                "Hello",
+                "World!",
+            ],
+        },
     ],
     use: [
         {
@@ -102,6 +132,21 @@
             config_key: "my_int64",
             config: "fuchsia.config.MyInt64",
         },
+        {
+            from: "self",
+            config_key: "my_string",
+            config: "fuchsia.config.MyString",
+        },
+        {
+            from: "self",
+            config_key: "my_uint8_vector",
+            config: "fuchsia.config.MyUint8Vector",
+        },
+        {
+            from: "self",
+            config_key: "my_string_vector",
+            config: "fuchsia.config.MyStringVector",
+        },
     ],
     config: {
         my_flag: { type: "bool" },
@@ -113,5 +158,22 @@
         my_int16: { type: "int16" },
         my_int32: { type: "int32" },
         my_int64: { type: "int64" },
+        my_string: {
+            type: "string",
+            max_size: 100,
+        },
+        my_uint8_vector: {
+            type: "vector",
+            element: { type: "uint8" },
+            max_count: 100,
+        },
+        my_string_vector: {
+            type: "vector",
+            element: {
+                type: "string",
+                max_size: 100,
+            },
+            max_count: 100,
+        },
     },
 }

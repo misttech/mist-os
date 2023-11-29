@@ -475,9 +475,31 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
         storage. Otherwise, the component's moniker from the storage
         capability is used.
 - `config_type`: (_optional `string`_) (`configuration only`) The type of configuration, one of:
-    - `bool`: This is a boolean configuration
+    - `bool`: Boolean type.
+    - `uint8`: Unsigned 8 bit type.
+    - `uint16`: Unsigned 16 bit type.
+    - `uint32`:Unsigned 32 bit type.
+    - `uint64`:Unsigned 64 bit type.
+    - `int8`: Signed 8 bit type.
+    - `int16`: Signed 16 bit type.
+    - `int32`: Signed 32 bit type.
+    - `int64`: Signed 64 bit type.
+    - `string`: ASCII string type.
+    - `vector`: Vector type. See `element_type` for the type of the element within the vector.
+- `config_max_size`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'string'.
+    This is the max size of the string.
+- `config_max_count`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'vector'.
+    This is the max amount of elements in the vector.
+- `config_element_type`: (_optional `string`_) (`configuration only`) Only supported if this configuration is type 'vector'.
+    This is the type of the elements in the configuration vector.
+    Example (simple type):
+     { type: "uint8" }
+    Example (string type):
+     {
+       type: "string",
+       max_size: 100,
+     }
 - `value`: (_optional `string`_) (`configuration only`) The value of the configuration.
-    If `config_type` is `bool`, the valid values are `true` and `false`.
 
 
 ### `use` {#use}

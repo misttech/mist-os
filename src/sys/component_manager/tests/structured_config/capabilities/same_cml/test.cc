@@ -26,5 +26,17 @@ TEST(ScTest, CheckValues) {
   ASSERT_EQ(c.my_int16(), -16);
   ASSERT_EQ(c.my_int32(), -32);
   ASSERT_EQ(c.my_int64(), -64);
+
+  // CVF sets this to "default", CML sets this to "test".
+  ASSERT_EQ(c.my_string(), "test");
+
+  ASSERT_EQ(c.my_uint8_vector().size(), 3);
+  ASSERT_EQ(c.my_uint8_vector()[0], 1);
+  ASSERT_EQ(c.my_uint8_vector()[1], 2);
+  ASSERT_EQ(c.my_uint8_vector()[2], 3);
+
+  ASSERT_EQ(c.my_string_vector().size(), 2);
+  ASSERT_EQ(c.my_string_vector()[0], "Hello");
+  ASSERT_EQ(c.my_string_vector()[1], "World!");
 }
 }  // namespace

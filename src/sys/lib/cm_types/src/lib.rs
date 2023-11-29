@@ -880,6 +880,8 @@ pub enum ConfigType {
     Int16,
     Int32,
     Int64,
+    String,
+    Vector,
 }
 
 #[cfg(test)]

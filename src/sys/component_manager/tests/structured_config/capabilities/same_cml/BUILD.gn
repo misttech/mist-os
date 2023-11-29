@@ -48,6 +48,9 @@ fuchsia_structured_config_values("values") {
     my_int16 = 0
     my_int32 = 0
     my_int64 = 0
+    my_string = "default"
+    my_uint8_vector = [ 0 ]
+    my_string_vector = [ "default" ]
   }
 }
 
