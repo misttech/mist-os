@@ -8,5 +8,6 @@ group("tests") {
     "usb:tests",
     "usb-endpoint:tests",
     "usb-monitor-util:tests",
+    "usb-phy:tests",
   ]
 }
