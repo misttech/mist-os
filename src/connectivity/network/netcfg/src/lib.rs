@@ -1932,10 +1932,10 @@ impl<'a> NetCfg<'a> {
         device_instance: &devices::NetworkDeviceInstance,
         stable_name: bool,
     ) -> Result<(), devices::AddDeviceError> {
-        let info =
+        let device_info =
             device_instance.get_device_info().await.context("error getting device info and MAC")?;
 
-        let DeviceInfo { mac, device_class, topological_path } = &info;
+        let DeviceInfo { mac, device_class, topological_path } = &device_info;
 
         let mac = mac.ok_or_else(|| {
             warn!("devices without mac address not supported yet");
@@ -1944,7 +1944,7 @@ impl<'a> NetCfg<'a> {
             )))
         })?;
 
-        let interface_type = info.interface_type();
+        let interface_type = device_info.interface_type();
         let metric = match interface_type {
             InterfaceType::Wlan => self.interface_metrics.wlan_metric,
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
@@ -1998,7 +1998,7 @@ impl<'a> NetCfg<'a> {
             interface_id.try_into().expect("interface ID should be nonzero"),
             control,
             interface_name,
-            &info,
+            &device_info,
             &mac,
         )
         .await
@@ -2018,12 +2018,12 @@ impl<'a> NetCfg<'a> {
         interface_name: String,
         // TODO(fxbug.dev/136874): Use DeviceInfoRef directly when the
         // same functions are  implemented for `is_wlan_ap`, `interface_type`
-        info: &DeviceInfo,
+        device_info: &DeviceInfo,
         // Pass the MAC separately although it is also present in DeviceInfo
         // since we have already unwrapped this Option.
         mac: &fidl_fuchsia_net_ext::MacAddress,
     ) -> Result<(), errors::Error> {
-        let class: DeviceClass = info.device_class.into();
+        let class: DeviceClass = device_info.device_class.into();
         let ForwardedDeviceClasses { ipv4, ipv6 } = &self.forwarded_device_classes;
         let ipv4_forwarding = ipv4.contains(&class);
         let ipv6_forwarding = ipv6.contains(&class);
@@ -2052,9 +2052,9 @@ impl<'a> NetCfg<'a> {
 
         let provisioning_action = interface::find_provisioning_action_from_provisioning_rules(
             &self.interface_provisioning_policy,
-            &info.topological_path,
+            &device_info.topological_path,
             &mac,
-            info.device_class,
+            device_info.device_class,
             &interface_name,
         );
         info!(
@@ -2062,7 +2062,7 @@ impl<'a> NetCfg<'a> {
             &interface_name, provisioning_action
         );
 
-        if info.is_wlan_ap() {
+        if device_info.is_wlan_ap() {
             if let Some(id) = self.interface_states.iter().find_map(|(id, state)| {
                 if state.is_wlan_ap() {
                     Some(id)
@@ -2105,7 +2105,7 @@ impl<'a> NetCfg<'a> {
                     control,
                     &self.stack,
                     interface_name,
-                    info,
+                    device_info,
                 )
                 .await
                 .context("error configuring wlan ap and dhcp server")?;
@@ -2169,7 +2169,7 @@ impl<'a> NetCfg<'a> {
                 &self.filter,
                 &self.stack,
                 interface_id,
-                info,
+                device_info,
                 // Disable in-stack DHCPv4 when provisioning is ignored.
                 self.dhcpv4_client_provider.is_none()
                     && provisioning_action == interface::ProvisioningAction::Local,
@@ -2199,11 +2199,11 @@ impl<'a> NetCfg<'a> {
         filter: &fnet_filter::FilterProxy,
         stack: &fnet_stack::StackProxy,
         interface_id: NonZeroU64,
-        info: &DeviceInfo,
+        device_info: &DeviceInfo,
         start_in_stack_dhcpv4: bool,
     ) -> Result<(), errors::Error> {
         filter_enabled_state
-            .maybe_update(Some(info.interface_type()), interface_id, filter)
+            .maybe_update(Some(device_info.interface_type()), interface_id, filter)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
@@ -2236,7 +2236,7 @@ impl<'a> NetCfg<'a> {
         control: &fidl_fuchsia_net_interfaces_ext::admin::Control,
         stack: &fidl_fuchsia_net_stack::StackProxy,
         name: String,
-        info: &DeviceInfo,
+        device_info: &DeviceInfo,
     ) -> Result<(), errors::Error> {
         let (address_state_provider, server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_net_interfaces_admin::AddressStateProviderMarker,
@@ -2245,7 +2245,7 @@ impl<'a> NetCfg<'a> {
         .map_err(errors::Error::Fatal)?;
 
         filter_enabled_state
-            .maybe_update(Some(info.interface_type()), interface_id, filter)
+            .maybe_update(Some(device_info.interface_type()), interface_id, filter)
             .await
             .map_err(|e| {
                 anyhow::anyhow!("failed to update filter on nic {interface_id} with error = {e:?}")
