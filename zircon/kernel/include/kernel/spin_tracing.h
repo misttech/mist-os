@@ -14,12 +14,33 @@
 
 namespace spin_tracing {
 
+template <bool Enabled = kSchedulerLockSpinTracingEnabled>
+class SpinTracingTimestamp;
+
+template <>
+class SpinTracingTimestamp<false> {
+ public:
+  constexpr SpinTracingTimestamp() = default;
+  constexpr uint64_t value() const { return 0; }
+};
+
+template <>
+class SpinTracingTimestamp<true> {
+ public:
+  SpinTracingTimestamp() = default;
+  uint64_t value() const { return value_; }
+
+ private:
+  const uint64_t value_{ktrace_timestamp()};
+};
+
 template <bool TraceInstrumented = false>
 class Tracer {
  public:
   constexpr Tracer() = default;
   constexpr explicit Tracer(zx_ticks_t) {}
-  constexpr void Finish(FinishType, EncodedLockId) const {}
+  constexpr void Finish(FinishType, EncodedLockId,
+                        SpinTracingTimestamp<false> = SpinTracingTimestamp<false>{}) const {}
 };
 
 template <>
@@ -28,7 +49,8 @@ class Tracer<true> {
   Tracer() = default;
   explicit constexpr Tracer(zx_ticks_t ticks) : start_{static_cast<uint64_t>(ticks)} {}
 
-  void Finish(FinishType finish_type, EncodedLockId elid) const {
+  void Finish(FinishType finish_type, EncodedLockId elid,
+              SpinTracingTimestamp<true> end_time = SpinTracingTimestamp<true>{}) const {
     const uint16_t class_name = static_cast<uint16_t>(
         (elid.class_name() != fxt::InternedString::kInvalidId) ? elid.class_name()
                                                                : "<unknown>"_intern.GetId());
@@ -38,7 +60,7 @@ class Tracer<true> {
     const bool blocked_after = (finish_type == FinishType::kBlocked);
 
     FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
-                     "lock_spin"_intern, start_, ktrace_timestamp(), TraceContext::Thread,
+                     "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
                      ("lock_id", lock_id),
                      ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
                      ("lock_type", lock_type), ("blocked_after", blocked_after));

@@ -314,7 +314,12 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
     now_ticks = current_ticks();
   } while (now_ticks < spin_until_ticks);
 
-  spin_tracer.Finish(spin_tracing::FinishType::kBlocked, this->encoded_lock_id());
+  // Capture the end-of-spin timestamp for our spin tracer, but do not finish
+  // the event just yet. We don't actually know if we are going to block or not
+  // yet; we have one last chance to grab the lock after we obtain a few more
+  // spinlocks.  Once we have dropped into the final locks, we should be able to
+  // produce our spin-record using the timestamp explicitly recorded here.
+  spin_tracing::SpinTracingTimestamp spin_end_ts{};
 
   if ((LK_DEBUGLEVEL > 0) && unlikely(this->IsHeld())) {
     panic("Mutex::Acquire: thread %p (%s) tried to acquire mutex %p it already owns.\n",
@@ -350,6 +355,8 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
         // flag.
         val_.store(new_mutex_state, ktl::memory_order_relaxed);
         RecordInitialAssignedCpu();
+        spin_tracer.Finish(spin_tracing::FinishType::kLockAcquired, this->encoded_lock_id(),
+                           spin_end_ts);
 
         if constexpr (TimesliceExtensionEnabled) {
           return Thread::Current::preemption_state().SetTimesliceExtension(
@@ -359,6 +366,7 @@ __NO_INLINE bool Mutex::AcquireContendedMutex(
       }
     }
 
+    spin_tracer.Finish(spin_tracing::FinishType::kBlocked, this->encoded_lock_id(), spin_end_ts);
     const uint64_t flow_id = current_thread->TakeNextLockFlowId();
     LOCK_TRACE_FLOW_BEGIN("contend_mutex", flow_id);
 
