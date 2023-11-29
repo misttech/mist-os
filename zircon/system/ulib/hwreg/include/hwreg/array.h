@@ -15,7 +15,7 @@
 
 namespace hwreg {
 
-// An hwreg::ArrayIo is an IoProvider for use with <hwreg/bitfields.h> types
+// An hwreg::ArrayIo is an IoProvider for use with "bitfields.h" types
 // that simply holds a std::span of the underlying integer type and does normal
 // memory access on it. This can be either a fixed-size or a dynamic span. The
 // `offset` arguments to the hwreg API methods are used as the index into the

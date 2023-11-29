@@ -13,7 +13,7 @@
 #include <mutex>
 #include <type_traits>
 
-#include <hwreg/mmio.h>
+#include "mmio.h"
 
 namespace hwreg {
 

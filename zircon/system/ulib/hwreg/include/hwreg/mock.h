@@ -10,7 +10,7 @@
 #include <optional>
 #include <type_traits>
 
-#include <hwreg/internal.h>
+#include "internal.h"
 
 namespace hwreg {
 

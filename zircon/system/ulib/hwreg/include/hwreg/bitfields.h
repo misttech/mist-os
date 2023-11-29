@@ -11,8 +11,8 @@
 
 #include <type_traits>
 
-#include <hwreg/internal.h>
-#include <hwreg/mmio.h>
+#include "internal.h"
+#include "mmio.h"
 
 // This file provides some helpers for accessing bitfields in registers.
 //

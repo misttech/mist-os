@@ -10,7 +10,7 @@
 #include <string_view>
 #include <type_traits>
 
-#include <hwreg/bitfields.h>
+#include "bitfields.h"
 
 namespace hwreg {
 

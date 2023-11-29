@@ -8,7 +8,7 @@
 #include "internal.h"
 
 #if !defined(__x86_64__) && !defined(__i386__)
-#error "<hwreg/x86msr.h> is for x86 only"
+#error ""x86msr.h" is for x86 only"
 #endif
 
 namespace hwreg {

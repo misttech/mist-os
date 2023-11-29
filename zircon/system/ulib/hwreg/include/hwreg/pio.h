@@ -11,7 +11,7 @@
 #include <type_traits>
 #include <variant>
 
-#include <hwreg/mmio.h>
+#include "mmio.h"
 
 namespace hwreg {
 
