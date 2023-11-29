@@ -19,6 +19,7 @@ sdk_source_set("cpp") {
     "connect.h",
     "device_server.cc",
     "device_server.h",
+    "metadata.h",
     "service_offers.cc",
     "service_offers.h",
   ]
