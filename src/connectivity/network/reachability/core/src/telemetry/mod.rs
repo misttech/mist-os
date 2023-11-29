@@ -9,8 +9,10 @@ use self::inspect::{inspect_record_stats, Stats};
 use crate::{IpVersions, State};
 
 use anyhow::{format_err, Context, Error};
-use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
+use cobalt_client::traits::AsEventCode;
+use fidl_fuchsia_metrics::MetricEvent;
 use fuchsia_async as fasync;
+use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_zircon as zx;
 use futures::channel::{mpsc, oneshot};
@@ -343,30 +345,33 @@ impl Telemetry {
 
         if let Some(prev) = &self.state_summary {
             if prev.system_state.has_interface_up() {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::REACHABILITY_STATE_UP_OR_ABOVE_DURATION_METRIC_ID,
-                    event_codes: vec![],
-                    payload: MetricEventPayload::IntegerValue(duration_cobalt.into_micros()),
-                });
+                metric_events.push(
+                    MetricEvent::builder(
+                        metrics::REACHABILITY_STATE_UP_OR_ABOVE_DURATION_METRIC_ID,
+                    )
+                    .as_integer(duration_cobalt.into_micros()),
+                );
 
                 let route_config_dim = convert::convert_route_config(&prev.system_state);
-                let internet_available_dim =
+                let internet_available =
                     convert::convert_yes_no_dim(prev.system_state.has_internet());
-                let gateway_reachable_dim =
+                let gateway_reachable =
                     convert::convert_yes_no_dim(prev.system_state.has_gateway());
-                let dns_active_dim = convert::convert_yes_no_dim(prev.dns_active);
+                let dns_active = convert::convert_yes_no_dim(prev.dns_active);
                 // We only log metric when at least one of IPv4 or IPv6 is in the SystemState.
-                if let Some(route_config_dim) = route_config_dim {
-                    metric_events.push(MetricEvent {
-                        metric_id: metrics::REACHABILITY_GLOBAL_SNAPSHOT_DURATION_METRIC_ID,
-                        event_codes: vec![
-                            route_config_dim as u32,
-                            internet_available_dim as u32,
-                            gateway_reachable_dim as u32,
-                            dns_active_dim as u32,
-                        ],
-                        payload: MetricEventPayload::IntegerValue(duration_cobalt.into_micros()),
-                    });
+                if let Some(route_config) = route_config_dim {
+                    metric_events.push(
+                        MetricEvent::builder(
+                            metrics::REACHABILITY_GLOBAL_SNAPSHOT_DURATION_METRIC_ID,
+                        )
+                        .with_event_codes(metrics::ReachabilityGlobalSnapshotDurationEventCodes {
+                            route_config,
+                            internet_available,
+                            gateway_reachable,
+                            dns_active,
+                        })
+                        .as_integer(duration_cobalt.into_micros()),
+                    );
                 }
 
                 if prev.system_state.has_internet() {
@@ -384,11 +389,11 @@ impl Telemetry {
             if previously_reachable && !now_reachable {
                 let route_config_dim = convert::convert_route_config(&prev.system_state);
                 if let Some(route_config_dim) = route_config_dim {
-                    metric_events.push(MetricEvent {
-                        metric_id: metrics::REACHABILITY_LOST_METRIC_ID,
-                        event_codes: vec![route_config_dim as u32],
-                        payload: MetricEventPayload::Count(1),
-                    });
+                    metric_events.push(
+                        MetricEvent::builder(metrics::REACHABILITY_LOST_METRIC_ID)
+                            .with_event_code(route_config_dim.as_event_code())
+                            .as_occurrence(1),
+                    );
                     self.reachability_lost_at = Some((now, route_config_dim));
                 }
                 self.stats.lock().reachability_lost_count.log_value(&1);
@@ -396,13 +401,11 @@ impl Telemetry {
 
             if !previously_reachable && now_reachable {
                 if let Some((reachability_lost_at, route_config_dim)) = self.reachability_lost_at {
-                    metric_events.push(MetricEvent {
-                        metric_id: metrics::REACHABILITY_LOST_DURATION_METRIC_ID,
-                        event_codes: vec![route_config_dim as u32],
-                        payload: MetricEventPayload::IntegerValue(
-                            (now - reachability_lost_at).into_micros(),
-                        ),
-                    });
+                    metric_events.push(
+                        MetricEvent::builder(metrics::REACHABILITY_LOST_DURATION_METRIC_ID)
+                            .with_event_code(route_config_dim.as_event_code())
+                            .as_integer((now - reachability_lost_at).into_micros()),
+                    );
                 }
                 self.reachability_lost_at = None;
             }
@@ -446,16 +449,20 @@ impl Telemetry {
             );
             // We only log metric when at least one of IPv4 or IPv6 has default route.
             if let Some(default_route_dim) = default_route_dim {
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_DURATION_METRIC_ID,
-                    event_codes: vec![default_route_dim as u32],
-                    payload: MetricEventPayload::IntegerValue(duration.into_micros()),
-                });
-                metric_events.push(MetricEvent {
-                    metric_id: metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_OCCURRENCE_METRIC_ID,
-                    event_codes: vec![default_route_dim as u32],
-                    payload: MetricEventPayload::Count(1),
-                });
+                metric_events.push(
+                    MetricEvent::builder(
+                        metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_DURATION_METRIC_ID,
+                    )
+                    .with_event_code(default_route_dim.as_event_code())
+                    .as_integer(duration.into_micros()),
+                );
+                metric_events.push(
+                    MetricEvent::builder(
+                        metrics::REACHABILITY_GLOBAL_DEFAULT_ROUTE_OCCURRENCE_METRIC_ID,
+                    )
+                    .with_event_code(default_route_dim.as_event_code())
+                    .as_occurrence(1),
+                );
             }
         }
 
@@ -507,6 +514,7 @@ impl Telemetry {
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_metrics::MetricEventPayload;
     use fuchsia_inspect::Inspector;
     use fuchsia_zircon::DurationNum;
     use futures::task::Poll;
