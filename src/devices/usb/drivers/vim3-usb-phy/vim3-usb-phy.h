@@ -8,28 +8,26 @@
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.phy/cpp/driver/fidl.h>
 #include <lib/async/cpp/irq.h>
-#include <lib/device-protocol/pdev-fidl.h>
+#include <lib/ddk/platform-defs.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
-#include <threads.h>
 
-#include <ddktl/device.h>
-#include <ddktl/protocol/empty-protocol.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
-#include <soc/aml-common/aml-registers.h>
 #include <usb/usb.h>
 
 namespace vim3_usb_phy {
 
-class Vim3UsbPhy;
-using Vim3UsbPhyType =
-    ddk::Device<Vim3UsbPhy, ddk::Initializable, ddk::Unbindable, ddk::ChildPreReleaseable>;
+class Vim3UsbPhyDevice;
 
 // This is the main class for the platform bus driver.
-class Vim3UsbPhy : public Vim3UsbPhyType,
-                   public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy>,
-                   public ddk::EmptyProtocol<ZX_PROTOCOL_USB_PHY> {
+// The Vim3UsbPhy driver manages 3 different controllers:
+//  - One USB 2.0 controller that is only supports host mode.
+//  - One USB 2.0 controller that supports OTG (both host and device mode).
+//  - One USB 3.0 controller that only supports host mode.
+class Vim3UsbPhy : public fdf::Server<fuchsia_hardware_usb_phy::UsbPhy> {
  public:
   // Public for testing.
   enum class UsbMode {
@@ -38,28 +36,55 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
     PERIPHERAL,
   };
 
-  explicit Vim3UsbPhy(zx_device_t* parent) : Vim3UsbPhyType(parent) {}
+  class UsbPhy2 {
+   public:
+    UsbPhy2(uint8_t idx, fdf::MmioBuffer mmio, bool is_otg_capable, usb_mode_t dr_mode)
+        : idx_(idx), mmio_(std::move(mmio)), is_otg_capable_(is_otg_capable), dr_mode_(dr_mode) {}
 
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+    void SetMode(UsbMode mode, Vim3UsbPhy* device);  // Must hold parent's lock_ while calling.
+
+    uint8_t idx() const { return idx_; }
+    fdf::MmioBuffer& mmio() { return mmio_; }
+    bool is_otg_capable() const { return is_otg_capable_; }
+    usb_mode_t dr_mode() const { return dr_mode_; }
+
+    // Public for testing.
+    UsbMode mode() { return phy_mode_; }
+
+   private:
+    const uint8_t idx_;  // For indexing into usbctrl_mmio.
+    fdf::MmioBuffer mmio_;
+    const bool is_otg_capable_;
+    const usb_mode_t dr_mode_;  // USB Controller Mode. Internal to Driver.
+
+    UsbMode phy_mode_ =
+        UsbMode::UNKNOWN;  // Physical USB mode. Must hold parent's lock_ while accessing.
+  };
+
+  Vim3UsbPhy(Vim3UsbPhyDevice* controller,
+             fidl::ClientEnd<fuchsia_hardware_registers::Device> reset_register,
+             std::array<uint32_t, 8> pll_settings, fdf::MmioBuffer usbctrl_mmio, UsbPhy2 usbphy20,
+             UsbPhy2 usbphy21, fdf::MmioBuffer usbphy3_mmio, zx::interrupt irq)
+      : controller_(controller),
+        reset_register_(std::move(reset_register)),
+        usbctrl_mmio_(std::move(usbctrl_mmio)),
+        usbphy2_({std::move(usbphy20), std::move(usbphy21)}),
+        usbphy3_mmio_(std::move(usbphy3_mmio)),
+        irq_(std::move(irq)),
+        pll_settings_(pll_settings) {}
+  ~Vim3UsbPhy() override {
+    irq_handler_.Cancel();
+    irq_.destroy();
+  }
+
+  zx_status_t Init();
 
   // fuchsia_hardware_usb_phy::UsbPhy required methods
   void ConnectStatusChanged(ConnectStatusChangedRequest& request,
                             ConnectStatusChangedCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_usb_phy::UsbPhy> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {
-    zxlogf(ERROR, "Unknown method %lu", metadata.method_ordinal);
-  }
-
-  // Device protocol implementation.
-  void DdkInit(ddk::InitTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkChildPreRelease(void* child_ctx);
-  void DdkRelease();
-
-  // Public for testing.
-  UsbMode mode() {
-    fbl::AutoLock lock(&lock_);
-    return phy_mode_;
+    FDF_LOG(ERROR, "Unknown method %lu", metadata.method_ordinal);
   }
 
  private:
@@ -74,45 +99,84 @@ class Vim3UsbPhy : public Vim3UsbPhyType,
   uint32_t CrBusRead(uint32_t addr);
   zx_status_t CrBusWrite(uint32_t addr, uint32_t data);
 
-  // Called when |SetMode| completes.
-  using SetModeCompletion = fit::callback<void(void)>;
-  void SetMode(UsbMode mode, SetModeCompletion completion) __TA_REQUIRES(lock_);
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
 
-  zx_status_t AddXhciDevice() __TA_REQUIRES(lock_);
-  void RemoveXhciDevice(SetModeCompletion completion) __TA_REQUIRES(lock_);
-  zx_status_t AddDwc2Device() __TA_REQUIRES(lock_);
-  void RemoveDwc2Device(SetModeCompletion completion) __TA_REQUIRES(lock_);
+  Vim3UsbPhyDevice* controller_;
 
-  zx_status_t Init();
-  int IrqThread();
-
-  ddk::PDevFidl pdev_;
   fidl::WireSyncClient<fuchsia_hardware_registers::Device> reset_register_;
-  std::optional<fdf::MmioBuffer> usbctrl_mmio_;
-  std::optional<fdf::MmioBuffer> usbphy20_mmio_;
-  std::optional<fdf::MmioBuffer> usbphy21_mmio_;
-  std::optional<fdf::MmioBuffer> usbphy3_mmio_;
+  fdf::MmioBuffer usbctrl_mmio_;
+  std::array<UsbPhy2, 2> usbphy2_;
+  fdf::MmioBuffer usbphy3_mmio_;
 
   zx::interrupt irq_;
-  thrd_t irq_thread_;
-  std::atomic_bool irq_thread_started_ = false;
+  async::IrqMethod<Vim3UsbPhy, &Vim3UsbPhy::HandleIrq> irq_handler_{this};
 
   fbl::Mutex lock_;
 
   // Magic numbers for PLL from metadata
-  uint32_t pll_settings_[8];
+  const std::array<uint32_t, 8> pll_settings_;
 
-  // Device node for binding XHCI driver.
-  zx_device_t* xhci_device_ __TA_GUARDED(lock_) = nullptr;
-  zx_device_t* dwc2_device_ __TA_GUARDED(lock_) = nullptr;
-
-  UsbMode phy_mode_ __TA_GUARDED(lock_) = UsbMode::UNKNOWN;  // Physical USB mode.
-  usb_mode_t dr_mode_ = USB_MODE_OTG;  // USB Controller Mode. Internal to Driver.
   bool dwc2_connected_ = false;
+};
 
-  // If set, indicates that the device has a pending SetMode which
-  // will be completed once |DdkChildPreRelease| is called.
-  SetModeCompletion set_mode_completion_ __TA_GUARDED(lock_);
+class Vim3UsbPhyDevice : public fdf::DriverBase {
+ private:
+  static constexpr char kDeviceName[] = "vim3_usb_phy";
+
+ public:
+  Vim3UsbPhyDevice(fdf::DriverStartArgs start_args,
+                   fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)) {}
+  zx::result<> Start() override;
+  void Stop() override;
+
+  zx::result<> AddXhci() { return AddDevice(xhci_); }
+  zx::result<> RemoveXhci() { return RemoveDevice(xhci_); }
+  zx::result<> AddDwc2() { return AddDevice(dwc2_); }
+  zx::result<> RemoveDwc2() { return RemoveDevice(dwc2_); }
+
+ private:
+  friend class Vim3UsbPhyTest;
+
+  zx::result<> CreateNode();
+
+  struct ChildNode {
+    explicit ChildNode(std::string_view name, uint32_t property_did)
+        : name_(name), property_did_(property_did) {}
+
+    void reset() __TA_REQUIRES(lock_) {
+      count_ = 0;
+      if (controller_) {
+        auto result = controller_->Remove();
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Failed to remove %s. %s", name_.data(),
+                  result.FormatDescription().c_str());
+        }
+        controller_.TakeClientEnd().reset();
+      }
+      compat_server_.reset();
+    }
+
+    const std::string_view name_;
+    const uint32_t property_did_;
+
+    fbl::Mutex lock_;
+    fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_ __TA_GUARDED(lock_);
+    std::optional<compat::DeviceServer> compat_server_ __TA_GUARDED(lock_);
+    std::atomic_uint32_t count_ __TA_GUARDED(lock_) = 0;
+  };
+  zx::result<> AddDevice(ChildNode& node);
+  zx::result<> RemoveDevice(ChildNode& node);
+
+  std::unique_ptr<Vim3UsbPhy> device_;
+
+  fdf::ServerBindingGroup<fuchsia_hardware_usb_phy::UsbPhy> bindings_;
+  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+
+  ChildNode xhci_{"xhci", PDEV_DID_USB_XHCI_COMPOSITE};
+  ChildNode dwc2_{"dwc2", PDEV_DID_USB_DWC2};
 };
 
 }  // namespace vim3_usb_phy

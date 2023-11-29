@@ -19,8 +19,7 @@ driver_bind_rules("vim3_usb_phy_bind") {
   ]
 }
 
-fuchsia_driver("vim3-usb-phy-driver") {
-  output_name = "vim3-usb-phy"
+source_set("common") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
@@ -28,19 +27,32 @@ fuchsia_driver("vim3-usb-phy-driver") {
   sources = [ "vim3-usb-phy.cc" ]
   deps = [
     ":vim3_usb_phy_bind",
+    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/amlogic",
-    "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zx",
+  ]
+}
+
+fuchsia_driver("vim3-usb-phy-driver") {
+  output_name = "vim3-usb-phy"
+  configs += [
+    "//build/config:all_source",
+    "//build/config/fuchsia:enable_zircon_asserts",
+  ]
+  deps = [
+    ":common",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
@@ -54,6 +66,30 @@ fuchsia_driver_component("vim3-usb-phy") {
 fuchsia_driver_package("package") {
   package_name = "vim3-usb-phy"
   driver_components = [ ":vim3-usb-phy" ]
+}
+
+test("vim3-usb-phy-test-bin") {
+  configs += [ "//build/config:all_source" ]
+  sources = [ "vim3-usb-phy-test.cc" ]
+  output_name = "vim3-usb-phy-test"
+  deps = [
+    ":common",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/registers/testing/mock-registers",
+    "//src/devices/testing/fake-mmio-reg",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("vim3-usb-phy-test") {
+  deps = [ ":vim3-usb-phy-test-bin" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

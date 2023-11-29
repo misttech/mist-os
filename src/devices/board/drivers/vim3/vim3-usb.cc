@@ -16,6 +16,7 @@
 #include <cstring>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/usb/phy/cpp/bind.h>
@@ -78,6 +79,16 @@ static const uint32_t pll_settings[] = {
     0x09400414, 0x927e0000, 0xac5f69e5, 0xfe18, 0x8000fff, 0x78000, 0xe0004, 0xe000c,
 };
 
+// vim3_usb_phy manages 3 different controllers:
+//  - One USB 2.0 controller that is only supports host mode.
+//  - One USB 2.0 controller that supports OTG (both host and device mode).
+//  - One USB 3.0 controller that only supports host mode.
+// The two USB-A ports both are connected to the USB 2.0 host only controller. The USB-A port
+// closest to the ethernet port is connected also the the USB 3.0 host only controller. The USB-C
+// port is connected to the USB 2.0 OTG controller, however, we only want the USB-C port to be in
+// peripheral mode to support USB-CDC use-case. dr_mode only refers to the OTG capable USB 2.0
+// controller that is on the Vim3. We define this to be peripheral mode only because we want to
+// support the USB-CDC use-case.
 static const usb_mode_t dr_mode = USB_MODE_PERIPHERAL;
 
 static const std::vector<fpbus::Metadata> usb_phy_metadata{
@@ -221,7 +232,8 @@ static fpbus::Node dwc2_dev = []() {
 zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
   const std::vector<fdf::BindRule> kDwc2PhyRules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -231,7 +243,14 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   };
 
   const std::vector<fdf::NodeProperty> kDwc2PhyProperties = std::vector{
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_USB_DWC2),
   };
 
   const std::vector<fdf::ParentSpec> kDwc2Parents{{kDwc2PhyRules, kDwc2PhyProperties}};
@@ -255,7 +274,8 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                              fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
   const std::vector<fuchsia_driver_framework::BindRule> kXhciCompositeRules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_usb_phy::SERVICE,
+                              bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
@@ -264,7 +284,8 @@ zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
                               bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
   };
   const std::vector<fuchsia_driver_framework::NodeProperty> kXhciCompositeProperties = {
-      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia_hardware_usb_phy::SERVICE,
+                        bind_fuchsia_hardware_usb_phy::SERVICE_DRIVERTRANSPORT),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
                         bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
       fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
