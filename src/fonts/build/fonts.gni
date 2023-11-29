@@ -20,9 +20,6 @@ all_font_file_paths = []
 # Default prefix for the manifest file name in /config/data.
 _default_manifest_prefix = "all"
 
-# Default name of the Fuchsia package containing the font service component.
-_default_font_service_pkg = "fonts"
-
 foreach(font_pkgs_path, font_pkgs_paths) {
   parsed = {
   }
@@ -51,13 +48,6 @@ foreach(font_pkgs_path, font_pkgs_paths) {
 #   asset_names
 #     Required: List of font file names, e.g. [ "Roboto-Regular.ttf" ]
 #     Type: list(file)
-#
-#   font_service_pkg
-#     Optional: Name of the Fuchsia package containing the font service
-#     component, used in `config_data` rules to provide data files to that
-#     package.
-#     Default: "fonts"
-#     Type: string
 template("local_font_bundle") {
   forward_variables_from(invoker,
                          [
@@ -65,10 +55,6 @@ template("local_font_bundle") {
                            "font_service_pkg",
                          ])
   assert(defined(asset_names))
-
-  if (!defined(font_service_pkg)) {
-    font_service_pkg = _default_font_service_pkg
-  }
 
   local_asset_paths = []
   not_found_asset_names = []
@@ -94,14 +80,6 @@ template("local_font_bundle") {
   assert(not_found_asset_names == [],
          "font_pkg_entries not found for ${not_found_asset_names}")
 
-  config_data_label = "_${target_name}_config_data"
-  config_data(config_data_label) {
-    forward_variables_from(invoker, [ "testonly" ])
-    for_pkg = font_service_pkg
-    sources = local_asset_paths
-    outputs = [ "assets/{{source_file_part}}" ]
-  }
-
   # Same as above, except bundled as regular assets.
   assets_label = "_${target_name}_assets"
   resource(assets_label) {
@@ -115,10 +93,7 @@ template("local_font_bundle") {
                              "testonly",
                              "visibility",
                            ])
-    deps = [
-      ":${assets_label}",
-      ":${config_data_label}",
-    ]
+    deps = [ ":${assets_label}" ]
     metadata = {
       local_font_file_names = asset_names
       font_barrier = []
@@ -171,13 +146,6 @@ template("local_font_bundle") {
 #     registry files.
 #     Type: boolean
 #
-#   font_service_pkg
-#     Optional: Name of the Fuchsia package containing the font service
-#     component, used in `config_data` rules to provide data files to that
-#     package.
-#     Default: "fonts"
-#     Type: string
-#
 #   generate_hermetic_assets
 #     Optional: If set, generates the hermetic font assets in addition to
 #     the config-data assets.
@@ -194,7 +162,6 @@ template("font_collection") {
   forward_variables_from(invoker,
                          [
                            "font_packages",
-                           "font_service_pkg",
                            "generate_hermetic_assets",
                            "assets_root_dir",
                            "local_asset_names",
@@ -223,10 +190,6 @@ template("font_collection") {
     manifest_prefix = _default_manifest_prefix
   }
 
-  if (!defined(font_service_pkg)) {
-    font_service_pkg = _default_font_service_pkg
-  }
-
   if (!defined(invoker.empty)) {
     invoker.empty = false
   }
@@ -236,8 +199,7 @@ template("font_collection") {
   }
 
   assert(
-      !(invoker.testonly && manifest_prefix == _default_manifest_prefix &&
-            font_service_pkg == _default_font_service_pkg),
+      !(invoker.testonly && manifest_prefix == _default_manifest_prefix),
       "Can't use default manifest_prefix '${manifest_prefix}' with a testonly font_collection.")
 
   # The font resolver in pkg_resolver expects a hard-coded location in
@@ -344,16 +306,6 @@ template("font_collection") {
     pretty_print = is_debug
   }
 
-  # Will appear at "/config/data/${manifest_prefix}.font_manifest.json"
-  font_manifest_config_data_label = "${target_name}_font_manifest_config_data"
-  config_data(font_manifest_config_data_label) {
-    forward_variables_from(invoker, [ "testonly" ])
-    for_pkg = font_service_pkg
-    deps = [ ":${manifest_file_label}" ]
-    sources = get_target_outputs(":${manifest_file_label}")
-    outputs = [ "${manifest_prefix}.font_manifest.json" ]
-  }
-
   # Also generate the font manifest for font resources that will get packaged
   # alongside the font manager.
   if (generate_hermetic_assets) {
@@ -397,7 +349,7 @@ template("font_collection") {
                              "visibility",
                            ])
 
-    deps = local_font_bundles + [ ":${font_manifest_config_data_label}" ]
+    deps = local_font_bundles
     if (generate_hermetic_assets) {
       deps += [ ":${font_assets_label}" ]
     }

@@ -154,21 +154,9 @@ fuchsia_test_component("web-semantics-test-component") {
   test_type = "system"
 }
 
-# The web engine requires a font provider for any test that attempts
-# to render text, and the font provider requires at least one font
-# asset.
-font_collection("single-font-collection") {
-  testonly = true
-  product_config_path =
-      "//src/ui/testing/data/single-font-collection.fontcfg.json5"
-  local_asset_names = [ "Roboto-Regular.ttf" ]
-  font_service_pkg = "web-semantics-test"
-}
-
 fuchsia_test_package("web-semantics-test") {
   test_components = [ ":web-semantics-test-component" ]
   deps = [
-    ":single-font-collection",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
