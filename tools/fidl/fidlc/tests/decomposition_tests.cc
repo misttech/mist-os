@@ -111,24 +111,25 @@ library example;
   ASSERT_EQUIVALENT(fidl, fidl, "LEGACY");
 }
 
-TEST(DecompositionTests, DefaultAddedAtHead) {
-  auto with_attribute = R"FIDL(
-@available(added=HEAD)
+// An unversioned library behaves the same as an unchanging versioned library.
+TEST(DecompositionTests, UnversionedLibrary) {
+  auto unversioned = R"FIDL(
 library example;
 
 type Foo = struct {};
 )FIDL";
 
-  auto without_attribute = R"FIDL(
+  auto versioned = R"FIDL(
+@available(added=1)
 library example;
 
 type Foo = struct {};
 )FIDL";
 
-  ASSERT_EQUIVALENT(with_attribute, without_attribute, "1");
-  ASSERT_EQUIVALENT(with_attribute, without_attribute, "2");
-  ASSERT_EQUIVALENT(with_attribute, without_attribute, "HEAD");
-  ASSERT_EQUIVALENT(with_attribute, without_attribute, "LEGACY");
+  ASSERT_EQUIVALENT(unversioned, versioned, "1");
+  ASSERT_EQUIVALENT(unversioned, versioned, "2");
+  ASSERT_EQUIVALENT(unversioned, versioned, "HEAD");
+  ASSERT_EQUIVALENT(unversioned, versioned, "LEGACY");
 }
 
 TEST(DecompositionTests, AbsentLibraryIsEmpty) {

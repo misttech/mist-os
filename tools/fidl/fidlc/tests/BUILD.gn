@@ -49,6 +49,7 @@ test("fidlc-test") {
     "coded_types_generator_tests.cc",
     "consts_tests.cc",
     "declaration_order_tests.cc",
+    "decomposition_tests.cc",
     "direct_dependencies_tests.cc",
     "enums_tests.cc",
     "errcat_docs_tests.cc",
