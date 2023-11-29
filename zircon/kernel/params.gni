@@ -69,6 +69,9 @@ declare_args() {
   # data.
   scheduler_lock_spin_tracing_compressed = false
 
+  # TODO(johngro): document
+  futex_block_tracing_enabled = false
+
   # Enables kernel tracing of futex interactions
   futex_tracing_enabled = false
 

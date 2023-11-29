@@ -33,6 +33,7 @@ namespace {  // file scope only
 // tracing by setting this top level flag to true, provided that their
 // investigation can tolerate the overhead.
 constexpr bool kEnableFutexKTracing = FUTEX_TRACING_ENABLED;
+constexpr bool kFutexBlockTracingEnabled = FUTEX_BLOCK_TRACING_ENABLED;
 
 class KTraceBase {
  public:
@@ -442,6 +443,10 @@ zx_status_t FutexContext::FutexWait(user_in_ptr<const zx_futex_t> value_ptr,
       // and wait on the futex wait queue, assigning ownership properly in the
       // process.
       {
+        ktrace::Scope block_tracer = KTRACE_BEGIN_SCOPE_ENABLE(
+            kFutexBlockTracingEnabled, "kernel:sched", "futex_block", ("futex_id", futex_id.get()),
+            ("blocking_tid", new_owner ? new_owner->tid() : ZX_KOID_INVALID));
+
         AutoEagerReschedDisabler eager_resched_disabler;
         Guard<MonitoredSpinLock, IrqSave> thread_lock_guard{ThreadLock::Get(), SOURCE_TAG};
         ThreadDispatcher::AutoBlocked by(ThreadDispatcher::Blocked::FUTEX);
