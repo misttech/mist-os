@@ -123,18 +123,18 @@ measure_parameters() {
     echo "THREAD_CCA_THRESHOLD=\"$(${OT_CLI_DUT} ccathreshold | head -n 1)\""
     if [ "$DUT_HAS_WL" = "1" ]
     then
-        echo "WL_VER=\"$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx ver | xargs)\""
-        echo "WL_PM=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx PM) # Power management mode"
-        echo "WL_ZBC_PARAMS_0=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 0) # Coex Enabled/Disabled"
-        echo "WL_ZBC_PARAMS_1=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 1)"
-        echo "WL_ZBC_PARAMS_4=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 4)"
-        echo "WL_ZBC_PARAMS_5=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 5) # WLAN abort counter"
-        echo "WL_ZBC_PARAMS_6=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 6) # RX response abort counter"
-        echo "WL_ZBC_PARAMS_7=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 7)"
-        echo "WL_ZBC_PARAMS_8=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 8) # Low priority coex table"
-        echo "WL_ZBC_PARAMS_12=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 12) # High priority coex table"
-        echo "WL_ZBC_PARAMS_22=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 22)"
-        echo "WL_ZBC_PARAMS_26=$(${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 26) # 802.15.4 request counter"
+        echo "WL_VER=\"$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh ver' | xargs)\""
+        echo "WL_PM=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh PM') # Power management mode"
+        echo "WL_ZBC_PARAMS_0=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 0') # Coex Enabled/Disabled"
+        echo "WL_ZBC_PARAMS_1=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 1')"
+        echo "WL_ZBC_PARAMS_4=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 4')"
+        echo "WL_ZBC_PARAMS_5=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 5') # WLAN abort counter"
+        echo "WL_ZBC_PARAMS_6=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 6') # RX response abort counter"
+        echo "WL_ZBC_PARAMS_7=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 7')"
+        echo "WL_ZBC_PARAMS_8=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 8') # Low priority coex table"
+        echo "WL_ZBC_PARAMS_12=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 12') # High priority coex table"
+        echo "WL_ZBC_PARAMS_22=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 22')"
+        echo "WL_ZBC_PARAMS_26=$(${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 26') # 802.15.4 request counter"
     fi
   ) > "${OUTPUT_DIR}/$name.other.DUT.txt"
   (
@@ -142,18 +142,18 @@ measure_parameters() {
     echo "THREAD_CCA_THRESHOLD=\"$(${OT_CLI_FDEV} ccathreshold | head -n 1)\""
     if [ "$FDEV_HAS_WL" = "1" ]
     then
-        echo "WL_VER=\"$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx ver | xargs)\""
-        echo "WL_PM=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx PM) # Power management mode"
-        echo "WL_ZBC_PARAMS_0=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 0) # Coex Enabled/Disabled"
-        echo "WL_ZBC_PARAMS_1=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 1)"
-        echo "WL_ZBC_PARAMS_4=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 4)"
-        echo "WL_ZBC_PARAMS_5=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 5) # WLAN abort counter"
-        echo "WL_ZBC_PARAMS_6=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 6) # RX response abort counter"
-        echo "WL_ZBC_PARAMS_7=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 7)"
-        echo "WL_ZBC_PARAMS_8=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 8) # Low priority coex table"
-        echo "WL_ZBC_PARAMS_12=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 12) # High priority coex table"
-        echo "WL_ZBC_PARAMS_22=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 22)"
-        echo "WL_ZBC_PARAMS_26=$(${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx zbc_params 26) # 802.15.4 request counter"
+        echo "WL_VER=\"$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh ver' | xargs)\""
+        echo "WL_PM=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh PM') # Power management mode"
+        echo "WL_ZBC_PARAMS_0=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 0') # Coex Enabled/Disabled"
+        echo "WL_ZBC_PARAMS_1=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 1')"
+        echo "WL_ZBC_PARAMS_4=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 4')"
+        echo "WL_ZBC_PARAMS_5=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 5') # WLAN abort counter"
+        echo "WL_ZBC_PARAMS_6=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 6') # RX response abort counter"
+        echo "WL_ZBC_PARAMS_7=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 7')"
+        echo "WL_ZBC_PARAMS_8=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 8') # Low priority coex table"
+        echo "WL_ZBC_PARAMS_12=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 12') # High priority coex table"
+        echo "WL_ZBC_PARAMS_22=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 22')"
+        echo "WL_ZBC_PARAMS_26=$(${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh zbc_params 26') # 802.15.4 request counter"
     fi
   ) > "${OUTPUT_DIR}/$name.other.FDEV.txt"
 }
@@ -479,22 +479,22 @@ which ping6 > /dev/null 2>&1 || die "ping6 was not found in path"
 setup_DUT
 setup_FDEV
 
-if (${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx ver > /dev/null 2>&1)
+if (${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh ver' > /dev/null 2>&1)
 then
   echo 'DUT has `wl` command.'
   DUT_HAS_WL=1
   echo "Turning off power save on DUT..."
-  ${FSHELL_DUT} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx PM 0 > /dev/null 2>&1
+  ${FSHELL_DUT} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh PM 0' > /dev/null 2>&1
 else
   echo 'DUT DOES NOT HAVE `wl` COMMAND.'
 fi
 
-if (${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx ver > /dev/null 2>&1)
+if (${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh ver' > /dev/null 2>&1)
 then
   echo 'FDEV has `wl` command.'
   FDEV_HAS_WL=1
   echo "Turning off power save on FDEV..."
-  ${FSHELL_FDEV} run fuchsia-pkg://fuchsia.com/wl#meta/wl.cmx PM 0 > /dev/null 2>&1
+  ${FSHELL_FDEV} '/pkgfs/versions/$(pkgctl get-hash fuchsia-pkg://fuchsia.com/wl)/scripts/bin_runner.sh PM 0' > /dev/null 2>&1
 else
   echo 'FDEV DOES NOT HAVE `wl` COMMAND.'
 fi
