@@ -824,7 +824,6 @@ impl<E> IntoErrno for core_datagram::SendToError<E> {
             core_datagram::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
                 err.into_errno()
             }
-            // TODO(https://fxbug.dev/21198): Verify the errnos with syscall tests.
             core_datagram::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Enetunreach,
             core_datagram::SendToError::RemoteUnexpectedlyNonMapped => fposix::Errno::Eafnosupport,
             core_datagram::SendToError::SerializeError(_e) => fposix::Errno::Einval,
