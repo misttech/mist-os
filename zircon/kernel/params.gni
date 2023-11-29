@@ -63,6 +63,12 @@ declare_args() {
   # performance analysis.
   scheduler_lock_spin_tracing_enabled = false
 
+  # Enables compressed records when tracing lock-spin events.  The events will
+  # be more difficult to interpret in a trace visualizer, but will take less
+  # space and provide the same information to scripts which parse lock trace
+  # data.
+  scheduler_lock_spin_tracing_compressed = false
+
   # Enables kernel tracing of futex interactions
   futex_tracing_enabled = false
 

@@ -15,6 +15,16 @@ constexpr bool kSchedulerLockSpinTracingEnabled = true;
 constexpr bool kSchedulerLockSpinTracingEnabled = false;
 #endif
 
+#if SCHEDULER_LOCK_SPIN_TRACING_COMPRESSED
+constexpr bool kSchedulerLockSpinTracingCompressed = true;
+#else
+constexpr bool kSchedulerLockSpinTracingCompressed = false;
+#endif
+
+static_assert(!kSchedulerLockSpinTracingCompressed || kSchedulerLockSpinTracingEnabled,
+              "Error: Compress lock-spin trace records requested, but lock-spin tracing is not "
+              "enabled.");
+
 namespace spin_tracing {
 
 namespace internal {
@@ -44,9 +54,9 @@ enum class FinishType {
 
 class EncodedLockId {
  public:
-  using IdBits = internal::Bitfield<uint64_t, 49, 0>;            // bits [ 0 .. 49]
+  using IdBits = internal::Bitfield<uint64_t, 49, 0>;            // bits [ 0 .. 48]
   using ClassNameBits = internal::Bitfield<uint16_t, 12, 49>;    // bits [49 .. 60]
-  using LockTypeBits = internal::Bitfield<LockType, 2, 62>;      // bits [61 .. 62]
+  using LockTypeBits = internal::Bitfield<LockType, 2, 61>;      // bits [61 .. 62]
   using FinishTypeBits = internal::Bitfield<FinishType, 1, 63>;  // bits [63 .. 63]
 
   constexpr EncodedLockId(LockType type, uint64_t lock_id, uint16_t class_name_id)
@@ -57,6 +67,10 @@ class EncodedLockId {
 
   void SetLockClassId(uint16_t class_name_id) {
     value_ = ClassNameBits::Reset(value_, class_name_id);
+  }
+
+  uint64_t FinishedValue(FinishType finish_type) {
+    return value_ | FinishTypeBits::Encode(finish_type);
   }
 
   constexpr uint64_t value() const { return value_; }

@@ -54,16 +54,30 @@ class Tracer<true> {
     const uint16_t class_name = static_cast<uint16_t>(
         (elid.class_name() != fxt::InternedString::kInvalidId) ? elid.class_name()
                                                                : "<unknown>"_intern.GetId());
-    const uint64_t lock_id = elid.id();
-    const auto& lock_type =
-        elid.lock_type() == LockType::kSpinlock ? "Spinlock"_intern : "Mutex"_intern;
-    const bool blocked_after = (finish_type == FinishType::kBlocked);
 
-    FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
-                     "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
-                     ("lock_id", lock_id),
-                     ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
-                     ("lock_type", lock_type), ("blocked_after", blocked_after));
+    if constexpr (!kSchedulerLockSpinTracingCompressed) {
+      const uint64_t lock_id = elid.id();
+      const auto& lock_type =
+          elid.lock_type() == LockType::kSpinlock ? "Spinlock"_intern : "Mutex"_intern;
+      const bool blocked_after = (finish_type == FinishType::kBlocked);
+
+      FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
+                       "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
+                       ("lock_id", lock_id),
+                       ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
+                       ("lock_type", lock_type), ("blocked_after", blocked_after));
+    } else {
+      // TODO(johngro): We could compress this even more if we omitted the
+      // dedicated lock_class field (we can extract the value from the elid
+      // instead).  To do this, I need to update my external scripts to process
+      // the native FXT format.  Currently, it depends on conversion to JSON
+      // before processing, which strips the string table from the data
+      // (embedding it directly into the JSON instead).
+      FXT_EVENT_COMMON(true, ktrace_category_enabled, ktrace::EmitComplete, "kernel:sched",
+                       "lock_spin"_intern, start_, end_time.value(), TraceContext::Thread,
+                       ("lock_class", fxt::StringRef<fxt::RefType::kId>{class_name}),
+                       ("elid", elid.FinishedValue(finish_type)));
+    }
   }
 
  private:
