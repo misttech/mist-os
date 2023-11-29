@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{
-        AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError,
-        Directory, Open, Request, Router,
+        router::Routable, AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer,
+        ConversionError, Directory, Open, Request, Router,
     },
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_request_stream,
@@ -19,7 +19,6 @@ use {
     std::collections::btree_map::Entry,
     std::collections::BTreeMap,
     std::fmt::Debug,
-    std::sync::Arc,
     thiserror::Error,
     vfs::{
         directory::{
@@ -178,6 +177,20 @@ impl TryInto<Open> for Dict {
     }
 }
 
+impl Routable for Dict {
+    fn route(&self, mut request: Request, completer: Completer) {
+        let Some(name) = request.relative_path.next() else {
+            completer.complete(Ok(Box::new(self.try_clone().unwrap())));
+            return;
+        };
+        let Some(capability) = self.entries.get(&name) else {
+            completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
+            return;
+        };
+        Router::from(capability).route(request, completer);
+    }
+}
+
 /// This error is returned when a [Dict] cannot be converted into an [Open] capability.
 #[derive(Error, Debug)]
 pub enum TryIntoOpenError {
@@ -245,20 +258,7 @@ impl Capability for Dict {
 ///   - If no entry found, close the completer with an error.
 impl AsRouter for Dict {
     fn as_router(&self) -> Router {
-        let dict: Dict = self.try_clone().unwrap();
-        let dict = Arc::new(dict);
-        let route_fn = move |mut request: Request, completer: Completer| {
-            let Some(name) = request.relative_path.next() else {
-                completer.complete(Ok(Box::new(dict.try_clone().unwrap())));
-                return;
-            };
-            let Some(capability) = dict.entries.get(&name) else {
-                completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
-                return;
-            };
-            Router::from(capability).route(request, completer);
-        };
-        Router::new(route_fn)
+        self.try_clone().unwrap().into()
     }
 }
 

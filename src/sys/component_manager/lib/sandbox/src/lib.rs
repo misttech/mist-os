@@ -32,5 +32,5 @@ pub use self::lazy::Lazy;
 pub use self::open::Open;
 pub use self::optional::Optional;
 pub use self::receiver::Receiver;
-pub use self::router::{route, AsRouter, Completer, Path, Request, Router};
+pub use self::router::{route, AsRouter, Completer, Path, Request, Routable, Router};
 pub use self::sender::Sender;

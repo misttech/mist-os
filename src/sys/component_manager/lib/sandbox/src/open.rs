@@ -4,7 +4,7 @@
 use {
     crate::{
         AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError,
-        Directory, Request, Router,
+        Directory, Request, Routable, Router,
     },
     core::fmt,
     fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -280,21 +280,21 @@ impl Capability for Open {
     }
 }
 
-/// [`Open`] can vend out routers. Each request from the router will yield a [`Directory`] or
-/// an [`Open`] which will with rights downscoped to `request.rights` and open paths relative to
-/// `request.relative_path` from the base [`Open`] object.
+impl Routable for Open {
+    /// Each request from the router will yield an [`Open`]  with rights downscoped to
+    /// `request.rights` and paths relative to `request.relative_path`.
+    fn route(&self, request: Request, completer: Completer) {
+        let mut open = self.clone().downscope_path(request.relative_path);
+        if let Some(rights) = request.rights {
+            open = open.downscope_rights(rights)
+        }
+        completer.complete(Ok(Box::new(open) as AnyCapability));
+    }
+}
+
 impl AsRouter for Open {
     fn as_router(&self) -> Router {
-        let open = self.clone();
-        let route_fn = move |request: Request, completer: Completer| {
-            let open = open.clone().downscope_path(request.relative_path);
-            completer.complete(Ok(Box::new(if let Some(rights) = request.rights {
-                open.downscope_rights(rights)
-            } else {
-                open
-            }) as AnyCapability));
-        };
-        Router::new(route_fn)
+        self.clone().into()
     }
 }
 

@@ -2,9 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::anyhow;
 use replace_with::replace_with;
-use sandbox::{AsRouter, Dict, Router};
+use sandbox::{AsRouter, Capability, Dict, Routable, Router};
 use std::{
     fmt,
     ops::{Deref, DerefMut},
@@ -28,7 +27,7 @@ enum ProgramState {
         input: Dict,
     },
     Running {
-        output: Router,
+        output: Dict,
     },
 }
 
@@ -48,20 +47,28 @@ impl Deref for Program {
 
 impl Inner {
     /// Explicitly start the program.
-    pub fn start(&self) -> Router {
+    pub fn start(&self) -> Dict {
         let mut state = self.state.lock().unwrap();
         replace_with(state.deref_mut(), |state| state.start(&self.name, self.runner.clone()));
-        match state.deref_mut() {
+        match state.deref() {
             ProgramState::MissingInput | ProgramState::NotRunning { .. } => {
                 unreachable!("just started the program")
             }
-            ProgramState::Running { output } => output.clone(),
+            ProgramState::Running { output } => output.try_clone().unwrap(),
         }
     }
 
     pub fn set_input(&self, input: Dict) {
         let mut state = self.state.lock().unwrap();
         replace_with(state.deref_mut(), move |state| state.set_input(input));
+    }
+}
+
+impl Routable for Inner {
+    fn route(&self, request: sandbox::Request, completer: sandbox::Completer) {
+        // Start the program if not started, then forward the request to its output.
+        let router = self.start();
+        router.route(request, completer);
     }
 }
 
@@ -87,23 +94,12 @@ impl ProgramState {
 
 impl AsRouter for Program {
     fn as_router(&self) -> Router {
-        let weak = Arc::downgrade(&self.0);
-        let route_fn = move |request, completer| {
-            match weak.upgrade() {
-                Some(program) => {
-                    // Start the program if not started, then forward the request to its output.
-                    let router = program.start();
-                    router.route(request, completer);
-                }
-                None => completer.complete(Err(anyhow!("program is destroyed"))),
-            }
-        };
-        Router::new(route_fn)
+        Arc::downgrade(&self.0).into()
     }
 }
 
 #[derive(Clone)]
-pub struct Runner(pub Arc<dyn Fn(&str, Dict) -> Router + Send + Sync>);
+pub struct Runner(pub Arc<dyn Fn(&str, Dict) -> Dict + Send + Sync>);
 
 impl fmt::Debug for Runner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

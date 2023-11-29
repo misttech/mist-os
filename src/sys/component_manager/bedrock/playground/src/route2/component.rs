@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
-use sandbox::{AsRouter, Capability, Data, Dict, Open, Request, Router};
+use sandbox::{AsRouter, Capability, Data, Dict, Open, Routable, Router};
 use std::{
     collections::HashMap,
     fmt,
@@ -252,6 +252,14 @@ fn resolve_impl(
     Ok(Resolved { output, program, children })
 }
 
+impl Routable for Inner {
+    fn route(&self, request: sandbox::Request, completer: sandbox::Completer) {
+        // Resolve the component if not already, then forward the request to its output.
+        let router = self.resolve();
+        router.route(request, completer);
+    }
+}
+
 /// How to mint output router when a component is created:
 ///
 /// - Create an async function will lazily ensure the component is resolved, then grab the
@@ -260,18 +268,7 @@ fn resolve_impl(
 ///
 impl AsRouter for Component {
     fn as_router(&self) -> Router {
-        let weak = Arc::downgrade(&self.0);
-        let route_fn = move |request, completer| {
-            match weak.upgrade() {
-                Some(component) => {
-                    // Resolve the component if not already, then forward the request to its output.
-                    let router = component.resolve();
-                    router.route(request, completer);
-                }
-                None => completer.complete(Err(anyhow!("component is destroyed"))),
-            }
-        };
-        Router::new(route_fn)
+        Arc::downgrade(&self.0).into()
     }
 }
 
@@ -294,6 +291,7 @@ mod test {
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
     use moniker::MonikerBase;
+    use sandbox::Request;
     use serve_processargs::{ignore_not_found, NamespaceBuilder};
     use vfs::{
         directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
@@ -363,20 +361,20 @@ mod test {
 
         let (child_b_started_sender, child_b_started) = oneshot::channel();
         let child_b_started_sender = Arc::new(Mutex::new(Some(child_b_started_sender)));
-        let runner = move |name: &str, input: Dict| -> Router {
+        let runner = move |name: &str, input: Dict| -> Dict {
             match name {
-                "root" => Dict::new().as_router(),
+                "root" => Dict::new(),
                 "child_a" => {
                     // child_a should see a request for "cap".
                     let mut output = Dict::new();
                     let cap = Data::new("hello".to_owned());
                     output.entries.insert("cap".to_owned(), Box::new(cap));
-                    output.as_router()
+                    output
                 }
                 "child_b" => {
                     let sender = child_b_started_sender.clone().lock().unwrap().take().unwrap();
                     sender.send(input).unwrap();
-                    Dict::new().as_router()
+                    Dict::new()
                 }
                 _ => panic!("unknown program {name}"),
             }
@@ -556,11 +554,9 @@ mod test {
         let (child_b_started_sender, child_b_started) = oneshot::channel();
         let child_b_started_sender = Arc::new(Mutex::new(Some(child_b_started_sender)));
 
-        // The runner in this test is a function that takes the name and input `Dict` of the
-        // program to run, then returns an output `Router`.
-        let runner = move |name: &str, input: Dict| -> Router {
+        let runner = move |name: &str, input: Dict| -> Dict {
             match name {
-                "root" => Dict::new().as_router(),
+                "root" => Dict::new(),
                 "child_a" => {
                     // Serve an outgoing directory in child_a that contains:
                     //
@@ -596,7 +592,7 @@ mod test {
                     // (component-to-component interface).
                     let mut output = Dict::new();
                     output.entries.insert("fuchsia.echo.Echo".to_string(), Box::new(echo));
-                    output.as_router()
+                    output
                 }
                 "child_b" => {
                     let sender = child_b_started_sender.clone().lock().unwrap().take().unwrap();
@@ -643,7 +639,7 @@ mod test {
                     .detach();
 
                     // child_b outputs no capabilities.
-                    Dict::new().as_router()
+                    Dict::new()
                 }
                 _ => panic!("unknown program {name}"),
             }

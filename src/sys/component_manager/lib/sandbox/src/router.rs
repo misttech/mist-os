@@ -20,6 +20,10 @@ use vfs::execution_scope::ExecutionScope;
 
 use crate::{AnyCapability, Capability, CloneError, Open};
 
+pub trait Routable {
+    fn route(&self, request: Request, completer: Completer);
+}
+
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
 /// asynchronously using a request that traverses through the component topology.
 ///
@@ -105,6 +109,33 @@ impl Capability for Router {
 
     fn try_clone(&self) -> Result<Self, CloneError> {
         Ok(self.clone())
+    }
+}
+
+impl<T> From<T> for Router
+where
+    T: Routable + Send + Sync + 'static,
+{
+    fn from(value: T) -> Self {
+        let route_fn = move |request, completer| {
+            value.route(request, completer);
+        };
+        Router::new(route_fn)
+    }
+}
+
+impl<T> From<std::sync::Weak<T>> for Router
+where
+    T: Routable + Send + Sync + 'static,
+{
+    fn from(value: std::sync::Weak<T>) -> Self {
+        let route_fn = move |request, completer| match value.upgrade() {
+            Some(component) => {
+                component.route(request, completer);
+            }
+            None => completer.complete(Err(anyhow!("object was destroyed"))),
+        };
+        Router::new(route_fn)
     }
 }
 
