@@ -13,7 +13,10 @@ use {
     netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable},
     netlink_packet_generic::GenlMessage,
     parking_lot::Mutex,
-    std::{convert::TryInto, sync::Arc},
+    std::{
+        convert::{TryFrom, TryInto},
+        sync::Arc,
+    },
     tracing::{error, info, warn},
     wlan_common::channel::{Cbw, Channel},
 };
@@ -63,7 +66,10 @@ async fn serve_wifi_sta_iface(reqs: fidl_wlanix::WifiStaIfaceRequestStream) {
     .await;
 }
 
-async fn handle_wifi_chip_request(req: fidl_wlanix::WifiChipRequest) -> Result<(), Error> {
+async fn handle_wifi_chip_request(
+    req: fidl_wlanix::WifiChipRequest,
+    chip_id: u16,
+) -> Result<(), Error> {
     match req {
         fidl_wlanix::WifiChipRequest::CreateStaIface { payload, responder, .. } => {
             info!("fidl_wlanix::WifiChipRequest::CreateStaIface");
@@ -103,6 +109,14 @@ async fn handle_wifi_chip_request(req: fidl_wlanix::WifiChipRequest) -> Result<(
             };
             responder.send(&response).context("send GetAvailableModes response")?;
         }
+        fidl_wlanix::WifiChipRequest::GetId { responder } => {
+            info!("fidl_wlanix::WifiChipRequest::GetId");
+            let response = fidl_wlanix::WifiChipGetIdResponse {
+                id: Some(chip_id as u32),
+                ..Default::default()
+            };
+            responder.send(&response).context("send GetId response")?;
+        }
         fidl_wlanix::WifiChipRequest::GetMode { responder } => {
             info!("fidl_wlanix::WifiChipRequest::GetMode");
             let response =
@@ -124,11 +138,11 @@ async fn handle_wifi_chip_request(req: fidl_wlanix::WifiChipRequest) -> Result<(
     Ok(())
 }
 
-async fn serve_wifi_chip(_chip_id: u32, reqs: fidl_wlanix::WifiChipRequestStream) {
+async fn serve_wifi_chip(chip_id: u16, reqs: fidl_wlanix::WifiChipRequestStream) {
     reqs.for_each_concurrent(None, |req| async {
         match req {
             Ok(req) => {
-                if let Err(e) = handle_wifi_chip_request(req).await {
+                if let Err(e) = handle_wifi_chip_request(req, chip_id).await {
                     warn!("Failed to handle WifiChipRequest: {}", e);
                 }
             }
@@ -218,8 +232,18 @@ async fn handle_wifi_request(
             match (payload.chip_id, payload.chip) {
                 (Some(chip_id), Some(chip)) => {
                     let chip_stream = chip.into_stream().context("create WifiChip stream")?;
-                    responder.send(Ok(())).context("send GetChip response")?;
-                    serve_wifi_chip(chip_id, chip_stream).await;
+                    match u16::try_from(chip_id) {
+                        Ok(chip_id) => {
+                            responder.send(Ok(())).context("send GetChip response")?;
+                            serve_wifi_chip(chip_id, chip_stream).await;
+                        }
+                        Err(_e) => {
+                            warn!("fidl_wlanix::WifiRequest::GetChip chip_id > u16::MAX");
+                            responder
+                                .send(Err(zx::sys::ZX_ERR_INVALID_ARGS))
+                                .context("send GetChip response")?;
+                        }
+                    }
                 }
                 _ => {
                     warn!("No chip_id or chip in fidl_wlanix::WifiRequest::GetChip");
@@ -900,6 +924,8 @@ mod tests {
         wlan_common::assert_variant,
     };
 
+    const CHIP_ID: u32 = 1;
+
     // This will only work if the message is a parseable nl80211 message. Some
     // attributes are currently write only in our NL80211 implementation. If a
     // write-only attribute is included, this function will panic.
@@ -1001,7 +1027,7 @@ mod tests {
         );
         let expected_response = fidl_wlanix::WifiChipGetAvailableModesResponse {
             chip_modes: Some(vec![fidl_wlanix::ChipMode {
-                id: Some(1),
+                id: Some(CHIP_ID),
                 available_combinations: Some(vec![fidl_wlanix::ChipConcurrencyCombination {
                     limits: Some(vec![fidl_wlanix::ChipConcurrencyCombinationLimit {
                         types: Some(vec![fidl_wlanix::IfaceConcurrencyType::Sta]),
@@ -1015,6 +1041,18 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(response, expected_response);
+    }
+
+    #[test]
+    fn test_wifi_chip_get_id() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test();
+
+        let get_id_fut = test_helper.wifi_chip_proxy.get_id();
+        pin_mut!(get_id_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        let response = assert_variant!(test_helper.exec.run_until_stalled(&mut get_id_fut), Poll::Ready(Ok(response)) => response);
+        assert_eq!(response.id, Some(CHIP_ID));
     }
 
     #[test]
@@ -1089,7 +1127,7 @@ mod tests {
         let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>()
             .expect("create WifiChip proxy should succeed");
         let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
-            chip_id: Some(1),
+            chip_id: Some(CHIP_ID),
             chip: Some(wifi_chip_server_end),
             ..Default::default()
         });

@@ -31,6 +31,7 @@ enum class CommandTag {
   kWifiChipCreateStaIface,
   kWifiChipRemoveStaIface,
   kWifiChipGetAvailableModes,
+  kWifiChipGetId,
   kWifiChipGetMode,
   kWifiChipGetCapabilities,
   kWifiChipUnknownMethod,
@@ -95,6 +96,7 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   void RemoveStaIface(fuchsia_wlan_wlanix::wire::WifiChipRemoveStaIfaceRequest* request,
                       RemoveStaIfaceCompleter::Sync& completer) override;
   void GetAvailableModes(GetAvailableModesCompleter::Sync& completer) override;
+  void GetId(GetIdCompleter::Sync& completer) override;
   void GetMode(GetModeCompleter::Sync& completer) override;
   void GetCapabilities(GetCapabilitiesCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::WifiChip> metadata,

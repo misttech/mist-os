@@ -152,6 +152,14 @@ void FakeWlanix::GetAvailableModes(GetAvailableModesCompleter::Sync& completer) 
   completer.Reply(response_builder.Build());
 }
 
+void FakeWlanix::GetId(GetIdCompleter::Sync& completer) {
+  AppendCommand(Command{.tag = CommandTag::kWifiChipGetId});
+  fidl::Arena arena;
+  auto builder = fuchsia_wlan_wlanix::wire::WifiChipGetIdResponse::Builder(arena);
+  builder.id(1);
+  completer.Reply(builder.Build());
+}
+
 void FakeWlanix::GetMode(GetModeCompleter::Sync& completer) {
   AppendCommand(Command{.tag = CommandTag::kWifiChipGetMode});
   fidl::Arena arena;

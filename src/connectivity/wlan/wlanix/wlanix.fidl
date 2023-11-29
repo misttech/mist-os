@@ -93,6 +93,10 @@ open protocol WifiChip {
     flexible GetAvailableModes() -> (table {
         1: chip_modes vector<ChipMode>:MAX;
     });
+    /// Get the ID of the current chip.
+    flexible GetId() -> (table {
+        1: id uint32;
+    });
     /// Get the current mode that the chip is in.
     flexible GetMode() -> (table {
         1: mode uint32;
