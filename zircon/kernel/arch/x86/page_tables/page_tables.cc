@@ -1581,7 +1581,10 @@ void X86PageTableBase::DestroyIndependent(vaddr_t base, size_t size) {
       }
 
       for (uint i = start; i < end; ++i) {
-        DEBUG_ASSERT(!IS_PAGE_PRESENT(table[i]));
+        DEBUG_ASSERT_MSG(!IS_PAGE_PRESENT(table[i]),
+                         "Destroy() called on page table with entry 0x%" PRIx64
+                         " still present at index %u; aspace size: %zu, prepopulated_pml4_: %d\n",
+                         table[i], i, size, has_prepopulated_pml4_);
       }
     }
   }
