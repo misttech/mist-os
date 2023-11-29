@@ -3,12 +3,22 @@
         "node": "dwc2-phy",
         "tests": [
             {
-                "name": "Match",
+                "name": "BanjoPhy",
                 "expected": "match",
                 "device": {
                     "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
                     "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
                     "fuchsia.BIND_PROTOCOL": "fuchsia.usb.phy.BIND_PROTOCOL.DEVICE",
+                    "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.USB_DWC2"
+                }
+            },
+            {
+                "name": "FidlPhy",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_PLATFORM_DEV_PID": "fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC",
+                    "fuchsia.BIND_PLATFORM_DEV_VID": "fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC",
+                    "fuchsia.hardware.usb.phy.Service": " fuchsia.hardware.usb.phy.Service.DriverTransport",
                     "fuchsia.BIND_PLATFORM_DEV_DID": "fuchsia.platform.BIND_PLATFORM_DEV_DID.USB_DWC2"
                 }
             }

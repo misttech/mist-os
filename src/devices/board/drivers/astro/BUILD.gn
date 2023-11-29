@@ -77,17 +77,6 @@ driver_bind_rules("pwm-ao-d-bind") {
   ]
 }
 
-driver_bind_rules("astro-xhci-bind") {
-  rules = "bind/astro-xhci.bind"
-  header_output = "astro-xhci-bind.h"
-  bind_output = "astro-xhci-bind.bc"
-  tests = "bind-tests/astro-xhci-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.usb.phy",
-  ]
-}
-
 driver_bind_rules("astro-aml-sdio-bind") {
   rules = "bind/astro-aml-sdio.bind"
   header_output = "astro-aml-sdio-bind.h"
@@ -158,7 +147,6 @@ fuchsia_driver("astro-driver") {
     ":astro-pwm-bind_header",
     ":astro-video-bind_header",
     ":astro-wifi-bind_header",
-    ":astro-xhci-bind_header",
     ":pd-armcore-bind_header",
     ":pwm-ao-d-bind_header",
     "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
@@ -255,7 +243,6 @@ group("tests") {
     ":astro-pwm-bind_test",
     ":astro-video-bind_test",
     ":astro-wifi-bind_test",
-    ":astro-xhci-bind_test",
     ":pd-armcore-bind_test",
     ":pwm-ao-d-bind_test",
   ]

@@ -24,6 +24,7 @@
 #include <usb/usb.h>
 
 #include "src/devices/usb/drivers/crg-udc/crg_udc_regs.h"
+#include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
 namespace crg_udc {
 
@@ -413,7 +414,7 @@ class CrgUdc : public CrgUdcType, public ddk::UsbDciProtocol<CrgUdc, ddk::base_p
 
   ddk::PDevFidl pdev_;
   std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
-  std::optional<ddk::UsbPhyProtocolClient> usb_phy_;
+  std::optional<usb_phy::UsbPhyClient> usb_phy_;
 
   std::optional<fdf::MmioBuffer> mmio_;
 

@@ -45,6 +45,7 @@
 #include "src/devices/usb/drivers/xhci/xhci-interrupter.h"
 #include "src/devices/usb/drivers/xhci/xhci-port-state.h"
 #include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
+#include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
 namespace usb_xhci {
 
@@ -79,7 +80,7 @@ class UsbXhci : public UsbXhciType,
   explicit UsbXhci(zx_device_t* parent, std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
                    async_dispatcher_t* dispatcher)
       : UsbXhciType(parent),
-        pci_(parent, "pci"),
+        pci_(parent),
         pdev_(parent),
         buffer_factory_(std::move(buffer_factory)),
         ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
@@ -455,7 +456,7 @@ class UsbXhci : public UsbXhciType,
   std::atomic_bool running_ = true;
 
   // PHY protocol
-  ddk::UsbPhyProtocolClient phy_;
+  std::optional<usb_phy::UsbPhyClient> phy_;
 
   // Pointer to the test harness when being called from a unit test
   // This is an opaque pointer that is managed by the test.
@@ -473,7 +474,7 @@ class UsbXhci : public UsbXhciType,
   // Parse Supported Protocol Capability to log the revision and port info.
   void ParseSupportedProtocol();
   // Performs platform-specific initialization functions
-  void InitQuirks();
+  zx_status_t InitQuirks();
   // Complete initialization of host controller.
   // Called after controller is first reset on startup.
   zx_status_t HciFinalize();

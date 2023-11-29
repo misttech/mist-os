@@ -22,6 +22,7 @@
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.platform.device.Service" },
+        { service: "fuchsia.hardware.usb.phy.Service" },
     ],
     expose: [
         {

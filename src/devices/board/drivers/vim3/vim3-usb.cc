@@ -183,19 +183,6 @@ static const fpbus::Node xhci_dev = []() {
   return dev;
 }();
 
-static const zx_bind_inst_t xhci_phy_match[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_USB_PHY),
-    BI_ABORT_IF(NE, BIND_PLATFORM_DEV_VID, PDEV_VID_GENERIC),
-    BI_ABORT_IF(NE, BIND_PLATFORM_DEV_PID, PDEV_PID_GENERIC),
-    BI_MATCH_IF(EQ, BIND_PLATFORM_DEV_DID, PDEV_DID_USB_XHCI_COMPOSITE),
-};
-static const device_fragment_part_t xhci_phy_fragment[] = {
-    {std::size(xhci_phy_match), xhci_phy_match},
-};
-static const device_fragment_t xhci_fragments[] = {
-    {"xhci-phy", std::size(xhci_phy_fragment), xhci_phy_fragment},
-};
-
 using FunctionDescriptor = fuchsia_hardware_usb_peripheral::wire::FunctionDescriptor;
 
 static const std::vector<fpbus::Metadata> usb_metadata{
@@ -261,6 +248,47 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
     zxlogf(ERROR, "AddCompositeNodeSpec Usb(dwc2_phy) failed: %s",
            zx_status_get_string(dwc2_result->error_value()));
     return dwc2_result->error_value();
+  }
+  return ZX_OK;
+}
+
+zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                             fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fuchsia_driver_framework::BindRule> kXhciCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kXhciCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  };
+
+  const std::vector<fuchsia_driver_framework::ParentSpec> kXhciParents = {
+      fuchsia_driver_framework::ParentSpec{
+          {.bind_rules = kXhciCompositeRules, .properties = kXhciCompositeProperties}}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, xhci_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "xhci-phy", .parents = kXhciParents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
   }
   return ZX_OK;
 }
@@ -331,20 +359,9 @@ zx_status_t Vim3::UsbInit() {
   }
 
   // Create XHCI device.
-  auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(
-      fidl::ToWire(fidl_arena, xhci_dev),
-      platform_bus_composite::MakeFidlFragment(fidl_arena, xhci_fragments,
-                                               std::size(xhci_fragments)),
-      "xhci-phy");
-  if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) request failed: %s",
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeImplicitPbusFragment Usb(xhci_dev) failed: %s",
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  status = AddXhciComposite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   return ZX_OK;

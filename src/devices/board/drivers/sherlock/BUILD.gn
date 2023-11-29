@@ -88,17 +88,6 @@ driver_bind_rules("sherlock-emmc-bind") {
   ]
 }
 
-driver_bind_rules("sherlock-xhci-bind") {
-  rules = "bind/sherlock-xhci.bind"
-  header_output = "sherlock-xhci-bind.h"
-  bind_output = "sherlock-xhci-bind.bc"
-  tests = "bind-tests/sherlock-xhci-test.json"
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.usb.phy",
-  ]
-}
-
 driver_bind_rules("sherlock-thermal-bind") {
   rules = "bind/sherlock-thermal.bind"
   header_output = "sherlock-thermal-bind.h"
@@ -258,7 +247,6 @@ template("sherlock_driver") {
       ":sherlock-video-enc-bind_header",
       ":sherlock-wifi-bind_header",
       ":sherlock-woofer-bind_header",
-      ":sherlock-xhci-bind_header",
       "//sdk/banjo/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",

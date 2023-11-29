@@ -12,10 +12,14 @@ driver_bind_rules("usb_xhci_bind") {
   bind_output = "xhci.bindbc"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
+    "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
     "//src/devices/bind/fuchsia.pci:serial",
     "//src/devices/bind/fuchsia.pci:serial.usb",
     "//src/devices/bind/fuchsia.platform",
+    "//src/devices/bind/fuchsia.sysmem",
+    "//src/devices/bind/fuchsia.usb.phy",
   ]
 }
 
@@ -54,6 +58,7 @@ fuchsia_driver("xhci-driver") {
     "//src/devices/pci/lib/device-protocol-pci",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+    "//src/devices/usb/lib/usb-phy",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async",
@@ -106,6 +111,7 @@ source_set("test-libs") {
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+    "//src/devices/usb/lib/usb-phy",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

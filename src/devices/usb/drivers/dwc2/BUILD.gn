@@ -12,6 +12,7 @@ driver_bind_rules("dwc2_bind") {
   bind_output = "dwc2.bindbc"
   tests = "tests.json"
   deps = [
+    "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
     "//src/devices/bind/fuchsia.designware.platform",
     "//src/devices/bind/fuchsia.platform",
     "//src/devices/bind/fuchsia.usb.phy",
@@ -40,6 +41,7 @@ fuchsia_driver("dwc2-driver") {
     "//src/devices/lib/mmio",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+    "//src/devices/usb/lib/usb-phy",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
@@ -84,6 +86,7 @@ test("dwc2-test-bin") {
     "//src/devices/testing/mock-ddk",
     "//src/devices/usb/lib/usb",
     "//src/devices/usb/lib/usb-endpoint:usb-endpoint-server",
+    "//src/devices/usb/lib/usb-phy",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

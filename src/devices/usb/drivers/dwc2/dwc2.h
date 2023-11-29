@@ -29,6 +29,7 @@
 
 #include "src/devices/usb/drivers/dwc2/usb_dwc_regs.h"
 #include "src/devices/usb/lib/usb-endpoint/include/usb-endpoint/usb-endpoint-server.h"
+#include "src/devices/usb/lib/usb-phy/include/usb-phy/usb-phy.h"
 
 namespace dwc2 {
 
@@ -192,7 +193,7 @@ class Dwc2 : public Dwc2Type,
 
   ddk::PDevFidl pdev_;
   std::optional<ddk::UsbDciInterfaceProtocolClient> dci_intf_;
-  std::optional<ddk::UsbPhyProtocolClient> usb_phy_;
+  std::optional<usb_phy::UsbPhyClient> usb_phy_;
 
   std::optional<fdf::MmioBuffer> mmio_;
 

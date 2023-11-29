@@ -1217,9 +1217,16 @@ void UsbXhci::Shutdown(zx_status_t status) {
   }
 }
 
-void UsbXhci::InitQuirks() {
+zx_status_t UsbXhci::InitQuirks() {
   fuchsia_hardware_pci::wire::DeviceInfo info;
-  pci_.GetDeviceInfo(&info);
+  auto status = pci_.GetDeviceInfo(&info);
+  if (status == ZX_ERR_PEER_CLOSED) {
+    // Reset.
+    pci_ = {};
+  }
+  if (status != ZX_OK) {
+    return status;
+  }
   if ((info.vendor_id == 0x1033) && (info.device_id == 0x194)) {
     qemu_quirk_ = true;
   }
@@ -1242,16 +1249,21 @@ void UsbXhci::InitQuirks() {
     // (have to wait for enumeration to time out)
     sleep(5);
   }
+
+  return ZX_OK;
 }
 
 zx_status_t UsbXhci::InitPci() {
   // Perform vendor-specific workarounds.
-  InitQuirks();
+  auto status = InitQuirks();
+  if (status != ZX_OK) {
+    return status;
+  }
   // PCIe interface supports cache snooping
   has_coherent_cache_ = true;
   // Initialize MMIO
   std::optional<fdf::MmioBuffer> buffer;
-  zx_status_t status = pci_.MapMmio(0, ZX_CACHE_POLICY_UNCACHED_DEVICE, &buffer);
+  status = pci_.MapMmio(0, ZX_CACHE_POLICY_UNCACHED_DEVICE, &buffer);
   if (status != ZX_OK) {
     return status;
   }
@@ -1387,11 +1399,13 @@ int UsbXhci::InitThread() {
   zx_status_t status;
   if (pci_.is_valid()) {
     status = InitPci();
-    if (status != ZX_OK) {
+    if (status != ZX_ERR_PEER_CLOSED && status != ZX_OK) {
       zxlogf(ERROR, "PCI initialization failed with: %s", zx_status_get_string(status));
       return thrd_error;
     }
-  } else {
+  }
+  // Because pci_.is_valid() may have changed in InitQuirks().
+  if (!pci_.is_valid()) {
     status = InitMmio();
     if (status != ZX_OK) {
       zxlogf(ERROR, "MMIO initialization failed with: %s", zx_status_get_string(status));
@@ -1717,7 +1731,10 @@ zx_status_t UsbXhci::Create(void* ctx, zx_device_t* parent) {
     dev->pdev_ = std::move(pdev_result.value());
     // We need at least a PDEV, but the PHY is optional
     // for devices not implementing OTG.
-    dev->phy_ = ddk::UsbPhyProtocolClient(parent, "xhci-phy");
+    auto phy = usb_phy::UsbPhyClient::Create(parent, "xhci-phy");
+    if (phy.is_ok()) {
+      dev->phy_.emplace(std::move(phy.value()));
+    }
   } else {
     // A device doesn't have to have a PDEV. It might use PCI instead.
     if (pdev_result.error_value() != ZX_ERR_NOT_FOUND) {

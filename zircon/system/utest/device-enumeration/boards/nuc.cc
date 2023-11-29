@@ -69,7 +69,7 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/intel_i915/intel-gpu-core",
       "sys/platform/pt/PCI0/bus/00:02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
-      "sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb-bus",
+      "sys/platform/pt/PCI0/bus/00:14.0/00_14_0/xhci/usb-bus",
       "sys/platform/pt/PCI0/bus/00:17.0/00_17_0/ahci",
       // TODO(fxbug.dev/84037): Temporarily removed.
       // "sys/platform/pt/PCI0/bus/00:1f.3/00_1f_3/intel-hda-000",
@@ -100,7 +100,7 @@ TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
   static const char* kDevicePaths[] = {
       "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-gpu-core",
       "sys/platform/pt/PC00/bus/00:02.0/00_02_0/intel_i915/intel-display-controller/display-coordinator",
-      "sys/platform/pt/PC00/bus/00:14.0/00:14.0/xhci/usb-bus",
+      "sys/platform/pt/PC00/bus/00:14.0/00_14_0/xhci/usb-bus",
       "sys/platform/pt/PC00/bus/00:17.0/00_17_0/ahci",
 #ifdef include_packaged_drivers
       "sys/platform/pt/PC00/bus/00:14.3/00:14.3/iwlwifi-wlanphyimpl",

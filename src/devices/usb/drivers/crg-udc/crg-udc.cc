@@ -1751,9 +1751,9 @@ zx_status_t CrgUdc::Init() {
   }
 
   // USB PHY protocol is optional.
-  usb_phy_ = ddk::UsbPhyProtocolClient(parent(), "udc-phy");
-  if (!usb_phy_->is_valid()) {
-    usb_phy_.reset();
+  auto phy = usb_phy::UsbPhyClient::Create(parent(), "udc-phy");
+  if (phy.is_ok()) {
+    usb_phy_.emplace(std::move(phy.value()));
   }
 
   for (uint8_t i = 0; i < std::size(endpoints_); i++) {

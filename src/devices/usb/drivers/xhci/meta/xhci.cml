@@ -23,6 +23,7 @@
             service: [
                 "fuchsia.hardware.pci.Service",
                 "fuchsia.hardware.platform.device.Service",
+                "fuchsia.hardware.usb.phy.Service",
             ],
         },
     ],

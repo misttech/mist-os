@@ -55,7 +55,8 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       // USB
       "sys/platform/05:03:2d/vim3_usb_phy",
       "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/dwc2/dwc2_phy/dwc2/usb-peripheral/function-000/cdc-eth-function",
-      "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci/xhci",
+      "sys/platform/05:03:2d/vim3_usb_phy/vim3_usb_phy/xhci",
+      "sys/platform/00:00:2/xhci-phy/xhci",
 
       // USB 2.0 Hub
       // Ignored because we've had a spate of vim3 devices that seem to have

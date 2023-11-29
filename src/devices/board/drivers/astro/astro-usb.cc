@@ -30,7 +30,6 @@
 #include <usb/usb.h>
 
 #include "astro.h"
-#include "src/devices/board/drivers/astro/astro-xhci-bind.h"
 #include "src/devices/bus/lib/platform-bus-composites/platform-bus-composite.h"
 
 namespace fdf {
@@ -269,6 +268,47 @@ zx_status_t AddDwc2Composite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
   return ZX_OK;
 }
 
+zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
+                             fidl::AnyArena& fidl_arena, fdf::Arena& arena) {
+  const std::vector<fuchsia_driver_framework::BindRule> kXhciCompositeRules = {
+      fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_PID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_DID,
+                              bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  };
+  const std::vector<fuchsia_driver_framework::NodeProperty> kXhciCompositeProperties = {
+      fdf::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_usb_phy::BIND_PROTOCOL_DEVICE),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                        bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_XHCI),
+  };
+
+  const std::vector<fuchsia_driver_framework::ParentSpec> kXhciParents = {
+      fuchsia_driver_framework::ParentSpec{
+          {.bind_rules = kXhciCompositeRules, .properties = kXhciCompositeProperties}}};
+  auto result = pbus.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, xhci_dev),
+      fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
+                                   {.name = "xhci-phy", .parents = kXhciParents}}));
+  if (!result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) request failed: %s",
+           result.FormatDescription().data());
+    return result.status();
+  }
+  if (result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Usb(xhci-phy) failed: %s",
+           zx_status_get_string(result->error_value()));
+    return result->error_value();
+  }
+  return ZX_OK;
+}
+
 zx_status_t Astro::UsbInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('USB_');
@@ -279,20 +319,9 @@ zx_status_t Astro::UsbInit() {
   }
 
   // Add XHCI and DWC2 to the same driver host as the aml-usb-phy.
-  auto result =
-      pbus_.buffer(arena)->AddComposite(fidl::ToWire(fidl_arena, xhci_dev),
-                                        platform_bus_composite::MakeFidlFragment(
-                                            fidl_arena, xhci_fragments, std::size(xhci_fragments)),
-                                        "xhci-phy");
-  if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Usb(xhci_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
-  }
-  if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Usb(xhci_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+  status = AddXhciComposite(pbus_, fidl_arena, arena);
+  if (status != ZX_OK) {
+    return status;
   }
 
   std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
