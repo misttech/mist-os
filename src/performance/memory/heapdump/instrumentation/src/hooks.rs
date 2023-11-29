@@ -44,15 +44,13 @@ fn with_profiler_and_call_site(f: impl FnOnce(&Profiler, &mut PerThreadData, zx:
 #[no_mangle]
 pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
     with_profiler_and_call_site(|profiler, thread_data, timestamp, compressed_stack_trace| {
-        if ptr != std::ptr::null_mut() {
-            profiler.record_allocation(
-                thread_data,
-                ptr as u64,
-                size as u64,
-                compressed_stack_trace,
-                timestamp.into_nanos(),
-            );
-        }
+        profiler.record_allocation(
+            thread_data,
+            ptr as u64,
+            size as u64,
+            compressed_stack_trace,
+            timestamp.into_nanos(),
+        );
     });
 }
 
