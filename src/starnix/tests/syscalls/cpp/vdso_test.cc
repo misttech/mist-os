@@ -367,6 +367,7 @@ TEST_F(VdsoProcTest, VdsoModificationsBeforeForkingDontAffectOtherPrograms) {
 
     // restore the vdso.
     SetEIPadFirstByte(vdso_base_, 0x00);
+    ASSERT_EQ(mprotect(vdso_base_, vdso_size_, PROT_READ | PROT_EXEC), 0);
 
     EXPECT_EQ(waited, child_pid);
     EXPECT_TRUE(WIFEXITED(status));
@@ -392,8 +393,24 @@ TEST_F(VdsoProcTest, VvarCantWriteDeathTest) {
 
 TEST_F(VdsoProcTest, VvarCannotBeMadeWritable) {
   EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_WRITE), -1);
+  EXPECT_EQ(errno, EACCES);
   EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC), -1);
+  EXPECT_EQ(errno, EACCES);
   EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC | PROT_WRITE), -1);
+  EXPECT_EQ(errno, EACCES);
+}
+
+TEST_F(VdsoProcTest, VvarCannotBeMadeWritableAfterFork) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_WRITE), -1);
+    EXPECT_EQ(errno, EACCES);
+    EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC), -1);
+    EXPECT_EQ(errno, EACCES);
+    EXPECT_EQ(mprotect(vvar_base_, vvar_size_, PROT_READ | PROT_EXEC | PROT_WRITE), -1);
+    EXPECT_EQ(errno, EACCES);
+  });
+  EXPECT_TRUE(helper.WaitForChildren());
 }
 
 TEST_F(VdsoProcTest, VvarCanBeUnmapped) {
@@ -412,4 +429,22 @@ TEST_F(VdsoProcTest, VvarCanBeMadeNonReadable) {
     _exit(0);
   });
   EXPECT_TRUE(helper.WaitForChildren());
+}
+
+TEST_F(VdsoProcTest, VvarAndVdsoHaveCorrectPermissions) {
+  std::string maps;
+  ASSERT_TRUE(files::ReadFileToString("/proc/self/maps", &maps));
+
+  auto vdso_mapping = test_helper::find_memory_mapping(
+      [](const test_helper::MemoryMapping& mapping) { return mapping.pathname == "[vdso]"; }, maps);
+  ASSERT_NE(vdso_mapping, std::nullopt);
+  EXPECT_EQ(vdso_mapping->perms, "r-xp");
+
+  auto vvar_mapping = test_helper::find_memory_mapping(
+      [](const test_helper::MemoryMapping& mapping) { return mapping.pathname == "[vvar]"; }, maps);
+  ASSERT_NE(vvar_mapping, std::nullopt);
+  EXPECT_EQ(vvar_mapping->perms, "r--p");
+
+  // TODO(https://fxbug.dev/313689934): Add a similar test that checks the
+  // flags in /proc/self/smaps
 }

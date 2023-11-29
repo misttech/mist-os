@@ -2211,7 +2211,11 @@ impl MemoryManager {
                     let vmo_offset = backing.vmo_offset + (range.start - backing.base) as u64;
                     let length = range.end - range.start;
 
-                    let target_vmo = if mapping.flags.contains(MappingFlags::SHARED) {
+                    let target_vmo = if mapping.flags.contains(MappingFlags::SHARED)
+                        || mapping.name == MappingName::Vvar
+                    {
+                        // Note that the Vvar is a special mapping that behaves like a shared mapping but
+                        // is private to each process.
                         backing.vmo.clone()
                     } else if mapping.flags.contains(MappingFlags::WIPEONFORK) {
                         create_anonymous_mapping_vmo(length as u64)?
