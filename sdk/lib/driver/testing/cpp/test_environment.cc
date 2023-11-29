@@ -14,9 +14,7 @@ const char TestEnvironment::kTestEnvironmentThreadSafetyDescription[] =
 
 TestEnvironment::TestEnvironment(fdf_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher ? dispatcher : fdf::Dispatcher::GetCurrent()->get()),
-      incoming_directory_server_(
-          component::OutgoingDirectory(fdf_dispatcher_get_async_dispatcher(dispatcher_)),
-          dispatcher_),
+      incoming_directory_server_(dispatcher_),
       checker_(fdf_dispatcher_get_async_dispatcher(dispatcher_),
                kTestEnvironmentThreadSafetyDescription) {}
 

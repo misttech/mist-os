@@ -34,14 +34,12 @@ class OutgoingDirectory final {
   static OutgoingDirectory Create(fdf_dispatcher_t* dispatcher) {
     ZX_ASSERT_MSG(dispatcher != nullptr,
                   "OutgoingDirectory::Create received nullptr |dispatcher|.");
-    auto component_outgoing_dir =
-        component::OutgoingDirectory(fdf_dispatcher_get_async_dispatcher(dispatcher));
-    return OutgoingDirectory(std::move(component_outgoing_dir), dispatcher);
+    return OutgoingDirectory(dispatcher);
   }
 
-  OutgoingDirectory(component::OutgoingDirectory component_outgoing_dir,
-                    fdf_dispatcher_t* dispatcher)
-      : component_outgoing_dir_(std::move(component_outgoing_dir)), dispatcher_(dispatcher) {}
+  explicit OutgoingDirectory(fdf_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->get())
+      : component_outgoing_dir_(fdf_dispatcher_get_async_dispatcher(dispatcher)),
+        dispatcher_(dispatcher) {}
 
   // OutgoingDirectory can be moved. Once moved, invoking a method on an
   // instance will yield undefined behavior.
