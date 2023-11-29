@@ -119,8 +119,10 @@ zx_status_t sys_pci_add_subtract_io_range(zx_handle_t handle, uint32_t mmio, uin
   LTRACEF("handle %x mmio %d base %#" PRIx64 " len %#" PRIx64 " add %d\n", handle, is_mmio, base,
           len, is_add);
 
+  // TODO(fxbug.dev/30918): finer grained validation
+  // TODO(security): Add additional access checks
   zx_status_t status;
-  if ((status = validate_resource(handle, ZX_RSRC_KIND_MMIO)) < 0) {
+  if ((status = validate_resource(handle, ZX_RSRC_KIND_ROOT)) < 0) {
     return status;
   }
 
@@ -165,8 +167,10 @@ static inline bool is_designware(const zx_pci_init_arg_t* arg) {
 // zx_status_t zx_pci_init
 zx_status_t sys_pci_init(zx_handle_t handle, user_in_ptr<const zx_pci_init_arg_t> _init_buf,
                          uint32_t len) {
+  // TODO(fxbug.dev/30918): finer grained validation
+  // TODO(security): Add additional access checks
   zx_status_t status;
-  if ((status = validate_resource(handle, ZX_RSRC_KIND_MMIO)) < 0) {
+  if ((status = validate_resource(handle, ZX_RSRC_KIND_ROOT)) < 0) {
     return status;
   }
 
@@ -448,10 +452,12 @@ zx_status_t sys_pci_get_nth_device(zx_handle_t hrsrc, uint32_t index,
    */
   LTRACEF("handle %x index %u\n", hrsrc, index);
 
+  // TODO(fxbug.dev/30918): finer grained validation
   zx_status_t status;
-  if ((status = validate_resource(hrsrc, ZX_RSRC_KIND_MMIO)) < 0) {
+  if ((status = validate_resource(hrsrc, ZX_RSRC_KIND_ROOT)) < 0) {
     return status;
   }
+
   if (!out_info) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -555,7 +561,7 @@ zx_status_t sys_pci_cfg_pio_rw(zx_handle_t handle, uint8_t bus, uint8_t dev, uin
                                uint32_t write) {
 #if ARCH_X86
   uint32_t val_;
-  zx_status_t status = validate_resource(handle, ZX_RSRC_KIND_MMIO);
+  zx_status_t status = validate_resource(handle, ZX_RSRC_KIND_ROOT);
   if (status != ZX_OK) {
     return status;
   }

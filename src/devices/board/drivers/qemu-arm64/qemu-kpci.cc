@@ -30,12 +30,14 @@ zx_status_t QemuArm64::PciInit() {
   }
   auto* arg = reinterpret_cast<zx_pci_init_arg_t*>(buf.get());
 
-  status = zx_pci_add_subtract_io_range(get_mmio_resource(parent()), true /* mmio */,
+  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+  status = zx_pci_add_subtract_io_range(get_root_resource(parent()), true /* mmio */,
                                         PCIE_MMIO_BASE_PHYS, PCIE_MMIO_SIZE, true /* add */);
   if (status != ZX_OK) {
     return status;
   }
-  status = zx_pci_add_subtract_io_range(get_mmio_resource(parent()), false /* pio */,
+  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+  status = zx_pci_add_subtract_io_range(get_root_resource(parent()), false /* pio */,
                                         PCIE_PIO_BASE_PHYS, PCIE_PIO_SIZE, true /* add */);
   if (status != ZX_OK) {
     return status;
@@ -59,7 +61,8 @@ zx_status_t QemuArm64::PciInit() {
   arg->addr_windows[0].bus_start = 0;
   arg->addr_windows[0].bus_end = (PCIE_ECAM_SIZE / ZX_PCI_ECAM_BYTE_PER_BUS) - 1;
 
-  status = zx_pci_init(get_mmio_resource(parent()), arg, static_cast<uint32_t>(arg_size));
+  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
+  status = zx_pci_init(get_root_resource(parent()), arg, static_cast<uint32_t>(arg_size));
   if (status != ZX_OK) {
     zxlogf(ERROR, "%s: error %d in zx_pci_init", __func__, status);
     return status;
