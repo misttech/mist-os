@@ -15,6 +15,16 @@
 
 namespace spin_tracing {
 
+class LockIdGenerator {
+ protected:
+  LockIdGenerator() = default;
+  ~LockIdGenerator() = default;
+  static uint64_t CreateId() { return generator_.fetch_add(1, ktl::memory_order_relaxed); }
+
+ private:
+  static inline ktl::atomic<uint64_t> generator_{1};
+};
+
 template <LockType kLockType, bool Enabled = false>
 class LockNameStorage {
  public:
@@ -27,7 +37,7 @@ class LockNameStorage {
 };
 
 template <LockType kLockType>
-class LockNameStorage<kLockType, true> {
+class LockNameStorage<kLockType, true> : public LockIdGenerator {
  public:
   void SetLockClassId(lockdep::LockClassId lcid) {
     if ((lcid != lockdep::kInvalidLockClassId) &&
@@ -66,10 +76,7 @@ class LockNameStorage<kLockType, true> {
   EncodedLockId encoded_lock_id() const { return encoded_lock_id_; }
 
  private:
-  static uint64_t CreateId() { return id_generator_.fetch_add(1, ktl::memory_order_relaxed); }
-
   EncodedLockId encoded_lock_id_;
-  static inline ktl::atomic<uint64_t> id_generator_{1};
 };
 
 }  // namespace spin_tracing
