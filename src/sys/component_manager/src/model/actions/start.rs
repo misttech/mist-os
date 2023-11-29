@@ -19,8 +19,8 @@ use {
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
-        component_instance::ComponentInstanceInterface, error::RoutingError,
-        policy::GlobalPolicyChecker,
+        component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
+        error::RoutingError, policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
@@ -298,13 +298,22 @@ async fn make_structured_config(
             continue;
         };
 
-        let source = routing::route_capability(
+        let route_result = routing::route_capability(
             RouteRequest::UseConfig(use_config.clone()),
             component,
             &mut routing::mapper::NoopRouteMapper,
         )
-        .await
-        .map_err(|err| StartActionError::StructuredConfigError {
+        .await;
+        // If the config capability is optional and routed from void, we ignore it.
+        if matches!(
+            route_result,
+            Err(RoutingError::AvailabilityRoutingError(
+                AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
+            ))
+        ) {
+            continue;
+        }
+        let source = route_result.map_err(|err| StartActionError::StructuredConfigError {
             moniker: component.moniker.clone(),
             err: err.into(),
         })?;
@@ -340,7 +349,7 @@ async fn make_structured_config(
             }
         };
 
-        if std::mem::discriminant(&field.value) != std::mem::discriminant(&cap.value) {
+        if !field.value.matches_type(&cap.value) {
             return Err(StartActionError::StructuredConfigError {
                 moniker: component.moniker.clone(),
                 err: StructuredConfigError::ValueMismatch { key: field.key.clone() },

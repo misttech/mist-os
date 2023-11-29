@@ -1361,6 +1361,19 @@ impl ConfigValue {
             Self::Vector(vv) => vv.ty(),
         }
     }
+
+    /// Check if this value matches the type of another value.
+    pub fn matches_type(&self, other: &ConfigValue) -> bool {
+        match (self, other) {
+            (ConfigValue::Single(a), ConfigValue::Single(b)) => {
+                std::mem::discriminant(a) == std::mem::discriminant(b)
+            }
+            (ConfigValue::Vector(a), ConfigValue::Vector(b)) => {
+                std::mem::discriminant(a) == std::mem::discriminant(b)
+            }
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Display for ConfigValue {
@@ -3717,5 +3730,20 @@ mod tests {
             .availability(),
             Availability::Required
         );
+    }
+
+    #[test]
+    fn config_value_matches_type() {
+        let bool_true = ConfigValue::Single(ConfigSingleValue::Bool(true));
+        let bool_false = ConfigValue::Single(ConfigSingleValue::Bool(false));
+        let uint8_zero = ConfigValue::Single(ConfigSingleValue::Uint8(0));
+        let vec_bool_true = ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![true]));
+        let vec_bool_false = ConfigValue::Vector(ConfigVectorValue::BoolVector(vec![false]));
+
+        assert!(bool_true.matches_type(&bool_false));
+        assert!(vec_bool_true.matches_type(&vec_bool_false));
+
+        assert!(!bool_true.matches_type(&uint8_zero));
+        assert!(!bool_true.matches_type(&vec_bool_true));
     }
 }

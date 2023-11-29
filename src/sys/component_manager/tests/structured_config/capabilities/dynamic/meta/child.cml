@@ -1,0 +1,38 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+{
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/sc_capabilities_dynamic_child",
+    },
+    capabilities: [
+        {
+            protocol: [ "test.config.Config" ],
+        },
+    ],
+    use: [
+        {
+            from: "parent",
+            config: "fuchsia.config.MyFlag",
+            config_key: "my_flag",
+        },
+        {
+            from: "parent",
+            config: "fuchsia.config.MyInt",
+            config_key: "my_int",
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            protocol: "test.config.Config",
+            from: "self",
+        },
+    ],
+    config: {
+        my_flag: { type: "bool" },
+        my_int: { type: "uint8" },
+    },
+}
