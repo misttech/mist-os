@@ -872,6 +872,14 @@ symmetrical_enums!(StorageId, fdecl::StorageId, StaticInstanceId, StaticInstance
 #[serde(rename_all = "snake_case")]
 pub enum ConfigType {
     Bool,
+    Uint8,
+    Uint16,
+    Uint32,
+    Uint64,
+    Int8,
+    Int16,
+    Int32,
+    Int64,
 }
 
 #[cfg(test)]

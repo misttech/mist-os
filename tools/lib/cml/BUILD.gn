@@ -17,6 +17,7 @@ rustc_library("cml") {
     "//src/lib/directed_graph",
     "//src/lib/fidl/rust/fidl",
     "//src/sys/lib/cm_fidl_validator",
+    "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:indexmap",
     "//third_party/rust_crates:itertools",
@@ -28,6 +29,7 @@ rustc_library("cml") {
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
     "//third_party/rust_crates:sha2",
+    "//tools/lib/config_value_file",
     "//tools/lib/reference_doc",
   ]
 

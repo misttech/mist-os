@@ -15,6 +15,7 @@ use {
         Path, PathClause, Program, ResolverRegistration, RightsClause, RootDictionaryRef,
         RunnerRegistration, SourceAvailability, Use, UseFromRef,
     },
+    cm_rust::NativeIntoFidl,
     cm_types::{self as cm, Name},
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
     indexmap::IndexMap,
@@ -1822,7 +1823,7 @@ pub fn translate_capabilities(
                 ..Default::default()
             }));
         } else if let Some(c) = &capability.config {
-            let value = configuration_to_value(&capability.config_type, &capability.value)?;
+            let value = configuration_to_value(c, &capability.config_type, &capability.value)?;
             out_capabilities.push(fdecl::Capability::Config(fdecl::Configuration {
                 name: Some(c.clone().into()),
                 value: Some(value),
@@ -1921,27 +1922,37 @@ fn dictionary_ref_to_source(d: &DictionaryRef) -> (fdecl::Ref, Option<String>) {
 }
 
 fn configuration_to_value(
+    name: &Name,
     config_type: &Option<cm::ConfigType>,
     value: &Option<serde_json::Value>,
 ) -> Result<fdecl::ConfigValue, Error> {
     let Some(config_type) = config_type.as_ref() else {
-        return Err(Error::InvalidArgs("Configuration field must have 'type' set".into()));
+        return Err(Error::InvalidArgs(format!(
+            "Configuration field '{}' must have 'type' set",
+            name
+        )));
     };
     let Some(value) = value.as_ref() else {
-        return Err(Error::InvalidArgs("Configuration field must have 'value' set".into()));
+        return Err(Error::InvalidArgs(format!(
+            "Configuration field '{}' must have 'value' set",
+            name
+        )));
     };
 
-    match config_type {
-        cm::ConfigType::Bool => {
-            let serde_json::Value::Bool(b) = value else {
-                return Err(Error::InvalidArgs(format!(
-                    "Boolean config value must be a boolean, field is: '{}'",
-                    value
-                )));
-            };
-            Ok(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(*b)))
-        }
-    }
+    let config_type = match config_type {
+        cm::ConfigType::Bool => cm_rust::ConfigValueType::Bool,
+        cm::ConfigType::Uint8 => cm_rust::ConfigValueType::Uint8,
+        cm::ConfigType::Uint16 => cm_rust::ConfigValueType::Uint16,
+        cm::ConfigType::Uint32 => cm_rust::ConfigValueType::Uint32,
+        cm::ConfigType::Uint64 => cm_rust::ConfigValueType::Uint64,
+        cm::ConfigType::Int8 => cm_rust::ConfigValueType::Int8,
+        cm::ConfigType::Int16 => cm_rust::ConfigValueType::Int16,
+        cm::ConfigType::Int32 => cm_rust::ConfigValueType::Int32,
+        cm::ConfigType::Int64 => cm_rust::ConfigValueType::Int64,
+    };
+    let value = config_value_file::field::config_value_from_json_value(value, &config_type)
+        .map_err(|e| Error::InvalidArgs(format!("Error parsing config '{}': {}", name, e)))?;
+    Ok(value.native_into_fidl())
 }
 
 #[cfg(test)]
