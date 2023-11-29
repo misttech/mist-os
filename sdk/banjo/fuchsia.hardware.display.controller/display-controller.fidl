@@ -32,7 +32,7 @@ type Image = struct {
     handle uint64;
 };
 
-const INVALID_DISPLAY_ID uint32 = 0;
+const INVALID_DISPLAY_ID uint64 = 0;
 const INVALID_ID uint32 = 0;
 
 /// Indicates that a ConfigStamp is invalid.
