@@ -9,7 +9,6 @@
     },
     "filter_enabled_interface_types": [],
     "interface_metrics": {},
-    "install_only": true,
     "interface_naming_policy": [
         {
             "matchers": [

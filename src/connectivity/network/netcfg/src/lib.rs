@@ -364,8 +364,6 @@ struct Config {
     #[serde(default)]
     pub forwarded_device_classes: ForwardedDeviceClasses,
     #[serde(default)]
-    pub install_only: bool,
-    #[serde(default)]
     pub interface_name_prefix: String,
     #[serde(default)]
     pub interface_naming_policy: Vec<interface::NamingRule>,
@@ -599,11 +597,6 @@ pub struct NetCfg<'a> {
     dhcpv6_prefix_provider_handler: Option<dhcpv6::PrefixProviderHandler>,
     dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
 
-    // When true, only perform device enumeration and ignore all provisioning.
-    // When false, perform device enumeration and provisioning.
-    // TODO(fxbug.dev/135113): Remove install_only field.
-    #[allow(unused)]
-    install_only: bool,
     // Makes sure that all interfaces added by netcfg have the specified prefix.
     interface_name_prefix: String,
     // Policy configuration to determine the name of an interface.
@@ -801,7 +794,6 @@ impl<'a> NetCfg<'a> {
         enable_dhcpv6: bool,
         forwarded_device_classes: ForwardedDeviceClasses,
         allowed_upstream_device_classes: &'a HashSet<DeviceClass>,
-        install_only: bool,
         interface_name_prefix: String,
         interface_naming_policy: Vec<interface::NamingRule>,
         interface_provisioning_policy: Vec<interface::ProvisioningRule>,
@@ -866,7 +858,6 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefix_provider_handler: None,
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
-            install_only,
             interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
@@ -2853,7 +2844,6 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
             AllowedDeviceClasses(allowed_bridge_upstream_device_classes),
         enable_dhcpv6,
         forwarded_device_classes,
-        install_only,
         interface_name_prefix,
         interface_naming_policy,
         interface_provisioning_policy,
@@ -2865,7 +2855,6 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
         enable_dhcpv6,
         forwarded_device_classes,
         &allowed_upstream_device_classes,
-        install_only,
         interface_name_prefix,
         interface_naming_policy,
         interface_provisioning_policy,
@@ -2874,12 +2863,12 @@ pub async fn run<M: Mode>() -> Result<(), anyhow::Error> {
     .context("error creating new netcfg instance")?;
 
     // TODO(fxbug.dev/130394): Once non-Fuchsia components can control filtering rules, disable
-    // setting filters when `install_only` flag is enabled.
+    // setting filters when interfaces are in Delegated provisioning mode.
     let () =
         netcfg.update_filters(filter_config).await.context("update filters based on config")?;
 
     // TODO(fxbug.dev/129708): Once non-Fuchsia components can control DNS servers, disable
-    // setting default DNS servers when `install_only` flag is enabled.
+    // setting default DNS servers when interfaces are in Delegated provisioning mode.
     let servers = servers.into_iter().map(static_source_from_ip).collect();
     debug!("updating default servers to {:?}", servers);
     let () = netcfg.update_dns_servers(DnsServersUpdateSource::Default, servers).await;
@@ -3125,7 +3114,6 @@ mod tests {
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
                 dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
-                install_only: false,
                 interface_name_prefix: String::new(),
                 interface_naming_policy: Default::default(),
                 interface_provisioning_policy: Default::default(),
@@ -4645,7 +4633,6 @@ mod tests {
   "allowed_bridge_upstream_device_classes": ["ethernet"],
   "enable_dhcpv6": true,
   "forwarded_device_classes": { "ipv4": [ "ethernet" ], "ipv6": [ "wlan" ] },
-  "install_only": false,
   "interface_name_prefix": "hello",
   "interface_naming_policy": [ { "matchers": [
         {"bus_types": ["usb", "pci", "sdio"]},
@@ -4679,7 +4666,6 @@ mod tests {
             allowed_bridge_upstream_device_classes,
             enable_dhcpv6,
             forwarded_device_classes,
-            install_only,
             interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
@@ -4714,7 +4700,6 @@ mod tests {
         };
         assert_eq!(forwarded_device_classes, expected_classes);
 
-        assert_eq!(install_only, false);
         assert_eq!(interface_name_prefix, "hello".to_string());
 
         let expected_naming_policy = Vec::from([interface::NamingRule {
@@ -4791,7 +4776,6 @@ mod tests {
             interface_metrics,
             enable_dhcpv6,
             forwarded_device_classes: _,
-            install_only,
             interface_name_prefix,
             interface_naming_policy,
             interface_provisioning_policy,
@@ -4801,7 +4785,6 @@ mod tests {
         assert_eq!(allowed_bridge_upstream_device_classes, Default::default());
         assert_eq!(interface_metrics, Default::default());
         assert_eq!(enable_dhcpv6, true);
-        assert_eq!(install_only, false);
         assert_eq!(interface_name_prefix, "".to_string());
         assert_eq!(interface_naming_policy.len(), 0);
         assert_eq!(interface_provisioning_policy.len(), 0);
@@ -4843,7 +4826,6 @@ mod tests {
             enable_dhcpv6: _,
             interface_metrics,
             forwarded_device_classes: _,
-            install_only: _,
             interface_name_prefix: _,
             interface_naming_policy: _,
             interface_provisioning_policy: _,
