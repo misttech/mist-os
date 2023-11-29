@@ -186,7 +186,7 @@ pub mod ioctl {
 
                 let node = file.node().clone();
                 *fsverity = FsVerityState::Building;
-                std::thread::spawn(move || {
+                task.kernel().kthreads.spawn(move |_, _| {
                     // Explicitly move write guard into this thread.
                     let _guard = guard;
                     // TODO(fxbug.dev/302620512): Generate merkle data, write to vmo.
