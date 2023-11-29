@@ -616,6 +616,16 @@ func (t *Device) hardPowerCycleAndPlaceInFastboot(ctx context.Context) error {
 	case res := <-fastbootedLogChan:
 		logger.Debugf(fastbootWaitCtx, "Log watcher returned %s", err)
 		retval = res
+		// We wait an additional two seconds here because at the
+		// instant we see this log line, the host is still enumerating
+		// the device and has likely not finished all of its USB
+		// requests yet, and `ffx flash` will error out immediately if
+		// it can't find the device with the matching serial number,
+		// rather than wait for such a device to appear (which is what
+		// `fastboot` would do).
+		// Feel free to remove this if `ffx flash` ever gets around to
+		// doing the more-useful thing.
+		time.Sleep(2 * time.Second)
 	case <-fastbootWaitCtx.Done():
 		logger.Debugf(fastbootWaitCtx, "Did not see '%s' in logs within %d seconds; carrying on anyway", fastbootIdleSignature, fastbootIdleWaitTimeoutSecs)
 		retval = nil
