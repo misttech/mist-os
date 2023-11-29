@@ -66,11 +66,11 @@ fuchsia_driver_package("package-dfv1") {
   driver_components = [ ":aml-sdmmc-dfv1" ]
 }
 
-test("aml-sdmmc-test-bin") {
-  output_name = "aml-sdmmc-test"
+test("aml-sdmmc-test-bin-dfv1") {
+  output_name = "aml-sdmmc-test-dfv1"
   sources = [
-    "aml-sdmmc-test.cc",
     "aml-sdmmc.cc",
+    "dfv1-driver-test.cc",
     "dfv1-driver.cc",
   ]
   deps = [
@@ -104,8 +104,8 @@ test("aml-sdmmc-test-bin") {
   ]
 }
 
-fuchsia_unittest_package("aml-sdmmc-test") {
-  deps = [ ":aml-sdmmc-test-bin" ]
+fuchsia_unittest_package("aml-sdmmc-test-dfv1") {
+  deps = [ ":aml-sdmmc-test-bin-dfv1" ]
   test_specs = {
     environments = basic_envs
     log_settings = {
@@ -118,7 +118,7 @@ group("tests") {
   testonly = true
   deps = [
     ":aml-sdmmc-bind_test",
-    ":aml-sdmmc-test",
+    ":aml-sdmmc-test-dfv1",
   ]
 }
 

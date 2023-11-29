@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "dfv1-driver.h"
+
 #include <lib/ddk/platform-defs.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -20,7 +22,6 @@
 #include <zxtest/zxtest.h>
 
 #include "aml-sdmmc-regs.h"
-#include "dfv1-driver.h"
 #include "src/devices/lib/mmio/test-helper.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
