@@ -13,21 +13,27 @@ rustc_library("lib") {
 
   sources = [
     "src/config_domain.rs",
+    "src/file_states.rs",
     "src/fuchsia_env.rs",
     "src/lib.rs",
   ]
 
   deps = [
+    "//src/developer/ffx/lib/sdk:lib",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:itertools",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:serde_json5",
+    "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:toml",
+    "//third_party/rust_crates:tracing",
   ]
 
   test_deps = [
     ":test_data",
+    "//src/lib/fuchsia",
     "//third_party/rust_crates:assert_matches",
   ]
 
@@ -51,6 +57,7 @@ host_test_data("test_data") {
     "test_data/rfc_example/.build-dir",
     "test_data/rfc_example/fuchsia_env.toml",
     "test_data/rfc_example/out/fuchsia_build_config.json",
+    "test_data/rfc_example/out/sdk/manifest/core",
   ]
 }
 

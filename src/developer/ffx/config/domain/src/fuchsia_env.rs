@@ -74,7 +74,7 @@ pub struct FuchsiaSdk {
     /// The location within the project root of files that the project tooling
     /// use to control the version of the SDK in use.
     #[serde(alias = "version-check-files")]
-    pub version_check_files: Option<Vec<String>>,
+    pub version_check_files: Option<Vec<Utf8PathBuf>>,
     /// A command to run to check that the sdk version is up to date before
     /// searching it. This will be run if any of the files in
     /// [`FuchsiaSdk::version_check_files`] has changed since they were last

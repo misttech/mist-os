@@ -452,6 +452,15 @@ impl EnvironmentContext {
             }
         }
     }
+
+    /// Returns the configuration domain for the current invocation, if there
+    /// is one.
+    pub fn get_config_domain(&self) -> Option<&ConfigDomain> {
+        match &self.kind {
+            EnvironmentKind::ConfigDomain { domain, .. } => Some(domain),
+            _ => None,
+        }
+    }
 }
 
 /// Finds the executable path of the ffx binary being run, attempting to

@@ -102,6 +102,21 @@ impl SdkRoot {
         path.join(SDK_MANIFEST_PATH).exists() || path.join(SDK_BUILD_MANIFEST_PATH).exists()
     }
 
+    /// Returns true if the SDK at this root exists and has a valid manifest
+    pub fn manifest_exists(&self) -> bool {
+        let root = match self {
+            Self::Full(path) => path,
+            Self::Modular { manifest, module } => {
+                let Ok(module_path) = module_manifest_path(manifest, module) else { return false };
+                if !module_path.exists() {
+                    return false;
+                }
+                manifest
+            }
+        };
+        root.exists() && Self::is_sdk_root(&root)
+    }
+
     /// Does a full load of the sdk configuration.
     pub fn get_sdk(self) -> Result<Sdk> {
         tracing::debug!("get_sdk");
@@ -149,6 +164,17 @@ impl SdkRoot {
     }
 }
 
+fn module_manifest_path(path: &Path, module: &str) -> Result<PathBuf> {
+    let arch_path = if cfg!(target_arch = "x86_64") {
+        "host_x64"
+    } else if cfg!(target_arch = "aarch64") {
+        "host_arm64"
+    } else {
+        ffx_bail!("Host architecture {} not supported by the SDK", std::env::consts::ARCH)
+    };
+    Ok(path.join(arch_path).join("sdk/manifest").join(module))
+}
+
 impl Sdk {
     fn from_build_dir(path: &Path, module_manifest: Option<&str>) -> Result<Self> {
         let path = std::fs::canonicalize(path).with_context(|| {
@@ -156,15 +182,7 @@ impl Sdk {
         })?;
         let manifest_path = match module_manifest {
             None => path.join(SDK_BUILD_MANIFEST_PATH),
-            Some(module) => if cfg!(target_arch = "x86_64") {
-                path.join("host_x64")
-            } else if cfg!(target_arch = "aarch64") {
-                path.join("host_arm64")
-            } else {
-                ffx_bail!("Host architecture {} not supported by the SDK", std::env::consts::ARCH)
-            }
-            .join("sdk/manifest")
-            .join(module),
+            Some(module) => module_manifest_path(&path, module)?,
         };
 
         let file = Self::open_manifest(&manifest_path)?;
@@ -441,6 +459,8 @@ mod test {
             "host_arm64/gen/tools/symbol-index/symbol_index_sdk.meta.json"
         );
         put_file!(r, "../test_data/core-sdk-root", "sdk/manifest/core");
+        put_file!(r, "../test_data/core-sdk-root", "host_x64/sdk/manifest/host_tools.internal");
+        put_file!(r, "../test_data/core-sdk-root", "host_arm64/sdk/manifest/host_tools.internal");
         put_file!(
             r,
             "../test_data/core-sdk-root",
@@ -470,6 +490,19 @@ mod test {
         put_file!(r, "../test_data/release-sdk-root", "meta/manifest.json");
         put_file!(r, "../test_data/release-sdk-root", "tools/zxdb-meta.json");
         r
+    }
+
+    #[test]
+    fn test_manifest_exists() {
+        let core_root = core_test_data_root();
+        let release_root = sdk_test_data_root();
+        assert!(SdkRoot::Full(core_root.path().to_owned()).manifest_exists());
+        assert!(SdkRoot::Modular {
+            manifest: core_root.path().to_owned(),
+            module: "host_tools.internal".to_owned()
+        }
+        .manifest_exists());
+        assert!(SdkRoot::Full(release_root.path().to_owned()).manifest_exists());
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
