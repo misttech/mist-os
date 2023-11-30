@@ -18,7 +18,7 @@ extern "C" {
 }
 
 /// Converts a slice to an equivalent MaybeUninit slice.
-pub fn slice_to_maybe_unit<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
+pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
     let ptr = slice.as_mut_ptr();
     let ptr = ptr as *mut MaybeUninit<T>;
     // SAFETY: This is effectively reinterpreting the `slice` reference as a
@@ -515,7 +515,7 @@ mod test {
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
         let (read_bytes, unread_bytes) =
-            usercopy.copyin(source_addr, slice_to_maybe_unit(&mut dest));
+            usercopy.copyin(source_addr, slice_to_maybe_uninit_mut(&mut dest));
         let expected_copied = vec!['a' as u8; offset];
         let expected_uncopied = vec![0 as u8; buf_len - offset];
         assert_eq!(read_bytes, &expected_copied);
@@ -605,7 +605,7 @@ mod test {
             new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size * 2));
 
         let (read_bytes, unread_bytes) =
-            usercopy.copyin_until_null_byte(source_addr, slice_to_maybe_unit(&mut dest));
+            usercopy.copyin_until_null_byte(source_addr, slice_to_maybe_uninit_mut(&mut dest));
         let expected_copied = vec!['a' as u8; offset];
         let expected_uncopied = vec![0 as u8; buf_len - offset];
         assert_eq!(read_bytes, &expected_copied);
@@ -646,7 +646,7 @@ mod test {
         let usercopy = new_usercopy_for_test!(Usercopy::new(mapped_addr..mapped_addr + page_size));
 
         let (read_bytes, unread_bytes) =
-            usercopy.copyin_until_null_byte(mapped_addr, slice_to_maybe_unit(&mut dest));
+            usercopy.copyin_until_null_byte(mapped_addr, slice_to_maybe_uninit_mut(&mut dest));
         let expected_copied_non_zero_bytes = vec!['a' as u8; zero_idx];
         let expected_uncopied = vec!['b' as u8; DEST_LEN - zero_idx - 1];
         assert_eq!(&read_bytes[..zero_idx], &expected_copied_non_zero_bytes);
@@ -674,7 +674,7 @@ mod test {
         let mut dest = vec![0u8];
 
         let (read_bytes, unread_bytes) =
-            usercopy.copyin_until_null_byte(addr, slice_to_maybe_unit(&mut dest));
+            usercopy.copyin_until_null_byte(addr, slice_to_maybe_uninit_mut(&mut dest));
         assert_eq!(read_bytes, &[]);
         assert_eq!(unread_bytes.len(), dest.len());
         assert_eq!(dest, [0]);
@@ -695,7 +695,8 @@ mod test {
 
         let mut dest = vec![0u8];
 
-        let (read_bytes, unread_bytes) = usercopy.copyin(addr, slice_to_maybe_unit(&mut dest));
+        let (read_bytes, unread_bytes) =
+            usercopy.copyin(addr, slice_to_maybe_uninit_mut(&mut dest));
         assert_eq!(read_bytes, &[]);
         assert_eq!(unread_bytes.len(), dest.len());
         assert_eq!(dest, [0]);

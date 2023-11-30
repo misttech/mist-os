@@ -588,7 +588,7 @@ impl VecInputBuffer {
 mod tests {
     use super::*;
     use crate::{mm::PAGE_SIZE, testing::*};
-    use usercopy::slice_to_maybe_unit;
+    use usercopy::slice_to_maybe_uninit_mut;
 
     #[::fuchsia::test]
     async fn test_data_input_buffer() {
@@ -646,16 +646,20 @@ mod tests {
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
             assert_eq!(
-                input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[0..20])).expect("read"),
+                input_buffer
+                    .read_exact(slice_to_maybe_uninit_mut(&mut buffer[0..20]))
+                    .expect("read"),
                 20
             );
             assert_eq!(input_buffer.available(), 17);
             assert_eq!(input_buffer.bytes_read(), 20);
             assert_eq!(
-                input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[20..37])).expect("read"),
+                input_buffer
+                    .read_exact(slice_to_maybe_uninit_mut(&mut buffer[20..37]))
+                    .expect("read"),
                 17
             );
-            assert!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[37..])).is_err());
+            assert!(input_buffer.read_exact(slice_to_maybe_uninit_mut(&mut buffer[37..])).is_err());
             assert_eq!(input_buffer.available(), 0);
             assert_eq!(input_buffer.bytes_read(), 37);
             assert_eq!(&data[..25], &buffer[..25]);
@@ -726,15 +730,21 @@ mod tests {
 
         let mut input_buffer = VecInputBuffer::new(b"helloworld");
         let mut buffer = [0; 5];
-        assert_eq!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).expect("read"), 5);
+        assert_eq!(
+            input_buffer.read_exact(slice_to_maybe_uninit_mut(&mut buffer)).expect("read"),
+            5
+        );
         assert_eq!(input_buffer.bytes_read(), 5);
         assert_eq!(input_buffer.available(), 5);
         assert_eq!(&buffer, b"hello");
-        assert_eq!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).expect("read"), 5);
+        assert_eq!(
+            input_buffer.read_exact(slice_to_maybe_uninit_mut(&mut buffer)).expect("read"),
+            5
+        );
         assert_eq!(input_buffer.bytes_read(), 10);
         assert_eq!(input_buffer.available(), 0);
         assert_eq!(&buffer, b"world");
-        assert!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).is_err());
+        assert!(input_buffer.read_exact(slice_to_maybe_uninit_mut(&mut buffer)).is_err());
 
         // Test read_object
         let mut input_buffer = VecInputBuffer::new(b"hello");

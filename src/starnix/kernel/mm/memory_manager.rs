@@ -40,7 +40,7 @@ use static_assertions::const_assert_eq;
 use std::{
     collections::HashMap, convert::TryInto, ffi::CStr, mem::MaybeUninit, ops::Range, sync::Arc,
 };
-use usercopy::slice_to_maybe_unit;
+use usercopy::slice_to_maybe_uninit_mut;
 use zerocopy::{AsBytes, FromBytes};
 
 fn usercopy(mm: &MemoryManager) -> &Option<usercopy::Usercopy> {
@@ -1671,7 +1671,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// over the allocation.
     fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
         let bytes_len = bytes.len();
-        self.read_memory(addr, slice_to_maybe_unit(bytes))
+        self.read_memory(addr, slice_to_maybe_uninit_mut(bytes))
             .map(|bytes_read| debug_assert_eq!(bytes_read.len(), bytes_len))
     }
 
@@ -1808,7 +1808,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         objects: &mut [T],
     ) -> Result<(), Errno> {
         let objects_len = objects.len();
-        self.read_objects(user, slice_to_maybe_unit(objects))
+        self.read_objects(user, slice_to_maybe_uninit_mut(objects))
             .map(|objects_read| debug_assert_eq!(objects_read.len(), objects_len))
     }
 
