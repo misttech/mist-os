@@ -884,10 +884,40 @@ fn test_dhcp<'a, D: DhcpClient>(
             .await
             .expect("failed to create DHCP domain objects");
 
+        // Gather all server MAC and IP addresses so we can add them to clients'
+        // neighbor tables to avoid flakes.
+        let server_ifaces = dhcp_objects
+            .iter()
+            .flat_map(|(_realm, servers, _clients)| servers)
+            .flat_map(|(_proxy, ifaces)| ifaces);
+
+        let all_server_macs_and_addrs = stream::iter(server_ifaces)
+            .then(|iface| async move {
+                let addrs = iface
+                    .get_addrs(fidl_fuchsia_net_interfaces_ext::IncludedAddresses::OnlyAssigned)
+                    .await
+                    .expect("get addresses");
+                (iface.mac().await, addrs.iter().map(|addr| addr.addr.addr).collect::<Vec<_>>())
+            })
+            .collect::<Vec<_>>()
+            .await;
+
         let mut realms = Vec::new();
         for (netstack_realm, servers, clients) in dhcp_objects {
             let mut client_ifaces = Vec::new();
+
             for (client, expected_acquired) in clients {
+                // Add all servers as neighbor entries to avoid flakes.
+                for (mac, addr) in all_server_macs_and_addrs
+                    .iter()
+                    .flat_map(|(mac, addrs)| addrs.iter().map(|addr| (*mac, *addr)))
+                {
+                    netstack_realm
+                        .add_neighbor_entry(client.id(), addr, mac)
+                        .await
+                        .expect("add neighbor entry");
+                }
+
                 assert_client_acquires_addr::<D>(
                     &netstack_realm,
                     &client,
