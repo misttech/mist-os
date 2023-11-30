@@ -4,6 +4,8 @@
 
 #include "block.h"
 
+#include <fuchsia/hardware/block/c/banjo.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
@@ -15,6 +17,7 @@
 #include <zircon/compiler.h>
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -52,6 +55,9 @@ void BlockDevice::BlockImplQuery(block_info_t* info, size_t* bopsz) {
   info->block_size = GetBlockSize();
   info->block_count = GetBlockCount();
   info->max_transfer_size = static_cast<uint32_t>(kPageSize * (ring_size - 2));
+  if (supports_discard_) {
+    info->flags |= FLAG_TRIM_SUPPORT;
+  }
 
   // Limit max transfer to our worst case scatter list size.
   if (info->max_transfer_size > kMaxMaxXfer) {
@@ -106,12 +112,18 @@ zx_status_t BlockDevice::Init() {
 
   DriverStatusAck();
 
-  if (!(DeviceFeaturesSupported() & VIRTIO_F_VERSION_1)) {
+  uint64_t features = DeviceFeaturesSupported();
+  if (!(features & VIRTIO_F_VERSION_1)) {
     // Declaring non-support until there is a need in the future.
     zxlogf(ERROR, "Legacy virtio interface is not supported by this driver");
     return ZX_ERR_NOT_SUPPORTED;
   }
-  DriverFeaturesAck(VIRTIO_F_VERSION_1);
+  if (features & VIRTIO_BLK_F_DISCARD) {
+    zxlogf(INFO, "virtio device supports discard");
+    supports_discard_ = true;
+  }
+  features &= (VIRTIO_F_VERSION_1 | VIRTIO_BLK_F_DISCARD);
+  DriverFeaturesAck(features);
   if (zx_status_t status = DeviceStatusFeaturesOk(); status != ZX_OK) {
     zxlogf(ERROR, "Feature negotiation failed: %s", zx_status_get_string(status));
     return status;
@@ -222,9 +234,12 @@ void BlockDevice::IrqRingUpdate() {
       list_for_every_entry (&pending_txn_list_, txn, block_txn_t, node) {
         if (txn->desc == head_desc) {
           zxlogf(TRACE, "completes txn %p", txn);
-          status = blk_res_[txn->index];
+          status = blk_res_[txn->req_index];
 
-          free_blk_req(txn->index);
+          free_blk_req(txn->req_index);
+          if (txn->discard_req_index) {
+            free_blk_req(*txn->discard_req_index);
+          }
           list_delete(&txn->node);
 
           sync_completion_signal(&txn_signal_);
@@ -256,17 +271,27 @@ void BlockDevice::IrqConfigChange() {}
 
 zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes, zx_paddr_t* pages,
                                   size_t pagecount, uint16_t* idx) {
-  size_t index;
+  size_t req_index;
+  std::optional<size_t> discard_req_index;
   {
     fbl::AutoLock lock(&txn_lock_);
-    index = alloc_blk_req();
-    if (index >= blk_req_count) {
-      zxlogf(TRACE, "too many block requests queued (%zu)!", index);
+    req_index = alloc_blk_req();
+    if (req_index >= blk_req_count) {
+      zxlogf(TRACE, "too many block requests queued (%zu)!", req_index);
       return ZX_ERR_NO_RESOURCES;
+    }
+    if (type == VIRTIO_BLK_T_DISCARD) {
+      // A second descriptor needs to be allocated for discard requests.
+      discard_req_index = alloc_blk_req();
+      if (*discard_req_index >= blk_req_count) {
+        zxlogf(TRACE, "too many block requests queued (%zu)!", *discard_req_index);
+        free_blk_req(req_index);
+        return ZX_ERR_NO_RESOURCES;
+      }
     }
   }
 
-  auto req = &blk_req_[index];
+  auto req = &blk_req_[req_index];
   req->type = type;
   req->ioprio = 0;
   if (type == VIRTIO_BLK_T_FLUSH) {
@@ -277,22 +302,39 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   zxlogf(TRACE, "blk_req type %u ioprio %u sector %" PRIu64 "", req->type, req->ioprio,
          req->sector);
 
-  // Save the request index so we can free it when we complete the transfer.
-  txn->index = index;
+  if (type == VIRTIO_BLK_T_DISCARD) {
+    // NOTE: if we decide to later send multiple virtio_blk_discard_write_zeroes at once, we must
+    // respect the max_discard_seg configuration of the device.
+    static_assert(sizeof(virtio_blk_discard_write_zeroes_t) <= sizeof(virtio_blk_req_t));
+    virtio_blk_discard_write_zeroes_t* req =
+        reinterpret_cast<virtio_blk_discard_write_zeroes_t*>(&blk_req_[req_index]);
+    req->sector = txn->op.rw.offset_dev;
+    req->num_sectors = txn->op.rw.length;
+    zxlogf(TRACE, "blk_dwz_req sector %" PRIu64 " num_sectors %" PRIu32, req->sector,
+           req->num_sectors);
+  }
+  // Save the request indexes so we can free them when we complete the transfer.
+  txn->req_index = req_index;
+  txn->discard_req_index = discard_req_index;
 
   zxlogf(TRACE, "page count %lu", pagecount);
 
   // Put together a transfer.
   uint16_t i;
   vring_desc* desc;
+  uint16_t num_descriptors =
+      (type == VIRTIO_BLK_T_DISCARD ? 3u : 2u) + static_cast<uint16_t>(pagecount);
   {
     fbl::AutoLock lock(&ring_lock_);
-    desc = vring_.AllocDescChain(static_cast<uint16_t>(2u + pagecount), &i);
+    desc = vring_.AllocDescChain(num_descriptors, &i);
   }
   if (!desc) {
     zxlogf(TRACE, "failed to allocate descriptor chain of length %zu", 2u + pagecount);
     fbl::AutoLock lock(&txn_lock_);
-    free_blk_req(index);
+    free_blk_req(req_index);
+    if (discard_req_index) {
+      free_blk_req(*discard_req_index);
+    }
     return ZX_ERR_NO_RESOURCES;
   }
 
@@ -302,7 +344,7 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   txn->desc = desc;
 
   // Set up the descriptor pointing to the head.
-  desc->addr = io_buffer_phys(&blk_req_buf_) + index * sizeof(virtio_blk_req_t);
+  desc->addr = io_buffer_phys(&blk_req_buf_) + req_index * sizeof(virtio_blk_req_t);
   desc->len = sizeof(virtio_blk_req_t);
   desc->flags = VRING_DESC_F_NEXT;
   if (zxlog_level_enabled(TRACE)) {
@@ -341,9 +383,19 @@ zx_status_t BlockDevice::QueueTxn(block_txn_t* txn, uint32_t type, size_t bytes,
   }
   assert(bytes == 0);
 
+  if (type == VIRTIO_BLK_T_DISCARD) {
+    desc = vring_.DescFromIndex(desc->next);
+    desc->addr = io_buffer_phys(&blk_req_buf_) + *discard_req_index * sizeof(virtio_blk_req_t);
+    desc->len = sizeof(virtio_blk_discard_write_zeroes_t);
+    desc->flags = VRING_DESC_F_NEXT;
+    if (zxlog_level_enabled(TRACE)) {
+      virtio_dump_desc(desc);
+    }
+  }
+
   // Set up the descriptor pointing to the response.
   desc = vring_.DescFromIndex(desc->next);
-  desc->addr = blk_res_pa_ + index;
+  desc->addr = blk_res_pa_ + req_index;
   desc->len = 1;
   desc->flags = VRING_DESC_F_WRITE;
   if (zxlog_level_enabled(TRACE)) {
@@ -383,6 +435,7 @@ void BlockDevice::SignalWorker(block_txn_t* txn) {
   switch (txn->op.command.opcode) {
     case BLOCK_OPCODE_READ:
     case BLOCK_OPCODE_WRITE:
+    case BLOCK_OPCODE_TRIM:
       if (zx_status_t status = block::CheckIoRange(txn->op.rw, config_.capacity); status != ZX_OK) {
         txn_complete(txn, status);
         return;
@@ -443,14 +496,18 @@ void BlockDevice::WorkerThread() {
       bytes = 0;
       num_pages = 0;
       do_flush = true;
+    } else if (txn->op.command.opcode == BLOCK_OPCODE_TRIM) {
+      type = VIRTIO_BLK_T_DISCARD;
+      bytes = 0;
+      num_pages = 0;
     } else {
       if (txn->op.command.opcode == BLOCK_OPCODE_WRITE) {
         type = VIRTIO_BLK_T_OUT;
       } else {
         type = VIRTIO_BLK_T_IN;
       }
-      txn->op.rw.offset_vmo *= config_.blk_size;
       bytes = static_cast<size_t>(txn->op.rw.length) * config_.blk_size;
+      txn->op.rw.offset_vmo *= config_.blk_size;
       status = pin_pages(bti_.get(), txn, bytes, pages, &num_pages);
     }
 
@@ -486,7 +543,10 @@ void BlockDevice::WorkerThread() {
         zxlogf(ERROR, "failed to queue txn to hw: %s", zx_status_get_string(status));
         {
           fbl::AutoLock lock(&txn_lock_);
-          free_blk_req(txn->index);
+          free_blk_req(txn->req_index);
+          if (txn->discard_req_index) {
+            free_blk_req(*txn->discard_req_index);
+          }
         }
         txn_complete(txn, status);
         break;
@@ -554,7 +614,10 @@ void BlockDevice::CleanupPendingTxns() {
   }
   fbl::AutoLock lock(&txn_lock_);
   list_for_every_entry_safe (&pending_txn_list_, txn, temp_entry, block_txn_t, node) {
-    free_blk_req(txn->index);
+    free_blk_req(txn->req_index);
+    if (txn->discard_req_index) {
+      free_blk_req(*txn->discard_req_index);
+    }
     list_delete(&txn->node);
     txn_complete(txn, ZX_ERR_IO_NOT_PRESENT);
   }

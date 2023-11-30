@@ -9,6 +9,7 @@
 #include <lib/virtio/backends/fake.h>
 
 #include <condition_variable>
+#include <cstdint>
 #include <memory>
 
 #include <zxtest/zxtest.h>
@@ -24,7 +25,7 @@ constexpr uint64_t kBlkSize = 1024;
 constexpr uint64_t kVmoOffsetBlocks = 1;
 const uint16_t kRingSize = 128;  // Should match block.h
 
-// Fake virtio 'backend' for a virtio-scsi device.
+// Fake virtio 'backend' for a virtio-block device.
 class FakeBackendForBlock : public virtio::FakeBackend {
  public:
   FakeBackendForBlock(zx_handle_t fake_bti)
@@ -93,14 +94,19 @@ class FakeBackendForBlock : public virtio::FakeBackend {
       // Find the last descriptor.
       vring_desc* desc = &descriptors[avail.ring[index]];
       uint16_t count = 1;
+      uint16_t data_descriptor_idx = UINT16_MAX;
       while (desc->flags & VRING_DESC_F_NEXT) {
-        if (count == 2) {
-          // The second descriptor describes the first page of data transfer (the first descriptor
-          // is the head descriptor).
-          EXPECT_EQ(desc->addr % zx_system_get_page_size(), kBlkSize * kVmoOffsetBlocks);
+        if (desc->addr % zx_system_get_page_size() == kBlkSize * kVmoOffsetBlocks) {
+          data_descriptor_idx = count;
         }
         desc = &descriptors[desc->next];
         ++count;
+      }
+      // The second-last descriptor describes the first page of data transfer (the first descriptor
+      // is the head descriptor).
+      if (data_descriptor_idx != UINT16_MAX) {
+        ASSERT_EQ(data_descriptor_idx, count - 1,
+                  "The second-last descriptor should point to data");
       }
 
       // It should be the status descriptor.
@@ -227,6 +233,14 @@ class BlockDeviceTest : public zxtest::Test {
     return txn;
   }
 
+  virtio::block_txn_t TestTrimCommand(uint32_t trim_blocks = 1) {
+    virtio::block_txn_t txn;
+    memset(&txn, 0, sizeof(txn));
+    txn.op.rw.command.opcode = BLOCK_OPCODE_TRIM;
+    txn.op.rw.length = trim_blocks;
+    return txn;
+  }
+
   static void CompletionCb(void* cookie, zx_status_t status, block_op_t* op) {
     BlockDeviceTest* operation = reinterpret_cast<BlockDeviceTest*>(cookie);
     operation->operation_status_ = status;
@@ -306,6 +320,18 @@ TEST_F(BlockDeviceTest, ReadError) {
                           this);
   ASSERT_TRUE(Wait());
   ASSERT_EQ(ZX_ERR_IO, OperationStatus());
+
+  RemoveDevice();
+}
+
+TEST_F(BlockDeviceTest, Trim) {
+  InitDevice();
+
+  virtio::block_txn_t txn = TestTrimCommand();
+  device_->BlockImplQueue(reinterpret_cast<block_op_t*>(&txn), &BlockDeviceTest::CompletionCb,
+                          this);
+  ASSERT_TRUE(Wait());
+  ASSERT_OK(OperationStatus());
 
   RemoveDevice();
 }

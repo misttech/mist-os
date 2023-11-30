@@ -19,11 +19,13 @@
 #define VIRTIO_BLK_F_FLUSH      ((uint64_t)1 << 9)
 #define VIRTIO_BLK_F_TOPOLOGY   ((uint64_t)1 << 10)
 #define VIRTIO_BLK_F_CONFIG_WCE ((uint64_t)1 << 11)
+#define VIRTIO_BLK_F_DISCARD    ((uint64_t)1 << 13)
 
 #define VIRTIO_BLK_T_IN         0
 #define VIRTIO_BLK_T_OUT        1
 #define VIRTIO_BLK_T_FLUSH      4
 #define VIRTIO_BLK_T_GET_ID     8
+#define VIRTIO_BLK_T_DISCARD    11
 
 #define VIRTIO_BLK_S_OK         0
 #define VIRTIO_BLK_S_IOERR      1
@@ -53,6 +55,12 @@ typedef struct virtio_blk_req {
   uint32_t ioprio;
   uint64_t sector;
 } __PACKED virtio_blk_req_t;
+
+typedef struct virtio_blk_discard_write_zeroes {
+  uint64_t sector;
+  uint32_t num_sectors;
+  uint32_t flags;
+} __PACKED virtio_blk_discard_write_zeroes_t;
 
 __END_CDECLS
 

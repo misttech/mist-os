@@ -28,7 +28,8 @@ struct block_txn_t {
   block_impl_queue_callback completion_cb;
   void* cookie;
   struct vring_desc* desc;
-  size_t index;
+  size_t req_index;
+  std::optional<size_t> discard_req_index;  // Only used if op is trim
   list_node_t node;
   zx_handle_t pmt;
 };
@@ -121,6 +122,8 @@ class BlockDevice : public Device,
   list_node worker_txn_list_ = LIST_INITIAL_VALUE(worker_txn_list_);
   sync_completion_t worker_signal_;
   std::atomic_bool worker_shutdown_ = false;
+
+  bool supports_discard_ = false;
 };
 
 }  // namespace virtio
