@@ -33,6 +33,12 @@ pub struct PlatformNetworkConfig {
     #[serde(default)]
     pub netcfg_config_path: Option<Utf8PathBuf>,
 
+    #[serde(default)]
+    pub netstack_config_path: Option<Utf8PathBuf>,
+
+    #[serde(default)]
+    pub google_maps_api_key_path: Option<Utf8PathBuf>,
+
     /// Controls whether the unified binary for networking should be used.
     ///
     /// The unified binary provides space savings for space-constrainted

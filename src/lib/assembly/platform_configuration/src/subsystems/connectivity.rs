@@ -98,6 +98,22 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
                 })?;
             }
 
+            if let Some(netstack_config_path) = &connectivity_config.network.netstack_config_path {
+                builder.package("netstack").config_data(FileEntry {
+                    source: netstack_config_path.clone(),
+                    destination: "default.json".into(),
+                })?;
+            }
+
+            if let Some(google_maps_api_key_path) =
+                &connectivity_config.network.google_maps_api_key_path
+            {
+                builder.package("emergency").config_data(FileEntry {
+                    source: google_maps_api_key_path.clone(),
+                    destination: "google_maps_api_key.txt".into(),
+                })?;
+            }
+
             // The use of netstack3 can be forcibly required by the board,
             // otherwise it's selectable by the product.
             match (
