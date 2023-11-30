@@ -1,0 +1,53 @@
+# Copyright 2023 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+
+group("all-test-dtb") {
+  deps = [
+    ":basic-properties-dtb",
+    ":simple-dtb",
+    ":status-disabled-dtb",
+  ]
+}
+
+devicetree_fragment("simple-include") {
+  sources = [ "simple.dtsi.S" ]
+}
+
+devicetree("simple") {
+  sources = [ "simple.dts" ]
+  golden = "simple.golden.dts"
+  deps = [ ":simple-include" ]
+}
+
+resource("simple-dtb") {
+  sources = get_target_outputs(":simple.dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":simple" ]
+}
+
+devicetree("basic-properties") {
+  sources = [ "basic-properties.dts.S" ]
+  golden = "basic-properties.golden.dts"
+  outputs = [ "$target_out_dir/basic-properties.dtb" ]
+  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
+}
+
+resource("basic-properties-dtb") {
+  sources = [ "$target_out_dir/basic-properties.dtb" ]
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":basic-properties" ]
+}
+
+dtb("status-disabled") {
+  sources = [ "status-disabled.dts" ]
+}
+
+resource("status-disabled-dtb") {
+  sources = get_target_outputs(":status-disabled")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":status-disabled" ]
+}

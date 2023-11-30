@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/devicetree/devicetree.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -76,41 +75,11 @@ test("devicetree-manager-test") {
   sources = [ "manager-test.cc" ]
 }
 
-devicetree_fragment("simple-include") {
-  sources = [ "test-data/simple.dtsi.S" ]
-}
-
-devicetree("simple") {
-  sources = [ "test-data/simple.dts" ]
-  golden = "test-data/simple.golden.dts"
-  deps = [ ":simple-include" ]
-}
-
-resource("simple-dtb") {
-  sources = get_target_outputs(":simple.dtb")
-  outputs = [ "test-data/{{source_file_part}}" ]
-  deps = [ ":simple" ]
-}
-
-devicetree("basic-properties") {
-  sources = [ "test-data/basic-properties.dts.S" ]
-  golden = "test-data/basic-properties.golden.dts"
-  outputs = [ "$target_out_dir/basic-properties.dtb" ]
-  deps = [ "//zircon/system/ulib/ddk-platform-defs" ]
-}
-
-resource("basic-properties-dtb") {
-  sources = [ "$target_out_dir/basic-properties.dtb" ]
-  outputs = [ "test-data/{{source_file_part}}" ]
-  deps = [ ":basic-properties" ]
-}
-
 fuchsia_unittest_component("devicetree-manager-test-component") {
   component_name = "devicetree-manager-test"
   deps = [
-    ":basic-properties-dtb",
     ":devicetree-manager-test",
-    ":simple-dtb",
+    "test-data:all-test-dtb",
   ]
 }
 

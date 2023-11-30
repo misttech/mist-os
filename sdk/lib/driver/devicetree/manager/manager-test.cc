@@ -315,5 +315,25 @@ TEST_F(ManagerTest, TestParentChild) {
   ASSERT_TRUE(DoPublish(manager).is_ok());
 }
 
+TEST_F(ManagerTest, TestSkipDisabledNodes) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/status-disabled.dtb"));
+  DefaultVisitors<> default_visitors;
+  ASSERT_EQ(ZX_OK, manager.Walk(default_visitors).status_value());
+
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+  ASSERT_EQ(3lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+
+  auto pbus_node0 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 0);
+  ASSERT_TRUE(pbus_node0.name().has_value());
+  // Root node has no name.
+  ASSERT_EQ(0lu, pbus_node0.name()->size());
+  auto pbus_node1 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 1);
+  ASSERT_TRUE(pbus_node1.name().has_value());
+  ASSERT_NE(nullptr, strstr("status-okay-device", pbus_node1.name()->data()));
+  auto pbus_node2 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 2);
+  ASSERT_TRUE(pbus_node2.name().has_value());
+  ASSERT_NE(nullptr, strstr("status-none-device", pbus_node2.name()->data()));
+}
+
 }  // namespace
 }  // namespace fdf_devicetree

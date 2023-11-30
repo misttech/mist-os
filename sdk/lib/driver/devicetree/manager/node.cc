@@ -95,6 +95,17 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     return zx::ok();
   }
 
+  auto status_property = properties_.find("status");
+  if (status_property != properties_.end()) {
+    auto status_string = status_property->second.AsString();
+    if (status_string && (*status_string != "okay")) {
+      FDF_LOG(DEBUG, "Not publishing node '%.*s' because its status is %.*s.",
+              static_cast<int>(name().size()), name().data(),
+              static_cast<int>(status_string->size()), status_string->data());
+      return zx::ok();
+    }
+  }
+
   // Pass properties to pbus node directly if we are not adding a composite spec.
   if (!composite_) {
     pbus_node_.properties() = node_properties_;
