@@ -117,19 +117,19 @@ impl<NonSyncCtx: NonSyncContext, L> CounterContext<ArpCounters>
 
 /// An execution context for the ARP protocol that allows sending IP packets to
 /// specific neighbors.
-pub(crate) trait BufferArpSenderContext<
-    D: ArpDevice,
-    C: ArpNonSyncCtx<D, Self::DeviceId>,
-    B: BufferMut,
->: ArpConfigContext + DeviceIdContext<D>
+pub(crate) trait ArpSenderContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
+    ArpConfigContext + DeviceIdContext<D>
 {
     /// Send an IP packet to the neighbor with address `dst_link_address`.
-    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         ctx: &mut C,
         dst_link_address: D::HType,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 // NOTE(joshlf): The `ArpDevice` parameter may seem unnecessary. We only ever
@@ -179,6 +179,19 @@ pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
 {
     type ConfigCtx<'a>: ArpConfigContext;
 
+    type ArpSenderCtx<'a>: ArpSenderContext<D, C, DeviceId = Self::DeviceId>;
+
+    /// Calls the function with a mutable reference to ARP state and the
+    /// synchronized context.
+    fn with_arp_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::ArpSenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
     /// Get a protocol address of this interface.
     ///
     /// If `device_id` does not have any addresses associated with it, return
@@ -210,27 +223,6 @@ pub(crate) trait ArpConfigContext {
     fn retransmit_timeout(&mut self) -> NonZeroDuration {
         NonZeroDuration::new(DEFAULT_ARP_REQUEST_PERIOD).unwrap()
     }
-}
-
-/// An execution context for the ARP protocol when a buffer is provided.
-///
-/// `BufferArpContext` is like [`ArpContext`], except that it also requires that
-/// the context be capable of sending frames in buffers of type `B`.
-pub(crate) trait BufferArpContext<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
-    ArpContext<D, C>
-{
-    type BufferArpSenderCtx<'a>: BufferArpSenderContext<D, C, B, DeviceId = Self::DeviceId>;
-
-    /// Calls the function with a mutable reference to ARP state and the
-    /// synchronized context.
-    fn with_arp_state_mut_and_buf_ctx<
-        O,
-        F: FnOnce(&mut ArpState<D, C::Instant, C::Notifier>, &mut Self::BufferArpSenderCtx<'_>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O;
 }
 
 impl<
@@ -273,10 +265,10 @@ impl<
         B: BufferMut,
         D: ArpDevice,
         C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: BufferArpContext<B, D, C> + CounterContext<ArpCounters>,
+        SC: ArpContext<D, C> + CounterContext<ArpCounters>,
     > BufferNudContext<B, Ipv4, D, C> for SC
 {
-    type BufferSenderCtx<'a> = <SC as BufferArpContext<B, D, C>>::BufferArpSenderCtx<'a>;
+    type BufferSenderCtx<'a> = <SC as ArpContext<D, C>>::ArpSenderCtx<'a>;
 
     fn with_nud_state_mut_and_buf_ctx<
         O,
@@ -289,18 +281,14 @@ impl<
         device_id: &SC::DeviceId,
         cb: F,
     ) -> O {
-        self.with_arp_state_mut_and_buf_ctx(device_id, |ArpState { nud }, sync_ctx| {
+        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, sync_ctx| {
             cb(nud, sync_ctx)
         })
     }
 }
 
-impl<
-        B: BufferMut,
-        D: ArpDevice,
-        C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: BufferArpSenderContext<D, C, B>,
-    > BufferNudSenderContext<B, Ipv4, D, C> for SC
+impl<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>>
+    BufferNudSenderContext<B, Ipv4, D, C> for SC
 {
     fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
         &mut self,
@@ -308,7 +296,7 @@ impl<
         dst_mac: D::HType,
         body: S,
     ) -> Result<(), S> {
-        BufferArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, ctx, dst_mac, body)
+        ArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, ctx, dst_mac, body)
     }
 }
 
@@ -703,7 +691,7 @@ mod tests {
         counters: ArpCounters,
     }
 
-    /// A fake `BufferArpSenderContext` that sends IP packets.
+    /// A fake `ArpSenderContext` that sends IP packets.
     struct FakeArpInnerCtx;
 
     /// A fake `ArpConfigContext`.
@@ -766,6 +754,27 @@ mod tests {
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
         type ConfigCtx<'a> = FakeArpConfigCtx;
 
+        type ArpSenderCtx<'a> = FakeArpInnerCtx;
+
+        fn with_arp_state_mut_and_sender_ctx<
+            O,
+            F: FnOnce(
+                &mut ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
+                &mut Self::ArpSenderCtx<'_>,
+            ) -> O,
+        >(
+            &mut self,
+            FakeLinkDeviceId: &FakeLinkDeviceId,
+            cb: F,
+        ) -> O {
+            let state = self.get_mut();
+            cb(&mut state.arp_state, &mut state.inner)
+        }
+
         fn get_protocol_addr(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
@@ -806,33 +815,8 @@ mod tests {
     impl ArpConfigContext for FakeArpConfigCtx {}
     impl ArpConfigContext for FakeArpInnerCtx {}
 
-    impl<B: BufferMut> BufferArpContext<B, EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeCtxImpl {
-        type BufferArpSenderCtx<'a> = FakeArpInnerCtx;
-
-        fn with_arp_state_mut_and_buf_ctx<
-            O,
-            F: FnOnce(
-                &mut ArpState<
-                    EthernetLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
-                >,
-                &mut Self::BufferArpSenderCtx<'_>,
-            ) -> O,
-        >(
-            &mut self,
-            FakeLinkDeviceId: &FakeLinkDeviceId,
-            cb: F,
-        ) -> O {
-            let state = self.get_mut();
-            cb(&mut state.arp_state, &mut state.inner)
-        }
-    }
-
-    impl<B: BufferMut> BufferArpSenderContext<EthernetLinkDevice, FakeNonSyncCtxImpl, B>
-        for FakeArpInnerCtx
-    {
-        fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    impl ArpSenderContext<EthernetLinkDevice, FakeNonSyncCtxImpl> for FakeArpInnerCtx {
+        fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
             _ctx: &mut FakeNonSyncCtxImpl,
             _dst_link_address: Mac,

@@ -42,8 +42,8 @@ use crate::{
     device::{
         self,
         arp::{
-            ArpConfigContext, ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpState, ArpTimerId,
-            BufferArpContext, BufferArpSenderContext,
+            ArpConfigContext, ArpContext, ArpFrameMetadata, ArpPacketHandler, ArpSenderContext,
+            ArpState, ArpTimerId,
         },
         link::LinkDevice,
         queue::{
@@ -1156,6 +1156,34 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 {
     type ConfigCtx<'a> = Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>;
 
+    type ArpSenderCtx<'a> =
+        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
+
+    fn with_arp_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(
+            &mut ArpState<EthernetLinkDevice, C::Instant, C::Notifier>,
+            &mut Self::ArpSenderCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<C>,
+        cb: F,
+    ) -> O {
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
+                };
+                cb(&mut arp, &mut locked)
+            },
+        )
+    }
+
     fn get_protocol_addr(
         &mut self,
         _ctx: &mut C,
@@ -1203,52 +1231,19 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 impl<C: NonSyncContext, L> ArpConfigContext for Locked<&SyncCtx<C>, L> {}
 impl<SC: DeviceIdContext<EthernetLinkDevice>> ArpConfigContext for SyncCtxWithDeviceId<'_, SC> {}
 
-impl<B: BufferMut, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    BufferArpContext<B, EthernetLinkDevice, C> for Locked<&SyncCtx<C>, L>
+impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
+    ArpSenderContext<EthernetLinkDevice, C> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
 {
-    type BufferArpSenderCtx<'a> =
-        SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, crate::lock_ordering::EthernetIpv4Arp>>;
-
-    fn with_arp_state_mut_and_buf_ctx<
-        O,
-        F: FnOnce(
-            &mut ArpState<EthernetLinkDevice, C::Instant, C::Notifier>,
-            &mut Self::BufferArpSenderCtx<'_>,
-        ) -> O,
-    >(
-        &mut self,
-        device_id: &EthernetDeviceId<C>,
-        cb: F,
-    ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
-            self,
-            device_id,
-            |mut state, sync_ctx| {
-                let mut arp = state.lock::<crate::lock_ordering::EthernetIpv4Arp>();
-                let mut locked = SyncCtxWithDeviceId {
-                    device_id,
-                    sync_ctx: &mut sync_ctx.cast_locked::<crate::lock_ordering::EthernetIpv4Arp>(),
-                };
-                cb(&mut arp, &mut locked)
-            },
-        )
-    }
-}
-
-impl<
-        'a,
-        B: BufferMut,
-        C: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
-    > BufferArpSenderContext<EthernetLinkDevice, C, B>
-    for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
-{
-    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         ctx: &mut C,
         dst_mac: Mac,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let Self { device_id, sync_ctx } = self;
         send_as_ethernet_frame_to_dst(*sync_ctx, ctx, device_id, dst_mac, body, EtherType::Ipv4)
     }
@@ -1609,6 +1604,27 @@ mod tests {
     impl ArpContext<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
         type ConfigCtx<'a> = FakeInnerCtx;
 
+        type ArpSenderCtx<'a> = SyncCtxWithDeviceId<'a, FakeInnerCtx>;
+
+        fn with_arp_state_mut_and_sender_ctx<
+            O,
+            F: FnOnce(
+                &mut ArpState<
+                    EthernetLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
+                >,
+                &mut Self::ArpSenderCtx<'_>,
+            ) -> O,
+        >(
+            &mut self,
+            device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(outer, &mut SyncCtxWithDeviceId { sync_ctx: inner, device_id })
+        }
+
         fn get_protocol_addr(
             &mut self,
             _ctx: &mut FakeNonSyncCtx,
@@ -1647,38 +1663,19 @@ mod tests {
 
     impl ArpConfigContext for FakeInnerCtx {}
 
-    impl<B: BufferMut> BufferArpContext<B, EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
-        type BufferArpSenderCtx<'a> = SyncCtxWithDeviceId<'a, FakeInnerCtx>;
-
-        fn with_arp_state_mut_and_buf_ctx<
-            O,
-            F: FnOnce(
-                &mut ArpState<
-                    EthernetLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<EthernetLinkDevice>,
-                >,
-                &mut Self::BufferArpSenderCtx<'_>,
-            ) -> O,
-        >(
-            &mut self,
-            device_id: &Self::DeviceId,
-            cb: F,
-        ) -> O {
-            let Self { outer, inner } = self;
-            cb(outer, &mut SyncCtxWithDeviceId { sync_ctx: inner, device_id })
-        }
-    }
-
-    impl<'a, B: BufferMut> BufferArpSenderContext<EthernetLinkDevice, FakeNonSyncCtx, B>
+    impl<'a> ArpSenderContext<EthernetLinkDevice, FakeNonSyncCtx>
         for SyncCtxWithDeviceId<'a, FakeInnerCtx>
     {
-        fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+        fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
             ctx: &mut FakeNonSyncCtx,
             link_addr: Mac,
             body: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             let Self { sync_ctx, device_id } = self;
             send_as_ethernet_frame_to_dst(
                 *sync_ctx,
