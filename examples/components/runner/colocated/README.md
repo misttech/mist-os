@@ -11,6 +11,10 @@ it runs. A program run by the `colocated` runner will allocate and map a VMO of
 a user-specified size, and then fill it with randomized bytes, to cause the
 pages to be physically allocated.
 
+If the program is started with a `PA_USER0` numbered handle, it will signal the
+`USER_0` signal on the peer handle once it has done filling the VMO, to indicate
+that all the backing pages have been allocated.
+
 ## Program schema
 
 The manifest of a component run by this runner would look like the following:

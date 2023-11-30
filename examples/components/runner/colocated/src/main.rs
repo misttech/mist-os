@@ -76,8 +76,86 @@ fn start(
     let vmo_size = runner::get_program_string(&start_info, VMO_SIZE)
         .ok_or(anyhow!("Missing vmo_size argument in program block"))?;
     let vmo_size: u64 = vmo_size.parse().context("vmo_size is not a valid number")?;
-
-    let program = ColocatedProgram::new(vmo_size)?;
+    let numbered_handles = start_info.numbered_handles.unwrap_or(vec![]);
+    let program = ColocatedProgram::new(vmo_size, numbered_handles)?;
     let termination = program.wait_for_termination();
     Ok((program, termination))
+}
+
+/// Unit test the `ComponentRunner` protocol server implementation.
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fidl::endpoints::Proxy;
+    use fidl_fuchsia_component_decl as fdecl;
+    use fidl_fuchsia_process::HandleInfo;
+    use fuchsia_runtime::HandleType;
+
+    #[fuchsia::test]
+    async fn test_start_stop_component() {
+        let (runner, runner_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentRunnerMarker>().unwrap();
+        let server = fasync::Task::spawn(handle_runner_request(runner_stream));
+
+        // Measure how much private RAM our own process is using.
+        let usage_initial = private_ram();
+
+        // Start a component using 64 MiB of RAM.
+        let decl = fuchsia_fs::file::read_in_namespace_to_fidl::<fdecl::Component>(
+            "/pkg/meta/colocated-component-64mb.cm",
+        )
+        .await
+        .unwrap();
+        let (controller, controller_server_end) = fidl::endpoints::create_endpoints();
+        let (user0, user0_peer) = zx::EventPair::create();
+        let start_info = fcrunner::ComponentStartInfo {
+            program: decl.program.unwrap().info,
+            numbered_handles: Some(vec![HandleInfo {
+                handle: user0_peer.into(),
+                id: fuchsia_runtime::HandleInfo::new(HandleType::User0, 0).as_raw(),
+            }]),
+            ..Default::default()
+        };
+        runner.start(start_info, controller_server_end).unwrap();
+
+        // Wait until the program has allocated 64 MiB worth of pages.
+        _ = fasync::OnSignals::new(&user0, zx::Signals::USER_0).await.unwrap();
+
+        // Measure our private memory usage again. It should increase by roughly that much more.
+        let usage_started = private_ram();
+        assert!(
+            usage_started > usage_initial,
+            "initial: {usage_initial}, started: {usage_started}"
+        );
+        assert!(
+            usage_started - usage_initial > 60 * 1024 * 1024,
+            "initial: {usage_initial}, started: {usage_started}"
+        );
+
+        // Stop the component.
+        let controller = controller.into_proxy().unwrap();
+        controller.stop().unwrap();
+        controller.on_closed().await.unwrap();
+
+        // Measure our private memory usage again. It should roughly go back to before.
+        let usage_stopped = private_ram();
+        assert!(
+            usage_stopped < usage_started,
+            "started: {usage_started}, stopped: {usage_stopped}"
+        );
+        assert!(
+            usage_started - usage_stopped > 60 * 1024 * 1024,
+            "started: {usage_started}, stopped: {usage_stopped}"
+        );
+
+        // Close the connection and verify the server task ends successfully.
+        drop(runner);
+        server.await.unwrap();
+    }
+
+    #[track_caller]
+    fn private_ram() -> usize {
+        let process = fuchsia_runtime::process_self();
+        process.task_stats().unwrap().mem_private_bytes
+    }
 }

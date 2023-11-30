@@ -4,7 +4,9 @@
 
 use async_lock::OnceCell;
 use async_trait::async_trait;
+use fidl_fuchsia_process::HandleInfo;
 use fuchsia_async as fasync;
+use fuchsia_runtime::HandleType;
 use fuchsia_zircon as zx;
 use futures::{
     channel::oneshot,
@@ -14,6 +16,7 @@ use mapped_vmo::Mapping;
 use runner::component::{ChannelEpitaph, Controllable};
 use std::{ops::DerefMut, sync::Arc};
 use tracing::warn;
+use zx::Peered;
 
 /// [`ColocatedProgram `] represents an instance of a program run by the
 /// colocated runner. Its state is held in this struct and its behavior
@@ -25,7 +28,7 @@ pub struct ColocatedProgram {
 }
 
 impl ColocatedProgram {
-    pub fn new(vmo_size: u64) -> Result<Self, anyhow::Error> {
+    pub fn new(vmo_size: u64, numbered_handles: Vec<HandleInfo>) -> Result<Self, anyhow::Error> {
         let vmo = zx::Vmo::create(vmo_size)?;
         let vmo_size = vmo.get_size()?;
         let (filled_sender, filled) = oneshot::channel();
@@ -42,6 +45,24 @@ impl ColocatedProgram {
             let _guard = guard;
 
             fill_vmo_task.await;
+
+            // Signal to the outside world that the pages have been allocated.
+            for info in numbered_handles.into_iter().filter(|info| {
+                match fuchsia_runtime::HandleInfo::try_from(info.id) {
+                    Ok(handle_info) => {
+                        handle_info == fuchsia_runtime::HandleInfo::new(HandleType::User0, 0)
+                    }
+                    Err(_) => false,
+                }
+            }) {
+                let handle = zx::EventPair::from(info.handle);
+                match handle.signal_peer(zx::Signals::empty(), zx::Signals::USER_0) {
+                    Ok(()) => {}
+                    Err(status) => {
+                        warn!("Failed to signal USER0 handle: {status}");
+                    }
+                }
+            }
 
             // Sleep forever.
             std::future::pending().await
