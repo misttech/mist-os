@@ -307,7 +307,34 @@ TEST(DwarfSymbolFactory, Array2D) {
   EXPECT_EQ("volatile int", elt_type->GetFullName());
 }
 
-TEST(DwarfSymbolFactory, Collection) {
+// TODO(https://fxbug.dev/136182): A recent compiler change modified the way the DWARF is
+// emitted for DW_AT_const_value, causing this test to fail. There's discussion going on
+// upstream (see the linked upstream llvm bug) that will restore the emitted DWARF to be the
+// same as it was before, so no action is being taken to change the behavior here until that's
+// figured out.
+//
+// The new output changes the struct to have only 3 members, where "kConstInt" and
+// "kConstLongDouble" to be declared with a DW_TAG_variable outside of the struct:
+//
+// 0x00000136:   DW_TAG_variable
+//                 DW_AT_specification	(... "kConstInt")
+//                 DW_AT_const_value	(...)
+//
+// and in the struct:
+//
+// 0x00000175:       DW_TAG_variable
+//                     DW_AT_name	("kConstInt")
+//                     DW_AT_type	(0x0000027f "const int")
+//                     DW_AT_decl_file	("./../../src/developer/debug/zxdb/symbols/test_data/type_test.cc")
+//                     DW_AT_decl_line	(36)
+//                     DW_AT_external	(true)
+//                     DW_AT_declaration  (true)
+//
+// "kConstLongDouble" is treated similarly.
+//
+// Once the upstream changes are finalized either with the new model or restoring the old
+// model, we can enable this test again.
+TEST(DwarfSymbolFactory, DISABLED_Collection) {
   TestSymbolModule setup(TestSymbolModule::kBuilt);
   ASSERT_TRUE(setup.Init().ok());
 
