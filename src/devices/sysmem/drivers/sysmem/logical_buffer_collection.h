@@ -768,6 +768,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
                       const fuchsia_sysmem2::BufferCollectionConstraints& constraints) const;
   void LogBufferCollectionInfo(IndentTracker& indent_tracker,
                                const fuchsia_sysmem2::BufferCollectionInfo& bci) const;
+  void LogPixelFormatAndModifier(
+      IndentTracker& indent_tracker, NodeProperties* node_properties,
+      const fuchsia_sysmem2::PixelFormatAndModifier& pixel_format_and_modifier) const;
   void LogImageFormatConstraints(IndentTracker& indent_tracker, NodeProperties* node_properties,
                                  const fuchsia_sysmem2::ImageFormatConstraints& ifc) const;
   void LogPrunedSubTree(NodeProperties* subtree) const;
@@ -797,6 +800,9 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   void CreateParentVmoInspect(zx_koid_t parent_vmo_koid);
 
   void ClearBuffers();
+
+  bool FlattenPixelFormatAndModifiers(const fuchsia_sysmem2::BufferUsage& buffer_usage,
+                                      fuchsia_sysmem2::BufferCollectionConstraints& constraints);
 
   Device* parent_device_ = nullptr;
 

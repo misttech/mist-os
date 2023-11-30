@@ -9,9 +9,10 @@ using fuchsia.math;
 const MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS uint32 = 64;
 const MAX_COUNT_BUFFER_MEMORY_CONSTRAINTS_HEAP_PERMITTED uint32 = 64;
 const MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES uint32 = 32;
+const MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS uint32 = 64;
 
 /// Constraints on allocated buffers and optionally, the images stored in the
-/// buffers.  These constraints can be specified per-participant.  The sysmem
+/// buffers. These constraints can be specified per-participant. The sysmem
 /// service implements aggregation of constraints from multiple participants.
 type BufferCollectionConstraints = table {
     /// The `usage` is only meant as a hint to help sysmem choose a more optimal
@@ -35,7 +36,7 @@ type BufferCollectionConstraints = table {
     /// When aggregating BufferCollectionConstraints, these values add.
     ///
     /// In testing scenarios, camping on more buffers than this for any
-    /// significant duration may (ideally will) be flagged as a failure.  In
+    /// significant duration may (ideally will) be flagged as a failure. In
     /// testing scenarios, the participant may not be provided with more buffers
     /// than this concurrently.
     2: min_buffer_count_for_camping uint32;
@@ -53,13 +54,13 @@ type BufferCollectionConstraints = table {
     /// (when slightly behind, vs. lower % without the extra buffer).
     ///
     /// In testing scenarios, this field may be forced to 0, and all
-    /// participants are expected to continue to work without getting stuck.  If
+    /// participants are expected to continue to work without getting stuck. If
     /// a buffer is needed for forward progress reasons, that buffer should be
     /// accounted for in `min_buffer_count_for_camping`.
     3: min_buffer_count_for_dedicated_slack uint32;
 
     /// Similar to `min_buffer_count_for_dedicated_slack`, except when
-    /// aggregating these values max (instead of add).  The value here is not
+    /// aggregating these values max (instead of add). The value here is not
     /// shared with any participant's `min_buffer_count_for_dedicated_slack`.
     ///
     /// A participant can specify > 0 here if a participant would like to ensure
@@ -70,24 +71,24 @@ type BufferCollectionConstraints = table {
     /// the degree to which the extra slack improves performance.
     ///
     /// In testing scenarios, this field may be forced to 0, and all
-    /// participants are expected to continue to work without getting stuck.  If
+    /// participants are expected to continue to work without getting stuck. If
     /// a buffer is needed for forward progress reasons, that buffer should be
     /// accounted for in `min_buffer_count_for_camping`.
     4: min_buffer_count_for_shared_slack uint32;
 
     /// A particularly-picky participant may unfortunately need to demand a
-    /// tight range of `buffer_count`, or even a specific `buffer_count`.  This
+    /// tight range of `buffer_count`, or even a specific `buffer_count`. This
     /// field should remain 0 unless a participant really must set this field to
-    /// constrain the overall `BufferCollectionInfo.buffer_count`.  Any such
+    /// constrain the overall `BufferCollectionInfo.buffer_count`. Any such
     /// participant should still fill out the min_buffer_count_for_* fields as
     /// appropriate.
     ///
     /// If this field is un-set, the logical `min_buffer_count` is 1.
     5: min_buffer_count uint32;
     /// A particularly-picky participant may unfortunately need to demand a
-    /// tight range of `buffer_count`, or even a specific `buffer_count`.  This
+    /// tight range of `buffer_count`, or even a specific `buffer_count`. This
     /// field should remain 0 unless a participant really must set this field to
-    /// constrain the overall `BufferCollectionInfo.buffer_count`.  Any such
+    /// constrain the overall `BufferCollectionInfo.buffer_count`. Any such
     /// participant should still fill out the min_buffer_count_for_* fields.
     ///
     /// If this field is un-set, the logical `max_buffer_count` is 0xFFFFFFFF.
@@ -114,8 +115,9 @@ type BufferCollectionConstraints = table {
     /// participants with non-zero image_format_constraints_count (and non-null)
     /// BufferCollectionConstraints) are retained.
     ///
-    /// Un-set means no image format constraints.  set but zero length is an
-    /// error.
+    /// In a SetConstraints message, un-set or zero length means no image format
+    /// constraints; a raw buffer can be allocated if no other participants
+    /// specify any image_format_constraints entries.
     8: image_format_constraints
             vector<ImageFormatConstraints>:MAX_COUNT_BUFFER_COLLECTION_CONSTRAINTS_IMAGE_FORMAT_CONSTRAINTS;
 };
@@ -188,49 +190,157 @@ type CoherencyDomain = flexible enum {
     INACCESSIBLE = 2;
 };
 
+type PixelFormatAndModifier = struct {
+    /// When specified by a participant in a message to sysmem, this can be any
+    /// `PixelFormat` value that's acceptable to the participant. Specifying
+    /// `kInvalid` is not permitted.
+    pixel_format fuchsia.images2.PixelFormat;
+    /// Specific modifier (not just flags), or `kFormatModifierDoNotCare`, from
+    /// set of values defined in fuchsia.images2 format_modifier.fidl.
+    pixel_format_modifier uint64;
+};
+
 /// Describes constraints on layout of image data in buffers.
 type ImageFormatConstraints = table {
-    /// The `PixelFormat` for which the following constraints apply.  A
-    /// participant may have more than one `PixelFormat` that's supported, in
-    /// which case that participant can use a list of `ImageFormatConstraints`
-    /// with an entry per `PixelFormat`.  It's not uncommon for the other fields
-    /// of `ImageFormatConstraints` to vary by `PixelFormat` or by
-    /// `pixel_format_modifier` - for example for a linear format to support
-    /// smaller max size than a tiled format.
+    /// The `PixelFormat` for which the following constraints apply.
     ///
-    /// If set to `fuchsia.images2.PixelFormat.DO_NOT_CARE`, these
-    /// `ImageFormatConstraints` apply to all `PixelFormat`s, and this
-    /// `ImageFormatConstraints` does not constrain which `PixelFormat` is
-    /// chosen. For example this can be used to set `required_max_coded_width`
-    /// and `required_max_coded_height` fields to force allocating large-enough
-    /// buffers to hold particular video dimensions, without needing to list
-    /// every `PixelFormat`. At least one participant must specify a
-    /// `pixel_format` that isn't `DO_NOT_CARE` else allocation fails.
+    /// The `pixel_format` and `pixel_format_modifier` fields together are
+    /// treated by the server as one additional `pixel_format_and_modifiers`
+    /// entry.
+    ///
+    /// A participant may have more than one `PixelFormatAndModifier` that's
+    /// supported.
+    ///   * If image constraints are the same for different
+    ///     `PixelFormatAndModifier`s, the participant may list additional
+    ///     `PixelFormatAndModifier`s for which the constraints apply in the
+    ///     `pixel_format_and_modifiers` field. This reduces the overall number
+    ///     of `ImageFormatConstraints` that need to be sent, without changing
+    ///     the meaning (vs for example sending a bunch of separate
+    ///     `ImageFormatConstraints` that only differ by the `pixel_format` and
+    ///     `pixel_format_modifier` which overall specify the same list of
+    ///     PixelFormatAndModifier(s)).
+    ///   * If image constraints differ for different `PixelFormatAndModifier`s,
+    ///     the participant can convey this using a separate
+    ///     `ImageFormatConstraints` entry in `image_format_constraints` for
+    ///     each set of `PixelFormatAndModifier`s that have different image
+    ///     constraints.
+    ///   * It's ok for a participant to have two `image_format_constraints`
+    ///     entries that only differ in their pixel_format_and_modifiers, but
+    ///     this is isnt' the most compact way to represent that situation since
+    ///     the two entries could be combined by specifying two
+    ///     `PixelFormatAndModifier`s within a single `ImageFormatConstraints`.
+    ///
+    /// It's not uncommon for the other fields of `ImageFormatConstraints` to
+    /// vary by `pixel_format` or by `pixel_format_modifier` - for example for a
+    /// linear format to support smaller max size than a tiled format.
+    ///
+    /// See also `pixel_format_and_modifiers`.
+    ///
+    /// Thie field must be set to a value other than `INVALID` unless
+    /// `pixel_format_and_modifiers` is non-empty. In other words, there must be
+    /// at least one `PixelFormatAndModifier` per `ImageFormatConstraints`. If
+    /// `pixel_format_modifier` is set, this field must also be set.
     1: pixel_format fuchsia.images2.PixelFormat;
 
-    /// If set, this is a specific value (not a flag value) from the set under
-    /// `fuchsia.images2` format_modifier.fidl, or
-    /// `FORMAT_MODIFIER_DO_NOT_CARE`.
+    /// The pixel format modifier for which the following constraints apply.
     ///
-    /// If un-set, the default depends on other fields:
-    ///   * If pixel_format is `DO_NOT_CARE`, this field is implicitly
+    /// The `pixel_format` and `pixel_format_modifier` fields together are
+    /// treated by the server as one additional `pixel_format_and_modifiers`
+    /// entry.
+    ///
+    /// This is a value from `fuchsia.images2` format_modifier.fidl that's
+    /// acceptable to the participant in combination with the `pixel_format`.
+    ///
+    /// See also `pixel_format_and_modifiers`.
+    ///
+    /// If `pixel_format` is set but `pixel_format_modifier` is un-set, the
+    /// default depends on other fields:
+    ///   * If `pixel_format` is `DO_NOT_CARE`, the pixel format modifier is
+    ///     implicitly `FORMAT_MODIFIER_DO_NOT_CARE`.
+    ///   * else if `BufferCollectionConstraints.usage` isn't `NONE`, the pixel
+    ///     format modifier is implicitly `FORMAT_MODIFIER_LINEAR`.
+    ///   * else the pixel format modifier is implicitly
     ///     `FORMAT_MODIFIER_DO_NOT_CARE`.
-    ///   * else if BufferCollectionConstraints.usage isn't `NONE`, this field
-    ///     is implicitly `FORMAT_MODIFIER_LINEAR`.
-    ///   * else this field is implicitly `FORMAT_MODIFIER_DO_NOT_CARE`.
     2: pixel_format_modifier uint64;
 
-    /// Empty is an error.  Duplicate entries are an error.  Arbitrary ordering
-    /// is not an error.
+    /// The (additional) `PixelFormatAndModifier`s for which the following
+    /// constraints apply.
+    ///
+    /// As a non-limiting example, if a participant only wants to set a single
+    /// `PixelFormatAndModifier` for this `ImageFormatConstraints`, the
+    /// participant can either (a) use `pixel_format` and
+    /// `pixel_format_modifier` fields to specify the fields of the one
+    /// `PixelFormatAndModifier` and leave `pixel_format_and_modifiers` un-set,
+    /// or (b) leave `pixel_format` and `pixel_format_modifier` fields un-set
+    /// and put the one `PixelFormatAndModifier` in
+    /// `pixel_format_and_modifiers`.
+    ///
+    /// If `pixel_format` is set, the server will take pixel_format and
+    /// pixel_format_modifier fields (un-setting them in the process), pack them
+    /// into a `PixelFormatAndModifier`, and move it into this vector as one
+    /// additional entry, with an overall size limit of
+    /// `MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS + 1`.
+    ///
+    /// After the server moves `pixel_format`, `pixel_format_modifier` into one
+    /// additional entry in this vector, this vector must not be empty. When the
+    /// resulting list has more than 1 item, the entries in this vector are
+    /// equivalent to (shorthand for) listing (size) separate
+    /// `ImageFormatConstraints` entries, one per `pixel_format_and_modifiers`
+    /// entry, each with one `PixelFormatAndModifier`, where all the separate
+    /// `ImageFormatConstraints` entries have the same constraints (compared
+    /// field by field, not including `pixel_format`, `pixel_format_modifier`,
+    /// or `pixel_format_and_modifiers` fields).
+    ///
+    /// In `SetConstraints` message, each entry specifies a
+    /// `PixelFormatAndModifier` which is acceptable to the participant
+    /// (assuming the following constraints fields are also satisfied).
+    ///
+    /// In the response to `WaitForAllBuffersAllocated`, this field will be
+    /// un-set and the one chosen `PixelFormatAndModifier` will be indicated
+    /// using the `pixel_format` and `pixel_format_modifier` fields.
+    ///
+    /// All the `PixelFormatAndModifiers` in a `SetConstraints` message from a
+    /// participant must be unique across all the entries under
+    /// `image_format_constraints`. If `fuchsia.images2.PixelFormat.DO_NOT_CARE`
+    /// is used in an entry, there must not be any other entry (considering all
+    /// the entries under `image_format_constraints`) with matching
+    /// `pixel_format_modifier`. If `FORMAT_MODIFIER_DO_NOT_CARE` is used, there
+    /// must not be any other entry (considering all the entries under
+    /// `image_format_constraints`) with matching `pixel_format`.
+    ///
+    /// A `PixelFormatAndModifier` value with either `DO_NOT_CARE` or
+    /// `FORMAT_MODIFIER_DO_NOT_CARE` (but not both, for purposes of this
+    /// example) can be combined with a `PixelFormatAndModifier` from a separate
+    /// participant with the other field indicating "do not care", resulting in
+    /// a complete `PixelFormatAndModifier` that can succeed allocation.
+    /// However, at least for now, it's not permitted for a single participant
+    /// to specify two separate `PixelFormatAndModifier` values which have "do
+    /// not care" in different fields. This does not prohibit a single
+    /// `PixelFormatAndModifier` with both DO_NOT_CARE and
+    /// PIXEL_FORMAT_DO_NOT_CARE (which is only a single
+    /// `PixelFormatAndModifier` value). If a client really needs to specify
+    /// some constraints relevant to `pixel_format`(s) with
+    /// `pixel_format_modifier` FORMAT_MODIFIER_DO_NOT_CARE, and other
+    /// constraints relevant to `pixel_format_modifier`(s) with `pixel_format`
+    /// DO_NOT_CARE, the client can do so by duplicating the token and
+    /// using/driving two separate participants.
+    ///
+    /// See also `pixel_format` for more comments relevant to multiple
+    /// `PixelFormatAndModifier`s in a single `ImageFormatConstraints`.
+   15: pixel_format_and_modifiers
+            vector<PixelFormatAndModifier>:MAX_COUNT_PIXEL_FORMAT_AND_MODIFIERS;
+
+    /// Empty is an error. Duplicate entries are an error. Arbitrary ordering is
+    /// not an error.
     3: color_spaces
             vector<fuchsia.images2.ColorSpace>:MAX_COUNT_IMAGE_FORMAT_CONSTRAINTS_COLOR_SPACES;
 
     /// Minimum permitted size in pixels.
     ///
     /// For example a video decoder participant may set this field to the
-    /// minimum size that might potentially be specified by a stream.  In
+    /// minimum size that might potentially be specified by a stream. In
     /// contrast, `required_min_size` would be set to the current size specified
-    /// by the stream.  While `min_size` aggregates by taking the max,
+    /// by the stream. While `min_size` aggregates by taking the max,
     /// `required_min_size` aggregates by taking the min.
     ///
     /// When sending to sysmem, this field can be un-set if the participant is
@@ -241,7 +351,7 @@ type ImageFormatConstraints = table {
     ///
     /// Producers should set `min_size` and set both width and height to the
     /// actual non-zero smallest width and height that the producer might
-    /// generate.  For example, a video decoder can set the size of a single
+    /// generate. For example, a video decoder can set the size of a single
     /// macroblock here.
     ///
     /// When receiving from sysmem, this field will always be set, and neither
@@ -251,7 +361,7 @@ type ImageFormatConstraints = table {
     ///
     /// See also `required_min_size`.
     4: min_size fuchsia.math.SizeU;
-    /// Maximum size in pixels.  For example Scenic may set this field (directly
+    /// Maximum size in pixels. For example Scenic may set this field (directly
     /// or via sub-participants) to the maximum size that can be composited.
     ///
     /// Sending to sysmem, un-set is treated as 0xFFFFFFFF, 0xFFFFFFFF.

@@ -381,10 +381,17 @@ void set_specific_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collect
   EXPECT_TRUE(collection->SetConstraints(std::move(set_constraints_request)).is_ok());
 }
 
+struct Format {
+  Format(std::optional<fuchsia_images2::PixelFormat> pixel_format,
+         std::optional<uint64_t> pixel_format_modifier)
+      : pixel_format(pixel_format), pixel_format_modifier(pixel_format_modifier) {}
+  std::optional<fuchsia_images2::PixelFormat> pixel_format;
+  std::optional<uint64_t> pixel_format_modifier;
+};
+
 void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollection>& collection,
-                                              fuchsia_images2::PixelFormat pixel_format,
-                                              std::optional<uint64_t> pixel_format_modifier,
-                                              bool has_buffer_usage) {
+                                              std::vector<Format> formats, bool has_buffer_usage,
+                                              bool use_only_format_array = false) {
   v2::BufferCollectionConstraints constraints;
   if (has_buffer_usage) {
     constraints.usage().emplace();
@@ -408,10 +415,27 @@ void set_pixel_format_modifier_constraints_v2(fidl::SyncClient<v2::BufferCollect
 
   constraints.image_format_constraints().emplace(1);
   auto& image_format_constraints = constraints.image_format_constraints()->at(0);
-  image_format_constraints.pixel_format() = pixel_format;
-  if (pixel_format_modifier.has_value()) {
-    image_format_constraints.pixel_format_modifier() = *pixel_format_modifier;
+
+  uint32_t i = 0;
+  if (formats.size() >= 1 && !use_only_format_array) {
+    // copy optionals
+    image_format_constraints.pixel_format() = formats[i].pixel_format;
+    image_format_constraints.pixel_format_modifier() = formats[i].pixel_format_modifier;
+    ++i;
   }
+  for (; i < formats.size(); ++i) {
+    auto& format = formats[i];
+    // caller must set all optionals beyond index 0
+    ZX_ASSERT(format.pixel_format.has_value());
+    ZX_ASSERT(format.pixel_format_modifier.has_value());
+    if (!image_format_constraints.pixel_format_and_modifiers().has_value()) {
+      image_format_constraints.pixel_format_and_modifiers().emplace();
+    }
+    image_format_constraints.pixel_format_and_modifiers()->emplace_back(
+        fuchsia_sysmem2::PixelFormatAndModifier(*format.pixel_format,
+                                                *format.pixel_format_modifier));
+  }
+
   image_format_constraints.color_spaces().emplace(1);
   image_format_constraints.color_spaces()->at(0) = fuchsia_images2::ColorSpace::kSrgb;
   image_format_constraints.min_size() = {256, 256};
@@ -6256,60 +6280,6 @@ TEST(Sysmem, SetWeakOk_ForChildNodesAlso_AllowsSysmem1Child) {
   // child Node did not cause allocation failure.
 }
 
-TEST(Sysmem, PixelFormatModifier_DoNotCare) {
-  std::random_device random_device;
-  std::mt19937 prng(random_device());
-
-  struct ModifierAndUsage {
-    std::optional<uint64_t> pixel_format_modifier;
-    bool buffer_usage;
-  };
-
-  // These settings should succeed, in any accumulation order.
-  std::vector<ModifierAndUsage> settings;
-  // no usage and un-set modifier means kFormatModifierDoNotCare
-  settings.emplace_back(ModifierAndUsage{std::nullopt, false});
-  // explicit kFormatModifierDoNotCare, with usage
-  settings.emplace_back(ModifierAndUsage{fuchsia_images2::kFormatModifierDoNotCare, true});
-  // specific pixel_format_modifier, with usage
-  settings.emplace_back(ModifierAndUsage{fuchsia_images2::kFormatModifierIntelI915XTiled, true});
-
-  constexpr uint32_t kIterationCount = 25;
-  for (uint32_t iteration = 0; iteration < kIterationCount; ++iteration) {
-    std::shuffle(settings.begin(), settings.end(), prng);
-
-    auto parent_token = create_initial_token_v2();
-    auto child_token = create_token_under_token_v2(parent_token);
-    auto child2_token = create_token_under_token_v2(child_token);
-
-    auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
-    auto child_collection = convert_token_to_collection_v2(std::move(child_token));
-    auto child2_collection = convert_token_to_collection_v2(std::move(child2_token));
-
-    set_pixel_format_modifier_constraints_v2(
-        parent_collection, fuchsia_images2::PixelFormat::kR8G8B8A8,
-        settings[0].pixel_format_modifier, settings[0].buffer_usage);
-    set_pixel_format_modifier_constraints_v2(
-        child_collection, fuchsia_images2::PixelFormat::kR8G8B8A8,
-        settings[1].pixel_format_modifier, settings[1].buffer_usage);
-    set_pixel_format_modifier_constraints_v2(
-        child2_collection, fuchsia_images2::PixelFormat::kR8G8B8A8,
-        settings[2].pixel_format_modifier, settings[2].buffer_usage);
-
-    auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
-    ASSERT_TRUE(parent_wait_result.is_ok());
-    auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
-    ASSERT_TRUE(child_wait_result.is_ok());
-    auto child2_wait_result = child2_collection->WaitForAllBuffersAllocated();
-    ASSERT_TRUE(child2_wait_result.is_ok());
-
-    auto& image_constraints =
-        *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
-    ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
-              fuchsia_images2::kFormatModifierIntelI915XTiled);
-  }
-}
-
 TEST(Sysmem, SetDebugClientInfo_NoIdIsFine) {
   auto token = create_initial_token_v2();
   fuchsia_sysmem2::NodeSetDebugClientInfoRequest token_set_debug_info_request;
@@ -6360,6 +6330,69 @@ TEST(Sysmem, SetDebugClientInfo_NoIdIsFine) {
   ASSERT_TRUE(collection_sync_result.is_ok());
 }
 
+TEST(Sysmem, PixelFormatModifier_DoNotCare) {
+  // These modifiers should succeed, in either accumulation order.
+  std::vector<uint64_t> modifiers;
+  // explicit kFormatModifierDoNotCare, with usage
+  modifiers.emplace_back(fuchsia_images2::kFormatModifierDoNotCare);
+  // specific pixel_format_modifier, with usage
+  modifiers.emplace_back(fuchsia_images2::kFormatModifierIntelI915XTiled);
+
+  for (uint32_t iteration = 0; iteration < 2; ++iteration) {
+    if (iteration == 1) {
+      std::swap(modifiers[0], modifiers[1]);
+    }
+
+    auto parent_token = create_initial_token_v2();
+    auto child_token = create_token_under_token_v2(parent_token);
+
+    auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+    auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+    set_pixel_format_modifier_constraints_v2(
+        parent_collection, {Format(fuchsia_images2::PixelFormat::kR8G8B8A8, modifiers[0])}, true);
+    set_pixel_format_modifier_constraints_v2(
+        child_collection, {Format(fuchsia_images2::PixelFormat::kR8G8B8A8, modifiers[1])}, true);
+
+    auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(parent_wait_result.is_ok());
+    auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+    ASSERT_TRUE(child_wait_result.is_ok());
+
+    auto& image_constraints =
+        *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+    ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+    ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+              fuchsia_images2::kFormatModifierIntelI915XTiled);
+  }
+}
+
+TEST(Sysmem, PixelFormatModifier_NoUsageDefaultDoNotCare) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection, {{fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt}}, false);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
 TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModifier) {
   auto parent_token = create_initial_token_v2();
   auto child_token = create_token_under_token_v2(parent_token);
@@ -6367,12 +6400,13 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModi
   auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
 
-  set_pixel_format_modifier_constraints_v2(parent_collection,
-                                           fuchsia_images2::PixelFormat::kR8G8B8A8,
-                                           fuchsia_images2::kFormatModifierDoNotCare, true);
-  set_pixel_format_modifier_constraints_v2(child_collection,
-                                           fuchsia_images2::PixelFormat::kDoNotCare,
-                                           fuchsia_images2::kFormatModifierIntelI915XTiled, true);
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(parent_wait_result.is_ok());
@@ -6388,7 +6422,6 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareButConstrainPixelFormatModi
 
 TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareImpliesModifierDefaultDoNotCare) {
   auto parent_token = create_initial_token_v2();
-  (void)parent_token->SetVerboseLogging();
   auto child_token = create_token_under_token_v2(parent_token);
   auto child2_token = create_token_under_token_v2(child_token);
 
@@ -6396,15 +6429,16 @@ TEST(Sysmem, PixelFormatModifier_PixelFormatDoNotCareImpliesModifierDefaultDoNot
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
   auto child2_collection = convert_token_to_collection_v2(std::move(child2_token));
 
-  set_pixel_format_modifier_constraints_v2(parent_collection,
-                                           fuchsia_images2::PixelFormat::kR8G8B8A8,
-                                           fuchsia_images2::kFormatModifierDoNotCare, true);
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
   // pixel_format DoNotCare implies modifier default DoNotCare, despite usage
   set_pixel_format_modifier_constraints_v2(
-      child_collection, fuchsia_images2::PixelFormat::kDoNotCare, std::nullopt, true);
-  set_pixel_format_modifier_constraints_v2(child2_collection,
-                                           fuchsia_images2::PixelFormat::kDoNotCare,
-                                           fuchsia_images2::kFormatModifierIntelI915XTiled, true);
+      child_collection, {{fuchsia_images2::PixelFormat::kDoNotCare, std::nullopt}}, true);
+  set_pixel_format_modifier_constraints_v2(
+      child2_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(parent_wait_result.is_ok());
@@ -6427,12 +6461,12 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithUsageDefaultsToLinear) {
   auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
 
-  set_pixel_format_modifier_constraints_v2(parent_collection,
-                                           fuchsia_images2::PixelFormat::kR8G8B8A8,
-                                           fuchsia_images2::kFormatModifierDoNotCare, true);
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
   // specific pixel_format with usage defaults to pixel_format_modifier linear
   set_pixel_format_modifier_constraints_v2(
-      child_collection, fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt, true);
+      child_collection, {{fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt}}, true);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(parent_wait_result.is_ok());
@@ -6453,12 +6487,13 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithoutUsageDefaultsToModifi
   auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
   auto child_collection = convert_token_to_collection_v2(std::move(child_token));
 
-  set_pixel_format_modifier_constraints_v2(parent_collection,
-                                           fuchsia_images2::PixelFormat::kR8G8B8A8,
-                                           fuchsia_images2::kFormatModifierIntelI915XTiled, true);
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
   // specific pixel_format without usage defaults to pixel_format_modifier DoNotCare
   set_pixel_format_modifier_constraints_v2(
-      child_collection, fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt, false);
+      child_collection, {{fuchsia_images2::PixelFormat::kR8G8B8A8, std::nullopt}}, false);
 
   auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
   ASSERT_TRUE(parent_wait_result.is_ok());
@@ -6470,6 +6505,399 @@ TEST(Sysmem, PixelFormatModifier_SpecificPixelFormatWithoutUsageDefaultsToModifi
   ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
   ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
             fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, VectorPixelFormatAndModifier) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kBgr24, fuchsia_images2::kFormatModifierLinear},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear}},
+      true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierLinear},
+       {fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierLinear}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierLinear);
+}
+
+TEST(Sysmem, VectorPixelFormatAndModifier_SingleEntry) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true, true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierDoNotCare}}, true,
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, VectorPixelFormatAndModifier_NoPixelFormatFails) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915YTiled}},
+      true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{std::nullopt, fuchsia_images2::kFormatModifierIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierArmAfbc16X16}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(child_wait_result.is_ok());
+
+  // verify sysmem still alive (fail here if not, instead of failing in a subsequent test)
+  auto token3 = create_initial_token_v2();
+}
+
+TEST(Sysmem, VectorPixelFormatAndModifier_MultipleInVector) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierArmAfbc16X16},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true, true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kBgra32, fuchsia_images2::kFormatModifierIntelI915YTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true, true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, PixelFormatAndModifier_SeparateDuplicatedFormatFails) {
+  for (uint32_t is_failure_case = 0; is_failure_case < 2; ++is_failure_case) {
+    auto token = create_initial_token_v2();
+    auto collection = convert_token_to_collection_v2(std::move(token));
+
+    auto format = Format{fuchsia_images2::PixelFormat::kR8G8B8A8,
+                         fuchsia_images2::kFormatModifierIntelI915XTiled};
+    auto formats = std::vector<Format>{{format}};
+    if (is_failure_case) {
+      // another instance of same format will cause failure below
+      formats.emplace_back(format);
+    }
+
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    auto& usage = constraints.usage().emplace();
+    usage.cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(formats.size());
+    for (uint32_t i = 0; i < formats.size(); ++i) {
+      auto& ifc = constraints.image_format_constraints()->at(i);
+      ifc.pixel_format() = formats[i].pixel_format;
+      ifc.pixel_format_modifier() = formats[i].pixel_format_modifier;
+      ifc.min_size() = {64, 64};
+      ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
+    }
+
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result = collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+
+    auto wait_result = collection->WaitForAllBuffersAllocated();
+    if (is_failure_case) {
+      ASSERT_FALSE(wait_result.is_ok());
+    } else {
+      ASSERT_TRUE(wait_result.is_ok());
+    }
+  }
+}
+
+TEST(Sysmem, PixelFormatAndModifier_TogetherDuplicatedFormatFails) {
+  for (uint32_t is_failure_case = 0; is_failure_case < 2; ++is_failure_case) {
+    auto token = create_initial_token_v2();
+    auto collection = convert_token_to_collection_v2(std::move(token));
+
+    auto format = Format{fuchsia_images2::PixelFormat::kR8G8B8A8,
+                         fuchsia_images2::kFormatModifierIntelI915XTiled};
+    auto formats = std::vector<Format>{{format}};
+    if (is_failure_case) {
+      // another instance of same format will cause failure below
+      formats.emplace_back(format);
+    }
+
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    auto& usage = constraints.usage().emplace();
+    usage.cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(1);
+    auto& ifc = constraints.image_format_constraints()->at(0);
+    ifc.pixel_format_and_modifiers().emplace(formats.size());
+    for (uint32_t i = 0; i < formats.size(); ++i) {
+      auto& format_and_modifier = ifc.pixel_format_and_modifiers()->at(i);
+      format_and_modifier.pixel_format() = formats[i].pixel_format.value();
+      format_and_modifier.pixel_format_modifier() = formats[i].pixel_format_modifier.value();
+      ifc.min_size() = {64, 64};
+      ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
+    }
+
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result = collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+
+    auto wait_result = collection->WaitForAllBuffersAllocated();
+    if (is_failure_case) {
+      ASSERT_FALSE(wait_result.is_ok());
+    } else {
+      ASSERT_TRUE(wait_result.is_ok());
+    }
+  }
+}
+
+TEST(Sysmem, PixelFormatDoNotCareCombinedWithPixelFormatModifierDoNotCare) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, RedundantMorePickyPixelFormatFails) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare}}, true);
+  // Not allowed to specify two entries where one covers the other.
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(child_wait_result.is_ok());
+}
+
+TEST(Sysmem, RedundantMorePickyPixelFormatModifierFails) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  // Not allowed to specify two entries where one covers the other.
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(child_wait_result.is_ok());
+}
+
+TEST(Sysmem, RedundantMorePickyFormatFails) {
+  auto parent_token = create_initial_token_v2();
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+
+  // Not allowed to specify two entries where one covers the other.
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierDoNotCare},
+       {fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(parent_wait_result.is_ok());
+}
+
+TEST(Sysmem, ImpliedNonSupportedFormatDoesNotForceFailure) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  // kMjpeg isn't supported as of this comment regardless of tiling, but because it only becomes a
+  // specific format during DoNotCare processing, it gets filtered out instead of forcing failure.
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
+       {fuchsia_images2::PixelFormat::kMjpeg, fuchsia_images2::kFormatModifierDoNotCare}},
+      true);
+  set_pixel_format_modifier_constraints_v2(
+      child_collection,
+      {{fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, ImpliedNonSupportedColorspaceDoesNotForceFailure) {
+  auto parent_token = create_initial_token_v2();
+  auto child_token = create_token_under_token_v2(parent_token);
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+  auto child_collection = convert_token_to_collection_v2(std::move(child_token));
+
+  {  // scope parent constraints
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(1);
+    auto& ifc = constraints.image_format_constraints()->at(0);
+    ifc.pixel_format() = fuchsia_images2::PixelFormat::kR8G8B8A8;
+    ifc.pixel_format_modifier() = fuchsia_images2::kFormatModifierDoNotCare;
+    ifc.min_size() = {64, 64};
+    ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb};
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result =
+        parent_collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+  }
+
+  {  // scope child constraints
+    fuchsia_sysmem2::BufferCollectionConstraints constraints;
+    constraints.usage().emplace();
+    constraints.usage()->cpu() = fuchsia_sysmem2::kCpuUsageWriteOften;
+    constraints.min_buffer_count() = 1;
+    constraints.image_format_constraints().emplace(1);
+    auto& ifc = constraints.image_format_constraints()->at(0);
+    ifc.pixel_format() = fuchsia_images2::PixelFormat::kDoNotCare;
+    ifc.pixel_format_modifier() = fuchsia_images2::kFormatModifierIntelI915XTiled;
+    ifc.min_size() = {64, 64};
+    // kRec2020 isn't supported with kR8G8B8A8, but because this ifc entry has a DoNotCare, the
+    // server will filter out the unsupported color space when combining with kR8G8B8A8 from other
+    // participant instead of failing the allocation.
+    ifc.color_spaces() = {fuchsia_images2::ColorSpace::kSrgb,
+                          fuchsia_images2::ColorSpace::kRec2020};
+    fuchsia_sysmem2::BufferCollectionSetConstraintsRequest set_constraints_request;
+    set_constraints_request.constraints() = std::move(constraints);
+    auto set_constraints_result =
+        child_collection->SetConstraints(std::move(set_constraints_request));
+    ASSERT_TRUE(set_constraints_result.is_ok());
+  }
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(parent_wait_result.is_ok());
+  auto child_wait_result = child_collection->WaitForAllBuffersAllocated();
+  ASSERT_TRUE(child_wait_result.is_ok());
+
+  auto& image_constraints =
+      *parent_wait_result->buffer_collection_info()->settings()->image_format_constraints();
+  ASSERT_EQ(image_constraints.pixel_format().value(), fuchsia_images2::PixelFormat::kR8G8B8A8);
+  ASSERT_EQ(image_constraints.pixel_format_modifier().value(),
+            fuchsia_images2::kFormatModifierIntelI915XTiled);
+}
+
+TEST(Sysmem, CombineableFormatsFromSingleParticipantFails) {
+  auto parent_token = create_initial_token_v2();
+
+  auto parent_collection = convert_token_to_collection_v2(std::move(parent_token));
+
+  // Not allowed to specify two entries where one covers the other.
+  set_pixel_format_modifier_constraints_v2(
+      parent_collection,
+      {{fuchsia_images2::PixelFormat::kR8G8B8A8, fuchsia_images2::kFormatModifierDoNotCare},
+       {fuchsia_images2::PixelFormat::kDoNotCare, fuchsia_images2::kFormatModifierIntelI915XTiled}},
+      true);
+
+  auto parent_wait_result = parent_collection->WaitForAllBuffersAllocated();
+  ASSERT_FALSE(parent_wait_result.is_ok());
 }
 
 // This test is too likely to cause an OOM which would be treated as a flake. For now we can enable
