@@ -571,7 +571,7 @@ impl CurrentTask {
         // update after process image is replaced.  See get_robust_list(2).
         self.notify_robust_list();
 
-        self.mm
+        self.mm()
             .exec(resolved_elf.file.name.clone())
             .map_err(|status| from_status_like_fdio!(status))?;
         let start_info = load_executable(self, resolved_elf, &path)?;
@@ -630,7 +630,7 @@ impl CurrentTask {
         bpf_filter: UserAddress,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
-        let fprog: sock_fprog = self.mm.read_object(UserRef::new(bpf_filter))?;
+        let fprog: sock_fprog = self.mm().read_object(UserRef::new(bpf_filter))?;
 
         if u32::from(fprog.len) > BPF_MAXINSNS || fprog.len == 0 {
             return Err(errno!(EINVAL));
@@ -751,7 +751,7 @@ impl CurrentTask {
             // No one has called set_robust_list.
             return;
         }
-        let robust_list_res = self.mm.read_object(task_state.robust_list_head);
+        let robust_list_res = self.mm().read_object(task_state.robust_list_head);
 
         let head = if let Ok(head) = robust_list_res {
             head
@@ -764,7 +764,7 @@ impl CurrentTask {
         let mut entries_count = 0;
         let mut curr_ptr = head.list.next;
         while curr_ptr.addr != robust_list_addr.into() && entries_count < ROBUST_LIST_LIMIT {
-            let curr_ref = self.mm.read_object(curr_ptr.into());
+            let curr_ref = self.mm().read_object(curr_ptr.into());
 
             let curr = if let Ok(curr) = curr_ref {
                 curr
@@ -782,7 +782,7 @@ impl CurrentTask {
             let futex_ref = UserRef::<u32>::new(UserAddress::from(futex_base));
 
             // TODO(b/299096230): Futex modification should be atomic.
-            let futex = if let Ok(futex) = self.mm.read_object(futex_ref) {
+            let futex = if let Ok(futex) = self.mm().read_object(futex_ref) {
                 futex
             } else {
                 return;
@@ -818,7 +818,7 @@ impl CurrentTask {
                     ExceptionResult::Signal(SignalInfo::default(SIGILL))
                 }
             },
-            zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => self.mm.handle_page_fault(
+            zx::sys::ZX_EXCP_FATAL_PAGE_FAULT => self.mm().handle_page_fault(
                 decode_page_fault_exception_report(report),
                 zx::Status::from_raw(report.context.synth_code as zx::zx_status_t),
             ),
@@ -1023,7 +1023,7 @@ impl CurrentTask {
             Arc::clone(&system_task.thread_group),
             None,
             FdTable::default(),
-            Arc::clone(&system_task.mm),
+            Arc::clone(system_task.mm()),
             Arc::clone(system_task.fs()),
             system_task.creds(),
             Arc::clone(&system_task.abstract_socket_namespace),
@@ -1178,7 +1178,7 @@ impl CurrentTask {
 
             if clone_thread {
                 let thread_group = self.thread_group.clone();
-                let memory_manager = self.mm.clone();
+                let memory_manager = self.mm().clone();
                 TaskInfo { thread: None, thread_group, memory_manager }
             } else {
                 // Drop the lock on this task before entering `create_zircon_process`, because it will
@@ -1264,11 +1264,11 @@ impl CurrentTask {
                 let state = self.read();
                 child_state.signals.alt_stack = state.signals.alt_stack;
                 child_state.signals.set_mask(state.signals.mask());
-                self.mm.snapshot_to(locked, &child.mm)?;
+                self.mm().snapshot_to(locked, child.mm())?;
             }
 
             if flags & (CLONE_PARENT_SETTID as u64) != 0 {
-                self.mm.write_object(user_parent_tid, &child.id)?;
+                self.mm().write_object(user_parent_tid, &child.id)?;
             }
 
             if flags & (CLONE_CHILD_CLEARTID as u64) != 0 {
@@ -1276,7 +1276,7 @@ impl CurrentTask {
             }
 
             if flags & (CLONE_CHILD_SETTID as u64) != 0 {
-                child.mm.vmo_write_object(user_child_tid, &child.id)?;
+                child.mm().vmo_write_object(user_child_tid, &child.id)?;
             }
             Ok(())
         });
@@ -1312,7 +1312,7 @@ impl CurrentTask {
 
 impl MemoryAccessor for CurrentTask {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
-        self.mm.read_memory(addr, bytes)
+        self.mm().read_memory(addr, bytes)
     }
 
     fn vmo_read_memory(
@@ -1320,7 +1320,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<(), Errno> {
-        self.mm.vmo_read_memory(addr, bytes)
+        self.mm().vmo_read_memory(addr, bytes)
     }
 
     fn read_memory_partial_until_null_byte<'a>(
@@ -1328,7 +1328,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm.read_memory_partial_until_null_byte(addr, bytes)
+        self.mm().read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial(
@@ -1336,7 +1336,7 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial(addr, bytes)
+        self.mm().read_memory_partial(addr, bytes)
     }
 
     fn vmo_read_memory_partial(
@@ -1344,27 +1344,27 @@ impl MemoryAccessor for CurrentTask {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.vmo_read_memory_partial(addr, bytes)
+        self.mm().vmo_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.write_memory(addr, bytes)
+        self.mm().write_memory(addr, bytes)
     }
 
     fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.vmo_write_memory(addr, bytes)
+        self.mm().vmo_write_memory(addr, bytes)
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.write_memory_partial(addr, bytes)
+        self.mm().write_memory_partial(addr, bytes)
     }
 
     fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.vmo_write_memory_partial(addr, bytes)
+        self.mm().vmo_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm.zero(addr, length)
+        self.mm().zero(addr, length)
     }
 }
 

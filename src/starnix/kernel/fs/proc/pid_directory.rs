@@ -167,7 +167,7 @@ fn static_directory_builder_with_common_task_entries<'a>(
         CallbackSymlinkNode::new({
             let task = WeakRef::from(task);
             move || {
-                if let Some(node) = Task::from_weak(&task)?.mm.executable_node() {
+                if let Some(node) = Task::from_weak(&task)?.mm().executable_node() {
                     Ok(SymlinkTarget::Node(node))
                 } else {
                     error!(ENOENT)
@@ -495,7 +495,7 @@ fn fill_buf_from_addr_range(
 ) -> Result<(), Errno> {
     #[allow(clippy::manual_saturating_arithmetic)]
     let len = range_end.ptr().checked_sub(range_start.ptr()).unwrap_or(0);
-    let buf = task.mm.read_memory_partial_to_vec(range_start, len)?;
+    let buf = task.mm().read_memory_partial_to_vec(range_start, len)?;
     sink.write(&buf[..]);
     Ok(())
 }
@@ -517,7 +517,7 @@ impl DynamicFileSource for CmdlineFile {
             return Ok(());
         };
         let (start, end) = {
-            let mm_state = task.mm.state.read();
+            let mm_state = task.mm().state.read();
             (mm_state.argv_start, mm_state.argv_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -536,7 +536,7 @@ impl DynamicFileSource for EnvironFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
         let (start, end) = {
-            let mm_state = task.mm.state.read();
+            let mm_state = task.mm().state.read();
             (mm_state.environ_start, mm_state.environ_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -555,7 +555,7 @@ impl DynamicFileSource for AuxvFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
         let (start, end) = {
-            let mm_state = task.mm.state.read();
+            let mm_state = task.mm().state.read();
             (mm_state.auxv_start, mm_state.auxv_end)
         };
         fill_buf_from_addr_range(&task, start, end, sink)
@@ -716,9 +716,9 @@ impl FileOps for MemFile {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
                     let actual = if current_task.has_same_address_space(&task) {
-                        task.mm.read_memory_partial(addr, bytes)
+                        task.mm().read_memory_partial(addr, bytes)
                     } else {
-                        task.mm.vmo_read_memory_partial(addr, bytes)
+                        task.mm().vmo_read_memory_partial(addr, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     addr += actual;
@@ -743,9 +743,9 @@ impl FileOps for MemFile {
                 let mut written = 0;
                 let result = data.peek_each(&mut |bytes| {
                     let actual = if current_task.has_same_address_space(&task) {
-                        task.mm.write_memory_partial(addr + written, bytes)
+                        task.mm().write_memory_partial(addr + written, bytes)
                     } else {
-                        task.mm.vmo_write_memory_partial(addr + written, bytes)
+                        task.mm().vmo_write_memory_partial(addr + written, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     written += actual;
@@ -874,14 +874,14 @@ impl DynamicFileSource for StatFile {
             duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
                 as u64;
 
-        let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
         let page_size = *PAGE_SIZE as usize;
         vsize = mem_stats.vm_size;
         rss = mem_stats.vm_rss / page_size;
         rsslim = task.thread_group.limits.lock().get(Resource::RSS).rlim_max;
 
         {
-            let mm_state = task.mm.state.read();
+            let mm_state = task.mm().state.read();
             startstack = mm_state.stack_start.ptr();
             arg_start = mm_state.argv_start.ptr();
             arg_end = mm_state.argv_end.ptr();
@@ -907,7 +907,7 @@ impl StatmFile {
 }
 impl DynamicFileSource for StatmFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let mem_stats = Task::from_weak(&self.0)?.mm.get_stats().map_err(|_| errno!(EIO))?;
+        let mem_stats = Task::from_weak(&self.0)?.mm().get_stats().map_err(|_| errno!(EIO))?;
         let page_size = *PAGE_SIZE as usize;
 
         // 5th and 7th fields are deprecated and should be set to 0.
@@ -966,7 +966,7 @@ impl DynamicFileSource for StatusFile {
         writeln!(sink, "Groups:\t{}", creds.groups.iter().map(|n| n.to_string()).join(" "))?;
 
         if let Some(task) = task {
-            let mem_stats = task.mm.get_stats().map_err(|_| errno!(EIO))?;
+            let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
             writeln!(sink, "VmSize:\t{} kB", mem_stats.vm_size / 1024)?;
             writeln!(sink, "VmRSS:\t{} kB", mem_stats.vm_rss / 1024)?;
             writeln!(sink, "RssAnon:\t{} kB", mem_stats.rss_anonymous / 1024)?;

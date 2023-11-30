@@ -83,7 +83,7 @@ pub fn sys_read(
     let file = current_task.files.get(fd)?;
     file.read(
         current_task,
-        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length)?,
+        &mut UserBuffersOutputBuffer::new_at(current_task.mm(), address, length)?,
     )
     .map_eintr(errno!(ERESTARTSYS))
 }
@@ -98,7 +98,7 @@ pub fn sys_write(
     let file = current_task.files.get(fd)?;
     file.write(
         current_task,
-        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length)?,
+        &mut UserBuffersInputBuffer::new_at(current_task.mm(), address, length)?,
     )
     .map_eintr(errno!(ERESTARTSYS))
 }
@@ -307,7 +307,7 @@ pub fn sys_pread64(
     file.read_at(
         current_task,
         offset,
-        &mut UserBuffersOutputBuffer::new_at(&current_task.mm, address, length)?,
+        &mut UserBuffersOutputBuffer::new_at(current_task.mm(), address, length)?,
     )
 }
 
@@ -324,7 +324,7 @@ pub fn sys_pwrite64(
     file.write_at(
         current_task,
         offset,
-        &mut UserBuffersInputBuffer::new_at(&current_task.mm, address, length)?,
+        &mut UserBuffersInputBuffer::new_at(current_task.mm(), address, length)?,
     )
 }
 
@@ -344,7 +344,7 @@ fn do_readv(
     }
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
-    let mut data = UserBuffersOutputBuffer::new(&current_task.mm, iovec)?;
+    let mut data = UserBuffersOutputBuffer::new(current_task.mm(), iovec)?;
     if let Some(offset) = offset {
         file.read_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
     } else {
@@ -404,7 +404,7 @@ fn do_writev(
     // TODO(fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
-    let mut data = UserBuffersInputBuffer::new(&current_task.mm, iovec)?;
+    let mut data = UserBuffersInputBuffer::new(current_task.mm(), iovec)?;
     if let Some(offset) = offset {
         file.write_at(current_task, offset.try_into().map_err(|_| errno!(EINVAL))?, &mut data)
     } else {
@@ -1013,7 +1013,7 @@ pub fn sys_fchownat(
 
 fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result<Vec<u8>, Errno> {
     let name = current_task
-        .mm
+        .mm()
         .read_c_string_to_vec(name_addr, XATTR_NAME_MAX as usize + 1)
         .map_err(|e| if e == ENAMETOOLONG { errno!(ERANGE) } else { e })?;
     if name.is_empty() {
@@ -1423,7 +1423,7 @@ pub fn sys_memfd_create(
     }
 
     let name = current_task
-        .mm
+        .mm()
         .read_c_string_to_vec(user_name, MEMFD_NAME_MAX_LEN)
         .map_err(|e| if e == ENAMETOOLONG { errno!(EINVAL) } else { e })?;
 
@@ -2045,7 +2045,7 @@ fn do_epoll_pwait(
     // for common pointer errors. When we catch bad pointers after the wait is complete when the
     // memory is actually written, the events will be lost. This check is not a guarantee.
     current_task
-        .mm
+        .mm()
         .check_plausible(events.addr(), max_events * std::mem::size_of::<epoll_event>())?;
 
     let active_events = if !user_sigmask.is_null() {
@@ -2612,7 +2612,7 @@ mod tests {
 
         let user_stat = UserRef::new(path_addr + file_path.len());
         current_task
-            .mm
+            .mm()
             .write_object(user_stat, &statfs::default(0))
             .expect("failed to clear struct");
 
@@ -2632,7 +2632,7 @@ mod tests {
         let no_slash_path = b"testdir";
         let no_slash_path_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(no_slash_path_addr, no_slash_path)
             .expect("failed to write path");
         let no_slash_user_path = UserCString::new(no_slash_path_addr);

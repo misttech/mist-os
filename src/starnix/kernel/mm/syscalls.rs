@@ -143,7 +143,7 @@ pub fn do_mmap(
     if flags & MAP_ANONYMOUS != 0 {
         trace_duration!(trace_category_starnix_mm!(), "AnonymousMmap");
         profile_duration!("AnonymousMmap");
-        current_task.mm.map_anonymous(addr, length, prot_flags, options, MappingName::None)
+        current_task.mm().map_anonymous(addr, length, prot_flags, options, MappingName::None)
     } else {
         trace_duration!(trace_category_starnix_mm!(), "FileBackedMmap");
         profile_duration!("FileBackedMmap");
@@ -164,7 +164,7 @@ pub fn sys_mprotect(
         not_implemented!("mmap: prot: 0x{:x}", prot);
         errno!(EINVAL)
     })?;
-    current_task.mm.protect(addr, length, prot_flags)?;
+    current_task.mm().protect(addr, length, prot_flags)?;
     Ok(())
 }
 
@@ -179,7 +179,7 @@ pub fn sys_mremap(
 ) -> Result<UserAddress, Errno> {
     let flags = MremapFlags::from_bits(flags).ok_or_else(|| errno!(EINVAL))?;
     let addr =
-        current_task.mm.remap(current_task, addr, old_length, new_length, flags, new_addr)?;
+        current_task.mm().remap(current_task, addr, old_length, new_length, flags, new_addr)?;
     Ok(addr)
 }
 
@@ -189,7 +189,7 @@ pub fn sys_munmap(
     addr: UserAddress,
     length: usize,
 ) -> Result<(), Errno> {
-    current_task.mm.unmap(addr, length)?;
+    current_task.mm().unmap(addr, length)?;
     Ok(())
 }
 
@@ -203,7 +203,7 @@ pub fn sys_msync(
     not_implemented_log_once!("msync not implemented");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
-    current_task.mm.ensure_mapped(addr, length)?;
+    current_task.mm().ensure_mapped(addr, length)?;
     Ok(())
 }
 
@@ -214,7 +214,7 @@ pub fn sys_madvise(
     length: usize,
     advice: u32,
 ) -> Result<(), Errno> {
-    current_task.mm.madvise(current_task, addr, length, advice)?;
+    current_task.mm().madvise(current_task, addr, length, advice)?;
     Ok(())
 }
 
@@ -223,7 +223,7 @@ pub fn sys_brk(
     current_task: &CurrentTask,
     addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
-    current_task.mm.set_brk(current_task, addr)
+    current_task.mm().set_brk(current_task, addr)
 }
 
 pub fn sys_process_vm_readv(
@@ -265,12 +265,12 @@ pub fn sys_process_vm_readv(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut output = UserBuffersOutputBuffer::new(&current_task.mm, local_iov)?;
+    let mut output = UserBuffersOutputBuffer::new(current_task.mm(), local_iov)?;
     if current_task.has_same_address_space(&remote_task) {
-        let mut input = UserBuffersInputBuffer::new(&remote_task.mm, remote_iov)?;
+        let mut input = UserBuffersInputBuffer::new(remote_task.mm(), remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut input = UserBuffersInputBuffer::vmo_new(&remote_task.mm, remote_iov)?;
+        let mut input = UserBuffersInputBuffer::vmo_new(remote_task.mm(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }
@@ -314,12 +314,12 @@ pub fn sys_process_vm_writev(
     // TODO(tbodt): According to the man page, this syscall was added to Linux specifically to
     // avoid doing two copies like other IPC mechanisms require. We should avoid this too at some
     // point.
-    let mut input = UserBuffersInputBuffer::new(&current_task.mm, local_iov)?;
+    let mut input = UserBuffersInputBuffer::new(current_task.mm(), local_iov)?;
     if current_task.has_same_address_space(&remote_task) {
-        let mut output = UserBuffersOutputBuffer::new(&remote_task.mm, remote_iov)?;
+        let mut output = UserBuffersOutputBuffer::new(remote_task.mm(), remote_iov)?;
         output.write_buffer(&mut input)
     } else {
-        let mut output = UserBuffersOutputBuffer::vmo_new(&remote_task.mm, remote_iov)?;
+        let mut output = UserBuffersOutputBuffer::vmo_new(remote_task.mm(), remote_iov)?;
         output.write_buffer(&mut input)
     }
 }
@@ -434,7 +434,7 @@ pub fn sys_futex(
     value3: u32,
 ) -> Result<usize, Errno> {
     if op & FUTEX_PRIVATE_FLAG != 0 {
-        do_futex(current_task, &current_task.mm.futex, addr, op, value, utime, addr2, value3)
+        do_futex(current_task, &current_task.mm().futex, addr, op, value, utime, addr2, value3)
     } else {
         do_futex(
             current_task,
@@ -671,7 +671,7 @@ mod tests {
         // Verify that the second page is still readable.
         assert_eq!(current_task.read_memory_to_array::<5>(mapped_address), error!(EFAULT));
         assert!(current_task
-            .mm
+            .mm()
             .read_memory_to_array::<5>(mapped_address + *PAGE_SIZE + 1u64)
             .is_ok());
     }

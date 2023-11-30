@@ -24,6 +24,7 @@ use starnix_uapi::{
 use std::{
     ffi::{CStr, CString},
     mem::size_of,
+    ops::Deref,
     sync::Arc,
 };
 
@@ -425,12 +426,12 @@ pub fn load_executable(
     let main_elf = load_elf(
         resolved_elf.file,
         resolved_elf.vmo,
-        &current_task.mm,
+        current_task.mm(),
         resolved_elf.file_write_guard,
     )?;
     let interp_elf = resolved_elf
         .interp
-        .map(|interp| load_elf(interp.file, interp.vmo, &current_task.mm, interp.file_write_guard))
+        .map(|interp| load_elf(interp.file, interp.vmo, current_task.mm(), interp.file_write_guard))
         .transpose()?;
 
     let entry_elf = interp_elf.as_ref().unwrap_or(&main_elf);
@@ -457,7 +458,7 @@ pub fn load_executable(
         .map_err(|status| from_status_like_fdio!(status))?;
 
     // Memory map the vvar vmo, mapping a space the size of (size of vvar + size of vDSO)
-    let vvar_map_result = current_task.mm.map_vmo(
+    let vvar_map_result = current_task.mm().map_vmo(
         DesiredAddress::Any,
         vvar_vmo,
         0,
@@ -469,7 +470,7 @@ pub fn load_executable(
     )?;
 
     // Overwrite the second part of the vvar mapping to contain the vDSO clone
-    let vdso_base = current_task.mm.map_vmo(
+    let vdso_base = current_task.mm().map_vmo(
         DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
         Arc::new(vdso_executable),
         0,
@@ -512,7 +513,7 @@ pub fn load_executable(
 
     let prot_flags = ProtectionFlags::READ | ProtectionFlags::WRITE;
 
-    let stack_base = current_task.mm.map_anonymous(
+    let stack_base = current_task.mm().map_anonymous(
         DesiredAddress::Any,
         stack_size,
         prot_flags,
@@ -523,7 +524,7 @@ pub fn load_executable(
     let stack = stack_base + (stack_size - 8);
 
     let stack = populate_initial_stack(
-        &*current_task.mm,
+        current_task.mm().deref(),
         original_path,
         &resolved_elf.argv,
         &resolved_elf.environ,
@@ -531,7 +532,7 @@ pub fn load_executable(
         stack,
     )?;
 
-    let mut mm_state = current_task.mm.state.write();
+    let mut mm_state = current_task.mm().state.write();
     mm_state.stack_base = stack_base;
     mm_state.stack_size = stack_size;
     mm_state.stack_start = stack.stack_pointer;
@@ -684,7 +685,7 @@ mod tests {
     async fn test_load_hello_starnix() {
         let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked_with_pkgfs();
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
-        assert!(current_task.mm.get_mapping_count() > 0);
+        assert!(current_task.mm().get_mapping_count() > 0);
     }
 
     // TODO(fxbug.dev/121659): Figure out why this snapshot fails.
@@ -695,9 +696,9 @@ mod tests {
         exec_hello_starnix(&mut current_task).expect("failed to load executable");
 
         let current2 = create_task(&kernel, "another-task");
-        current_task.mm.snapshot_to(&mut locked, &current2.mm).expect("failed to snapshot mm");
+        current_task.mm().snapshot_to(&mut locked, current2.mm()).expect("failed to snapshot mm");
 
-        assert_eq!(current_task.mm.get_mapping_count(), current2.mm.get_mapping_count());
+        assert_eq!(current_task.mm().get_mapping_count(), current2.mm().get_mapping_count());
     }
 
     #[::fuchsia::test]

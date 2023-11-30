@@ -288,7 +288,7 @@ impl SocketOps for ZxioBackedSocket {
         optname: u32,
         user_opt: UserBuffer,
     ) -> Result<(), Errno> {
-        let optval = task.mm.read_buffer(&user_opt)?;
+        let optval = task.mm().read_buffer(&user_opt)?;
 
         if level == SOL_SOCKET && optname == SO_ATTACH_FILTER {
             not_implemented!(

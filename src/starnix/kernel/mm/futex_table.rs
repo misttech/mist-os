@@ -419,7 +419,7 @@ impl FutexKey for PrivateFutexKey {
         if !addr.is_aligned(4) {
             return error!(EINVAL);
         }
-        let (vmo, offset) = task.mm.get_mapping_vmo(addr, perms)?;
+        let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = PrivateFutexKey { addr };
         Ok((FutexOperand { vmo, offset }, key))
     }
@@ -446,7 +446,7 @@ impl FutexKey for SharedFutexKey {
         if !addr.is_aligned(4) {
             return error!(EINVAL);
         }
-        let (vmo, offset) = task.mm.get_mapping_vmo(addr, perms)?;
+        let (vmo, offset) = task.mm().get_mapping_vmo(addr, perms)?;
         let key = SharedFutexKey::new(&vmo, offset)?;
         Ok((FutexOperand { vmo, offset }, key))
     }

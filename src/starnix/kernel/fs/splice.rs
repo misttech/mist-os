@@ -156,7 +156,7 @@ impl SplicedFile {
                 // The file is seekable and the user specified an offset. The new offset must be
                 // written back to userspace.
                 current_task
-                    .mm
+                    .mm()
                     .write_object(self.offset_ref, &((*v + spliced) as off_t))
                     .map(|_| ())
             }

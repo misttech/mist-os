@@ -202,14 +202,14 @@ pub fn sys_execveat(
     let (argv, argv_size) = if user_argv.is_null() {
         (Vec::new(), 0)
     } else {
-        read_c_string_vector(&current_task.mm, user_argv, page_limit_size, argv_env_limit)?
+        read_c_string_vector(current_task.mm(), user_argv, page_limit_size, argv_env_limit)?
     };
 
     let (environ, _) = if user_environ.is_null() {
         (Vec::new(), 0)
     } else {
         read_c_string_vector(
-            &current_task.mm,
+            current_task.mm(),
             user_environ,
             page_limit_size,
             argv_env_limit - argv_size,
@@ -875,16 +875,16 @@ pub fn sys_prctl(
                 }
                 Some(name)
             };
-            current_task.mm.set_mapping_name(addr, length, name)?;
+            current_task.mm().set_mapping_name(addr, length, name)?;
             Ok(().into())
         }
         PR_SET_DUMPABLE => {
-            let mut dumpable = current_task.mm.dumpable.lock(locked);
+            let mut dumpable = current_task.mm().dumpable.lock(locked);
             *dumpable = if arg2 == 1 { DumpPolicy::User } else { DumpPolicy::Disable };
             Ok(().into())
         }
         PR_GET_DUMPABLE => {
-            let dumpable = current_task.mm.dumpable.lock(locked);
+            let dumpable = current_task.mm().dumpable.lock(locked);
             Ok(match *dumpable {
                 DumpPolicy::Disable => 0.into(),
                 DumpPolicy::User => 1.into(),
@@ -1185,7 +1185,7 @@ pub fn sys_prlimit64(
             // The stack size is fixed at the moment, but
             // if MAP_GROWSDOWN is implemented this should
             // report the limit that it can be grown.
-            let mm_state = task.mm.state.read();
+            let mm_state = task.mm().state.read();
             let stack_size = mm_state.stack_size as u64;
             rlimit { rlim_cur: stack_size, rlim_max: stack_size }
         }
@@ -1620,7 +1620,7 @@ pub fn sys_kcmp(
                 .cmp(&obfuscate_arc(&task2.thread_group.signal_actions)),
         )),
         KcmpResource::VM => {
-            Ok(encode_ordering(obfuscate_arc(&task1.mm).cmp(&obfuscate_arc(&task2.mm))))
+            Ok(encode_ordering(obfuscate_arc(&task1.mm()).cmp(&obfuscate_arc(&task2.mm()))))
         }
         _ => error!(EINVAL),
     }
@@ -1655,14 +1655,14 @@ mod tests {
         assert_eq!(
             Some("test-name".into()),
             current_task
-                .mm
+                .mm()
                 .get_mapping_name(mapped_address + 24u64)
                 .expect("failed to get address")
         );
 
         sys_munmap(&mut locked, &current_task, mapped_address, *PAGE_SIZE as usize)
             .expect("failed to unmap memory");
-        assert_eq!(error!(EFAULT), current_task.mm.get_mapping_name(mapped_address + 24u64));
+        assert_eq!(error!(EFAULT), current_task.mm().get_mapping_name(mapped_address + 24u64));
     }
 
     #[::fuchsia::test]
@@ -1748,7 +1748,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_set_vma_name_misaligned() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -1864,7 +1864,7 @@ mod tests {
         let mapped_address = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let name = "my-task-name\0";
         current_task
-            .mm
+            .mm()
             .write_memory(mapped_address, name.as_bytes())
             .expect("failed to write name");
 
@@ -2016,7 +2016,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_vector() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let arg_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let arg = b"test-arg\0";

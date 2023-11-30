@@ -550,7 +550,7 @@ pub struct Task {
     pub files: FdTable,
 
     /// The memory manager for this task.
-    pub mm: Arc<MemoryManager>,
+    mm: Arc<MemoryManager>,
 
     /// The file system for this task.
     fs: Option<Arc<FsContext>>,
@@ -603,7 +603,7 @@ impl Task {
     }
 
     pub fn has_same_address_space(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.mm, &other.mm)
+        Arc::ptr_eq(self.mm(), other.mm())
     }
 
     pub fn flags(&self) -> TaskFlags {
@@ -803,6 +803,10 @@ impl Task {
         self.fs.as_ref().expect("fs must be set")
     }
 
+    pub fn mm(&self) -> &Arc<MemoryManager> {
+        &self.mm
+    }
+
     /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
     pub fn set_scheduler_policy(&self, policy: SchedulerPolicy) -> Result<(), Errno> {
         self.update_sched_policy_then_role(|sched_policy| *sched_policy = policy)
@@ -909,7 +913,7 @@ impl Task {
         //      PR_SET_DUMPABLE in prctl(2)), and the caller does not have
         //      the CAP_SYS_PTRACE capability in the user namespace of the
         //      target process.
-        let dumpable = *target.mm.dumpable.lock(locked);
+        let dumpable = *target.mm().dumpable.lock(locked);
         if dumpable != DumpPolicy::User && !creds.has_capability(CAP_SYS_PTRACE) {
             return error!(EPERM);
         }
@@ -957,7 +961,7 @@ impl Task {
         let user_tid = state.clear_child_tid;
         if !user_tid.is_null() {
             let zero: pid_t = 0;
-            self.mm.write_object(user_tid, &zero)?;
+            self.mm().write_object(user_tid, &zero)?;
             self.kernel().shared_futexes.wake(
                 self,
                 user_tid.addr(),
@@ -987,11 +991,11 @@ impl Task {
 
     pub fn read_argv(&self) -> Result<Vec<FsString>, Errno> {
         let (argv_start, argv_end) = {
-            let mm_state = self.mm.state.read();
+            let mm_state = self.mm().state.read();
             (mm_state.argv_start, mm_state.argv_end)
         };
 
-        self.mm.read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
+        self.mm().read_nul_delimited_c_string_list(argv_start, argv_end - argv_start)
     }
 
     pub fn thread_runtime_info(&self) -> Result<zx::TaskRuntimeInfo, Errno> {
@@ -1238,7 +1242,7 @@ impl Releasable for Task {
 
 impl MemoryAccessor for Task {
     fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
-        self.mm.read_memory(addr, bytes)
+        self.mm().read_memory(addr, bytes)
     }
 
     fn vmo_read_memory(
@@ -1246,7 +1250,7 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<(), Errno> {
-        self.mm.vmo_read_memory(addr, bytes)
+        self.mm().vmo_read_memory(addr, bytes)
     }
 
     fn read_memory_partial_until_null_byte<'a>(
@@ -1254,7 +1258,7 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a mut [u8], Errno> {
-        self.mm.read_memory_partial_until_null_byte(addr, bytes)
+        self.mm().read_memory_partial_until_null_byte(addr, bytes)
     }
 
     fn read_memory_partial(
@@ -1262,7 +1266,7 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.read_memory_partial(addr, bytes)
+        self.mm().read_memory_partial(addr, bytes)
     }
 
     fn vmo_read_memory_partial(
@@ -1270,27 +1274,27 @@ impl MemoryAccessor for Task {
         addr: UserAddress,
         bytes: &mut [MaybeUninit<u8>],
     ) -> Result<usize, Errno> {
-        self.mm.vmo_read_memory_partial(addr, bytes)
+        self.mm().vmo_read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.write_memory(addr, bytes)
+        self.mm().write_memory(addr, bytes)
     }
 
     fn vmo_write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.vmo_write_memory(addr, bytes)
+        self.mm().vmo_write_memory(addr, bytes)
     }
 
     fn write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.write_memory_partial(addr, bytes)
+        self.mm().write_memory_partial(addr, bytes)
     }
 
     fn vmo_write_memory_partial(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
-        self.mm.vmo_write_memory_partial(addr, bytes)
+        self.mm().vmo_write_memory_partial(addr, bytes)
     }
 
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
-        self.mm.zero(addr, length)
+        self.mm().zero(addr, length)
     }
 }
 

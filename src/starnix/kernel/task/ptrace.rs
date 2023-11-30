@@ -333,16 +333,16 @@ pub fn ptrace_dispatch(
             // NB: The behavior of the syscall is different from the behavior in ptrace(2),
             // which is provided by libc.
             let src: UserRef<usize> = UserRef::from(addr);
-            let val = tracee.mm.vmo_read_object(src)?;
+            let val = tracee.mm().vmo_read_object(src)?;
 
             let dst: UserRef<usize> = UserRef::from(data);
-            current_task.mm.write_object(dst, &val)?;
+            current_task.mm().write_object(dst, &val)?;
             Ok(())
         }
         PTRACE_POKEDATA | PTRACE_POKETEXT => {
             let ptr: UserRef<usize> = UserRef::from(addr);
             let val = data.ptr() as usize;
-            tracee.mm.vmo_write_object(ptr, &val)?;
+            tracee.mm().vmo_write_object(ptr, &val)?;
             Ok(())
         }
         PTRACE_SETSIGMASK => {
@@ -353,7 +353,7 @@ pub fn ptrace_dispatch(
             }
             // sigset comes from *data.
             let src: UserRef<SigSet> = UserRef::from(data);
-            let val = current_task.mm.read_object(src)?;
+            let val = current_task.mm().read_object(src)?;
             state.signals.set_mask(val);
 
             Ok(())
@@ -367,14 +367,14 @@ pub fn ptrace_dispatch(
             // sigset goes in *data.
             let dst: UserRef<SigSet> = UserRef::from(data);
             let val = state.signals.mask();
-            current_task.mm.write_object(dst, &val)?;
+            current_task.mm().write_object(dst, &val)?;
             Ok(())
         }
         PTRACE_GETSIGINFO => {
             let dst: UserRef<u8> = UserRef::from(data);
             if let Some(ptrace) = &state.ptrace {
                 if let Some(signal) = ptrace.last_signal.as_ref() {
-                    current_task.mm.write_objects(dst, &signal.as_siginfo_bytes())?;
+                    current_task.mm().write_objects(dst, &signal.as_siginfo_bytes())?;
                 } else {
                     return error!(EINVAL);
                 }
@@ -473,7 +473,7 @@ where
         return error!(EPERM);
     }
 
-    if *tracee.mm.dumpable.lock(locked) == DumpPolicy::Disable {
+    if *tracee.mm().dumpable.lock(locked) == DumpPolicy::Disable {
         return error!(EPERM);
     }
 

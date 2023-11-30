@@ -136,7 +136,7 @@ pub fn map_memory_anywhere(current_task: &CurrentTask, len: u64) -> UserAddress 
 /// Useful for syscall in-pointer parameters.
 pub fn map_object_anywhere<T: AsBytes>(current_task: &CurrentTask, object: &T) -> UserAddress {
     let addr = map_memory_anywhere(current_task, std::mem::size_of::<T>() as u64);
-    current_task.mm.write_object(addr.into(), object).expect("could not write object");
+    current_task.mm().write_object(addr.into(), object).expect("could not write object");
     addr
 }
 
@@ -325,7 +325,7 @@ pub struct UserMemoryWriter<'a> {
 impl<'a> UserMemoryWriter<'a> {
     /// Constructs a new `UserMemoryWriter` to write to `task`'s memory at `addr`.
     pub fn new(task: &'a Task, addr: UserAddress) -> Self {
-        Self { mm: &task.mm, current_addr: addr }
+        Self { mm: task.mm(), current_addr: addr }
     }
 
     /// Writes all of `data` to the current address in the task's address space, incrementing the

@@ -323,20 +323,20 @@ impl NetlinkSocketInner {
             SOL_SOCKET => match optname {
                 SO_SNDBUF => {
                     let requested_capacity: socklen_t =
-                        task.mm.read_object(user_opt.try_into()?)?;
+                        task.mm().read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUF => {
                     let requested_capacity: socklen_t =
-                        task.mm.read_object(user_opt.try_into()?)?;
+                        task.mm().read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize);
                 }
                 SO_PASSCRED => {
-                    let passcred: u32 = task.mm.read_object(user_opt.try_into()?)?;
+                    let passcred: u32 = task.mm().read_object(user_opt.try_into()?)?;
                     self.passcred = passcred != 0;
                 }
                 SO_TIMESTAMP => {
-                    let timestamp: u32 = task.mm.read_object(user_opt.try_into()?)?;
+                    let timestamp: u32 = task.mm().read_object(user_opt.try_into()?)?;
                     self.timestamp = timestamp != 0;
                 }
                 SO_SNDBUFFORCE => {
@@ -344,7 +344,7 @@ impl NetlinkSocketInner {
                         return error!(EPERM);
                     }
                     let requested_capacity: socklen_t =
-                        task.mm.read_object(user_opt.try_into()?)?;
+                        task.mm().read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize * 2);
                 }
                 SO_RCVBUFFORCE => {
@@ -352,7 +352,7 @@ impl NetlinkSocketInner {
                         return error!(EPERM);
                     }
                     let requested_capacity: socklen_t =
-                        task.mm.read_object(user_opt.try_into()?)?;
+                        task.mm().read_object(user_opt.try_into()?)?;
                     self.set_capacity(requested_capacity as usize);
                 }
                 _ => return error!(ENOSYS),
@@ -1155,7 +1155,7 @@ impl SocketOps for GenericNetlinkSocket {
         match level {
             SOL_NETLINK => match optname {
                 NETLINK_ADD_MEMBERSHIP => {
-                    let group_id: u32 = task.mm.read_object(user_opt.try_into()?)?;
+                    let group_id: u32 = task.mm().read_object(user_opt.try_into()?)?;
                     self.client.add_membership(ModernGroup(group_id))
                 }
                 _ => self.lock().setsockopt(task, level, optname, user_opt),

@@ -115,7 +115,7 @@ impl FileOps for DevZero {
 
         options |= MappingOptions::ANONYMOUS;
 
-        current_task.mm.map_vmo(
+        current_task.mm().map_vmo(
             addr,
             vmo.clone(),
             vmo_offset,

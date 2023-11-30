@@ -593,7 +593,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_data_input_buffer() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);
@@ -666,7 +666,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_data_output_buffer() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), 64 * page_size);

@@ -896,7 +896,7 @@ mod tests {
         sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
             .expect("failed to call sigaltstack");
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack_t>()])
             .expect("failed to clear struct");
         sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
@@ -910,7 +910,7 @@ mod tests {
         sys_sigaltstack(&mut locked, &current_task, user_ss, nullptr)
             .expect("failed to call sigaltstack");
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaltstack_t>()])
             .expect("failed to clear struct");
         sys_sigaltstack(&mut locked, &current_task, nullptr, user_ss)
@@ -1104,7 +1104,7 @@ mod tests {
         let how = SIG_SETMASK;
 
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>()])
             .expect("failed to clear struct");
 
@@ -1158,7 +1158,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1197,7 +1197,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1236,7 +1236,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1275,7 +1275,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1314,7 +1314,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1393,7 +1393,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
@@ -1426,7 +1426,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<sigaction_t>()])
             .expect("failed to clear struct");
 
@@ -1434,7 +1434,7 @@ mod tests {
         let original_action = sigaction_t { sa_mask: org_mask, ..sigaction_t::default() };
         let set_action_ref = UserRef::<sigaction_t>::new(addr);
         current_task
-            .mm
+            .mm()
             .write_object(set_action_ref, &original_action)
             .expect("failed to set action");
 
@@ -1557,7 +1557,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 
@@ -1590,7 +1590,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(addr, &[0u8; std::mem::size_of::<SigSet>() * 2])
             .expect("failed to clear struct");
 

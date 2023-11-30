@@ -2913,7 +2913,7 @@ impl SequenceFileSource for ProcMapsFile {
         sink: &mut DynamicFileBuf,
     ) -> Result<Option<UserAddress>, Errno> {
         let task = Task::from_weak(&self.0)?;
-        let state = task.mm.state.read();
+        let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
@@ -2941,7 +2941,7 @@ impl SequenceFileSource for ProcSmapsFile {
     ) -> Result<Option<UserAddress>, Errno> {
         let page_size_kb = *PAGE_SIZE / 1024;
         let task = Task::from_weak(&self.0)?;
-        let state = task.mm.state.read();
+        let state = task.mm().state.read();
         let mut iter = state.mappings.iter_starting_at(&cursor);
         if let Some((range, map)) = iter.next() {
             write_map(&task, sink, range, map)?;
@@ -3028,7 +3028,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_brk() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         // Look up the given addr in the mappings table.
         let get_range = |addr: &UserAddress| {
@@ -3089,7 +3089,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_mm_exec() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let has = |addr: &UserAddress| -> bool {
             let state = mm.state.read();
@@ -3122,7 +3122,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_get_contiguous_mappings_at() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         // Create four one-page mappings with a hole between the third one and the fourth one.
         let page_size = *PAGE_SIZE as usize;
@@ -3216,7 +3216,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_crossing_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         // Map two contiguous pages at fixed addresses, but backed by distinct mappings.
         let page_size = *PAGE_SIZE;
@@ -3239,7 +3239,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_errors() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let addr = map_memory(&current_task, UserAddress::default(), page_size);
@@ -3266,7 +3266,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec_large() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let max_size = 4 * page_size as usize;
@@ -3295,7 +3295,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string_to_vec() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let max_size = 2 * page_size as usize;
@@ -3336,7 +3336,7 @@ mod tests {
     #[::fuchsia::test]
     async fn can_read_argv_like_regions() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         // Map a page.
         let page_size = *PAGE_SIZE;
@@ -3381,7 +3381,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_c_string() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let page_size = *PAGE_SIZE;
         let buf_cap = 2 * page_size as usize;
@@ -3423,7 +3423,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_returned_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -3437,7 +3437,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_returns_multiple_mappings() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let _ = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
@@ -3454,7 +3454,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_beginning() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -3501,7 +3501,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_end() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 2);
 
@@ -3549,7 +3549,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_unmap_middle() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE * 3);
 
@@ -3607,7 +3607,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_objects() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let items_ref = UserRef::<i32>::new(addr);
 
@@ -3624,7 +3624,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_read_write_objects_null() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
         let items_ref = UserRef::<i32>::new(UserAddress::default());
 
         let items_written = vec![];
@@ -3645,7 +3645,7 @@ mod tests {
         }
 
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let items_array_ref = UserRef::<i32>::new(addr);
 
@@ -3685,7 +3685,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_partial_read() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         let second_map = map_memory(&current_task, addr + *PAGE_SIZE, *PAGE_SIZE);
@@ -3714,7 +3714,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_mapping_empty_mm() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = UserAddress::from(0x100000);
 
@@ -3724,7 +3724,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_inside_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
 
@@ -3734,7 +3734,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_write_fault_inside_read_only_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = do_mmap(
             &current_task,
@@ -3754,7 +3754,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_fault_inside_prot_none_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = do_mmap(
             &current_task,
@@ -3774,7 +3774,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_below_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) - *PAGE_SIZE;
 
@@ -3787,7 +3787,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_above_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let addr = map_memory_growsdown(&current_task, *PAGE_SIZE) + *PAGE_SIZE;
 
@@ -3797,7 +3797,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_grow_write_fault_below_read_only_mapping() {
         let (_kernel, current_task) = create_kernel_and_task();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let mapped_addr = map_memory_growsdown(&current_task, *PAGE_SIZE);
 
@@ -3816,7 +3816,7 @@ mod tests {
         use fuchsia_zircon::sys::zx_page_request_command_t::ZX_PAGER_VMO_READ;
 
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let mm = &current_task.mm;
+        let mm = current_task.mm();
 
         let port = Arc::new(zx::Port::create());
         let port_clone = port.clone();
@@ -3872,23 +3872,23 @@ mod tests {
             .expect("map failed");
 
         let target = create_task(&kernel, "another-task");
-        mm.snapshot_to(&mut locked, &target.mm).expect("snapshot_to failed");
+        mm.snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
 
         // Make sure it has what we wrote.
-        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
         // Write something to both source and target and make sure they are forked.
         mm.write_memory(addr, b"bar").expect("write_memory failed");
 
-        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"foo");
 
-        target.mm.write_memory(addr, b"baz").expect("write_memory failed");
+        target.mm().write_memory(addr, b"baz").expect("write_memory failed");
         let buf = mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"bar");
 
-        let buf = target.mm.read_memory_to_vec(addr, 3).expect("read_memory failed");
+        let buf = target.mm().read_memory_to_vec(addr, 3).expect("read_memory failed");
         assert_eq!(buf, b"baz");
 
         port.queue(&zx::Packet::from_user_packet(0, 0, zx::UserPacket::from_u8_array([0; 32])))
@@ -3918,7 +3918,7 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(current_task.mm.get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
+        assert_eq!(current_task.mm().get_mapping_name(mapping_addr).unwrap(), Some(vma_name));
     }
 
     #[::fuchsia::test]
@@ -3927,7 +3927,7 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -3953,7 +3953,7 @@ mod tests {
         .unwrap();
 
         {
-            let state = current_task.mm.state.read();
+            let state = current_task.mm().state.read();
 
             // The name should apply to both mappings.
             let (_, mapping) = state.mappings.get(&first_mapping_addr).unwrap();
@@ -3970,14 +3970,14 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        current_task.mm.unmap(second_page, *PAGE_SIZE as usize).unwrap();
+        current_task.mm().unmap(second_page, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since it extends past the end of the mapping into unmapped memory.
         assert_eq!(
@@ -3995,7 +3995,7 @@ mod tests {
 
         // Despite returning an error, the prctl should still assign a name to the region at the start of the region.
         {
-            let state = current_task.mm.state.read();
+            let state = current_task.mm().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));
@@ -4008,14 +4008,14 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
         let mapping_addr = map_memory(&current_task, UserAddress::default(), 2 * *PAGE_SIZE);
 
         let second_page = mapping_addr + *PAGE_SIZE;
-        current_task.mm.unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
+        current_task.mm().unmap(mapping_addr, *PAGE_SIZE as usize).unwrap();
 
         // This should fail with ENOMEM since the start of the range is in unmapped memory.
         assert_eq!(
@@ -4034,7 +4034,7 @@ mod tests {
         // Unlike a range which starts within a mapping and extends past the end, this should not assign
         // a name to any mappings.
         {
-            let state = current_task.mm.state.read();
+            let state = current_task.mm().state.read();
 
             let (_, mapping) = state.mappings.get(&second_page).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -4047,7 +4047,7 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4068,7 +4068,7 @@ mod tests {
 
         // This should split the mapping into 3 pieces with the second piece having the name "foo"
         {
-            let state = current_task.mm.state.read();
+            let state = current_task.mm().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::None);
@@ -4087,7 +4087,7 @@ mod tests {
 
         let name_addr = map_memory(&current_task, UserAddress::default(), *PAGE_SIZE);
         current_task
-            .mm
+            .mm()
             .write_memory(name_addr, CString::new("foo").unwrap().as_bytes_with_nul())
             .unwrap();
 
@@ -4107,10 +4107,10 @@ mod tests {
         );
 
         let target = create_task(&kernel, "another-task");
-        current_task.mm.snapshot_to(&mut locked, &target.mm).expect("snapshot_to failed");
+        current_task.mm().snapshot_to(&mut locked, target.mm()).expect("snapshot_to failed");
 
         {
-            let state = target.mm.state.read();
+            let state = target.mm().state.read();
 
             let (_, mapping) = state.mappings.get(&mapping_addr).unwrap();
             assert_eq!(mapping.name, MappingName::Vma("foo".into()));

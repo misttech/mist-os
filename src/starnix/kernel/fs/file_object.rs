@@ -258,7 +258,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
             FileWriteGuardRef(None)
         };
 
-        current_task.mm.map_vmo(
+        current_task.mm().map_vmo(
             addr,
             vmo,
             vmo_offset,

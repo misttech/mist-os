@@ -3961,7 +3961,7 @@ impl BinderDriver {
         let vmo = Arc::new(zx::Vmo::create(length as u64).map_err(|_| errno!(ENOMEM))?);
 
         // Map the VMO into the binder process' address space.
-        let user_address = current_task.mm.map_vmo(
+        let user_address = current_task.mm().map_vmo(
             addr,
             vmo.clone(),
             0,
@@ -3981,7 +3981,7 @@ impl BinderDriver {
             Err(err) => {
                 // Try to cleanup by unmapping from userspace, but ignore any errors. We
                 // can't really recover from them.
-                let _ = current_task.mm.unmap(user_address, length);
+                let _ = current_task.mm().unmap(user_address, length);
                 Err(err)
             }
         }
@@ -5379,7 +5379,7 @@ pub mod tests {
         let offsets_addr = data_addr
             + sender
                 .task
-                .mm
+                .mm()
                 .write_memory(data_addr, &transaction_data)
                 .expect("failed to write transaction data");
 
@@ -5387,7 +5387,7 @@ pub mod tests {
         let offsets_data: u64 = BINDER_DATA.len() as u64;
         sender
             .task
-            .mm
+            .mm()
             .write_object(UserRef::new(offsets_addr), &offsets_data)
             .expect("failed to write offsets buffer");
 
@@ -5927,19 +5927,19 @@ pub mod tests {
         // Read back the translated objects from the receiver's memory.
         let translated_objects = receiver
             .task
-            .mm
+            .mm()
             .read_objects_to_array::<binder_buffer_object, 2>(UserRef::new(data_buffer.address))
             .expect("read output");
 
         // Check that the second buffer is the string "foo".
         let foo_addr = UserAddress::from(translated_objects[1].buffer);
-        let str = receiver.task.mm.read_memory_to_array::<3>(foo_addr).expect("read buffer 1");
+        let str = receiver.task.mm().read_memory_to_array::<3>(foo_addr).expect("read buffer 1");
         assert_eq!(&str, b"foo");
 
         // Check that the first buffer points to the string "foo".
         let foo_ptr: UserAddress = receiver
             .task
-            .mm
+            .mm()
             .read_object(UserRef::new(UserAddress::from(translated_objects[0].buffer)))
             .expect("read buffer 0");
         assert_eq!(foo_ptr, foo_addr);
@@ -6242,7 +6242,7 @@ pub mod tests {
 
         // Start reading from the receiver's memory, which holds the translated transaction.
         let mut reader = UserMemoryCursor::new(
-            &*receiver.task.mm,
+            receiver.task.mm().deref(),
             data_buffer.address,
             data_buffer.length as u64,
         )
@@ -6256,7 +6256,7 @@ pub mod tests {
             reader.read_object::<binder_buffer_object>().expect("read bar buffer object");
         let translated_bar = receiver
             .task
-            .mm
+            .mm()
             .read_object::<Bar>(UserRef::new(UserAddress::from(bar_buffer_object.buffer)))
             .expect("read Bar");
 
