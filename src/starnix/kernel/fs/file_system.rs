@@ -253,7 +253,7 @@ impl FileSystem {
         info: FsNodeInfo,
     ) -> FsNodeHandle {
         let ops = ops.into();
-        let node = FsNode::new_uncached(ops, self, id, info);
+        let node = FsNode::new_uncached(current_task, ops, self, id, info);
         self.nodes
             .lock()
             .insert(node.node_id, self.prepare_node_for_insertion(current_task, &node));

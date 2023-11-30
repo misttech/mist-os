@@ -236,6 +236,7 @@ impl OverlayNode {
 
     fn init_fs_node_for_child(
         self: &Arc<OverlayNode>,
+        current_task: &CurrentTask,
         node: &FsNode,
         lower: Option<ActiveEntry>,
         upper: Option<ActiveEntry>,
@@ -247,7 +248,7 @@ impl OverlayNode {
         let parent = if upper.is_some() { None } else { Some(self.clone()) };
 
         let overlay_node = OverlayNode::new(self.fs.clone(), lower, upper, parent);
-        FsNode::new_uncached(overlay_node, &node.fs(), info.ino, info)
+        FsNode::new_uncached(current_task, overlay_node, &node.fs(), info.ino, info)
     }
 
     /// If the file is currently in the lower FS, then promote it to the upper FS. No-op if the
@@ -501,7 +502,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             return error!(ENOENT);
         }
 
-        Ok(self.init_fs_node_for_child(node, lower, upper))
+        Ok(self.init_fs_node_for_child(current_task, node, lower, upper))
     }
 
     fn mknod(
@@ -518,7 +519,7 @@ impl FsNodeOps for Arc<OverlayNode> {
                 dir_node.mknod(current_task, mount, name, mode, dev, owner.clone())
             })
         })?;
-        Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
+        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn mkdir(
@@ -540,7 +541,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             Ok(entry)
         })?;
 
-        Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
+        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn create_symlink(
@@ -556,7 +557,7 @@ impl FsNodeOps for Arc<OverlayNode> {
                 dir_node.create_symlink(current_task, mount, name, target, owner.clone())
             })
         })?;
-        Ok(self.init_fs_node_for_child(node, None, Some(new_upper_node)))
+        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {

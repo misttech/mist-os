@@ -657,6 +657,7 @@ impl FsNodeOps for RemoteNode {
                     error!(ENOTSUP)
                 };
                 let child = FsNode::new_uncached(
+                    current_task,
                     ops,
                     &fs,
                     node_id,

@@ -168,6 +168,7 @@ impl FsNodeOps for ExtDirectory {
             };
 
             let child = FsNode::new_uncached(
+                current_task,
                 ops,
                 &fs,
                 inode_num,

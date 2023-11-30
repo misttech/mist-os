@@ -4,8 +4,8 @@
 
 use crate::{
     fs::{
-        inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps,
-        StaticDirectoryBuilder,
+        fs_args, inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, StaticDirectoryBuilder,
     },
     task::{
         ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
@@ -13,12 +13,15 @@ use crate::{
 };
 use starnix_lock::Mutex;
 use starnix_uapi::{
-    auth::{FsCred, CAP_SYS_ADMIN},
+    auth::{FsCred, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     error,
     errors::Errno,
     file_mode::mode,
 };
-use std::borrow::Cow;
+use std::{
+    borrow::Cow,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
@@ -91,6 +94,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
                 mode,
             );
         });
+        dir.entry(current_task, b"pipe-max-size", PipeMaxSizeFile::new_node(), mode);
     });
     dir.build(current_task)
 }
@@ -284,3 +288,41 @@ impl BytesFileOps for PtraceYamaScope {
         Ok(ptrace_get_scope(current_task.kernel()).into())
     }
 }
+
+trait AtomicGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicUsize;
+}
+
+struct PipeMaxSizeGetter;
+impl AtomicGetter for PipeMaxSizeGetter {
+    fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicUsize {
+        &current_task.kernel().pipe_max_size
+    }
+}
+
+struct SystemLimitFile<G: AtomicGetter + Send + Sync + 'static> {
+    marker: std::marker::PhantomData<G>,
+}
+
+impl<G: AtomicGetter + Send + Sync + 'static> SystemLimitFile<G> {
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self { marker: Default::default() })
+    }
+}
+
+impl<G: AtomicGetter + Send + Sync + 'static> BytesFileOps for SystemLimitFile<G> {
+    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+        if !current_task.creds().has_capability(CAP_SYS_RESOURCE) {
+            return error!(EPERM);
+        }
+        let value = fs_args::parse::<usize>(&data)?;
+        G::get_atomic(current_task).store(value, Ordering::Relaxed);
+        Ok(())
+    }
+
+    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(G::get_atomic(current_task).load(Ordering::Relaxed).to_string().into_bytes().into())
+    }
+}
+
+type PipeMaxSizeFile = SystemLimitFile<PipeMaxSizeGetter>;

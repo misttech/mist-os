@@ -18,6 +18,7 @@ use crate::{
 use starnix_lock::{Mutex, MutexGuard};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
+    auth::CAP_SYS_RESOURCE,
     errno, error,
     errors::Errno,
     file_mode::mode,
@@ -30,7 +31,6 @@ use starnix_uapi::{
 use std::{convert::TryInto, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;
-const PIPE_MAX_SIZE: usize = 1048576; // From pipe.go in gVisor.
 
 fn round_up(value: usize, increment: usize) -> usize {
     (value + (increment - 1)) & !(increment - 1)
@@ -55,27 +55,18 @@ pub struct Pipe {
     had_writer: bool,
 }
 
-impl Default for Pipe {
-    fn default() -> Self {
-        // The default size of a pipe is 16 pages.
-        let default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
+pub type PipeHandle = Arc<Mutex<Pipe>>;
 
-        Pipe {
+impl Pipe {
+    pub fn new(default_pipe_capacity: usize) -> PipeHandle {
+        Arc::new(Mutex::new(Pipe {
             messages: MessageQueue::new(default_pipe_capacity),
             waiters: WaitQueue::default(),
             reader_count: 0,
             had_reader: false,
             writer_count: 0,
             had_writer: false,
-        }
-    }
-}
-
-pub type PipeHandle = Arc<Mutex<Pipe>>;
-
-impl Pipe {
-    pub fn new() -> PipeHandle {
-        Arc::new(Mutex::new(Pipe::default()))
+        }))
     }
 
     pub fn open(pipe: &Arc<Mutex<Self>>, flags: OpenFlags) -> Result<Box<dyn FileOps>, Errno> {
@@ -123,8 +114,15 @@ impl Pipe {
         self.messages.capacity()
     }
 
-    fn set_capacity(&mut self, mut requested_capacity: usize) -> Result<(), Errno> {
-        if requested_capacity > PIPE_MAX_SIZE {
+    fn set_capacity(
+        &mut self,
+        task: &CurrentTask,
+        mut requested_capacity: usize,
+    ) -> Result<(), Errno> {
+        if !task.creds().has_capability(CAP_SYS_RESOURCE)
+            && requested_capacity
+                > task.kernel().pipe_max_size.load(std::sync::atomic::Ordering::Relaxed)
+        {
             return error!(EINVAL);
         }
         let page_size = *PAGE_SIZE as usize;
@@ -213,14 +211,14 @@ impl Pipe {
     fn fcntl(
         &mut self,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         cmd: u32,
         arg: u64,
     ) -> Result<SyscallResult, Errno> {
         match cmd {
             F_GETPIPE_SZ => Ok(self.capacity().into()),
             F_SETPIPE_SZ => {
-                self.set_capacity(arg as usize)?;
+                self.set_capacity(current_task, arg as usize)?;
                 Ok(self.capacity().into())
             }
             _ => default_fcntl(cmd),

@@ -65,22 +65,26 @@
                 "cve-2022-2590",
                 "delete_module02",
                 "fallocate04",
+
+                // 23 requires F_SETLEASE
                 "fcntl23",
                 "fcntl23_64",
+
+                // 24 requires F_SETLEASE, and does not run on tmpfs.
                 "fcntl24",
                 "fcntl24_64",
                 "fcntl25",
                 "fcntl25_64",
                 "fcntl26",
                 "fcntl26_64",
+
+                // 31 requires F_SETSIG.
                 "fcntl31",
                 "fcntl31_64",
                 "fcntl32",
                 "fcntl32_64",
                 "fcntl33",
                 "fcntl33_64",
-                "fcntl35",
-                "fcntl35_64",
                 "fcntl37",
                 "fcntl37_64",
                 "fdatasync02",

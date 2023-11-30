@@ -18,7 +18,7 @@ use crate::{
     },
     lock_ordering::KernelIpTables,
     logging::log_error,
-    mm::{FutexTable, SharedFutexKey},
+    mm::{FutexTable, SharedFutexKey, PAGE_SIZE},
     power::PowerManager,
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
@@ -47,7 +47,7 @@ use starnix_uapi::{
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicI32, AtomicU16, AtomicU8},
+        atomic::{AtomicI32, AtomicU16, AtomicU8, AtomicUsize},
         Arc, Weak,
     },
 };
@@ -194,6 +194,9 @@ pub struct Kernel {
 
     pub inotify_limits: InotifyLimits,
 
+    /// The maximum size of pipes in the system.
+    pub pipe_max_size: AtomicUsize,
+
     // Controls which processes a process is allowed to ptrace.  See Documentation/security/Yama.txt
     pub ptrace_scope: AtomicU8,
 
@@ -325,6 +328,7 @@ impl Kernel {
                 max_user_instances: AtomicI32::new(128),
                 max_user_watches: AtomicI32::new(1048576),
             },
+            pipe_max_size: AtomicUsize::new((*PAGE_SIZE * 256) as usize),
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
             delayed_releaser: Default::default(),

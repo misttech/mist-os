@@ -256,7 +256,7 @@ impl FuseNode {
             });
             let mut info = FsNodeInfo::default();
             FuseNode::refresh_node_info(&mut info, entry.attr)?;
-            Ok(FsNode::new_uncached(fuse_node, &node.fs(), id, info))
+            Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
         })?;
         // . and .. do not get their lookup count increased.
         if !DirEntry::is_reserved_name(name) {
