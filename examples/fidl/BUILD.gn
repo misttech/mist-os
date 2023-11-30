@@ -10,6 +10,7 @@ if (is_fuchsia) {
       ":host_tests($host_toolchain)",
       "calculator:all",
       "cpp:all",
+      "fuchsia.examples.docs:all",
       "hlcpp:all",
       "rust:all",
     ]

@@ -114,7 +114,7 @@ ajar protocol BazTransaction {
     });
 };
 
-open protocol Foo2 {
+open protocol Foo3 {
     flexible StartBazTransaction(resource struct {
         transaction server_end:BazTransaction;
     });

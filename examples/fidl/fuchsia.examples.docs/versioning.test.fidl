@@ -45,6 +45,18 @@ protocol Example {
 };
 // [END deprecation]
 
+// [START replaced]
+@available(replaced=5)
+type Color = strict enum {
+    RED = 1;
+};
+
+@available(added=5)
+type Color = flexible enum { // Note: flexible instead of strict
+    RED = 1;
+};
+// [END replaced]
+
 // [START legacy]
 protocol LegacyExample {
     @available(deprecated=5, removed=6, legacy=true, note="...")
@@ -63,15 +75,3 @@ type ReferencesType = table {
 
 alias ReferencesTypeAndValue = vector<Type>:VALUE;
 // [END references]
-
-// [START swapping]
-@available(removed=HEAD)
-type Color = strict enum {
-    RED = 1;
-};
-
-@available(added=HEAD)
-type Color = flexible enum { // Note: flexible instead of strict
-    RED = 1;
-};
-// [END swapping]

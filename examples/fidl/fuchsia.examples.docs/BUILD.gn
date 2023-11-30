@@ -22,18 +22,32 @@ fidl("fuchsia.examples.docs") {
     "//sdk/fidl/fuchsia.mem",
     "//zircon/vdso/zx",
   ]
+  excluded_checks = [
+    "invalid-case-for-decl-name",
+    "protocol-name-includes-service",
+    "string-bounds-not-specified",
+    "vector-bounds-not-specified",
+  ]
 }
 
 fidl("versioning") {
   name = "fuchsia.examples.docs"
   sources = [ "versioning.test.fidl" ]
-}
-
-fidl("versioning_decomposed") {
-  name = "fuchsia.examples.docs"
-  sources = [ "versioning_decomposed.test.fidl" ]
+  excluded_checks = [ "string-bounds-not-specified" ]
 }
 
 fidl("builtin") {
   sources = [ "language_reference_builtin.test.fidl" ]
+  excluded_checks = [
+    "invalid-case-for-decl-name",
+    "wrong-prefix-for-platform-source-library",
+  ]
+}
+
+group("all") {
+  deps = [
+    ":builtin($fidl_toolchain)",
+    ":fuchsia.examples.docs($fidl_toolchain)",
+    ":versioning($fidl_toolchain)",
+  ]
 }

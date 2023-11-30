@@ -44,7 +44,8 @@ Illustrates both aspects:
 ## `@available` {#available}
 
 **USAGE**: `@available(platform="`_string_`", added=`_version_`,
-deprecated=`_version_`, removed=`_version_`, note="`_string_`", legacy=`_legacy_`)`
+deprecated=`_version_`, removed=`_version_`, removed=`_version_`,
+note="`_string_`", legacy=`_legacy_`)`
 
 **MEANING**:
 All arguments are optional, but at least one must be provided.
@@ -52,9 +53,11 @@ All arguments are optional, but at least one must be provided.
 * `platform`: Only allowed when the attribute is on the `library` declaration.
   Must be a valid [library name element][identifiers]. If omitted, defaults to
   the first element of the library name.
-* `added`, `deprecated`, `removed`: Must be an integer from 1 to 2^63-1 or the
-  special constant `HEAD`. Cannot be `LEGACY`. Must respect `added <= deprecated
-  < removed`.
+* `added`, `deprecated`, `removed`, `replaced`: Must be an integer from 1 to
+  2^63-1 or the special constant `HEAD`. Cannot be `LEGACY`.
+    * `removed` and `replaced` are mutually exclusive.
+    * Must respect `added <= deprecated < removed` or
+      `added <= deprecated < replaced`.
 * `note`: Only allowed if `deprecated` is provided. Should contain a brief
   explanation indicating what to use instead, suitable to be included in
   compiler error messages.

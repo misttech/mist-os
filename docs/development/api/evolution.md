@@ -59,6 +59,20 @@ adding it to the internal or experimental SDK categories to prevent partners fro
 depending on it and to opt out of static compatibility tests, allowing the API
 to change freely. Once the API is stable, add it to the partner category.
 
+### Replacing FIDL APIs {#replacing}
+
+Sometimes you need to replace an API with a new definition. To do this at API
+level `N`, annotate the old definition with `@available(replaced=N)` and the new
+definition with `@available(added=N)`. For example, this is how you would change
+the value of a constant at API level 5:
+
+```fidl
+@available(replaced=5)
+const MAX_LENGTH uint32 = 16;
+@available(added=5)
+const MAX_LENGTH uint32 = 32;
+```
+
 ### Deprecating FIDL APIs {#deprecating}
 
 You should always deprecate an API at an earlier level than you remove it. When

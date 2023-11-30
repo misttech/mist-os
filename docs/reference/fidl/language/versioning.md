@@ -9,11 +9,11 @@ FIDL versioning lets you change a FIDL library over time while keeping the
 ability to generate bindings for older versions of the library. There are a
 number of ways you could do this manually:
 
-* Store `.fidl` files in a `v1/` directory. To make a change, copy `v1/` to
+- Store `.fidl` files in a `v1/` directory. To make a change, copy `v1/` to
   `v2/` and change files there. To generate bindings for the older version,
   use the `v1/` library instead of `v2/`.
 
-* Store `.fidl` files in a git repository and make changes in commits. To
+- Store `.fidl` files in a git repository and make changes in commits. To
   generate bindings for an older version, check out an older revision of the
   repository.
 
@@ -28,10 +28,10 @@ you pass the `--available` flag to fidlc and specify an older version.
 
 There are two important things to keep in mind with FIDL versioning:
 
-* It affects **API only**. Versions exist only at compile time, and have no
+- It affects **API only**. Versions exist only at compile time, and have no
   impact on runtime behavior.
 
-* It can represent **any syntactically valid change**. Just because you can
+- It can represent **any syntactically valid change**. Just because you can
   represent a change with versioning doesn't mean that change is safe to make.
 
 ## Concepts
@@ -47,7 +47,7 @@ like `HEAD`, but it also includes [legacy elements](#legacy).
 
 If a FIDL library doesn't have any `@available` attributes, it is unversioned.
 The behavior of an unversioned library is similar to a library annotated with
-`@available(added=HEAD)`, except it belongs to a unique, unnnameable platorm.
+`@available(added=HEAD)`, except it belongs to a unique, unnameable platform.
 
 ## Command line
 
@@ -73,19 +73,26 @@ version chosen for `B`.
 The `@available` attribute is allowed on any [FIDL element][element]. It takes
 the following arguments:
 
-Argument     | Type      | Note
------------- | --------- | -------------------------
-`platform`   | `string`  | Only allowed on `library`
-`added`      | `uint64`  | Integer or `HEAD`
-`deprecated` | `uint64`  | Integer or `HEAD`
-`removed`    | `uint64`  | Integer or `HEAD`
-`note`       | `string`  | Goes with `deprecated`
-`legacy`     | `boolean` | Goes with `removed`
+| Argument     | Type      | Note                      |
+| ------------ | --------- | ------------------------- |
+| `platform`   | `string`  | Only allowed on `library` |
+| `added`      | `uint64`  | Integer or `HEAD`         |
+| `deprecated` | `uint64`  | Integer or `HEAD`         |
+| `removed`    | `uint64`  | Integer or `HEAD`         |
+| `replaced`   | `uint64`  | Integer or `HEAD`         |
+| `note`       | `string`  | Goes with `deprecated`    |
+| `legacy`     | `boolean` | Goes with `removed`       |
 
-All arguments are optional, but at least one must be provided. Argument values
-must be literals, not references to `const` declarations. The `added`,
-`deprecated`, `removed`, and `legacy` arguments [inherit](#inheritance) from the
-parent element by default. They must respect `added <= deprecated < removed`.
+There are some restrictions on the arguments:
+
+- All arguments are optional, but at least one must be provided.
+- Arguments must be literals, not references to `const` declarations.
+- The `removed` and `replaced` arguments are mutually exclusive.
+- Arguments must respect `added <= deprecated < removed`, or
+  `added <= deprecated < replaced`.
+- The `added`, `deprecated`, `removed`, `replaced`, and `legacy` arguments
+  [inherit](#inheritance) from the parent element if unspecified.
+
 For example:
 
 ```fidl
@@ -136,6 +143,39 @@ As of May 2022 deprecation has no impact in bindings. However, the FIDL team
 languages. For instance, the example above could produce `#[deprecated = "use
 Replacement"]` in the Rust bindings.
 
+## Replacing
+
+The `replaced` argument lets you change an element at a particular version by
+writing a completely new definition. This is the only way to change certain
+aspects of FIDL elements, including:
+
+- The value of a constant
+- The type of a struct, table, or union member
+- The ordinal of table or union member
+- The kind of a declaration, e.g. changing a struct to an alias
+- The presence of `error` syntax on a method
+- Other attributes on the element such as `@selector`
+- Modifiers such as `strict`, `flexible`, and `resource`
+
+To replace an element at version `N`, annotate the old definition with
+`@available(replaced=N)` and the new definition with `@available(added=N)`.
+For example, here is how you change an enum from `strict` to `flexible`:
+
+```fidl
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="replaced" %}
+```
+
+You can also use replacement to clean up a FIDL library that has become
+cluttered by a long history of API changes. Simply replace all elements with a
+fresh definition, and then move the old definitions to a separate file with a
+name like `history.fidl`.
+
+The FIDL compiler verifies that every `@available(replaced=N)` element has a
+matching `@available(added=N)` replacement. It also verifies that every
+`@available(removed=N)` element **does not** have such a replacement. This
+validation only applies to elements directly annotated, not to elements that
+[inherit](#inheritance) the `removed` or `replaced` argument.
+
 ## Legacy {#legacy}
 
 When removing an element, you can use `legacy=true` to keep it in the `LEGACY`
@@ -184,32 +224,6 @@ const A bool = B;
 
 @available(deprecated=1)
 const B bool = true;
-```
-
-## Swapping
-
-Some parts of the FIDL language do not support attributes. For example, you
-cannot place the `@available` attribute directly on an enum's `strict` modifier.
-However, FIDL versioning can still represent this kind of change using a
-technique called _swapping_. Instead of changing the enum, you duplicate it,
-simultaneously removing the old copy and adding the new one. For example:
-
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="swapping" %}
-```
-
-Taken to the extreme, swapping makes it possible to decompose a versioned
-library into a series of snapshots for each version. For example, given the
-protocol shown [earlier](#inheritance):
-
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning.test.fidl" region_tag="inheritance" %}
-```
-
-We can decompose it by swapping the protocol at every version:
-
-```fidl
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/fidl/fuchsia.examples.docs/versioning_decomposed.test.fidl" region_tag="decomposed" %}
 ```
 
 [element]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md#terminology

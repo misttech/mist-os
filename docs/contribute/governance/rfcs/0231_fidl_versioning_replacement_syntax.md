@@ -202,5 +202,5 @@ prior art on this exact problem, as far as I know.
 [legacy]: /docs/reference/fidl/language/versioning.md#legacy
 [rfc-0083]: /docs/contribute/governance/rfcs/0083_fidl_versioning.md
 [rfc-0232]: /docs/contribute/governance/rfcs/0232_fidl_bindings_for_multiple_api_levels.md
-[swapping]: /docs/reference/fidl/language/versioning.md#swapping
+[swapping]: https://cs.opensource.google/fuchsia/fuchsia/+/main:docs/reference/fidl/language/versioning.md;l=189;drc=818df65453cad51dd8351cd88074d606a00575e8
 [versioning]: /docs/reference/fidl/language/versioning.md
