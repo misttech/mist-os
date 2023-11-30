@@ -31,10 +31,6 @@ $ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc
 
 ### Soft Reboot Test
 ```shell
-$ fx set core.qemu-x64 \
-    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
-    --with //src/testing/end_to_end/examples
-
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 

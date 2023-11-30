@@ -5,7 +5,6 @@
 """Soft Reboot test."""
 
 import logging
-from typing import List, Tuple
 
 from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
@@ -26,7 +25,7 @@ class SoftRebootTest(fuchsia_base_test.FuchsiaBaseTest):
 
     def pre_run(self) -> None:
         """Mobly method used to generate the test cases at run time."""
-        test_arg_tuple_list: List[Tuple[int]] = []
+        test_arg_tuple_list: list[tuple[int]] = []
 
         for iteration in range(1, int(self.user_params["num_reboots"]) + 1):
             test_arg_tuple_list.append((iteration,))
