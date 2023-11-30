@@ -92,7 +92,7 @@ closed protocol Block {
     ///
     /// storage_metrics.CallStat.bytes_transferred is number of bytes requested
     /// to be transferred.
-    @available(removed=15)
+    @available(replaced=15)
     strict GetStats(struct {
         clear bool;
     }) -> (struct {

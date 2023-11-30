@@ -36,7 +36,7 @@ type LastReboot = table {
 };
 
 /// Reasons why a device last rebooted.
-@available(removed=9)
+@available(replaced=9)
 type RebootReason = strict enum : uint16 {
     // ///////////////////////////////////////////////////////////////////////////////////////////
     // Ungraceful reboot reasons

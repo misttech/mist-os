@@ -82,7 +82,7 @@ closed protocol Environment {
     /// Gets a superset of services provided by this environment's
     /// `host_directory`.
     strict GetDirectory(resource struct {
-        @available(removed=10)
+        @available(replaced=10)
         directory_request zx.Handle:CHANNEL;
         @available(added=10)
         directory_request server_end:fuchsia.io.Directory;

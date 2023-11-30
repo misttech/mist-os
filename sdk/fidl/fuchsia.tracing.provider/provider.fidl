@@ -89,7 +89,7 @@ closed protocol Registry {
     strict RegisterProvider(resource struct {
         provider client_end:Provider;
         pid zx.Koid;
-        @available(removed=11)
+        @available(replaced=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
         @available(added=11)
         name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
@@ -107,7 +107,7 @@ closed protocol Registry {
     strict RegisterProviderSynchronously(resource struct {
         provider client_end:Provider;
         pid zx.Koid;
-        @available(removed=11)
+        @available(replaced=11)
         name string:MAX_PROVIDER_NAME_LENGTH;
         @available(added=11)
         name string:fuchsia.tracing.MAX_PROVIDER_NAME_LENGTH;
@@ -147,7 +147,7 @@ type BufferingMode = strict enum : uint8 {
 // tables are ready for use in zircon.
 type ProviderConfig = resource struct {
     /// `buffering_mode` specifies what happens when the buffer fills.
-    @available(removed=11)
+    @available(replaced=11)
     buffering_mode BufferingMode;
     @available(added=11)
     buffering_mode fuchsia.tracing.BufferingMode;
@@ -162,7 +162,7 @@ type ProviderConfig = resource struct {
     fifo zx.Handle:FIFO;
 
     /// What trace categories to collect data for.
-    @available(removed=11)
+    @available(replaced=11)
     categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
     @available(added=11)
     categories
@@ -208,14 +208,14 @@ type StartOptions = struct {
     /// Whether and how to clear the buffer when starting data collection.
     /// This allows, for example, multiple Start/Stop trace runs to be
     /// collected in the same buffer.
-    @available(removed=11)
+    @available(replaced=11)
     buffer_disposition BufferDisposition;
     @available(added=11)
     buffer_disposition fuchsia.tracing.BufferDisposition;
 
     /// The trace categories to add to the initial set provided in
     /// `ProviderConfig`.
-    @available(removed=11)
+    @available(replaced=11)
     additional_categories vector<string:MAX_CATEGORY_NAME_LENGTH>:MAX_NUM_CATEGORIES;
     @available(added=11)
     additional_categories

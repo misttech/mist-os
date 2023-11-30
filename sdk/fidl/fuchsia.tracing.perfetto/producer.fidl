@@ -25,7 +25,7 @@ closed protocol BufferReceiver {
     /// is signaled before continuing with trace session setup.
     /// Method should be called only once per BufferReceiver connection.
     /// The channel may be safely dropped once a buffer is received.
-    @available(removed=9)
+    @available(replaced=9)
     strict ProvideBuffer(resource struct {
         buffer zx.Handle:VMO;
     }) -> () error zx.Status;

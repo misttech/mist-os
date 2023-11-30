@@ -67,7 +67,7 @@ closed protocol SecureMem {
         properties SecureHeapProperties;
     }) error zx.Status;
 
-    @available(added=7, deprecated=8, removed=9)
+    @available(added=7, deprecated=8, replaced=9)
     strict GetPhysicalSecureHeapProperties(struct {
         heap HeapType;
     }) -> (struct {

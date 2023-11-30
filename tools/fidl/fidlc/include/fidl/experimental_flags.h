@@ -55,10 +55,6 @@ class ExperimentalFlags {
 
     // Enable an allow-list for the @transitional attribute.
     kTransitionalAllowList = 1 << 11,
-
-    // Enforce using @available(replaced=N) instead of @available(removed=N)
-    // when an element with the same name is marked @available(added=N).
-    kEnforceReplaced = 1 << 12,
   };
 
   ExperimentalFlags() = default;

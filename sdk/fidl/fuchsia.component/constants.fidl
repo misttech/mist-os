@@ -8,7 +8,7 @@ using fuchsia.io;
 const MAX_NAME_LENGTH uint32 = 100;
 const MAX_CHILD_NAME_LENGTH uint32 = 1024;
 
-@available(removed=15)
+@available(replaced=15)
 const MAX_PATH_LENGTH uint32 = 1024;
 @available(added=15)
 const MAX_PATH_LENGTH uint64 = fuchsia.io.MAX_PATH_LENGTH;

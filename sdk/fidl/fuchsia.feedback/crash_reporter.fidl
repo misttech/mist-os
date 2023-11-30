@@ -156,7 +156,7 @@ type NativeCrashReport = resource table {
 };
 
 const MAX_EXCEPTION_TYPE_LENGTH uint32 = 128;
-@available(removed=10)
+@available(replaced=10)
 const MAX_EXCEPTION_MESSAGE_LENGTH uint32 = 2048;
 @available(added=10)
 const MAX_EXCEPTION_MESSAGE_LENGTH uint32 = 4096;

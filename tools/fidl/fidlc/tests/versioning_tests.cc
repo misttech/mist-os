@@ -2190,7 +2190,6 @@ TEST(VersioningTests, BadRemovedWithReplacement) {
   TestLibrary library;
   library.AddFile("bad/fi-0205.test.fidl");
   library.SelectVersion("test", "HEAD");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
   library.ExpectFail(fidl::ErrRemovedWithReplacement, "Bar", fidl::Version::From(2).value(),
                      "bad/fi-0205.test.fidl:11:14");
   ASSERT_COMPILER_DIAGNOSTICS(library);
@@ -2210,7 +2209,6 @@ type Bar = struct {
 };
 )FIDL");
   library.SelectVersion("example", "HEAD");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
   library.ExpectFail(fidl::ErrRemovedWithReplacement, "Foo", fidl::Version::From(2).value(),
                      "example.fidl:10:9");
   ASSERT_COMPILER_DIAGNOSTICS(library);

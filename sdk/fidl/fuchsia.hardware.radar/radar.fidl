@@ -160,7 +160,7 @@ closed protocol RadarBurstReader {
         2: error StatusCode;
     });
 
-    @available(removed=14)
+    @available(replaced=14)
     strict -> OnBurst(struct {
         burst Burst;
     }) error StatusCode;

@@ -76,7 +76,7 @@ closed protocol Dataset {
         dataset OperationalDatasetTlvs;
     }) -> ();
 
-    @available(removed=8)
+    @available(replaced=8)
     strict AttachAllNodesTo(struct {
         dataset OperationalDatasetTlvs;
     }) -> ();

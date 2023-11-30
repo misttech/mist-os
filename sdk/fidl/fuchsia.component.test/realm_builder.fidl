@@ -658,7 +658,7 @@ closed protocol Realm {
     }) -> () error RealmBuilderError;
 
     // replaced by ABI-compatible type above
-    @available(added=9, removed=13)
+    @available(added=9, replaced=13)
     strict SetConfigValue(struct {
         /// The name of the component whose config value is being replaced.
         name fuchsia.component.name;

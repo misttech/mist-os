@@ -1376,7 +1376,6 @@ TEST(ErrcatGoodTests, Good0204) {
 TEST(ErrcatGoodTests, Good0205a) {
   TestLibrary library;
   library.AddFile("good/fi-0205-a.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
   library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
@@ -1384,7 +1383,6 @@ TEST(ErrcatGoodTests, Good0205a) {
 TEST(ErrcatGoodTests, Good0205b) {
   TestLibrary library;
   library.AddFile("good/fi-0205-b.test.fidl");
-  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
   library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }

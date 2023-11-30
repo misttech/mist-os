@@ -82,5 +82,5 @@ const MAX_RESOLUTION_CONTEXT_LENGTH uint32 = 8192;
 type Context = struct {
     bytes vector<uint8>:MAX_RESOLUTION_CONTEXT_SIZE;
 };
-@available(removed=9)
+@available(replaced=9)
 alias Context = vector<uint8>:MAX_RESOLUTION_CONTEXT_LENGTH;

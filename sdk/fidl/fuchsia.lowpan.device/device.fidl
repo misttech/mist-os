@@ -18,7 +18,7 @@ type Identity = table {
     /// [1]: https://tools.ietf.org/html/rfc3454
     1: raw_name vector<uint8>:63;
 
-    @available(removed=11)
+    @available(replaced=11)
     2: xpanid vector<uint8>:8;
     // TODO(https://fxbug.dev/118274): nominally `removed=11` but FIDL requires
     // added < removed.

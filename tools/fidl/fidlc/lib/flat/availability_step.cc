@@ -446,8 +446,7 @@ class Validator {
         auto version = element->availability.set().ranges().first.pair().second;
         auto it = by_added.find(version);
         auto replacement = it != by_added.end() ? it->second : nullptr;
-        if (removed_arg && replacement &&
-            flags_.IsFlagEnabled(ExperimentalFlags::Flag::kEnforceReplaced)) {
+        if (removed_arg && replacement) {
           reporter_->Fail(ErrRemovedWithReplacement, removed_arg->span, name, version,
                           replacement->GetNameSource());
         } else if (replaced_arg && !replacement) {

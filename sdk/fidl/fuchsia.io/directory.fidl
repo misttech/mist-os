@@ -205,7 +205,7 @@ closed protocol Openable {
     /// `OnOpen` event if applicable, and the `object` connection closed.
     ///
     /// `mode` is ignored.
-    @available(deprecated=11, removed=12, note="Use the new signature of Open.")
+    @available(deprecated=11, replaced=12, note="Use the new signature of Open.")
     @selector("fuchsia.io1/Directory.Open")
     strict Open(resource struct {
         flags OpenFlags;

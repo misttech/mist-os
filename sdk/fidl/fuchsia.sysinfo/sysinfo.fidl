@@ -11,7 +11,7 @@ const BOOTLOADER_VENDOR_LEN uint8 = 32;
 @available(added=HEAD)
 const SERIAL_NUMBER_LEN uint8 = 32;
 
-@available(removed=12)
+@available(replaced=12)
 type InterruptControllerType = strict enum {
     UNKNOWN = 0;
     APIC = 1;

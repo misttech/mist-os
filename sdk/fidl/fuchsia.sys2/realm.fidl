@@ -252,7 +252,7 @@ closed protocol RealmQuery {
     }) error GetStructuredConfigError;
 
     // replaced by ABI-compatible version above
-    @available(added=11, removed=13)
+    @available(added=11, replaced=13)
     strict GetStructuredConfig(struct {
         moniker string:fuchsia.component.MAX_MONIKER_LENGTH;
     }) -> (struct {
