@@ -550,7 +550,7 @@ pub struct Task {
     pub files: FdTable,
 
     /// The memory manager for this task.
-    mm: Arc<MemoryManager>,
+    mm: Option<Arc<MemoryManager>>,
 
     /// The file system for this task.
     fs: Option<Arc<FsContext>>,
@@ -740,7 +740,7 @@ impl Task {
             thread_group,
             thread: RwLock::new(thread),
             files,
-            mm,
+            mm: Some(mm),
             fs: Some(fs),
             abstract_socket_namespace,
             abstract_vsock_namespace,
@@ -804,7 +804,7 @@ impl Task {
     }
 
     pub fn mm(&self) -> &Arc<MemoryManager> {
-        &self.mm
+        self.mm.as_ref().expect("mm must be set")
     }
 
     /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
@@ -1221,8 +1221,9 @@ impl Releasable for Task {
 
         self.signal_vfork();
 
-        // Drop the fs to ensure no FsNode are owned by this task.
+        // Drop fields that can end up owning a FsNode to ensure no FsNode are owned by this task.
         self.fs = None;
+        self.mm = None;
         // Rebuild a temporary CurrentTask to run the release actions that requires a CurrentState.
         let current_task = CurrentTask { task: OwnedRef::new(self), thread_state };
 
