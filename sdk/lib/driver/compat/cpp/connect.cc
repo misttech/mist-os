@@ -6,14 +6,16 @@
 
 namespace compat {
 
-void FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
-                          async_dispatcher_t* dispatcher, EntriesCallback cb) {
-  auto client = fidl::WireSharedClient<fuchsia_io::Directory>(std::move(dir), dispatcher);
-  auto copy = client.Clone();
+fdf::async_helpers::AsyncTask FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
+                                                   async_dispatcher_t* dispatcher,
+                                                   EntriesCallback cb) {
+  auto client = fidl::WireClient<fuchsia_io::Directory>(std::move(dir), dispatcher);
+
+  fdf::async_helpers::AsyncTask task;
   // NOTE: It would be nicer to call Watch, but that is not supported in the component's
   // VFS implementation.
   client->ReadDirents(fuchsia_io::wire::kMaxBuf)
-      .Then([client = std::move(copy), cb = std::move(cb)](
+      .Then([cb = std::move(cb), completer = task.CreateCompleter()](
                 fidl::WireUnownedResult<::fuchsia_io::Directory::ReadDirents>& result) mutable {
         // The format of the packed dirent structure, taken from io.fidl.
         struct dirent {
@@ -50,6 +52,8 @@ void FindDirectoryEntries(fidl::ClientEnd<fuchsia_io::Directory> dir,
 
         cb(zx::ok(std::move(names)));
       });
+  task.SetItem(std::move(client));
+  return task;
 }
 
 zx::result<std::vector<std::string>> FindDirectoryEntries(
@@ -93,16 +97,16 @@ zx::result<std::vector<std::string>> FindDirectoryEntries(
   return zx::ok(std::move(names));
 }
 
-void ConnectToParentDevices(async_dispatcher_t* dispatcher, const fdf::Namespace* ns,
-                            ConnectCallback cb) {
+fdf::async_helpers::AsyncTask ConnectToParentDevices(async_dispatcher_t* dispatcher,
+                                                     const fdf::Namespace* ns, ConnectCallback cb) {
   auto result = ns->Connect<fuchsia_io::Directory>(fuchsia_driver_compat::Service::Name);
 
   if (result.is_error()) {
     cb(result.take_error());
-    return;
+    return fdf::async_helpers::AsyncTask(true);
   }
 
-  FindDirectoryEntries(
+  return FindDirectoryEntries(
       std::move(result.value()), dispatcher,
       [ns, cb = std::move(cb)](zx::result<std::vector<std::string>> entries) mutable {
         if (entries.is_error()) {

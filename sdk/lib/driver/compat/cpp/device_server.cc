@@ -457,10 +457,11 @@ void DeviceServer::ServeAndSetInitializeResult(
 void DeviceServer::BeginAsyncInit() {
   AsyncInit* init_state = std::get_if<AsyncInit>(&state_);
   ZX_ASSERT(init_state != nullptr);
-  ConnectToParentDevices(init_state->dispatcher, init_state->incoming.get(),
-                         [this](zx::result<std::vector<ParentDevice>> parents) {
-                           OnParentDevices(std::move(parents));
-                         });
+  auto task = ConnectToParentDevices(init_state->dispatcher, init_state->incoming.get(),
+                                     [this](zx::result<std::vector<ParentDevice>> parents) {
+                                       OnParentDevices(std::move(parents));
+                                     });
+  async_tasks_.AddTask(std::move(task));
 }
 
 void DeviceServer::OnParentDevices(zx::result<std::vector<ParentDevice>> parent_devices) {

@@ -2,10 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/driver/compat/cpp/connect.h>
 #include <lib/driver/compat/cpp/logging.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdio/directory.h>
 
 #include <memory>
@@ -19,7 +18,8 @@
 #include "src/storage/lib/vfs/cpp/service.h"
 
 TEST(CompatConnectTest, Connection) {
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  fdf_testing::DriverRuntime runtime;
+
   auto file = fbl::MakeRefCounted<fs::UnbufferedPseudoFile>(
       [](fbl::String* output) { return ZX_OK; }, [](std::string_view input) { return ZX_OK; });
 
@@ -30,14 +30,16 @@ TEST(CompatConnectTest, Connection) {
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fs::ManagedVfs vfs(loop.dispatcher());
+  auto dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+  fs::ManagedVfs vfs(dispatcher);
 
   vfs.ServeDirectory(directory, std::move(endpoints->server));
 
   bool callback_complete = false;
 
-  compat::FindDirectoryEntries(
-      std::move(endpoints->client), loop.dispatcher(),
+  fdf::async_helpers::AsyncTask task = compat::FindDirectoryEntries(
+      std::move(endpoints->client), dispatcher,
       [&callback_complete](zx::result<std::vector<std::string>> entries) mutable {
         callback_complete = true;
         ASSERT_EQ(ZX_OK, entries.status_value());
@@ -46,7 +48,7 @@ TEST(CompatConnectTest, Connection) {
         ASSERT_EQ(std::string("one"), entries.value()[1]);
         ASSERT_EQ(std::string("two"), entries.value()[2]);
       });
-  loop.RunUntilIdle();
+  runtime.RunUntilIdle();
   ASSERT_TRUE(callback_complete);
 
   sync_completion_t shutdown;
@@ -55,7 +57,7 @@ TEST(CompatConnectTest, Connection) {
     sync_completion_signal(&shutdown);
     ASSERT_EQ(status, ZX_OK);
   });
-  loop.RunUntilIdle();
+  runtime.RunUntilIdle();
   ASSERT_EQ(sync_completion_wait(&shutdown, zx::duration::infinite().get()), ZX_OK);
 }
 

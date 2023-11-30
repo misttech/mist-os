@@ -717,7 +717,7 @@ zx::result<> Driver::StartDriver() {
 
 fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {
   bridge<void, zx_status_t> bridge;
-  compat::ConnectToParentDevices(
+  auto task = compat::ConnectToParentDevices(
       dispatcher(), incoming().get(),
       [this, completer = std::move(bridge.completer)](
           zx::result<std::vector<compat::ParentDevice>> devices) mutable {
@@ -746,6 +746,7 @@ fpromise::promise<void, zx_status_t> Driver::ConnectToParentDevices() {
         device_.set_fragments(std::move(parents_names));
         completer.complete_ok();
       });
+  async_tasks_.AddTask(std::move(task));
   return bridge.consumer.promise_or(error(ZX_ERR_INTERNAL)).wrap_with(scope_);
 }
 

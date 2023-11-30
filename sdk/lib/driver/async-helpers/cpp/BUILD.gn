@@ -25,6 +25,7 @@ sdk_source_set("cpp") {
   public_deps = [
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fit",
+    "//src/devices/bin/driver_runtime",
     "//zircon/system/ulib/async:async-cpp",
   ]
 }

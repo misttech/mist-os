@@ -158,6 +158,8 @@ class Driver : public fdf::DriverBase {
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;
 
+  fdf::async_helpers::TaskGroup async_tasks_;
+
   // NOTE: Must be the last member.
   fpromise::scope scope_;
 };

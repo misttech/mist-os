@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/ddk/driver.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <zircon/errors.h>
 
 #include <gtest/gtest.h>
@@ -11,9 +11,9 @@
 #include "src/devices/misc/drivers/compat/device.h"
 
 TEST(ApiTest, GetVariableDfv2BufferTooSmall) {
-  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  fdf_testing::DriverRuntime runtime;
   compat::Device device(compat::kDefaultDevice, nullptr, nullptr, std::nullopt, nullptr,
-                        loop.dispatcher());
+                        fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   size_t size;
   zx_status_t status =
@@ -23,9 +23,9 @@ TEST(ApiTest, GetVariableDfv2BufferTooSmall) {
 }
 
 TEST(ApiTest, GetVariableDfv2) {
-  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  fdf_testing::DriverRuntime runtime;
   compat::Device device(compat::kDefaultDevice, nullptr, nullptr, std::nullopt, nullptr,
-                        loop.dispatcher());
+                        fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
   char buf[2];
   size_t size;

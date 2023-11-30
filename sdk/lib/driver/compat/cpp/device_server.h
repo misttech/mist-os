@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/async-helpers/cpp/task_group.h>
 #include <lib/driver/compat/cpp/connect.h>
 #include <lib/driver/compat/cpp/service_offers.h>
 #include <lib/driver/incoming/cpp/namespace.h>
@@ -254,6 +255,7 @@ class DeviceServer : public fidl::WireServer<fuchsia_driver_compat::Device> {
 
   // This callback is called when the class is destructed and it will stop serving the protocol.
   fit::deferred_callback stop_serving_;
+  fdf::async_helpers::TaskGroup async_tasks_;
 };
 
 }  // namespace compat

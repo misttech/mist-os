@@ -56,9 +56,8 @@ test("test") {
   deps = [
     ":cpp",
     ":logging",
+    "//sdk/lib/driver/testing/cpp",
     "//src/storage/lib/vfs/cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",
   ]
 }

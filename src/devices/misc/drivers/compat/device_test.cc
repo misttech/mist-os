@@ -10,6 +10,7 @@
 #include <fidl/test.placeholders/cpp/wire.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/symbols.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/transaction.h>
@@ -19,9 +20,6 @@
 #include "lib/ddk/binding_priv.h"
 #include "lib/ddk/device.h"
 #include "lib/ddk/driver.h"
-#include "src/devices/misc/drivers/compat/driver.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -29,11 +27,13 @@ using namespace fuchsia_driver_framework;
 namespace fio = fuchsia_io;
 namespace frunner = fuchsia_component_runner;
 
-class DeviceTest : public gtest::TestLoopFixture {
+class DeviceTest : public ::testing::Test {
  public:
-  void SetUp() override {
-    TestLoopFixture::SetUp();
+  static async_dispatcher_t* dispatcher() {
+    return fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  }
 
+  void SetUp() override {
     auto svc = fidl::CreateEndpoints<fio::Directory>();
     ASSERT_EQ(ZX_OK, svc.status_value());
     auto ns = CreateNamespace(std::move(svc->client));
@@ -42,6 +42,11 @@ class DeviceTest : public gtest::TestLoopFixture {
     auto logger = fdf::Logger::Create(*ns, dispatcher(), "test-logger", FUCHSIA_LOG_INFO, false);
     ASSERT_EQ(ZX_OK, logger.status_value());
     logger_ = std::shared_ptr<fdf::Logger>((*logger).release());
+  }
+
+  bool RunLoopUntilIdle() {
+    runtime_.RunUntilIdle();
+    return true;
   }
 
  protected:
@@ -58,6 +63,7 @@ class DeviceTest : public gtest::TestLoopFixture {
     return fdf::Namespace::Create(entries);
   }
 
+  fdf_testing::DriverRuntime runtime_;
   std::shared_ptr<fdf::Logger> logger_;
 };
 
@@ -533,10 +539,10 @@ TEST_F(DeviceTest, GetTopologicalPath) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), second_device);
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
 
   fidl::WireClient<fuchsia_device::Controller> client;
-  client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
+  client.Bind(std::move(dev_endpoints->client), dispatcher());
 
   bool callback_called = false;
   client->GetTopologicalPath().Then(
@@ -552,7 +558,7 @@ TEST_F(DeviceTest, GetTopologicalPath) {
         callback_called = true;
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(callback_called);
 }
 
@@ -572,10 +578,10 @@ TEST_F(DeviceTest, SetPerformanceState) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &device);
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), &device);
 
   fidl::WireClient<fuchsia_device::Controller> client;
-  client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
+  client.Bind(std::move(dev_endpoints->client), dispatcher());
 
   bool callback_called = false;
   const uint32_t kState = 5;
@@ -591,7 +597,7 @@ TEST_F(DeviceTest, SetPerformanceState) {
         callback_called = true;
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(callback_called);
 }
 
@@ -607,10 +613,10 @@ TEST_F(DeviceTest, SetAndGetMinDriverLogSeverity) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), &device);
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), &device);
 
   fidl::WireClient<fuchsia_device::Controller> client;
-  client.Bind(std::move(dev_endpoints->client), test_loop().dispatcher());
+  client.Bind(std::move(dev_endpoints->client), dispatcher());
 
   bool callback_called = false;
   client->SetMinDriverLogSeverity(fuchsia_logger::wire::LogLevelFilter::kError)
@@ -663,7 +669,7 @@ TEST_F(DeviceTest, SetAndGetMinDriverLogSeverity) {
             });
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(callback_called);
 }
 
@@ -688,8 +694,8 @@ TEST_F(DeviceTest, TestBind) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), test_loop().dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
 
   bool callback_called = false;
   client->Bind("gpt.so").Then(
@@ -703,7 +709,7 @@ TEST_F(DeviceTest, TestBind) {
         callback_called = true;
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(callback_called);
   ASSERT_FALSE(static_cast<devfs_fidl::DeviceInterface*>(second_device)->IsUnbound());
 
@@ -742,8 +748,8 @@ TEST_F(DeviceTest, TestBindAlreadyBound) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), test_loop().dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
 
   bool got_reply = false;
   client->Bind("gpt.so").Then(
@@ -757,7 +763,7 @@ TEST_F(DeviceTest, TestBindAlreadyBound) {
         got_reply = true;
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(got_reply);
 }
 
@@ -784,8 +790,8 @@ TEST_F(DeviceTest, TestRebind) {
   auto dev_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
   ASSERT_EQ(ZX_OK, dev_endpoints.status_value());
 
-  fidl::BindServer(test_loop().dispatcher(), std::move(dev_endpoints->server), second_device);
-  fidl::WireClient client{std::move(dev_endpoints->client), test_loop().dispatcher()};
+  fidl::BindServer(dispatcher(), std::move(dev_endpoints->server), second_device);
+  fidl::WireClient client{std::move(dev_endpoints->client), dispatcher()};
 
   client->Rebind("gpt.so").Then(
       [&got_reply](fidl::WireUnownedResult<fuchsia_device::Controller::Rebind>& result) {
@@ -798,7 +804,7 @@ TEST_F(DeviceTest, TestRebind) {
         got_reply = true;
       });
 
-  ASSERT_TRUE(test_loop().RunUntilIdle());
+  ASSERT_TRUE(RunLoopUntilIdle());
   ASSERT_TRUE(got_reply);
 
   const fdf_testing::TestNode& child_node = node.children().at("second-device");
