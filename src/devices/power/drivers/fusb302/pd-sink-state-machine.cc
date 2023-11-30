@@ -164,7 +164,7 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::NextState(SinkPolicyEngineIn
       return current_state;
 
     case SinkPolicyEngineState::kEvaluateCapability:
-      // This state could be used to track an asynchronous FIDL exchg
+      // This state could be used to track an asynchronous FIDL exchange.
       return SinkPolicyEngineState::kSelectCapability;
 
     case SinkPolicyEngineState::kSelectCapability:
@@ -307,11 +307,13 @@ SinkPolicyEngineState SinkPolicyEngineStateMachine::ProcessMessageInReady() {
   const usb_pd::MessageType message_type = message.header().message_type();
 
   if (message_type == usb_pd::MessageType::kSourceCapabilities) {
-    return SinkPolicyEngineState::kEvaluateCapability;
+    // The message will be read when entering this state.
+    ForceStateTransition(SinkPolicyEngineState::kWaitForCapabilities);
   }
 
   // The MacBookPro M1 USB-C ports issue a Hard Reset if this isn't handled.
   if (message_type == usb_pd::MessageType::kGetSinkCapabilities) {
+    // The message will be read when entering this state.
     return SinkPolicyEngineState::kGiveSinkCapabilities;
   }
 
@@ -361,15 +363,20 @@ void SinkPolicyEngineStateMachine::ProcessUnexpectedMessage() {
           usb_pd::MessageTypeToString(message_type), StateToString(current_state()));
 
   if (message_type == usb_pd::MessageType::kSourceCapabilities) {
-    ForceStateTransition(SinkPolicyEngineState::kEvaluateCapability);
+    // The message will be read when entering this state.
+    ForceStateTransition(SinkPolicyEngineState::kWaitForCapabilities);
     return;
   }
+
   if (message_type == usb_pd::MessageType::kGetSinkCapabilities) {
+    // The message will be read when entering this state.
     ForceStateTransition(SinkPolicyEngineState::kGiveSinkCapabilities);
     return;
   }
 
+  // The state transitions below assume that the message has been read.
   [[maybe_unused]] zx::result<> result = device_.protocol().MarkMessageAsRead();
+
   // See ProcessMessageInReady() for the rationale for ignoring VDM
   // (vendor-defined messages).
   if (message_type != usb_pd::MessageType::kVendorDefined) {
