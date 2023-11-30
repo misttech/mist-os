@@ -18,9 +18,11 @@ from fidl import StopEventHandler
 from fidl import FrameworkError
 
 
+# [START echo_server_impl]
 class TestEchoer(ffx.Echo.Server):
     def echo_string(self, request: ffx.EchoEchoStringRequest):
         return ffx.EchoEchoStringResponse(response=request.value)
+        # [END echo_server_impl]
 
 
 class AsyncEchoer(ffx.Echo.Server):
@@ -111,6 +113,7 @@ class TestingServer(fc_test.Testing.Server):
 
 class ServerTests(unittest.IsolatedAsyncioTestCase):
     async def test_echo_server_sync(self):
+        # [START use_echoer_example]
         (tx, rx) = Channel.create()
         server = TestEchoer(rx)
         client = ffx.Echo.Client(tx)
@@ -118,6 +121,7 @@ class ServerTests(unittest.IsolatedAsyncioTestCase):
         res = await client.echo_string(value="foobar")
         self.assertEqual(res.response, "foobar")
         server_task.cancel()
+        # [END use_echoer_example]
 
     async def test_echo_server_async(self):
         (tx, rx) = Channel.create()

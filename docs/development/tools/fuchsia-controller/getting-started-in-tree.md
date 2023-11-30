@@ -332,15 +332,7 @@ With this approach, the protocol is expected to exit mid-execution of the
 method with a `PEER_CLOSED` error:
 
 ```py
-ch = ctx.connect_device_proxy("/bootstrap/shutdown_shim",
-        fuchsia_hardware_power_statecontrol.Admin.MARKER)
-reboot_proxy = fuchsia_hardware_power_statecontrol.Admin.Client(ch)
-try:
-    await reboot_proxy.reboot(reason=fuchsia_hardware_power_statecontrol.RebootReason.USER_REQUEST)
-except fuchsia_controller_py.ZxStatus as status:
-    zx_status = status.args[0]
-    if zx_status != fuchsia_controller_py.ZxStatus.ZX_PEER_CLOSED:
-        raise status
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/reboot_test.py" region_tag="reboot_example" %}
 ```
 
 However, a challenging part comes afterward when we need to determine
@@ -394,22 +386,7 @@ Getting a snapshot from a fuchsia device involves running a snapshot and
 binding a `File` protocol for reading:
 
 ```py
-client, server = fuchsia_controller_py.Channel.create()
-file = fuchsia_io.File.Client(client)
-params = fuchsia_feedback.GetSnapshotParameters(
-    # This is 120 seconds calculated from nanoseconds.
-    collection_timeout_per_data=(2 * 60 * 10**9),
-    response_channel=server.take())
-ch = ctx.connect_device_proxy("/core/feedback", "fuchsia.feedback.DataProvider")
-provider = fuchsia_feedback.DataProvider.Client(ch)
-await provider.get_snapshot(params)
-
-data = bytearray()
-while True:
-    response = await file.read(count=fuchsia_io.MAX_BUF)
-    if not response.data:
-        break
-    data.extend(response.data)
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly/target_identity_tests.py" region_tag="snapshot_example" %}
 ```
 
 ## Implement a FIDL server {:#implement-a-fidl-server .numbered}
@@ -424,15 +401,7 @@ The functions you need to override are derived from the FIDL file definition. So
 the `echo` server (using the `ffx` protocol) would look like below:
 
 ```py
-class EchoServerIimpl(ffx.Echo.Server):
-
-    def echo_string(
-        self,
-        request: ffx.EchoEchoStringRequest
-    ) -> ffx.EchoEchoStringResponse:
-        echo_value = request.value
-        result = ffx.EchoEchoStringResponse(response=echo_value)
-        return result
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/lib/fuchsia-controller/tests/server.py" region_tag="echo_server_impl" %}
 ```
 
 To make a proper implementation, you need to import the appropriate libraries.
@@ -450,44 +419,18 @@ The following code is a simple program that utilizes the `echo` server:
 
 ```py
 import asyncio
+import unittest
 import fidl.fuchsia_developer_ffx as ffx
 from fuchsia_controller_py import Channel
 
 
-class EchoServerImpl(ffx.Echo.Server):
-
-    def echo_string(
-        self,
-        request: ffx.EchoEchoStringRequest
-    ) -> ffx.EchoEchoStringResponse:
-        echo_value = request.value
-        result = ffx.EchoEchoStringResponse(response=echo_value)
-        return result
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/lib/fuchsia-controller/tests/server.py" region_tag="echo_server_impl" %}
 
 
-async def async_main():
-    client, server = Channel.create()
-    echo_proxy = ffx.Echo.Client(client)
-    echo_server = EchoServerImpl(server)
-    loop = asyncio.get_running_loop()
-    echo_server_task = loop.create_task(echo_server.serve())
-    sent_string = "foobar"
-    echo_result = await echo_proxy.echo_string(value=sent_string)
-    print(f"Echo: sent {sent_string}, received {echo_result}")
+class TestCases(unittest.IsolatedAsyncioTestCase):
 
-
-def main():
-    asyncio.run(async_main())
-
-
-if __name__ == "__main__":
-    main()
-```
-
-Running this program prints output similar to the following:
-
-```sh {.devsite-disable-click-to-copy}
-Echo: sent foobar, received EchoEchoStringResponse(response='foobar')
+    async def test_echoer_example(self):
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="src/developer/ffx/lib/fuchsia-controller/tests/server.py" region_tag="use_echoer_example" %}
 ```
 
 There are a few things to note when implementing a server:

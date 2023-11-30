@@ -24,6 +24,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
     @asynctest
     async def test_fuchsia_device_reboot(self) -> None:
         """Attempts to reboot a device."""
+        # [START reboot_example]
         ch = self.device.ctx.connect_device_proxy(
             "bootstrap/shutdown_shim", power_statecontrol.Admin.MARKER
         )
@@ -36,6 +37,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         except ZxStatus as status:
             if status.args[0] != ZxStatus.ZX_ERR_PEER_CLOSED:
                 raise status
+        # [END reboot_example]
         await self.device.wait_offline()
         await self.device.wait_online()
 

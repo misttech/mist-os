@@ -67,6 +67,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
         socket).
         -- call that takes another FIDL protocol's channel as a parameter (fuchsia.io/File server).
         """
+        # [START snapshot_example]
         client, server = Channel.create()
         file = io.File.Client(client)
         params = feedback.GetSnapshotParameters(
@@ -90,6 +91,7 @@ class FuchsiaControllerTests(base_test.BaseTestClass):
             if not response.data:
                 break
             data.extend(response.data)
+        # [END snapshot_example]
         asserts.assert_equal(len(data), attr_res.attributes.content_size)
 
 
