@@ -2,20 +2,11 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# SL4F packages needed by some functional tests.
-group("sl4f_packages") {
-  testonly = true
-  public_deps = [
-    "//src/sys/bin/start_sl4f",
-    "//src/testing/sl4f",
-  ]
-}
-
 # Target-side packages needed by functional tests.
 group("packages") {
   testonly = true
   public_deps = [
-    ":sl4f_packages",
+    "../../..:sl4f_packages",
     "affordance_tests:packages",
     "transport_tests:packages",
   ]
@@ -140,7 +131,7 @@ if (is_host) {
 
 group("stable_emulator_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("stable_emulator_packages") {
@@ -150,7 +141,7 @@ group("stable_emulator_packages") {
 
 group("stable_vim3_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("stable_vim3_packages") {
@@ -160,7 +151,7 @@ group("stable_vim3_packages") {
 
 group("stable_nuc_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("stable_nuc_packages") {
@@ -170,7 +161,7 @@ group("stable_nuc_packages") {
 
 group("unstable_emulator_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("unstable_emulator_packages") {
@@ -180,7 +171,7 @@ group("unstable_emulator_packages") {
 
 group("unstable_vim3_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("unstable_vim3_packages") {
@@ -190,7 +181,7 @@ group("unstable_vim3_packages") {
 
 group("unstable_nuc_sl4f_packages") {
   testonly = true
-  public_deps = [ ":sl4f_packages" ]
+  public_deps = [ "../../..:sl4f_packages" ]
 }
 
 group("unstable_nuc_packages") {

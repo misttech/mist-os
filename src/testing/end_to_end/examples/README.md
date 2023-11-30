@@ -24,8 +24,7 @@ example lacewing tests using SL4F or Fuchsia-Controller transports.
 
 ### Hello World Test
 ```shell
-$ fx set core.qemu-x64 \
-    --with-host //src/testing/end_to_end/examples:tests
+$ fx set core.qemu-x64 --with //src/testing/end_to_end/examples
 
 $ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc --e2e --output
 ```
@@ -33,29 +32,21 @@ $ fx test //src/testing/end_to_end/examples/test_hello_world:hello_world_test_fc
 ### Soft Reboot Test
 ```shell
 $ fx set core.qemu-x64 \
-    --with //src/testing/sl4f \
-    --with //src/sys/bin/start_sl4f \
     --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
-    --with-host //src/testing/end_to_end/examples:tests
+    --with //src/testing/end_to_end/examples
 
 # start the emulator with networking enabled
 $ ffx emu stop ; ffx emu start -H --net tap
 
+# Run SoftRebootTest using SL4F
+$ fx set core.qemu-x64 \
+    --args 'core_realm_shards += [ "//src/testing/sl4f:sl4f_core_shard" ]' \
+    --with //src/testing/end_to_end/examples
 $ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_sl4f --e2e --output
 
+# Run SoftRebootTest using Fuchsia-Controller
+$ fx set core.qemu-x64 --with //src/testing/end_to_end/examples
 $ fx test //src/testing/end_to_end/examples/test_soft_reboot:soft_reboot_test_fc --e2e --output
-```
-
-### Hybrid Test
-```shell
-$ fx set core.qemu-x64 \
-    --with //vendor/google/starnix/tests \
-    --with-host //src/testing/end_to_end/examples:tests
-
-# start the emulator with networking enabled
-$ ffx emu stop ; ffx emu start -H --net tap
-
-$ fx test //src/testing/end_to_end/examples/test_hybrid:simple_hybrid_test_fc --e2e --output
 ```
 
 ### Multi Device Test
