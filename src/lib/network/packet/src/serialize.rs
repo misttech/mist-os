@@ -1325,6 +1325,34 @@ impl<B: ReusableBuffer, A: BufferAlloc<B>> BufferProvider<B, B> for MaybeReuseBu
     }
 }
 
+/// Provides an implementation of [`BufferProvider`] from a [`BufferAlloc`] `A`
+/// that never attempts to reuse the input buffer, and always create a new
+/// buffer from the allocator `A`.
+pub struct NoReuseBufferProvider<A>(pub A);
+
+impl<I: FragmentedBuffer, O: ReusableBuffer, A: BufferAlloc<O>> BufferProvider<I, O>
+    for NoReuseBufferProvider<A>
+{
+    type Error = A::Error;
+
+    fn alloc_no_reuse(self, prefix: usize, body: usize, suffix: usize) -> Result<O, A::Error> {
+        let Self(alloc) = self;
+        alloc.alloc(prefix + body + suffix).map(|mut b| {
+            b.shrink(prefix..prefix + body);
+            b
+        })
+    }
+
+    fn reuse_or_realloc(self, buffer: I, prefix: usize, suffix: usize) -> Result<O, (A::Error, I)> {
+        BufferProvider::<I, O>::alloc_no_reuse(self, prefix, buffer.len(), suffix)
+            .map(|mut b| {
+                b.copy_from(&buffer);
+                b
+            })
+            .map_err(|e| (e, buffer))
+    }
+}
+
 pub trait Serializer: Sized {
     /// The type of buffers returned from serialization methods on this trait.
     type Buffer;
@@ -2493,6 +2521,37 @@ mod tests {
         // If we don't have enough capacity, it fails and must realloc.
         test_expect_realloc(0..9, 1, 1);
         test_expect_realloc(1..10, 1, 1);
+    }
+
+    #[test]
+    fn test_no_reuse_buffer_provider() {
+        #[track_caller]
+        fn test_expect(body_range: Range<usize>, prefix: usize, suffix: usize) {
+            let mut bytes = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+            // The buffer that will not be reused.
+            let internal_buffer: Buf<&mut [u8]> = Buf::new(&mut bytes[..], body_range);
+            let body = internal_buffer.as_ref().to_vec();
+            // The newly allocated buffer, note the type is different from
+            // internal_buffer.
+            let buffer: Buf<Vec<u8>> = BufferProvider::reuse_or_realloc(
+                NoReuseBufferProvider(new_buf_vec),
+                internal_buffer,
+                prefix,
+                suffix,
+            )
+            .unwrap();
+            let bytes: &[u8] = buffer.as_ref();
+            assert_eq!(bytes, body.as_slice());
+            assert_eq!(buffer.prefix_len(), prefix);
+            assert_eq!(buffer.suffix_len(), suffix);
+        }
+        // No prefix or suffix trivially succeeds, reuse opportunity is ignored.
+        test_expect(0..10, 0, 0);
+        // If we have enough prefix/suffix, reuse opportunity is ignored.
+        test_expect(1..9, 1, 1);
+        // Prefix and suffix and properly allocated and the body is copied.
+        test_expect(0..9, 10, 10);
+        test_expect(1..10, 15, 15);
     }
 
     /// Simple Vec-backed buffer to test fragmented buffers implementation.

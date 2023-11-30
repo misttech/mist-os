@@ -9,8 +9,8 @@ use core::convert::Infallible as Never;
 
 use derivative::Derivative;
 use packet::{
-    new_buf_vec, Buf, BufferProvider, ContiguousBuffer, FragmentedBufferMut as _, GrowBufferMut,
-    ReusableBuffer, Serializer, ShrinkBuffer,
+    new_buf_vec, Buf, BufferAlloc, ContiguousBuffer, GrowBufferMut, NoReuseBufferProvider,
+    ReusableBuffer, Serializer,
 };
 
 use crate::{
@@ -294,7 +294,8 @@ impl<
         SC: TransmitQueueContext<D, C> + BufferSocketHandler<D, C>,
     > BufferTransmitQueueHandler<D, I, C> for SC
 where
-    for<'a> &'a mut SC::Allocator: BufferProvider<I, SC::Buffer>,
+    for<'a> &'a mut SC::Allocator: BufferAlloc<SC::Buffer>,
+    SC::Buffer: ReusableBuffer,
 {
     fn queue_tx_frame<S: Serializer<Buffer = I>>(
         &mut self,
@@ -311,7 +312,7 @@ where
         let result =
             self.with_transmit_queue_mut(device_id, |TransmitQueueState { allocator, queue }| {
                 let get_buffer = |body: S| {
-                    body.serialize_outer(allocator)
+                    body.serialize_outer(NoReuseBufferProvider(allocator))
                         .map_err(|(_e, s)| TransmitQueueFrameError::SerializeError(s))
                 };
 
@@ -351,33 +352,11 @@ where
 #[derive(Default)]
 pub(crate) struct BufVecU8Allocator;
 
-impl<I: ReusableBuffer> BufferProvider<I, Buf<Vec<u8>>> for &'_ mut BufVecU8Allocator {
+impl<'a> BufferAlloc<Buf<Vec<u8>>> for &'a mut BufVecU8Allocator {
     type Error = Never;
 
-    fn alloc_no_reuse(
-        self,
-        prefix: usize,
-        body: usize,
-        suffix: usize,
-    ) -> Result<Buf<Vec<u8>>, Never> {
-        new_buf_vec(prefix + body + suffix).map(|mut b| {
-            b.shrink(prefix..prefix + body);
-            b
-        })
-    }
-
-    fn reuse_or_realloc(
-        self,
-        buffer: I,
-        prefix: usize,
-        suffix: usize,
-    ) -> Result<Buf<Vec<u8>>, (Never, I)> {
-        BufferProvider::<I, Buf<Vec<u8>>>::alloc_no_reuse(self, prefix, buffer.len(), suffix)
-            .map(|mut b| {
-                b.copy_from(&buffer);
-                b
-            })
-            .map_err(|e| (e, buffer))
+    fn alloc(self, len: usize) -> Result<Buf<Vec<u8>>, Self::Error> {
+        new_buf_vec(len)
     }
 }
 
