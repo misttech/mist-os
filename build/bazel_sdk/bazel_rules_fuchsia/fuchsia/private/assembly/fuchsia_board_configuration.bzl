@@ -7,7 +7,6 @@ load(
     ":providers.bzl",
     "FuchsiaBoardConfigDirectoryInfo",
     "FuchsiaBoardConfigInfo",
-    "FuchsiaProductAssemblyBundleInfo",
 )
 load(":util.bzl", "extract_labels", "replace_labels_with_files")
 
@@ -38,17 +37,23 @@ rm -rf \"$2\" && cp -fR \"$1/\" \"$2\"
     )
 
 def _fuchsia_board_configuration_impl(ctx):
+    board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
+    deps = [board_config_file]
+
     filesystems = json.decode(ctx.attr.filesystems)
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
+
+    for label, _ in ctx.attr.filesystems_labels.items():
+        src = label.files.to_list()[0]
+        dest = ctx.actions.declare_file(src.path)
+        ctx.actions.symlink(output = dest, target_file = src)
+        deps.append(dest)
 
     board_config = {}
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
     if filesystems != {}:
         board_config["filesystems"] = filesystems
-
-    board_config_file = ctx.actions.declare_file(ctx.label.name + "_board_config.json")
-    deps = [board_config_file]
 
     if ctx.attr.board_bundles_dir:
         board_dir_name = ctx.file.board_bundles_dir.basename
@@ -63,7 +68,7 @@ def _fuchsia_board_configuration_impl(ctx):
     return [
         DefaultInfo(
             files = depset(
-                direct = deps + ctx.files.filesystems_labels,
+                direct = deps,
             ),
         ),
         FuchsiaBoardConfigInfo(
