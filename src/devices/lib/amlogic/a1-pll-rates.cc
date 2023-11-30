@@ -4,6 +4,7 @@
 
 #include <lib/ddk/debug.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <algorithm>
@@ -61,19 +62,13 @@ void AmlA1PllDevice::Disable() {
 }
 
 zx_status_t AmlA1PllDevice::Enable() {
-  zx_status_t status;
   auto ctrl0 = PllCtrl0::Get().ReadFrom(&view_);
 
   if (ctrl0.enable()) {
     return ZX_OK;
   }
 
-  status = SetRate(current_rate_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "pll enable failed.");
-  }
-
-  return status;
+  return SetRate(current_rate_);
 }
 
 zx_status_t AmlA1PllDevice::SetRate(const uint64_t hz) {
@@ -110,7 +105,6 @@ zx_status_t AmlA1PllDevice::SetRate(const uint64_t hz) {
   } while (retry--);
 
   if (retry == 0) {
-    zxlogf(ERROR, "pll locked failed.");
     return ZX_ERR_TIMED_OUT;
   }
 

@@ -5,7 +5,6 @@
 #ifndef SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_A1_A1_HIU_H_
 #define SRC_DEVICES_LIB_AMLOGIC_INCLUDE_SOC_AML_A1_A1_HIU_H_
 
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio-view.h>
 #include <lib/stdcompat/span.h>

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/debug.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/mmio/mmio-view.h>
 #include <string.h>
@@ -49,13 +48,11 @@ zx_status_t s905d2_hiu_init(zx_handle_t mmio_resource, fdf::MmioBuffer* device) 
   zx_status_t status = zx::vmo::create_physical(zx::resource(mmio_resource), S905D2_HIU_BASE,
                                                 S905D2_HIU_LENGTH, &vmo);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to create VMO: %s", zx_status_get_string(status));
     return status;
   }
   zx::result<fdf::MmioBuffer> mmio = fdf::MmioBuffer::Create(0, S905D2_HIU_LENGTH, std::move(vmo),
                                                              ZX_CACHE_POLICY_UNCACHED_DEVICE);
   if (mmio.is_error()) {
-    zxlogf(ERROR, "mmio_buffer_init_physical failed %s", mmio.status_string());
     return mmio.status_value();
   }
 
@@ -201,7 +198,6 @@ zx_status_t s905d2_pll_ena(aml_pll_dev_t* pll_dev) {
     wait_count--;
   }
 
-  zxlogf(ERROR, "Clk enable timedout");
   return ZX_ERR_TIMED_OUT;
 }
 

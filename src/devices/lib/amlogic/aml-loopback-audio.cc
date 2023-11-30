@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/debug.h>
-
 #include <fbl/alloc_checker.h>
 #include <hwreg/bitfields.h>
 #include <soc/aml-common/aml-loopback-audio.h>
@@ -126,12 +124,10 @@ std::unique_ptr<AmlLoopbackDevice> AmlLoopbackDevice::Create(const fdf::MmioBuff
   auto dev = std::unique_ptr<AmlLoopbackDevice>(
       new (&ac) AmlLoopbackDevice(std::move(view), version, config));
   if (!ac.check()) {
-    zxlogf(ERROR, "Could not Create AmlLoopbackDevice.");
     return nullptr;
   }
 
   ZX_ASSERT(dev->Initialize() == ZX_OK);
-  zxlogf(INFO, "Create AmlLoopbackDevice Successfully.");
 
   return dev;
 }

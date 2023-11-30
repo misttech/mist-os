@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/debug.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <threads.h>
@@ -34,7 +33,6 @@ zx_status_t a113_clk_set_mpll2(fdf::MmioBuffer *device, uint64_t rate, uint64_t 
 
   uint64_t sdm = DIV_ROUND_UP((A113_FIXED_PLL_RATE - n * rate) * SDM_FRACTIONALITY, rate);
   ZX_DEBUG_ASSERT(sdm < (1 << 14));
-  zxlogf(INFO, "sdm= %ld  n= %ld", sdm, n);
   a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 0, 14, static_cast<uint32_t>(sdm));
   a113_clk_update_reg(device, A113_HHI_MPLL_CNTL8, 16, 9, static_cast<uint32_t>(n));
 

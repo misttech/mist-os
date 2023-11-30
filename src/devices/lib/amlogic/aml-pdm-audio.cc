@@ -2,8 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/ddk/debug.h>
-
 #include <iterator>
 #include <limits>
 #include <memory>
@@ -89,7 +87,6 @@ std::unique_ptr<AmlPdmDevice> AmlPdmDevice::Create(
       new (&ac) AmlPdmDevice(std::move(pdm_mmio), std::move(audio_mmio), std::move(audio2_mmio),
                              pdm_clk_src, sysclk_div, dclk_div, toddr_dev, fifo_depth, version));
   if (!ac.check()) {
-    zxlogf(ERROR, "%s: Could not create AmlPdmDevice", __func__);
     return nullptr;
   }
 
