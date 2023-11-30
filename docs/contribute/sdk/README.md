@@ -69,10 +69,6 @@ and willing customer, and the API must have gone through
 To request an API Calibration, fill out this form:
 [goto.google.com/fuchsia-api-calibration-request][calibration-form].
 
-If you don't have access to that form, send an email to api-council@fuchsia.dev
-indicating the specific library or libraries you'd like to promote, and the API
-council will follow up with next steps.
-
 <!-- Reference links -->
 
 [fuchsia-api-surface]: /docs/glossary/README.md#fuchsia-api-surface
@@ -85,5 +81,5 @@ council will follow up with next steps.
 [membership]: /docs/contribute/governance/api_council.md#membership
 [sdk-category]: /docs/contribute/sdk/categories.md
 [calibration]: /docs/contribute/governance/api_council.md#calibration
-[calibration-form]: https://goto.google.com/fuchsia-api-calibration-request
+[calibration-form]: https://issues.fuchsia.dev/issues/new?component=1454153&template=1892475
 [evolve-gracefully]: /docs/development/api/evolution.md#evolve-gracefully
