@@ -327,7 +327,6 @@ impl<'a> FileBackedConfig<'a> {
 #[derive(Debug)]
 pub enum NameGenerationError {
     GenerationError(anyhow::Error),
-    AlreadyExistsError(anyhow::Error),
     FileUpdateError { name: String, err: anyhow::Error },
 }
 
@@ -615,17 +614,12 @@ impl NamingRule {
                     // Try to generate another name with the modified attempt number.
                     continue;
                 }
-                // TODO(fxbug.dev/56559): When a unique name can not be found with
-                // the provided naming rule, escalate. If the pre-existing
-                // interface is found to be the same logical interface with the
-                // same name, remove the existing interface and install this one.
-                // When it is a different logical interface, reject installing
-                // the new interface into netstack.
-                return Err(NameGenerationError::AlreadyExistsError(anyhow::format_err!(
-                    "interface name {name} was not unique for mac={:?}, topo_path={}",
-                    info.mac,
-                    info.topological_path
-                )));
+
+                tracing::warn!(
+                    "name ({name}) already used for an interface installed by netcfg. \
+                 using name since it is possible that the interface using this name is no \
+                 longer active"
+                );
             }
             return Ok(name);
         }
@@ -1636,11 +1630,13 @@ mod tests {
 
         let naming_rule = NamingRule {
             matchers: HashSet::new(),
-            naming_scheme: vec![NameCompositionRule::Static { value: shared_interface_name }],
+            naming_scheme: vec![NameCompositionRule::Static {
+                value: shared_interface_name.clone(),
+            }],
         };
 
-        let name = naming_rule.generate_name(&interfaces, &default_device_info());
-        assert_matches!(name, Err(NameGenerationError::AlreadyExistsError(_)));
+        let name = naming_rule.generate_name(&interfaces, &default_device_info()).unwrap();
+        assert_eq!(name, shared_interface_name);
     }
 
     // This test is different from `test_get_usb_255_with_naming_rule` as this
