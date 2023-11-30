@@ -7,7 +7,7 @@ use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
-use sandbox::{AsRouter, Capability, Data, Dict, Open, Routable, Router};
+use sandbox::{Capability, Data, Dict, Open, Routable, Router};
 use std::{
     collections::HashMap,
     fmt,
@@ -54,6 +54,10 @@ impl Component {
             resolver,
         }))
     }
+
+    pub fn output(&self) -> Router {
+        Router::from_routable(Arc::downgrade(&self.0))
+    }
 }
 
 impl Deref for Component {
@@ -73,7 +77,9 @@ impl Inner {
             ComponentState::MissingInput | ComponentState::Unresolved(_) => {
                 unreachable!("just resolved the component")
             }
-            ComponentState::Resolved(ref resolved) => resolved.output.as_router(),
+            ComponentState::Resolved(ref resolved) => {
+                Router::from_routable(resolved.output.try_clone().unwrap())
+            }
         }
     }
 
@@ -197,14 +203,17 @@ fn resolve_impl(
         children.iter().map(|(key, _value)| (key.clone(), pass_runner_resolver())).collect();
 
     let children_outputs: HashMap<decl::ComponentName, Router> =
-        children.iter().map(|(key, value)| (key.clone(), value.as_router())).collect();
+        children.iter().map(|(key, value)| (key.clone(), value.output())).collect();
+
+    let input = Router::from_routable(unresolved.input);
+    let program_output = program.output();
 
     for use_ in decl.uses {
         let router = route_from(
             &use_.name,
             &use_.from,
-            unresolved.input.as_router(),
-            program.as_router(),
+            input.clone(),
+            program_output.clone(),
             &children_outputs,
         )?;
         let cap = router.availability(use_.availability);
@@ -215,8 +224,8 @@ fn resolve_impl(
         let router = route_from(
             &offer.name,
             &offer.from,
-            unresolved.input.as_router(),
-            program.as_router(),
+            input.clone(),
+            program_output.clone(),
             &children_outputs,
         )?;
         let cap = router.availability(offer.availability);
@@ -236,8 +245,8 @@ fn resolve_impl(
         let router = route_from(
             &expose.name,
             &expose.from,
-            unresolved.input.as_router(),
-            program.as_router(),
+            input.clone(),
+            program_output.clone(),
             &children_outputs,
         )?;
         let cap = router.availability(expose.availability);
@@ -257,18 +266,6 @@ impl Routable for Inner {
         // Resolve the component if not already, then forward the request to its output.
         let router = self.resolve();
         router.route(request, completer);
-    }
-}
-
-/// How to mint output router when a component is created:
-///
-/// - Create an async function will lazily ensure the component is resolved, then grab the
-///   output dictionary, then erase the capability
-/// - Return this router from the component
-///
-impl AsRouter for Component {
-    fn as_router(&self) -> Router {
-        Arc::downgrade(&self.0).into()
     }
 }
 
@@ -416,7 +413,7 @@ mod test {
             .context("building test topology")?;
 
         // Using the input dict of child_b, check we can obtain "cap".
-        let router = input.as_router();
+        let router = Router::from_routable(input);
         let request = Request {
             rights: None,
             relative_path: sandbox::Path::new("cap"),
@@ -599,7 +596,7 @@ mod test {
 
                     // Given the input dict of the child_b component, make a namespace for a
                     // hypothetical child_b program, then send it to the main test function.
-                    let input = input.as_router();
+                    let input = Router::from_routable(input);
                     let (errors, errors_receiver) = mpsc::unbounded();
 
                     // Makes an Open that will request the `fuchsia.echo.Echo` capability

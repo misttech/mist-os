@@ -21,10 +21,7 @@ use {
     },
     lazy_static::lazy_static,
     moniker::Moniker,
-    sandbox::{
-        AnyCapability, AsTrait, AsTraitError, Capability, Completer, Dict, Receiver, Request,
-        Router,
-    },
+    sandbox::{AnyCapability, Capability, Completer, Dict, Receiver, Request, Router},
     std::sync::Arc,
     tracing::warn,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
@@ -55,15 +52,6 @@ impl Message {
 impl Capability for Message {
     fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
         (self.handle, None)
-    }
-}
-
-impl AsTrait for Message {
-    unsafe fn try_as_trait(
-        &self,
-        _type_id: std::any::TypeId,
-    ) -> Result<&dyn std::any::Any, AsTraitError> {
-        panic!("AsTrait is unimplemented for Message");
     }
 }
 

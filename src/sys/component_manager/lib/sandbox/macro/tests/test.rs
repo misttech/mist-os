@@ -55,20 +55,8 @@ fn test_try_from_any_convert() {
     assert_eq!(cap.as_handle_ref().get_koid().unwrap(), expected_koid);
 }
 
-#[test]
-fn test_as_trait_not_supported() {
-    let event = zx::Event::create();
-    let cap = TestHandle(event.into());
-    let any: AnyCapability = Box::new(cap);
-
-    trait Foo {}
-    let foo: Result<&dyn Foo, _> = sandbox::try_as_trait!(Foo, &any);
-    assert!(foo.is_err());
-}
-
 /// A cloneable capability that holds a string.
 #[derive(Capability, Clone, Debug)]
-#[capability(as_trait(ReadString))]
 struct TestCloneable(pub String);
 
 trait ReadString {
@@ -125,15 +113,6 @@ fn test_convert_to_self_only_wrong_type() {
     assert!(convert_result.is_err());
 }
 
-#[test]
-fn test_as_trait_supported() {
-    let cap = TestCloneable("hello".to_string());
-    let any: AnyCapability = Box::new(cap);
-    let read_string: &dyn ReadString = sandbox::try_as_trait!(ReadString, &any)
-        .expect("TestCloneable should implement ReadString");
-    assert_eq!(read_string.read().as_str(), "hello");
-}
-
 /// Tests the `TryFrom<&AnyCapability>` to reference downcast conversion.
 #[test]
 fn try_from_any_ref() {
@@ -180,44 +159,4 @@ fn try_from_dyn_erased_mut_ref() {
     let to: &mut TestHandle = from.try_into().unwrap();
 
     assert!(to.0.is_invalid());
-}
-
-/// A capability that implements many traits.
-#[derive(Capability, Clone, Debug)]
-#[capability(as_trait(GetInt, GetStr))]
-struct TestManyTrait;
-
-impl Capability for TestManyTrait {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        unimplemented!()
-    }
-
-    fn try_clone(&self) -> Result<Self, CloneError> {
-        Ok(self.clone())
-    }
-}
-
-trait GetInt {
-    fn get_int(&self) -> i32 {
-        42
-    }
-}
-
-trait GetStr {
-    fn get_str(&self) -> &'static str {
-        "abc"
-    }
-}
-
-impl GetInt for TestManyTrait {}
-impl GetStr for TestManyTrait {}
-
-#[test]
-fn test_try_as_different_traits() {
-    let cap = TestManyTrait;
-    let any: AnyCapability = Box::new(cap);
-    let get_int = sandbox::try_as_trait!(GetInt, &any).unwrap();
-    assert_eq!(get_int.get_int(), 42);
-    let get_str = sandbox::try_as_trait!(GetStr, &any).unwrap();
-    assert_eq!(get_str.get_str(), "abc");
 }

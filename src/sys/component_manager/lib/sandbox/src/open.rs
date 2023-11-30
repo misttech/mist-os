@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{
-        AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer, ConversionError,
-        Directory, Request, Routable, Router,
+        AnyCapability, AnyCast, Capability, CloneError, Completer, ConversionError, Directory,
+        Request, Routable,
     },
     core::fmt,
     fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
@@ -50,7 +50,6 @@ use {
 /// is equivalent to two agents each opening one capability through their respective
 /// clones of the open capability.
 #[derive(Capability, Clone)]
-#[capability(as_trait(AsRouter))]
 pub struct Open {
     open_fn: Arc<OpenFn>,
     entry_type: fio::DirentType,
@@ -289,12 +288,6 @@ impl Routable for Open {
             open = open.downscope_rights(rights)
         }
         completer.complete(Ok(Box::new(open) as AnyCapability));
-    }
-}
-
-impl AsRouter for Open {
-    fn as_router(&self) -> Router {
-        self.clone().into()
     }
 }
 

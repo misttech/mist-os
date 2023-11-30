@@ -18,19 +18,21 @@ use moniker::Moniker;
 use std::{collections::VecDeque, fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
 
-use crate::{AnyCapability, Capability, CloneError, Open};
+use crate::{AnyCapability, Capability, CloneError, Dict, Open};
 
+/// Types that implement [`Routable`] let the holder asynchronously request
+/// capabilities from them.
 pub trait Routable {
     fn route(&self, request: Request, completer: Completer);
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
-/// asynchronously using a request that traverses through the component topology.
+/// asynchronously. [`Router`] is the object capability representation of [`Routable`].
 ///
-/// During routing, the request might pass through several routers, ending up at some
-/// router that will fulfill the completer instead of forwarding it upstream.
+/// During routing, a request usually traverses through the component topology,
+/// passing through several routers, ending up at some router that will fulfill
+/// the completer instead of forwarding it upstream.
 #[derive(Capability, Clone)]
-#[capability(as_trait(AsRouter))]
 pub struct Router {
     route_fn: Arc<RouteFn>,
 }
@@ -112,30 +114,25 @@ impl Capability for Router {
     }
 }
 
-impl<T> From<T> for Router
-where
-    T: Routable + Send + Sync + 'static,
-{
-    fn from(value: T) -> Self {
-        let route_fn = move |request, completer| {
-            value.route(request, completer);
-        };
-        Router::new(route_fn)
+impl Routable for Router {
+    fn route(&self, request: Request, completer: Completer) {
+        self.route(request, completer);
     }
 }
 
-impl<T> From<std::sync::Weak<T>> for Router
+/// If `T` is [`Routable`], then a `Weak<T>` is also [`Routable`], except the request
+/// may fail if the weak pointer has expired.
+impl<T> Routable for std::sync::Weak<T>
 where
     T: Routable + Send + Sync + 'static,
 {
-    fn from(value: std::sync::Weak<T>) -> Self {
-        let route_fn = move |request, completer| match value.upgrade() {
-            Some(component) => {
-                component.route(request, completer);
+    fn route(&self, request: Request, completer: Completer) {
+        match self.upgrade() {
+            Some(routable) => {
+                routable.route(request, completer);
             }
             None => completer.complete(Err(anyhow!("object was destroyed"))),
-        };
-        Router::new(route_fn)
+        }
     }
 }
 
@@ -158,6 +155,15 @@ impl Router {
         }
     }
 
+    /// Package a [`Routable`] object into a [`Router`].
+    pub fn from_routable<T: Routable + Send + Sync + 'static>(routable: T) -> Router {
+        let route_fn = move |request, completer| {
+            routable.route(request, completer);
+        };
+        Router::new(route_fn)
+    }
+
+    /// Obtain a capability from this router, following the description in `request`.
     pub fn route(&self, request: Request, completer: Completer) {
         (self.route_fn)(request, completer)
     }
@@ -252,22 +258,21 @@ impl Router {
     }
 }
 
-impl From<&AnyCapability> for Router {
-    fn from(capability: &AnyCapability) -> Self {
-        let output: Result<&dyn AsRouter, _> = crate::try_as_trait!(AsRouter, capability);
-        let capability = match capability.try_clone() {
+impl Routable for AnyCapability {
+    fn route(&self, request: Request, completer: Completer) {
+        let capability = match self.try_clone() {
             Ok(capability) => capability,
-            Err(error) => return Router::new_error(error.into()),
+            Err(error) => return Router::new_error(error.into()).route(request, completer),
         };
-        match output {
-            Ok(output) => output.as_router(),
-            Err(_) => Router::new(move |request, completer| {
+        match try_get_routable(self) {
+            Ok(router) => router.route(request, completer),
+            Err(_) => {
                 if request.relative_path.is_empty() {
                     completer.complete(Ok(capability.try_clone().unwrap()));
                 } else {
-                    completer.complete(Err(anyhow!("the capability does not support AsRouter")))
+                    completer.complete(Err(anyhow!("the capability does not support routing")))
                 }
-            }),
+            }
         }
     }
 }
@@ -295,20 +300,24 @@ impl Completer {
     }
 }
 
-/// Types implementing this trait can provide capabilities on-demand by vending out
-/// [`Router`]s which let the holder asynchronously request capabilities from them.
-/// Examples: programs, components, dictionaries.
-///
-/// The returned [`Router`] may outlive the provider, in which case requests might be
-/// dropped with an appropriate error.
-pub trait AsRouter {
-    fn as_router(&self) -> Router;
-}
-
-impl AsRouter for Router {
-    fn as_router(&self) -> Router {
-        self.clone()
+/// If the capability implements [`Routable`], then get a reference to that trait. Otherwise fail.
+fn try_get_routable<'a>(capability: &'a AnyCapability) -> Result<&'a dyn Routable, ()> {
+    // These are all the capability types that we know implements `Routable`.
+    // This approach will need to be revised once we have capability types
+    // outside of the sandbox and routing crates.
+    let result: Result<&Dict, _> = capability.try_into();
+    if let Ok(dict) = result {
+        return Ok(dict);
     }
+    let result: Result<&Open, _> = capability.try_into();
+    if let Ok(open) = result {
+        return Ok(open);
+    }
+    let result: Result<&Router, _> = capability.try_into();
+    if let Ok(router) = result {
+        return Ok(router);
+    }
+    Err(())
 }
 
 /// Obtain a capability from `router`, following the description in `request`.
@@ -327,7 +336,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_good() {
         let source = Box::new(Data::new("hello")) as AnyCapability;
-        let base = Router::from(&source);
+        let base = Router::from_routable(source);
         let proxy = base.availability(Availability::Optional);
         let capability = route(
             &proxy,
@@ -347,7 +356,7 @@ mod tests {
     #[fuchsia::test]
     async fn availability_bad() {
         let source = Box::new(Data::new("hello")) as AnyCapability;
-        let base = Router::from(&source);
+        let base = Router::from_routable(source);
         let proxy = base.availability(Availability::Optional);
         let error = route(
             &proxy,

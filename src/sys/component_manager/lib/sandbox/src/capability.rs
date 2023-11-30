@@ -25,32 +25,8 @@ pub enum CloneError {
     Other(#[from] anyhow::Error),
 }
 
-#[derive(Error, Debug)]
-#[error("the type does not support trait {0:?}")]
-pub struct AsTraitError(pub std::any::TypeId);
-
-/// Trait for capabilities that implements another trait and can provide a reference to the
-/// corresponding trait object.
-pub trait AsTrait {
-    /// Attempt to get a `&dyn SomeTrait` based on the `type_id` of the trait object.
-    /// Implementations should cast themselves to `&dyn SomeTrait`, then transmute that
-    /// reference to `&dyn std::any::Any` to skip the lifetime checks.
-    ///
-    /// # Safety
-    ///
-    /// The returned reference has the same lifetime as `self`, despite `Any` implying a
-    /// static lifetime. The returned reference must not outlive `self`. Instead of
-    /// directly using this unsafe method, you should use the [`crate::try_as_trait`]
-    /// macro instead, which will transmute the `&dyn std::any::Any` back to
-    /// `&dyn SomeTrait` and ensure that lifetimes are preserved.
-    unsafe fn try_as_trait(
-        &self,
-        type_id: std::any::TypeId,
-    ) -> Result<&dyn std::any::Any, AsTraitError>;
-}
-
 /// The capability trait, implemented by all capabilities.
-pub trait Capability: AsTrait + AnyCast + TryFrom<AnyCapability> + Debug + Send + Sync {
+pub trait Capability: AnyCast + TryFrom<AnyCapability> + Debug + Send + Sync {
     /// Convert this capability to a Zircon handle.
     ///
     /// This may return a future that implements the object represented by the handle. For example,

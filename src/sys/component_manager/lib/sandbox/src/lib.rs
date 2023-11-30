@@ -23,7 +23,7 @@ mod router;
 mod sender;
 
 pub use self::any::{AnyCapability, AnyCast, ErasedCapability};
-pub use self::capability::{AsTrait, AsTraitError, Capability, CloneError, ConversionError};
+pub use self::capability::{Capability, CloneError, ConversionError};
 pub use self::data::Data;
 pub use self::dict::{Dict, Key as DictKey, TryIntoOpenError};
 pub use self::directory::Directory;
@@ -32,5 +32,5 @@ pub use self::lazy::Lazy;
 pub use self::open::Open;
 pub use self::optional::Optional;
 pub use self::receiver::Receiver;
-pub use self::router::{route, AsRouter, Completer, Path, Request, Routable, Router};
+pub use self::router::{route, Completer, Path, Request, Routable, Router};
 pub use self::sender::Sender;

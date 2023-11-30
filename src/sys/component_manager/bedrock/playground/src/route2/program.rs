@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use replace_with::replace_with;
-use sandbox::{AsRouter, Capability, Dict, Routable, Router};
+use sandbox::{Capability, Dict, Routable, Router};
 use std::{
     fmt,
     ops::{Deref, DerefMut},
@@ -34,6 +34,10 @@ enum ProgramState {
 impl Program {
     pub fn new(name: String, runner: Runner) -> Self {
         Program(Arc::new(Inner { name, state: Mutex::new(ProgramState::MissingInput), runner }))
+    }
+
+    pub fn output(&self) -> Router {
+        Router::from_routable(Arc::downgrade(&self.0))
     }
 }
 
@@ -89,12 +93,6 @@ impl ProgramState {
             }
             ProgramState::Running { output } => ProgramState::Running { output },
         }
-    }
-}
-
-impl AsRouter for Program {
-    fn as_router(&self) -> Router {
-        Arc::downgrade(&self.0).into()
     }
 }
 

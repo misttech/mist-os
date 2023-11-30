@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{AsTrait, AsTraitError, Capability, CloneError, ConversionError, Handle},
+    crate::{Capability, CloneError, ConversionError, Handle},
     crate_local::{BoxConvert, BoxRemote, TryCloneAny},
     fuchsia_zircon as zx,
     futures::future::BoxFuture,
@@ -29,7 +29,7 @@ use {
 /// Capability type. The [Capability] traits are both entry and exit points, with
 /// [ErasedCapability] traits in the middle, performing object safety conversions.
 pub trait ErasedCapability:
-    AnyCast + BoxConvert + AsTrait + BoxRemote + TryCloneAny + Debug + Send + Sync
+    AnyCast + BoxConvert + BoxRemote + TryCloneAny + Debug + Send + Sync
 {
 }
 
@@ -85,44 +85,6 @@ pub(crate) mod crate_local {
 
 /// Trait object that holds any kind of capability.
 pub type AnyCapability = Box<dyn ErasedCapability>;
-
-/// Attempt to get a `&dyn Trait` if the underlying capability type identified
-/// by `src` implements that trait. Example:
-///
-/// ```rust
-/// let capability: &AnyCapability = ...;
-/// let my_trait: Result<&dyn MyTrait, AsTraitError> = crate::try_as_trait!(MyTrait, capability);
-/// ```
-///
-/// This is a macro as opposed to a function because it's not possible to pass a trait
-/// as a generic function parameter.
-#[macro_export]
-macro_rules! try_as_trait {
-    ($Trait:path, $src:expr) => {{
-        fn as_trait_via_transmute<'a>(
-            src: &'a AnyCapability,
-        ) -> Result<&'a dyn $Trait, ::sandbox::AsTraitError> {
-            use core::any::Any;
-            use core::any::TypeId;
-            unsafe {
-                src.as_ref()
-                    .try_as_trait(TypeId::of::<dyn $Trait>())
-                    .map(|dst| std::mem::transmute::<&(dyn Any), &'a (dyn $Trait)>(dst))
-            }
-        }
-        as_trait_via_transmute($src)
-    }};
-}
-
-impl AsTrait for AnyCapability {
-    #[inline]
-    unsafe fn try_as_trait(
-        &self,
-        type_id: std::any::TypeId,
-    ) -> Result<&dyn std::any::Any, AsTraitError> {
-        self.as_ref().try_as_trait(type_id)
-    }
-}
 
 impl Capability for AnyCapability {
     #[inline]

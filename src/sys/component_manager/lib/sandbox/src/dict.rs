@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 use {
     crate::{
-        router::Routable, AnyCapability, AnyCast, AsRouter, Capability, CloneError, Completer,
-        ConversionError, Directory, Open, Request, Router,
+        router::Routable, AnyCapability, AnyCast, Capability, CloneError, Completer,
+        ConversionError, Directory, Open, Request,
     },
     anyhow::{anyhow, Context, Error},
     fidl::endpoints::create_request_stream,
@@ -36,7 +36,6 @@ pub type Key = String;
 
 /// A capability that represents a dictionary of capabilities.
 #[derive(Capability, Debug)]
-#[capability(as_trait(AsRouter))]
 pub struct Dict {
     pub entries: BTreeMap<Key, AnyCapability>,
 
@@ -177,6 +176,11 @@ impl TryInto<Open> for Dict {
     }
 }
 
+/// Dictionary supports routing requests:
+/// - Check if path is empty, then resolve the completer with the current object.
+/// - If not, see if there's a entry corresponding to the next path segment, and
+///   - Delegate the rest of the request to that entry.
+///   - If no entry found, close the completer with an error.
 impl Routable for Dict {
     fn route(&self, mut request: Request, completer: Completer) {
         let Some(name) = request.relative_path.next() else {
@@ -187,7 +191,7 @@ impl Routable for Dict {
             completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
             return;
         };
-        Router::from(capability).route(request, completer);
+        capability.route(request, completer);
     }
 }
 
@@ -248,17 +252,6 @@ impl Capability for Dict {
             return Ok(Box::new(directory));
         }
         Err(ConversionError::NotSupported)
-    }
-}
-
-/// Dictionary can vend out routers:
-/// - Such router will check if path is empty, then resolve the completer with the current object.
-/// - If not, find an entry, and:
-///   - Transform the request, get a router from the entry, and delegate to that router.
-///   - If no entry found, close the completer with an error.
-impl AsRouter for Dict {
-    fn as_router(&self) -> Router {
-        self.try_clone().unwrap().into()
     }
 }
 
