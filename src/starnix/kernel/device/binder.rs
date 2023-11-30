@@ -2732,11 +2732,11 @@ impl MemoryAccessor for RemoteResourceAccessor {
         Ok(())
     }
 
-    fn read_memory_partial_until_null_byte(
+    fn read_memory_partial_until_null_byte<'a>(
         &self,
         _addr: UserAddress,
-        _bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        _bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         error!(ENOTSUP)
     }
 

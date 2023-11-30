@@ -11,7 +11,7 @@ use std::{
 
 use crate::{
     fs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
         devpts::{get_device_type_for_pts, DEVPTS_COUNT},
         FdEvents,
     },
@@ -1088,8 +1088,8 @@ impl Queue {
         if room == 0 && data_length > 0 {
             return error!(EAGAIN);
         }
-        let mut buffer = vec![0 as RawByte; std::cmp::min(room, data_length)];
-        let read_from_userspace = data.read_exact(&mut buffer)?;
+        let buffer = data.read_to_vec_exact(std::cmp::min(room, data_length))?;
+        let read_from_userspace = buffer.len();
         let signals = self.push_to_waiting_buffer(terminal, buffer);
         Ok((read_from_userspace, signals))
     }

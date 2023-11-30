@@ -11,7 +11,7 @@ use crate::{
         FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNodeInfo, FsStr, MountInfo, SpecialNode,
     },
-    mm::{MemoryAccessorExt, PAGE_SIZE},
+    mm::{read_to_vec, MemoryAccessorExt, PAGE_SIZE},
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter},
 };
@@ -437,15 +437,15 @@ struct SpliceOutputBuffer<'a> {
 
 impl<'a> OutputBuffer for SpliceOutputBuffer<'a> {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
-        let mut bytes = vec![0; self.available];
-        let result = callback(&mut bytes)?;
-        bytes.truncate(result);
-        if result > 0 {
+        // SAFETY: `callback` returns the number of bytes read on success.
+        let bytes = unsafe { read_to_vec(self.available, callback) }?;
+        let bytes_len = bytes.len();
+        if bytes_len > 0 {
             self.pipe.messages.write_message(bytes.into());
             self.pipe.notify_write();
-            self.available -= result;
+            self.available -= bytes_len;
         }
-        Ok(result)
+        Ok(bytes_len)
     }
 
     fn available(&self) -> usize {

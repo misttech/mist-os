@@ -716,9 +716,9 @@ impl FileOps for MemFile {
                 let mut addr = UserAddress::default() + offset;
                 data.write_each(&mut |bytes| {
                     let actual = if current_task.has_same_address_space(&task) {
-                        task.mm.read_memory_partial_to_slice(addr, bytes)
+                        task.mm.read_memory_partial(addr, bytes)
                     } else {
-                        task.mm.vmo_read_memory_partial_to_slice(addr, bytes)
+                        task.mm.vmo_read_memory_partial(addr, bytes)
                     }
                     .map_err(|_| errno!(EIO))?;
                     addr += actual;

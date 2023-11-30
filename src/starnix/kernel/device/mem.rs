@@ -5,7 +5,7 @@
 use crate::{
     device::{simple_device_ops, DeviceMode},
     fs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
         fileops_impl_seekless,
         kobject::KObjectDeviceAttribute,
         Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
@@ -17,12 +17,13 @@ use crate::{
     task::CurrentTask,
 };
 use fuchsia_zircon::{
-    cprng_draw, {self as zx},
+    cprng_draw_uninit, {self as zx},
 };
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress,
 };
+use std::mem::MaybeUninit;
 
 #[derive(Default)]
 pub struct DevNull;
@@ -54,14 +55,15 @@ impl FileOps for DevNull {
         // For debugging log up to 4096 bytes from the input buffer. We don't care about errors when
         // trying to read data to log. The amount of data logged is chosen arbitrarily.
         let bytes_to_log = std::cmp::min(4096, data.available());
-        let mut log_buffer = vec![0; bytes_to_log];
-        let bytes_logged = match data.read(&mut log_buffer) {
+        let log_buffer = data.read_to_vec_limited(bytes_to_log);
+        let bytes_logged = match log_buffer {
             Ok(bytes) => {
-                log_info!("write to devnull: {:?}", String::from_utf8_lossy(&log_buffer[0..bytes]));
-                bytes
+                log_info!("write to devnull: {:?}", String::from_utf8_lossy(&bytes));
+                bytes.len()
             }
             Err(_) => 0,
         };
+
         Ok(bytes_logged + data.drain())
     }
 
@@ -173,7 +175,7 @@ impl FileOps for DevFull {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         data.write_each(&mut |bytes| {
-            bytes.fill(0);
+            bytes.fill(MaybeUninit::new(0));
             Ok(bytes.len())
         })
     }
@@ -202,8 +204,8 @@ impl FileOps for DevRandom {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         data.write_each(&mut |bytes| {
-            cprng_draw(bytes);
-            Ok(bytes.len())
+            let read_bytes = cprng_draw_uninit(bytes);
+            Ok(read_bytes.len())
         })
     }
 }

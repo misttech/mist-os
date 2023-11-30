@@ -65,7 +65,8 @@ use starnix_uapi::{
     XATTR_REPLACE,
 };
 use std::{
-    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, sync::Arc, usize,
+    cmp::Ordering, collections::VecDeque, convert::TryInto, marker::PhantomData, mem::MaybeUninit,
+    sync::Arc, usize,
 };
 
 // Constants from bionic/libc/include/sys/stat.h
@@ -1558,19 +1559,19 @@ fn do_mount_create(
     data_addr: UserCString,
     flags: MountFlags,
 ) -> Result<(), Errno> {
-    let mut buf = [0u8; PATH_MAX as usize];
+    let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {
         b""
     } else {
-        current_task.read_c_string_to_slice(source_addr, &mut buf)?
+        current_task.read_c_string(source_addr, &mut source_buf)?
     };
-    let mut buf = [0u8; PATH_MAX as usize];
-    let fs_type = current_task.read_c_string_to_slice(filesystemtype_addr, &mut buf)?;
-    let mut buf = [0u8; PATH_MAX as usize];
+    let mut fs_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
+    let fs_type = current_task.read_c_string(filesystemtype_addr, &mut fs_buf)?;
+    let mut data_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let data = if data_addr.is_null() {
         b""
     } else {
-        current_task.read_c_string_to_slice(data_addr, &mut buf)?
+        current_task.read_c_string(data_addr, &mut data_buf)?
     };
     log_trace!(
         "mount(source={:?}, target={:?}, type={:?}, data={:?})",

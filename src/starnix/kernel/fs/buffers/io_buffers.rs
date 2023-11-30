@@ -2,15 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager};
+use crate::mm::{
+    read_to_array, read_to_object_as_bytes, read_to_vec, MemoryAccessor, MemoryAccessorExt,
+    MemoryManager,
+};
 use starnix_uapi::{
     errno, error, errors::Errno, user_address::UserAddress, user_buffer::UserBuffer,
 };
+use std::mem::MaybeUninit;
 use zerocopy::FromBytes;
 
 /// The callback for `OutputBuffer::write_each`. The callback is passed the buffers to write to in
 /// order, and must return for each, how many bytes has been written.
-pub type OutputBufferCallback<'a> = dyn FnMut(&mut [u8]) -> Result<usize, Errno> + 'a;
+pub type OutputBufferCallback<'a> = dyn FnMut(&mut [MaybeUninit<u8>]) -> Result<usize, Errno> + 'a;
+
+fn slice_to_maybe_uninit(buffer: &[u8]) -> &[MaybeUninit<u8>] {
+    // SAFETY: &[u8] and &[MaybeUninit<u8>] have the same layout.
+    unsafe { std::slice::from_raw_parts(buffer.as_ptr() as *const MaybeUninit<u8>, buffer.len()) }
+}
 
 /// The OutputBuffer allows for writing bytes to a buffer.
 /// A single OutputBuffer will only write up to MAX_RW_COUNT bytes which is the maximum size of a
@@ -36,11 +45,14 @@ pub trait OutputBuffer: std::fmt::Debug {
     /// be partial.
     ///
     /// Returns the number of bytes written in this buffer.
-    fn write(&mut self, mut buffer: &[u8]) -> Result<usize, Errno> {
+    fn write(&mut self, buffer: &[u8]) -> Result<usize, Errno> {
+        let mut buffer = slice_to_maybe_uninit(buffer);
+
         self.write_each(&mut move |data| {
             let size = std::cmp::min(buffer.len(), data.len());
-            data[0..size].clone_from_slice(&buffer[0..size]);
-            buffer = &buffer[size..];
+            let (to_clone, remaining) = buffer.split_at(size);
+            data[0..size].clone_from_slice(to_clone);
+            buffer = remaining;
             Ok(size)
         })
     }
@@ -136,9 +148,11 @@ pub trait InputBuffer: std::fmt::Debug {
     /// If `buffer` is too large, the remaining bytes will be left untouched.
     ///
     /// Returns the number of bytes read from this buffer.
-    fn read(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
+    fn read(&mut self, buffer: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
         let mut index = 0;
-        self.read_each(&mut move |data| {
+        self.read_each(&mut move |data: &[u8]| {
+            let data = slice_to_maybe_uninit(data);
+
             let size = std::cmp::min(buffer.len() - index, data.len());
             buffer[index..index + size].clone_from_slice(&data[0..size]);
             index += size;
@@ -151,7 +165,7 @@ pub trait InputBuffer: std::fmt::Debug {
     /// If `buffer` is larger than the number of available bytes, an error will be returned.
     ///
     /// In case of success, always returns `buffer.len()`.
-    fn read_exact(&mut self, buffer: &mut [u8]) -> Result<usize, Errno> {
+    fn read_exact(&mut self, buffer: &mut [MaybeUninit<u8>]) -> Result<usize, Errno> {
         let size = self.read(buffer)?;
         if size != buffer.len() {
             error!(EINVAL)
@@ -160,6 +174,55 @@ pub trait InputBuffer: std::fmt::Debug {
         }
     }
 }
+
+pub trait InputBufferExt: InputBuffer {
+    /// Reads exactly `len` bytes into a returned `Vec`.
+    ///
+    /// Returns an error if `len` is larger than the number of available bytes.
+    fn read_to_vec_exact(&mut self, len: usize) -> Result<Vec<u8>, Errno> {
+        // SAFETY: `data.read_exact` returns `len` bytes on success.
+        unsafe { read_to_vec(len, |buf| self.read_exact(buf)) }
+    }
+
+    /// Reads up to `limit` bytes into a returned `Vec`.
+    fn read_to_vec_limited(&mut self, limit: usize) -> Result<Vec<u8>, Errno> {
+        // SAFETY: `data.read` returns the number of bytes read.
+        unsafe { read_to_vec(limit, |buf| self.read(buf)) }
+    }
+
+    /// Reads bytes into the array.
+    ///
+    /// Returns an error if `N` is larger than the number of available bytes.
+    fn read_to_array<const N: usize>(&mut self) -> Result<[u8; N], Errno> {
+        // SAFETY: `data.read_exact` returns `N` bytes on success.
+        unsafe {
+            read_to_array::<_, N>(|buf| {
+                self.read_exact(buf).map(|bytes_read| debug_assert_eq!(bytes_read, buf.len()))
+            })
+        }
+    }
+
+    /// Interprets the buffer as an object.
+    ///
+    /// Returns an error if the buffer does not have enough bytes to represent the
+    /// object.
+    fn read_to_object<T: FromBytes>(&mut self) -> Result<T, Errno> {
+        // SAFETY: the callback returns successfully only if the required number of
+        // bytes were read.
+        unsafe {
+            read_to_object_as_bytes(|buf| {
+                if self.read(buf)? != buf.len() {
+                    error!(EINVAL)
+                } else {
+                    Ok(())
+                }
+            })
+        }
+    }
+}
+
+impl InputBufferExt for dyn InputBuffer + '_ {}
+impl<T: InputBuffer> InputBufferExt for T {}
 
 /// An OutputBuffer that write data to user space memory through a `MemoryManager`.
 ///
@@ -220,19 +283,25 @@ impl<'a, const USE_VMO: bool> OutputBuffer for UserBuffersOutputBuffer<'a, USE_V
             if buffer.is_null() {
                 continue;
             }
-            let mut bytes = vec![0; buffer.length];
-            let result = callback(&mut bytes)?;
-            if result > buffer.length {
-                return error!(EINVAL);
-            }
-            bytes_written += if USE_VMO {
-                self.mm.vmo_write_memory(buffer.address, &bytes[0..result])
-            } else {
-                self.mm.write_memory(buffer.address, &bytes[0..result])
+            // SAFETY: `callback` returns the number of bytes read on success.
+            let bytes = unsafe {
+                read_to_vec(buffer.length, |buf| {
+                    let result = callback(buf)?;
+                    if result > buffer.length {
+                        return error!(EINVAL);
+                    }
+                    Ok(result)
+                })
             }?;
-            buffer.advance(result)?;
-            self.available -= result;
-            self.bytes_written += result;
+            bytes_written += if USE_VMO {
+                self.mm.vmo_write_memory(buffer.address, &bytes)
+            } else {
+                self.mm.write_memory(buffer.address, &bytes)
+            }?;
+            let bytes_len = bytes.len();
+            buffer.advance(bytes_len)?;
+            self.available -= bytes_len;
+            self.bytes_written += bytes_len;
             if !buffer.is_empty() {
                 self.buffers.push(buffer);
                 break;
@@ -393,53 +462,57 @@ impl<'a, const USE_VMO: bool> InputBuffer for UserBuffersInputBuffer<'a, USE_VMO
 #[derive(Debug)]
 pub struct VecOutputBuffer {
     buffer: Vec<u8>,
-    bytes_written: usize,
+    // Used to keep track of the requested capacity. `Vec::with_capacity` may
+    // allocate more than the requested capacity so we can't rely on
+    // `Vec::capacity` to return the expected capacity.
+    capacity: usize,
 }
 
 impl VecOutputBuffer {
     pub fn new(capacity: usize) -> Self {
-        Self { buffer: vec![0; capacity], bytes_written: 0 }
+        Self { buffer: Vec::with_capacity(capacity), capacity }
     }
 
     pub fn data(&self) -> &[u8] {
-        &self.buffer[0..self.bytes_written]
+        &self.buffer
     }
 
     pub fn reset(&mut self) {
-        self.bytes_written = 0;
+        self.buffer.truncate(0)
     }
 }
 
 impl From<VecOutputBuffer> for Vec<u8> {
-    fn from(mut data: VecOutputBuffer) -> Self {
-        data.buffer.resize(data.bytes_written, 0);
+    fn from(data: VecOutputBuffer) -> Self {
         data.buffer
     }
 }
 
 impl OutputBuffer for VecOutputBuffer {
     fn write_each(&mut self, callback: &mut OutputBufferCallback<'_>) -> Result<usize, Errno> {
-        let written = callback(&mut self.buffer.as_mut_slice()[self.bytes_written..])?;
-        if self.bytes_written + written > self.buffer.len() {
+        let current_len = self.buffer.len();
+        let written =
+            callback(&mut self.buffer.spare_capacity_mut()[..self.capacity - current_len])?;
+        if current_len + written > self.capacity {
             return error!(EINVAL);
         }
-        self.bytes_written += written;
+        // SAFETY: the vector is now initialized for an extra `written` bytes.
+        unsafe { self.buffer.set_len(current_len + written) }
         Ok(written)
     }
 
     fn available(&self) -> usize {
-        self.buffer.len() - self.bytes_written
+        self.capacity - self.buffer.len()
     }
 
     fn bytes_written(&self) -> usize {
-        self.bytes_written
+        self.buffer.len()
     }
 
     fn zero(&mut self) -> Result<usize, Errno> {
-        let previous_bytes_written = self.bytes_written;
-        self.buffer.as_mut_slice()[previous_bytes_written..].fill(0);
-        self.bytes_written = self.buffer.len();
-        Ok(self.bytes_written - previous_bytes_written)
+        let zeroed = self.capacity - self.buffer.len();
+        self.buffer.resize(self.capacity, 0);
+        Ok(zeroed)
     }
 }
 
@@ -515,6 +588,7 @@ impl VecInputBuffer {
 mod tests {
     use super::*;
     use crate::{mm::PAGE_SIZE, testing::*};
+    use usercopy::slice_to_maybe_unit;
 
     #[::fuchsia::test]
     async fn test_data_input_buffer() {
@@ -571,11 +645,17 @@ mod tests {
             let mut buffer = [0; 50];
             assert_eq!(input_buffer.available(), 37);
             assert_eq!(input_buffer.bytes_read(), 0);
-            assert_eq!(input_buffer.read_exact(&mut buffer[0..20]).expect("read"), 20);
+            assert_eq!(
+                input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[0..20])).expect("read"),
+                20
+            );
             assert_eq!(input_buffer.available(), 17);
             assert_eq!(input_buffer.bytes_read(), 20);
-            assert_eq!(input_buffer.read_exact(&mut buffer[20..37]).expect("read"), 17);
-            assert!(input_buffer.read_exact(&mut buffer[37..]).is_err());
+            assert_eq!(
+                input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[20..37])).expect("read"),
+                17
+            );
+            assert!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer[37..])).is_err());
             assert_eq!(input_buffer.available(), 0);
             assert_eq!(input_buffer.bytes_read(), 37);
             assert_eq!(&data[..25], &buffer[..25]);
@@ -646,15 +726,15 @@ mod tests {
 
         let mut input_buffer = VecInputBuffer::new(b"helloworld");
         let mut buffer = [0; 5];
-        assert_eq!(input_buffer.read_exact(&mut buffer).expect("read"), 5);
+        assert_eq!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).expect("read"), 5);
         assert_eq!(input_buffer.bytes_read(), 5);
         assert_eq!(input_buffer.available(), 5);
         assert_eq!(&buffer, b"hello");
-        assert_eq!(input_buffer.read_exact(&mut buffer).expect("read"), 5);
+        assert_eq!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).expect("read"), 5);
         assert_eq!(input_buffer.bytes_read(), 10);
         assert_eq!(input_buffer.available(), 0);
         assert_eq!(&buffer, b"world");
-        assert!(input_buffer.read_exact(&mut buffer).is_err());
+        assert!(input_buffer.read_exact(slice_to_maybe_unit(&mut buffer)).is_err());
 
         // Test read_object
         let mut input_buffer = VecInputBuffer::new(b"hello");

@@ -44,7 +44,7 @@ use starnix_uapi::{
     file_mode::{mode, FileMode},
     open_flags::OpenFlags,
     statfs,
-    user_address::{UserAddress, UserCString},
+    user_address::{UserAddress, UserCString, UserRef},
     BPF_FS_MAGIC, BPF_F_RDONLY_PROG, PATH_MAX,
 };
 use std::{collections::BTreeMap, ops::Bound, sync::Arc};
@@ -131,31 +131,23 @@ fn read_attr<Attr: FromBytes>(
     attr_addr: UserAddress,
     attr_size: u32,
 ) -> Result<Attr, Errno> {
-    let attr_size = attr_size as usize;
+    let mut attr_size = attr_size as usize;
     let sizeof_attr = std::mem::size_of::<Attr>();
 
     // Verify that the extra is all zeros.
     if attr_size > sizeof_attr {
         let tail =
             current_task.read_memory_to_vec(attr_addr + sizeof_attr, attr_size - sizeof_attr)?;
-        for byte in tail {
-            if byte != 0 {
-                return error!(E2BIG);
-            }
+        if tail.into_iter().any(|byte| byte != 0) {
+            return error!(E2BIG);
         }
+
+        attr_size = sizeof_attr;
     }
 
     // If the struct passed is smaller than our definition of the struct, let whatever is not
     // passed be zero.
-    let mut attr = Attr::new_zeroed();
-    // SAFETY: attr is FromBytes, meaning it is safe to write any bit pattern to its storage. (The
-    // unsafe slice construction is necessary because it's not necessarily safe to read from its
-    // storage directly.)
-    current_task.read_memory_to_slice(attr_addr, unsafe {
-        std::slice::from_raw_parts_mut(&mut attr as *mut Attr as *mut u8, sizeof_attr)
-    })?;
-
-    Ok(attr)
+    current_task.read_object_partial(UserRef::new(attr_addr), attr_size)
 }
 
 fn install_bpf_fd(current_task: &CurrentTask, obj: impl BpfObject) -> Result<SyscallResult, Errno> {

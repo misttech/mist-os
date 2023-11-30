@@ -277,7 +277,7 @@ impl FileOps for VmoFile {
             let buf = &mut buf[..std::cmp::min(self.size.saturating_sub(offset), buflen)];
             if !buf.is_empty() {
                 self.vmo
-                    .read(buf, offset as u64)
+                    .read_uninit(buf, offset as u64)
                     .map_err(|status| from_status_like_fdio!(status))?;
                 offset += buf.len();
             }

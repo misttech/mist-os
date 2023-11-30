@@ -4,7 +4,7 @@
 
 use crate::{
     fs::{
-        buffers::{InputBuffer, OutputBuffer, OutputBufferCallback},
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback},
         default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
         fs_args, CacheConfig, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FallocMode,
         FdEvents, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
@@ -34,7 +34,7 @@ use std::{
     collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
 };
-use zerocopy::{AsBytes, FromBytes, FromZeroes};
+use zerocopy::{AsBytes, FromBytes};
 
 const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
 
@@ -1229,10 +1229,8 @@ impl FuseMutableState {
             FuseConnectionState::Disconnected => return error!(ENODEV),
             _ => {}
         }
-        let mut header = uapi::fuse_out_header::new_zeroed();
-        if data.read(header.as_bytes_mut())? != std::mem::size_of::<uapi::fuse_out_header>() {
-            return error!(EINVAL);
-        }
+        let header: uapi::fuse_out_header = data.read_to_object()?;
+
         let remainder: usize = (header.len as usize) - std::mem::size_of::<uapi::fuse_out_header>();
         if data.available() < remainder {
             return error!(EINVAL);
@@ -1248,8 +1246,8 @@ impl FuseMutableState {
             running_operation.response =
                 Some(operation.handle_error(&mut self.operations_state, errno));
         } else {
-            let mut buffer = vec![0u8; remainder];
-            if data.read(&mut buffer)? != remainder {
+            let buffer = data.read_to_vec_limited(remainder)?;
+            if buffer.len() != remainder {
                 return error!(EINVAL);
             }
             let response = operation.parse_response(buffer)?;

@@ -9,7 +9,7 @@ use zerocopy::{
 
 use crate::{
     fs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
         socket::{SocketAddress, SocketMessageFlags},
         FdFlags, FdNumber, FileHandle, FsString,
     },
@@ -378,9 +378,7 @@ pub struct MessageData {
 impl MessageData {
     /// Copies data from user memory into a new MessageData object.
     pub fn copy_from_user(data: &mut dyn InputBuffer, limit: usize) -> Result<MessageData, Errno> {
-        let mut bytes = vec![0u8; limit];
-        data.read_exact(&mut bytes)?;
-        Ok(bytes.into())
+        data.read_to_vec_exact(limit).map(Into::into)
     }
 
     /// Returns the number of bytes in the message.

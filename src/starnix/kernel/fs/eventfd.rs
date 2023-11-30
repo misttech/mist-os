@@ -6,7 +6,7 @@ use starnix_lock::Mutex;
 
 use crate::{
     fs::{
-        buffers::{InputBuffer, OutputBuffer},
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
@@ -68,8 +68,7 @@ impl FileOps for EventFdFileObject {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         file.blocking_op(current_task, FdEvents::POLLOUT | FdEvents::POLLHUP, None, || {
-            let mut written_data = [0; DATA_SIZE];
-            data.read_exact(&mut written_data)?;
+            let written_data = data.read_to_array::<DATA_SIZE>()?;
             let add_value = u64::from_ne_bytes(written_data);
             if add_value == u64::MAX {
                 return error!(EINVAL);

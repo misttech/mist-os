@@ -1249,11 +1249,11 @@ impl MemoryAccessor for Task {
         self.mm.vmo_read_memory(addr, bytes)
     }
 
-    fn read_memory_partial_until_null_byte(
+    fn read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.mm.read_memory_partial_until_null_byte(addr, bytes)
     }
 

@@ -1482,11 +1482,13 @@ pub trait MemoryAccessor {
     ///
     /// This is used, for example, to read null-terminated strings where the exact length is not
     /// known, only the maximum length is.
-    fn read_memory_partial_until_null_byte(
+    ///
+    /// Returns the bytes that have been read to on success.
+    fn read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno>;
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
 
     /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
     /// or no more bytes can be read from the target.
@@ -1544,21 +1546,105 @@ pub trait MemoryAccessor {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno>;
 }
 
-fn object_as_mut_bytes<T: FromBytes + Sized>(object: &mut T) -> &mut [u8] {
-    // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
-    // is safe because T's alignment requirements are larger than u8.
-    unsafe { std::slice::from_raw_parts_mut(object as *mut T as *mut u8, std::mem::size_of::<T>()) }
+// TODO(https://fxbug.dev/129310): replace this with MaybeUninit::as_bytes_mut.
+#[inline]
+fn object_as_mut_bytes<T: FromBytes + Sized>(
+    object: &mut MaybeUninit<T>,
+) -> &mut [MaybeUninit<u8>] {
+    // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting
+    // MaybeUninit<T> as [MaybeUninit<u8>] is safe because T's alignment requirements
+    // are larger than u8.
+    unsafe {
+        std::slice::from_raw_parts_mut(
+            object.as_mut_ptr() as *mut MaybeUninit<u8>,
+            std::mem::size_of::<T>(),
+        )
+    }
 }
 
-fn slice_as_mut_bytes<T: FromBytes + Sized>(slice: &mut [T]) -> &mut [u8] {
+// TODO(https://fxbug.dev/129310): replace this with MaybeUninit::slice_as_bytes_mut.
+#[inline]
+fn slice_as_mut_bytes<T: FromBytes + Sized>(
+    slice: &mut [MaybeUninit<T>],
+) -> &mut [MaybeUninit<u8>] {
     // SAFETY: T is FromBytes, which means that any bit pattern is valid. Interpreting T as u8
     // is safe because T's alignment requirements are larger than u8.
     unsafe {
         std::slice::from_raw_parts_mut(
-            slice.as_mut_ptr() as *mut u8,
+            slice.as_mut_ptr() as *mut MaybeUninit<u8>,
             slice.len() * std::mem::size_of::<T>(),
         )
     }
+}
+
+/// Performs a read into a `Vec` using the provided read function.
+///
+/// The read function returns the number of elements of type `T` read.
+///
+/// # Safety
+///
+/// The read function must only return `Ok(n)` if at least one byte was read
+/// and `n` holds the number of bytes read starting from the beginning of the
+/// slice.
+#[inline]
+pub unsafe fn read_to_vec<T: FromBytes>(
+    max_len: usize,
+    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<usize, Errno>,
+) -> Result<Vec<T>, Errno> {
+    let mut buffer = Vec::with_capacity(max_len);
+    // We can't just pass `spare_capacity_mut` because `Vec::with_capacity`
+    // returns a `Vec` with _at least_ the requested capacity.
+    let read_bytes = read_fn(&mut buffer.spare_capacity_mut()[..max_len])?;
+    debug_assert!(read_bytes <= max_len, "read_bytes={read_bytes}, max_len={max_len}");
+    // SAFETY: The new length is equal to the number of bytes successfully
+    // initialized (since `read_fn` returned successfully).
+    unsafe { buffer.set_len(read_bytes) }
+    Ok(buffer)
+}
+
+/// Performs a read into an array using the provided read function.
+///
+/// The read function returns `Ok(())` if the buffer was fully read to.
+///
+/// # Safety
+///
+/// The read function must only return `Ok(())` if all the bytes were read to.
+#[inline]
+pub unsafe fn read_to_array<T: FromBytes, const N: usize>(
+    read_fn: impl FnOnce(&mut [MaybeUninit<T>]) -> Result<(), Errno>,
+) -> Result<[T; N], Errno> {
+    // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
+    let buffer: MaybeUninit<[MaybeUninit<T>; N]> = MaybeUninit::uninit();
+    // SAFETY: We are converting from an uninitialized array to an array
+    // of uninitialized elements which is the same. See
+    // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element.
+    let mut buffer = unsafe { buffer.assume_init() };
+    read_fn(&mut buffer)?;
+    // SAFETY: This is safe because we have initialized all the elements in
+    // the array (since `read_fn` returned successfully).
+    //
+    // TODO(https://fxbug.deb/129309): replace with MaybeUninit::array_assume_init.
+    let buffer = buffer.map(|a| unsafe { a.assume_init() });
+    Ok(buffer)
+}
+
+/// Performs a read into an object using the provided read function.
+///
+/// The read function returns `Ok(())` if the buffer was fully read to.
+///
+/// # Safety
+///
+/// THe read function must only return `Ok(())` if all the bytes were read to.
+#[inline]
+pub unsafe fn read_to_object_as_bytes<T: FromBytes>(
+    read_fn: impl FnOnce(&mut [MaybeUninit<u8>]) -> Result<(), Errno>,
+) -> Result<T, Errno> {
+    let mut object = MaybeUninit::uninit();
+    read_fn(object_as_mut_bytes(&mut object))?;
+    // SAFETY: The call to `read_fn` succeeded so we know that `object`
+    // has been initialized.
+    let object = unsafe { object.assume_init() };
+    Ok(object)
 }
 
 pub trait MemoryAccessorExt: MemoryAccessor {
@@ -1572,67 +1658,18 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         self.read_memory(addr, slice_to_maybe_unit(bytes))
     }
 
-    /// Like `read_memory_to_slice` but always reads the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
-        self.vmo_read_memory(addr, slice_to_maybe_unit(bytes))
-    }
-
-    /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
-    /// bytes have been read or no more bytes can be read from the target.
-    ///
-    /// This is used, for example, to read null-terminated strings where the exact length is not
-    /// known, only the maximum length is.
-    fn read_memory_partial_to_slice_until_null_byte(
-        &self,
-        addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        self.read_memory_partial_until_null_byte(addr, slice_to_maybe_unit(bytes))
-    }
-
-    /// Reads bytes starting at `addr`, continuing until either `bytes.len()` bytes have been read
-    /// or no more bytes can be read from the target.
-    ///
-    /// This is used, for example, to read null-terminated strings where the exact length is not
-    /// known, only the maximum length is.
-    ///
-    /// Consider using `MemoryAccessorExt::read_memory_partial_to_*` methods if you do not require
-    /// control over the allocation.
-    fn read_memory_partial_to_slice(
-        &self,
-        addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        self.read_memory_partial(addr, slice_to_maybe_unit(bytes))
-    }
-
-    /// Like `read_memory_partial_to_slice` but always reads the memory through a VMO.
-    ///
-    /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial_to_slice(
-        &self,
-        addr: UserAddress,
-        bytes: &mut [u8],
-    ) -> Result<usize, Errno> {
-        self.vmo_read_memory_partial(addr, slice_to_maybe_unit(bytes))
-    }
-
     /// Read exactly `len` bytes of memory, returning them as a a Vec.
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
-        let mut buffer = vec![0u8; len];
-        self.read_memory_to_slice(addr, &mut buffer[..])?;
-        Ok(buffer)
+        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_vec(len, |buf| self.read_memory(addr, buf).map(|()| len)) }
     }
 
     /// Like `read_memory_to_vec` but always writes the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
     fn vmo_read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
-        let mut buffer = vec![0u8; len];
-        self.vmo_read_memory_to_slice(addr, &mut buffer[..])?;
-        Ok(buffer)
+        // SAFETY: `self.vmo_read_memory` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_vec(len, |buf| self.vmo_read_memory(addr, buf).map(|()| len)) }
     }
 
     /// Read up to `max_len` bytes from `addr`, returning them as a Vec.
@@ -1641,17 +1678,15 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         addr: UserAddress,
         max_len: usize,
     ) -> Result<Vec<u8>, Errno> {
-        let mut buffer = vec![0u8; max_len];
-        let bytes_read = self.read_memory_partial_to_slice(addr, &mut buffer[..])?;
-        buffer.truncate(bytes_read);
-        Ok(buffer)
+        // SAFETY: `self.read_memory_partial` only returns `Ok(n)` if at least one
+        // byte was read and `n` is the number of bytes read.
+        unsafe { read_to_vec(max_len, |buf| self.read_memory_partial(addr, buf)) }
     }
 
     /// Read exactly `N` bytes from `addr`, returning them as an array.
     fn read_memory_to_array<const N: usize>(&self, addr: UserAddress) -> Result<[u8; N], Errno> {
-        let mut buffer = [0u8; N];
-        self.read_memory_to_slice(addr, &mut buffer[..])?;
-        Ok(buffer)
+        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_array(|buf| self.read_memory(addr, buf)) }
     }
 
     /// Read the contents of `buffer`, returning them as a Vec.
@@ -1661,16 +1696,14 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T from `user`.
     fn read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        let mut object = T::new_zeroed();
-        self.read_memory_to_slice(user.addr(), object_as_mut_bytes(&mut object))?;
-        Ok(object)
+        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_object_as_bytes(|buf| self.read_memory(user.addr(), buf)) }
     }
 
     /// Read an instance of T from `user` through the VMO.
     fn vmo_read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        let mut object = T::new_zeroed();
-        self.vmo_read_memory_to_slice(user.addr(), object_as_mut_bytes(&mut object))?;
-        Ok(object)
+        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_object_as_bytes(|buf| self.vmo_read_memory(user.addr(), buf)) }
     }
 
     /// Reads the first `partial` bytes of an object, leaving any remainder 0-filled.
@@ -1692,14 +1725,25 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
         // This implementation involves an extra memcpy compared to read_object but avoids unsafe
         // code. This isn't currently called very often.
-        let mut full_buffer = std::vec::Vec::<u8>::with_capacity(full_size);
-        full_buffer.resize(partial_size, 0u8);
+        let mut object = MaybeUninit::uninit();
+        let (to_read, to_zero) = object_as_mut_bytes(&mut object).split_at_mut(partial_size);
+        self.read_memory(user.addr(), to_read)?;
 
-        self.read_memory_to_slice(user.addr(), &mut full_buffer)?;
-        full_buffer.resize(full_size, 0u8); // Zero pad out to the correct size.
+        // Zero pad out to the correct size.
+        to_zero.fill(MaybeUninit::new(0));
 
-        // This should only fail if we provided a mis-sized buffers so panicking is OK.
-        Ok(T::read_from(&*full_buffer).unwrap())
+        // SAFETY: `T` implements `FromBytes` so any bit pattern is valid and all
+        // bytes of `object` have been initialized.
+        Ok(unsafe { object.assume_init() })
+    }
+
+    /// Read exactly `objects.len()` objects into `objects` from `user`.
+    fn read_objects<T: FromBytes>(
+        &self,
+        user: UserRef<T>,
+        objects: &mut [MaybeUninit<T>],
+    ) -> Result<(), Errno> {
+        self.read_memory(user.addr(), slice_as_mut_bytes(objects))
     }
 
     /// Read exactly `objects.len()` objects into `objects` from `user`.
@@ -1708,7 +1752,7 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
         objects: &mut [T],
     ) -> Result<(), Errno> {
-        self.read_memory_to_slice(user.addr(), slice_as_mut_bytes(objects))
+        self.read_objects(user, slice_to_maybe_unit(objects))
     }
 
     /// Read exactly `len` objects from `user`, returning them as a Vec.
@@ -1717,9 +1761,8 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
         len: usize,
     ) -> Result<Vec<T>, Errno> {
-        let mut objects = vec![T::new_zeroed(); len];
-        self.read_objects_to_slice(user, &mut objects[..])?;
-        Ok(objects)
+        // SAFETY: `self.read_objects` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_vec(len, |buf| self.read_objects(user, buf).map(|()| len)) }
     }
 
     /// Read exactly `N` objects from `user`, returning them as an array.
@@ -1727,9 +1770,8 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         &self,
         user: UserRef<T>,
     ) -> Result<[T; N], Errno> {
-        let mut objects = [T::new_zeroed(); N];
-        self.read_objects_to_slice(user, &mut objects[..])?;
-        Ok(objects)
+        // SAFETY: `self.read_objects` only returns `Ok(())` if all bytes were read to.
+        unsafe { read_to_array(|buf| self.read_objects(user, buf)) }
     }
 
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`, returning them as a Vec.
@@ -1751,36 +1793,39 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Read up to `max_size` bytes from `string`, stopping at the first discovered null byte and
     /// returning the results as a Vec.
     fn read_c_string_to_vec(&self, string: UserCString, max_size: usize) -> Result<Vec<u8>, Errno> {
-        let min_chunk_size = std::cmp::min(*PAGE_SIZE as usize, max_size);
+        let chunk_size = std::cmp::min(*PAGE_SIZE as usize, max_size);
 
-        let mut buf = vec![0; min_chunk_size];
+        let mut buf = Vec::with_capacity(chunk_size);
         let mut index = 0;
         loop {
             // This operation should never overflow: we should fail to read before that.
             let addr = string.addr().checked_add(index).ok_or(errno!(EFAULT))?;
-            let read =
-                self.read_memory_partial_to_slice_until_null_byte(addr, &mut buf[index..])?;
+            let read = self.read_memory_partial_until_null_byte(
+                addr,
+                &mut buf.spare_capacity_mut()[index..][..chunk_size],
+            )?;
+            let read_len = read.len();
 
             // Check if the last byte read is the null byte.
-            let maybe_null_index = index + read - 1;
-            if buf[maybe_null_index] == 0 {
-                buf.resize(maybe_null_index, 0u8);
+            if read.last() == Some(&0) {
+                let null_index = index + read_len - 1;
+                // SAFETY: Bytes until `null_index` have been initialized.
+                unsafe { buf.set_len(null_index) }
                 if buf.len() > max_size {
                     return error!(ENAMETOOLONG);
                 }
 
                 return Ok(buf);
             }
-            index += read;
+            index += read_len;
 
-            if index != buf.len() || index >= max_size {
+            if read_len < chunk_size || index >= max_size {
                 // There's no more for us to read.
                 return error!(ENAMETOOLONG);
             }
 
             // Trigger a capacity increase.
-            buf.reserve(min_chunk_size);
-            buf.resize(std::cmp::min(buf.capacity(), max_size), 0);
+            buf.reserve(index + chunk_size);
         }
     }
 
@@ -1817,20 +1862,20 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// and returning the result as a slice that ends before that null.
     ///
     /// Consider using `read_c_string_to_vec` if you do not require control over the allocation.
-    fn read_c_string_to_slice<'a>(
+    fn read_c_string<'a>(
         &self,
         string: UserCString,
-        buffer: &'a mut [u8],
+        buffer: &'a mut [MaybeUninit<u8>],
     ) -> Result<&'a [u8], Errno> {
-        let actual = self.read_memory_partial_to_slice_until_null_byte(string.addr(), buffer)?;
-
+        let buffer = self.read_memory_partial_until_null_byte(string.addr(), buffer)?;
         // Make sure the last element holds the null byte.
-        let maybe_null_index = actual - 1;
-        if buffer[maybe_null_index] == 0 {
-            Ok(&buffer[..maybe_null_index])
-        } else {
-            error!(ENAMETOOLONG)
+        if let Some((null_byte, buffer)) = buffer.split_last() {
+            if null_byte == &0 {
+                return Ok(buffer);
+            }
         }
+
+        error!(ENAMETOOLONG)
     }
 
     fn write_object<T: AsBytes>(&self, user: UserRef<T>, object: &T) -> Result<usize, Errno> {
@@ -1869,24 +1914,21 @@ impl MemoryAccessor for MemoryManager {
         self.state.read().read_memory(addr, bytes)
     }
 
-    fn read_memory_partial_until_null_byte(
+    fn read_memory_partial_until_null_byte<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             profile_duration!("UsercopyReadPartialUntilNull");
             let (read_bytes, unread_bytes) = usercopy.copyin_until_null_byte(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
             } else {
-                Ok(read_bytes.len())
+                Ok(read_bytes)
             }
         } else {
-            self.state
-                .read()
-                .read_memory_partial_until_null_byte(addr, bytes)
-                .map(|bytes| bytes.len())
+            self.state.read().read_memory_partial_until_null_byte(addr, bytes)
         }
     }
 
@@ -3337,12 +3379,16 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_read_c_string_to_slice() {
+    async fn test_read_c_string() {
         let (_kernel, current_task) = create_kernel_and_task();
         let mm = &current_task.mm;
 
         let page_size = *PAGE_SIZE;
-        let mut buf = vec![0u8; 2 * page_size as usize];
+        let buf_cap = 2 * page_size as usize;
+        let mut buf = Vec::with_capacity(buf_cap);
+        // We can't just use `spare_capacity_mut` because `Vec::with_capacity`
+        // returns a `Vec` with _at least_ the requested capacity.
+        let buf = &mut buf.spare_capacity_mut()[..buf_cap];
         let addr = mm.base_addr + 10 * page_size;
 
         // Map a page at a fixed address and write an unterminated string at the end of it.
@@ -3352,35 +3398,26 @@ mod tests {
         mm.write_memory(test_addr, test_str).expect("failed to write test string");
 
         // Expect error if the string is not terminated.
-        assert_eq!(
-            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf),
-            error!(ENAMETOOLONG)
-        );
+        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf), error!(ENAMETOOLONG));
 
         // Expect success if the string is terminated.
         mm.write_memory(addr + (page_size - 1), b"\0").expect("failed to write nul");
-        assert_eq!(
-            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf).unwrap(),
-            b"foo"
-        );
+        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), b"foo");
 
         // Expect success if the string spans over two mappings.
         assert_eq!(map_memory(&current_task, addr + page_size, page_size), addr + page_size);
         assert_eq!(mm.get_mapping_count(), 2);
         mm.write_memory(addr + (page_size - 1), b"bar\0").expect("failed to write extra chars");
-        assert_eq!(
-            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut buf).unwrap(),
-            b"foobar"
-        );
+        assert_eq!(mm.read_c_string(UserCString::new(test_addr), buf).unwrap(), b"foobar");
 
         // Expect error if the string does not fit in the provided buffer.
         assert_eq!(
-            mm.read_c_string_to_slice(UserCString::new(test_addr), &mut [0u8; 2]),
+            mm.read_c_string(UserCString::new(test_addr), &mut [MaybeUninit::uninit(); 2]),
             error!(ENAMETOOLONG)
         );
 
         // Expect error if the address is invalid.
-        assert_eq!(mm.read_c_string_to_slice(UserCString::default(), &mut buf), error!(EFAULT));
+        assert_eq!(mm.read_c_string(UserCString::default(), buf), error!(EFAULT));
     }
 
     #[::fuchsia::test]
