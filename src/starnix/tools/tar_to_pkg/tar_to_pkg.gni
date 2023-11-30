@@ -50,6 +50,9 @@ template("tar_to_pkg") {
       "-d",
       rebase_path(depfile, root_build_dir),
     ]
+
+    # TODO(b/314016615): Delete the line below after fixing.
+    hermetic_deps = false
   }
 
   distribution_entries_from_fini(target_name) {
