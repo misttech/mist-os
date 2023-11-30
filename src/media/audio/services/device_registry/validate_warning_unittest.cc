@@ -15,15 +15,350 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/zx/clock.h"
 #include "src/media/audio/services/device_registry/validate.h"
+
+// These cases unittest the Validate... functions with inputs that cause WARNING log output.
 
 namespace media_audio {
 
-// TODO(fxbug.dev/117826): Negative-test ValidateStreamProperties
+// Negative-test ValidateStreamProperties
+fuchsia_hardware_audio::StreamProperties ValidStreamProperties() {
+  return {{
+      .is_input = false,
+      .min_gain_db = 0.0f,
+      .max_gain_db = 0.0f,
+      .gain_step_db = 0.0f,
+      .plug_detect_capabilities = fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify,
+      .clock_domain = fuchsia_hardware_audio::kClockDomainMonotonic,
+  }};
+}
+TEST(ValidateTest, BadStreamProperties) {
+  auto stream_properties = ValidStreamProperties();
+  ASSERT_EQ(ValidateStreamProperties(stream_properties), ZX_OK) << "Baseline setup unsuccessful";
 
-// TODO(fxbug.dev/117826): Negative-test ValidateSupportedFormats
+  // missing is_input
+  stream_properties = ValidStreamProperties();
+  stream_properties.is_input() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
 
-// TODO(fxbug.dev/117826): Negative-test ValidateGainState
+  // missing min_gain_db
+  stream_properties = ValidStreamProperties();
+  stream_properties.min_gain_db() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  // bad min_gain_db (NAN, inf)
+  stream_properties.min_gain_db() = NAN;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  stream_properties.min_gain_db() = -INFINITY;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+
+  // missing max_gain_db
+  stream_properties = ValidStreamProperties();
+  stream_properties.max_gain_db() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  // bad max_gain_db (NAN, inf)
+  stream_properties.max_gain_db() = NAN;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  stream_properties.max_gain_db() = INFINITY;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+
+  // bad max_gain_db (below min_gain_db)
+  stream_properties = ValidStreamProperties();
+  stream_properties.min_gain_db() = 0.0f;
+  stream_properties.max_gain_db() = -1.0f;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+
+  // missing gain_step_db
+  stream_properties = ValidStreamProperties();
+  stream_properties.gain_step_db() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  // bad gain_step_db (NAN, inf)
+  stream_properties.gain_step_db() = NAN;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  stream_properties.gain_step_db() = INFINITY;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  // gain_step_db too large (max-min)
+  stream_properties.gain_step_db() = 1.0f;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+  stream_properties = ValidStreamProperties();
+  stream_properties.min_gain_db() = -42.0f;
+  stream_properties.max_gain_db() = 26.0f;
+  stream_properties.gain_step_db() = 68.1f;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+
+  // current mute state impossible (implicit)
+  stream_properties = ValidStreamProperties();
+  EXPECT_EQ(
+      ValidateStreamProperties(stream_properties,
+                               fuchsia_hardware_audio::GainState{{.muted = true, .gain_db = 0.0f}}),
+      ZX_ERR_INVALID_ARGS);
+  // current mute state impossible (explicit)
+  stream_properties.can_mute() = false;
+  EXPECT_EQ(
+      ValidateStreamProperties(stream_properties,
+                               fuchsia_hardware_audio::GainState{{.muted = true, .gain_db = 0.0f}}),
+      ZX_ERR_INVALID_ARGS);
+
+  // current agc state impossible (implicit)
+  stream_properties = ValidStreamProperties();
+  EXPECT_EQ(ValidateStreamProperties(
+                stream_properties,
+                fuchsia_hardware_audio::GainState{{.agc_enabled = true, .gain_db = 0.0f}}),
+            ZX_ERR_INVALID_ARGS);
+  // current agc state impossible (explicit)
+  stream_properties.can_agc() = false;
+  EXPECT_EQ(ValidateStreamProperties(
+                stream_properties,
+                fuchsia_hardware_audio::GainState{{.agc_enabled = true, .gain_db = 0.0f}}),
+            ZX_ERR_INVALID_ARGS);
+
+  // current gain_db out of range
+  stream_properties = ValidStreamProperties();
+  EXPECT_EQ(ValidateStreamProperties(stream_properties,
+                                     fuchsia_hardware_audio::GainState{{.gain_db = -0.1f}}),
+            ZX_ERR_INVALID_ARGS);
+  EXPECT_EQ(ValidateStreamProperties(stream_properties,
+                                     fuchsia_hardware_audio::GainState{{.gain_db = 0.1f}}),
+            ZX_ERR_INVALID_ARGS);
+
+  // missing plug_detect_capabilities
+  stream_properties = ValidStreamProperties();
+  stream_properties.plug_detect_capabilities() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+
+  // current plug state impossible
+  stream_properties = ValidStreamProperties();
+  stream_properties.plug_detect_capabilities() =
+      fuchsia_hardware_audio::PlugDetectCapabilities::kHardwired;
+  EXPECT_EQ(ValidateStreamProperties(
+                stream_properties, fuchsia_hardware_audio::GainState{{.gain_db = 0.0f}},
+                fuchsia_hardware_audio::PlugState{{.plugged = false, .plug_state_time = 0}}),
+            ZX_ERR_INVALID_ARGS);
+
+  // missing clock_domain
+  stream_properties = ValidStreamProperties();
+  stream_properties.clock_domain() = std::nullopt;
+  EXPECT_EQ(ValidateStreamProperties(stream_properties), ZX_ERR_INVALID_ARGS);
+}
+
+// Negative-test ValidateSupportedFormats
+fuchsia_hardware_audio::SupportedFormats CompliantFormatSet() {
+  return fuchsia_hardware_audio::SupportedFormats{{
+      .pcm_supported_formats = fuchsia_hardware_audio::PcmSupportedFormats{{
+          .channel_sets = {{
+              fuchsia_hardware_audio::ChannelSet{{
+                  .attributes = {{
+                      fuchsia_hardware_audio::ChannelAttributes{{
+                          .min_frequency = 20,
+                          .max_frequency = 20000,
+                      }},
+                  }},
+              }},
+          }},
+          .sample_formats = {{fuchsia_hardware_audio::SampleFormat::kPcmSigned}},
+          .bytes_per_sample = {{2}},
+          .valid_bits_per_sample = {{16}},
+          .frame_rates = {{48000}},
+      }},
+  }};
+}
+TEST(ValidateWarningTest, BadSupportedFormats) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats;
+
+  // Empty top-level vector
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.push_back(CompliantFormatSet());
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+
+  // No pcm_supported_formats (one supported_formats[] vector entry, but it is empty)
+  supported_formats.emplace_back();
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+}
+
+// Negative-test ValidateSupportedFormats for frame_rates
+TEST(ValidateWarningTest, BadSupportedFormatsFrameRates) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
+
+  // Missing frame_rates
+  supported_formats.at(0).pcm_supported_formats()->frame_rates() = std::nullopt;
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty frame_rates vector
+  supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Too low frame_rate
+  supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{999}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+
+  // Too high frame_rate
+  supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{192001}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+
+  // Out-of-order frame_rates
+  supported_formats.at(0).pcm_supported_formats()->frame_rates() = {{48000, 44100}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+}
+
+// Negative-test ValidateSupportedFormats for channel_sets
+TEST(ValidateWarningTest, BadSupportedFormatsChannelSets) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
+
+  // Missing channel_sets
+  supported_formats.at(0).pcm_supported_formats()->channel_sets() = std::nullopt;
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty channel_sets vector
+  supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Missing attributes
+  supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{
+      {},
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty attributes vector
+  supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{
+      {
+          .attributes = {{}},
+      },
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Duplicate channel_set lengths
+  // Two channel_sets entries - both with a single channel
+  supported_formats.at(0).pcm_supported_formats()->channel_sets() = {{
+      {{
+          .attributes = {{
+              {},
+          }},
+      }},
+      {{
+          .attributes = {{
+              {},
+          }},
+      }},
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0)
+      .pcm_supported_formats()
+      ->channel_sets()
+      ->at(0)
+      .attributes()
+      ->emplace_back();
+  ASSERT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+
+  // Too high min_frequency
+  supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
+      .min_frequency = 24001,
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+
+  // Min > max
+  supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
+      .min_frequency = 16001,
+      .max_frequency = 16000,
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Too high max_frequency (passes but emits WARNING, thus is in the "warning" suite)
+  supported_formats.at(0).pcm_supported_formats()->channel_sets()->at(1).attributes()->at(0) = {{
+      .max_frequency = 192000,
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_OK);
+}
+
+// Negative-test ValidateSupportedFormats for sample_formats
+TEST(ValidateWarningTest, BadSupportedFormatsSampleFormats) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
+  // Missing sample_formats
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = std::nullopt;
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty sample_formats vector
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = {{}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Duplicate sample_format
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = {{
+      fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+      fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+  }};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+}
+
+// Negative-test ValidateSupportedFormats for bytes_per_sample
+TEST(ValidateWarningTest, BadSupportedFormatsBytesPerSample) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
+
+  // Missing bytes_per_sample
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = std::nullopt;
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty bytes_per_sample vector
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Out-of-order bytes_per_sample
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{4, 2}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Bad bytes_per_sample - unsigned
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
+      {fuchsia_hardware_audio::SampleFormat::kPcmUnsigned}};
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{0, 1}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{1, 2}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Bad bytes_per_sample - signed
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
+      {fuchsia_hardware_audio::SampleFormat::kPcmSigned}};
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{1, 2}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{3, 4}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{2, 8}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Bad bytes_per_sample - float
+  supported_formats.at(0).pcm_supported_formats()->sample_formats() = {
+      {fuchsia_hardware_audio::SampleFormat::kPcmFloat}};
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{2, 4}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{6, 8}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+  supported_formats.at(0).pcm_supported_formats()->bytes_per_sample() = {{4, 16}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+}
+
+// Negative-test ValidateSupportedFormats for valid_bits_per_sample
+TEST(ValidateWarningTest, BadSupportedFormatsValidBitsPerSample) {
+  std::vector<fuchsia_hardware_audio::SupportedFormats> supported_formats{CompliantFormatSet()};
+
+  // Missing valid_bits_per_sample
+  supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = std::nullopt;
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Empty valid_bits_per_sample vector
+  supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Out-of-order valid_bits_per_sample
+  supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{16, 15}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_INVALID_ARGS);
+
+  // Too low valid_bits_per_sample
+  supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{0, 16}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+
+  // Too high valid_bits_per_sample
+  supported_formats.at(0).pcm_supported_formats()->valid_bits_per_sample() = {{16, 18}};
+  EXPECT_EQ(ValidateSupportedFormats(supported_formats), ZX_ERR_OUT_OF_RANGE);
+}
+
+// Negative-test ValidateGainState
 TEST(ValidateWarningTest, BadGainState) {
   // empty
   EXPECT_EQ(ValidateGainState(fuchsia_hardware_audio::GainState{}), ZX_ERR_INVALID_ARGS);
@@ -116,7 +451,7 @@ TEST(ValidateWarningTest, BadGainState) {
                               }},
                               fuchsia_hardware_audio::StreamProperties{{
                                   .is_input = false,
-                                  // can_mute is missing: CANNOT mute,
+                                  // can_mute (optional) is missing: CANNOT mute
                                   .can_agc = true,
                                   .min_gain_db = -12.0f,
                                   .max_gain_db = 12.0f,
@@ -192,7 +527,7 @@ TEST(ValidateWarningTest, BadPlugState) {
 
   // missing plugged
   EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
-                                  // plugged is missing
+                                  // plugged (required) is missing
                                   .plug_state_time = zx::clock::get_monotonic().get(),
                               }},
                               fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify),
@@ -209,7 +544,7 @@ TEST(ValidateWarningTest, BadPlugState) {
   // missing plug_state_time
   EXPECT_EQ(ValidatePlugState(fuchsia_hardware_audio::PlugState{{
                                   .plugged = false,
-                                  // plug_state_time is missing
+                                  // plug_state_time (required) is missing
                               }},
                               fuchsia_hardware_audio::PlugDetectCapabilities::kCanAsyncNotify),
             ZX_ERR_INVALID_ARGS);
@@ -225,6 +560,7 @@ TEST(ValidateWarningTest, BadPlugState) {
 }
 
 // TODO(fxbug.dev/117826): Negative-test ValidateDeviceInfo
+// TEST(ValidateWarningTest, BadDeviceInfo) {}
 
 // Negative-test ValidateRingBufferProperties
 TEST(ValidateWarningTest, BadRingBufferProperties) {
@@ -254,13 +590,23 @@ TEST(ValidateWarningTest, BadRingBufferProperties) {
             }}),
             ZX_ERR_INVALID_ARGS);
 
-  // // bad driver_transfer_bytes (larger than RB size?)
+  // TODO(b/311694769): Resolve driver_transfer_bytes lower limit: specifically is 0 allowed?
+  // bad driver_transfer_bytes (too small)
+  // EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
+  //               .needs_cache_flush_or_invalidate = true,
+  //               .turn_on_delay = 125,
+  //               .driver_transfer_bytes = 0,
+  //           }}),
+  //           ZX_ERR_INVALID_ARGS);
+
+  // TODO(b/311694769): Resolve driver_transfer_bytes upper limit: no limit? Soft guideline?
+  // bad driver_transfer_bytes (too large)
   // EXPECT_EQ(ValidateRingBufferProperties(fuchsia_hardware_audio::RingBufferProperties{{
   //               .needs_cache_flush_or_invalidate = true,
   //               .turn_on_delay = 125,
   //               .driver_transfer_bytes = 0xFFFFFFFF,
   //           }}),
-  //           ZX_ERR_OUT_OF_RANGE);
+  //           ZX_ERR_INVALID_ARGS);
 }
 
 // Negative-test ValidateRingBufferFormat
@@ -269,6 +615,7 @@ TEST(ValidateWarningTest, BadRingBufferFormat) {
   EXPECT_EQ(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{}), ZX_ERR_INVALID_ARGS);
 
   // bad value number_of_channels
+  // Is there an upper limit on number_of_channels?
   EXPECT_EQ(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
                 .pcm_format = fuchsia_hardware_audio::PcmFormat{{
                     .number_of_channels = 0,
@@ -279,16 +626,6 @@ TEST(ValidateWarningTest, BadRingBufferFormat) {
                 }},
             }}),
             ZX_ERR_OUT_OF_RANGE);
-  // EXPECT_EQ(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
-  //               .pcm_format = fuchsia_hardware_audio::PcmFormat{{
-  //                   .number_of_channels = 255,
-  //                   .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
-  //                   .bytes_per_sample = 2,
-  //                   .valid_bits_per_sample = 16,
-  //                   .frame_rate = 48000,
-  //               }},
-  //           }}),
-  //           ZX_ERR_OUT_OF_RANGE);
 
   // bad value bytes_per_sample
   EXPECT_EQ(ValidateRingBufferFormat(fuchsia_hardware_audio::Format{{
@@ -424,8 +761,43 @@ TEST(ValidateWarningTest, BadFormatCompatibility) {
   }
 }
 
-// TODO(fxbug.dev/117826): negative-test ValidateRingBufferVmo
-// TEST(ValidateWarningTest, BadRingBufferVmo) {}
+// Negative-test ValidateRingBufferVmo
+TEST(ValidateWarningTest, BadRingBufferVmo) {
+  constexpr uint64_t kVmoContentSize = 8192;
+  zx::vmo vmo;
+  auto status = zx::vmo::create(kVmoContentSize, 0, &vmo);
+  ASSERT_EQ(status, ZX_OK) << "could not create VMO for test input";
+
+  constexpr uint8_t kChannelCount = 1;
+  constexpr uint8_t kSampleSize = 2;
+  fuchsia_hardware_audio::Format format{{
+      .pcm_format = fuchsia_hardware_audio::PcmFormat{{
+          .number_of_channels = kChannelCount,
+          .sample_format = fuchsia_hardware_audio::SampleFormat::kPcmSigned,
+          .bytes_per_sample = kSampleSize,
+          .valid_bits_per_sample = 16,
+          .frame_rate = 48000,
+      }},
+  }};
+  uint32_t num_frames = static_cast<uint32_t>(kVmoContentSize / kChannelCount / kSampleSize);
+
+  // Bad VMO (get_size failed)
+  EXPECT_EQ(ValidateRingBufferVmo(zx::vmo(), num_frames, format), ZX_ERR_BAD_HANDLE);
+
+  // bad num_frames (too large for VMO)
+  EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames + 1, format), ZX_ERR_INVALID_ARGS);
+
+  // Bad format (flagged by the encapsulated ValidateRingBufferFormat)
+  format.pcm_format()->frame_rate() = 999;
+  EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames, format), ZX_ERR_OUT_OF_RANGE);
+  format.pcm_format()->frame_rate() = 192001;
+  EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames, format), ZX_ERR_OUT_OF_RANGE);
+
+  // Bad format (flagged by the encapsulated ValidateFormatCompatibility)
+  format.pcm_format()->frame_rate() = 48000;
+  format.pcm_format()->sample_format() = fuchsia_hardware_audio::SampleFormat::kPcmFloat;
+  EXPECT_EQ(ValidateRingBufferVmo(vmo, num_frames, format), ZX_ERR_INVALID_ARGS);
+}
 
 // Negative-test ValidateDelayInfo for internal_delay
 TEST(ValidateWarningTest, BadInternalDelayInfo) {

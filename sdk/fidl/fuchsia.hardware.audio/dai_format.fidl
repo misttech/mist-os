@@ -14,13 +14,13 @@ type DaiSampleFormat = strict enum : uint8 {
     /// Pulse Density Modulation samples.
     PDM = 1;
 
-    /// Signed Linear Pulse Code Modulation samples at the host endianness.
+    /// Signed integer Linear Pulse Code Modulation samples, at the host endianness.
     PCM_SIGNED = 2;
 
-    /// Unsigned Linear Pulse Code Modulation samples at the host endianness.
+    /// Unsigned integer Linear Pulse Code Modulation samples, at the host endianness.
     PCM_UNSIGNED = 3;
 
-    /// Floating point samples IEEE-754 encoded.
+    /// Floating point samples, encoded per the IEEE-754 standard.
     PCM_FLOAT = 4;
 };
 
@@ -117,10 +117,10 @@ type DaiSupportedFormats = struct {
     sample_formats vector<DaiSampleFormat>:MAX_COUNT_DAI_SUPPORTED_SAMPLE_FORMATS;
     /// Frame formats supported.
     frame_formats vector<DaiFrameFormat>:MAX_COUNT_DAI_SUPPORTED_FRAME_FORMATS;
-    /// Rates supported.
+    /// Rates supported. Values must be listed in ascending order.
     frame_rates vector<uint32>:MAX_COUNT_DAI_SUPPORTED_RATES;
-    /// The bits per slot supported.
+    /// The bits per slot supported. Values must be listed in ascending order.
     bits_per_slot vector<uint8>:MAX_COUNT_DAI_SUPPORTED_BITS_PER_SLOT;
-    /// Bits per sample supported.
+    /// Bits per sample supported. Values must be listed in ascending order.
     bits_per_sample vector<uint8>:MAX_COUNT_DAI_SUPPORTED_BITS_PER_SAMPLE;
 };

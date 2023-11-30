@@ -25,8 +25,8 @@ int main(int argc, char** argv) {
   bool devfs_only = command_line.HasOption("devfs-only");
 
   // --no-virtual: Don't automatically create and test virtual_audio instances for StreamConfig
-  // Dai and Composite (using default settings). When this flag is enabled, any _preexisting_
-  // virtual_audio instances are allowed and tested like any other physical device.
+  //   Dai and Composite (using default settings). When this flag is enabled, any _preexisting_
+  //   virtual_audio instances are allowed and tested like any other physical device.
   bool no_virtual_audio = command_line.HasOption("no-virtual");
 
   // --admin: Validate commands that require exclusive access, such as SetFormat.

@@ -10,6 +10,7 @@
 #include <lib/syslog/cpp/macros.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <string_view>
 
@@ -204,9 +205,9 @@ void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateC
 //      .number_of_channels has at least 1 value, these are distinct (and increasing?).
 //      .sample_formats has at least 1 value, these are distinct.
 //      .frame_formats has at least 1 value, these are distinct.
-//      .frame_rates has at least 1 value, these are distinct (and increasing?).
-//      .bits_per_slot has at least 1 value, these are distinct (and increasing?).
-//      .bits_per_sample has at least 1 value, these are distinct (and increasing?).
+//      .frame_rates has at least 1 value, these are distinct and increasing.
+//      .bits_per_slot has at least 1 value, these are distinct and increasing.
+//      .bits_per_sample has at least 1 value, these are distinct and increasing.
 //      .bits_per_sample <= .bits_per_slot max value.
 //    (Is there ANY scenario in which we expect ERROR instead of valid response?)
 //
@@ -386,83 +387,59 @@ void BasicTest::ValidateFormatCorrectness() {
       }
     }
 
-    // Ensure bytes_per_sample are unique.
-    for (size_t j = 0; j < format_set.bytes_per_sample().size() - 1; ++j) {
-      for (size_t k = j + 1; k < format_set.sample_formats().size(); ++k) {
-        EXPECT_NE(static_cast<uint16_t>(format_set.bytes_per_sample()[j]),
-                  static_cast<uint16_t>(format_set.bytes_per_sample()[k]))
+    // Ensure bytes_per_sample are unique and listed in ascending order.
+    uint16_t max_bytes = 0;
+    for (size_t j = 0; j < format_set.bytes_per_sample().size(); ++j) {
+      EXPECT_GT(format_set.bytes_per_sample()[j], 0)
+          << "bytes_per_sample[" << j << "] ("
+          << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
+          << ") must be greater than zero";
+      if (j > 0) {
+        EXPECT_GT(format_set.bytes_per_sample()[j], format_set.bytes_per_sample()[j - 1])
             << "bytes_per_sample[" << j << "] ("
             << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
-            << ") must not equal bytes_per_sample[" << k << "] ("
-            << static_cast<uint16_t>(format_set.bytes_per_sample()[k]) << ")";
+            << ") must exceed bytes_per_sample[" << j - 1 << "] ("
+            << static_cast<uint16_t>(format_set.bytes_per_sample()[j - 1]) << ")";
       }
+      max_bytes = std::max(max_bytes, static_cast<uint16_t>(format_set.bytes_per_sample()[j]));
     }
 
     // Ensure valid_bits_per_sample are unique and listed in ascending order.
-    for (size_t j = 0; j < format_set.valid_bits_per_sample().size() - 1; ++j) {
-      for (size_t k = j + 1; k < format_set.sample_formats().size(); ++k) {
-        EXPECT_NE(static_cast<uint16_t>(format_set.valid_bits_per_sample()[j]),
-                  static_cast<uint16_t>(format_set.valid_bits_per_sample()[k]))
-            << "valid_bits_per_sample[" << j << "] ("
-            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
-            << ") must not equal valid_bits_per_sample[" << k << "] ("
-            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[k]) << ")";
-      }
-    }
-
-    // Ensure frame_rates are in range and unique.
-    for (size_t j = 0; j < format_set.frame_rates().size(); ++j) {
-      SCOPED_TRACE(testing::Message() << "frame_rates[" << j << "]");
-
-      EXPECT_GE(format_set.frame_rates()[j], fuchsia::media::MIN_PCM_FRAMES_PER_SECOND);
-      EXPECT_LE(format_set.frame_rates()[j], fuchsia::media::MAX_PCM_FRAMES_PER_SECOND);
-
-      for (size_t k = j + 1; k < format_set.sample_formats().size(); ++k) {
-        EXPECT_NE(format_set.frame_rates()[j], format_set.frame_rates()[k])
-            << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
-            << ") must not equal frame_rates[" << k << "] (" << format_set.frame_rates()[k] << ")";
-      }
-    }
-  }
-}
-
-// Fail if the returned sample sizes, valid bits and rates are not listed in ascending order.
-// This is split into a separate check (and test case) because it is often overlooked.
-void BasicTest::ValidateFormatOrdering() {
-  for (size_t i = 0; i < ring_buffer_pcm_formats().size(); ++i) {
-    SCOPED_TRACE(testing::Message() << "ring_buffer_pcm_format[" << i << "]");
-    auto& format_set = ring_buffer_pcm_formats()[i];
-
-    ASSERT_TRUE(format_set.has_bytes_per_sample());
-    ASSERT_TRUE(format_set.has_valid_bits_per_sample());
-    ASSERT_TRUE(format_set.has_frame_rates());
-
-    // Ensure bytes_per_sample are listed in ascending order.
-    for (size_t j = 0; j < format_set.bytes_per_sample().size() - 1; ++j) {
-      EXPECT_LT(static_cast<uint16_t>(format_set.bytes_per_sample()[j]),
-                static_cast<uint16_t>(format_set.bytes_per_sample()[j + 1]))
-          << "bytes_per_sample[" << j << "] ("
-          << static_cast<uint16_t>(format_set.bytes_per_sample()[j])
-          << ") must be less than bytes_per_sample[" << j + 1 << "] ("
-          << static_cast<uint16_t>(format_set.bytes_per_sample()[j + 1]) << ")";
-    }
-
-    // Ensure valid_bits_per_sample are listed in ascending order.
-    for (size_t j = 0; j < format_set.valid_bits_per_sample().size() - 1; ++j) {
-      EXPECT_LT(static_cast<uint16_t>(format_set.valid_bits_per_sample()[j]),
-                static_cast<uint16_t>(format_set.valid_bits_per_sample()[j + 1]))
+    for (size_t j = 0; j < format_set.valid_bits_per_sample().size(); ++j) {
+      EXPECT_GT(format_set.valid_bits_per_sample()[j], 0)
           << "valid_bits_per_sample[" << j << "] ("
           << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
-          << ") must be less than valid_bits_per_sample[" << j + 1 << "] ("
-          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j + 1]) << ")";
+          << ") must be greater than zero";
+      if (j > 0) {
+        EXPECT_GT(format_set.valid_bits_per_sample()[j], format_set.valid_bits_per_sample()[j - 1])
+            << "valid_bits_per_sample[" << j << "] ("
+            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
+            << ") must exceed than valid_bits_per_sample[" << j - 1 << "] ("
+            << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j - 1]) << ")";
+      }
+      EXPECT_LE(format_set.valid_bits_per_sample()[j], max_bytes * 8)
+          << "valid_bits_per_sample[" << j << "] ("
+          << static_cast<uint16_t>(format_set.valid_bits_per_sample()[j])
+          << ") must fit into the maximum bytes_per_sample (" << max_bytes << ")";
     }
 
-    // Ensure frame_rates are listed in ascending order.
-    for (size_t j = 0; j < format_set.frame_rates().size() - 1; ++j) {
-      EXPECT_LT(format_set.frame_rates()[j], format_set.frame_rates()[j + 1])
+    // Ensure frame_rates are in range and unique and listed in ascending order.
+    for (size_t j = 0; j < format_set.frame_rates().size(); ++j) {
+      EXPECT_GE(format_set.frame_rates()[j], fuchsia::media::MIN_PCM_FRAMES_PER_SECOND)
           << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
-          << ") must be less than frame_rates[" << j + 1 << "] (" << format_set.frame_rates()[j + 1]
-          << ")";
+          << ") cannot be less than MIN_PCM_FRAMES_PER_SECOND ("
+          << fuchsia::media::MIN_PCM_FRAMES_PER_SECOND << ")";
+      EXPECT_LE(format_set.frame_rates()[j], fuchsia::media::MAX_PCM_FRAMES_PER_SECOND)
+          << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
+          << ") cannot exceed MAX_PCM_FRAMES_PER_SECOND ("
+          << fuchsia::media::MAX_PCM_FRAMES_PER_SECOND << ")";
+
+      if (j > 0) {
+        EXPECT_GT(format_set.frame_rates()[j], format_set.frame_rates()[j - 1])
+            << "frame_rates[" << j << "] (" << format_set.frame_rates()[j]
+            << ") must exceed frame_rates[" << j - 1 << "] (" << format_set.frame_rates()[j - 1]
+            << ")";
+      }
     }
   }
 }
@@ -624,16 +601,6 @@ DEFINE_BASIC_TEST_CLASS(FormatCorrectness, {
   WaitForError();
 });
 
-// Verify that the reported rates and samples sizes are listed in ascending order. This is split
-// into a distinct test case to make this often-overlooked requirement more prominent.
-DEFINE_BASIC_TEST_CLASS(FormatsListedInOrder, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
-
-  ValidateFormatOrdering();
-  WaitForError();
-});
-
 // Verify that a valid initial plug detect response is successfully received.
 DEFINE_BASIC_TEST_CLASS(GetInitialPlugState, {
   ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
@@ -675,7 +642,6 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
     REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
     REGISTER_BASIC_TEST(SetGain, device_entry);
     REGISTER_BASIC_TEST(FormatCorrectness, device_entry);
-    REGISTER_BASIC_TEST(FormatsListedInOrder, device_entry);
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else if (device_entry.isDai()) {

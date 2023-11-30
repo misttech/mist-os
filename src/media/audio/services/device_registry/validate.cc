@@ -18,7 +18,7 @@ namespace media_audio {
 
 // Frame rates must be listed in ascending order, but some drivers don't do this.
 // TODO(fxbug.dev/116959): once this is fixed, clean out this workaround.
-inline constexpr bool kStrictFrameRateOrdering = false;
+inline constexpr bool kStrictFrameRateOrdering = true;
 
 // We define these here only temporarily, as we publish no frame-rate limits for audio devices.
 // TODO(fxbug.dev/116961): officially define frame-rate limits/expectations for audio devices.
@@ -212,83 +212,74 @@ zx_status_t ValidateSupportedFormats(
     return ZX_ERR_INVALID_ARGS;
   }
 
-  for (const auto& supported_formats : formats) {
-    if (!supported_formats.pcm_supported_formats()) {
+  for (const auto& format_set : formats) {
+    if (!format_set.pcm_supported_formats()) {
       FX_LOGS(WARNING) << "GetSupportedFormats: pcm_supported_formats is absent";
       return ZX_ERR_INVALID_ARGS;
     }
-    const auto& pcm_supported_formats = *supported_formats.pcm_supported_formats();
+    const auto& pcm_format_set = *format_set.pcm_supported_formats();
 
     // Frame rates
-    [[maybe_unused]] uint32_t prev_frame_rate = 0;
-    uint32_t max_supported_frame_rate = 0;
-    if (!pcm_supported_formats.frame_rates() || pcm_supported_formats.frame_rates()->empty()) {
-      FX_LOGS(WARNING) << "GetSupportedFormats: frame_rates[] is absent/empty";
+    if (!pcm_format_set.frame_rates() || pcm_format_set.frame_rates()->empty()) {
+      FX_LOGS(WARNING) << "GetSupportedFormats: frame_rates[] is "
+                       << (pcm_format_set.frame_rates() ? "empty" : "absent");
       return ZX_ERR_INVALID_ARGS;
     }
-    for (const auto& rate : *pcm_supported_formats.frame_rates()) {
+    // While testing frame_rates, we can determine max_supported_frame_rate.
+    uint32_t prev_frame_rate = 0, max_supported_frame_rate = 0;
+    for (const auto& rate : *pcm_format_set.frame_rates()) {
       if (rate < kMinFrameRate || rate > kMaxFrameRate) {
         FX_LOGS(WARNING) << "GetSupportedFormats: frame_rate (" << rate << ") out of range ["
                          << kMinFrameRate << "," << kMaxFrameRate << "] ";
         return ZX_ERR_OUT_OF_RANGE;
       }
-      if constexpr (kStrictFrameRateOrdering) {
-        // This also eliminates duplicate entries.
-        if (rate <= prev_frame_rate) {
-          FX_LOGS(WARNING) << "GetSupportedFormats: frame_rate must be listed in ascending order: "
-                           << rate << " listed after " << prev_frame_rate;
-          return ZX_ERR_INVALID_ARGS;
-        }
-        prev_frame_rate = rate;
-      } else {
-        if (std::count(pcm_supported_formats.frame_rates()->begin(),
-                       pcm_supported_formats.frame_rates()->end(), rate) > 1) {
-          FX_LOGS(WARNING) << "GetSupportedFormats: rate (" << rate
-                           << ") must be unique across frame_rates";
-          return ZX_ERR_INVALID_ARGS;
-        }
+      // Checking for "strictly ascending" also eliminates duplicate entries.
+      if (rate <= prev_frame_rate) {
+        FX_LOGS(WARNING) << "GetSupportedFormats: frame_rate must be in ascending order: "
+                         << prev_frame_rate << " was listed before " << rate;
+        return ZX_ERR_INVALID_ARGS;
       }
-
+      prev_frame_rate = rate;
       max_supported_frame_rate = std::max(max_supported_frame_rate, rate);
     }
 
     // Channel sets
-    if (!pcm_supported_formats.channel_sets() || pcm_supported_formats.channel_sets()->empty()) {
-      FX_LOGS(WARNING) << "GetSupportedFormats: channel_sets[] is absent/empty";
+    if (!pcm_format_set.channel_sets() || pcm_format_set.channel_sets()->empty()) {
+      FX_LOGS(WARNING) << "GetSupportedFormats: channel_sets[] is "
+                       << (pcm_format_set.channel_sets() ? "empty" : "absent");
       return ZX_ERR_INVALID_ARGS;
     }
-    for (const fuchsia_hardware_audio::ChannelSet& chan_set :
-         *pcm_supported_formats.channel_sets()) {
+    auto max_allowed_frequency = max_supported_frame_rate / 2;
+    for (const fuchsia_hardware_audio::ChannelSet& chan_set : *pcm_format_set.channel_sets()) {
       if (!chan_set.attributes() || chan_set.attributes()->empty()) {
-        FX_LOGS(WARNING) << "GetSupportedFormats: ChannelSet.attributes[] is absent/empty";
+        FX_LOGS(WARNING) << "GetSupportedFormats: ChannelSet.attributes[] is "
+                         << (chan_set.attributes() ? "empty" : "absent");
         return ZX_ERR_INVALID_ARGS;
       }
-      if (CountChannelMatches(*pcm_supported_formats.channel_sets(),
-                              chan_set.attributes()->size()) > 1) {
+      if (CountChannelMatches(*pcm_format_set.channel_sets(), chan_set.attributes()->size()) > 1) {
         FX_LOGS(WARNING)
             << "GetSupportedFormats: channel-count must be unique across channel_sets: "
             << chan_set.attributes()->size();
         return ZX_ERR_INVALID_ARGS;
       }
       for (const auto& attrib : *chan_set.attributes()) {
-        auto max_allowed_frequency = max_supported_frame_rate / 2;
         if (attrib.min_frequency()) {
           if (*attrib.min_frequency() > max_allowed_frequency) {
-            FX_LOGS(WARNING)
-                << "GetSupportedFormats: ChannelAttributes.min_frequency out of range: "
-                << *attrib.min_frequency();
+            FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttributes.min_frequency ("
+                             << *attrib.min_frequency() << ") out of range: " << "[0, "
+                             << max_allowed_frequency << "]";
             return ZX_ERR_OUT_OF_RANGE;
           }
           if (attrib.max_frequency() && *attrib.min_frequency() > *attrib.max_frequency()) {
-            FX_LOGS(WARNING) << "GetSupportedFormats: min_frequency cannot exceed max_frequency: "
-                             << *attrib.min_frequency() << "," << *attrib.max_frequency();
+            FX_LOGS(WARNING) << "GetSupportedFormats: min_frequency (" << *attrib.min_frequency()
+                             << ") cannot exceed max_frequency (" << *attrib.max_frequency() << ")";
             return ZX_ERR_INVALID_ARGS;
           }
         }
 
         if (attrib.max_frequency()) {
           if (*attrib.max_frequency() > max_allowed_frequency) {
-            FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttrib.max_freq "
+            FX_LOGS(WARNING) << "GetSupportedFormats: ChannelAttrib.max_frequency "
                              << *attrib.max_frequency() << " will be limited to "
                              << max_allowed_frequency;
           }
@@ -297,12 +288,12 @@ zx_status_t ValidateSupportedFormats(
     }
 
     // Sample format
-    if (!pcm_supported_formats.sample_formats() ||
-        pcm_supported_formats.sample_formats()->empty()) {
-      FX_LOGS(WARNING) << "GetSupportedFormats: sample_formats[] is empty";
+    if (!pcm_format_set.sample_formats() || pcm_format_set.sample_formats()->empty()) {
+      FX_LOGS(WARNING) << "GetSupportedFormats: sample_formats[] is "
+                       << (pcm_format_set.sample_formats() ? "empty" : "absent");
       return ZX_ERR_INVALID_ARGS;
     }
-    const auto& sample_formats = *pcm_supported_formats.sample_formats();
+    const auto& sample_formats = *pcm_format_set.sample_formats();
     for (const auto& format : sample_formats) {
       if (CountFormatMatches(sample_formats, format) > 1) {
         FX_LOGS(WARNING) << "GetSupportedFormats: no duplicate SampleFormat values allowed: "
@@ -312,40 +303,37 @@ zx_status_t ValidateSupportedFormats(
     }
 
     // Bytes per sample
-    if (!pcm_supported_formats.bytes_per_sample() ||
-        pcm_supported_formats.bytes_per_sample()->empty()) {
-      FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample[] is absent/empty";
+    if (!pcm_format_set.bytes_per_sample() || pcm_format_set.bytes_per_sample()->empty()) {
+      FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample[] is "
+                       << (pcm_format_set.bytes_per_sample() ? "empty" : "absent");
       return ZX_ERR_INVALID_ARGS;
     }
-    uint8_t prev_bytes_per_sample = 0;
-    uint8_t max_bytes_per_sample = 0;
-    for (const auto& bytes : *pcm_supported_formats.bytes_per_sample()) {
+    uint8_t prev_bytes_per_sample = 0, max_bytes_per_sample = 0;
+    for (const auto& bytes : *pcm_format_set.bytes_per_sample()) {
       if (CountFormatMatches(sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmSigned) &&
           (bytes != 2 && bytes != 4)) {
-        FX_LOGS(WARNING)
-            << "GetSupportedFormats: bytes_per_sample must be 2 or 4 for PCM_SIGNED format: "
-            << bytes;
+        FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
+                         << static_cast<uint16_t>(bytes)
+                         << ") must be 2 or 4 for PCM_SIGNED format";
         return ZX_ERR_INVALID_ARGS;
       }
       if (CountFormatMatches(sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmFloat) &&
           (bytes != 4 && bytes != 8)) {
-        FX_LOGS(WARNING)
-            << "GetSupportedFormats: bytes_per_sample must be 4 or 8 for PCM_FLOAT format: "
-            << bytes;
+        FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
+                         << static_cast<uint16_t>(bytes) << ") must be 4 or 8 for PCM_FLOAT format";
         return ZX_ERR_INVALID_ARGS;
       }
       if (CountFormatMatches(sample_formats, fuchsia_hardware_audio::SampleFormat::kPcmUnsigned) &&
           bytes != 1) {
-        FX_LOGS(WARNING)
-            << "GetSupportedFormats: bytes_per_sample must be 1 for PCM_UNSIGNED format: " << bytes;
+        FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample ("
+                         << static_cast<uint16_t>(bytes) << ") must be 1 for PCM_UNSIGNED format";
         return ZX_ERR_INVALID_ARGS;
       }
-      // Bytes per sample must be listed in ascending order. This also eliminates duplicate values.
+      // Checking for "strictly ascending" also eliminates duplicate entries.
       if (bytes <= prev_bytes_per_sample) {
-        FX_LOGS(WARNING)
-            << "GetSupportedFormats: bytes_per_sample must be listed in ascending order: "
-            << static_cast<uint16_t>(bytes) << " listed after "
-            << static_cast<uint16_t>(prev_bytes_per_sample);
+        FX_LOGS(WARNING) << "GetSupportedFormats: bytes_per_sample must be in ascending order: "
+                         << static_cast<uint16_t>(prev_bytes_per_sample) << " was listed before "
+                         << static_cast<uint16_t>(bytes);
         return ZX_ERR_INVALID_ARGS;
       }
       prev_bytes_per_sample = bytes;
@@ -354,24 +342,26 @@ zx_status_t ValidateSupportedFormats(
     }
 
     // Valid bits per sample
-    if (!pcm_supported_formats.valid_bits_per_sample() ||
-        pcm_supported_formats.valid_bits_per_sample()->empty()) {
-      FX_LOGS(WARNING) << "GetSupportedFormats: valid_bits_per_sample[] is absent/empty";
+    if (!pcm_format_set.valid_bits_per_sample() ||
+        pcm_format_set.valid_bits_per_sample()->empty()) {
+      FX_LOGS(WARNING) << "GetSupportedFormats: valid_bits_per_sample[] is "
+                       << (pcm_format_set.valid_bits_per_sample() ? "empty" : "absent");
       return ZX_ERR_INVALID_ARGS;
     }
     uint8_t prev_valid_bits = 0;
-    for (const auto& valid_bits : *pcm_supported_formats.valid_bits_per_sample()) {
+    for (const auto& valid_bits : *pcm_format_set.valid_bits_per_sample()) {
       if (valid_bits == 0 || valid_bits > max_bytes_per_sample * 8) {
-        FX_LOGS(WARNING) << "GetSupportedFormats: valid_bits_per_sample out of range: "
-                         << static_cast<uint16_t>(valid_bits);
+        FX_LOGS(WARNING) << "GetSupportedFormats: valid_bits_per_sample ("
+                         << static_cast<uint16_t>(valid_bits) << ") out of range [1, "
+                         << max_bytes_per_sample * 8 << "]";
         return ZX_ERR_OUT_OF_RANGE;
       }
-      // Valid bits per sample must be listed in ascending order.
+      // Checking for "strictly ascending" also eliminates duplicate entries.
       if (valid_bits <= prev_valid_bits) {
         FX_LOGS(WARNING)
-            << "GetSupportedFormats: valid_bits_per_sample must be listed in ascending order: "
-            << static_cast<uint16_t>(valid_bits) << " listed after "
-            << static_cast<uint16_t>(prev_valid_bits);
+            << "GetSupportedFormats: valid_bits_per_sample must be in ascending order: "
+            << static_cast<uint16_t>(prev_valid_bits) << " was listed before "
+            << static_cast<uint16_t>(valid_bits);
         return ZX_ERR_INVALID_ARGS;
       }
       prev_valid_bits = valid_bits;
@@ -545,14 +535,14 @@ zx_status_t ValidateRingBufferFormat(const fuchsia_hardware_audio::Format& forma
 zx_status_t ValidateFormatCompatibility(uint8_t bytes_per_sample,
                                         fuchsia_hardware_audio::SampleFormat sample_format) {
   // Explicitly check for fuchsia_audio::SampleType kUint8, kInt16, kInt32, kFloat32, kFloat64
-  if ((bytes_per_sample == 1 &&
-       sample_format == fuchsia_hardware_audio::SampleFormat::kPcmUnsigned) ||
-      (bytes_per_sample == 2 &&
-       sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned) ||
-      (bytes_per_sample == 4 &&
-       sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned) ||
-      (bytes_per_sample == 4 && sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat) ||
-      (bytes_per_sample == 8 && sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat)) {
+  if ((sample_format == fuchsia_hardware_audio::SampleFormat::kPcmUnsigned &&
+       bytes_per_sample == 1) ||
+      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
+       bytes_per_sample == 2) ||
+      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmSigned &&
+       bytes_per_sample == 4) ||
+      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat && bytes_per_sample == 4) ||
+      (sample_format == fuchsia_hardware_audio::SampleFormat::kPcmFloat && bytes_per_sample == 8)) {
     return ZX_OK;
   }
 
@@ -568,6 +558,11 @@ zx_status_t ValidateRingBufferVmo(const zx::vmo& vmo, uint32_t num_frames,
 
   uint64_t size;
   auto status = ValidateRingBufferFormat(format);
+  if (status != ZX_OK) {
+    return status;
+  }
+  status = ValidateFormatCompatibility(format.pcm_format()->bytes_per_sample(),
+                                       format.pcm_format()->sample_format());
   if (status != ZX_OK) {
     return status;
   }

@@ -10,7 +10,6 @@
 
 #include <optional>
 
-#include "src/lib/fsl/io/device_watcher.h"
 #include "src/media/audio/drivers/tests/test_base.h"
 
 namespace media::audio::drivers::test {
@@ -43,7 +42,6 @@ class BasicTest : public TestBase {
   void WatchPlugStateAndExpectNoUpdate();
 
   void ValidateFormatCorrectness();
-  void ValidateFormatOrdering();
 
  private:
   static constexpr size_t kUniqueIdLength = 16;

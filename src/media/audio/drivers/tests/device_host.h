@@ -33,8 +33,8 @@ class DeviceHost {
   // Detect devfs-based audio devices, optionally adding device entries for a2dp and virtual_audio.
   void DetectDevices(bool devfs_only, bool no_virtual_audio);
 
-  // Optionally called during DetectDevices. Create virtual_audio instances (one for input, one for
-  // output) using the default configurations settings (which should always pass all tests).
+  // Optionally called during DetectDevices. Create virtual_audio instances for each device type
+  // using the default configurations settings (which should always pass all tests).
   void AddVirtualDevices();
   void AddVirtualDevice(bool is_input, fuchsia::virtualaudio::DeviceType device_type,
                         fuchsia::virtualaudio::DevicePtr& device_ptr);
