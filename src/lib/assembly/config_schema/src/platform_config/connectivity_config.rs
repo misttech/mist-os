@@ -90,6 +90,9 @@ pub struct PlatformWlanConfig {
 pub struct MdnsConfig {
     /// Enable a wired service so that ffx can discover the device.
     pub publish_fuchsia_dev_wired_service: Option<bool>,
+
+    /// Service config file.
+    pub config: Option<Utf8PathBuf>,
 }
 
 /// Platform configuration options to use for the thread area.

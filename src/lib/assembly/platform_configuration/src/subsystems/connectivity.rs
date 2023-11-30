@@ -40,6 +40,12 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         if publish_fuchsia_dev_wired_service {
             builder.platform_bundle("mdns_fuchsia_device_wired_service");
         }
+        if let Some(mdns_config) = &connectivity_config.mdns.config {
+            builder.package("mdns").config_data(FileEntry {
+                source: mdns_config.clone(),
+                destination: "assembly.config".into(),
+            })?;
+        }
 
         // The configuration of networking is dependent on all three of:
         // - the feature_set_level
