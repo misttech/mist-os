@@ -1444,30 +1444,25 @@ fn try_deliver<
 ) -> bool {
     sync_ctx.with_sockets_state(|sync_ctx, state| {
         let should_deliver = match state.get_socket_state(&id).expect("socket ID is valid") {
-            DatagramSocketState::Bound(
-                DatagramBoundSocketState{socket_type, original_bound_addr: _}
-            ) => match socket_type {
+            DatagramSocketState::Bound(DatagramBoundSocketState {
+                socket_type,
+                original_bound_addr: _,
+            }) => match socket_type {
                 DatagramBoundSocketStateType::Connected { state, sharing: _ } => {
-                    let state = match transport::udp::BoundStateContext::dual_stack_context(sync_ctx) {
+                    match transport::udp::BoundStateContext::dual_stack_context(sync_ctx) {
                         MaybeDualStack::DualStack(dual_stack) => {
                             match dual_stack.converter().convert(state) {
-                                DualStackConnState::ThisStack(state) => state,
-                                DualStackConnState::OtherStack(state) => {
-                                    dual_stack.assert_dual_stack_enabled(state);
-                                    todo!(
-                                        "https://fxbug.dev/21198: Support dual-stack udp try_deliver"
-                                    );
-                                }
+                                DualStackConnState::ThisStack(state) => state.should_receive(),
+                                DualStackConnState::OtherStack(state) => state.should_receive(),
                             }
                         }
                         MaybeDualStack::NotDualStack(not_dual_stack) => {
-                            not_dual_stack.converter().convert(state)
+                            not_dual_stack.converter().convert(state).should_receive()
                         }
-                    };
-                    state.should_receive()
+                    }
                 }
                 DatagramBoundSocketStateType::Listener { state: _, sharing: _ } => true,
-            }
+            },
             DatagramSocketState::Unbound(_) => true,
         };
         if should_deliver {
@@ -1928,8 +1923,6 @@ pub enum SendError {
     NotWriteable,
     /// The packet couldn't be sent.
     IpSock(IpSockSendError),
-    /// TODO(https://fxbug.dev/21198): Remove once dual-stack send is supported.
-    DualStackNotImplemented,
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
     RemotePortUnset,
@@ -1982,9 +1975,6 @@ impl<
                 DatagramSendError::SerializeError(err) => match err {
                     UdpSerializeError::RemotePortUnset => Either::Left(SendError::RemotePortUnset),
                 },
-                DatagramSendError::DualStackNotImplemented => {
-                    Either::Left(SendError::DualStackNotImplemented)
-                }
             }
         })
     }

@@ -827,8 +827,6 @@ impl<E> IntoErrno for core_datagram::SendError<E> {
             core_datagram::SendError::NotWriteable => fposix::Errno::Epipe,
             core_datagram::SendError::IpSock(err) => err.into_errno(),
             core_datagram::SendError::SerializeError(_e) => fposix::Errno::Einval,
-            // TODO(https://fxbug.dev/21198): Support dual-stack send.
-            core_datagram::SendError::DualStackNotImplemented => fposix::Errno::Eopnotsupp,
         }
     }
 }

@@ -381,19 +381,9 @@ impl<I: IpExt, D, S: DatagramSocketSpec> AsRef<Self> for IpOptions<I, D, S> {
     }
 }
 
-impl<I: IpExt, D, S: DatagramSocketSpec> SendOptions<I> for IpOptions<I, D, S> {
-    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
-        <SocketHopLimits as SendOptions<I>>::hop_limit(&self.hop_limits, destination)
-    }
-}
-
 impl<I: IpExt, D, S: DatagramSocketSpec> IpOptions<I, D, S> {
     pub(crate) fn other_stack(&self) -> &S::OtherStackIpOptions<I> {
         &self.other_stack
-    }
-
-    pub(crate) fn hop_limits(&self) -> &SocketHopLimits {
-        &self.hop_limits
     }
 }
 
@@ -423,12 +413,20 @@ impl SocketHopLimits {
     }
 }
 
-impl<I: IpExt> SendOptions<I> for SocketHopLimits {
-    fn hop_limit(&self, destination: &SpecifiedAddr<I::Addr>) -> Option<NonZeroU8> {
+// TODO(https://fxbug.dev/137046): Independently store IPv4 and Ipv6 socket
+// options. DualStack sockets require `SendOptions<I::OtherVersion`, which we
+// implement here by decoupling the `WireI` and `SocketI`. This effectively
+// uses the IPv6 hop_limits (SO_IPV6_UNICAST_HOPS & SO_IPV6_MULTICAST_HOPS) for
+// sent Ipv4 packets, rater than the IPv4 hop_limits
+// (SO_IP_TTL & SO_IP_MULTICAST_TTL).
+impl<WireI: IpExt, SocketI: IpExt, D, S: DatagramSocketSpec> SendOptions<WireI>
+    for IpOptions<SocketI, D, S>
+{
+    fn hop_limit(&self, destination: &SpecifiedAddr<WireI::Addr>) -> Option<NonZeroU8> {
         if destination.is_multicast() {
-            self.multicast
+            self.hop_limits.multicast
         } else {
-            self.unicast
+            self.hop_limits.unicast
         }
     }
 }
@@ -3915,8 +3913,6 @@ pub enum SendError<SE> {
     IpSock(IpSockSendError),
     /// There was a problem when serializing the packet.
     SerializeError(SE),
-    /// TODO(https://fxbug.dev/21198): Remove once dual-stack send is supported.
-    DualStackNotImplemented,
 }
 
 pub(crate) fn send_conn<
@@ -3944,38 +3940,89 @@ pub(crate) fn send_conn<
             }
         };
 
-        let ConnState {
-            socket,
-            clear_device_on_disconnect: _,
-            shutdown: Shutdown { send: shutdown_send, receive: _ },
-            addr,
-            extra: _,
-        } = match sync_ctx.dual_stack_context() {
+        struct SendParams<'a, WireI: IpExt, SocketI: IpExt, S: DatagramSocketSpec, D: WeakId> {
+            socket: &'a IpSock<WireI, D, IpOptions<SocketI, D, S>>,
+            ip: &'a ConnIpAddr<
+                WireI::Addr,
+                <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
+                <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
+            >,
+        }
+
+        enum Operation<
+            'a,
+            I: DualStackIpExt,
+            S: DatagramSocketSpec,
+            D: WeakId,
+            B: BufferMut,
+            C: DatagramStateNonSyncContext<I, S>,
+            DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
+            SC: BufferDatagramBoundStateContext<I, C, S, B>,
+        > {
+            SendToThisStack((SendParams<'a, I, I, S, D>, &'a mut SC)),
+            SendToOtherStack((SendParams<'a, I::OtherVersion, I, S, D>, &'a mut DualStackSC)),
+            // Allow `Operation` to be generic over `B` and `C` so that they can
+            // be used in trait bounds for `DualStackSC` and `SC`.
+            _Phantom((Never, PhantomData<(B, C)>)),
+        }
+
+        let (shutdown, operation) = match sync_ctx.dual_stack_context() {
             MaybeDualStack::DualStack(dual_stack) => match dual_stack.converter().convert(state) {
-                DualStackConnState::ThisStack(state) => state,
-                DualStackConnState::OtherStack(state) => {
-                    dual_stack.assert_dual_stack_enabled(state);
-                    // TODO(https://fxbug.dev/21198): Support dual-stack send.
-                    warn!("dualstack send not supported");
-                    return Err(SendError::DualStackNotImplemented);
+                DualStackConnState::ThisStack(ConnState {
+                    socket,
+                    clear_device_on_disconnect: _,
+                    shutdown,
+                    addr: ConnAddr { ip, device: _ },
+                    extra: _,
+                }) => (shutdown, Operation::SendToThisStack((SendParams { socket, ip }, sync_ctx))),
+                DualStackConnState::OtherStack(ConnState {
+                    socket,
+                    clear_device_on_disconnect: _,
+                    shutdown,
+                    addr: ConnAddr { ip, device: _ },
+                    extra: _,
+                }) => {
+                    (shutdown, Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)))
                 }
             },
             MaybeDualStack::NotDualStack(not_dual_stack) => {
-                not_dual_stack.converter().convert(state)
+                let ConnState {
+                    socket,
+                    clear_device_on_disconnect: _,
+                    shutdown,
+                    addr: ConnAddr { ip, device: _ },
+                    extra: _,
+                } = not_dual_stack.converter().convert(state);
+                (shutdown, Operation::SendToThisStack((SendParams { socket, ip }, sync_ctx)))
             }
         };
+
+        let Shutdown { send: shutdown_send, receive: _ } = shutdown;
         if *shutdown_send {
             return Err(SendError::NotWriteable);
         }
 
-        let ConnAddr { ip, device: _ } = addr;
-
-        let packet = S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
-        sync_ctx.with_transport_context_buf(|sync_ctx| {
-            sync_ctx
-                .send_ip_packet(ctx, &socket, packet, None)
-                .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
-        })
+        match operation {
+            Operation::SendToThisStack((SendParams { socket, ip }, sync_ctx)) => {
+                let packet =
+                    S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
+                sync_ctx.with_transport_context_buf(|sync_ctx| {
+                    sync_ctx
+                        .send_ip_packet(ctx, &socket, packet, None)
+                        .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
+                })
+            }
+            Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)) => {
+                let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
+                    .map_err(SendError::SerializeError)?;
+                dual_stack.with_other_transport_context_buf(|sync_ctx| {
+                    sync_ctx
+                        .send_ip_packet(ctx, &socket, packet, None)
+                        .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
+                })
+            }
+            Operation::_Phantom((never, _)) => match never {},
+        }
     })
 }
 
@@ -4035,9 +4082,12 @@ pub(crate) fn send_to<
             DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
             SC: BufferDatagramBoundStateContext<I, C, S, B>,
         > {
-            SendToThisStack((SendOneshotParameters<'a, I, S, D>, &'a mut SC)),
+            SendToThisStack((SendOneshotParameters<'a, I, S, D, IpOptions<I, D, S>>, &'a mut SC)),
             SendToOtherStack(
-                (SendOneshotParameters<'a, I::OtherVersion, S, D>, &'a mut DualStackSC),
+                (
+                    SendOneshotParameters<'a, I::OtherVersion, S, D, IpOptions<I, D, S>>,
+                    &'a mut DualStackSC,
+                ),
             ),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
@@ -4067,7 +4117,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &ip_options.hop_limits(),
+                                    send_options: &ip_options,
                                 },
                                 sync_ctx,
                             )),
@@ -4094,7 +4144,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options().hop_limits(),
+                                    send_options: &socket.options(),
                                 },
                                 sync_ctx,
                             )),
@@ -4125,7 +4175,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options.hop_limits(),
+                                send_options: &ip_options,
                             },
                             sync_ctx,
                         )),
@@ -4142,7 +4192,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options.hop_limits(),
+                                send_options: &ip_options,
                             },
                             sync_ctx,
                         )),
@@ -4159,7 +4209,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options.hop_limits(),
+                                send_options: &ip_options,
                             },
                             ds,
                         )),
@@ -4176,7 +4226,7 @@ pub(crate) fn send_to<
                                 remote_ip,
                                 remote_id: remote_identifier,
                                 device: &device,
-                                send_options: &ip_options.hop_limits(),
+                                send_options: &ip_options,
                             },
                             ds,
                         )),
@@ -4212,7 +4262,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options().hop_limits(),
+                                    send_options: &socket.options(),
                                 },
                                 sync_ctx,
                             )),
@@ -4239,7 +4289,7 @@ pub(crate) fn send_to<
                                     remote_ip,
                                     remote_id: remote_identifier,
                                     device: &device,
-                                    send_options: &socket.options().hop_limits(),
+                                    send_options: &socket.options(),
                                 },
                                 ds,
                             )),
@@ -4259,13 +4309,13 @@ pub(crate) fn send_to<
         match operation {
             Operation::SendToThisStack((params, sync_ctx)) => {
                 BufferDatagramBoundStateContext::with_transport_context_buf(sync_ctx, |sync_ctx| {
-                    send_oneshot::<_, S, _, _, _>(sync_ctx, ctx, params, body)
+                    send_oneshot::<_, S, _, _, _, _>(sync_ctx, ctx, params, body)
                 })
             }
             Operation::SendToOtherStack((params, sync_ctx)) => {
                 DualStackDatagramBoundStateContext::with_other_transport_context_buf(
                     sync_ctx,
-                    |sync_ctx| send_oneshot::<_, S, _, _, _>(sync_ctx, ctx, params, body),
+                    |sync_ctx| send_oneshot::<_, S, _, _, _, _>(sync_ctx, ctx, params, body),
                 )
             }
             Operation::_Phantom((never, _)) => match never {},
@@ -4274,13 +4324,13 @@ pub(crate) fn send_to<
     })
 }
 
-struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId> {
+struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId, O: SendOptions<I>> {
     local_ip: Option<SocketIpAddr<I::Addr>>,
     local_id: <S::AddrSpec as SocketMapAddrSpec>::LocalIdentifier,
     remote_ip: ZonedAddr<SocketIpAddr<I::Addr>, D::Strong>,
     remote_id: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     device: &'a Option<D>,
-    send_options: &'a SocketHopLimits,
+    send_options: &'a O,
 }
 
 fn send_oneshot<
@@ -4289,6 +4339,7 @@ fn send_oneshot<
     SC: BufferIpSocketHandler<I, C, B>,
     C,
     B: BufferMut,
+    O: SendOptions<I>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -4299,7 +4350,7 @@ fn send_oneshot<
         remote_id,
         device,
         send_options,
-    }: SendOneshotParameters<'_, I, S, SC::WeakDeviceId>,
+    }: SendOneshotParameters<'_, I, S, SC::WeakDeviceId, O>,
     body: B,
 ) -> Result<(), SendToError<S::SerializeError>> {
     let (remote_ip, device) = match crate::transport::resolve_addr_with_device::<I::Addr, _, _, _>(

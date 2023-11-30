@@ -639,8 +639,6 @@ impl IntoErrno for udp::SendError {
         match self {
             Self::IpSock(err) => err.into_errno(),
             Self::NotWriteable => Errno::Epipe,
-            // TODO(https://fxbug.dev/21198): Support dual-stack send.
-            Self::DualStackNotImplemented => Errno::Eopnotsupp,
             Self::RemotePortUnset => Errno::Edestaddrreq,
         }
     }
