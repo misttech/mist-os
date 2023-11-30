@@ -68,15 +68,22 @@ class CollectorErrorKind(enum.Enum):
     def explanation(self) -> str:
         messages = {
             CollectorErrorKind.THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES: """
-The target has no `applicable_licenses` argument, no associated valid README.fuchsia file.
+The target has no `applicable_licenses` argument, nor associated valid README.fuchsia file.
+It should have at lease one of these set up.
 
 To add applicable_licenses argument, see //build/licenses/license.gni.
 
 To add README.fuchsia file, see:
 https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata.
 
-If either one was done and you still see this error, there might be other
-errors, which should be printed above/below.
+Notes:
+1. If you still seeing this error after adding applicable_licenses argument,
+   it might be due incomplete forwarding of the `applicable_licenses` argument
+   through custom GN action templates, downwards the to that basic actions. Make
+   sure `forward_variables_from(invoker, ["applicable_licenses"])` is called
+   in all GN paths.
+2. If a README.fuchsia file exists but you still see this error, it could
+   be due to other errors, which should be printed above/below.
 """,
             CollectorErrorKind.LICENSE_FILE_IN_README_NOT_FOUND: """
 The `License File: ...` specified in the README.fuchsia file does not exist.
@@ -98,16 +105,21 @@ a `build/licenses/license.gni` target.
             CollectorErrorKind.THIRD_PARTY_RESOURCE_WITHOUT_LICENSE: """
 Could not find a licenes that applies to the 3rd party resource.
 The resource is referenced directly by a target but the target has
-no `applicable_licenses` argument. Alternatively, the resource may
-not have an associated README.fuchsia file.
+no `applicable_licenses` argument, nor associated README.fuchsia file.
 
 To add `applicable_licenses` argument, see //build/licenses/license.gni.
 
 To add README.fuchsia file, see:
 https://fuchsia.dev/fuchsia-src/development/source_code/third-party-metadata.
 
-If either one was done and you still see this error, there might be other
-errors, which should be printed above/below.
+Notes:
+1. If you still seeing this error after adding applicable_licenses argument,
+   it might be due incomplete forwarding of the `applicable_licenses` argument
+   through custom GN action templates, downwards the to that basic actions. Make
+   sure `forward_variables_from(invoker, ["applicable_licenses"])` is called
+   in all GN paths.
+2. If a README.fuchsia file exists but you still see this error, it could
+   be due to other errors, which should be printed above/below.
 """,
         }
 

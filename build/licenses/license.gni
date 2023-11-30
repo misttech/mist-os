@@ -6,6 +6,8 @@ import("//build/group_with_inputs.gni")
 
 # Declares license metadata.
 #
+# Usage:
+# ======
 # Use to declare license targets that are referenced in the "applicable_licenses"
 # parameter of each target declaration.
 #
@@ -47,6 +49,17 @@ import("//build/group_with_inputs.gni")
 #   }
 # ```
 #
+# Very Important:
+# ===============
+# When using `applicable_licenses` with a GN template, make sure that the
+# template forwards the parameter to all of its internal actions.
+# Ditto for any other templates invoked by that template, recursively.
+# Do that by adding (or modifying the existing)
+# `forward_variables_from(invoker, ["applicable_licenses"])` calls
+# (similar to "testonly" forwarding). For example: fxr/953227.
+#
+# Implementation:
+# ===============
 # Internally, the target will have a 'license' metadata
 # scope with the following schema:
 # {
