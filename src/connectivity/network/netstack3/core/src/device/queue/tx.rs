@@ -133,17 +133,20 @@ pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
 }
 
 /// An implementation of a transmit queue, with a buffer.
-pub(crate) trait BufferTransmitQueueHandler<D: Device, I: ReusableBuffer, C>:
+pub(crate) trait BufferTransmitQueueHandler<D: Device, C>:
     TransmitQueueCommon<D, C>
 {
     /// Queues a frame for transmission.
-    fn queue_tx_frame<S: Serializer<Buffer = I>>(
+    fn queue_tx_frame<S>(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
         body: S,
-    ) -> Result<(), TransmitQueueFrameError<S>>;
+    ) -> Result<(), TransmitQueueFrameError<S>>
+    where
+        S: Serializer,
+        S::Buffer: ReusableBuffer;
 }
 
 impl<
@@ -289,21 +292,24 @@ fn deliver_to_device_sockets<
 
 impl<
         D: Device,
-        I: ReusableBuffer,
         C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
         SC: TransmitQueueContext<D, C> + BufferSocketHandler<D, C>,
-    > BufferTransmitQueueHandler<D, I, C> for SC
+    > BufferTransmitQueueHandler<D, C> for SC
 where
     for<'a> &'a mut SC::Allocator: BufferAlloc<SC::Buffer>,
     SC::Buffer: ReusableBuffer,
 {
-    fn queue_tx_frame<S: Serializer<Buffer = I>>(
+    fn queue_tx_frame<S>(
         &mut self,
         ctx: &mut C,
         device_id: &SC::DeviceId,
         meta: SC::Meta,
         body: S,
-    ) -> Result<(), TransmitQueueFrameError<S>> {
+    ) -> Result<(), TransmitQueueFrameError<S>>
+    where
+        S: Serializer,
+        S::Buffer: ReusableBuffer,
+    {
         enum EnqueueStatus<N> {
             NotAttempted(N),
             Attempted,

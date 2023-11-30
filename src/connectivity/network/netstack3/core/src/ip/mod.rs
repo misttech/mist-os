@@ -957,17 +957,20 @@ pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
 }
 
 /// The IP device context provided to the IP layer requiring a buffer type.
-pub(crate) trait BufferIpDeviceContext<I: IpLayerIpExt, C, B: BufferMut>:
+pub(crate) trait BufferIpDeviceContext<I: IpLayerIpExt, C>:
     IpDeviceStateContext<I, C>
 {
     /// Sends an IP frame to the next hop.
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
+    fn send_ip_frame<S>(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         next_hop: SpecifiedAddr<I::Addr>,
         packet: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 /// The execution context for the IP layer requiring buffer.
@@ -977,7 +980,7 @@ pub(crate) trait BufferIpLayerContext<
     B: BufferMut,
 >:
     BufferTransportContext<I, C, B>
-    + BufferIpDeviceContext<I, C, B>
+    + BufferIpDeviceContext<I, C>
     + BufferIcmpHandler<I, C, B>
     + IpLayerContext<I, C>
     + FragmentHandler<I, C>
@@ -989,7 +992,7 @@ impl<
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
         B: BufferMut,
         SC: BufferTransportContext<I, C, B>
-            + BufferIpDeviceContext<I, C, B>
+            + BufferIpDeviceContext<I, C>
             + BufferIcmpHandler<I, C, B>
             + IpLayerContext<I, C>
             + FragmentHandler<I, C>,
@@ -2124,7 +2127,7 @@ pub(crate) fn receive_ipv4_packet<
                 packet.set_ttl(ttl - 1);
                 let _: (Ipv4Addr, Ipv4Addr, Ipv4Proto, ParseMetadata) =
                     drop_packet_and_undo_parse!(packet, buffer);
-                match BufferIpDeviceContext::<Ipv4, _, _>::send_ip_frame(
+                match BufferIpDeviceContext::<Ipv4, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
                     &dst_device,
@@ -2448,7 +2451,7 @@ pub(crate) fn receive_ipv6_packet<
                 packet.set_ttl(ttl - 1);
                 let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                     drop_packet_and_undo_parse!(packet, buffer);
-                if let Err(buffer) = BufferIpDeviceContext::<Ipv6, _, _>::send_ip_frame(
+                if let Err(buffer) = BufferIpDeviceContext::<Ipv6, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
                     &dst_device,
@@ -2868,7 +2871,7 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv4, C> + Ipv4StateContext<C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2884,7 +2887,7 @@ impl<
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv6, C, B> + NonTestCtxMarker,
+        SC: BufferIpDeviceContext<Ipv6, C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv6, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2903,12 +2906,7 @@ impl<
 ///
 /// Panics if either the source or destination address is the loopback address
 /// and the device is a non-loopback device.
-pub(crate) fn send_ipv4_packet_from_device<
-    B: BufferMut,
-    C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv4, C, B> + Ipv4StateContext<C> + IpDeviceStateContext<Ipv4, C>,
-    S: Serializer<Buffer = B>,
->(
+pub(crate) fn send_ipv4_packet_from_device<C, SC, S>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
@@ -2917,7 +2915,13 @@ pub(crate) fn send_ipv4_packet_from_device<
         Option<SpecifiedAddr<Ipv4Addr>>,
     >,
     body: S,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    SC: BufferIpDeviceContext<Ipv4, C> + Ipv4StateContext<C> + IpDeviceStateContext<Ipv4, C>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+{
     let src_ip = src_ip.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get());
     let builder = {
         assert!(
@@ -2951,12 +2955,7 @@ pub(crate) fn send_ipv4_packet_from_device<
 ///
 /// Panics if either the source or destination address is the loopback address
 /// and the device is a non-loopback device.
-pub(crate) fn send_ipv6_packet_from_device<
-    B: BufferMut,
-    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv6, C, B> + IpDeviceStateContext<Ipv6, C>,
-    S: Serializer<Buffer = B>,
->(
+pub(crate) fn send_ipv6_packet_from_device<C, SC, S>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
@@ -2965,7 +2964,13 @@ pub(crate) fn send_ipv6_packet_from_device<
         Option<SpecifiedAddr<Ipv6Addr>>,
     >,
     body: S,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
+    SC: BufferIpDeviceContext<Ipv6, C> + IpDeviceStateContext<Ipv6, C>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+{
     let src_ip = src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get());
     let builder = {
         assert!(
@@ -3404,28 +3409,23 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl<
-            I: packet_formats::ip::IpExt,
-            B: BufferMut,
-            S,
-            Id,
-            Event: Debug,
-            DeviceId,
-            NonSyncCtxState,
-        >
+    impl<I: packet_formats::ip::IpExt, S, Id, Event: Debug, DeviceId, NonSyncCtxState>
         crate::context::SendFrameContext<
             crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
-            B,
             SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
         >
         for crate::context::testutil::FakeSyncCtx<S, DualStackSendIpPacketMeta<DeviceId>, DeviceId>
     {
-        fn send_frame<SS: Serializer<Buffer = B>>(
+        fn send_frame<SS>(
             &mut self,
             ctx: &mut crate::context::testutil::FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             metadata: SendIpPacketMeta<I, DeviceId, SpecifiedAddr<I::Addr>>,
             frame: SS,
-        ) -> Result<(), SS> {
+        ) -> Result<(), SS>
+        where
+            SS: Serializer,
+            SS::Buffer: BufferMut,
+        {
             self.send_frame(ctx, DualStackSendIpPacketMeta::from(metadata), frame)
         }
     }

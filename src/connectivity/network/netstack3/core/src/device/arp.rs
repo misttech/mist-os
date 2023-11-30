@@ -11,7 +11,7 @@ use net_types::{
     ip::{Ipv4, Ipv4Addr},
     SpecifiedAddr, UnicastAddr, Witness as _,
 };
-use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, Serializer};
+use packet::{BufferMut, InnerPacketBuilder, Serializer};
 use packet_formats::{
     arp::{ArpOp, ArpPacket, ArpPacketBuilder, HType},
     utils::NonZeroDuration,
@@ -175,7 +175,7 @@ impl<
 
 /// An execution context for the ARP protocol.
 pub(crate) trait ArpContext<D: ArpDevice, C: ArpNonSyncCtx<D, Self::DeviceId>>:
-    DeviceIdContext<D> + SendFrameContext<C, EmptyBuf, ArpFrameMetadata<D, Self::DeviceId>>
+    DeviceIdContext<D> + SendFrameContext<C, ArpFrameMetadata<D, Self::DeviceId>>
 {
     type ConfigCtx<'a>: ArpConfigContext;
 
@@ -329,7 +329,7 @@ impl<
         D: ArpDevice,
         C: ArpNonSyncCtx<D, SC::DeviceId>,
         SC: ArpContext<D, C>
-            + SendFrameContext<C, B, ArpFrameMetadata<D, Self::DeviceId>>
+            + SendFrameContext<C, ArpFrameMetadata<D, Self::DeviceId>>
             + NudHandler<Ipv4, D, C>
             + CounterContext<ArpCounters>,
     > ArpPacketHandler<B, D, C> for SC
@@ -351,7 +351,7 @@ fn handle_packet<
     C: ArpNonSyncCtx<D, SC::DeviceId>,
     B: BufferMut,
     SC: ArpContext<D, C>
-        + SendFrameContext<C, B, ArpFrameMetadata<D, SC::DeviceId>>
+        + SendFrameContext<C, ArpFrameMetadata<D, SC::DeviceId>>
         + NudHandler<Ipv4, D, C>
         + CounterContext<ArpCounters>,
 >(

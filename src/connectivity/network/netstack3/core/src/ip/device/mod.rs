@@ -1059,17 +1059,19 @@ impl<
 pub(crate) trait BufferIpDeviceContext<
     I: IpDeviceIpExt,
     C: IpDeviceNonSyncContext<I, Self::DeviceId>,
-    B: BufferMut,
 >: DeviceIdContext<AnyDevice>
 {
     /// Sends an IP packet through the device.
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
+    fn send_ip_frame<S>(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         local_addr: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 fn enable_ipv6_device_with_config<
@@ -1690,19 +1692,20 @@ fn del_ipv6_addr_with_reason_with_config<
 }
 
 /// Sends an IP packet through the device.
-pub(crate) fn send_ip_frame<
-    I: IpDeviceIpExt,
-    C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: BufferIpDeviceContext<I, C, B>,
-    B: BufferMut,
-    S: Serializer<Buffer = B>,
->(
+pub(crate) fn send_ip_frame<I, C, SC, S>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     local_addr: SpecifiedAddr<I::Addr>,
     body: S,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    I: IpDeviceIpExt,
+    C: IpDeviceNonSyncContext<I, SC::DeviceId>,
+    SC: BufferIpDeviceContext<I, C>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+{
     sync_ctx.send_ip_frame(ctx, device_id, local_addr, body)
 }
 

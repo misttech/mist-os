@@ -90,7 +90,7 @@ pub(crate) trait IgmpStateContext<C: IgmpNonSyncContext<Self::DeviceId>>:
 
 /// The execution context for the Internet Group Management Protocol (IGMP).
 pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, IgmpPacketMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + SendFrameContext<C, IgmpPacketMetadata<Self::DeviceId>>
 {
     /// Calls the function with a mutable reference to the device's IGMP state
     /// and whether or not IGMP is enabled for the `device`.

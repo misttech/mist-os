@@ -184,15 +184,19 @@ impl<C: NonSyncContext> RwLockFor<crate::lock_ordering::DeviceSockets>
     }
 }
 
-impl<C: NonSyncContext, B: BufferMut, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
-    SendFrameContext<C, B, DeviceSocketMetadata<LoopbackDeviceId<C>>> for Locked<&SyncCtx<C>, L>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
+    SendFrameContext<C, DeviceSocketMetadata<LoopbackDeviceId<C>>> for Locked<&SyncCtx<C>, L>
 {
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         metadata: DeviceSocketMetadata<LoopbackDeviceId<C>>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let DeviceSocketMetadata { device_id, header } = metadata;
         match header {
             Some(DatagramHeader { dest_addr, protocol }) => {
@@ -259,18 +263,19 @@ fn send_as_ethernet_frame_to_dst<
     send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|s| s.into_inner())
 }
 
-fn send_ethernet_frame<
-    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
-    S: Serializer<Buffer = B>,
-    B: BufferMut,
-    NonSyncCtx: NonSyncContext,
->(
+fn send_ethernet_frame<L, S, NonSyncCtx>(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
     frame: S,
-) -> Result<(), S> {
-    match BufferTransmitQueueHandler::<LoopbackDevice, _, _>::queue_tx_frame(
+) -> Result<(), S>
+where
+    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    NonSyncCtx: NonSyncContext,
+{
+    match BufferTransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,

@@ -14,7 +14,7 @@ use net_types::{
     ip::{Ip, Ipv6, Ipv6Addr, Ipv6ReservedScope, Ipv6Scope, Ipv6SourceAddr},
     LinkLocalUnicastAddr, MulticastAddr, ScopeableAddress, SpecifiedAddr, Witness,
 };
-use packet::{serialize::Serializer, EmptyBuf, InnerPacketBuilder};
+use packet::{serialize::Serializer, InnerPacketBuilder};
 use packet_formats::{
     icmp::{
         mld::{
@@ -92,7 +92,7 @@ pub(crate) trait MldStateContext<C: MldNonSyncContext<Self::DeviceId>>:
 
 /// The execution context for the Multicast Listener Discovery (MLD) protocol.
 pub(crate) trait MldContext<C: MldNonSyncContext<Self::DeviceId>>:
-    DeviceIdContext<AnyDevice> + SendFrameContext<C, EmptyBuf, MldFrameMetadata<Self::DeviceId>>
+    DeviceIdContext<AnyDevice> + SendFrameContext<C, MldFrameMetadata<Self::DeviceId>>
 {
     /// Calls the function with a mutable reference to the device's MLD state
     /// and whether or not MLD is enabled for the `device`.

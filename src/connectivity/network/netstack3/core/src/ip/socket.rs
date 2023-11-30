@@ -1175,7 +1175,6 @@ pub(crate) mod testutil {
     where
         FakeSyncCtx<S, Meta, DeviceId>: SendFrameContext<
                 FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
-                B,
                 SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
             > + IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>,
     {

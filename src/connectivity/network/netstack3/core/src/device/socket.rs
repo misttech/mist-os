@@ -543,7 +543,7 @@ pub(super) struct DatagramHeader {
 impl<
         B: BufferMut,
         C: NonSyncContext<SC::DeviceId>,
-        SC: SyncContext<C> + SendFrameContext<C, B, DeviceSocketMetadata<SC::DeviceId>>,
+        SC: SyncContext<C> + SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>>,
     > BufferSocketSendHandler<B, C> for SC
 {
     fn send_frame<S: Serializer<Buffer = B>>(
@@ -1131,7 +1131,7 @@ mod tests {
     use const_unwrap::const_unwrap_option;
     use derivative::Derivative;
     use net_types::ethernet::Mac;
-    use packet::{Buf, BufferMut, ParsablePacket};
+    use packet::{Buf, BufferMut, FragmentedBuffer as _, ParsablePacket};
     use packet_formats::ethernet::EthernetFrameLengthCheck;
     use test_case::test_case;
 
@@ -1203,16 +1203,19 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, B: BufferMut>
-        SendFrameContext<FakeNonSyncCtx<D>, B, DeviceSocketMetadata<D>>
+    impl<D: FakeStrongDeviceId> SendFrameContext<FakeNonSyncCtx<D>, DeviceSocketMetadata<D>>
         for FakeSyncCtx<FakeSockets<D>, (), D>
     {
-        fn send_frame<S: Serializer<Buffer = B>>(
+        fn send_frame<S>(
             &mut self,
             ctx: &mut FakeNonSyncCtx<D>,
             metadata: DeviceSocketMetadata<D>,
             frame: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             let DeviceSocketMetadata { device_id: _, header: _ } = &metadata;
             match frame.serialize_vec_outer() {
                 Ok(frame) => Ok(ctx.sent.push((
@@ -1529,16 +1532,19 @@ mod tests {
         }
     }
 
-    impl<D: FakeStrongDeviceId, B: BufferMut>
-        SendFrameContext<FakeNonSyncCtx<D>, B, DeviceSocketMetadata<D>>
+    impl<D: FakeStrongDeviceId> SendFrameContext<FakeNonSyncCtx<D>, DeviceSocketMetadata<D>>
         for HashMap<D, DeviceSockets<FakeStrongId>>
     {
-        fn send_frame<S: Serializer<Buffer = B>>(
+        fn send_frame<S>(
             &mut self,
             ctx: &mut FakeNonSyncCtx<D>,
             metadata: DeviceSocketMetadata<D>,
             frame: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             let body = frame.serialize_vec_outer().map_err(|(_, s)| s)?;
             let body = body.map_a(|b| b.to_flattened_vec()).map_b(Buf::into_inner).into_inner();
             ctx.sent.push((metadata, body));

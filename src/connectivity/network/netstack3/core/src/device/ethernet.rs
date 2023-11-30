@@ -293,20 +293,21 @@ impl<
     }
 }
 
-fn send_as_ethernet_frame_to_dst<
-    B: BufferMut,
-    S: Serializer<Buffer = B>,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
->(
+fn send_as_ethernet_frame_to_dst<S, C, SC>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     dst_mac: Mac,
     body: S,
     ether_type: EtherType,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    S: Serializer,
+    S::Buffer: BufferMut,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+{
     /// The minimum body length for the Ethernet frame.
     ///
     /// Using a frame length of 0 improves efficiency by avoiding unnecessary
@@ -325,19 +326,20 @@ fn send_as_ethernet_frame_to_dst<
     send_ethernet_frame(sync_ctx, ctx, device_id, frame).map_err(|frame| frame.into_inner())
 }
 
-fn send_ethernet_frame<
-    B: BufferMut,
-    S: Serializer<Buffer = B>,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
->(
+fn send_ethernet_frame<S, C, SC>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     frame: S,
-) -> Result<(), S> {
-    match BufferTransmitQueueHandler::<EthernetLinkDevice, _, _>::queue_tx_frame(
+) -> Result<(), S>
+where
+    S: Serializer,
+    S::Buffer: BufferMut,
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+{
+    match BufferTransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,
@@ -818,7 +820,7 @@ pub(super) fn send_ip_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>
+        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
         + CounterContext<DeviceCounters>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
@@ -1128,12 +1130,11 @@ pub(super) fn insert_static_ndp_table_entry<
 
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
-        B: BufferMut,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
-    > SendFrameContext<C, B, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
+            + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+    > SendFrameContext<C, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         ArpFrameMetadata { device_id, dst_addr }: ArpFrameMetadata<
@@ -1141,7 +1142,11 @@ impl<
             SC::DeviceId,
         >,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         send_as_ethernet_frame_to_dst(self, ctx, &device_id, dst_addr, body, EtherType::Arp)
     }
 }
@@ -1250,17 +1255,20 @@ impl<
 }
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
-        B: BufferMut,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + BufferTransmitQueueHandler<EthernetLinkDevice, B, C, Meta = ()>,
-    > SendFrameContext<C, B, DeviceSocketMetadata<SC::DeviceId>> for SC
+            + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+    > SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>> for SC
 {
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         metadata: DeviceSocketMetadata<SC::DeviceId>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let DeviceSocketMetadata { device_id, header } = metadata;
         match header {
             Some(DatagramHeader { dest_addr, protocol }) => {

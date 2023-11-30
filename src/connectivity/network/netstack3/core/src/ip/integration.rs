@@ -63,7 +63,7 @@ impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: ip::BufferIpDeviceContext<Ipv4, C, B>
+        SC: ip::BufferIpDeviceContext<Ipv4, C>
             + Ipv4StateContext<C>
             + IpSocketContext<Ipv4, C>
             + NonTestCtxMarker,
@@ -87,7 +87,7 @@ impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: ip::BufferIpDeviceContext<Ipv6, C, B>
+        SC: ip::BufferIpDeviceContext<Ipv6, C>
             + IpStateContext<Ipv6, C>
             + IpSocketContext<Ipv6, C>
             + NonTestCtxMarker,

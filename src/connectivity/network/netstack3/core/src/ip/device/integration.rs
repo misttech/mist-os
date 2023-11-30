@@ -569,18 +569,21 @@ fn assignment_state_v6<
 
 impl<
         I: IpLayerIpExt + IpDeviceIpExt,
-        B: BufferMut,
         C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-        SC: device::BufferIpDeviceContext<I, C, B> + ip::IpDeviceStateContext<I, C>,
-    > ip::BufferIpDeviceContext<I, C, B> for SC
+        SC: device::BufferIpDeviceContext<I, C> + ip::IpDeviceStateContext<I, C>,
+    > ip::BufferIpDeviceContext<I, C> for SC
 {
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
+    fn send_ip_frame<S>(
         &mut self,
         ctx: &mut C,
         device_id: &SC::DeviceId,
         next_hop: SpecifiedAddr<I::Addr>,
         packet: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         send_ip_frame(self, ctx, device_id, next_hop, packet)
     }
 }
@@ -1315,11 +1318,7 @@ impl<'a, Config: Borrow<Ipv4DeviceConfiguration>, C: NonSyncContext> IgmpContext
 }
 
 impl<'a, Config, C: NonSyncContext>
-    SendFrameContext<
-        C,
-        EmptyBuf,
-        IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
-    >
+    SendFrameContext<C, IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
     for SyncCtxWithIpDeviceConfiguration<
         'a,
         Config,
@@ -1327,14 +1326,18 @@ impl<'a, Config, C: NonSyncContext>
         C,
     >
 {
-    fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         meta: IgmpPacketMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let Self { config: _, sync_ctx } = self;
-        device::BufferIpDeviceContext::<Ipv4, _, _>::send_ip_frame(
+        device::BufferIpDeviceContext::<Ipv4, _>::send_ip_frame(
             sync_ctx,
             ctx,
             &meta.device,
@@ -1404,17 +1407,21 @@ impl<
 }
 
 impl<'a, Config, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    SendFrameContext<C, EmptyBuf, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
+    SendFrameContext<C, MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>>
     for SyncCtxWithIpDeviceConfiguration<'a, Config, L, C>
 {
-    fn send_frame<S: Serializer<Buffer = EmptyBuf>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         meta: MldFrameMetadata<<Self as DeviceIdContext<AnyDevice>>::DeviceId>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let Self { config: _, sync_ctx } = self;
-        device::BufferIpDeviceContext::<Ipv6, _, _>::send_ip_frame(
+        device::BufferIpDeviceContext::<Ipv6, _>::send_ip_frame(
             sync_ctx,
             ctx,
             &meta.device,

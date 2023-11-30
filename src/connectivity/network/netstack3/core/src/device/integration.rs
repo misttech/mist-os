@@ -138,19 +138,20 @@ where
     }
 }
 
-impl<
-        B: BufferMut,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IpState<Ipv4>>,
-    > BufferIpDeviceContext<Ipv4, NonSyncCtx, B> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
+    BufferIpDeviceContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
+    fn send_ip_frame<S>(
         &mut self,
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv4Addr>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         send_ip_frame(self, ctx, device, local_addr, body)
     }
 }
@@ -750,19 +751,20 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
     }
 }
 
-impl<
-        B: BufferMut,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
-    > BufferIpDeviceContext<Ipv6, NonSyncCtx, B> for Locked<&SyncCtx<NonSyncCtx>, L>
+impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
+    BufferIpDeviceContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
-    fn send_ip_frame<S: Serializer<Buffer = B>>(
+    fn send_ip_frame<S>(
         &mut self,
         ctx: &mut NonSyncCtx,
         device: &DeviceId<NonSyncCtx>,
         local_addr: SpecifiedAddr<Ipv6Addr>,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         send_ip_frame(self, ctx, device, local_addr, body)
     }
 }
@@ -817,18 +819,22 @@ impl<C: socket::NonSyncContext<DeviceId<C>> + DeviceLayerEventDispatcher>
     }
 }
 
-impl<C: NonSyncContext, B: BufferMut, L>
-    SendFrameContext<C, B, socket::DeviceSocketMetadata<DeviceId<C>>> for Locked<&SyncCtx<C>, L>
+impl<C: NonSyncContext, L> SendFrameContext<C, socket::DeviceSocketMetadata<DeviceId<C>>>
+    for Locked<&SyncCtx<C>, L>
 where
-    Self: SendFrameContext<C, B, socket::DeviceSocketMetadata<EthernetDeviceId<C>>>
-        + SendFrameContext<C, B, socket::DeviceSocketMetadata<LoopbackDeviceId<C>>>,
+    Self: SendFrameContext<C, socket::DeviceSocketMetadata<EthernetDeviceId<C>>>
+        + SendFrameContext<C, socket::DeviceSocketMetadata<LoopbackDeviceId<C>>>,
 {
-    fn send_frame<S: Serializer<Buffer = B>>(
+    fn send_frame<S>(
         &mut self,
         ctx: &mut C,
         metadata: socket::DeviceSocketMetadata<DeviceId<C>>,
         frame: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let socket::DeviceSocketMetadata { device_id, header } = metadata;
         match device_id {
             DeviceId::Ethernet(device_id) => SendFrameContext::send_frame(
@@ -1150,7 +1156,7 @@ where
     A::Version: EthernetIpExt,
     for<'a> Locked<&'a SyncCtx<NonSyncCtx>, L>: EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx, DeviceId = EthernetDeviceId<NonSyncCtx>>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, NonSyncCtx>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, B, NonSyncCtx, Meta = ()>,
+        + BufferTransmitQueueHandler<EthernetLinkDevice, NonSyncCtx, Meta = ()>,
 {
     match device {
         DeviceId::Ethernet(id) => {

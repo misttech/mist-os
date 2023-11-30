@@ -253,7 +253,7 @@ pub trait RecvFrameContext<C, Meta> {
 }
 
 /// A context for sending frames.
-pub trait SendFrameContext<C, B: BufferMut, Meta> {
+pub trait SendFrameContext<C, Meta> {
     // TODO(joshlf): Add an error type parameter or associated type once we need
     // different kinds of errors.
 
@@ -265,12 +265,10 @@ pub trait SendFrameContext<C, B: BufferMut, Meta> {
     /// unmodified `Serializer` is returned.
     ///
     /// [`Serializer`]: packet::Serializer
-    fn send_frame<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut C,
-        metadata: Meta,
-        frame: S,
-    ) -> Result<(), S>;
+    fn send_frame<S>(&mut self, ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 /// A context that stores counters.
@@ -1032,13 +1030,12 @@ pub mod testutil {
         }
     }
 
-    impl<C, B: BufferMut, Meta> SendFrameContext<C, B, Meta> for FakeFrameCtx<Meta> {
-        fn send_frame<S: Serializer<Buffer = B>>(
-            &mut self,
-            _ctx: &mut C,
-            metadata: Meta,
-            frame: S,
-        ) -> Result<(), S> {
+    impl<C, Meta> SendFrameContext<C, Meta> for FakeFrameCtx<Meta> {
+        fn send_frame<S>(&mut self, _ctx: &mut C, metadata: Meta, frame: S) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             if let Some(should_error_for_frame) = &self.should_error_for_frame {
                 if should_error_for_frame(&metadata) {
                     return Err(frame);
@@ -1531,16 +1528,20 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<B: BufferMut, S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState>
-        SendFrameContext<FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B, Meta>
+    impl<S, Id, Meta, Event: Debug, DeviceId, NonSyncCtxState>
+        SendFrameContext<FakeNonSyncCtx<Id, Event, NonSyncCtxState>, Meta>
         for FakeSyncCtx<S, Meta, DeviceId>
     {
-        fn send_frame<SS: Serializer<Buffer = B>>(
+        fn send_frame<SS>(
             &mut self,
             ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             metadata: Meta,
             frame: SS,
-        ) -> Result<(), SS> {
+        ) -> Result<(), SS>
+        where
+            SS: Serializer,
+            SS::Buffer: BufferMut,
+        {
             self.frames.send_frame(ctx, metadata, frame)
         }
     }
