@@ -1,8 +1,10 @@
 [
     {
-        "license_id": "LicenseRef-Bar",
-        "name": "Bar",
-        "links": [],
+        "license_id": "LicenseRef-A-known",
+        "name": "License A known",
+        "links": [
+            "http://foo.com"
+        ],
         "dependents": [
             "Package A"
         ],
@@ -11,7 +13,60 @@
         "is_source_code_shipped": false,
         "identifications": [
             {
-                "identified_as": "License Kind 3",
+                "identified_as": "License Class 1",
+                "conditions": [
+                    "default-condition"
+                ],
+                "verified": true,
+                "verified_conditions": [
+                    "allowed-condition"
+                ],
+                "overriden_conditions": [
+                    "allowed-condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
+                        "override_condition_to": "allowed-condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "Test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "License A known"
+                            ],
+                            "identifications": [
+                                "*"
+                            ],
+                            "conditions": [
+                                "*"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "*Package A*"
+                            ]
+                        }
+                    }
+                ],
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "c75a0b6b4970633b53eacf7ba3e6a44e",
+                "snippet_text": "Some known\ntest license A"
+            },
+            {
+                "identified_as": "License Class 2",
                 "conditions": [
                     "disallowed-condition"
                 ],
@@ -25,123 +80,21 @@
                 "overriding_rules": [
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
-                        "override_condition_to": "allowed-condition",
-                        "bug": "fxb/123",
-                        "comment": [
-                            "This is a test override rule"
-                        ],
-                        "match_criteria": {
-                            "license_names": [
-                                "Bar"
-                            ],
-                            "identifications": [
-                                "License*Kind*3"
-                            ],
-                            "conditions": [
-                                "*"
-                            ],
-                            "snippet_checksums": [
-                                "*"
-                            ],
-                            "dependents": [
-                                "Package A"
-                            ]
-                        }
-                    }
-                ],
-                "confidence": 1.0,
-                "start_line": 1,
-                "end_line": 2,
-                "snippet_checksum": "af0d025f2d1193bea258782d5144e55c",
-                "snippet_text": "Some known\ntest license 2"
-            },
-            {
-                "identified_as": "[UNIDENTIFIED]",
-                "conditions": [
-                    "default-condition"
-                ],
-                "verified": false,
-                "verification_message": "'default-condition' condition is not an allowed.",
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Bar"
-                        ],
-                        "identifications": [
-                            "[UNIDENTIFIED]"
-                        ],
-                        "conditions": [
-                            "default-condition"
-                        ],
-                        "snippet_checksums": [
-                            "63ade272d3a25260a50df773dbf2fed8"
-                        ],
-                        "dependents": [
-                            "Package A"
-                        ]
-                    }
-                },
-                "confidence": 1.0,
-                "start_line": 3,
-                "end_line": 3,
-                "snippet_checksum": "63ade272d3a25260a50df773dbf2fed8",
-                "snippet_text": "(used by both Bar and Baz)"
-            }
-        ],
-        "identification_stats": {
-            "size_bytes": 52,
-            "size_lines": 3,
-            "unidentified_lines": 0
-        }
-    },
-    {
-        "license_id": "LicenseRef-Baz",
-        "name": "Baz",
-        "links": [],
-        "dependents": [
-            "Package A",
-            "Package B"
-        ],
-        "is_project_shipped": true,
-        "is_notice_shipped": false,
-        "is_source_code_shipped": false,
-        "identifications": [
-            {
-                "identified_as": "License Kind 3",
-                "conditions": [
-                    "disallowed-condition"
-                ],
-                "verified": false,
-                "verification_message": "The overriding rules ['fuchsia/licenses/classification/test_policy_override_rule.json'] changed the conditions to 'allowed-condition' but the rules don't match the dependencies {'Package A'} that remain with the condition 'disallowed-condition' which is not allowed'.",
-                "overriden_conditions": [
-                    "allowed-condition"
-                ],
-                "dependents_unmatched_by_overriding_rules": [
-                    "Package A"
-                ],
-                "overriding_rules": [
-                    {
-                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "public_source_mirrors": [
                             "http://mirror1",
                             "http://mirror2"
                         ],
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/456",
+                        "bug": "fxb/123",
                         "comment": [
-                            "This is another test override rule"
+                            "Test override rule"
                         ],
                         "match_criteria": {
                             "license_names": [
-                                "Baz"
+                                "License A known"
                             ],
                             "identifications": [
-                                "*Kind 3"
+                                "*"
                             ],
                             "conditions": [
                                 "*"
@@ -150,176 +103,20 @@
                                 "*"
                             ],
                             "dependents": [
-                                "Package B"
+                                "*Package A*"
                             ]
                         }
                     }
                 ],
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Baz"
-                        ],
-                        "identifications": [
-                            "License Kind 3"
-                        ],
-                        "conditions": [
-                            "disallowed-condition"
-                        ],
-                        "snippet_checksums": [
-                            "af0d025f2d1193bea258782d5144e55c"
-                        ],
-                        "dependents": [
-                            "Package A"
-                        ]
-                    }
-                },
                 "public_source_mirrors": [
                     "http://mirror1",
                     "http://mirror2"
                 ],
-                "confidence": 1.0,
-                "start_line": 1,
-                "end_line": 2,
-                "snippet_checksum": "af0d025f2d1193bea258782d5144e55c",
-                "snippet_text": "Some known\ntest license 2"
-            },
-            {
-                "identified_as": "[UNIDENTIFIED]",
-                "conditions": [
-                    "default-condition"
-                ],
-                "verified": false,
-                "verification_message": "'default-condition' condition is not an allowed.",
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Baz"
-                        ],
-                        "identifications": [
-                            "[UNIDENTIFIED]"
-                        ],
-                        "conditions": [
-                            "default-condition"
-                        ],
-                        "snippet_checksums": [
-                            "63ade272d3a25260a50df773dbf2fed8"
-                        ],
-                        "dependents": [
-                            "Package A",
-                            "Package B"
-                        ]
-                    }
-                },
-                "confidence": 1.0,
-                "start_line": 3,
-                "end_line": 3,
-                "snippet_checksum": "63ade272d3a25260a50df773dbf2fed8",
-                "snippet_text": "(used by both Bar and Baz)"
-            }
-        ],
-        "identification_stats": {
-            "size_bytes": 52,
-            "size_lines": 3,
-            "unidentified_lines": 0
-        }
-    },
-    {
-        "license_id": "LicenseRef-Foo",
-        "name": "Foo",
-        "links": [
-            "http://foo.com"
-        ],
-        "dependents": [
-            "Package A"
-        ],
-        "is_project_shipped": true,
-        "is_notice_shipped": false,
-        "is_source_code_shipped": false,
-        "identifications": [
-            {
-                "identified_as": "License Kind 1",
-                "conditions": [
-                    "default-condition"
-                ],
-                "verified": false,
-                "verification_message": "'default-condition' condition is not an allowed.",
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Foo"
-                        ],
-                        "identifications": [
-                            "License Kind 1"
-                        ],
-                        "conditions": [
-                            "default-condition"
-                        ],
-                        "snippet_checksums": [
-                            "fa2258a0fd04107e67394fdb57c0eecf"
-                        ],
-                        "dependents": [
-                            "Package A"
-                        ]
-                    }
-                },
-                "confidence": 1.0,
-                "start_line": 1,
-                "end_line": 2,
-                "snippet_checksum": "fa2258a0fd04107e67394fdb57c0eecf",
-                "snippet_text": "Some known\ntest license 1"
-            },
-            {
-                "identified_as": "License Kind 2",
-                "conditions": [
-                    "disallowed-condition"
-                ],
-                "verified": false,
-                "verification_message": "'disallowed-condition' condition is not an allowed.",
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Foo"
-                        ],
-                        "identifications": [
-                            "License Kind 2"
-                        ],
-                        "conditions": [
-                            "disallowed-condition"
-                        ],
-                        "snippet_checksums": [
-                            "80c12e04fe66d3cf50eb6a4e8e2185fc"
-                        ],
-                        "dependents": [
-                            "Package A"
-                        ]
-                    }
-                },
                 "confidence": 0.5,
                 "start_line": 2,
                 "end_line": 3,
-                "snippet_checksum": "80c12e04fe66d3cf50eb6a4e8e2185fc",
-                "snippet_text": "test license 1"
+                "snippet_checksum": "f5b53fd0b832c1db7b7034035e1c3310",
+                "snippet_text": "test license A"
             }
         ],
         "identification_stats": {
@@ -329,8 +126,315 @@
         }
     },
     {
-        "license_id": "LicenseRef-Multi-A",
-        "name": "Multi-conditions-none-overriden",
+        "license_id": "LicenseRef-B-dedupped",
+        "name": "License B Dedupped",
+        "links": [],
+        "dependents": [
+            "Package A"
+        ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
+        "identifications": [
+            {
+                "identified_as": "License Class 3",
+                "conditions": [
+                    "disallowed-condition"
+                ],
+                "verified": true,
+                "verified_conditions": [
+                    "allowed-condition"
+                ],
+                "overriden_conditions": [
+                    "allowed-condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
+                        "override_condition_to": "allowed-condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "Test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "License B*"
+                            ],
+                            "identifications": [
+                                "*"
+                            ],
+                            "conditions": [
+                                "disallowed-condition",
+                                "default-condition"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "*"
+                            ]
+                        }
+                    }
+                ],
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "dddad70f6beddca25e436c8ffbbca451",
+                "snippet_text": "Some known\ntest license B"
+            },
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "conditions": [
+                    "default-condition"
+                ],
+                "verified": true,
+                "verified_conditions": [
+                    "allowed-condition"
+                ],
+                "overriden_conditions": [
+                    "allowed-condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
+                        "override_condition_to": "allowed-condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "Test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "License B*"
+                            ],
+                            "identifications": [
+                                "*"
+                            ],
+                            "conditions": [
+                                "disallowed-condition",
+                                "default-condition"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "*"
+                            ]
+                        }
+                    }
+                ],
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
+                "confidence": 1.0,
+                "start_line": 3,
+                "end_line": 3,
+                "snippet_checksum": "88dd87ea111c2ab80ff5a826d2c75c68",
+                "snippet_text": "(multiple copies)"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 43,
+            "size_lines": 3,
+            "unidentified_lines": 0
+        }
+    },
+    {
+        "license_id": "LicenseRef-B-dedupped-copy",
+        "name": "License B (copy)",
+        "links": [],
+        "dependents": [
+            "Package B"
+        ],
+        "is_project_shipped": true,
+        "is_notice_shipped": true,
+        "is_source_code_shipped": false,
+        "identifications": [
+            {
+                "identified_as": "License Class 3",
+                "conditions": [
+                    "disallowed-condition"
+                ],
+                "verified": true,
+                "verified_conditions": [
+                    "allowed-condition"
+                ],
+                "overriden_conditions": [
+                    "allowed-condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
+                        "override_condition_to": "allowed-condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "Test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "License B*"
+                            ],
+                            "identifications": [
+                                "*"
+                            ],
+                            "conditions": [
+                                "disallowed-condition",
+                                "default-condition"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "*"
+                            ]
+                        }
+                    }
+                ],
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "dddad70f6beddca25e436c8ffbbca451",
+                "snippet_text": "Some known\ntest license B"
+            },
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "conditions": [
+                    "default-condition"
+                ],
+                "verified": true,
+                "verified_conditions": [
+                    "allowed-condition"
+                ],
+                "overriden_conditions": [
+                    "allowed-condition"
+                ],
+                "overriding_rules": [
+                    {
+                        "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
+                        "public_source_mirrors": [
+                            "http://mirror1",
+                            "http://mirror2"
+                        ],
+                        "override_condition_to": "allowed-condition",
+                        "bug": "fxb/123",
+                        "comment": [
+                            "Test override rule"
+                        ],
+                        "match_criteria": {
+                            "license_names": [
+                                "License B*"
+                            ],
+                            "identifications": [
+                                "*"
+                            ],
+                            "conditions": [
+                                "disallowed-condition",
+                                "default-condition"
+                            ],
+                            "snippet_checksums": [
+                                "*"
+                            ],
+                            "dependents": [
+                                "*"
+                            ]
+                        }
+                    }
+                ],
+                "public_source_mirrors": [
+                    "http://mirror1",
+                    "http://mirror2"
+                ],
+                "confidence": 1.0,
+                "start_line": 3,
+                "end_line": 3,
+                "snippet_checksum": "88dd87ea111c2ab80ff5a826d2c75c68",
+                "snippet_text": "(multiple copies)"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 43,
+            "size_lines": 3,
+            "unidentified_lines": 0
+        }
+    },
+    {
+        "license_id": "LicenseRef-C-unknown",
+        "name": "License C unknown",
+        "links": [],
+        "dependents": [
+            "Package A"
+        ],
+        "is_project_shipped": true,
+        "is_notice_shipped": false,
+        "is_source_code_shipped": false,
+        "identifications": [
+            {
+                "identified_as": "[UNIDENTIFIED]",
+                "conditions": [
+                    "default-condition"
+                ],
+                "verified": false,
+                "verification_message": "'default-condition' condition is not an allowed.",
+                "suggested_override_rule": {
+                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
+                    "bug": "<INSERT TICKET URL>",
+                    "comment": [
+                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
+                    ],
+                    "match_criteria": {
+                        "license_names": [
+                            "License C unknown"
+                        ],
+                        "identifications": [
+                            "[UNIDENTIFIED]"
+                        ],
+                        "conditions": [
+                            "default-condition"
+                        ],
+                        "snippet_checksums": [
+                            "86406c53db40703267d15be0c58321d7"
+                        ],
+                        "dependents": [
+                            "Package A"
+                        ]
+                    }
+                },
+                "confidence": 1.0,
+                "start_line": 1,
+                "end_line": 2,
+                "snippet_checksum": "86406c53db40703267d15be0c58321d7",
+                "snippet_text": "Some unknown\ntest license C"
+            }
+        ],
+        "identification_stats": {
+            "size_bytes": 27,
+            "size_lines": 2,
+            "unidentified_lines": 0
+        }
+    },
+    {
+        "license_id": "LicenseRef-D-multiple-conditions",
+        "name": "License D multiple conditions",
         "links": [],
         "dependents": [
             "Package C"
@@ -340,7 +444,7 @@
         "is_source_code_shipped": false,
         "identifications": [
             {
-                "identified_as": "License Kind 4",
+                "identified_as": "License Class 4",
                 "conditions": [
                     "allowed-condition",
                     "disallowed-condition"
@@ -355,16 +459,16 @@
                     ],
                     "match_criteria": {
                         "license_names": [
-                            "Multi-conditions-none-overriden"
+                            "License D multiple conditions"
                         ],
                         "identifications": [
-                            "License Kind 4"
+                            "License Class 4"
                         ],
                         "conditions": [
                             "disallowed-condition"
                         ],
                         "snippet_checksums": [
-                            "306479831bc71a7dfc1336336a982de5"
+                            "b7328536cbc0322d6cb2eafaddc76d28"
                         ],
                         "dependents": [
                             "Package C"
@@ -374,19 +478,19 @@
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
-                "snippet_checksum": "306479831bc71a7dfc1336336a982de5",
-                "snippet_text": "Test license 4"
+                "snippet_checksum": "b7328536cbc0322d6cb2eafaddc76d28",
+                "snippet_text": "License D with multiple conditions, none are overriden"
             }
         ],
         "identification_stats": {
-            "size_bytes": 14,
+            "size_bytes": 54,
             "size_lines": 1,
             "unidentified_lines": -1
         }
     },
     {
-        "license_id": "LicenseRef-Multi-B",
-        "name": "Multi-conditions-some-overriden",
+        "license_id": "LicenseRef-E-multiple-conditions-enough-overriden",
+        "name": "License E multiple conditions some overriden",
         "links": [],
         "dependents": [
             "Package C"
@@ -396,7 +500,7 @@
         "is_source_code_shipped": false,
         "identifications": [
             {
-                "identified_as": "License Kind 5",
+                "identified_as": "License Class 5",
                 "conditions": [
                     "allowed-condition",
                     "disallowed-condition"
@@ -415,16 +519,16 @@
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/789",
+                        "bug": "fxb/123",
                         "comment": [
-                            "Yet another test override rule"
+                            "Test override rule"
                         ],
                         "match_criteria": {
                             "license_names": [
-                                "Multi-conditions-some-overriden"
+                                "License E multiple conditions some overriden"
                             ],
                             "identifications": [
-                                "License Kind 5"
+                                "*"
                             ],
                             "conditions": [
                                 "disallowed-condition"
@@ -433,7 +537,7 @@
                                 "*"
                             ],
                             "dependents": [
-                                "Package C"
+                                "*"
                             ]
                         }
                     }
@@ -441,19 +545,19 @@
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
-                "snippet_checksum": "512ff122bebae52b6883dc2d56b7b5a4",
-                "snippet_text": "Test license 5"
+                "snippet_checksum": "b0862af973673d2ccbb1764d8254e75b",
+                "snippet_text": "Test license E with multiple conditions, enough are overriden"
             }
         ],
         "identification_stats": {
-            "size_bytes": 14,
+            "size_bytes": 61,
             "size_lines": 1,
             "unidentified_lines": -1
         }
     },
     {
-        "license_id": "LicenseRef-Multi-C",
-        "name": "Multi-conditions-not-enough-overriden",
+        "license_id": "LicenseRef-F-multiple-conditions-not-enough-overriden",
+        "name": "License F multiple conditions not enough overriden",
         "links": [],
         "dependents": [
             "Package C"
@@ -463,7 +567,7 @@
         "is_source_code_shipped": false,
         "identifications": [
             {
-                "identified_as": "License Kind 6",
+                "identified_as": "License Class 6",
                 "conditions": [
                     "disallowed-condition-1",
                     "disallowed-condition-2"
@@ -480,16 +584,16 @@
                     {
                         "rule_file_path": "fuchsia/licenses/classification/test_policy_override_rule.json",
                         "override_condition_to": "allowed-condition",
-                        "bug": "fxb/101",
+                        "bug": "fxb/123",
                         "comment": [
-                            "Only matches one of the conditions"
+                            "Test override rule"
                         ],
                         "match_criteria": {
                             "license_names": [
-                                "Multi-conditions-not-enough-overriden"
+                                "License F multiple conditions not enough overriden"
                             ],
                             "identifications": [
-                                "License Kind 6"
+                                "*"
                             ],
                             "conditions": [
                                 "disallowed-condition-1"
@@ -498,7 +602,7 @@
                                 "*"
                             ],
                             "dependents": [
-                                "Package C"
+                                "*"
                             ]
                         }
                     }
@@ -511,16 +615,16 @@
                     ],
                     "match_criteria": {
                         "license_names": [
-                            "Multi-conditions-not-enough-overriden"
+                            "License F multiple conditions not enough overriden"
                         ],
                         "identifications": [
-                            "License Kind 6"
+                            "License Class 6"
                         ],
                         "conditions": [
                             "disallowed-condition-2"
                         ],
                         "snippet_checksums": [
-                            "d7824b76c09f12523c600ed2fe61b24f"
+                            "6db760bec0b033267f3c226402e8aa7d"
                         ],
                         "dependents": [
                             "Package C"
@@ -530,68 +634,13 @@
                 "confidence": 1.0,
                 "start_line": 1,
                 "end_line": 2,
-                "snippet_checksum": "d7824b76c09f12523c600ed2fe61b24f",
-                "snippet_text": "Test license 6"
+                "snippet_checksum": "6db760bec0b033267f3c226402e8aa7d",
+                "snippet_text": "Test license F with multiple conditions, not enough are overriden"
             }
         ],
         "identification_stats": {
-            "size_bytes": 14,
+            "size_bytes": 65,
             "size_lines": 1,
-            "unidentified_lines": -1
-        }
-    },
-    {
-        "license_id": "LicenseRef-Quz",
-        "name": "Qux",
-        "links": [],
-        "dependents": [
-            "Package A"
-        ],
-        "is_project_shipped": true,
-        "is_notice_shipped": false,
-        "is_source_code_shipped": false,
-        "identifications": [
-            {
-                "identified_as": "[UNIDENTIFIED]",
-                "conditions": [
-                    "default-condition"
-                ],
-                "verified": false,
-                "verification_message": "'default-condition' condition is not an allowed.",
-                "suggested_override_rule": {
-                    "override_condition_to": "<CHOOSE ONE OF 'allowed-condition'>",
-                    "bug": "<INSERT TICKET URL>",
-                    "comment": [
-                        "<INSERT DOCUMENTATION FOR OVERRIDE RULE>"
-                    ],
-                    "match_criteria": {
-                        "license_names": [
-                            "Qux"
-                        ],
-                        "identifications": [
-                            "[UNIDENTIFIED]"
-                        ],
-                        "conditions": [
-                            "default-condition"
-                        ],
-                        "snippet_checksums": [
-                            "71c68279356ec2c9ebba3e0e31f97110"
-                        ],
-                        "dependents": [
-                            "Package A"
-                        ]
-                    }
-                },
-                "confidence": 1.0,
-                "start_line": 1,
-                "end_line": 3,
-                "snippet_checksum": "71c68279356ec2c9ebba3e0e31f97110",
-                "snippet_text": "Some unknown\ntest license 3"
-            }
-        ],
-        "identification_stats": {
-            "size_bytes": 27,
-            "size_lines": 2,
             "unidentified_lines": -1
         }
     }

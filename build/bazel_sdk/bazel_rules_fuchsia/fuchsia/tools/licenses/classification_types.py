@@ -60,7 +60,7 @@ class IdentifiedSnippet:
             identified_as=IdentifiedSnippet.UNIDENTIFIED_IDENTIFICATION,
             confidence=1.0,
             start_line=1,
-            end_line=len(extracted_text_lines) + 1,
+            end_line=len(extracted_text_lines),
             conditions=set([condition]),
         )
 
@@ -384,6 +384,7 @@ Snippet checksum: {self.snippet_checksum}
 Snippet: <begin>
 {snippet}
 <end>
+SPDX License Ref: {license.license_id}
 
 To fix this verification problem you should either:
 1. Remove the dependency on projects with this license in the dependent code bases.
@@ -637,12 +638,15 @@ class LicensesClassifications:
         for license_id, file_name in license_paths_by_license_id.items():
             if file_name in results_by_file_path.keys():
                 for match_json in results_by_file_path[file_name]:
-                    identifications_by_license_id[license_id].append(
+                    identified_snippet = (
                         IdentifiedSnippet.from_identify_license_dict(
                             dictionary=match_json,
                             location=identify_license_output_path,
                             default_condition=default_condition,
                         )
+                    )
+                    identifications_by_license_id[license_id].append(
+                        identified_snippet
                     )
         license_classifications = {}
         for (

@@ -8,6 +8,7 @@ import argparse
 import os
 import subprocess
 import sys
+from pathlib import Path
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *
 
@@ -21,23 +22,21 @@ def _prepare_license_files(
 ) -> Dict[str, str]:
     """Extract license texts in the spdx_doc into separate files"""
 
-    # Reuse files for duplicate license texts to speed up classification
+    # Reuse files with duplicate license texts to speed up classification
     file_by_unique_text: Dict[str, str] = {}
 
     license_files_by_id = {}
+
     for license in spdx_doc.extracted_licenses:
         id = license.license_id
         text = license.extracted_text
         if text in file_by_unique_text:
             file_path = file_by_unique_text[text]
         else:
-            file_path = os.path.join(
-                license_files_dir,
-                f"license{len(file_by_unique_text.keys())}.txt",
-            )
+            file_path = os.path.join(license_files_dir, id + ".txt")
             file_by_unique_text[text] = file_path
-            with open(file_path, "w") as license_file:
-                license_file.write(text)
+            Path(file_path).write_text(text)
+
         license_files_by_id[id] = file_path
 
     _log(
@@ -50,12 +49,12 @@ def _prepare_license_files(
 
 def _invoke_identify_license(
     identify_license_path: str,
+    identify_license_output_path: str,
     license_files_dir: str,
     license_files_by_id: Dict[str, str],
     default_condition: str,
 ) -> LicensesClassifications:
     """Invokes identify_license tool, returning an LicensesClassifications."""
-    identify_license_output_path = "identify_license_out.json"
 
     license_paths = sorted(list(set(license_files_by_id.values())))
 
@@ -70,11 +69,12 @@ def _invoke_identify_license(
         identify_license_path,
         "-headers",
         f"-json={identify_license_output_path}",
+        "-include_text=true",
         license_files_dir,
     ]
 
     _log(f"identify_license invocation = {command}")
-    subprocess.check_output(command)
+    subprocess.check_output(command, text=True)
 
     assert os.path.exists(
         identify_license_output_path
@@ -182,6 +182,11 @@ def main():
         required=True,
     )
     parser.add_argument(
+        "--identify_license_output",
+        help="Path to json file output by running identify_license binary.",
+        required=True,
+    )
+    parser.add_argument(
         "--policy_override_rules",
         help="Condition override rule files (JSON files)",
         nargs="*",
@@ -270,6 +275,7 @@ allowing downstream customers to provide project specific instructions.
 
     classification = _invoke_identify_license(
         identify_license_path=args.identify_license_bin,
+        identify_license_output_path=args.identify_license_output,
         license_files_dir=licenses_dir,
         license_files_by_id=license_files_by_id,
         default_condition=args.default_condition,

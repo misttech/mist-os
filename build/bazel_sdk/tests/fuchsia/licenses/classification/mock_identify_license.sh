@@ -20,9 +20,26 @@ verify_arg () {
     fi
 }
 
+read_arg_value () {
+    local arg_title=$1
+    local actual_value=$2
+    local prefix_value=$3
+
+    if [[ "$actual_value" =~ $prefix_value* ]];
+    then
+        local prefix_len=${#prefix_value}
+        local value="${actual_value:$prefix_len}"
+        echo $value
+    else
+        echoerr "Expected $arg_title to begin with '$prefix_value' but got '$actual_value'"
+        exit -1
+    fi
+}
+
 verify_arg "1st argument" "$1" "-headers"
-verify_arg "2st argument" "$2" "-json=identify_license_out.json"
-verify_arg "3st argument" "$3" "input_licenses"
+output_json_path=$(read_arg_value "2st argument" "$2" "-json=")
+verify_arg "3rd argument" "$3" "-include_text=true"
+verify_arg "4th argument" "$4" "input_licenses"
 
 verify_file_exists () {
     local file_path=$1
@@ -33,31 +50,34 @@ verify_file_exists () {
 }
 
 # There are 5 unique license texts in input.spdx.json
-verify_file_exists input_licenses/license0.txt
-verify_file_exists input_licenses/license1.txt
-verify_file_exists input_licenses/license2.txt
-verify_file_exists input_licenses/license3.txt
-verify_file_exists input_licenses/license4.txt
+verify_file_exists input_licenses/LicenseRef-A-known.txt
+verify_file_exists input_licenses/LicenseRef-B-dedupped.txt
+verify_file_exists input_licenses/LicenseRef-C-unknown.txt
+verify_file_exists input_licenses/LicenseRef-D-multiple-conditions.txt
+verify_file_exists input_licenses/LicenseRef-E-multiple-conditions-enough-overriden.txt
+verify_file_exists input_licenses/LicenseRef-F-multiple-conditions-not-enough-overriden.txt
+
+echo "Writing output to $output_json_path"
 
 write () {
-    echo "$1" >> identify_license_out.json
+    echo "$1" >> $output_json_path
 }
 
-# Output mock classification. Only license0 and license1 are classified.
+# Output mock classification.
 
 write '['
 write '    {'
-write '        "Filepath": "input_licenses/license0.txt",'
+write '        "Filepath": "input_licenses/LicenseRef-A-known.txt",'
 write '        "Classifications": ['
 write '            {'
-write '                "Name": "License Kind 1",'
+write '                "Name": "License Class 1",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'
 write '                "Conditions": "allowed-condition"'
 write '            },'
 write '            {'
-write '                "Name": "License Kind 2",'
+write '                "Name": "License Class 2",'
 write '                "Confidence": 0.5,'
 write '                "StartLine": 2,'
 write '                "EndLine": 3,'
@@ -66,10 +86,10 @@ write '            }'
 write '        ]'
 write '    },'
 write '    {'
-write '        "Filepath": "input_licenses/license1.txt",'
+write '        "Filepath": "input_licenses/LicenseRef-B-dedupped.txt",'
 write '        "Classifications": ['
 write '            {'
-write '                "Name": "License Kind 3",'
+write '                "Name": "License Class 3",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'
@@ -85,10 +105,14 @@ write '            }'
 write '        ]'
 write '    },'
 write '    {'
-write '        "Filepath": "input_licenses/license3.txt",'
+write '        "Filepath": "input_licenses/LicenseRef-C-unknown.txt",'
+write '        "Classifications": []'
+write '    },'
+write '    {'
+write '        "Filepath": "input_licenses/LicenseRef-D-multiple-conditions.txt",'
 write '        "Classifications": ['
 write '            {'
-write '                "Name": "License Kind 4",'
+write '                "Name": "License Class 4",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'
@@ -97,10 +121,10 @@ write '            }'
 write '        ]'
 write '    },'
 write '    {'
-write '        "Filepath": "input_licenses/license4.txt",'
+write '        "Filepath": "input_licenses/LicenseRef-E-multiple-conditions-enough-overriden.txt",'
 write '        "Classifications": ['
 write '            {'
-write '                "Name": "License Kind 5",'
+write '                "Name": "License Class 5",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'
@@ -109,10 +133,10 @@ write '            }'
 write '        ]'
 write '    },'
 write '    {'
-write '        "Filepath": "input_licenses/license5.txt",'
+write '        "Filepath": "input_licenses/LicenseRef-F-multiple-conditions-not-enough-overriden.txt",'
 write '        "Classifications": ['
 write '            {'
-write '                "Name": "License Kind 6",'
+write '                "Name": "License Class 6",'
 write '                "Confidence": 1,'
 write '                "StartLine": 1,'
 write '                "EndLine": 2,'

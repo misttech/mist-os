@@ -11,62 +11,62 @@
     "dataLicense": "CC0-1.0",
     "packages": [
         {
-            "SPDXID": "SPDXRef-Package-1",
+            "SPDXID": "SPDXRef-Package-A",
             "name": "Package A",
-            "licenseConcluded": "LicenseRef-Foo AND LicenseRef-Bar AND LicenseRef-Baz AND LicenseRef-Quz",
+            "licenseConcluded": "LicenseRef-A-known AND LicenseRef-B-dedupped AND LicenseRef-C-unknown",
             "copyrightText": "copyright A"
         },
         {
-            "SPDXID": "SPDXRef-Package-2",
+            "SPDXID": "SPDXRef-Package-B",
             "name": "Package B",
-            "licenseConcluded": "LicenseRef-Baz",
+            "licenseConcluded": "LicenseRef-B-dedupped-copy",
             "copyrightText": "copyright B"
         },
         {
-            "SPDXID": "SPDXRef-Package-3",
+            "SPDXID": "SPDXRef-Package-C",
             "name": "Package C",
-            "licenseConcluded": "LicenseRef-Multi-A AND LicenseRef-Multi-B AND LicenseRef-Multi-C",
+            "licenseConcluded": "LicenseRef-D-multiple-conditions AND LicenseRef-E-multiple-conditions-enough-overriden AND LicenseRef-F-multiple-conditions-not-enough-overriden",
             "copyrightText": "copyright C"
         }
     ],
     "hasExtractedLicensingInfos": [
         {
-            "name": "Foo",
-            "licenseId": "LicenseRef-Foo",
-            "extractedText": "Some known\ntest license 1",
+            "name": "License A known",
+            "licenseId": "LicenseRef-A-known",
+            "extractedText": "Some known\ntest license A",
             "seeAlso": [
                 "http://foo.com"
             ]
         },
         {
-            "name": "Bar",
-            "licenseId": "LicenseRef-Bar",
-            "extractedText": "Some known\ntest license 2\n(used by both Bar and Baz)"
+            "name": "License B Dedupped",
+            "licenseId": "LicenseRef-B-dedupped",
+            "extractedText": "Some known\ntest license B\n(multiple copies)"
         },
         {
-            "name": "Baz",
-            "licenseId": "LicenseRef-Baz",
-            "extractedText": "Some known\ntest license 2\n(used by both Bar and Baz)"
+            "name": "License B (copy)",
+            "licenseId": "LicenseRef-B-dedupped-copy",
+            "extractedText": "Some known\ntest license B\n(multiple copies)"
         },
         {
-            "name": "Qux",
-            "licenseId": "LicenseRef-Quz",
-            "extractedText": "Some unknown\ntest license 3"
+            "name": "License C unknown",
+            "licenseId": "LicenseRef-C-unknown",
+            "extractedText": "Some unknown\ntest license C"
         },
         {
-            "name": "Multi-conditions-none-overriden",
-            "licenseId": "LicenseRef-Multi-A",
-            "extractedText": "Test license 4"
+            "name": "License D multiple conditions",
+            "licenseId": "LicenseRef-D-multiple-conditions",
+            "extractedText": "License D with multiple conditions, none are overriden"
         },
         {
-            "name": "Multi-conditions-some-overriden",
-            "licenseId": "LicenseRef-Multi-B",
-            "extractedText": "Test license 5"
+            "name": "License E multiple conditions some overriden",
+            "licenseId": "LicenseRef-E-multiple-conditions-enough-overriden",
+            "extractedText": "Test license E with multiple conditions, enough are overriden"
         },
         {
-            "name": "Multi-conditions-not-enough-overriden",
-            "licenseId": "LicenseRef-Multi-C",
-            "extractedText": "Test license 6"
+            "name": "License F multiple conditions not enough overriden",
+            "licenseId": "LicenseRef-F-multiple-conditions-not-enough-overriden",
+            "extractedText": "Test license F with multiple conditions, not enough are overriden"
         }
     ]
 }

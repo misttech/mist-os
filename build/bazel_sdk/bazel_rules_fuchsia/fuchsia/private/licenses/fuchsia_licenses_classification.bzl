@@ -7,10 +7,13 @@
 def _fuchsia_licenses_classification_impl(ctx):
     out_json = ctx.actions.declare_file(ctx.label.name)
 
+    identify_license_output_json = ctx.actions.declare_file(ctx.label.name + ".identify_license_output.json")
+
     inputs = [ctx.file.spdx_input, ctx.executable.identify_license]
     arguments = [
         "--spdx_input=%s" % ctx.file.spdx_input.path,
         "--identify_license_bin=%s" % ctx.executable.identify_license.path,
+        "--identify_license_output=%s" % identify_license_output_json.path,
         "--output_file=%s" % out_json.path,
     ]
 
@@ -41,7 +44,7 @@ def _fuchsia_licenses_classification_impl(ctx):
     ctx.actions.run(
         progress_message = "Generating license classifications into %s" % out_json.path,
         inputs = inputs,
-        outputs = [out_json],
+        outputs = [out_json, identify_license_output_json],
         executable = ctx.executable._generate_licenses_classification_tool,
         arguments = arguments,
     )
