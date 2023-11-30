@@ -26,6 +26,7 @@ const HOURS_BETWEEN_IFACE_DESTRUCTIONS: i64 = 12;
 const SCAN_FAILURE_RECOVERY_THRESHOLD: usize = 5;
 const EMPTY_SCAN_RECOVERY_THRESHOLD: usize = 10;
 const CONNECT_FAILURE_RECOVERY_THRESHOLD: usize = 15;
+const AP_START_FAILURE_RECOVERY_THRESHOLD: usize = 12;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PhyRecoveryOperation {
@@ -158,6 +159,34 @@ fn thresholded_iface_destruction_and_phy_reset(
     None
 }
 
+fn thresholded_phy_reset(
+    phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    most_recent_defect: Defect,
+    defect_count_threshold: usize,
+) -> Option<RecoveryAction> {
+    let proposed_phy_reset_action =
+        RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id });
+
+    if defect_history.event_count(most_recent_defect) < defect_count_threshold {
+        return None;
+    }
+
+    // If the threshold has been crossed and sufficient time has passed since the last PHY reset,
+    // recommend that the PHY be reset.
+    let recovery_allowed = match recovery_history.time_since_last_event(proposed_phy_reset_action) {
+        None => true,
+        Some(time) => time.into_hours() > HOURS_BETWEEN_PHY_RESETS,
+    };
+
+    if recovery_allowed {
+        return Some(proposed_phy_reset_action);
+    }
+
+    None
+}
+
 fn thresholded_scan_failure_recovery_profile(
     phy_id: u16,
     defect_history: &mut EventHistory<Defect>,
@@ -228,6 +257,27 @@ fn thresholded_connect_failure_recovery_profile(
         connect_defect,
         CONNECT_FAILURE_RECOVERY_THRESHOLD,
     )
+}
+
+fn thresholded_ap_start_failure_recovery_profile(
+    phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    ap_start_defect: Defect,
+) -> Option<RecoveryAction> {
+    match ap_start_defect {
+        Defect::Iface(IfaceFailure::ApStartFailure { .. }) => thresholded_phy_reset(
+            phy_id,
+            defect_history,
+            recovery_history,
+            ap_start_defect,
+            AP_START_FAILURE_RECOVERY_THRESHOLD,
+        ),
+        other => {
+            warn!("Assessing invalid defect type for AP start failure recovery: {:?}", other);
+            None
+        }
+    }
 }
 
 #[cfg(test)]
@@ -370,6 +420,63 @@ mod tests {
         );
     }
 
+    // This test verifies that:
+    // 1. No recovery is recommended until the threshold has been crossed.
+    // 2. PHY reset is recommended once the threshold is crossed.
+    // 3. PHY resets are only recommended once per 24-hour period.
+    fn test_thresholded_phy_reset(
+        exec: &TestExecutor,
+        recovery_fn: RecoveryProfile,
+        defect_to_log: Defect,
+        defect_threshold: usize,
+    ) {
+        // Set the test time to start at time zero.
+        let start_time = Time::from_nanos(0);
+        exec.set_fake_time(start_time);
+
+        // The PHY recovery intervention that is expected.
+        let reset_phy_recommendation =
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id: PHY_ID });
+
+        // Retain defects and recovery actions for 48 hours.
+        let mut defects = EventHistory::<Defect>::new(48 * 60 * 60);
+        let mut recoveries = EventHistory::<RecoveryAction>::new(48 * 60 * 60);
+
+        // Add failures until just under the threshold.
+        for _ in 0..(defect_threshold - 1) {
+            defects.add_event(defect_to_log);
+
+            // Verify that there is no recovery recommended
+            assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+        }
+
+        // Add one more failure and verify that a PHY reset was recommended.
+        defects.add_event(defect_to_log);
+        assert_eq!(
+            Some(reset_phy_recommendation),
+            recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,)
+        );
+        recoveries.add_event(reset_phy_recommendation);
+
+        // Add another defect and verify that no recovery is recommended.
+        defects.add_event(defect_to_log);
+        assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+
+        // Advance the clock 23 hours, log another defect, and verify no recovery is recommended.
+        exec.set_fake_time(Time::after(23.hours()));
+        defects.add_event(defect_to_log);
+        assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+
+        // Advance the clock another 2 hours to get beyond the 24 hour throttle and verify that
+        // another occurrence of the defect results in a PHY reset recovery recommendation.
+        exec.set_fake_time(Time::after(23.hours()));
+        defects.add_event(defect_to_log);
+        assert_eq!(
+            Some(reset_phy_recommendation),
+            recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,)
+        );
+    }
+
     #[fuchsia::test]
     fn test_scan_failure_recovery() {
         let exec = TestExecutor::new_with_fake_time();
@@ -404,5 +511,17 @@ mod tests {
             defect_to_log,
             CONNECT_FAILURE_RECOVERY_THRESHOLD,
         );
+    }
+
+    #[fuchsia::test]
+    fn test_ap_start_failure_recovery() {
+        let exec = TestExecutor::new_with_fake_time();
+        let defect_to_log = Defect::Iface(IfaceFailure::ApStartFailure { iface_id: IFACE_ID });
+        test_thresholded_phy_reset(
+            &exec,
+            thresholded_ap_start_failure_recovery_profile,
+            defect_to_log,
+            AP_START_FAILURE_RECOVERY_THRESHOLD,
+        )
     }
 }
