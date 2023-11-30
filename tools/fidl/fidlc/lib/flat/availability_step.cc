@@ -9,6 +9,7 @@
 #include "tools/fidl/fidlc/include/fidl/diagnostics.h"
 #include "tools/fidl/fidlc/include/fidl/flat/compile_step.h"
 #include "tools/fidl/fidlc/include/fidl/flat_ast.h"
+#include "tools/fidl/fidlc/include/fidl/reporter.h"
 #include "tools/fidl/fidlc/include/fidl/versioning_types.h"
 
 namespace fidl::flat {
@@ -126,33 +127,50 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
   const auto added = attribute->GetArg("added");
   const auto deprecated = attribute->GetArg("deprecated");
   const auto removed = attribute->GetArg("removed");
+  const auto replaced = attribute->GetArg("replaced");
   const auto note = attribute->GetArg("note");
   const auto legacy = attribute->GetArg("legacy");
 
-  if (attribute->args.empty()) {
+  // These errors do not block further analysis.
+  if (!is_library && attribute->args.empty()) {
     reporter()->Fail(ErrAvailableMissingArguments, attribute->span);
   }
   if (note && !deprecated) {
     reporter()->Fail(ErrNoteWithoutDeprecation, attribute->span);
   }
-  if (!is_library && platform) {
-    reporter()->Fail(ErrPlatformNotOnLibrary, platform->span);
+
+  // These errors block further analysis because we don't know what's intended,
+  // and proceeding further will lead to confusing error messages.
+  // We use & to report as many errors as possible (&& would short circuit).
+  bool ok = true;
+  if (is_library) {
+    if (!added) {
+      ok &= reporter()->Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
+    }
+    if (replaced) {
+      ok &= reporter()->Fail(ErrLibraryReplaced, replaced->span);
+    }
+  } else {
+    if (platform) {
+      ok &= reporter()->Fail(ErrPlatformNotOnLibrary, platform->span);
+    }
+    if (!library()->attributes->Get("available")) {
+      ok &= reporter()->Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
+    }
   }
-  if (is_library && !added && !attribute->args.empty()) {
-    reporter()->Fail(ErrLibraryAvailabilityMissingAdded, attribute->span);
+  if (removed && replaced) {
+    ok &= reporter()->Fail(ErrRemovedAndReplaced, attribute->span);
   }
-  if (!is_library && !library()->attributes->Get("available")) {
-    reporter()->Fail(ErrMissingLibraryAvailability, attribute->span, library()->name);
-    // Return early to avoid confusing error messages about inheritance
-    // conflicts with the default @available(added=HEAD) on the library.
+  if (!ok) {
     element->availability.Fail();
     return;
   }
 
+  const auto removed_or_replaced = removed ? removed : replaced;
   const auto init_args = Availability::InitArgs{
       .added = GetVersion(added),
       .deprecated = GetVersion(deprecated),
-      .removed = GetVersion(removed),
+      .removed = GetVersion(removed_or_replaced),
       .legacy = GetLegacy(legacy),
   };
   if (is_library) {
@@ -179,6 +197,8 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     }
     if (removed) {
       msg.append(" < removed");
+    } else if (replaced) {
+      msg.append(" < replaced");
     }
     reporter()->Fail(ErrInvalidAvailabilityOrder, attribute->span, msg);
     // Return early to avoid confusing error messages about inheritance
@@ -188,25 +208,26 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
 
   // Reports an error for arg given its inheritance status.
   auto report = [&](const AttributeArg* arg, Availability::InheritResult::Status status) {
-    std::string_view child_what, when, parent_what;
+    const char* when;
+    const AttributeArg* inherited_arg;
     switch (status) {
       case Availability::InheritResult::Status::kOk:
         return;
       case Availability::InheritResult::Status::kBeforeParentAdded:
         when = "before";
-        parent_what = "added";
+        inherited_arg = AncestorArgument(element, {"added"});
         break;
       case Availability::InheritResult::Status::kAfterParentDeprecated:
         when = "after";
-        parent_what = "deprecated";
+        inherited_arg = AncestorArgument(element, {"deprecated"});
         break;
       case Availability::InheritResult::Status::kAfterParentRemoved:
         when = "after";
-        parent_what = "removed";
+        inherited_arg = AncestorArgument(element, {"removed", "replaced"});
         break;
     }
-    child_what = arg->name.value().data();
-    const auto* inherited_arg = AncestorArgument(element, parent_what);
+    auto child_what = arg->name.value().data();
+    auto parent_what = inherited_arg->name.value().data();
     reporter()->Fail(ErrAvailabilityConflictsWithParent, arg->span, arg, arg->value->span.data(),
                      inherited_arg, inherited_arg->value->span.data(), inherited_arg->span,
                      child_what, when, parent_what);
@@ -222,7 +243,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
         reporter()->Fail(ErrLegacyWithoutRemoval, arg->span, arg);
         break;
       case Availability::InheritResult::LegacyStatus::kWithoutParent: {
-        const auto* inherited_arg = AncestorArgument(element, "removed");
+        const auto* inherited_arg = AncestorArgument(element, {"removed", "replaced"});
         reporter()->Fail(ErrLegacyConflictsWithParent, arg->span, arg, arg->value->span.data(),
                          inherited_arg, inherited_arg->value->span.data(), inherited_arg->span);
         break;
@@ -234,7 +255,7 @@ void AvailabilityStep::CompileAvailabilityFromAttribute(Element* element, Attrib
     const auto result = element->availability.Inherit(source.value());
     report(added, result.added);
     report(deprecated, result.deprecated);
-    report(removed, result.removed);
+    report(removed_or_replaced, result.removed);
     report_legacy(legacy, result.legacy);
   }
 }
@@ -305,12 +326,14 @@ std::optional<Availability> AvailabilityStep::AvailabilityToInheritFrom(const El
   return std::nullopt;
 }
 
-const AttributeArg* AvailabilityStep::AncestorArgument(const Element* element,
-                                                       std::string_view arg_name) {
+const AttributeArg* AvailabilityStep::AncestorArgument(
+    const Element* element, const std::vector<std::string_view>& arg_names) {
   while ((element = LexicalParent(element))) {
     if (auto attribute = element->attributes->Get("available")) {
-      if (auto arg = attribute->GetArg(arg_name)) {
-        return arg;
+      for (auto name : arg_names) {
+        if (auto arg = attribute->GetArg(name)) {
+          return arg;
+        }
       }
     }
   }
@@ -337,16 +360,17 @@ struct CmpAvailability {
   }
 };
 
-// Helper that checks for canonical name collisions on overlapping elements.
-class NameValidator {
+// Helper class that validates:
+// * No canonical name collisions on elements with overlapping availabilities
+// * For each @available(replaced=N) there IS a corresponding @available(added=N)
+// * For each @available(removed=N) there IS NOT a corresponding @available(added=N)
+class Validator {
  public:
-  explicit NameValidator(Reporter* reporter, const Platform& platform)
-      : reporter_(reporter), platform_(platform) {}
+  explicit Validator(Reporter* reporter, const Platform& platform, ExperimentalFlags flags)
+      : reporter_(reporter), platform_(platform), flags_(flags) {}
+  Validator(const Validator&) = delete;
 
   void Insert(const Element* element) {
-    // TODO(fxbug.dev/67858): This algorithm is worst-case O(n^2) in the number
-    // of elements having the same name. It can be optimized to O(n*log(n)).
-
     // Skip elements whose availabilities we failed to compile.
     if (element->availability.state() != Availability::State::kInherited) {
       return;
@@ -356,10 +380,29 @@ class NameValidator {
       // This is a reserved field or a protocol composition.
       return;
     }
+    auto set = element->availability.set();
+    auto added = set.ranges().first.pair().first;
     auto name = maybe_name.value();
     auto canonical_name = utils::canonicalize(name);
-    auto set = element->availability.set();
     auto& same_canonical_name = by_canonical_name_[canonical_name];
+    CheckForNameCollisions(element, set, name, canonical_name, same_canonical_name);
+    same_canonical_name.insert(element);
+    by_added_by_name_[name].emplace(added, element);
+  }
+
+  ~Validator() {
+    for (auto& [name, by_added] : by_added_by_name_) {
+      CheckRemovedAndReplacedArguments(name, by_added);
+    }
+  }
+
+ private:
+  // Note: This algorithm is worst-case O(n^2) in the number of elements
+  // having the same name. It could be optimized to O(n*log(n)).
+  void CheckForNameCollisions(
+      const Element* element, const VersionSet& set, std::string_view name,
+      std::string_view canonical_name,
+      const std::set<const Element*, CmpAvailability>& same_canonical_name) {
     for (auto other : same_canonical_name) {
       auto other_set = other->availability.set();
       auto overlap = VersionSet::Intersect(set, other_set);
@@ -389,23 +432,50 @@ class NameValidator {
       // Report at most one error per element to avoid noisy redundant errors.
       break;
     }
-    same_canonical_name.insert(element);
   }
 
- private:
+  void CheckRemovedAndReplacedArguments(std::string_view name,
+                                        const std::map<Version, const Element*>& by_added) {
+    for (auto& [_added, element] : by_added) {
+      if (auto attribute = element->attributes->Get("available")) {
+        auto removed_arg = attribute->GetArg("removed");
+        auto replaced_arg = attribute->GetArg("replaced");
+        if (!removed_arg && !replaced_arg) {
+          continue;
+        }
+        auto version = element->availability.set().ranges().first.pair().second;
+        auto it = by_added.find(version);
+        auto replacement = it != by_added.end() ? it->second : nullptr;
+        if (removed_arg && replacement &&
+            flags_.IsFlagEnabled(ExperimentalFlags::Flag::kEnforceReplaced)) {
+          reporter_->Fail(ErrRemovedWithReplacement, removed_arg->span, name, version,
+                          replacement->GetNameSource());
+        } else if (replaced_arg && !replacement) {
+          reporter_->Fail(ErrReplacedWithoutReplacement, replaced_arg->span, name, version);
+        }
+      }
+    }
+  }
+
   Reporter* reporter_;
   const Platform& platform_;
+  ExperimentalFlags flags_;
   std::map<std::string, std::set<const Element*, CmpAvailability>> by_canonical_name_;
+  std::map<std::string_view, std::map<Version, const Element*>> by_added_by_name_;
 };
 
 }  // namespace
 
 void AvailabilityStep::ValidateAvailabilities() {
-  auto& platform = library()->platform.value();
-  NameValidator decl_validator(reporter(), platform);
+  auto& platform = library()->platform;
+  if (!platform.has_value()) {
+    // We failed to compile the library declaration's @available attribute.
+    return;
+  }
+  Validator decl_validator(reporter(), *platform, experimental_flags());
   for (auto& [name, decl] : library()->declarations.all) {
     decl_validator.Insert(decl);
-    NameValidator member_validator(reporter(), platform);
+    Validator member_validator(reporter(), *platform, experimental_flags());
     decl->ForEachMember([&](const Element* member) { member_validator.Insert(member); });
   }
 }

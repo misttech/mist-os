@@ -507,14 +507,14 @@ TEST(DecompositionTests, MisalignedSwapping) {
 @available(added=1)
 library example;
 
-@available(removed=4)
+@available(replaced=4)
 const LEN uint64 = 16;
 @available(added=4)
 const LEN uint64 = 32;
 
 @available(added=2)
 type Foo = table {
-    @available(removed=3)
+    @available(replaced=3)
     1: bar string;
     @available(added=3)
     1: bar string:LEN;
@@ -576,7 +576,7 @@ type X = struct {
     y Y;
 };
 
-@available(added=2, removed=3)
+@available(added=2, replaced=3)
 type Y = strict enum { A = 1; };
 
 @available(added=3)
@@ -638,7 +638,7 @@ library example;
 type Foo = struct {
     bar Bar;
 };
-@available(added=1, removed=4)
+@available(added=1, replaced=4)
 type Bar = struct {};
 
 @available(added=4, removed=7)
@@ -715,15 +715,15 @@ library example;
 const LEN uint64 = 10;
 
 type Foo = table {
-    @available(removed=3)
+    @available(replaced=3)
     1: bar Bar;
-    @available(added=3, removed=4)
+    @available(added=3, replaced=4)
     1: bar string:LEN;
     @available(added=4, removed=5)
     1: bar Bar;
 };
 
-@available(removed=2)
+@available(replaced=2)
 type Bar = struct {};
 @available(added=2)
 type Bar = table {};
@@ -1028,12 +1028,12 @@ TEST(DecompositionTests, AllElementsSplitByReference) {
 @available(added=1)
 library example;
 
-@available(removed=2)
+@available(replaced=2)
 const VALUE uint32 = 1;
 @available(added=2)
 const VALUE uint32 = 2;
 
-@available(removed=2)
+@available(replaced=2)
 type Type = struct {
     value bool;
 };
@@ -1043,18 +1043,18 @@ type Type = table {
 };
 
 // Need unsigned integers for bits underlying type.
-@available(removed=2)
+@available(replaced=2)
 alias IntegerType = uint32;
 @available(added=2)
 alias IntegerType = uint64;
 
 // Need uint32/int32 for error type.
-@available(removed=2)
+@available(replaced=2)
 alias ErrorIntegerType = uint32;
 @available(added=2)
 alias ErrorIntegerType = int32;
 
-@available(removed=2)
+@available(replaced=2)
 protocol TargetProtocol {};
 @available(added=2)
 protocol TargetProtocol {
@@ -1496,11 +1496,11 @@ protocol NeverRemoved {
     @available(removed=3, legacy=true)
     RemovedAt3LegacyTrue();
 
-    @available(removed=2)
-    SwappedAt2();
+    @available(replaced=2)
+    ReplacedAt2();
 
     @available(added=2)
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 @available(removed=3)
@@ -1513,11 +1513,11 @@ protocol RemovedAt3 {
     @available(removed=2)
     RemovedAt2();
 
-    @available(removed=2)
-    SwappedAt2();
+    @available(replaced=2)
+    ReplacedAt2();
 
     @available(added=2)
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 @available(removed=3, legacy=false)
@@ -1530,11 +1530,11 @@ protocol RemovedAt3LegacyFalse {
     @available(removed=2)
     RemovedAt2();
 
-    @available(removed=2)
-    SwappedAt2();
+    @available(replaced=2)
+    ReplacedAt2();
 
     @available(added=2)
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 @available(removed=3, legacy=true)
@@ -1550,11 +1550,11 @@ protocol RemovedAt3LegacyTrue {
     @available(removed=2)
     RemovedAt2();
 
-    @available(removed=2)
-    SwappedAt2();
+    @available(replaced=2)
+    ReplacedAt2();
 
     @available(added=2)
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 )FIDL";
 
@@ -1566,21 +1566,21 @@ protocol NeverRemoved {
     RemovedAt3();
     RemovedAt3LegacyFalse();
     RemovedAt3LegacyTrue();
-    SwappedAt2();
+    ReplacedAt2();
 };
 
 protocol RemovedAt3 {
     Default();
     LegacyFalse();
     RemovedAt2();
-    SwappedAt2();
+    ReplacedAt2();
 };
 
 protocol RemovedAt3LegacyFalse {
     Default();
     LegacyFalse();
     RemovedAt2();
-    SwappedAt2();
+    ReplacedAt2();
 };
 
 protocol RemovedAt3LegacyTrue {
@@ -1588,7 +1588,7 @@ protocol RemovedAt3LegacyTrue {
     LegacyFalse();
     LegacyTrue();
     RemovedAt2();
-    SwappedAt2();
+    ReplacedAt2();
 };
 )FIDL";
 
@@ -1600,26 +1600,26 @@ protocol NeverRemoved {
     RemovedAt3();
     RemovedAt3LegacyFalse();
     RemovedAt3LegacyTrue();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 protocol RemovedAt3 {
     Default();
     LegacyFalse();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 protocol RemovedAt3LegacyFalse {
     Default();
     LegacyFalse();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 protocol RemovedAt3LegacyTrue {
     Default();
     LegacyFalse();
     LegacyTrue();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 )FIDL";
 
@@ -1628,7 +1628,7 @@ protocol RemovedAt3LegacyTrue {
 library example;
 
 protocol NeverRemoved {
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 )FIDL";
 
@@ -1639,13 +1639,13 @@ library example;
 
 protocol NeverRemoved {
     RemovedAt3LegacyTrue();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 
 protocol RemovedAt3LegacyTrue {
     Default();
     LegacyTrue();
-    SwappedAt2(struct { b bool; });
+    ReplacedAt2(struct { b bool; });
 };
 )FIDL";
 
@@ -1726,6 +1726,96 @@ type Foo = table {
   ASSERT_EQUIVALENT(fidl, v3_onward, "3");
   ASSERT_EQUIVALENT(fidl, v3_onward, "HEAD");
   ASSERT_EQUIVALENT(fidl, v3_onward, "LEGACY");
+}
+
+TEST(DecompositionTests, ConvertNamedToAnonymous) {
+  auto fidl = R"FIDL(
+@available(added=1)
+library example;
+
+@available(replaced=2)
+type Foo = struct {
+    member Bar;
+};
+
+@available(replaced=2)
+type Bar = struct {};
+
+@available(added=2)
+type Foo = struct {
+    member @generated_name("Bar") struct {};
+};
+)FIDL";
+
+  auto v1 = R"FIDL(
+@available(added=1, removed=2)
+library example;
+
+type Foo = struct {
+    member Bar;
+};
+
+type Bar = struct {};
+)FIDL";
+
+  auto v2_onward = R"FIDL(
+@available(added=2)
+library example;
+
+type Foo = struct {
+    member @generated_name("Bar") struct {};
+};
+)FIDL";
+
+  ASSERT_EQUIVALENT(fidl, v1, "1");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "2");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "HEAD");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
+}
+
+TEST(DecompositionTests, ConvertAnonymousToNamed) {
+  auto fidl = R"FIDL(
+@available(added=1)
+library example;
+
+@available(replaced=2)
+type Foo = struct {
+    member @generated_name("Bar") struct {};
+};
+
+@available(added=2)
+type Foo = struct {
+    member Bar;
+};
+
+@available(added=2)
+type Bar = struct {};
+)FIDL";
+
+  auto v1 = R"FIDL(
+@available(added=1, removed=2)
+library example;
+
+type Foo = struct {
+    member @generated_name("Bar") struct {};
+};
+)FIDL";
+
+  auto v2_onward = R"FIDL(
+@available(added=2)
+library example;
+
+type Foo = struct {
+    member Bar;
+};
+
+type Bar = struct {};
+)FIDL";
+
+  ASSERT_EQUIVALENT(fidl, v1, "1");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "2");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "HEAD");
+  ASSERT_EQUIVALENT(fidl, v2_onward, "LEGACY");
 }
 
 }  // namespace

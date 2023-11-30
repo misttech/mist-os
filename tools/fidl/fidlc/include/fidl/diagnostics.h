@@ -413,6 +413,17 @@ constexpr ErrorDef<201, std::vector<std::string_view>, Platform> ErrPlatformVers
 constexpr ErrorDef<202, std::string_view> ErrTransitionalNotAllowed(
     "The @transitional attribute is not allowed on {0}. "
     "Try using @available instead.");
+constexpr ErrorDef<203> ErrRemovedAndReplaced(
+    "the @available arguments 'removed' and 'replaced' are mutually exclusive");
+constexpr ErrorDef<204> ErrLibraryReplaced(
+    "the @available argument 'replaced' cannot be used on the library "
+    "declaration; used 'removed' instead");
+constexpr ErrorDef<205, std::string_view, Version, SourceSpan> ErrRemovedWithReplacement(
+    "element '{0}' is marked removed={1}, but there is a replacement marked "
+    "added={1} at {2}; change the removed={1} to replaced={1}");
+constexpr ErrorDef<206, std::string_view, Version> ErrReplacedWithoutReplacement(
+    "element '{0}' is marked replaced={1}, but there is no replacement marked "
+    "added={1}; change the replaced={1} to removed={1}");
 
 // To add a new error:
 //
@@ -628,6 +639,10 @@ static constexpr const DiagnosticDef *kAllDiagnosticDefs[] = {
     /* fi-0200 */ &ErrOverlayMustNotContainReserved,
     /* fi-0201 */ &ErrPlatformVersionNotSelected,
     /* fi-0202 */ &ErrTransitionalNotAllowed,
+    /* fi-0203 */ &ErrRemovedAndReplaced,
+    /* fi-0204 */ &ErrLibraryReplaced,
+    /* fi-0205 */ &ErrRemovedWithReplacement,
+    /* fi-0206 */ &ErrReplacedWithoutReplacement,
 };
 
 // In reporter.h we assert that reported error IDs are <= kNumDiagnosticDefs.

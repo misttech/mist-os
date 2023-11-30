@@ -217,3 +217,10 @@ fi-0192.test.fidl
 fi-0193.test.fidl
 fi-0201.test.fidl
 fi-0202.test.fidl
+fi-0203-a.test.fidl
+fi-0203-b.test.fidl
+fi-0204.test.fidl
+fi-0205-a.test.fidl
+fi-0205-b.test.fidl
+fi-0206-a.test.fidl
+fi-0206-b.test.fidl

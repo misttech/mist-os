@@ -466,6 +466,8 @@ AttributeSchemaMap AttributeSchema::OfficialAttributes() {
                                                AttributeArgSchema::Optionality::kOptional))
       .AddArg("removed", AttributeArgSchema(AttributeArgSchema::SpecialCase::kVersion,
                                             AttributeArgSchema::Optionality::kOptional))
+      .AddArg("replaced", AttributeArgSchema(AttributeArgSchema::SpecialCase::kVersion,
+                                             AttributeArgSchema::Optionality::kOptional))
       .AddArg("note", AttributeArgSchema(ConstantValue::Kind::kString,
                                          AttributeArgSchema::Optionality::kOptional))
       .AddArg("legacy", AttributeArgSchema(ConstantValue::Kind::kBool,

@@ -1337,18 +1337,69 @@ TEST(ErrcatGoodTests, Good0193) {
   ASSERT_COMPILED(library);
 }
 
-TEST(ErrcatTests, Good0201) {
+TEST(ErrcatGoodTests, Good0201) {
   TestLibrary library;
   library.AddFile("good/fi-0201.test.fidl");
   library.SelectVersion("foo", "1");
   ASSERT_COMPILED(library);
 }
 
-TEST(ErrcatTests, Good0202) {
+TEST(ErrcatGoodTests, Good0202) {
   TestLibrary library;
   library.AddFile("good/fi-0202.test.fidl");
   library.EnableFlag(fidl::ExperimentalFlags::Flag::kTransitionalAllowList);
   library.SelectVersion("test", "10");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0203a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0203-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0203b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0203-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0204) {
+  TestLibrary library;
+  library.AddFile("good/fi-0204.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0205a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0205-a.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0205b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0205-b.test.fidl");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0206a) {
+  TestLibrary library;
+  library.AddFile("good/fi-0206-a.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  ASSERT_COMPILED(library);
+}
+
+TEST(ErrcatGoodTests, Good0206b) {
+  TestLibrary library;
+  library.AddFile("good/fi-0206-b.test.fidl");
+  library.SelectVersion("test", "HEAD");
   ASSERT_COMPILED(library);
 }
 

@@ -176,14 +176,12 @@ void Availability::Fail() {
 
 bool Availability::Init(InitArgs args) {
   ZX_ASSERT_MSG(state_ == State::kUnset, "called Init in the wrong order");
-  ZX_ASSERT_MSG(args.added != Version::Legacy(), "adding at LEGACY is not allowed");
-  ZX_ASSERT_MSG(args.removed != Version::Legacy(), "removing at LEGACY is not allowed");
-  ZX_ASSERT_MSG(args.deprecated != Version::Legacy(), "deprecating at LEGACY is not allowed");
-  ZX_ASSERT_MSG(args.deprecated != Version::NegInf(),
-                "deprecated version must be finite, got -inf");
-  ZX_ASSERT_MSG(args.deprecated != Version::PosInf(),
-                "deprecated version must be finite, got +inf");
   ZX_ASSERT_MSG(args.legacy != Legacy::kNotApplicable, "legacy cannot be kNotApplicable");
+  for (auto version : {args.added, args.deprecated, args.removed}) {
+    ZX_ASSERT(version != Version::NegInf());
+    ZX_ASSERT(version != Version::PosInf());
+    ZX_ASSERT(version != Version::Legacy());
+  }
   added_ = args.added;
   deprecated_ = args.deprecated;
   removed_ = args.removed;

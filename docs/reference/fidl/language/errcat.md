@@ -400,4 +400,12 @@ This document lists all errors emitted by the [FIDL compiler][docs-fidlc],
 
 <<error-catalog/_fi-0202.md>>
 
+<<error-catalog/_fi-0203.md>>
+
+<<error-catalog/_fi-0204.md>>
+
+<<error-catalog/_fi-0205.md>>
+
+<<error-catalog/_fi-0206.md>>
+
 [docs-fidlc]: ../language/fidlc.md

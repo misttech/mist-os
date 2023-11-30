@@ -289,8 +289,7 @@ class Availability final {
   };
 
   // Must be called first. Initializes the availability from @available fields.
-  // Returns false if they do not satisfy `added <= deprecated < removed`. If
-  // `deprecated` is set, it must be finite.
+  // Returns false if they do not satisfy `added <= deprecated < removed`.
   bool Init(InitArgs args);
 
   struct InheritResult {

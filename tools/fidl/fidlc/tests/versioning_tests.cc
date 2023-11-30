@@ -383,6 +383,54 @@ type Foo = struct {};
   }
 }
 
+TEST(VersioningTests, GoodDeclAddedAndReplaced) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=1, replaced=2)
+type Foo = struct {};
+
+@available(added=2)
+type Foo = table {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+    ASSERT_NE(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", kMaxNumericVersion);
+    ASSERT_COMPILED(library);
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+    ASSERT_NE(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "HEAD");
+    ASSERT_COMPILED(library);
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+    ASSERT_NE(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "LEGACY");
+    ASSERT_COMPILED(library);
+    ASSERT_EQ(library.LookupStruct("Foo"), nullptr);
+    ASSERT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
 TEST(VersioningTests, GoodDeclAddedAndDeprecatedAndRemoved) {
   auto source = R"FIDL(
 @available(added=1)
@@ -610,6 +658,66 @@ type Foo = struct {
     ASSERT_COMPILED(library);
     ASSERT_NE(library.LookupStruct("Foo"), nullptr);
     ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 0u);
+  }
+}
+
+TEST(VersioningTests, GoodMemberAddedAndReplaced) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Foo = struct {
+    @available(added=1, replaced=2)
+    member string;
+    @available(added=2)
+    member uint32;
+};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
+              fidl::flat::Type::Kind::kString);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
+              fidl::flat::Type::Kind::kPrimitive);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", kMaxNumericVersion);
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
+              fidl::flat::Type::Kind::kPrimitive);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "HEAD");
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
+              fidl::flat::Type::Kind::kPrimitive);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "LEGACY");
+    ASSERT_COMPILED(library);
+    ASSERT_NE(library.LookupStruct("Foo"), nullptr);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.size(), 1u);
+    ASSERT_EQ(library.LookupStruct("Foo")->members.front().type_ctor->type->kind,
+              fidl::flat::Type::Kind::kPrimitive);
   }
 }
 
@@ -977,11 +1085,27 @@ TEST(VersioningTests, BadLibraryMissingAddedOnlyPlatform) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadLibraryReplaced) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0204.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(fidl::ErrLibraryReplaced);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadNoteWithoutDeprecation) {
   TestLibrary library;
   library.AddFile("bad/fi-0148.test.fidl");
   library.SelectVersion("test", "HEAD");
   library.ExpectFail(fidl::ErrNoteWithoutDeprecation);
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadRemovedAndReplaced) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0203.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(fidl::ErrRemovedAndReplaced);
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1032,6 +1156,19 @@ TEST(VersioningTests, BadAddedEqualsRemoved) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadAddedEqualsReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, replaced=2)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added < replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadAddedGreaterThanRemoved) {
   TestLibrary library(R"FIDL(
 @available(added=2, removed=1)
@@ -1039,6 +1176,19 @@ library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadAddedGreaterThanReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=3, replaced=2)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added < replaced");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1069,6 +1219,19 @@ TEST(VersioningTests, BadDeprecatedEqualsRemoved) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadDeprecatedEqualsReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=1, deprecated=2, replaced=2)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated < replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadDeprecatedGreaterThanRemoved) {
   TestLibrary library(R"FIDL(
 @available(added=1, deprecated=3, removed=2)
@@ -1076,6 +1239,19 @@ library example;
 )FIDL");
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated < removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadDeprecatedGreaterThanReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=1, deprecated=3, replaced=2)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrInvalidAvailabilityOrder, "added <= deprecated < replaced");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1169,6 +1345,26 @@ TEST(VersioningTests, BadAddedWhenParentRemoved) {
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadAddedWhenParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(added=6)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "added", "6", "replaced", "6",
+                     "example.fidl:5:35", "added", "after", "replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadAddedAfterParentRemoved) {
   TestLibrary library(R"FIDL(
 @available(added=2, deprecated=4, removed=6)
@@ -1180,6 +1376,26 @@ type Foo = struct {};
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "added", "7", "removed", "6",
                      "example.fidl:2:35", "added", "after", "removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadAddedAfterParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(added=7)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "added", "7", "replaced", "6",
+                     "example.fidl:5:35", "added", "after", "replaced");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1257,6 +1473,26 @@ type Foo = struct {};
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadDeprecatedWhenParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(deprecated=6)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "deprecated", "6", "replaced", "6",
+                     "example.fidl:5:35", "deprecated", "after", "replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadDeprecatedAfterParentRemoved) {
   TestLibrary library(R"FIDL(
 @available(added=2, deprecated=4, removed=6)
@@ -1268,6 +1504,26 @@ type Foo = struct {};
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "deprecated", "7", "removed", "6",
                      "example.fidl:2:35", "deprecated", "after", "removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadDeprecatedAfterParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(deprecated=7)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "deprecated", "7", "replaced", "6",
+                     "example.fidl:5:35", "deprecated", "after", "replaced");
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1285,6 +1541,23 @@ type Foo = struct {};
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadReplacedBeforeParentAdded) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=1)
+    member bool;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "replaced", "1", "added", "2",
+                     "example.fidl:5:12", "replaced", "before", "added");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, BadRemovedWhenParentAdded) {
   TestLibrary library(R"FIDL(
 @available(added=2, deprecated=4, removed=6)
@@ -1299,6 +1572,23 @@ type Foo = struct {};
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
+TEST(VersioningTests, BadReplacedWhenParentAdded) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=2)
+    member bool;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "replaced", "2", "added", "2",
+                     "example.fidl:5:12", "replaced", "before", "added");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
 TEST(VersioningTests, GoodRemovedBeforeParentDeprecated) {
   TestLibrary library(R"FIDL(
 @available(added=2, deprecated=4, removed=6)
@@ -1306,6 +1596,27 @@ library example;
 
 @available(removed=3)
 type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "2");
+  ASSERT_COMPILED(library);
+
+  auto foo = library.LookupStruct("Foo");
+  ASSERT_NE(foo, nullptr);
+  EXPECT_FALSE(foo->availability.is_deprecated());
+}
+
+TEST(VersioningTests, GoodReplacedBeforeParentDeprecated) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=3)
+    member bool;
+    @available(added=3)
+    member uint32;
+};
 )FIDL");
   library.SelectVersion("example", "2");
   ASSERT_COMPILED(library);
@@ -1331,6 +1642,27 @@ type Foo = struct {};
   EXPECT_FALSE(foo->availability.is_deprecated());
 }
 
+TEST(VersioningTests, GoodReplacedWhenParentDeprecated) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=4)
+    member bool;
+    @available(added=4)
+    member uint32;
+};
+)FIDL");
+  library.SelectVersion("example", "3");
+  ASSERT_COMPILED(library);
+
+  auto foo = library.LookupStruct("Foo");
+  ASSERT_NE(foo, nullptr);
+  EXPECT_FALSE(foo->availability.is_deprecated());
+}
+
 TEST(VersioningTests, GoodRemovedAfterParentDeprecated) {
   TestLibrary library(R"FIDL(
 @available(added=2, deprecated=4, removed=6)
@@ -1338,6 +1670,27 @@ library example;
 
 @available(removed=5)
 type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "4");
+  ASSERT_COMPILED(library);
+
+  auto foo = library.LookupStruct("Foo");
+  ASSERT_NE(foo, nullptr);
+  EXPECT_TRUE(foo->availability.is_deprecated());
+}
+
+TEST(VersioningTests, GoodReplacedAfterParentDeprecated) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=5)
+    member bool;
+    @available(added=5)
+    member uint32;
+};
 )FIDL");
   library.SelectVersion("example", "4");
   ASSERT_COMPILED(library);
@@ -1358,6 +1711,120 @@ type Foo = struct {};
   library.SelectVersion("example", "HEAD");
   library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "removed", "7", "removed", "6",
                      "example.fidl:2:35", "removed", "after", "removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadRemovedAfterParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(removed=7)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "removed", "7", "replaced", "6",
+                     "example.fidl:5:35", "removed", "after", "replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadReplacedAfterParentRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(replaced=7)
+    member bool;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "replaced", "7", "removed", "6",
+                     "example.fidl:5:35", "replaced", "after", "removed");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadReplacedAfterParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(replaced=7)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrAvailabilityConflictsWithParent, "replaced", "7", "replaced", "6",
+                     "example.fidl:5:35", "replaced", "after", "replaced");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, GoodRemovedWhenParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(added=2, deprecated=4, removed=6)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "6");
+  ASSERT_COMPILED(library);
+
+  auto foo = library.LookupStruct("Foo");
+  ASSERT_NE(foo, nullptr);
+  EXPECT_TRUE(foo->members.empty());
+}
+
+TEST(VersioningTests, BadReplacedWhenParentRemoved) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, removed=6)
+type Foo = struct {
+    @available(added=2, deprecated=4, replaced=6)
+    member bool;
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrReplacedWithoutReplacement, "member", fidl::Version::From(6).value());
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadReplacedWhenParentReplaced) {
+  TestLibrary library(R"FIDL(
+@available(added=1)
+library example;
+
+@available(added=2, deprecated=4, replaced=6)
+type Foo = struct {
+    @available(added=2, deprecated=4, replaced=6)
+    member bool;
+};
+
+@available(added=6)
+type Foo = struct {};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.ExpectFail(fidl::ErrReplacedWithoutReplacement, "member", fidl::Version::From(6).value());
   ASSERT_COMPILER_DIAGNOSTICS(library);
 }
 
@@ -1719,12 +2186,297 @@ type Foo = struct {};
   EXPECT_EQ(library.errors()[0]->span.position().line, 5);
 }
 
-TEST(VersioningTests, GoodNonOverlappingNames) {
-  auto source = R"FIDL(
+TEST(VersioningTests, BadRemovedWithReplacement) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0205.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
+  library.ExpectFail(fidl::ErrRemovedWithReplacement, "Bar", fidl::Version::From(2).value(),
+                     "bad/fi-0205.test.fidl:11:14");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, BadRemovedNamedToAnonymous) {
+  TestLibrary library(R"FIDL(
 @available(added=1)
 library example;
 
 @available(removed=2)
+type Foo = struct {};
+
+type Bar = struct {
+    @available(added=2)
+    foo struct {};
+};
+)FIDL");
+  library.SelectVersion("example", "HEAD");
+  library.EnableFlag(fidl::ExperimentalFlags::Flag::kEnforceReplaced);
+  library.ExpectFail(fidl::ErrRemovedWithReplacement, "Foo", fidl::Version::From(2).value(),
+                     "example.fidl:10:9");
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, GoodRemovedAnonymousToNamed) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Bar = struct {
+    // The anonymous type "Foo" inherits removed=2, but removed/replaced
+    // does not apply to inherited availabilities.
+    @available(removed=2)
+    foo struct {};
+};
+
+@available(added=2)
+type Foo = table {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodRemovedAnonymousToAnonymous) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Bar1 = struct {
+    // The anonymous type "Foo" inherits removed=2, but removed/replaced
+    // does not apply to inherited availabilities.
+    @available(removed=2)
+    foo struct {};
+};
+
+type Bar2 = struct {
+    @available(added=2)
+    foo table {};
+};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, BadReplacedWithoutReplacement) {
+  TestLibrary library;
+  library.AddFile("bad/fi-0206.test.fidl");
+  library.SelectVersion("test", "HEAD");
+  library.ExpectFail(fidl::ErrReplacedWithoutReplacement, "Bar", fidl::Version::From(2).value());
+  ASSERT_COMPILER_DIAGNOSTICS(library);
+}
+
+TEST(VersioningTests, GoodAnonymousReplacedWithoutReplacement) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Bar = struct {
+    // The anonymous type "Foo" inherits replaced=2, but removed/replaced
+    // validation does not apply to inherited availabilities.
+    @available(replaced=2)
+    foo struct {};
+    @available(added=2)
+    foo string;
+};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodReplacedNamedToAnonymous) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(replaced=2)
+type Foo = struct {};
+
+type Bar = struct {
+    @available(added=2)
+    foo table {};
+};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodReplacedAnonymousToNamed) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Bar = struct {
+    @available(replaced=2)
+    foo struct {};
+    @available(added=2)
+    foo string;
+};
+
+@available(added=2)
+type Foo = table {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodReplacedAnonymousToAnonymous) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+type Bar1 = struct {
+    @available(replaced=2)
+    foo struct {};
+    @available(added=2)
+    foo string;
+};
+
+type Bar2 = struct {
+    @available(added=2)
+    foo table {};
+};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodReplacedTwice) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(replaced=2)
+type Foo = struct {};
+
+@available(added=2, replaced=3)
+type Foo = table {};
+
+@available(added=3)
+type Foo = union {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+    EXPECT_EQ(library.LookupUnion("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+    EXPECT_EQ(library.LookupUnion("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "3");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+    EXPECT_NE(library.LookupUnion("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodNonOverlappingNamesNoGap) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(replaced=2)
 type Foo = struct {};
 
 @available(added=2)
@@ -1749,7 +2501,45 @@ type Foo = table {};
   }
 }
 
-TEST(VersioningTests, GoodNonOverlappingNamesCanonical) {
+TEST(VersioningTests, GoodNonOverlappingNamesWithGap) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(removed=2)
+type Foo = struct {};
+
+@available(added=3)
+type Foo = table {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("Foo"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "3");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("Foo"), nullptr);
+    EXPECT_NE(library.LookupTable("Foo"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodNonOverlappingNamesNoGapCanonical) {
   auto source = R"FIDL(
 @available(added=1)
 library example;
@@ -1772,6 +2562,44 @@ type FOO = table {};
   {
     TestLibrary library(source);
     library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("foo"), nullptr);
+    EXPECT_NE(library.LookupTable("FOO"), nullptr);
+  }
+}
+
+TEST(VersioningTests, GoodNonOverlappingNamesWithGapCanonical) {
+  auto source = R"FIDL(
+@available(added=1)
+library example;
+
+@available(removed=2)
+type foo = struct {};
+
+@available(added=3)
+type FOO = table {};
+)FIDL";
+
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "1");
+    ASSERT_COMPILED(library);
+
+    EXPECT_NE(library.LookupStruct("foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("FOO"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "2");
+    ASSERT_COMPILED(library);
+
+    EXPECT_EQ(library.LookupStruct("foo"), nullptr);
+    EXPECT_EQ(library.LookupTable("FOO"), nullptr);
+  }
+  {
+    TestLibrary library(source);
+    library.SelectVersion("example", "3");
     ASSERT_COMPILED(library);
 
     EXPECT_EQ(library.LookupStruct("foo"), nullptr);
@@ -1940,7 +2768,7 @@ TEST(VersioningTests, BadOverlappingNamesJustAtLegacy) {
 @available(added=1)
 library example;
 
-@available(removed=2, legacy=true)
+@available(replaced=2, legacy=true)
 type Foo = struct {};
 @available(added=2, removed=3, legacy=true)
 type Foo = table {};
@@ -1978,7 +2806,7 @@ TEST(VersioningTests, BadOverlappingNamesIntersectAtLegacy) {
 @available(added=1)
 library example;
 
-@available(removed=2, legacy=true)
+@available(replaced=2, legacy=true)
 type Foo = struct {};
 @available(added=2)
 type Foo = table {};
@@ -2197,7 +3025,7 @@ TEST(VersioningTests, BadOverlappingMemberNamesJustAtLegacy) {
 library example;
 
 type Foo = struct {
-    @available(removed=2, legacy=true)
+    @available(replaced=2, legacy=true)
     member bool;
     @available(added=2, removed=3, legacy=true)
     member bool;
@@ -2239,7 +3067,7 @@ TEST(VersioningTests, BadOverlappingMemberNamesIntersectAtLegacy) {
 library example;
 
 type Foo = struct {
-    @available(removed=2, legacy=true)
+    @available(replaced=2, legacy=true)
     member bool;
     @available(added=2)
     member bool;
@@ -2504,7 +3332,7 @@ TEST(VersioningTests, GoodMultiplePlatformsUsesCorrectDecl) {
 @available(added=2)
 library dependency;
 
-@available(deprecated=3, removed=4)
+@available(deprecated=3, replaced=4)
 type Foo = resource struct {};
 
 @available(added=4, removed=5)
