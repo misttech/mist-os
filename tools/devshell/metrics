@@ -47,18 +47,16 @@ the session and user workflow in order to improve the user experience:
 1. For every "fx" invocation:
    - The output of "uname -rs" (Kernel name and release)
    - The version of the shell (bash or zsh)
-   - The name of the "fx" subcommand invoked
-   - (in the future) Imports in BUILDDIR/args.gn for product and board
-   - (in the future) Value FUCHSIA_ARCH from BUILDDIR/fx.config
-
-2. For the subcomand(s) [${_METRICS_TRACK_ALL_ARGS[@]}]:
-   - All arguments passed to the subcommand
-
-3. For the subcomand(s) [${_METRICS_TRACK_RESULTS[@]}]:
+   - The name of the "fx" subcommand invoked (e.g. set, publish cache, etc.)
    - Time taken to complete
    - Exit status
+   - Whether ninja persistent mode is enabled
 
-4. Custom events for the subcommand(s): [${_METRICS_ALLOWS_CUSTOM_REPORTING[@]}]
+2. For "fx set":
+   - The target name (product.board, e.g. core.x64)
+   - Packages added by --with or --with-base
+
+3. Custom events for the subcommand(s): [${_METRICS_ALLOWS_CUSTOM_REPORTING[@]}]
 
 When metrics collection is disabled, any existing UUID is deleted, and a
 new UUID will be created if metrics is later re-enabled.
