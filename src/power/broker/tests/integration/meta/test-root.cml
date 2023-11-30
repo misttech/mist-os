@@ -12,10 +12,6 @@
     },
     use: [
         {
-            protocol: "fuchsia.power.broker.LevelControl",
-            from: "self",
-        },
-        {
             protocol: "fuchsia.power.broker.Lessor",
             from: "self",
         },

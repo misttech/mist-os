@@ -4,16 +4,19 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_power_broker::{
-    self as fpb, LessorRequest, LessorRequestStream, LevelControlRequest,
+    self as fpb, LessorRequest, LessorRequestStream, LevelControlMarker, LevelControlRequest,
     LevelControlRequestStream, StatusRequest, StatusRequestStream, TopologyRequest,
     TopologyRequestStream,
 };
+use fuchsia_async::Task;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{component, health::Reporter};
+use futures::lock::Mutex;
 use futures::prelude::*;
-use std::sync::{Arc, Mutex};
+use std::rc::Rc;
 
 use crate::broker::Broker;
+use crate::topology::ElementID;
 
 mod broker;
 mod credentials;
@@ -23,24 +26,23 @@ mod topology;
 /// and dispatched.
 enum IncomingRequest {
     Lessor(LessorRequestStream),
-    LevelControl(LevelControlRequestStream),
     Status(StatusRequestStream),
     Topology(TopologyRequestStream),
 }
 
 struct BrokerSvc {
-    broker: Arc<Mutex<Broker>>,
+    broker: Rc<Mutex<Broker>>,
 }
 
 impl BrokerSvc {
     async fn run_status(&self, stream: StatusRequestStream) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async move {
+            .try_for_each(|request| async {
                 match request {
                     StatusRequest::GetPowerLevel { token, responder } => {
                         tracing::debug!("GetPowerLevel({:?})", &token);
-                        let broker: std::sync::MutexGuard<'_, Broker> = self.broker.lock().unwrap();
+                        let broker = self.broker.lock().await;
                         let result = broker.get_current_level(token.into());
                         tracing::debug!("get_current_level = {:?}", &result);
                         if let Ok(power_level) = result {
@@ -54,8 +56,7 @@ impl BrokerSvc {
                     StatusRequest::WatchPowerLevel { token, last_level, responder } => {
                         tracing::debug!("WatchPowerLevel({:?}, {:?})", &token, last_level);
                         let watch_res = {
-                            let mut broker: std::sync::MutexGuard<'_, Broker> =
-                                self.broker.lock().unwrap();
+                            let mut broker = self.broker.lock().await;
                             tracing::debug!("subscribe_current_level({:?})", &token);
                             broker.watch_current_level(token.into())
                         };
@@ -86,11 +87,11 @@ impl BrokerSvc {
     async fn run_lessor(&self, stream: LessorRequestStream) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async move {
+            .try_for_each(|request| async {
                 match request {
                     LessorRequest::Lease { token, level, responder } => {
                         tracing::debug!("Lease({:?}, {:?})", &token, &level);
-                        let mut broker = self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let resp = broker.acquire_lease(token.into(), level);
                         match resp {
                             Ok(lease) => {
@@ -102,7 +103,7 @@ impl BrokerSvc {
                     }
                     LessorRequest::DropLease { lease_id, .. } => {
                         tracing::debug!("DropLease({:?})", &lease_id);
-                        let mut broker = self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         broker.drop_lease(&lease_id.into()).expect("drop_lease failed");
                         Ok(())
                     }
@@ -112,25 +113,27 @@ impl BrokerSvc {
             .await
     }
 
-    async fn run_level_control(&self, stream: LevelControlRequestStream) -> Result<(), Error> {
+    async fn run_level_control(
+        &self,
+        element_id: ElementID,
+        stream: LevelControlRequestStream,
+    ) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async move {
+            .try_for_each(|request| async {
                 match request {
                     LevelControlRequest::WatchRequiredLevel {
-                        token,
                         last_required_level,
                         responder,
                     } => {
                         tracing::debug!(
                             "WatchRequiredLevel({:?}, {:?})",
-                            &token,
+                            &element_id,
                             &last_required_level
                         );
                         let watch_res = {
-                            let mut broker: std::sync::MutexGuard<'_, Broker> =
-                                self.broker.lock().unwrap();
-                            broker.watch_required_level(token.into())
+                            let mut broker = self.broker.lock().await;
+                            broker.watch_required_level(&element_id)
                         };
                         let Ok(mut receiver) = watch_res else {
                             return responder.send(Err(watch_res.unwrap_err())).context("send failed");
@@ -145,33 +148,29 @@ impl BrokerSvc {
                                 tracing::error!("element missing default required level");
                                 return responder.send(Err(fpb::WatchRequiredLevelError::Internal)).context("send failed");
                             };
-                            if last_required_level.is_some() && last_required_level.clone().unwrap().as_ref() == &required_level {
-                                tracing::debug!(
-                                    "WatchRequiredLevel: level has not changed, watching for next update...",
-                                );
-                                continue;
-                            } else {
+                            if last_required_level.is_none() || **last_required_level.as_ref().unwrap() != required_level {
                                 tracing::debug!(
                                     "WatchRequiredLevel: sending new level: {:?}", &required_level,
                                 );
                                 return responder.send(Ok(&required_level)).context("send failed");
                             }
+                            tracing::debug!(
+                                "WatchRequiredLevel: level has not changed, watching for next update...",
+                            );
                         }
                         Err(anyhow::anyhow!("receiver closed unexpectedly"))
                     }
                     LevelControlRequest::UpdateCurrentPowerLevel {
-                        token,
                         current_level,
                         responder,
                     } => {
                         tracing::debug!(
                             "UpdateCurrentPowerLevel({:?}, {:?})",
-                            &token,
+                            &element_id,
                             &current_level
                         );
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
-                        let res = broker.update_current_level(token.into(), current_level);
+                        let mut broker = self.broker.lock().await;
+                        let res = broker.update_current_level(&element_id, current_level);
                         match res {
                             Ok(_) => {
                                 responder.send(Ok(())).context("send failed")
@@ -188,10 +187,10 @@ impl BrokerSvc {
             .await
     }
 
-    async fn run_topology(&self, stream: TopologyRequestStream) -> Result<(), Error> {
+    async fn run_topology(self: Rc<Self>, stream: TopologyRequestStream) -> Result<(), Error> {
         stream
             .map(|result| result.context("failed request"))
-            .try_for_each(|request| async move {
+            .try_for_each(|request| async {
                 match request {
                     TopologyRequest::AddElement {
                         element_name,
@@ -205,8 +204,7 @@ impl BrokerSvc {
                             &element_name,
                             &credentials_to_register
                         );
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let credentials =
                             credentials_to_register.into_iter().map(|d| d.into()).collect();
                         let res = broker.add_element(
@@ -217,14 +215,32 @@ impl BrokerSvc {
                         );
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
-                            Ok(_) => responder.send(Ok(())).context("send failed"),
+                            Ok(element_id) => {
+                                let (client, server) =
+                                    fidl::endpoints::create_request_stream::<LevelControlMarker>()?;
+                                tracing::debug!(
+                                    "Spawning level control task for {:?}",
+                                    &element_id
+                                );
+                                Task::local({
+                                    let svc = self.clone();
+                                    async move {
+                                        if let Err(err) =
+                                            svc.run_level_control(element_id, server).await
+                                        {
+                                            tracing::debug!("run_level_control err: {:?}", err);
+                                        }
+                                    }
+                                })
+                                .detach();
+                                responder.send(Ok(client)).context("send failed")
+                            }
                             Err(err) => responder.send(Err(err.into())).context("send failed"),
                         }
                     }
                     TopologyRequest::RemoveElement { token, responder } => {
                         tracing::debug!("RemoveElement({:?})", &token);
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let res = broker.remove_element(token.into());
                         tracing::debug!("RemoveElement remove_element = {:?}", &res);
                         if let Err(err) = res {
@@ -235,8 +251,7 @@ impl BrokerSvc {
                     }
                     TopologyRequest::AddDependency { dependency, responder } => {
                         tracing::debug!("AddDependency({:?})", &dependency);
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let res = broker.add_dependency(
                             dependency.dependent.token.into(),
                             dependency.dependent.level,
@@ -252,8 +267,7 @@ impl BrokerSvc {
                     }
                     TopologyRequest::RemoveDependency { dependency, responder } => {
                         tracing::debug!("RemoveDependency({:?})", &dependency);
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let res = broker.remove_dependency(
                             dependency.dependent.token.into(),
                             dependency.dependent.level,
@@ -277,8 +291,7 @@ impl BrokerSvc {
                             &token,
                             &credentials_to_register
                         );
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let res = broker.register_credentials(
                             token.into(),
                             credentials_to_register.into_iter().map(|c| c.into()).collect(),
@@ -300,8 +313,7 @@ impl BrokerSvc {
                             &token,
                             &tokens_to_unregister
                         );
-                        let mut broker: std::sync::MutexGuard<'_, Broker> =
-                            self.broker.lock().unwrap();
+                        let mut broker = self.broker.lock().await;
                         let res = broker.unregister_credentials(
                             token.into(),
                             tokens_to_unregister.into_iter().map(|c| c.into()).collect(),
@@ -336,7 +348,6 @@ async fn main() -> Result<(), anyhow::Error> {
     // service_fs.dir("svc").add_fidl_service(IncomingRequest::MyProtocol);
     // ```
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Lessor);
-    service_fs.dir("svc").add_fidl_service(IncomingRequest::LevelControl);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Status);
     service_fs.dir("svc").add_fidl_service(IncomingRequest::Topology);
 
@@ -344,7 +355,7 @@ async fn main() -> Result<(), anyhow::Error> {
 
     component::health().set_ok();
 
-    let svc: BrokerSvc = BrokerSvc { broker: Arc::new(Mutex::new(Broker::new())) };
+    let svc = Rc::new(BrokerSvc { broker: Rc::new(Mutex::new(Broker::new())) });
 
     service_fs
         .for_each_concurrent(None, |request: IncomingRequest| async {
@@ -352,14 +363,11 @@ async fn main() -> Result<(), anyhow::Error> {
                 IncomingRequest::Lessor(stream) => {
                     svc.run_lessor(stream).await.expect("run_lessor failed");
                 }
-                IncomingRequest::LevelControl(stream) => {
-                    svc.run_level_control(stream).await.expect("run_level_control failed");
-                }
                 IncomingRequest::Status(stream) => {
                     svc.run_status(stream).await.expect("run_status failed");
                 }
                 IncomingRequest::Topology(stream) => {
-                    svc.run_topology(stream).await.expect("run_topology failed");
+                    svc.clone().run_topology(stream).await.expect("run_topology failed");
                 }
             }
             ()

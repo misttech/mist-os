@@ -41,7 +41,6 @@ type UpdateCurrentPowerLevelError = flexible enum {
 
 /// Offered by the Power Broker to managed Power Element owners to receive
 /// current power level status and initiate power level changes.
-@discoverable
 open protocol LevelControl {
     /// Request made by element owners on behalf of a single power element to
     /// the Power Broker as a hanging GET:
@@ -50,9 +49,6 @@ open protocol LevelControl {
     /// If last_required_level matches the current level, the call will
     /// hang until the required level changes.
     flexible WatchRequiredLevel(resource struct {
-        /// Must supply a token to a previously registered Credential with
-        /// Permissions.MODIFY_POWER_LEVEL.
-        token zx.Handle:EVENTPAIR;
         /// Provided by the client with the last level received, or None if
         /// this is the first call.
         last_required_level PowerLevel:optional;
@@ -63,9 +59,6 @@ open protocol LevelControl {
     /// Sent by the element on initial startup and whenever there is a change
     /// in power level.
     flexible UpdateCurrentPowerLevel(resource struct {
-        /// Must supply a token to a previously registered Credential with
-        /// Permissions.MODIFY_POWER_LEVEL.
-        token zx.Handle:EVENTPAIR;
         current_level PowerLevel;
     }) -> () error UpdateCurrentPowerLevelError;
 };
@@ -200,7 +193,10 @@ open protocol Topology {
         /// List of initial credentials to register for this element.
         /// You may not register credentials for other elements here.
         credentials_to_register vector<Credential>:128;
-    }) -> () error AddElementError;
+    }) -> (resource struct {
+        /// LevelControl channel for this element.
+        level_control_channel client_end:LevelControl;
+    }) error AddElementError;
 
     /// Made by a Power Element owner to remove their Power Element.
     /// Removing a Power Element also removes all associated Dependencies.
