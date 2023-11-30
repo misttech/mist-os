@@ -24,6 +24,7 @@
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
+#include <bind/fuchsia/register/cpp/bind.h>
 #include <bind/fuchsia/sony/platform/cpp/bind.h>
 #include <bind/fuchsia/sysmem/cpp/bind.h>
 #include <soc/aml-common/aml-registers.h>
@@ -159,6 +160,20 @@ static const fpbus::Node isp_dev = []() {
   dev.vid() = PDEV_VID_ARM;
   dev.pid() = PDEV_PID_ARM_ISP;
   dev.did() = PDEV_DID_ARM_MALI_IV009;
+  dev.mmio() = isp_mmios;
+  dev.bti() = isp_btis;
+  dev.irq() = isp_irqs;
+  return dev;
+}();
+
+static const fpbus::Node isp_dev_old = []() {
+  // ISP
+  fpbus::Node dev = {};
+  dev.name() = "isp-old";
+  dev.vid() = PDEV_VID_ARM;
+  dev.pid() = PDEV_PID_ARM_ISP;
+  dev.did() = PDEV_DID_ARM_MALI_IV009;
+  dev.instance_id() = 1;
   dev.mmio() = isp_mmios;
   dev.bti() = isp_btis;
   dev.irq() = isp_irqs;
@@ -444,18 +459,65 @@ zx_status_t Sherlock::CameraInit() {
     return spec_result->error_value();
   }
 
+  auto isp_sensor_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::PROTOCOL,
+                                      bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_camera::BIND_PROTOCOL_CAMERA_SENSOR_2),
+          },
+  }};
+
+  auto isp_reset_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
+                                      bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeAcceptBindRule(bind_fuchsia::REGISTER_ID,
+                                      bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_ISP_RESET),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::FIDL_PROTOCOL,
+                                bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
+              fdf::MakeProperty(bind_fuchsia::REGISTER_ID,
+                                bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_ISP_RESET),
+          },
+  }};
+
+  composite_spec = fuchsia_driver_framework::CompositeNodeSpec{
+      {.name = "isp", .parents = {{isp_sensor_node, isp_reset_node}}}};
+
   // Add a composite device for ARM ISP
+  spec_result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, isp_dev),
+                                                          fidl::ToWire(fidl_arena, composite_spec));
+  if (!spec_result.ok()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Camera(isp_dev) request failed: %s",
+           spec_result.FormatDescription().data());
+    return spec_result.status();
+  }
+  if (spec_result->is_error()) {
+    zxlogf(ERROR, "AddCompositeNodeSpec Camera(isp_dev) failed: %s",
+           zx_status_get_string(spec_result->error_value()));
+    return spec_result->error_value();
+  }
+
+  // Duplicate ARM ISP node added for soft transition of bind rules. Will be removed soon.
   auto result = pbus_.buffer(arena)->AddComposite(
-      fidl::ToWire(fidl_arena, isp_dev),
+      fidl::ToWire(fidl_arena, isp_dev_old),
       platform_bus_composite::MakeFidlFragment(fidl_arena, isp_fragments, std::size(isp_fragments)),
       "camera-sensor");
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev) request failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev_old) request failed: %s", __func__,
            result.FormatDescription().data());
     return result.status();
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev) failed: %s", __func__,
+    zxlogf(ERROR, "%s: AddComposite Camera(isp_dev_old) failed: %s", __func__,
            zx_status_get_string(result->error_value()));
     return result->error_value();
   }
@@ -467,7 +529,6 @@ zx_status_t Sherlock::CameraInit() {
 
   const ddk::BindRule kGdcRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GDC),
-
   };
 
   const ddk::BindRule kGe2dRules[] = {
