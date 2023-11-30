@@ -566,11 +566,11 @@ mod tests {
     }
 
     impl MemoryAccessor for StackVmo {
-        fn read_memory(
+        fn read_memory<'a>(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [MaybeUninit<u8>],
-        ) -> Result<(), Errno> {
+            _bytes: &'a mut [MaybeUninit<u8>],
+        ) -> Result<&'a mut [u8], Errno> {
             todo!()
         }
 
@@ -582,27 +582,27 @@ mod tests {
             todo!()
         }
 
-        fn vmo_read_memory(
+        fn vmo_read_memory<'a>(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [MaybeUninit<u8>],
-        ) -> Result<(), Errno> {
+            _bytes: &'a mut [MaybeUninit<u8>],
+        ) -> Result<&'a mut [u8], Errno> {
             todo!()
         }
 
-        fn read_memory_partial(
+        fn read_memory_partial<'a>(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [MaybeUninit<u8>],
-        ) -> Result<usize, Errno> {
+            _bytes: &'a mut [MaybeUninit<u8>],
+        ) -> Result<&'a mut [u8], Errno> {
             todo!()
         }
 
-        fn vmo_read_memory_partial(
+        fn vmo_read_memory_partial<'a>(
             &self,
             _addr: UserAddress,
-            _bytes: &mut [MaybeUninit<u8>],
-        ) -> Result<usize, Errno> {
+            _bytes: &'a mut [MaybeUninit<u8>],
+        ) -> Result<&'a mut [u8], Errno> {
             todo!()
         }
 

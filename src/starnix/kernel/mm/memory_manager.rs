@@ -1309,7 +1309,11 @@ impl MemoryManagerState {
     /// # Parameters
     /// - `addr`: The address to read data from.
     /// - `bytes`: The byte array to read into.
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         let mut bytes_read = 0;
         for (mapping, len) in self.get_contiguous_mappings_at(addr, bytes.len())? {
             let next_offset = bytes_read + len;
@@ -1320,7 +1324,14 @@ impl MemoryManagerState {
         if bytes_read != bytes.len() {
             error!(EFAULT)
         } else {
-            Ok(())
+            // SAFETY: The created slice is properly aligned/sized since it
+            // is a subset of the `bytes` slice. Note that `MaybeUninit<T>` has
+            // the same layout as `T`. Also note that `bytes_read` bytes have
+            // been properly initialized.
+            let bytes = unsafe {
+                std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, bytes_read)
+            };
+            Ok(bytes)
         }
     }
 
@@ -1466,16 +1477,20 @@ pub trait MemoryAccessor {
     ///
     /// Consider using `MemoryAccessorExt::read_memory_to_*` methods if you do not require control
     /// over the allocation.
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno>;
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
 
     /// Like `read_memory` but always reads the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory(
+    fn vmo_read_memory<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<(), Errno>;
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
 
     /// Reads bytes starting at `addr`, continuing until either a null byte is read, `bytes.len()`
     /// bytes have been read or no more bytes can be read from the target.
@@ -1498,20 +1513,20 @@ pub trait MemoryAccessor {
     ///
     /// Consider using `MemoryAccessorExt::read_memory_partial_to_*` methods if you do not require
     /// control over the allocation.
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno>;
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
 
     /// Like `read_memory_partial` but always reads the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
-    fn vmo_read_memory_partial(
+    fn vmo_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno>;
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno>;
 
     /// Writes the provided bytes to `addr`.
     ///
@@ -1655,21 +1670,37 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     /// Consider using `MemoryAccessorExt::read_memory_to_*` methods if you do not require control
     /// over the allocation.
     fn read_memory_to_slice(&self, addr: UserAddress, bytes: &mut [u8]) -> Result<(), Errno> {
+        let bytes_len = bytes.len();
         self.read_memory(addr, slice_to_maybe_unit(bytes))
+            .map(|bytes_read| debug_assert_eq!(bytes_read.len(), bytes_len))
     }
 
     /// Read exactly `len` bytes of memory, returning them as a a Vec.
     fn read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
-        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_vec(len, |buf| self.read_memory(addr, buf).map(|()| len)) }
+        // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_vec(len, |buf| {
+                self.read_memory(addr, buf).map(|bytes_read| {
+                    debug_assert_eq!(bytes_read.len(), len);
+                    len
+                })
+            })
+        }
     }
 
     /// Like `read_memory_to_vec` but always writes the memory through a VMO.
     ///
     /// Useful when the address may not be mapped in the current address space.
     fn vmo_read_memory_to_vec(&self, addr: UserAddress, len: usize) -> Result<Vec<u8>, Errno> {
-        // SAFETY: `self.vmo_read_memory` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_vec(len, |buf| self.vmo_read_memory(addr, buf).map(|()| len)) }
+        // SAFETY: `self.vmo_read_memory` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_vec(len, |buf| {
+                self.vmo_read_memory(addr, buf).map(|bytes_read| {
+                    debug_assert_eq!(bytes_read.len(), len);
+                    len
+                })
+            })
+        }
     }
 
     /// Read up to `max_len` bytes from `addr`, returning them as a Vec.
@@ -1678,15 +1709,22 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         addr: UserAddress,
         max_len: usize,
     ) -> Result<Vec<u8>, Errno> {
-        // SAFETY: `self.read_memory_partial` only returns `Ok(n)` if at least one
-        // byte was read and `n` is the number of bytes read.
-        unsafe { read_to_vec(max_len, |buf| self.read_memory_partial(addr, buf)) }
+        // SAFETY: `self.read_memory_partial` returns the bytes read.
+        unsafe {
+            read_to_vec(max_len, |buf| {
+                self.read_memory_partial(addr, buf).map(|bytes_read| bytes_read.len())
+            })
+        }
     }
 
     /// Read exactly `N` bytes from `addr`, returning them as an array.
     fn read_memory_to_array<const N: usize>(&self, addr: UserAddress) -> Result<[u8; N], Errno> {
-        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_array(|buf| self.read_memory(addr, buf)) }
+        // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_array(|buf| {
+                self.read_memory(addr, buf).map(|bytes_read| debug_assert_eq!(bytes_read.len(), N))
+            })
+        }
     }
 
     /// Read the contents of `buffer`, returning them as a Vec.
@@ -1696,14 +1734,24 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 
     /// Read an instance of T from `user`.
     fn read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_object_as_bytes(|buf| self.read_memory(user.addr(), buf)) }
+        // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_object_as_bytes(|buf| {
+                self.read_memory(user.addr(), buf)
+                    .map(|bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<T>()))
+            })
+        }
     }
 
     /// Read an instance of T from `user` through the VMO.
     fn vmo_read_object<T: FromBytes>(&self, user: UserRef<T>) -> Result<T, Errno> {
-        // SAFETY: `self.read_memory` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_object_as_bytes(|buf| self.vmo_read_memory(user.addr(), buf)) }
+        // SAFETY: `self.read_memory` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_object_as_bytes(|buf| {
+                self.vmo_read_memory(user.addr(), buf)
+                    .map(|bytes_read| debug_assert_eq!(bytes_read.len(), std::mem::size_of::<T>()))
+            })
+        }
     }
 
     /// Reads the first `partial` bytes of an object, leaving any remainder 0-filled.
@@ -1738,12 +1786,19 @@ pub trait MemoryAccessorExt: MemoryAccessor {
     }
 
     /// Read exactly `objects.len()` objects into `objects` from `user`.
-    fn read_objects<T: FromBytes>(
+    fn read_objects<'a, T: FromBytes>(
         &self,
         user: UserRef<T>,
-        objects: &mut [MaybeUninit<T>],
-    ) -> Result<(), Errno> {
-        self.read_memory(user.addr(), slice_as_mut_bytes(objects))
+        objects: &'a mut [MaybeUninit<T>],
+    ) -> Result<&'a mut [T], Errno> {
+        let objects_len = objects.len();
+        self.read_memory(user.addr(), slice_as_mut_bytes(objects)).map(|bytes_read| {
+            debug_assert_eq!(bytes_read.len(), objects_len * std::mem::size_of::<T>());
+            // SAFETY: `T` implements `FromBytes` and all bytes have been initialized.
+            unsafe {
+                std::slice::from_raw_parts_mut(bytes_read.as_mut_ptr() as *mut T, objects_len)
+            }
+        })
     }
 
     /// Read exactly `objects.len()` objects into `objects` from `user`.
@@ -1752,7 +1807,9 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
         objects: &mut [T],
     ) -> Result<(), Errno> {
+        let objects_len = objects.len();
         self.read_objects(user, slice_to_maybe_unit(objects))
+            .map(|objects_read| debug_assert_eq!(objects_read.len(), objects_len))
     }
 
     /// Read exactly `len` objects from `user`, returning them as a Vec.
@@ -1761,8 +1818,15 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         user: UserRef<T>,
         len: usize,
     ) -> Result<Vec<T>, Errno> {
-        // SAFETY: `self.read_objects` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_vec(len, |buf| self.read_objects(user, buf).map(|()| len)) }
+        // SAFETY: `self.read_objects` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_vec(len, |buf| {
+                self.read_objects(user, buf).map(|objects_read| {
+                    debug_assert_eq!(objects_read.len(), len);
+                    len
+                })
+            })
+        }
     }
 
     /// Read exactly `N` objects from `user`, returning them as an array.
@@ -1770,8 +1834,14 @@ pub trait MemoryAccessorExt: MemoryAccessor {
         &self,
         user: UserRef<T>,
     ) -> Result<[T; N], Errno> {
-        // SAFETY: `self.read_objects` only returns `Ok(())` if all bytes were read to.
-        unsafe { read_to_array(|buf| self.read_objects(user, buf)) }
+        // SAFETY: `self.read_objects` only returns `Ok` if all bytes were read to.
+        unsafe {
+            read_to_array(|buf| {
+                self.read_objects(user, buf).map(|objects_read| {
+                    debug_assert_eq!(objects_read.len(), N);
+                })
+            })
+        }
     }
 
     /// Read exactly `iovec_count` `UserBuffer`s from `iovec_addr`, returning them as a Vec.
@@ -1892,12 +1962,16 @@ pub trait MemoryAccessorExt: MemoryAccessor {
 }
 
 impl MemoryAccessor for MemoryManager {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             profile_duration!("UsercopyRead");
-            let (_read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
+            let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if unread_bytes.is_empty() {
-                Ok(())
+                Ok(read_bytes)
             } else {
                 error!(EFAULT)
             }
@@ -1906,11 +1980,11 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn vmo_read_memory(
+    fn vmo_read_memory<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<(), Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.state.read().read_memory(addr, bytes)
     }
 
@@ -1932,30 +2006,30 @@ impl MemoryAccessor for MemoryManager {
         }
     }
 
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         if let Some(usercopy) = usercopy(self).as_ref() {
             profile_duration!("UsercopyReadPartial");
             let (read_bytes, unread_bytes) = usercopy.copyin(addr.ptr(), bytes);
             if read_bytes.is_empty() && !unread_bytes.is_empty() {
                 error!(EFAULT)
             } else {
-                Ok(read_bytes.len())
+                Ok(read_bytes)
             }
         } else {
             self.vmo_read_memory_partial(addr, bytes)
         }
     }
 
-    fn vmo_read_memory_partial(
+    fn vmo_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
-        self.state.read().read_memory_partial(addr, bytes).map(|bytes| bytes.len())
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        self.state.read().read_memory_partial(addr, bytes)
     }
 
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {

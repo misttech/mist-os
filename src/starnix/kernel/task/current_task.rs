@@ -1311,15 +1311,19 @@ impl CurrentTask {
 }
 
 impl MemoryAccessor for CurrentTask {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.mm().read_memory(addr, bytes)
     }
 
-    fn vmo_read_memory(
+    fn vmo_read_memory<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<(), Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.mm().vmo_read_memory(addr, bytes)
     }
 
@@ -1331,19 +1335,19 @@ impl MemoryAccessor for CurrentTask {
         self.mm().read_memory_partial_until_null_byte(addr, bytes)
     }
 
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.mm().read_memory_partial(addr, bytes)
     }
 
-    fn vmo_read_memory_partial(
+    fn vmo_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.mm().vmo_read_memory_partial(addr, bytes)
     }
 

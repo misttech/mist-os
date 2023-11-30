@@ -2694,17 +2694,23 @@ impl std::fmt::Debug for RemoteResourceAccessor {
 const MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE: usize = 64 * 1024 * 1024;
 
 impl MemoryAccessor for RemoteResourceAccessor {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
+    fn read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.vmo_read_memory(addr, bytes)
     }
 
-    fn vmo_read_memory(
+    fn vmo_read_memory<'a>(
         &self,
         addr: UserAddress,
-        mut unread_bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<(), Errno> {
+        mut unread_bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         profile_duration!("RemoteReadMemory");
         let mut addr = addr.ptr();
+        let unread_bytes_ptr = unread_bytes.as_mut_ptr();
+        let unread_bytes_len = unread_bytes.len();
         while !unread_bytes.is_empty() {
             let len = std::cmp::min(unread_bytes.len(), MAX_PROCESS_READ_WRITE_MEMORY_BUFFER_SIZE);
             let (read_bytes, _unread_bytes) = self
@@ -2729,7 +2735,14 @@ impl MemoryAccessor for RemoteResourceAccessor {
             // which is what we want.
             unread_bytes = &mut unread_bytes[bytes_count..];
         }
-        Ok(())
+
+        debug_assert_eq!(unread_bytes.len(), 0);
+        // SAFETY: [MaybeUninit<T>] and [T] have the same layout. All bytes have been
+        // initialized.
+        let bytes = unsafe {
+            std::slice::from_raw_parts_mut(unread_bytes_ptr as *mut u8, unread_bytes_len)
+        };
+        Ok(bytes)
     }
 
     fn read_memory_partial_until_null_byte<'a>(
@@ -2740,19 +2753,19 @@ impl MemoryAccessor for RemoteResourceAccessor {
         error!(ENOTSUP)
     }
 
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         self.vmo_read_memory_partial(addr, bytes)
     }
 
-    fn vmo_read_memory_partial(
+    fn vmo_read_memory_partial<'a>(
         &self,
         _addr: UserAddress,
-        _bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        _bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         error!(ENOTSUP)
     }
 

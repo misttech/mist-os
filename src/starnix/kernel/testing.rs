@@ -404,14 +404,18 @@ impl std::convert::AsRef<CurrentTask> for AutoReleasableTask {
 }
 
 impl MemoryAccessor for AutoReleasableTask {
-    fn read_memory(&self, addr: UserAddress, bytes: &mut [MaybeUninit<u8>]) -> Result<(), Errno> {
-        (**self).read_memory(addr, bytes)
-    }
-    fn vmo_read_memory(
+    fn read_memory<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<(), Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
+        (**self).read_memory(addr, bytes)
+    }
+    fn vmo_read_memory<'a>(
+        &self,
+        addr: UserAddress,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         (**self).vmo_read_memory(addr, bytes)
     }
     fn read_memory_partial_until_null_byte<'a>(
@@ -421,18 +425,18 @@ impl MemoryAccessor for AutoReleasableTask {
     ) -> Result<&'a mut [u8], Errno> {
         (**self).read_memory_partial_until_null_byte(addr, bytes)
     }
-    fn read_memory_partial(
+    fn read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         (**self).read_memory_partial(addr, bytes)
     }
-    fn vmo_read_memory_partial(
+    fn vmo_read_memory_partial<'a>(
         &self,
         addr: UserAddress,
-        bytes: &mut [MaybeUninit<u8>],
-    ) -> Result<usize, Errno> {
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Errno> {
         (**self).vmo_read_memory_partial(addr, bytes)
     }
     fn write_memory(&self, addr: UserAddress, bytes: &[u8]) -> Result<usize, Errno> {
