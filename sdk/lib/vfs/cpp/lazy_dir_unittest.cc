@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// TODO(b/309685624): Delete these tests when LazyDir is removed.
+
 #include <fuchsia/io/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/vfs/cpp/lazy_dir.h>
@@ -14,14 +16,13 @@
 
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 namespace {
 
 using vfs_tests::Dirent;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 class TestLazyDir : public vfs::LazyDir {
-#pragma clang diagnostic pop
  public:
   struct TestContent {
    public:
@@ -181,5 +182,6 @@ TEST_F(LazyDirConnection, LookupReturnsNotFound) {
   vfs::internal::Node* n;
   ASSERT_EQ(ZX_ERR_NOT_FOUND, dir_.Lookup("file5", &n));
 }
-
 }  // namespace
+
+#pragma clang diagnostic pop

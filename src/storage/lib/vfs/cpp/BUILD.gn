@@ -27,7 +27,7 @@ static_library("cpp") {
   ]
 
   public_deps = [
-    "//sdk/lib/fdio",
+    "//sdk/lib/fdio:constants",
     "//sdk/lib/fit",
     "//zircon/system/ulib/fbl",
 
@@ -106,7 +106,6 @@ static_library("cpp") {
     ]
     deps += [
       "//sdk/fidl/fuchsia.mem:fuchsia.mem_cpp",
-      "//sdk/lib/fdio",
       "//sdk/lib/fidl",
       "//sdk/lib/fit",
       "//zircon/system/ulib/fbl",

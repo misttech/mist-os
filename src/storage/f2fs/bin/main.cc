@@ -6,11 +6,12 @@
 #include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/process.h>
+#include <zircon/processargs.h>
 
 #include "src/storage/f2fs/fsck.h"
 #include "src/storage/f2fs/mkfs.h"
 #include "src/storage/f2fs/mount.h"
-
 namespace {
 
 int StartComponent() {

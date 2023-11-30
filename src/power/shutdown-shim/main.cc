@@ -13,6 +13,7 @@
 #include <lib/fit/function.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 
 #include <chrono>

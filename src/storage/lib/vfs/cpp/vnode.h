@@ -5,7 +5,6 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_VNODE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_VNODE_H_
 
-#include <lib/fdio/io.h>
 #include <lib/fdio/vfs.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
@@ -20,7 +19,6 @@
 #include <map>
 #include <memory>
 #include <string_view>
-#include <type_traits>
 #include <utility>
 
 #include <fbl/intrusive_double_list.h>

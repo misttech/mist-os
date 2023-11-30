@@ -5,11 +5,8 @@
 #include "src/storage/lib/vfs/cpp/stream_file_connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/vfs.h>
 #include <lib/zx/handle.h>
 #include <lib/zx/result.h>
-#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,8 +14,6 @@
 #include <zircon/assert.h>
 #include <zircon/rights.h>
 
-#include <memory>
-#include <type_traits>
 #include <utility>
 
 #include <fbl/string_buffer.h>

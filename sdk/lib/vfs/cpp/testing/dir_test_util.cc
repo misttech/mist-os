@@ -6,6 +6,11 @@
 #include <lib/vfs/cpp/testing/dir_test_util.h>
 #include <zircon/status.h>
 
+// TODO(b/293936429): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
+// as part of io2 migration.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+
 namespace vfs_tests {
 
 Dirent Dirent::DirentForDot() { return DirentForDirectory("."); }
@@ -125,3 +130,5 @@ void DirConnection::AssertRead(fuchsia::io::FileSyncPtr& file, int count,
 }
 
 }  // namespace vfs_tests
+
+#pragma clang diagnostic pop

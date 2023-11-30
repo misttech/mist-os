@@ -107,9 +107,8 @@ processes. It's intended for filesystem developers - if you just want to mount a
 code, see the previous section.
 
 Platform filesystem processes take 2 startup handles and a handful of command line arguments. The
-two startup handles are `PA_DIRECTORY_REQUEST` and `FS_HANDLE_BLOCK_DEVICE_ID`
-(`PA_HND(PA_USER0,1)`), which are the server end of the export directory and the block device
-handle, respectively.
+two startup handles are the server end of the export directory (`PA_DIRECTORY_REQUEST`), and a
+handle to the block device (`PA_HND(PA_USER0, 1)`).
 
 The export directory should have the structure described at the beginning of this document.
 

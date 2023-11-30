@@ -5,11 +5,9 @@
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/fdio/watcher.h>
 #include <lib/zx/event.h>
 #include <lib/zx/process.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <threads.h>
 #include <unistd.h>
@@ -18,7 +16,6 @@
 #include <memory>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 #include <fbl/auto_lock.h>
 #include <fbl/ref_ptr.h>

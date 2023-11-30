@@ -23,12 +23,12 @@
 #include <lib/zx/debuglog.h>
 #include <lib/zx/process.h>
 #include <lib/zx/time.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
 #include <algorithm>
 #include <future>
-#include <ios>
 #include <latch>
 #include <utility>
 
@@ -377,9 +377,8 @@ int main(int argv, char** argc) {
                   if (fragment_len < 0) {
                     const void* path_ptr = path.data();
                     const void* component_ptr = component.data();
-                    FX_LOGS(FATAL) << "expected overlapping memory:"
-                                   << " path@" << path_ptr << "=" << path << " component@"
-                                   << component_ptr << "=" << component;
+                    FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
+                                   << path << " component@" << component_ptr << "=" << component;
                   }
                   return std::string_view{path.data(), static_cast<size_t>(fragment_len)};
                 }();

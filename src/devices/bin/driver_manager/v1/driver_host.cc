@@ -7,6 +7,7 @@
 #include <lib/driver/component/cpp/internal/start_args.h>
 #include <lib/fdio/spawn-actions.h>
 #include <lib/fdio/spawn.h>
+#include <zircon/processargs.h>
 #include <zircon/status.h>
 
 #include <vector>

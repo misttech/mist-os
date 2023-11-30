@@ -5,10 +5,7 @@
 #include "src/storage/lib/vfs/cpp/directory_connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/vfs.h>
 #include <lib/zx/handle.h>
-#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>

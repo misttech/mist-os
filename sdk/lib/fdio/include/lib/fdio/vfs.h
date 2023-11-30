@@ -5,45 +5,17 @@
 #ifndef LIB_FDIO_VFS_H_
 #define LIB_FDIO_VFS_H_
 
-#include <stdio.h>
-#include <unistd.h>  // ssize_t
+#include <stdint.h>
 #include <zircon/availability.h>
 #include <zircon/compiler.h>
-#include <zircon/listnode.h>
-#include <zircon/processargs.h>
-#include <zircon/types.h>
 
 __BEGIN_CDECLS
-
-// On Fuchsia, the Block Device is transmitted by file descriptor, rather than
-// by path. This can prevent some racy behavior relating to FS start-up.
-#ifdef __Fuchsia__
-#define FS_HANDLE_ROOT_ID PA_HND(PA_USER0, 0)
-#define FS_HANDLE_BLOCK_DEVICE_ID PA_HND(PA_USER0, 1)
-#endif
 
 // POSIX defines st_blocks to be the number of 512 byte blocks allocated to the file. The "blkcnt"
 // field of vnattr attempts to accomplish this same goal, but by indirecting through VNATTR_BLKSIZE,
 // we reserve the right to change this "block size unit" (which is distinct from "blksize", because
 // POSIX) whenever we want.
 #define VNATTR_BLKSIZE 512
-
-typedef struct vnattr {
-  uint32_t valid;  // Mask of which bits to set for setattr.
-  uint32_t mode;
-  uint64_t inode;
-  uint64_t size;
-  uint64_t blksize;   // Block size for filesystem I/O.
-  uint64_t blkcount;  // Number of `VNATTR_BLKSIZE` byte blocks allocated.
-  uint64_t nlink;
-  uint64_t create_time;  // POSIX time (seconds since epoch).
-  uint64_t modify_time;  // POSIX time (seconds since epoch).
-} vnattr_t ZX_AVAILABLE_SINCE(1);
-
-// mask that identifies what fields to set in setattr
-#define ATTR_CTIME 0000001
-#define ATTR_MTIME 0000002
-#define ATTR_ATIME 0000004  // not yet implemented
 
 // bits compatible with POSIX stat
 #define V_TYPE_MASK 0170000
@@ -71,15 +43,30 @@ typedef struct vnattr {
 #define V_IWOTH 0000002
 #define V_IXOTH 0000001
 
-#define VTYPE_TO_DTYPE(mode) (((mode)&V_TYPE_MASK) >> 12)
-#define DTYPE_TO_VTYPE(type) (((type)&15) << 12)
+#define VTYPE_TO_DTYPE(mode) (((mode) & V_TYPE_MASK) >> 12)
+#define DTYPE_TO_VTYPE(type) (((type) & 15) << 12)
+
+// TODO(b/293947862): Remove vdirent_t and vnattr_t (see deprecation notes below).
 
 typedef struct vdirent {
   uint64_t ino;
   uint8_t size;
   uint8_t type;
   char name[0];
-} __PACKED vdirent_t ZX_AVAILABLE_SINCE(1);
+} __PACKED vdirent_t ZX_DEPRECATED_SINCE(
+    1, 16, "Will be replaced by fuchsia.io/DirectoryIterator as part of io2 migration.");
+
+typedef struct vnattr {
+  uint32_t valid;  // Mask of which bits to set for setattr.
+  uint32_t mode;
+  uint64_t inode;
+  uint64_t size;
+  uint64_t blksize;   // Block size for filesystem I/O.
+  uint64_t blkcount;  // Number of `VNATTR_BLKSIZE` byte blocks allocated.
+  uint64_t nlink;
+  uint64_t create_time;  // POSIX time (seconds since epoch).
+  uint64_t modify_time;  // POSIX time (seconds since epoch).
+} vnattr_t ZX_REMOVED_SINCE(1, 16, 17, "Functionality unused.");
 
 __END_CDECLS
 

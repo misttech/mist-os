@@ -15,6 +15,13 @@ using vfs_tests::Dirent;
 
 constexpr size_t kCommonCapacity = 1024;
 
+// TODO(b/293936429): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
+// as part of io2 migration.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+constexpr size_t kVdirentSize = sizeof(vdirent_t);
+#pragma clang diagnostic pop
+
 class TestNode : public vfs::internal::Node {
  public:
   TestNode(std::function<void()> death_callback = nullptr) : death_callback_(death_callback) {}
@@ -290,7 +297,7 @@ TEST_F(PseudoDirConnection, ReadDirSizeLessThanFirstEntry) {
   auto ptr = dir_.Serve();
 
   std::vector<Dirent> expected_dirents;
-  AssertReadDirents(ptr, sizeof(vdirent_t), expected_dirents, ZX_ERR_INVALID_ARGS);
+  AssertReadDirents(ptr, kVdirentSize, expected_dirents, ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(PseudoDirConnection, ReadDirSizeLessThanEntry) {
@@ -301,9 +308,9 @@ TEST_F(PseudoDirConnection, ReadDirSizeLessThanEntry) {
   auto ptr = dir_.Serve();
 
   std::vector<Dirent> expected_dirents = {Dirent::DirentForDot()};
-  AssertReadDirents(ptr, sizeof(vdirent_t) + 1, expected_dirents);
+  AssertReadDirents(ptr, kVdirentSize + 1, expected_dirents);
   std::vector<Dirent> empty_dirents;
-  AssertReadDirents(ptr, sizeof(vdirent_t), empty_dirents, ZX_ERR_INVALID_ARGS);
+  AssertReadDirents(ptr, kVdirentSize, empty_dirents, ZX_ERR_INVALID_ARGS);
 }
 
 TEST_F(PseudoDirConnection, ReadDirInParts) {
@@ -325,8 +332,8 @@ TEST_F(PseudoDirConnection, ReadDirInParts) {
       Dirent::DirentForFile("file2"),
       Dirent::DirentForFile("file3"),
   };
-  AssertReadDirents(ptr, 2 * sizeof(vdirent_t) + 10, expected_dirents1);
-  AssertReadDirents(ptr, 3 * sizeof(vdirent_t) + 20, expected_dirents2);
+  AssertReadDirents(ptr, 2 * kVdirentSize + 10, expected_dirents1);
+  AssertReadDirents(ptr, 3 * kVdirentSize + 20, expected_dirents2);
 }
 
 TEST_F(PseudoDirConnection, ReadDirWithExactBytes) {
@@ -441,10 +448,10 @@ TEST_F(PseudoDirConnection, RewindWorksAfterPartialRead) {
       Dirent::DirentForFile("file2"),
       Dirent::DirentForFile("file3"),
   };
-  AssertReadDirents(ptr, 2 * sizeof(vdirent_t) + 10, expected_dirents1);
+  AssertReadDirents(ptr, 2 * kVdirentSize + 10, expected_dirents1);
   AssertRewind(ptr);
-  AssertReadDirents(ptr, 2 * sizeof(vdirent_t) + 10, expected_dirents1);
-  AssertReadDirents(ptr, 3 * sizeof(vdirent_t) + 20, expected_dirents2);
+  AssertReadDirents(ptr, 2 * kVdirentSize + 10, expected_dirents1);
+  AssertReadDirents(ptr, 3 * kVdirentSize + 20, expected_dirents2);
 }
 
 TEST_F(PseudoDirConnection, ReadDirAfterAddingEntry) {

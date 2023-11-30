@@ -5,6 +5,7 @@
 #include "src/storage/lib/vfs/cpp/watcher.h"
 
 #include <lib/async/cpp/wait.h>
+#include <lib/fdio/limits.h>
 #include <lib/fit/defer.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -134,6 +135,10 @@ zx_status_t WatcherContainer::WatchDir(FuchsiaVfs* vfs, Vnode* vn, fio::wire::Wa
           break;
         }
         char* ptr = readdir_buf;
+// TODO(b/293936429): Remove use of deprecated `vdirent_t` when transitioning ReadDir to Enumerate
+// as part of io2 migration.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
         while (actual >= sizeof(vdirent_t)) {
           auto dirent = reinterpret_cast<vdirent_t*>(ptr);
           if (dirent->name[0]) {
@@ -145,6 +150,7 @@ zx_status_t WatcherContainer::WatchDir(FuchsiaVfs* vfs, Vnode* vn, fio::wire::Wa
           actual -= entry_len;
           ptr += entry_len;
         }
+#pragma clang diagnostic pop
       }
     }
 

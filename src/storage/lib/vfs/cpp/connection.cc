@@ -5,20 +5,14 @@
 #include "src/storage/lib/vfs/cpp/connection.h"
 
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/fdio/io.h>
-#include <lib/fdio/vfs.h>
 #include <lib/fidl/txn_header.h>
 #include <lib/zx/handle.h>
-#include <limits.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/stat.h>
 #include <zircon/assert.h>
 
-#include <iterator>
 #include <memory>
-#include <type_traits>
 #include <utility>
 
 #include <fbl/string_buffer.h>
