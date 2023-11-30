@@ -112,3 +112,19 @@ TEST(AddrTest, TestParseFormat) {
   EXPECT_NO_VALUE_FMT(Parse("[::]"), Format);
   EXPECT_NO_VALUE_FMT(Parse("[::]::0"), Format);
 }
+
+TEST(AddrTest, TestAddrlen) {
+  sockaddr_storage addr_unspec;
+  addr_unspec.ss_family = AF_UNSPEC;
+  EXPECT_EQ(AddrLen(addr_unspec), sizeof(sockaddr_storage));
+
+  std::optional addr_v4 = Parse("192.168.0.1:2020");
+  ASSERT_TRUE(addr_v4.has_value());
+  ASSERT_EQ(addr_v4.value().ss_family, AF_INET);
+  EXPECT_EQ(AddrLen(addr_v4.value()), sizeof(sockaddr_in));
+
+  std::optional addr_v6 = Parse("[ff02::2%100]:3");
+  ASSERT_TRUE(addr_v6.has_value());
+  ASSERT_EQ(addr_v6.value().ss_family, AF_INET6);
+  EXPECT_EQ(AddrLen(addr_v6.value()), sizeof(sockaddr_in6));
+}

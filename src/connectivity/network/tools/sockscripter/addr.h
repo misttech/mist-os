@@ -25,4 +25,7 @@ std::optional<sockaddr_storage> Parse(const std::string& ip_str,
 std::pair<std::optional<in_addr>, std::optional<int>> ParseIpv4WithScope(
     const std::string& ip_id_str);
 
+/// Returns the length of the provided address based on its family.
+socklen_t AddrLen(const sockaddr_storage& addr);
+
 #endif  // SRC_CONNECTIVITY_NETWORK_TOOLS_SOCKSCRIPTER_ADDR_H_

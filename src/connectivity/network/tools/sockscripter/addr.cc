@@ -217,3 +217,17 @@ std::pair<std::optional<in_addr>, std::optional<int>> ParseIpv4WithScope(
 
   return std::make_pair(addr_opt, id_opt);
 }
+
+socklen_t AddrLen(const sockaddr_storage& addr) {
+  switch (addr.ss_family) {
+    case AF_INET: {
+      return sizeof(sockaddr_in);
+    }
+    case AF_INET6: {
+      return sizeof(sockaddr_in6);
+    }
+    default: {
+      return sizeof(addr);
+    }
+  }
+}

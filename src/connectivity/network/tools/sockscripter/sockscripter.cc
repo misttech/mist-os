@@ -719,7 +719,7 @@ bool SockScripter::Bind(char* arg) {
 
   LOG(INFO) << "Bind(fd:" << sockfd_ << ") to " << Format(addr.value());
 
-  socklen_t addr_len = sizeof(addr.value());
+  socklen_t addr_len = AddrLen(addr.value());
 
   if (api_->bind(sockfd_, reinterpret_cast<sockaddr*>(&addr.value()), addr_len) < 0) {
     LOG(ERROR) << "Error-Bind(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
@@ -821,7 +821,7 @@ bool SockScripter::Connect(char* arg) {
 
   LOG(INFO) << "Connect(fd:" << sockfd_ << ") to " << Format(addr.value());
 
-  socklen_t addr_len = sizeof(addr.value());
+  socklen_t addr_len = AddrLen(addr.value());
 
   if (api_->connect(sockfd_, reinterpret_cast<sockaddr*>(&addr.value()), addr_len) < 0) {
     LOG(ERROR) << "Error-Connect(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
@@ -1055,8 +1055,10 @@ bool SockScripter::SendTo(char* arg) {
   LOG(INFO) << "Sending [" << snd_buf.length() << "]='" << Escaped(snd_buf) << "' on fd:" << sockfd_
             << " to " << Format(addr.value());
 
+  socklen_t addr_len = AddrLen(addr.value());
+
   ssize_t sent = api_->sendto(sockfd_, snd_buf.c_str(), snd_buf.length(), snd_flags_,
-                              reinterpret_cast<sockaddr*>(&addr.value()), sizeof(addr.value()));
+                              reinterpret_cast<sockaddr*>(&addr.value()), addr_len);
   if (sent < 0) {
     LOG(ERROR) << "Error-sendto(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
                << strerror(errno);
