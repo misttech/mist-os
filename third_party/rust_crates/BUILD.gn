@@ -14182,6 +14182,8 @@ rust_library("smallvec-v1_8_0") {
     "-Cmetadata=2ac5f197ec7958a6",
     "-Cextra-filename=-2ac5f197ec7958a6",
     "--cfg=feature=\"const_generics\"",
+    "--cfg=feature=\"const_new\"",
+    "--cfg=feature=\"union\"",
   ]
 
   visibility = [ ":*" ]
