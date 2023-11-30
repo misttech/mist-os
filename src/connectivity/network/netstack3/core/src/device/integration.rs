@@ -43,9 +43,9 @@ use crate::{
             Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
             Ipv6DadState, Ipv6DeviceConfiguration,
         },
-        BufferIpDeviceContext, DualStackDeviceContext, DualStackDeviceStateRef,
-        IpDeviceAddressContext, IpDeviceAddressIdContext, IpDeviceConfigurationContext,
-        IpDeviceIpExt, IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
+        DualStackDeviceContext, DualStackDeviceStateRef, IpDeviceAddressContext,
+        IpDeviceAddressIdContext, IpDeviceConfigurationContext, IpDeviceIpExt, IpDeviceSendContext,
+        IpDeviceStateContext, Ipv6DeviceConfigurationContext, Ipv6DeviceContext,
     },
     sync::{PrimaryRc, StrongRc},
     NonSyncContext, SyncCtx,
@@ -139,7 +139,7 @@ where
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    BufferIpDeviceContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+    IpDeviceSendContext<Ipv4, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn send_ip_frame<S>(
         &mut self,
@@ -752,7 +752,7 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpDeviceAdd
 }
 
 impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    BufferIpDeviceContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
+    IpDeviceSendContext<Ipv6, NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
 {
     fn send_ip_frame<S>(
         &mut self,

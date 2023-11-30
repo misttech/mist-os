@@ -69,7 +69,7 @@ use crate::{
     ip::{
         device::{
             slaac::SlaacCounters, state::IpDeviceStateIpExt, BufferIpv4DeviceHandler,
-            IpDeviceIpExt, IpDeviceNonSyncContext,
+            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext,
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
@@ -956,23 +956,6 @@ pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
-/// The IP device context provided to the IP layer requiring a buffer type.
-pub(crate) trait BufferIpDeviceContext<I: IpLayerIpExt, C>:
-    IpDeviceStateContext<I, C>
-{
-    /// Sends an IP frame to the next hop.
-    fn send_ip_frame<S>(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
-        packet: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut;
-}
-
 /// The execution context for the IP layer requiring buffer.
 pub(crate) trait BufferIpLayerContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
@@ -980,7 +963,8 @@ pub(crate) trait BufferIpLayerContext<
     B: BufferMut,
 >:
     BufferTransportContext<I, C, B>
-    + BufferIpDeviceContext<I, C>
+    + IpDeviceStateContext<I, C>
+    + IpDeviceSendContext<I, C>
     + BufferIcmpHandler<I, C, B>
     + IpLayerContext<I, C>
     + FragmentHandler<I, C>
@@ -992,7 +976,8 @@ impl<
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
         B: BufferMut,
         SC: BufferTransportContext<I, C, B>
-            + BufferIpDeviceContext<I, C>
+            + IpDeviceStateContext<I, C>
+            + IpDeviceSendContext<I, C>
             + BufferIcmpHandler<I, C, B>
             + IpLayerContext<I, C>
             + FragmentHandler<I, C>,
@@ -2127,7 +2112,7 @@ pub(crate) fn receive_ipv4_packet<
                 packet.set_ttl(ttl - 1);
                 let _: (Ipv4Addr, Ipv4Addr, Ipv4Proto, ParseMetadata) =
                     drop_packet_and_undo_parse!(packet, buffer);
-                match BufferIpDeviceContext::<Ipv4, _>::send_ip_frame(
+                match IpDeviceSendContext::<Ipv4, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
                     &dst_device,
@@ -2451,7 +2436,7 @@ pub(crate) fn receive_ipv6_packet<
                 packet.set_ttl(ttl - 1);
                 let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                     drop_packet_and_undo_parse!(packet, buffer);
-                if let Err(buffer) = BufferIpDeviceContext::<Ipv6, _>::send_ip_frame(
+                if let Err(buffer) = IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
                     sync_ctx,
                     ctx,
                     &dst_device,
@@ -2871,7 +2856,10 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv4, C> + Ipv4StateContext<C> + NonTestCtxMarker,
+        SC: IpDeviceStateContext<Ipv4, C>
+            + IpDeviceSendContext<Ipv4, C>
+            + Ipv4StateContext<C>
+            + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2887,7 +2875,7 @@ impl<
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: BufferIpDeviceContext<Ipv6, C> + NonTestCtxMarker,
+        SC: IpDeviceStateContext<Ipv6, C> + IpDeviceSendContext<Ipv6, C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv6, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2918,7 +2906,7 @@ pub(crate) fn send_ipv4_packet_from_device<C, SC, S>(
 ) -> Result<(), S>
 where
     C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv4, C> + Ipv4StateContext<C> + IpDeviceStateContext<Ipv4, C>,
+    SC: IpDeviceStateContext<Ipv4, C> + IpDeviceSendContext<Ipv4, C> + Ipv4StateContext<C>,
     S: Serializer,
     S::Buffer: BufferMut,
 {
@@ -2967,7 +2955,7 @@ pub(crate) fn send_ipv6_packet_from_device<C, SC, S>(
 ) -> Result<(), S>
 where
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: BufferIpDeviceContext<Ipv6, C> + IpDeviceStateContext<Ipv6, C>,
+    SC: IpDeviceSendContext<Ipv6, C> + IpDeviceStateContext<Ipv6, C>,
     S: Serializer,
     S::Buffer: BufferMut,
 {

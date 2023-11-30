@@ -44,7 +44,6 @@ use crate::{
                 Ipv6RouteDiscoveryState,
             },
             router_solicitation::{RsContext, RsHandler},
-            send_ip_frame,
             slaac::{
                 SlaacAddressEntry, SlaacAddressEntryMut, SlaacAddresses, SlaacAddrsMutAndConfig,
                 SlaacContext, SlaacCounters,
@@ -54,8 +53,8 @@ use crate::{
                 Ipv4DeviceConfiguration, Ipv6AddrConfig, Ipv6AddressFlags, Ipv6AddressState,
                 Ipv6DeviceConfiguration, SlaacConfig,
             },
-            DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceStateContext,
-            RemovedReason,
+            DelIpv6Addr, IpAddressId, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext,
+            IpDeviceStateContext, RemovedReason,
         },
         gmp::{
             self,
@@ -566,28 +565,6 @@ fn assignment_state_v6<
         AddressStatus::Present(Ipv6PresentAddressStatus::UnicastTentative)
     }
 }
-
-impl<
-        I: IpLayerIpExt + IpDeviceIpExt,
-        C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-        SC: device::BufferIpDeviceContext<I, C> + ip::IpDeviceStateContext<I, C>,
-    > ip::BufferIpDeviceContext<I, C> for SC
-{
-    fn send_ip_frame<S>(
-        &mut self,
-        ctx: &mut C,
-        device_id: &SC::DeviceId,
-        next_hop: SpecifiedAddr<I::Addr>,
-        packet: S,
-    ) -> Result<(), S>
-    where
-        S: Serializer,
-        S::Buffer: BufferMut,
-    {
-        send_ip_frame(self, ctx, device_id, next_hop, packet)
-    }
-}
-
 pub(crate) struct SyncCtxWithIpDeviceConfiguration<'a, Config, L, C: NonSyncContext> {
     pub config: Config,
     pub sync_ctx: Locked<&'a SyncCtx<C>, L>,
@@ -1337,7 +1314,7 @@ impl<'a, Config, C: NonSyncContext>
         S::Buffer: BufferMut,
     {
         let Self { config: _, sync_ctx } = self;
-        device::BufferIpDeviceContext::<Ipv4, _>::send_ip_frame(
+        IpDeviceSendContext::<Ipv4, _>::send_ip_frame(
             sync_ctx,
             ctx,
             &meta.device,
@@ -1421,7 +1398,7 @@ impl<'a, Config, C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<
         S::Buffer: BufferMut,
     {
         let Self { config: _, sync_ctx } = self;
-        device::BufferIpDeviceContext::<Ipv6, _>::send_ip_frame(
+        IpDeviceSendContext::<Ipv6, _>::send_ip_frame(
             sync_ctx,
             ctx,
             &meta.device,

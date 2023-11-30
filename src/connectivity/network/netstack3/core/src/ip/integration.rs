@@ -14,14 +14,14 @@ use packet::{BufferMut, Serializer};
 use crate::{
     context::NonTestCtxMarker,
     ip::{
-        self,
-        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
+        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext},
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::FragmentStateContext,
         send_ipv4_packet_from_device, send_ipv6_packet_from_device,
         socket::{BufferIpSocketContext, IpSocketContext, IpSocketNonSyncContext},
-        AnyDevice, DeviceIdContext, IpLayerNonSyncContext, IpPacketFragmentCache, IpStateContext,
-        Ipv4StateContext, MulticastMembershipHandler, SendIpPacketMeta,
+        AnyDevice, DeviceIdContext, IpDeviceStateContext, IpLayerNonSyncContext,
+        IpPacketFragmentCache, IpStateContext, Ipv4StateContext, MulticastMembershipHandler,
+        SendIpPacketMeta,
     },
     NonSyncContext, SyncCtx,
 };
@@ -63,7 +63,8 @@ impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: ip::BufferIpDeviceContext<Ipv4, C>
+        SC: IpDeviceStateContext<Ipv4, C>
+            + IpDeviceSendContext<Ipv4, C>
             + Ipv4StateContext<C>
             + IpSocketContext<Ipv4, C>
             + NonTestCtxMarker,
@@ -87,7 +88,8 @@ impl<
         B: BufferMut,
         C: IpSocketNonSyncContext
             + IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: ip::BufferIpDeviceContext<Ipv6, C>
+        SC: IpDeviceStateContext<Ipv6, C>
+            + IpDeviceSendContext<Ipv6, C>
             + IpStateContext<Ipv6, C>
             + IpSocketContext<Ipv6, C>
             + NonTestCtxMarker,

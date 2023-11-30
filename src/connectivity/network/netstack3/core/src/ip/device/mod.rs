@@ -1056,11 +1056,7 @@ impl<
 }
 
 /// The execution context for an IP device with a buffer.
-pub(crate) trait BufferIpDeviceContext<
-    I: IpDeviceIpExt,
-    C: IpDeviceNonSyncContext<I, Self::DeviceId>,
->: DeviceIdContext<AnyDevice>
-{
+pub(crate) trait IpDeviceSendContext<I: Ip, C>: DeviceIdContext<AnyDevice> {
     /// Sends an IP packet through the device.
     fn send_ip_frame<S>(
         &mut self,
@@ -1689,24 +1685,6 @@ fn del_ipv6_addr_with_reason_with_config<
             Ipv6AddrConfig::Manual(_manual_config) => (),
         },
     )
-}
-
-/// Sends an IP packet through the device.
-pub(crate) fn send_ip_frame<I, C, SC, S>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    device_id: &SC::DeviceId,
-    local_addr: SpecifiedAddr<I::Addr>,
-    body: S,
-) -> Result<(), S>
-where
-    I: IpDeviceIpExt,
-    C: IpDeviceNonSyncContext<I, SC::DeviceId>,
-    SC: BufferIpDeviceContext<I, C>,
-    S: Serializer,
-    S::Buffer: BufferMut,
-{
-    sync_ctx.send_ip_frame(ctx, device_id, local_addr, body)
 }
 
 pub(crate) fn get_ipv4_configuration_and_flags<
