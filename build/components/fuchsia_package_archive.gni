@@ -34,6 +34,7 @@ template("fuchsia_package_archive") {
                              [
                                "testonly",
                                "visibility",
+                               "applicable_licenses",
                              ])
       sources = [ "$target_out_dir/$target_name.far" ]
       outputs = [ "$target_out_dir/$target_name.far" ]

@@ -54,6 +54,7 @@ template("export_fuchsia_package_to_bazel") {
                              "deps",
                              "testonly",
                              "visibility",
+                             "applicable_licenses",
                            ])
     package = invoker.package
   }
@@ -64,6 +65,7 @@ template("export_fuchsia_package_to_bazel") {
                              "deps",
                              "testonly",
                              "visibility",
+                             "applicable_licenses",
                            ])
     deps = [ ":${labels.archive_label}" ]
     sources = get_target_outputs(":${labels.archive_label}")
