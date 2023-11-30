@@ -15,6 +15,7 @@ using zx;
 /// levels, such as ACPI.
 type PowerLevel = strict union {
     1: binary BinaryPowerLevel;
+    2: user_defined UserDefinedPowerLevel;
 };
 
 type BinaryPowerLevel = strict enum : uint32 {
@@ -22,11 +23,16 @@ type BinaryPowerLevel = strict enum : uint32 {
     ON = 1;
 };
 
+type UserDefinedPowerLevel = struct {
+    level uint8;
+};
+
 // Unique ID provided by Power Broker (currently a UUID but subject to change).
 alias LeaseId = string:64;
 
 type WatchRequiredLevelError = flexible enum {
-    NOT_AUTHORIZED = 1;
+    INTERNAL = 1;
+    NOT_AUTHORIZED = 2;
 };
 
 type UpdateCurrentPowerLevelError = flexible enum {
@@ -184,6 +190,9 @@ open protocol Topology {
     flexible AddElement(resource struct {
         /// Human-readable name for logging and debug purposes.
         element_name string:1024;
+        /// Default level (i.e. OFF or the lowest possible power level) for
+        /// this element.
+        default_level PowerLevel;
         /// List of dependencies for this element's power levels.
         /// dependency.requires.token must include Permissions.MODIFY_DEPENDENT.
         /// Note: dependencies ON this element's levels cannot be added here.

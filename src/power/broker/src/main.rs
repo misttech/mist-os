@@ -4,8 +4,8 @@
 
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_power_broker::{
-    BinaryPowerLevel, LessorRequest, LessorRequestStream, LevelControlRequest,
-    LevelControlRequestStream, PowerLevel, StatusRequest, StatusRequestStream, TopologyRequest,
+    self as fpb, LessorRequest, LessorRequestStream, LevelControlRequest,
+    LevelControlRequestStream, StatusRequest, StatusRequestStream, TopologyRequest,
     TopologyRequestStream,
 };
 use fuchsia_component::server::ServiceFs;
@@ -91,7 +91,7 @@ impl BrokerSvc {
                     LessorRequest::Lease { token, level, responder } => {
                         tracing::debug!("Lease({:?}, {:?})", &token, &level);
                         let mut broker = self.broker.lock().unwrap();
-                        let resp = broker.acquire_lease(token.into(), &level);
+                        let resp = broker.acquire_lease(token.into(), level);
                         match resp {
                             Ok(lease) => {
                                 tracing::debug!("responder.send({:?})", &lease);
@@ -141,8 +141,10 @@ impl BrokerSvc {
                                 &next,
                                 last_required_level
                             );
-                            // TODO(b/299637587): support other power level types.
-                            let required_level = next.unwrap_or(PowerLevel::Binary(BinaryPowerLevel::Off));
+                            let Some(required_level) = next else {
+                                tracing::error!("element missing default required level");
+                                return responder.send(Err(fpb::WatchRequiredLevelError::Internal)).context("send failed");
+                            };
                             if last_required_level.is_some() && last_required_level.clone().unwrap().as_ref() == &required_level {
                                 tracing::debug!(
                                     "WatchRequiredLevel: level has not changed, watching for next update...",
@@ -169,7 +171,7 @@ impl BrokerSvc {
                         );
                         let mut broker: std::sync::MutexGuard<'_, Broker> =
                             self.broker.lock().unwrap();
-                        let res = broker.update_current_level(token.into(), &current_level);
+                        let res = broker.update_current_level(token.into(), current_level);
                         match res {
                             Ok(_) => {
                                 responder.send(Ok(())).context("send failed")
@@ -193,6 +195,7 @@ impl BrokerSvc {
                 match request {
                     TopologyRequest::AddElement {
                         element_name,
+                        default_level,
                         dependencies,
                         credentials_to_register,
                         responder,
@@ -206,7 +209,12 @@ impl BrokerSvc {
                             self.broker.lock().unwrap();
                         let credentials =
                             credentials_to_register.into_iter().map(|d| d.into()).collect();
-                        let res = broker.add_element(&element_name, dependencies, credentials);
+                        let res = broker.add_element(
+                            &element_name,
+                            default_level,
+                            dependencies,
+                            credentials,
+                        );
                         tracing::debug!("AddElement add_element = {:?}", res);
                         match res {
                             Ok(_) => responder.send(Ok(())).context("send failed"),

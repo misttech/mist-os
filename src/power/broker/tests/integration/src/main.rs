@@ -6,7 +6,7 @@ use anyhow::{Error, Result};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, Credential, Dependency, ElementLevel, LessorMarker,
     LevelControlMarker, LevelControlProxy, LevelDependency, Permissions, PowerLevel, StatusMarker,
-    TopologyMarker,
+    TopologyMarker, UserDefinedPowerLevel,
 };
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_zircon::{self as zx, HandleBased};
@@ -66,7 +66,10 @@ async fn test_direct() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("P", vec![], vec![parent_cred]).await?.expect("add_element failed");
+    topology
+        .add_element("P", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![parent_cred])
+        .await?
+        .expect("add_element failed");
     let (child_token, child_broker_token) = zx::EventPair::create();
     let child_cred = Credential {
         broker_token: child_broker_token,
@@ -77,6 +80,7 @@ async fn test_direct() -> Result<()> {
     topology
         .add_element(
             "C",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 requires: ElementLevel {
@@ -180,7 +184,10 @@ async fn test_transitive() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("A", vec![], vec![element_a_cred]).await?.expect("add_element failed");
+    topology
+        .add_element("A", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![element_a_cred])
+        .await?
+        .expect("add_element failed");
     let (element_b_token, element_b_broker_token) = zx::EventPair::create();
     let element_b_cred = Credential {
         broker_token: element_b_broker_token,
@@ -192,6 +199,7 @@ async fn test_transitive() -> Result<()> {
     topology
         .add_element(
             "B",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 requires: ElementLevel {
@@ -213,6 +221,7 @@ async fn test_transitive() -> Result<()> {
     topology
         .add_element(
             "C",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 requires: ElementLevel {
@@ -231,7 +240,10 @@ async fn test_transitive() -> Result<()> {
         broker_token: element_d_broker_token,
         permissions: Permissions::READ_POWER_LEVEL | Permissions::MODIFY_POWER_LEVEL,
     };
-    topology.add_element("D", vec![], vec![element_d_cred]).await?.expect("add_element failed");
+    topology
+        .add_element("D", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![element_d_cred])
+        .await?
+        .expect("add_element failed");
 
     let level_control: LevelControlProxy =
         realm.root.connect_to_protocol_at_exposed_dir::<LevelControlMarker>()?;
@@ -442,13 +454,22 @@ async fn test_transitive() -> Result<()> {
 
 #[fuchsia::test]
 async fn test_shared() -> Result<()> {
-    let realm = build_power_broker_realm().await?;
-
     // Create a topology of two child elements with a shared
     // parent and grandparent
     // C1 \
     //     > P -> GP
     // C2 /
+    // Child 1 requires Parent at 50 to support its own level of 5.
+    // Parent requires Grandparent at 200 to support its own level of 50.
+    // C1 -> P -> GP
+    //  5 -> 50 -> 200
+    // Child 2 requires Parent at 30 to support its own level of 3.
+    // Parent requires Grandparent at 90 to support its own level of 30.
+    // C2 -> P -> GP
+    //  3 -> 30 -> 90
+    // Grandparent has a default minimum level of 10.
+    // All other elements have a default of 0.
+    let realm = build_power_broker_realm().await?;
     let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
     let (grandparent_token, grandparent_broker_token) = zx::EventPair::create();
     let grandparent_cred = Credential {
@@ -457,7 +478,15 @@ async fn test_shared() -> Result<()> {
             | Permissions::MODIFY_POWER_LEVEL
             | Permissions::MODIFY_DEPENDENT,
     };
-    topology.add_element("GP", vec![], vec![grandparent_cred]).await?.expect("add_element failed");
+    topology
+        .add_element(
+            "GP",
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+            vec![],
+            vec![grandparent_cred],
+        )
+        .await?
+        .expect("add_element failed");
     let (parent_token, parent_broker_token) = zx::EventPair::create();
     let parent_cred = Credential {
         broker_token: parent_broker_token,
@@ -469,15 +498,27 @@ async fn test_shared() -> Result<()> {
     topology
         .add_element(
             "P",
-            vec![LevelDependency {
-                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
-                requires: ElementLevel {
-                    token: grandparent_token
-                        .duplicate_handle(zx::Rights::SAME_RIGHTS)
-                        .expect("dup failed"),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+            vec![
+                LevelDependency {
+                    dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
+                    requires: ElementLevel {
+                        token: grandparent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
+                    },
                 },
-            }],
+                LevelDependency {
+                    dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
+                    requires: ElementLevel {
+                        token: grandparent_token
+                            .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                            .expect("dup failed"),
+                        level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }),
+                    },
+                },
+            ],
             vec![parent_cred],
         )
         .await?
@@ -490,13 +531,14 @@ async fn test_shared() -> Result<()> {
     topology
         .add_element(
             "C1",
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             vec![LevelDependency {
-                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
                 requires: ElementLevel {
                     token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
                 },
             }],
             vec![child1_cred],
@@ -511,13 +553,14 @@ async fn test_shared() -> Result<()> {
     topology
         .add_element(
             "C2",
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
             vec![LevelDependency {
-                dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
+                dependent_level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
                 requires: ElementLevel {
                     token: parent_token
                         .duplicate_handle(zx::Rights::SAME_RIGHTS)
                         .expect("dup failed"),
-                    level: PowerLevel::Binary(BinaryPowerLevel::On),
+                    level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
                 },
             }],
             vec![child2_cred],
@@ -528,53 +571,63 @@ async fn test_shared() -> Result<()> {
     let level_control: LevelControlProxy =
         realm.root.connect_to_protocol_at_exposed_dir::<LevelControlMarker>()?;
     let lessor = realm.root.connect_to_protocol_at_exposed_dir::<LessorMarker>()?;
-    let status: fpb::StatusProxy =
-        realm.root.connect_to_protocol_at_exposed_dir::<StatusMarker>()?;
 
-    // Initial required level for each element should be OFF.
-    // Update all elements' current level to OFF with PowerBroker.
-    for token in [&parent_token, &grandparent_token] {
-        let req_level = level_control
-            .watch_required_level(
-                token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                None,
-            )
-            .await?
-            .expect("watch_required_level failed");
-        assert_eq!(req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-        level_control
-            .update_current_power_level(
-                token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-                &PowerLevel::Binary(BinaryPowerLevel::Off),
-            )
-            .await?
-            .expect("update_current_power_level failed");
-        let power_level = status
-            .get_power_level(token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"))
-            .await?
-            .expect("get_power_level failed");
-        assert_eq!(power_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-    }
+    // Initially, Grandparent should have a default required level of 10
+    // and Parent should have a default required level of 0.
+    let grandparent_req_level = level_control
+        .watch_required_level(
+            grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            None,
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(grandparent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }));
+    level_control
+        .update_current_power_level(
+            grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }),
+        )
+        .await?
+        .expect("update_current_power_level failed");
+    let parent_req_level = level_control
+        .watch_required_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            None,
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }));
+    level_control
+        .update_current_power_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+        )
+        .await?
+        .expect("update_current_power_level failed");
 
-    // Acquire lease for C1. Initially, GP should have required level ON
-    // and P should have required level OFF because C1 has a dependency on P
-    // and P has a dependency on GP. GP has no dependencies so it should be
-    // turned on first.
+    // Acquire lease for Child 1. Initially, Grandparent should have
+    // required level 200 and Parent should have required level 0
+    // because Child 1 has a dependency on Parent and Parent has a
+    // dependency on Grandparent. Grandparent has no dependencies so its
+    // level should be raised first.
     let lease_child_1 = lessor
         .lease(
             child1_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
         )
         .await?
         .expect("Lease response not ok");
     let grandparent_req_level = level_control
         .watch_required_level(
             grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            Some(&PowerLevel::Binary(BinaryPowerLevel::Off)),
+            Some(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 })),
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(
+        grandparent_req_level,
+        PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 })
+    );
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -582,15 +635,16 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }));
     // TODO(b/302717376): Check Lease status here. Lease should be pending.
 
-    // Update GP's current level to ON. Now P's required level should become ON
-    // because its dependency on GP is unblocked.
+    // Raise Grandparent's current level to 200. Now Parent claim should
+    // be active, because its dependency on Grandparent is unblocked
+    // raising its required level to 50.
     level_control
         .update_current_power_level(
             grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 }),
         )
         .await?
         .expect("update_current_power_level failed");
@@ -601,23 +655,26 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(
+        grandparent_req_level,
+        PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 })
+    );
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            Some(&PowerLevel::Binary(BinaryPowerLevel::Off)),
+            Some(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 })),
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
     // TODO(b/302717376): Check Lease status here. Lease should be pending.
 
-    // Update P's current level to ON.
-    // Both P and GP should have required_level ON.
+    // Update Parent's current level to 50.
+    // Parent and Grandparent should have required levels of 50 and 200.
     level_control
         .update_current_power_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }),
         )
         .await?
         .expect("update_current_power_level failed");
@@ -628,7 +685,10 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(
+        grandparent_req_level,
+        PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 })
+    );
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -636,14 +696,16 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
     // TODO(b/302717376): Check Lease status here. Lease should now be active.
 
-    // Acquire lease for C2, P and GP should still have required_level ON.
+    // Acquire lease for Child 2, Though Child 2 has nominal
+    // requirements of Parent at 30 and Grandparent at 100, they are
+    // superseded by Child 1's requirements of 50 and 200.
     let lease_child_2 = lessor
         .lease(
             child2_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::On),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
         )
         .await?
         .expect("Lease response not ok");
@@ -654,7 +716,10 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(
+        grandparent_req_level,
+        PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 })
+    );
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -662,11 +727,11 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 50 }));
     // TODO(b/302717376): Check Lease status here. Lease should immediately be active.
 
-    // Drop lease for C1, P and GP should still have required_level ON
-    // because of lease on C2.
+    // Drop lease for Child 1. Parent's required level should immediately
+    // drop to 30. Grandparent's required level will remain at 200 for now.
     lessor.drop_lease(&lease_child_1).expect("drop failed");
     let grandparent_req_level = level_control
         .watch_required_level(
@@ -675,7 +740,10 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(
+        grandparent_req_level,
+        PowerLevel::UserDefined(UserDefinedPowerLevel { level: 200 })
+    );
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
@@ -683,35 +751,15 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }));
     // TODO(b/302717376): Check Lease status here. Lease 2 should still be active.
 
-    // Drop lease for C2, P should have required level OFF.
-    // GP should still have required level ON.
-    lessor.drop_lease(&lease_child_2).expect("drop failed");
-    let grandparent_req_level = level_control
-        .watch_required_level(
-            grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            None,
-        )
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::On));
-    let parent_req_level = level_control
-        .watch_required_level(
-            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            Some(&PowerLevel::Binary(BinaryPowerLevel::On)),
-        )
-        .await?
-        .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
-
-    // Lower P's current level to OFF
-    // Both P and GP should have required level OFF.
+    // Lower Parent's current level to 30. Now Grandparent's required level
+    // should drop to 90.
     level_control
         .update_current_power_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            &PowerLevel::Binary(BinaryPowerLevel::Off),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }),
         )
         .await?
         .expect("update_current_power_level failed");
@@ -722,15 +770,61 @@ async fn test_shared() -> Result<()> {
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(grandparent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+    assert_eq!(grandparent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }));
     let parent_req_level = level_control
         .watch_required_level(
             parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
-            Some(&PowerLevel::Binary(BinaryPowerLevel::On)),
+            None,
         )
         .await?
         .expect("watch_required_level failed");
-    assert_eq!(parent_req_level, PowerLevel::Binary(BinaryPowerLevel::Off));
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 }));
+
+    // Drop lease for Child 2, Parent should have required level 0.
+    // Grandparent should still have required level 90.
+    lessor.drop_lease(&lease_child_2).expect("drop failed");
+    let grandparent_req_level = level_control
+        .watch_required_level(
+            grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            None,
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(grandparent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 }));
+    let parent_req_level = level_control
+        .watch_required_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            Some(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 30 })),
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }));
+
+    // Lower Parent's current level to 0. Grandparent claim should now be
+    // dropped and have its default required level of 10.
+    level_control
+        .update_current_power_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            &PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }),
+        )
+        .await?
+        .expect("update_current_power_level failed");
+    let grandparent_req_level = level_control
+        .watch_required_level(
+            grandparent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            Some(&PowerLevel::UserDefined(UserDefinedPowerLevel { level: 90 })),
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(grandparent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 10 }));
+    let parent_req_level = level_control
+        .watch_required_level(
+            parent_token.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("dup failed"),
+            None,
+        )
+        .await?
+        .expect("watch_required_level failed");
+    assert_eq!(parent_req_level, PowerLevel::UserDefined(UserDefinedPowerLevel { level: 0 }));
 
     Ok(())
 }
@@ -744,7 +838,10 @@ async fn test_topology() -> Result<()> {
     let (earth_token, earth_broker_token) = zx::EventPair::create();
     let earth_cred =
         Credential { broker_token: earth_broker_token, permissions: Permissions::MODIFY_DEPENDENT };
-    topology.add_element("Earth", vec![], vec![earth_cred]).await?.expect("add_element failed");
+    topology
+        .add_element("Earth", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![earth_cred])
+        .await?
+        .expect("add_element failed");
     let (water_token, water_broker_token) = zx::EventPair::create();
     let water_cred = Credential {
         broker_token: water_broker_token,
@@ -753,6 +850,7 @@ async fn test_topology() -> Result<()> {
     topology
         .add_element(
             "Water",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
             vec![LevelDependency {
                 dependent_level: PowerLevel::Binary(BinaryPowerLevel::On),
                 requires: ElementLevel {
@@ -769,14 +867,22 @@ async fn test_topology() -> Result<()> {
     let (fire_token, fire_broker_token) = zx::EventPair::create();
     let fire_cred =
         Credential { broker_token: fire_broker_token, permissions: Permissions::REMOVE_ELEMENT };
-    topology.add_element("Fire", vec![], vec![fire_cred]).await?.expect("add_element failed");
+    topology
+        .add_element("Fire", &PowerLevel::Binary(BinaryPowerLevel::Off), vec![], vec![fire_cred])
+        .await?
+        .expect("add_element failed");
     let (air_token, air_broker_token) = zx::EventPair::create();
     let air_cred = Credential { broker_token: air_broker_token, permissions: Permissions::all() };
     let (air_token_no_perms, air_broker_token_no_perms) = zx::EventPair::create();
     let air_cred_no_perms =
         Credential { broker_token: air_broker_token_no_perms, permissions: Permissions::empty() };
     topology
-        .add_element("Air", vec![], vec![air_cred, air_cred_no_perms])
+        .add_element(
+            "Air",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
+            vec![],
+            vec![air_cred, air_cred_no_perms],
+        )
         .await?
         .expect("add_element failed");
 
@@ -890,7 +996,12 @@ async fn test_register_unregister_credentials() -> Result<()> {
             | Permissions::REMOVE_ELEMENT,
     };
     topology
-        .add_element("element", vec![], vec![broker_credential])
+        .add_element(
+            "element",
+            &PowerLevel::Binary(BinaryPowerLevel::Off),
+            vec![],
+            vec![broker_credential],
+        )
         .await?
         .expect("add_element failed");
     let (token_new_owner, token_new_broker) = zx::EventPair::create();
