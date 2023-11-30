@@ -39,9 +39,10 @@
                 // Depends on /sys/class/net
                 "ifaddrs.getifaddrs_interfaces",
 
-                // arm64 specific
+                // These tests fail on arm64, and skipped on other arches but counted as failed by expectation matcher.
                 "MemtagNoteTest.*",
                 "MemtagStackTest.*",
+                "MemtagGlobalsTest.*",
                 "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
 
                 // Our test runner doesn't understand DISABLED
