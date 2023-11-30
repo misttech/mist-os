@@ -25,6 +25,7 @@ const HOURS_BETWEEN_IFACE_DESTRUCTIONS: i64 = 12;
 // recommended.
 const SCAN_FAILURE_RECOVERY_THRESHOLD: usize = 5;
 const EMPTY_SCAN_RECOVERY_THRESHOLD: usize = 10;
+const CONNECT_FAILURE_RECOVERY_THRESHOLD: usize = 15;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PhyRecoveryOperation {
@@ -205,6 +206,30 @@ fn thresholded_empty_scan_results_recovery_profile(
     )
 }
 
+fn thresholded_connect_failure_recovery_profile(
+    phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    connect_defect: Defect,
+) -> Option<RecoveryAction> {
+    let iface_id = match connect_defect {
+        Defect::Iface(IfaceFailure::ConnectionFailure { iface_id }) => iface_id,
+        other => {
+            warn!("Assessing invalid defect type for connection failure recovery: {:?}", other);
+            return None;
+        }
+    };
+
+    thresholded_iface_destruction_and_phy_reset(
+        phy_id,
+        iface_id,
+        defect_history,
+        recovery_history,
+        connect_defect,
+        CONNECT_FAILURE_RECOVERY_THRESHOLD,
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -366,6 +391,18 @@ mod tests {
             thresholded_empty_scan_results_recovery_profile,
             defect_to_log,
             EMPTY_SCAN_RECOVERY_THRESHOLD,
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_connect_failure_recovery() {
+        let exec = TestExecutor::new_with_fake_time();
+        let defect_to_log = Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: IFACE_ID });
+        test_thresholded_iface_destruction_and_phy_reset(
+            &exec,
+            thresholded_connect_failure_recovery_profile,
+            defect_to_log,
+            CONNECT_FAILURE_RECOVERY_THRESHOLD,
         );
     }
 }
