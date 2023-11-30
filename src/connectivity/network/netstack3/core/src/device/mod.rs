@@ -47,7 +47,7 @@ use crate::{
         },
         queue::{
             rx::ReceiveQueueHandler,
-            tx::{BufferTransmitQueueHandler, TransmitQueueConfiguration, TransmitQueueHandler},
+            tx::{TransmitQueueApi, TransmitQueueConfiguration, TransmitQueueHandler},
         },
         socket::HeldSockets,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
@@ -630,11 +630,11 @@ pub fn set_tx_queue_configuration<NonSyncCtx: NonSyncContext>(
 ) {
     let sync_ctx = &mut Locked::new(sync_ctx);
     match device {
-        DeviceId::Ethernet(id) => TransmitQueueHandler::<EthernetLinkDevice, _>::set_configuration(
+        DeviceId::Ethernet(id) => TransmitQueueApi::<_, _, EthernetLinkDevice>::set_configuration(
             sync_ctx, ctx, id, config,
         ),
         DeviceId::Loopback(id) => {
-            TransmitQueueHandler::<LoopbackDevice, _>::set_configuration(sync_ctx, ctx, id, config)
+            TransmitQueueApi::<_, _, LoopbackDevice>::set_configuration(sync_ctx, ctx, id, config)
         }
     }
 }
@@ -648,10 +648,10 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
     let sync_ctx = &mut Locked::new(sync_ctx);
     match device {
         DeviceId::Ethernet(id) => {
-            TransmitQueueHandler::<EthernetLinkDevice, _>::transmit_queued_frames(sync_ctx, ctx, id)
+            TransmitQueueApi::<_, _, EthernetLinkDevice>::transmit_queued_frames(sync_ctx, ctx, id)
         }
         DeviceId::Loopback(id) => {
-            TransmitQueueHandler::<LoopbackDevice, _>::transmit_queued_frames(sync_ctx, ctx, id)
+            TransmitQueueApi::<_, _, LoopbackDevice>::transmit_queued_frames(sync_ctx, ctx, id)
         }
     }
 }

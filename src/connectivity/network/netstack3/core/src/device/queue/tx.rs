@@ -6,6 +6,7 @@
 
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
+use core::marker::PhantomData;
 
 use derivative::Derivative;
 use packet::{
@@ -114,28 +115,8 @@ pub enum TransmitQueueConfiguration {
     Fifo,
 }
 
-/// An implementation of a transmit queue.
+/// An implementation of a transmit queue that stores egress frames.
 pub(crate) trait TransmitQueueHandler<D: Device, C>: TransmitQueueCommon<D, C> {
-    /// Transmits any queued frames.
-    fn transmit_queued_frames(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-    ) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>>;
-
-    /// Sets the queue configuration for the device.
-    fn set_configuration(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-        config: TransmitQueueConfiguration,
-    );
-}
-
-/// An implementation of a transmit queue, with a buffer.
-pub(crate) trait BufferTransmitQueueHandler<D: Device, C>:
-    TransmitQueueCommon<D, C>
-{
     /// Queues a frame for transmission.
     fn queue_tx_frame<S>(
         &mut self,
@@ -149,18 +130,22 @@ pub(crate) trait BufferTransmitQueueHandler<D: Device, C>:
         S::Buffer: ReusableBuffer;
 }
 
+/// Crate-internal transmit queue API interaction.
+pub(crate) struct TransmitQueueApi<SC, C, D>(Never, PhantomData<(SC, C, D)>);
+
 impl<
         D: Device,
         C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
         SC: TransmitDequeueContext<D, C> + BufferSocketHandler<D, C>,
-    > TransmitQueueHandler<D, C> for SC
+    > TransmitQueueApi<SC, C, D>
 {
-    fn transmit_queued_frames(
-        &mut self,
+    /// Transmits any queued frames.
+    pub(crate) fn transmit_queued_frames(
+        sync_ctx: &mut SC,
         ctx: &mut C,
         device_id: &SC::DeviceId,
     ) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>> {
-        self.with_dequed_packets_and_tx_queue_ctx(
+        sync_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
@@ -204,15 +189,16 @@ impl<
         )
     }
 
-    fn set_configuration(
-        &mut self,
+    /// Sets the queue configuration for the device.
+    pub(crate) fn set_configuration(
+        sync_ctx: &mut SC,
         ctx: &mut C,
         device_id: &SC::DeviceId,
         config: TransmitQueueConfiguration,
     ) {
         // We take the dequeue lock as well to make sure we finish any current
         // dequeuing before changing the configuration.
-        self.with_dequed_packets_and_tx_queue_ctx(
+        sync_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
                 assert!(
@@ -250,7 +236,7 @@ impl<
                             Err(DeviceSendFrameError::DeviceNotReady(x)) => {
                                 // We swapped to no-queue and device cannot send
                                 // the frame so we just drop it.
-                                let _: (Self::Meta, Self::Buffer) = x;
+                                let _: (SC::Meta, SC::Buffer) = x;
                             }
                         }
                     }
@@ -294,7 +280,7 @@ impl<
         D: Device,
         C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
         SC: TransmitQueueContext<D, C> + BufferSocketHandler<D, C>,
-    > BufferTransmitQueueHandler<D, C> for SC
+    > TransmitQueueHandler<D, C> for SC
 where
     for<'a> &'a mut SC::Allocator: BufferAlloc<SC::Buffer>,
     SC::Buffer: ReusableBuffer,
@@ -498,7 +484,7 @@ mod tests {
 
         let body = Buf::new(vec![0], ..);
         assert_eq!(
-            BufferTransmitQueueHandler::queue_tx_frame(
+            TransmitQueueHandler::queue_tx_frame(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -519,7 +505,7 @@ mod tests {
         // Should not have any frames waiting to be transmitted since we have no
         // queue.
         assert_eq!(
-            TransmitQueueHandler::transmit_queued_frames(
+            TransmitQueueApi::transmit_queued_frames(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -535,7 +521,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
-        TransmitQueueHandler::set_configuration(
+        TransmitQueueApi::set_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &FakeLinkDeviceId,
@@ -546,7 +532,7 @@ mod tests {
             for i in 0..MAX_TX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
-                    BufferTransmitQueueHandler::queue_tx_frame(
+                    TransmitQueueHandler::queue_tx_frame(
                         &mut sync_ctx,
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
@@ -562,7 +548,7 @@ mod tests {
 
             let body = Buf::new(vec![131], ..);
             assert_eq!(
-                BufferTransmitQueueHandler::queue_tx_frame(
+                TransmitQueueHandler::queue_tx_frame(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -583,7 +569,7 @@ mod tests {
             assert!(MAX_TX_QUEUED_LEN > MAX_BATCH_SIZE);
             for i in (0..(MAX_TX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
-                    TransmitQueueHandler::transmit_queued_frames(
+                    TransmitQueueApi::transmit_queued_frames(
                         &mut sync_ctx,
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
@@ -599,7 +585,7 @@ mod tests {
             }
 
             assert_eq!(
-                TransmitQueueHandler::transmit_queued_frames(
+                TransmitQueueApi::transmit_queued_frames(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -634,7 +620,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
-        TransmitQueueHandler::set_configuration(
+        TransmitQueueApi::set_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &FakeLinkDeviceId,
@@ -643,7 +629,7 @@ mod tests {
 
         let body = Buf::new(vec![0], ..);
         assert_eq!(
-            BufferTransmitQueueHandler::queue_tx_frame(
+            TransmitQueueHandler::queue_tx_frame(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -660,7 +646,7 @@ mod tests {
 
         sync_ctx.get_mut().device_not_ready = true;
         assert_eq!(
-            TransmitQueueHandler::transmit_queued_frames(
+            TransmitQueueApi::transmit_queued_frames(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -680,7 +666,7 @@ mod tests {
 
         sync_ctx.get_mut().device_not_ready = false;
         assert_eq!(
-            TransmitQueueHandler::transmit_queued_frames(
+            TransmitQueueApi::transmit_queued_frames(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -697,7 +683,7 @@ mod tests {
         let FakeCtx { mut sync_ctx, mut non_sync_ctx } =
             FakeCtx::with_sync_ctx(FakeSyncCtxImpl::default());
 
-        TransmitQueueHandler::set_configuration(
+        TransmitQueueApi::set_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &FakeLinkDeviceId,
@@ -706,7 +692,7 @@ mod tests {
 
         let body = Buf::new(vec![0], ..);
         assert_eq!(
-            BufferTransmitQueueHandler::queue_tx_frame(
+            TransmitQueueHandler::queue_tx_frame(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -722,7 +708,7 @@ mod tests {
         assert_eq!(sync_ctx.get_mut().transmitted_packets, []);
 
         sync_ctx.get_mut().device_not_ready = device_not_ready;
-        TransmitQueueHandler::set_configuration(
+        TransmitQueueApi::set_configuration(
             &mut sync_ctx,
             &mut non_sync_ctx,
             &FakeLinkDeviceId,

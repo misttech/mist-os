@@ -30,9 +30,9 @@ use crate::{
                 ReceiveQueueTypes,
             },
             tx::{
-                BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
-                TransmitQueue, TransmitQueueCommon, TransmitQueueContext,
-                TransmitQueueNonSyncContext, TransmitQueueState,
+                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue, TransmitQueueCommon,
+                TransmitQueueContext, TransmitQueueHandler, TransmitQueueNonSyncContext,
+                TransmitQueueState,
             },
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
@@ -275,7 +275,7 @@ where
     S::Buffer: BufferMut,
     NonSyncCtx: NonSyncContext,
 {
-    match BufferTransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
+    match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,

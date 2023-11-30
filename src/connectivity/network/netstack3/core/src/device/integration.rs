@@ -25,11 +25,11 @@ use crate::{
     device::{
         ethernet::{self, EthernetLinkDevice, SyncCtxWithDeviceId},
         loopback::{self, LoopbackDevice, LoopbackDeviceId},
-        socket, AnyDevice, BufferTransmitQueueHandler, DeviceId, DeviceIdContext,
-        DeviceLayerEventDispatcher, DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter,
-        EthernetDeviceId, EthernetIpLinkDeviceDynamicStateContext, EthernetWeakDeviceId,
-        IpLinkDeviceState, Ipv6DeviceLinkLayerAddr, OriginTracker, RecvFrameContext,
-        RecvIpFrameMeta, WeakDeviceId,
+        socket, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState,
+        DeviceLayerTypes, Devices, DevicesIter, EthernetDeviceId,
+        EthernetIpLinkDeviceDynamicStateContext, EthernetWeakDeviceId, IpLinkDeviceState,
+        Ipv6DeviceLinkLayerAddr, OriginTracker, RecvFrameContext, RecvIpFrameMeta,
+        TransmitQueueHandler, WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
@@ -1156,7 +1156,7 @@ where
     A::Version: EthernetIpExt,
     for<'a> Locked<&'a SyncCtx<NonSyncCtx>, L>: EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx, DeviceId = EthernetDeviceId<NonSyncCtx>>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, NonSyncCtx>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, NonSyncCtx, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, NonSyncCtx, Meta = ()>,
 {
     match device {
         DeviceId::Ethernet(id) => {

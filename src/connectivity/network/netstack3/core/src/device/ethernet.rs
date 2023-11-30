@@ -48,9 +48,9 @@ use crate::{
         link::LinkDevice,
         queue::{
             tx::{
-                BufVecU8Allocator, BufferTransmitQueueHandler, TransmitDequeueContext,
-                TransmitQueue, TransmitQueueCommon, TransmitQueueContext,
-                TransmitQueueNonSyncContext, TransmitQueueState,
+                BufVecU8Allocator, TransmitDequeueContext, TransmitQueue, TransmitQueueCommon,
+                TransmitQueueContext, TransmitQueueHandler, TransmitQueueNonSyncContext,
+                TransmitQueueState,
             },
             DequeueState, TransmitQueueFrameError,
         },
@@ -306,7 +306,7 @@ where
     S::Buffer: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
 {
     /// The minimum body length for the Ethernet frame.
     ///
@@ -337,9 +337,9 @@ where
     S::Buffer: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
 {
-    match BufferTransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
+    match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
         device_id,
@@ -820,7 +820,7 @@ pub(super) fn send_ip_frame<
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
-        + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
         + CounterContext<DeviceCounters>,
     A: IpAddress,
     S: Serializer<Buffer = B>,
@@ -1131,7 +1131,7 @@ pub(super) fn insert_static_ndp_table_entry<
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
     > SendFrameContext<C, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
     fn send_frame<S>(
@@ -1256,7 +1256,7 @@ impl<
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + BufferTransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
     > SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>> for SC
 {
     fn send_frame<S>(
