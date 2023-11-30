@@ -44,10 +44,15 @@ void VolumeControl::AddBinding(fidl::InterfaceRequest<fuchsia::media::audio::Vol
 
 void VolumeControl::SetVolume(float volume) {
   if (volume == current_volume_) {
+    if constexpr (kLogVolumeCalls) {
+      FX_LOGS(INFO) << name_ << " VolumeControl::SetVolume(" << volume << "): no change. Ignoring.";
+    }
     return;
   }
-  if constexpr (kLogVolumeCalls) {
-    FX_LOGS(INFO) << name_ << " VolumeControl::SetVolume(" << volume << ")";
+
+  if constexpr (kLogVolumeCalls || kLogVolumeChanges) {
+    FX_LOGS(INFO) << name_ << " VolumeControl::SetVolume(" << volume << "), was " << current_volume_
+                  << ". Will notify " << bindings_.bindings().size() << " clients";
   }
 
   // TODO(fxbug.dev/35581): Generate event async after update from callback.
@@ -61,9 +66,17 @@ void VolumeControl::SetVolume(float volume) {
 
 void VolumeControl::SetMute(bool mute) {
   if (mute == muted_) {
+    if constexpr (kLogMuteCalls) {
+      FX_LOGS(INFO) << name_ << " VolumeControl::SetMute(" << mute << "): no change. Ignoring.";
+    }
     return;
   }
-  FX_LOGS(INFO) << name_ << " VolumeControl::SetMute(" << mute << ")";
+
+  if constexpr (kLogMuteCalls || kLogMuteChanges) {
+    FX_LOGS(INFO) << name_ << " VolumeControl::SetMute(" << mute << "), was " << muted_
+                  << ". Will notify " << bindings_.bindings().size() << " clients";
+  }
+
   muted_ = mute;
 
   auto vol = muted_ ? fuchsia::media::audio::MIN_VOLUME : current_volume_;

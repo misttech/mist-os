@@ -83,7 +83,10 @@ inline constexpr bool kLogPresentationDelay = false;
 
 // Loudness-related logging
 //
+inline constexpr bool kLogMuteCalls = false;
+inline constexpr bool kLogMuteChanges = true;
 inline constexpr bool kLogVolumeCalls = true;
+inline constexpr bool kLogVolumeChanges = true;
 inline constexpr bool kLogCaptureUsageVolumeGainActions = true;
 inline constexpr bool kLogRenderUsageVolumeGainActions = true;
 inline constexpr bool kLogRendererSetGainMuteRampCalls = false;
