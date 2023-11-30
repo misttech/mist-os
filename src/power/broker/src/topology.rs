@@ -33,7 +33,7 @@ impl Into<String> for ElementID {
 
 #[derive(Clone, Debug, PartialEq, Eq, Ord, PartialOrd, Hash)]
 pub struct ElementLevel {
-    pub element: ElementID,
+    pub element_id: ElementID,
     pub level: PowerLevel,
 }
 
@@ -143,9 +143,9 @@ impl Topology {
         Ok(id)
     }
 
-    pub fn remove_element(&mut self, element: &ElementID) -> Result<(), RemoveElementError> {
-        if self.elements.remove(element).is_none() {
-            return Err(RemoveElementError::NotFound(element.clone()));
+    pub fn remove_element(&mut self, element_id: &ElementID) -> Result<(), RemoveElementError> {
+        if self.elements.remove(element_id).is_none() {
+            return Err(RemoveElementError::NotFound(element_id.clone()));
         }
         Ok(())
     }
@@ -184,11 +184,13 @@ impl Topology {
 
     /// Adds a direct dependency to the Topology.
     pub fn add_direct_dep(&mut self, dep: &Dependency) -> Result<(), AddDependencyError> {
-        if !self.elements.contains_key(&dep.dependent.element) {
-            return Err(AddDependencyError::ElementNotFound(dep.dependent.element.clone()));
+        if !self.elements.contains_key(&dep.dependent.element_id) {
+            return Err(AddDependencyError::ElementNotFound(dep.dependent.element_id.clone()));
         }
-        if !self.elements.contains_key(&dep.requires.element) {
-            return Err(AddDependencyError::RequiredElementNotFound(dep.requires.element.clone()));
+        if !self.elements.contains_key(&dep.requires.element_id) {
+            return Err(AddDependencyError::RequiredElementNotFound(
+                dep.requires.element_id.clone(),
+            ));
         }
         // TODO(b/299463665): Add Dependency validation here, or in Dependency construction.
         let required_levels = self.dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
@@ -201,10 +203,10 @@ impl Topology {
 
     /// Removes a direct dependency from the Topology.
     pub fn remove_direct_dep(&mut self, dep: &Dependency) -> Result<(), RemoveDependencyError> {
-        if !self.elements.contains_key(&dep.dependent.element) {
+        if !self.elements.contains_key(&dep.dependent.element_id) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
         }
-        if !self.elements.contains_key(&dep.requires.element) {
+        if !self.elements.contains_key(&dep.requires.element_id) {
             return Err(RemoveDependencyError::NotFound(dep.clone()));
         }
         let required_levels = self.dependencies.entry(dep.dependent.clone()).or_insert(Vec::new());
@@ -239,11 +241,11 @@ mod tests {
 
         t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: water.clone(),
+                element_id: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: earth.clone(),
+                element_id: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         })
@@ -251,11 +253,11 @@ mod tests {
 
         let extra_add_dep_res = t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: water.clone(),
+                element_id: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: earth.clone(),
+                element_id: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         });
@@ -263,11 +265,11 @@ mod tests {
 
         t.remove_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: water.clone(),
+                element_id: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: earth.clone(),
+                element_id: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         })
@@ -275,11 +277,11 @@ mod tests {
 
         let extra_remove_dep_res = t.remove_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: water.clone(),
+                element_id: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: earth.clone(),
+                element_id: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         });
@@ -290,11 +292,11 @@ mod tests {
 
         let element_not_found_res = t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: air.clone(),
+                element_id: air.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: water.clone(),
+                element_id: water.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         });
@@ -302,11 +304,11 @@ mod tests {
 
         let req_element_not_found_res = t.add_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: earth.clone(),
+                element_id: earth.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: fire.clone(),
+                element_id: fire.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         });
@@ -334,54 +336,54 @@ mod tests {
         // A <- B <- C -> D
         let ba = Dependency {
             dependent: ElementLevel {
-                element: b.clone(),
+                element_id: b.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: a.clone(),
+                element_id: a.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&ba).expect("add_direct_dep failed");
         let cb = Dependency {
             dependent: ElementLevel {
-                element: c.clone(),
+                element_id: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: b.clone(),
+                element_id: b.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cb).expect("add_direct_dep failed");
         let cd = Dependency {
             dependent: ElementLevel {
-                element: c.clone(),
+                element_id: c.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
             requires: ElementLevel {
-                element: d.clone(),
+                element_id: d.clone(),
                 level: PowerLevel::Binary(BinaryPowerLevel::On),
             },
         };
         t.add_direct_dep(&cd).expect("add_direct_dep failed");
 
         let mut a_deps = t.get_direct_deps(&ElementLevel {
-            element: a.clone(),
+            element_id: a.clone(),
             level: PowerLevel::Binary(BinaryPowerLevel::On),
         });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
         let mut b_deps = t.get_direct_deps(&ElementLevel {
-            element: b.clone(),
+            element_id: b.clone(),
             level: PowerLevel::Binary(BinaryPowerLevel::On),
         });
         b_deps.sort();
         assert_eq!(b_deps, [ba]);
 
         let mut c_deps = t.get_direct_deps(&ElementLevel {
-            element: c.clone(),
+            element_id: c.clone(),
             level: PowerLevel::Binary(BinaryPowerLevel::On),
         });
         let mut want_c_deps = [cb, cd];
@@ -410,72 +412,72 @@ mod tests {
         // 3 <- 5 <- 1 -> 3
         let b1_a2 = Dependency {
             dependent: ElementLevel {
-                element: b.clone(),
+                element_id: b.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
             },
             requires: ElementLevel {
-                element: a.clone(),
+                element_id: a.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 2 }),
             },
         };
         t.add_direct_dep(&b1_a2).expect("add_direct_dep failed");
         let b5_a3 = Dependency {
             dependent: ElementLevel {
-                element: b.clone(),
+                element_id: b.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
             },
             requires: ElementLevel {
-                element: a.clone(),
+                element_id: a.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
             },
         };
         t.add_direct_dep(&b5_a3).expect("add_direct_dep failed");
         let c1_b5 = Dependency {
             dependent: ElementLevel {
-                element: c.clone(),
+                element_id: c.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
             },
             requires: ElementLevel {
-                element: b.clone(),
+                element_id: b.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
             },
         };
         t.add_direct_dep(&c1_b5).expect("add_direct_dep failed");
         let c1_d3 = Dependency {
             dependent: ElementLevel {
-                element: c.clone(),
+                element_id: c.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
             },
             requires: ElementLevel {
-                element: d.clone(),
+                element_id: d.clone(),
                 level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 3 }),
             },
         };
         t.add_direct_dep(&c1_d3).expect("add_direct_dep failed");
 
         let mut a_deps = t.get_all_deps(&ElementLevel {
-            element: a.clone(),
+            element_id: a.clone(),
             level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
         });
         a_deps.sort();
         assert_eq!(a_deps, []);
 
         let mut b1_deps = t.get_all_deps(&ElementLevel {
-            element: b.clone(),
+            element_id: b.clone(),
             level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
         });
         b1_deps.sort();
         assert_eq!(b1_deps, [b1_a2.clone()]);
 
         let mut b5_deps = t.get_all_deps(&ElementLevel {
-            element: b.clone(),
+            element_id: b.clone(),
             level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 5 }),
         });
         b5_deps.sort();
         assert_eq!(b5_deps, [b5_a3.clone()]);
 
         let mut c_deps = t.get_all_deps(&ElementLevel {
-            element: c.clone(),
+            element_id: c.clone(),
             level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
         });
         let mut want_c_deps = [b5_a3.clone(), c1_b5.clone(), c1_d3.clone()];
@@ -485,7 +487,7 @@ mod tests {
 
         t.remove_direct_dep(&c1_d3).expect("remove_direct_dep failed");
         let mut c_deps = t.get_all_deps(&ElementLevel {
-            element: c.clone(),
+            element_id: c.clone(),
             level: PowerLevel::UserDefined(UserDefinedPowerLevel { level: 1 }),
         });
         let mut want_c_deps = [b5_a3.clone(), c1_b5.clone()];

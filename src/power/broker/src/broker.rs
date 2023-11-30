@@ -34,16 +34,16 @@ impl Broker {
         self.credentials.lookup(token)
     }
 
-    fn unregister_all_credentials_for_element(&mut self, element: &ElementID) {
-        self.credentials.unregister_all_for_element(element)
+    fn unregister_all_credentials_for_element(&mut self, element_id: &ElementID) {
+        self.credentials.unregister_all_for_element(element_id)
     }
 
     fn register_credential(
         &mut self,
-        element: &ElementID,
+        element_id: &ElementID,
         credential_to_register: CredentialToRegister,
     ) -> Result<(), RegisterCredentialsError> {
-        self.credentials.register(element, credential_to_register)?;
+        self.credentials.register(element_id, credential_to_register)?;
         Ok(())
     }
 
@@ -153,10 +153,10 @@ impl Broker {
             let pending_claims = self
                 .catalog
                 .pending_claims
-                .for_required_element(&claim.dependency.dependent.element);
+                .for_required_element(&claim.dependency.dependent.element_id);
             tracing::debug!(
                 "pending_claims.for_required_element({:?}) = {:?})",
-                &claim.dependency.dependent.element,
+                &claim.dependency.dependent.element_id,
                 &pending_claims
             );
             let claims_activated = self.check_claims_to_activate(&pending_claims);
@@ -224,13 +224,13 @@ impl Broker {
     fn update_required_levels(&mut self, claims: &Vec<Claim>) {
         for claim in claims {
             let new_required_level =
-                self.catalog.calculate_required_level(&claim.dependency.requires.element);
+                self.catalog.calculate_required_level(&claim.dependency.requires.element_id);
             tracing::debug!(
                 "update required level({:?}, {:?})",
-                &claim.dependency.requires.element,
+                &claim.dependency.requires.element_id,
                 new_required_level
             );
-            self.required.update(&claim.dependency.requires.element, new_required_level);
+            self.required.update(&claim.dependency.requires.element_id, new_required_level);
         }
     }
 
@@ -246,12 +246,12 @@ impl Broker {
                 .topology
                 .get_direct_deps(&claim.dependency.requires)
                 .into_iter()
-                .try_for_each(|dep: Dependency| match self.current.get(&dep.requires.element) {
+                .try_for_each(|dep: Dependency| match self.current.get(&dep.requires.element_id) {
                     Some(current) => {
                         if !current.satisfies(dep.requires.level) {
                             Err(anyhow!(
                                 "element {:?} at {:?}, requires {:?}",
-                                &dep.requires.element,
+                                &dep.requires.element_id,
                                 &current,
                                 &dep.requires.level
                             ))
@@ -320,9 +320,12 @@ impl Broker {
                 return Err(AddElementError::NotAuthorized);
             }
             if let Err(err) = self.catalog.topology.add_direct_dep(&Dependency {
-                dependent: ElementLevel { element: id.clone(), level: dependency.dependent_level },
+                dependent: ElementLevel {
+                    element_id: id.clone(),
+                    level: dependency.dependent_level,
+                },
                 requires: ElementLevel {
-                    element: credential.get_element().clone(),
+                    element_id: credential.get_element().clone(),
                     level: dependency.requires.level,
                 },
             }) {
@@ -396,11 +399,11 @@ impl Broker {
         }
         self.catalog.topology.add_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: dependent_cred.get_element().clone(),
+                element_id: dependent_cred.get_element().clone(),
                 level: dependent_level,
             },
             requires: ElementLevel {
-                element: requires_cred.get_element().clone(),
+                element_id: requires_cred.get_element().clone(),
                 level: requires_level,
             },
         })
@@ -428,11 +431,11 @@ impl Broker {
         }
         self.catalog.topology.remove_direct_dep(&Dependency {
             dependent: ElementLevel {
-                element: dependent_cred.get_element().clone(),
+                element_id: dependent_cred.get_element().clone(),
                 level: dependent_level,
             },
             requires: ElementLevel {
-                element: requires_cred.get_element().clone(),
+                element_id: requires_cred.get_element().clone(),
                 level: requires_level,
             },
         })
@@ -444,14 +447,14 @@ type LeaseID = String;
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialOrd, PartialEq)]
 pub struct Lease {
     pub id: LeaseID,
-    pub element: ElementID,
+    pub element_id: ElementID,
     pub level: PowerLevel,
 }
 
 impl Lease {
-    fn new(element: &ElementID, level: PowerLevel) -> Self {
+    fn new(element_id: &ElementID, level: PowerLevel) -> Self {
         let id = LeaseID::from(Uuid::new_v4().as_simple().to_string());
-        Lease { id: id.clone(), element: element.clone(), level: level.clone() }
+        Lease { id: id.clone(), element_id: element_id.clone(), level: level.clone() }
     }
 }
 
@@ -502,7 +505,7 @@ impl Catalog {
         let no_claims = Vec::new();
         let element_claims = self
             .active_claims
-            .claims_by_required_element
+            .claims_by_required_element_id
             .get(element_id)
             // Treat both missing key and empty vec as no claims.
             .unwrap_or(&no_claims)
@@ -530,16 +533,16 @@ impl Catalog {
     /// Returns the new lease, and a Vec of all claims created.
     fn create_lease_and_claims(
         &mut self,
-        element: &ElementID,
+        element_id: &ElementID,
         level: PowerLevel,
     ) -> (Lease, Vec<Claim>) {
-        tracing::debug!("acquire({:?}, {:?})", &element, &level);
+        tracing::debug!("acquire({:?}, {:?})", &element_id, &level);
         // TODO: Add lease validation and control.
-        let lease = Lease::new(&element, level);
+        let lease = Lease::new(&element_id, level);
         self.leases.insert(lease.id.clone(), lease.clone());
         // Create claims for all of the transitive dependencies.
         let mut claims = Vec::new();
-        let element_level = ElementLevel { element: element.clone(), level: level.clone() };
+        let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
         for dependency in self.topology.get_all_deps(&element_level) {
             // TODO: Make sure this is permitted by Limiters (once we have them).
             let dep_lease = Claim::new(dependency, &lease.id);
@@ -592,24 +595,24 @@ impl Catalog {
 #[derive(Debug)]
 struct ClaimTracker {
     claims: HashMap<ClaimID, Claim>,
-    claims_by_required_element: HashMap<ElementID, Vec<ClaimID>>,
+    claims_by_required_element_id: HashMap<ElementID, Vec<ClaimID>>,
     claims_by_lease: HashMap<LeaseID, Vec<ClaimID>>,
-    claims_to_drop_by_element: HashMap<ElementID, Vec<ClaimID>>,
+    claims_to_drop_by_element_id: HashMap<ElementID, Vec<ClaimID>>,
 }
 
 impl ClaimTracker {
     fn new() -> Self {
         ClaimTracker {
             claims: HashMap::new(),
-            claims_by_required_element: HashMap::new(),
+            claims_by_required_element_id: HashMap::new(),
             claims_by_lease: HashMap::new(),
-            claims_to_drop_by_element: HashMap::new(),
+            claims_to_drop_by_element_id: HashMap::new(),
         }
     }
 
     fn add(&mut self, claim: Claim) {
-        self.claims_by_required_element
-            .entry(claim.dependency.requires.element.clone())
+        self.claims_by_required_element_id
+            .entry(claim.dependency.requires.element_id.clone())
             .or_insert(Vec::new())
             .push(claim.id.clone());
         self.claims_by_lease
@@ -624,11 +627,11 @@ impl ClaimTracker {
             return None;
         };
         if let Some(claim_ids) =
-            self.claims_by_required_element.get_mut(&claim.dependency.requires.element)
+            self.claims_by_required_element_id.get_mut(&claim.dependency.requires.element_id)
         {
             claim_ids.retain(|x| x != id);
             if claim_ids.is_empty() {
-                self.claims_by_required_element.remove(&claim.dependency.requires.element);
+                self.claims_by_required_element_id.remove(&claim.dependency.requires.element_id);
             }
         }
         if let Some(claim_ids) = self.claims_by_lease.get_mut(&claim.lease_id) {
@@ -638,11 +641,11 @@ impl ClaimTracker {
             }
         }
         if let Some(claim_ids) =
-            self.claims_to_drop_by_element.get_mut(&claim.dependency.dependent.element)
+            self.claims_to_drop_by_element_id.get_mut(&claim.dependency.dependent.element_id)
         {
             claim_ids.retain(|x| x != id);
             if claim_ids.is_empty() {
-                self.claims_to_drop_by_element.remove(&claim.dependency.dependent.element);
+                self.claims_to_drop_by_element_id.remove(&claim.dependency.dependent.element_id);
             }
         }
         Some(claim)
@@ -655,8 +658,8 @@ impl ClaimTracker {
     fn mark_lease_claims_to_drop(&mut self, lease_id: &LeaseID) -> Vec<Claim> {
         let claims_marked = self.for_lease(lease_id);
         for claim in &claims_marked {
-            self.claims_to_drop_by_element
-                .entry(claim.dependency.dependent.element.clone())
+            self.claims_to_drop_by_element_id
+                .entry(claim.dependency.dependent.element_id.clone())
                 .or_insert(Vec::new())
                 .push(claim.id.clone());
         }
@@ -675,7 +678,7 @@ impl ClaimTracker {
     }
 
     fn for_required_element(&self, element_id: &ElementID) -> Vec<Claim> {
-        let Some(claim_ids) = self.claims_by_required_element.get(element_id) else {
+        let Some(claim_ids) = self.claims_by_required_element_id.get(element_id) else {
             return Vec::new();
         };
         self.for_claim_ids(claim_ids)
@@ -689,7 +692,7 @@ impl ClaimTracker {
     }
 
     fn to_drop_for_element(&self, element_id: &ElementID) -> Vec<Claim> {
-        let Some(claim_ids) = self.claims_to_drop_by_element.get(element_id) else {
+        let Some(claim_ids) = self.claims_to_drop_by_element_id.get(element_id) else {
             return Vec::new();
         };
         self.for_claim_ids(claim_ids)
