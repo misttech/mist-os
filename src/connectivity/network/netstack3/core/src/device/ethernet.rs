@@ -55,7 +55,7 @@ use crate::{
             DequeueState, TransmitQueueFrameError,
         },
         socket::{
-            BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
+            DatagramHeader, DeviceSocketHandler, DeviceSocketMetadata, HeldDeviceSockets,
             NonSyncContext as SocketNonSyncContext, ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
@@ -867,7 +867,7 @@ pub(super) fn receive_frame<
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv6>>
         + ArpPacketHandler<B, EthernetLinkDevice, C>
-        + BufferSocketHandler<EthernetLinkDevice, C>,
+        + DeviceSocketHandler<EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1452,7 +1452,7 @@ mod tests {
     type FakeInnerCtx =
         crate::context::testutil::FakeSyncCtx<FakeEthernetCtx, FakeDeviceId, FakeDeviceId>;
 
-    impl BufferSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
+    impl DeviceSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeCtx {
         fn handle_frame(
             &mut self,
             ctx: &mut FakeNonSyncCtx,
@@ -1470,7 +1470,7 @@ mod tests {
         }
     }
 
-    impl BufferSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
+    impl DeviceSocketHandler<EthernetLinkDevice, FakeNonSyncCtx> for FakeInnerCtx {
         fn handle_frame(
             &mut self,
             _ctx: &mut FakeNonSyncCtx,

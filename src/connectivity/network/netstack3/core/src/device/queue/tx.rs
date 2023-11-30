@@ -20,7 +20,7 @@ use crate::{
             fifo, DequeueResult, DequeueState, EnqueueResult, TransmitQueueFrameError,
             MAX_BATCH_SIZE,
         },
-        socket::{BufferSocketHandler, ParseSentFrameError, SentFrame},
+        socket::{DeviceSocketHandler, ParseSentFrameError, SentFrame},
         Device, DeviceIdContext, DeviceSendFrameError,
     },
     sync::Mutex,
@@ -94,7 +94,7 @@ pub(crate) trait TransmitDequeueContext<D: Device, C>: TransmitQueueCommon<D, C>
             Meta = Self::Meta,
             Buffer = Self::Buffer,
             DeviceId = Self::DeviceId,
-        > + BufferSocketHandler<D, C>;
+        > + DeviceSocketHandler<D, C>;
 
     /// Calls the function with the TX deque state and the TX queue context.
     fn with_dequed_packets_and_tx_queue_ctx<
@@ -136,7 +136,7 @@ pub(crate) struct TransmitQueueApi<SC, C, D>(Never, PhantomData<(SC, C, D)>);
 impl<
         D: Device,
         C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-        SC: TransmitDequeueContext<D, C> + BufferSocketHandler<D, C>,
+        SC: TransmitDequeueContext<D, C> + DeviceSocketHandler<D, C>,
     > TransmitQueueApi<SC, C, D>
 {
     /// Transmits any queued frames.
@@ -254,7 +254,7 @@ impl<
 fn deliver_to_device_sockets<
     D: Device,
     C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-    SC: TransmitQueueCommon<D, C> + BufferSocketHandler<D, C>,
+    SC: TransmitQueueCommon<D, C> + DeviceSocketHandler<D, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -264,7 +264,7 @@ fn deliver_to_device_sockets<
     let bytes = buffer.as_ref();
     match SC::parse_outgoing_frame(bytes) {
         Ok(sent_frame) => {
-            BufferSocketHandler::handle_frame(sync_ctx, ctx, device_id, sent_frame.into(), bytes)
+            DeviceSocketHandler::handle_frame(sync_ctx, ctx, device_id, sent_frame.into(), bytes)
         }
         Err(ParseSentFrameError) => {
             tracing::trace!(
@@ -279,7 +279,7 @@ fn deliver_to_device_sockets<
 impl<
         D: Device,
         C: TransmitQueueNonSyncContext<D, SC::DeviceId>,
-        SC: TransmitQueueContext<D, C> + BufferSocketHandler<D, C>,
+        SC: TransmitQueueContext<D, C> + DeviceSocketHandler<D, C>,
     > TransmitQueueHandler<D, C> for SC
 where
     for<'a> &'a mut SC::Allocator: BufferAlloc<SC::Buffer>,
@@ -465,7 +465,7 @@ mod tests {
         }
     }
 
-    impl BufferSocketHandler<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
+    impl DeviceSocketHandler<FakeLinkDevice, FakeNonSyncCtxImpl> for FakeSyncCtxImpl {
         fn handle_frame(
             &mut self,
             ctx: &mut FakeNonSyncCtxImpl,

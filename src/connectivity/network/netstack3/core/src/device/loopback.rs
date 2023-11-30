@@ -37,7 +37,7 @@ use crate::{
             DequeueState, ReceiveQueueFullError, TransmitQueueFrameError,
         },
         socket::{
-            BufferSocketHandler, DatagramHeader, DeviceSocketMetadata, HeldDeviceSockets,
+            DatagramHeader, DeviceSocketHandler, DeviceSocketMetadata, HeldDeviceSockets,
             ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
@@ -365,7 +365,7 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
         let frame_dest = FrameDestination::from_dest(frame.dst_mac(), Mac::UNSPECIFIED);
         let ethertype = frame.ethertype();
 
-        BufferSocketHandler::<LoopbackDevice, _>::handle_frame(
+        DeviceSocketHandler::<LoopbackDevice, _>::handle_frame(
             self,
             ctx,
             device_id,
