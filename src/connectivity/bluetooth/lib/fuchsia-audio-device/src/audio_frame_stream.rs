@@ -203,6 +203,7 @@ mod tests {
             x => panic!("expected Ready Ok from get_properties, got {:?}", x),
         };
         assert_eq!(props2.needs_cache_flush_or_invalidate, Some(false));
+        assert!(props2.driver_transfer_bytes.unwrap() > 0);
 
         let result = exec.run_until_stalled(&mut ring_buffer.get_vmo(88200, 0)); // 2 seconds.
         assert!(result.is_ready());

@@ -230,6 +230,7 @@ mod tests {
             x => panic!("expected get_properties to be ready ok: {x:?}"),
         };
         assert_eq!(props2.needs_cache_flush_or_invalidate, Some(false));
+        assert!(props2.driver_transfer_bytes.unwrap() > 0);
 
         const TWO_SEC_FRAMES: u32 = 44100 * 2;
 

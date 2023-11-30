@@ -471,27 +471,41 @@ mod tests {
         );
 
         let notifications_per_ring = 20;
-        // Request at least 1 second of audio buffer.
+        // Request a 1-second audio buffer. This is guaranteed to be greater than 1 second, since
+        // the driver must reserve any space it needs ON TOP OF the client-requested 16000 bytes.
         let (frames, _vmo) = ring_buffer
             .get_vmo(16000, notifications_per_ring)
             .await
             .expect("fidl")
             .expect("response");
 
-        let _ = ring_buffer.start().await;
-
+        // To be deterministic, we set the first notification before even starting the ring-buffer.
         let mut position_info = ring_buffer.watch_clock_recovery_position_info();
         let mut position_notifications = 0;
 
+        let _ = ring_buffer.start().await;
+
         // For 100 MSBC Audio frames, we get 7.5 x 100 = 750 milliseconds, or 12000 frames.
         let frames_per_notification = frames / notifications_per_ring;
+        // As noted above, `frames` > 16000, so `frames_per_notification` > 800. Assuming the ring-
+        // buffer is < 17000 frames, `expected_notifications` will be 14.xx (as u32: 14), not 15.
         let expected_notifications = 12000 / frames_per_notification;
+
+        // We might receive the first notification as early as ring-buffer position 0,
+        // so we check for a notification before processing the first chunk of data.
+        if position_info
+            .poll_unpin(&mut Context::from_waker(futures::task::noop_waker_ref()))
+            .is_ready()
+        {
+            position_notifications += 1;
+            position_info = ring_buffer.watch_clock_recovery_position_info();
+        }
         for _ in 1..100 {
             assert_eq!(
                 Some(ProcessedRequest::ScoRead),
                 process_sco_request(&mut sco_request_stream, &ZERO_INPUT_SBC_PACKET).await
             );
-            // We are the only ones polling position_info.
+            // We are the only ones polling position_info, so we can ignore wakeups (noop waker).
             if position_info
                 .poll_unpin(&mut Context::from_waker(futures::task::noop_waker_ref()))
                 .is_ready()
@@ -501,7 +515,11 @@ mod tests {
             }
         }
 
-        assert_eq!(position_notifications, expected_notifications);
+        // The audio driver protocol require notification VALUES [timestamp, position] to tightly
+        // correlate. It is less concerned with notification ARRIVAL TIMES; these could occur up to
+        // 1 notification's duration early. Thus, if we expect X notifications, then we allow X+1.
+        assert!(position_notifications >= expected_notifications);
+        assert!(position_notifications <= expected_notifications + 1);
     }
 
     #[fuchsia::test]

@@ -398,9 +398,8 @@ impl SoftPcm {
             RingBufferRequest::GetProperties { responder } => {
                 let prop = RingBufferProperties {
                     needs_cache_flush_or_invalidate: Some(false),
-                    // TODO(fxbug.dev/123475): Adds driver_transfer_bytes for output streams.
-                    driver_transfer_bytes: (!self.is_output)
-                        .then_some((self.packet_frames * self.frame_bytes) as u32),
+                    // TODO(fxbug.dev/123475): Make driver_transfer_bytes (output) more accurate.
+                    driver_transfer_bytes: Some((self.packet_frames * self.frame_bytes) as u32),
                     ..Default::default()
                 };
                 responder.send(&prop)?;
@@ -421,7 +420,8 @@ impl SoftPcm {
                 };
                 // Require a minimum amount of frames for three packets.
                 let min_frames_from_duration = 3 * self.packet_frames as u32;
-                let ring_buffer_frames = min_frames.max(min_frames_from_duration);
+                let ring_buffer_frames =
+                    (min_frames + self.packet_frames as u32).max(min_frames_from_duration);
                 self.inspect.record_vmo_status("gotten");
                 match self.frame_vmo.lock().set_format(
                     fps,
@@ -435,7 +435,7 @@ impl SoftPcm {
                         responder.send(Err(GetVmoError::InternalError))?;
                     }
                     Ok(vmo_handle) => {
-                        responder.send(Ok((min_frames, vmo_handle)))?;
+                        responder.send(Ok((ring_buffer_frames, vmo_handle)))?;
                     }
                 }
             }
