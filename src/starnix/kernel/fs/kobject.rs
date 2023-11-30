@@ -35,8 +35,9 @@ pub enum KType {
     Device(DeviceMetadata),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub struct DeviceMetadata {
+    pub class: Weak<KObject>,
     /// Name of the device in /dev.
     pub name: FsString,
     pub device_type: DeviceType,
@@ -44,8 +45,19 @@ pub struct DeviceMetadata {
 }
 
 impl DeviceMetadata {
-    pub fn new(name: &FsStr, device_type: DeviceType, mode: DeviceMode) -> Self {
-        Self { name: name.to_vec(), device_type, mode }
+    pub fn new(
+        class: &KObjectHandle,
+        name: &FsStr,
+        device_type: DeviceType,
+        mode: DeviceMode,
+    ) -> Self {
+        Self { class: Arc::downgrade(class), name: name.to_vec(), device_type, mode }
+    }
+}
+
+impl PartialEq for DeviceMetadata {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.device_type == other.device_type
     }
 }
 
@@ -67,10 +79,15 @@ impl KObjectDeviceAttribute {
         device_type: DeviceType,
         mode: DeviceMode,
     ) -> Self {
-        Self {
-            class,
-            name: kobject_name.to_vec(),
-            device: DeviceMetadata::new(device_name, device_type, mode),
+        match class.ktype() {
+            KType::Class => Self {
+                device: DeviceMetadata::new(&class, device_name, device_type, mode),
+                class,
+                name: kobject_name.to_vec(),
+            },
+            _ => {
+                panic!("Invalid class kobject")
+            }
         }
     }
 }
@@ -218,6 +235,18 @@ impl KObject {
 
     pub fn get_children_kobjects(&self) -> Vec<KObjectHandle> {
         self.children.lock().values().cloned().collect::<Vec<KObjectHandle>>()
+    }
+
+    /// Removes the child if exists.
+    pub fn remove_child(self: &KObjectHandle, name: &FsStr) -> Option<(FsString, KObjectHandle)> {
+        self.children.lock().remove_entry(name)
+    }
+
+    /// Removes itself from the parent kobject.
+    pub fn remove(&self) {
+        if let Some(parent) = self.parent() {
+            parent.remove_child(&self.name());
+        }
     }
 }
 
@@ -386,12 +415,16 @@ mod tests {
     #[::fuchsia::test]
     fn kobject_path() {
         let root = KObject::new_root();
-        let device = root
-            .get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
-            .get_or_create_child(b"mem", KType::Class, SysFsDirectory::new)
-            .get_or_create_child(
+        let bus = root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
+        let device =
+            bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new).get_or_create_child(
                 b"null",
-                KType::Device(DeviceMetadata::new(b"null", DeviceType::NULL, DeviceMode::Char)),
+                KType::Device(DeviceMetadata::new(
+                    &bus,
+                    b"null",
+                    DeviceType::NULL,
+                    DeviceMode::Char,
+                )),
                 DeviceDirectory::new,
             );
         assert_eq!(device.path(), b"/virtual/mem/null".to_vec());
@@ -409,5 +442,15 @@ mod tests {
         assert!(names.iter().any(|name| *name == b"cpu".to_vec()));
         assert!(names.iter().any(|name| *name == b"power".to_vec()));
         assert!(!names.iter().any(|name| *name == b"system".to_vec()));
+    }
+
+    #[::fuchsia::test]
+    fn kobject_remove() {
+        let root = KObject::new_root();
+        let bus = root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
+        let class = bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new);
+        assert!(bus.has_child(b"mem"));
+        class.remove();
+        assert!(!bus.has_child(b"mem"));
     }
 }

@@ -433,7 +433,7 @@ pub fn loop_device_init(current_task: &CurrentTask) {
     // Device registry.
     kernel
         .device_registry
-        .register_blkdev_major(LOOP_MAJOR, get_or_create_loop_device)
+        .register_major(LOOP_MAJOR, get_or_create_loop_device, DeviceMode::Block)
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.
