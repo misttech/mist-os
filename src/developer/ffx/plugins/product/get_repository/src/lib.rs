@@ -38,6 +38,7 @@ pub struct RepositoryInfo {
     name: String,
     target_json: Utf8PathBuf,
     blobs_dir: Utf8PathBuf,
+    delivery_blob_type: u32,
 }
 
 fn extract_repository_info(
@@ -56,6 +57,7 @@ fn extract_repository_info(
             name: repository.name.clone(),
             target_json: path_relative_from(target_json, &cmd.product_bundle)?,
             blobs_dir: path_relative_from(blobs_dir, &cmd.product_bundle)?,
+            delivery_blob_type: repository.delivery_blob_type.unwrap_or_default(),
         })
     }
     Ok(repository_infos)
@@ -72,7 +74,7 @@ mod tests {
     use sdk_metadata::Repository;
 
     #[test]
-    fn test_get_flashing_artifacts() {
+    fn test_get_repository() {
         let tmp = tempfile::tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
         let product_bundle_dir = dir.join("product_bundle");
@@ -92,7 +94,7 @@ mod tests {
                 name: "fuchsia.com".into(),
                 metadata_path: fuchsia_metadata_dir.clone(),
                 blobs_path: blobs_dir.clone(),
-                delivery_blob_type: None,
+                delivery_blob_type: Some(1),
                 root_private_key_path: None,
                 targets_private_key_path: None,
                 snapshot_private_key_path: None,
@@ -108,6 +110,7 @@ mod tests {
             name: String::from("fuchsia.com"),
             target_json: Utf8PathBuf::from("repository/targets.json"),
             blobs_dir: Utf8PathBuf::from("blobs"),
+            delivery_blob_type: 1,
         }];
         assert_eq!(expected_info, info);
     }
