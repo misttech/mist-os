@@ -576,6 +576,401 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0055",
+        "value": "4294901845"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0056",
+        "value": "4294901846"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0059",
+        "value": "4294901849"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_005C",
+        "value": "4294901852"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_005D",
+        "value": "4294901853"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_005E",
+        "value": "4294901854"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0079",
+        "value": "4294901881"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_007A",
+        "value": "4294901882"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_007B",
+        "value": "4294901883"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_007C",
+        "value": "4294901884"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0085",
+        "value": "4294901893"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0087",
+        "value": "4294901895"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0089",
+        "value": "4294901897"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_009C",
+        "value": "4294901916"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_009F",
+        "value": "4294901919"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A0",
+        "value": "4294901920"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A2",
+        "value": "4294901922"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A3",
+        "value": "4294901923"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A5",
+        "value": "4294901925"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A6",
+        "value": "4294901926"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A7",
+        "value": "4294901927"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A8",
+        "value": "4294901928"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00A9",
+        "value": "4294901929"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00AD",
+        "value": "4294901933"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00B1",
+        "value": "4294901937"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00B2",
+        "value": "4294901938"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00B3",
+        "value": "4294901939"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00B4",
+        "value": "4294901940"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00C9",
+        "value": "4294901961"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00CF",
+        "value": "4294901967"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00D0",
+        "value": "4294901968"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00D4",
+        "value": "4294901972"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_00E2",
+        "value": "4294901986"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0120",
+        "value": "4294902048"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0121",
+        "value": "4294902049"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0122",
+        "value": "4294902050"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0123",
+        "value": "4294902051"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0124",
+        "value": "4294902052"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0125",
+        "value": "4294902053"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0126",
+        "value": "4294902054"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0127",
+        "value": "4294902055"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0128",
+        "value": "4294902056"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0129",
+        "value": "4294902057"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012A",
+        "value": "4294902058"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012B",
+        "value": "4294902059"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012C",
+        "value": "4294902060"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012D",
+        "value": "4294902061"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012E",
+        "value": "4294902062"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_012F",
+        "value": "4294902063"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0130",
+        "value": "4294902064"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0131",
+        "value": "4294902065"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0132",
+        "value": "4294902066"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0133",
+        "value": "4294902067"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0134",
+        "value": "4294902068"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0135",
+        "value": "4294902069"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0136",
+        "value": "4294902070"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0137",
+        "value": "4294902071"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0138",
+        "value": "4294902072"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0139",
+        "value": "4294902073"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_013A",
+        "value": "4294902074"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_013B",
+        "value": "4294902075"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_013C",
+        "value": "4294902076"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_013D",
+        "value": "4294902077"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_013E",
+        "value": "4294902078"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0161",
+        "value": "4294902113"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_016A",
+        "value": "4294902122"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_016E",
+        "value": "4294902126"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0172",
+        "value": "4294902130"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0179",
+        "value": "4294902137"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_018E",
+        "value": "4294902158"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_018F",
+        "value": "4294902159"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0190",
+        "value": "4294902160"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0191",
+        "value": "4294902161"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0192",
+        "value": "4294902162"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0193",
+        "value": "4294902163"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_0195",
+        "value": "4294902165"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_01D0",
+        "value": "4294902224"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_020A",
+        "value": "4294902282"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.input/Key.UNKNOWN_020B",
+        "value": "4294902283"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.input/Key.UP",
         "value": "458834"
     },

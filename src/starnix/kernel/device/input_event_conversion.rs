@@ -755,6 +755,87 @@ fn init_key_map() -> KeyMap {
     // m.insert(uapi::KEY_KBD_LCD_MENU4,);
     // m.insert(uapi::KEY_KBD_LCD_MENU5,);
 
+    // we use following keycodes in starnix tests. See b/311425670 for details.
+    m.insert(0x0055, Key::Unknown0055);
+    m.insert(0x0056, Key::Unknown0056);
+    m.insert(0x0059, Key::Unknown0059);
+    m.insert(0x005c, Key::Unknown005C);
+    m.insert(0x005d, Key::Unknown005D);
+    m.insert(0x005e, Key::Unknown005E);
+    m.insert(0x0079, Key::Unknown0079);
+    m.insert(0x007a, Key::Unknown007A);
+    m.insert(0x007b, Key::Unknown007B);
+    m.insert(0x007c, Key::Unknown007C);
+    m.insert(0x0085, Key::Unknown0085);
+    m.insert(0x0087, Key::Unknown0087);
+    m.insert(0x0089, Key::Unknown0089);
+    m.insert(0x009c, Key::Unknown009C);
+    m.insert(0x009f, Key::Unknown009F);
+    m.insert(0x00a0, Key::Unknown00A0);
+    m.insert(0x00a2, Key::Unknown00A2);
+    m.insert(0x00a3, Key::Unknown00A3);
+    m.insert(0x00a5, Key::Unknown00A5);
+    m.insert(0x00a6, Key::Unknown00A6);
+    m.insert(0x00a7, Key::Unknown00A7);
+    m.insert(0x00a8, Key::Unknown00A8);
+    m.insert(0x00a9, Key::Unknown00A9);
+    m.insert(0x00ad, Key::Unknown00Ad);
+    m.insert(0x00b1, Key::Unknown00B1);
+    m.insert(0x00b2, Key::Unknown00B2);
+    m.insert(0x00b3, Key::Unknown00B3);
+    m.insert(0x00b4, Key::Unknown00B4);
+    m.insert(0x00c9, Key::Unknown00C9);
+    m.insert(0x00cf, Key::Unknown00Cf);
+    m.insert(0x00d0, Key::Unknown00D0);
+    m.insert(0x00d4, Key::Unknown00D4);
+    m.insert(0x00e2, Key::Unknown00E2);
+    m.insert(0x0120, Key::Unknown0120);
+    m.insert(0x0121, Key::Unknown0121);
+    m.insert(0x0122, Key::Unknown0122);
+    m.insert(0x0123, Key::Unknown0123);
+    m.insert(0x0124, Key::Unknown0124);
+    m.insert(0x0125, Key::Unknown0125);
+    m.insert(0x0126, Key::Unknown0126);
+    m.insert(0x0127, Key::Unknown0127);
+    m.insert(0x0128, Key::Unknown0128);
+    m.insert(0x0129, Key::Unknown0129);
+    m.insert(0x012a, Key::Unknown012A);
+    m.insert(0x012b, Key::Unknown012B);
+    m.insert(0x012c, Key::Unknown012C);
+    m.insert(0x012d, Key::Unknown012D);
+    m.insert(0x012e, Key::Unknown012E);
+    m.insert(0x012f, Key::Unknown012F);
+    m.insert(0x0130, Key::Unknown0130);
+    m.insert(0x0131, Key::Unknown0131);
+    m.insert(0x0132, Key::Unknown0132);
+    m.insert(0x0133, Key::Unknown0133);
+    m.insert(0x0134, Key::Unknown0134);
+    m.insert(0x0135, Key::Unknown0135);
+    m.insert(0x0136, Key::Unknown0136);
+    m.insert(0x0137, Key::Unknown0137);
+    m.insert(0x0138, Key::Unknown0138);
+    m.insert(0x0139, Key::Unknown0139);
+    m.insert(0x013a, Key::Unknown013A);
+    m.insert(0x013b, Key::Unknown013B);
+    m.insert(0x013c, Key::Unknown013C);
+    m.insert(0x013d, Key::Unknown013D);
+    m.insert(0x013e, Key::Unknown013E);
+    m.insert(0x0161, Key::Unknown0161);
+    m.insert(0x016a, Key::Unknown016A);
+    m.insert(0x016e, Key::Unknown016E);
+    m.insert(0x0172, Key::Unknown0172);
+    m.insert(0x0179, Key::Unknown0179);
+    m.insert(0x018e, Key::Unknown018E);
+    m.insert(0x018f, Key::Unknown018F);
+    m.insert(0x0190, Key::Unknown0190);
+    m.insert(0x0191, Key::Unknown0191);
+    m.insert(0x0192, Key::Unknown0192);
+    m.insert(0x0193, Key::Unknown0193);
+    m.insert(0x0195, Key::Unknown0195);
+    m.insert(0x01d0, Key::Unknown01D0);
+    m.insert(0x020a, Key::Unknown020A);
+    m.insert(0x020b, Key::Unknown020B);
+
     m
 }
 
@@ -794,6 +875,35 @@ mod test {
             let got = km.fuchsia_input_key_to_linux_keycode(fuchsia_key);
             assert_eq!(want, got);
         }
+    }
+
+    #[test]
+    fn linux_keycode_testset() {
+        // Want to ensure all linux keycode in this can map to fuchsia key. See b/311425670 for
+        // details.
+        let linux_keycodes: Vec<u32> = vec![
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
+            25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 44, 45, 46, 47,
+            48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+            70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 85, 86, 87, 88, 89, 92, 93, 94,
+            96, 97, 98, 100, 102, 103, 105, 106, 107, 108, 110, 111, 113, 114, 115, 117, 119, 121,
+            122, 123, 124, 133, 135, 137, 139, 156, 159, 160, 162, 163, 164, 165, 166, 167, 168,
+            169, 173, 177, 178, 179, 180, 201, 207, 208, 212, 226, 288, 289, 290, 291, 292, 293,
+            294, 295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305, 306, 307, 308, 309, 310,
+            311, 312, 313, 314, 315, 316, 317, 318, 353, 362, 366, 370, 377, 398, 399, 400, 401,
+            402, 403, 405, 464, 522, 523,
+        ];
+
+        let km = init_key_map();
+
+        let mut kcs = vec![];
+        for kc in linux_keycodes {
+            if km.linux_keycode_to_fuchsia_input_key(kc) == Key::Unknown {
+                kcs.push(kc);
+            }
+        }
+
+        assert_eq!(kcs.len(), 0, "{:?}", kcs);
     }
 
     fn uapi_input_event(ty: u32, code: u32, value: i32) -> uapi::input_event {
