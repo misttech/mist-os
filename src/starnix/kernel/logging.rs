@@ -130,8 +130,11 @@ pub fn set_current_task_info(current_task: &CurrentTask) {
 /// *Do not use this for kernel logic.* If you need access to the current pid/tid/etc for the
 /// purposes of writing kernel logic beyond logging for debugging purposes, those should be accessed
 /// through the `CurrentTask` type as an argument explicitly passed to your function.
-pub fn with_current_task_info<T>(f: impl FnOnce(&(dyn fmt::Display)) -> T) -> T {
-    CURRENT_TASK_INFO.with(|task_info| f(&task_info.borrow()))
+pub fn with_current_task_info<T>(f: impl Fn(&(dyn fmt::Display)) -> T) -> T {
+    match CURRENT_TASK_INFO.try_with(|task_info| f(&task_info.borrow())) {
+        Ok(value) => value,
+        Err(_) => f(&TaskDebugInfo::Unknown),
+    }
 }
 
 /// Used to track the current thread's logical context.
@@ -141,6 +144,9 @@ enum TaskDebugInfo {
     /// The thread with this set is used to service syscalls for a specific user thread, and this
     /// describes the user thread's identity.
     User { pid: pid_t, tid: pid_t, command: String },
+    /// Unknown info. This happens when trying to log while in the destructor of a thread local
+    /// variable.
+    Unknown,
 }
 
 // TODO(b/280356702) replace this with a tracing span
@@ -156,6 +162,7 @@ impl fmt::Display for TaskDebugInfo {
         match self {
             Self::Kernel => write!(f, "kthread"),
             Self::User { pid, tid, command } => write!(f, "{}:{}[{}]", pid, tid, command),
+            Self::Unknown => write!(f, "unknown"),
         }
     }
 }
