@@ -18,10 +18,6 @@
 
 namespace media::audio::drivers::test {
 
-// TODO(fxbug.dev/116355): Once A2DP driver issues are fixed, remove these flags.
-constexpr bool kRequireA2dpNonZeroDriverTransferBytes = false;
-constexpr bool kRequireA2dpVmoSizeContribution = false;
-
 void AdminTest::TearDown() {
   DropRingBuffer();
 
@@ -136,12 +132,9 @@ void AdminTest::RequestRingBufferProperties() {
     EXPECT_GE(ring_buffer_props_->turn_on_delay(), 0);
   }
 
-  // TODO(fxbug.dev/123475): After BT adds support, remove this flag.
-  if (kRequireA2dpNonZeroDriverTransferBytes || !device_entry().isA2DP()) {
-    // This field is required, but was recently added (HEAD). It must be non-zero.
-    ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
-    EXPECT_GT(ring_buffer_props_->driver_transfer_bytes(), 0u);
-  }
+  // This field is required, and must be non-zero.
+  ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
+  EXPECT_GT(ring_buffer_props_->driver_transfer_bytes(), 0u);
 }
 
 // Request the ring buffer's VMO handle, at the current format (relies on the ring buffer channel).
@@ -166,17 +159,14 @@ void AdminTest::RequestBuffer(uint32_t min_ring_buffer_frames,
     return;
   }
 
-  // TODO(fxbug.dev/116355): Once driver issues are fixed, remove these flags.
-  if ((kRequireA2dpVmoSizeContribution && kRequireA2dpNonZeroDriverTransferBytes) ||
-      !device_entry().isA2DP()) {
-    ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
-    uint32_t driver_transfer_frames =
-        (ring_buffer_props_->driver_transfer_bytes() + (frame_size_ - 1)) / frame_size_;
-    EXPECT_GE(ring_buffer_frames_, min_ring_buffer_frames_ + driver_transfer_frames)
-        << "Driver must add at least driver_transfer_bytes to the client-requested ring buffer size";
-  } else {
-    EXPECT_GE(ring_buffer_frames_, min_ring_buffer_frames_);
-  }
+  ASSERT_TRUE(ring_buffer_props_->has_driver_transfer_bytes());
+  uint32_t driver_transfer_frames =
+      (ring_buffer_props_->driver_transfer_bytes() + (frame_size_ - 1)) / frame_size_;
+  EXPECT_GE(ring_buffer_frames_, min_ring_buffer_frames_ + driver_transfer_frames)
+      << "Driver (returned " << ring_buffer_frames_
+      << " frames) must add at least driver_transfer_bytes (" << driver_transfer_frames
+      << " frames) to the client-requested ring buffer size (" << min_ring_buffer_frames_
+      << " frames)";
 
   ring_buffer_mapper_.Unmap();
   const zx_vm_option_t option_flags = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE;
@@ -579,13 +569,8 @@ void RegisterAdminTestsForDevice(const DeviceEntry& device_entry,
   if (device_entry.isA2DP() || expect_audio_core_not_connected) {
     REGISTER_ADMIN_TEST(GetRingBufferProperties, device_entry);
     REGISTER_ADMIN_TEST(GetBuffer, device_entry);
-    // TODO(fxbug.dev/116355): Once driver issues are fixed, remove this check.
-    if ((kRequireA2dpVmoSizeContribution && kRequireA2dpNonZeroDriverTransferBytes) ||
-        !device_entry.isA2DP()) {
-      REGISTER_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
-    } else {
-      REGISTER_DISABLED_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
-    }
+    REGISTER_ADMIN_TEST(DriverReservesRingBufferSpace, device_entry);
+
     REGISTER_ADMIN_TEST(InternalDelayIsValid, device_entry);
     REGISTER_ADMIN_TEST(ExternalDelayIsValid, device_entry);
 
