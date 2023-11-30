@@ -152,6 +152,7 @@ TEST(ProfileConfig, Parse) {
 
 TEST(ProfileConfig, ParseRoleSelector) {
   EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd"));
+  EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("a.b.c.d"));
   EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123"));
   EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("_abcd123"));
   EXPECT_EQ(fit::success{}, zircon_profile::ParseRoleSelector("abcd123.01234"));

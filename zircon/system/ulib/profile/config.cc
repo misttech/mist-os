@@ -478,7 +478,7 @@ void ParseProfiles(const std::string& filename, const rapidjson::Document& docum
 namespace zircon_profile {
 
 fit::result<fit::failed, Role> ParseRoleSelector(std::string_view role_selector) {
-  static const re2::RE2 kReRoleParts{"(\\w[\\w\\-]+(?:\\.\\w[\\w\\-]+)*)(?::(.+))?"};
+  static const re2::RE2 kReRoleParts{"(\\w[\\w\\-]*(?:\\.\\w[\\w\\-]*)*)(?::(.+))?"};
   static const re2::RE2 kSelector{"(\\w[\\w\\-]+)(?:=([^,]+))?,?"};
 
   Role role;
