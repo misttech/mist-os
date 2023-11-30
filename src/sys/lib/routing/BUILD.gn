@@ -60,15 +60,19 @@ rustc_library("routing") {
     "src/environment.rs",
     "src/error.rs",
     "src/event.rs",
+    "src/legacy_router.rs",
     "src/lib.rs",
     "src/mapper.rs",
     "src/path.rs",
     "src/policy.rs",
     "src/resolving.rs",
     "src/rights.rs",
-    "src/router.rs",
     "src/walk_state.rs",
   ]
+
+  if (is_fuchsia) {
+    sources += [ "src/router.rs" ]
+  }
 
   test_deps = [
     "//third_party/rust_crates:assert_matches",

@@ -9,13 +9,21 @@ pub mod component_instance;
 pub mod environment;
 pub mod error;
 pub mod event;
+mod legacy_router;
 pub mod mapper;
 pub mod path;
 pub mod policy;
 pub mod resolving;
 pub mod rights;
-pub mod router;
 pub mod walk_state;
+
+#[cfg(target_os = "fuchsia")]
+pub mod router;
+
+#[cfg(not(target_os = "fuchsia"))]
+pub mod router {
+    pub use crate::legacy_router::*;
+}
 
 use {
     crate::{
