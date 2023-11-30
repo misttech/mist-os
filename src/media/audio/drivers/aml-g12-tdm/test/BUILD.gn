@@ -11,6 +11,7 @@ executable("aml-g12-tdm-test-bin") {
   testonly = true
   sources = [
     "../aml-tdm-config-device.cc",
+    "../aml-tdm-config-device.h",
     "../audio-stream.cc",
     "stream-test.cc",
   ]
@@ -60,6 +61,7 @@ executable("aml-g12-tdm-dai-test-bin") {
   testonly = true
   sources = [
     "../aml-tdm-config-device.cc",
+    "../aml-tdm-config-device.h",
     "../dai.cc",
     "dai-test.cc",
   ]

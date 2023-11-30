@@ -32,6 +32,7 @@ fuchsia_driver("aml-g12-tdm-driver") {
   ]
   sources = [
     "aml-tdm-config-device.cc",
+    "aml-tdm-config-device.h",
     "audio-stream.cc",
   ]
 
@@ -93,6 +94,7 @@ fuchsia_driver("aml-g12-tdm-dai-driver") {
   ]
   sources = [
     "aml-tdm-config-device.cc",
+    "aml-tdm-config-device.h",
     "dai.cc",
   ]
 
@@ -148,6 +150,7 @@ driver_bind_rules("aml-g12-composite-bind") {
 source_set("aml-g12-composite-common") {
   sources = [
     "aml-tdm-config-device.cc",
+    "aml-tdm-config-device.h",
     "composite-server.cc",
     "composite-server.h",
     "composite.cc",

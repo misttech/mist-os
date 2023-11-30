@@ -1,9 +1,8 @@
 // Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-#include "aml-tdm-config-device.h"
+#include "src/media/audio/drivers/aml-g12-tdm/aml-tdm-config-device.h"
 
-#include <lib/ddk/debug.h>
 #include <lib/fit/defer.h>
 
 #include <iterator>
@@ -11,19 +10,19 @@
 
 namespace audio::aml_g12 {
 
-AmlTdmConfigDevice::AmlTdmConfigDevice(const metadata::AmlConfig& metadata, fdf::MmioBuffer mmio) {
+AmlTdmConfigDevice::AmlTdmConfigDevice(const metadata::AmlConfig& config, fdf::MmioBuffer mmio) {
   ee_audio_mclk_src_t mclk_src = {};
-  if (metadata.is_custom_tdm_src_clk_sel) {
+  if (config.is_custom_tdm_src_clk_sel) {
     mclk_src = MP0_PLL;
   } else {
     mclk_src = HIFI_PLL;
   }
 
-  if (metadata.is_input) {
+  if (config.is_input) {
     aml_tdm_in_t tdm = {};
     aml_toddr_t ddr = {};
     aml_tdm_mclk_t mclk = {};
-    switch (metadata.bus) {
+    switch (config.bus) {
       case metadata::AmlBus::TDM_A:
         tdm = TDM_IN_A;
         ddr = TODDR_A;
@@ -41,20 +40,20 @@ AmlTdmConfigDevice::AmlTdmConfigDevice(const metadata::AmlConfig& metadata, fdf:
         break;
     }
 
-    if (metadata.is_custom_tdm_clk_sel)
-      mclk = ToMclkId(metadata.tdm_clk_sel);
+    if (config.is_custom_tdm_clk_sel)
+      mclk = ToMclkId(config.tdm_clk_sel);
 
-    if (metadata.is_loopback) {
-      device_ = AmlTdmLbDevice::Create(std::move(mmio), mclk_src, ddr, mclk, metadata.loopback,
-                                       metadata.version);
+    if (config.is_loopback) {
+      device_ = AmlTdmLbDevice::Create(std::move(mmio), mclk_src, ddr, mclk, config.loopback,
+                                       config.version);
     } else {
-      device_ = AmlTdmInDevice::Create(std::move(mmio), mclk_src, tdm, ddr, mclk, metadata.version);
+      device_ = AmlTdmInDevice::Create(std::move(mmio), mclk_src, tdm, ddr, mclk, config.version);
     }
   } else {
     aml_tdm_out_t tdm = {};
     aml_frddr_t ddr = {};
     aml_tdm_mclk_t mclk = {};
-    switch (metadata.bus) {
+    switch (config.bus) {
       case metadata::AmlBus::TDM_A:
         tdm = TDM_OUT_A;
         ddr = FRDDR_A;
@@ -72,16 +71,16 @@ AmlTdmConfigDevice::AmlTdmConfigDevice(const metadata::AmlConfig& metadata, fdf:
         break;
     }
 
-    if (metadata.is_custom_tdm_clk_sel)
-      mclk = ToMclkId(metadata.tdm_clk_sel);
+    if (config.is_custom_tdm_clk_sel)
+      mclk = ToMclkId(config.tdm_clk_sel);
 
-    device_ = AmlTdmOutDevice::Create(std::move(mmio), mclk_src, tdm, ddr, mclk, metadata.version);
+    device_ = AmlTdmOutDevice::Create(std::move(mmio), mclk_src, tdm, ddr, mclk, config.version);
   }
   ZX_ASSERT(device_ != nullptr);
 }
 
-zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
-                                       uint64_t channels_to_use, uint32_t frame_rate) {
+zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& config, uint64_t channels_to_use,
+                                       uint32_t frame_rate) {
   zx_status_t status;
 
   // Shut down the SoC audio peripherals (tdm/dma)
@@ -95,8 +94,8 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
   constexpr uint32_t kMaxLanes = metadata::kMaxNumberOfLanes;
   uint32_t lanes_mutes[kMaxLanes] = {};
   // bitoffset defines samples start relative to the edge of fsync.
-  uint8_t bitoffset = metadata.is_input ? 4 : 3;
-  switch (metadata.dai.type) {
+  uint8_t bitoffset = config.is_input ? 4 : 3;
+  switch (config.dai.type) {
     // No change, data already starts at the frame sync start.
     case metadata::DaiType::Tdm1:
       [[fallthrough]];
@@ -115,7 +114,7 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
       bitoffset -= 2;
       break;
   }
-  if (metadata.dai.sclk_on_raising) {
+  if (config.dai.sclk_on_raising) {
     bitoffset--;
   }
 
@@ -124,7 +123,7 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
   size_t lane_start = 0;
   for (size_t i = 0; i < kMaxLanes; ++i) {
     for (size_t j = 0; j < 64; ++j) {
-      if (metadata.lanes_enable_mask[i] & (static_cast<uint64_t>(1) << j)) {
+      if (config.lanes_enable_mask[i] & (static_cast<uint64_t>(1) << j)) {
         if (~channels_to_use & (1 << channel)) {
           lanes_mutes[i] |= ((1 << channel) >> lane_start);
         }
@@ -136,31 +135,30 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
   // Number of channels enabled in lanes must match the number of channels in the ring buffer.
   // If some weird configuration requires this constrain to not be true, remove this check.
   // Most configurations would be an error if these did not match.
-  ZX_ASSERT(channel == metadata.ring_buffer.number_of_channels);
+  ZX_ASSERT(channel == config.ring_buffer.number_of_channels);
 
-  device_->ConfigTdmSlot(bitoffset, static_cast<uint8_t>(metadata.dai.number_of_channels - 1),
-                         metadata.dai.bits_per_slot - 1, metadata.dai.bits_per_sample - 1,
-                         metadata.mix_mask, metadata.dai.type == metadata::DaiType::I2s);
-  device_->ConfigTdmSwaps(metadata.swaps);
+  device_->ConfigTdmSlot(bitoffset, static_cast<uint8_t>(config.dai.number_of_channels - 1),
+                         config.dai.bits_per_slot - 1, config.dai.bits_per_sample - 1,
+                         config.mix_mask, config.dai.type == metadata::DaiType::I2s);
+  device_->ConfigTdmSwaps(config.swaps);
   for (size_t i = 0; i < kMaxLanes; ++i) {
-    status = device_->ConfigTdmLane(i, metadata.lanes_enable_mask[i], lanes_mutes[i]);
+    status = device_->ConfigTdmLane(i, config.lanes_enable_mask[i], lanes_mutes[i]);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "could not configure TDM lane %d", status);
       return status;
     }
 
-    if (metadata.dpad_mask & (1 << i)) {
-      device_->SetDatPad(ToDatPadId(metadata.dpad_sel[i]), static_cast<aml_tdm_dat_lane_t>(i));
+    if (config.dpad_mask & (1 << i)) {
+      device_->SetDatPad(ToDatPadId(config.dpad_sel[i]), static_cast<aml_tdm_dat_lane_t>(i));
     }
   }
 
-  if (metadata.mClockDivFactor) {
+  if (config.mClockDivFactor) {
     // PLL sourcing audio clock tree should be running at 768MHz
     // Note: Audio clock tree input should always be < 1GHz
     // mclk rate for 96kHz = 768MHz/5 = 153.6MHz
     // mclk rate for 48kHz = 768MHz/10 = 76.8MHz
     // Note: absmax mclk frequency is 500MHz per AmLogic
-    ZX_ASSERT(!(metadata.mClockDivFactor % 2));  // mClock div factor must be divisable by 2.
+    ZX_ASSERT(!(config.mClockDivFactor % 2));  // mClock div factor must be divisible by 2.
     ZX_ASSERT(frame_rate == 8'000 || frame_rate == 16'000 || frame_rate == 32'000 ||
               frame_rate == 48'000 || frame_rate == 96'000);
     static_assert(std::size(AmlTdmConfigDevice::kSupportedFrameRates) == 5);
@@ -169,29 +167,28 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
     ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[2] == 32'000);
     ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[3] == 48'000);
     ZX_ASSERT(AmlTdmConfigDevice::kSupportedFrameRates[4] == 96'000);
-    const uint32_t frame_bytes = metadata.dai.bits_per_slot / 8 * metadata.dai.number_of_channels;
+    const uint32_t frame_bytes = config.dai.bits_per_slot / 8 * config.dai.number_of_channels;
     // With frame_bytes = 8, we take mClockDivFactor and adjust the mclk_div up or down from 48kHz.
-    const uint32_t mclk_div = metadata.mClockDivFactor * 48'000 * 8 / frame_bytes / frame_rate;
+    const uint32_t mclk_div = config.mClockDivFactor * 48'000 * 8 / frame_bytes / frame_rate;
     status = device_->SetMclkDiv(mclk_div - 1);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "could not configure MCLK %d", status);
       return status;
     }
-    if (metadata.is_custom_tdm_mpad_sel) {
-      device_->SetMClkPad(ToMclkPadId(metadata.mpad_sel));
+    if (config.is_custom_tdm_mpad_sel) {
+      device_->SetMClkPad(ToMclkPadId(config.mpad_sel));
     } else {
       device_->SetMClkPad(MCLK_PAD_0);
     }
   }
-  if (metadata.sClockDivFactor) {
+  if (config.sClockDivFactor) {
     uint32_t frame_sync_clks = 0;
-    switch (metadata.dai.type) {
+    switch (config.dai.type) {
       case metadata::DaiType::I2s:
         [[fallthrough]];
       case metadata::DaiType::StereoLeftJustified:
         // For I2S and Stereo Left Justified we have a 50% duty cycle, hence the frame sync clocks
         // is set to the size of one slot.
-        frame_sync_clks = metadata.dai.bits_per_slot;
+        frame_sync_clks = config.dai.bits_per_slot;
         break;
       case metadata::DaiType::Tdm1:
         [[fallthrough]];
@@ -201,12 +198,11 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
         frame_sync_clks = 1;
         break;
     }
-    device_->SetSclkPad(ToSclkPadId(metadata.spad_sel), metadata.is_custom_tdm_spad_sel);
-    status = device_->SetSclkDiv(metadata.sClockDivFactor - 1, frame_sync_clks - 1,
-                                 (metadata.dai.bits_per_slot * metadata.dai.number_of_channels) - 1,
-                                 !metadata.dai.sclk_on_raising);
+    device_->SetSclkPad(ToSclkPadId(config.spad_sel), config.is_custom_tdm_spad_sel);
+    status = device_->SetSclkDiv(config.sClockDivFactor - 1, frame_sync_clks - 1,
+                                 (config.dai.bits_per_slot * config.dai.number_of_channels) - 1,
+                                 !config.dai.sclk_on_raising);
     if (status != ZX_OK) {
-      zxlogf(ERROR, "could not configure SCLK %d", status);
       return status;
     }
   }
@@ -223,37 +219,29 @@ zx_status_t AmlTdmConfigDevice::InitHW(const metadata::AmlConfig& metadata,
   return ZX_OK;
 }
 
-zx_status_t AmlTdmConfigDevice::Normalize(metadata::AmlConfig& metadata) {
-  if (metadata.ring_buffer.bytes_per_sample == 0) {
-    metadata.ring_buffer.bytes_per_sample = 2;
+zx_status_t AmlTdmConfigDevice::Normalize(metadata::AmlConfig& config) {
+  if (config.ring_buffer.bytes_per_sample == 0) {
+    config.ring_buffer.bytes_per_sample = 2;
   }
   // Only 16 bits samples supported.
-  if (metadata.ring_buffer.bytes_per_sample != 2) {
-    zxlogf(ERROR, "metadata unsupported bytes per sample %u",
-           metadata.ring_buffer.bytes_per_sample);
+  if (config.ring_buffer.bytes_per_sample != 2) {
     return ZX_ERR_NOT_SUPPORTED;
   }
   // Only the PCM signed sample format is supported.
-  if (metadata.dai.sample_format != metadata::SampleFormat::PcmSigned) {
-    zxlogf(ERROR, "metadata unsupported sample type %d",
-           static_cast<int>(metadata.dai.sample_format));
+  if (config.dai.sample_format != metadata::SampleFormat::PcmSigned) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  if (metadata.dai.type == metadata::DaiType::I2s ||
-      metadata.dai.type == metadata::DaiType::StereoLeftJustified) {
-    metadata.dai.number_of_channels = 2;
+  if (config.dai.type == metadata::DaiType::I2s ||
+      config.dai.type == metadata::DaiType::StereoLeftJustified) {
+    config.dai.number_of_channels = 2;
   }
-  if (metadata.dai.bits_per_slot != 32 && metadata.dai.bits_per_slot != 16) {
-    zxlogf(ERROR, "metadata unsupported bits per slot %d", metadata.dai.bits_per_slot);
+  if (config.dai.bits_per_slot != 32 && config.dai.bits_per_slot != 16) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  if (metadata.dai.bits_per_sample != 32 && metadata.dai.bits_per_sample != 16) {
-    zxlogf(ERROR, "metadata unsupported bits per sample %d", metadata.dai.bits_per_sample);
+  if (config.dai.bits_per_sample != 32 && config.dai.bits_per_sample != 16) {
     return ZX_ERR_NOT_SUPPORTED;
   }
-  if (metadata.dai.bits_per_sample > metadata.dai.bits_per_slot) {
-    zxlogf(ERROR, "metadata unsupported bits per sample bits per slot combination %u/%u",
-           metadata.dai.bits_per_sample, metadata.dai.bits_per_slot);
+  if (config.dai.bits_per_sample > config.dai.bits_per_slot) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

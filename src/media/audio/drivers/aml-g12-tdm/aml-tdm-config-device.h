@@ -15,11 +15,11 @@ class AmlTdmConfigDevice {
  public:
   static constexpr uint32_t kDefaultFrameRateIndex = 3;
   static constexpr uint32_t kSupportedFrameRates[] = {8'000, 16'000, 32'000, 48'000, 96'000};
-  explicit AmlTdmConfigDevice(const metadata::AmlConfig& metadata, fdf::MmioBuffer mmio);
+  explicit AmlTdmConfigDevice(const metadata::AmlConfig& config, fdf::MmioBuffer mmio);
 
-  zx_status_t InitHW(const metadata::AmlConfig& metadata, uint64_t channels_to_use,
+  zx_status_t InitHW(const metadata::AmlConfig& config, uint64_t channels_to_use,
                      uint32_t frame_rate);
-  static zx_status_t Normalize(metadata::AmlConfig& metadata);
+  static zx_status_t Normalize(metadata::AmlConfig& config);
 
   zx_status_t SetBuffer(zx_paddr_t buf, size_t len) { return device_->SetBuffer(buf, len); }
   uint32_t GetRingPosition() { return device_->GetRingPosition(); }
