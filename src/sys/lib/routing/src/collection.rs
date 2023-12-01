@@ -72,6 +72,7 @@ where
         let component = self.containing_component.upgrade()?;
         let mut child_components = vec![];
         let mut parent = None;
+        let mut include_self = false;
         {
             let resolved_state = component.lock_resolved_state().await?;
             for s in &self.members {
@@ -95,6 +96,9 @@ where
                                 }
                             }
                         }
+                    }
+                    AggregateMember::Self_ => {
+                        include_self = true;
                     }
                 }
             }
@@ -133,6 +137,9 @@ where
                 Err(_) => {}
             }
         }
+        if include_self {
+            instances.push(AggregateInstance::Self_);
+        }
         Ok(instances)
     }
 
@@ -147,6 +154,7 @@ where
         match instance {
             AggregateInstance::Child(name) => self.route_child_instance(&name).await,
             AggregateInstance::Parent => self.route_parent_instance().await,
+            AggregateInstance::Self_ => self.route_self_instance().await,
         }
     }
 
@@ -231,6 +239,18 @@ where
         legacy_router::route_from_offer(
             parent_offers,
             parent,
+            self.sources.clone(),
+            &mut self.visitor.clone(),
+            &mut NoopRouteMapper,
+        )
+        .await
+    }
+
+    async fn route_self_instance(&self) -> Result<CapabilitySource<C>, RoutingError> {
+        let containing_component = self.containing_component.upgrade()?;
+        legacy_router::route_from_self_by_name(
+            &self.capability_name,
+            containing_component,
             self.sources.clone(),
             &mut self.visitor.clone(),
             &mut NoopRouteMapper,

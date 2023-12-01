@@ -3685,7 +3685,7 @@ async fn use_filtered_aggregate_service_from_sibling() {
 }
 
 #[fuchsia::test]
-async fn use_anonymized_aggregate_service_from_sibling_and_parent() {
+async fn use_anonymized_aggregate_service() {
     let expose_service_decl = ComponentDeclBuilder::new()
         .expose(ExposeDecl::Service(ExposeServiceDecl {
             source: ExposeSource::Self_,
@@ -3754,6 +3754,20 @@ async fn use_anonymized_aggregate_service_from_sibling_and_parent() {
                     source_instance_filter: None,
                     renamed_instances: None,
                 }))
+                .offer(OfferDecl::Service(OfferServiceDecl {
+                    source: OfferSource::Self_,
+                    source_name: "my.service.Service".parse().unwrap(),
+                    source_dictionary: None,
+                    target: OfferTarget::static_child("e".to_string()),
+                    target_name: "my.service.Service".parse().unwrap(),
+                    availability: Availability::Required,
+                    source_instance_filter: None,
+                    renamed_instances: None,
+                }))
+                .service(ServiceDecl {
+                    name: "my.service.Service".parse().unwrap(),
+                    source_path: Some("/svc/my.service.Service".parse().unwrap()),
+                })
                 .add_child(ChildDeclBuilder::new_lazy_child("c"))
                 .add_child(ChildDeclBuilder::new_lazy_child("d"))
                 .add_child(ChildDeclBuilder::new_lazy_child("e"))
@@ -3787,6 +3801,11 @@ async fn use_anonymized_aggregate_service_from_sibling_and_parent() {
             instance_dir.clone(),
         )
         .add_outgoing_path(
+            "b",
+            "/svc/my.service.Service/default".parse().unwrap(),
+            instance_dir.clone(),
+        )
+        .add_outgoing_path(
             "c",
             "/svc/my.service.Service/default".parse().unwrap(),
             instance_dir.clone(),
@@ -3808,7 +3827,7 @@ async fn use_anonymized_aggregate_service_from_sibling_and_parent() {
         "b/e".parse().unwrap(),
         CheckUse::Service {
             path: "/svc/my.service.Service".parse().unwrap(),
-            instance: ServiceInstance::Aggregated(3),
+            instance: ServiceInstance::Aggregated(4),
             member: "echo".to_string(),
             expected_res: ExpectedResult::Ok,
         },

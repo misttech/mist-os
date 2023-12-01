@@ -43,6 +43,7 @@ pub enum AggregateMember {
     Child(ChildName),
     Collection(Name),
     Parent,
+    Self_,
 }
 
 impl fmt::Display for AggregateMember {
@@ -56,6 +57,9 @@ impl fmt::Display for AggregateMember {
             }
             Self::Parent => {
                 write!(f, "parent")
+            }
+            Self::Self_ => {
+                write!(f, "self")
             }
         }
     }
@@ -210,6 +214,7 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
 pub enum AggregateInstance {
     Child(ChildName),
     Parent,
+    Self_,
 }
 
 impl fmt::Display for AggregateInstance {
@@ -220,6 +225,9 @@ impl fmt::Display for AggregateInstance {
             }
             Self::Parent => {
                 write!(f, "parent")
+            }
+            Self::Self_ => {
+                write!(f, "self")
             }
         }
     }

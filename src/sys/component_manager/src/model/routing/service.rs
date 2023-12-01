@@ -675,6 +675,9 @@ mod tests {
                                 moniker: Moniker::root(),
                             }
                         }
+                        AggregateInstance::Self_ => {
+                            panic!("not expected");
+                        }
                     })?
                     .clone(),
             })
@@ -1045,7 +1048,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_anonymized_service_directory_with_parent() {
+    async fn test_anonymized_service_directory_with_parent_and_self() {
         let leaf_component_decl = ComponentDeclBuilder::new()
             .expose(ExposeDecl::Service(ExposeServiceDecl {
                 source: ExposeSource::Self_,
@@ -1108,6 +1111,16 @@ mod tests {
                         source_instance_filter: None,
                         renamed_instances: None,
                     }))
+                    .offer(OfferDecl::Service(OfferServiceDecl {
+                        source: OfferSource::Self_,
+                        source_name: "my.service.Service".parse().unwrap(),
+                        source_dictionary: None,
+                        target_name: "my.service.Service".parse().unwrap(),
+                        target: OfferTarget::static_child("target".into()),
+                        availability: cm_rust::Availability::Required,
+                        source_instance_filter: None,
+                        renamed_instances: None,
+                    }))
                     .add_collection(CollectionDeclBuilder::new_transient_collection("coll"))
                     .add_lazy_child("target")
                     .build(),
@@ -1149,6 +1162,11 @@ mod tests {
             .add_outgoing_path(
                 "container",
                 "/svc/my.service.Service".parse().unwrap(),
+                mock_single_instance.clone(),
+            )
+            .add_outgoing_path(
+                "root",
+                "/svc/my.service.Service".parse().unwrap(),
                 mock_single_instance,
             )
             .build()
@@ -1167,6 +1185,7 @@ mod tests {
         )
         .await;
 
+        let root_component = test.model.root();
         let container_component =
             test.model.find_and_maybe_resolve(&"container".parse().unwrap()).await.unwrap();
         let foo_component = test
@@ -1182,7 +1201,8 @@ mod tests {
 
         let provider = MockAnonymizedCapabilityProvider {
             instances: hashmap! {
-                AggregateInstance::Parent => container_component.as_weak(),
+                AggregateInstance::Parent => root_component.as_weak(),
+                AggregateInstance::Self_ => container_component.as_weak(),
                 AggregateInstance::Child("coll:foo".try_into().unwrap()) => foo_component.as_weak(),
                 AggregateInstance::Child("coll:bar".try_into().unwrap()) => bar_component.as_weak(),
             },
@@ -1193,6 +1213,7 @@ mod tests {
             members: vec![
                 AggregateMember::Collection("coll".parse().unwrap()),
                 AggregateMember::Parent,
+                AggregateMember::Self_,
             ],
             service_name: "my.service.Service".parse().unwrap(),
         };
@@ -1217,7 +1238,7 @@ mod tests {
                 dir_arc.entries().await.into_iter().map(|e| e.name.clone()).collect();
             let dir_contents = fuchsia_fs::directory::readdir(&dir_proxy).await.unwrap();
             let dir_instance_names: HashSet<_> = dir_contents.into_iter().map(|d| d.name).collect();
-            assert_eq!(instance_names.len(), 3);
+            assert_eq!(instance_names.len(), 4);
             assert_eq!(dir_instance_names, instance_names);
             instance_names
         };
@@ -1266,11 +1287,11 @@ mod tests {
         {
             bar_component.stop().await.unwrap();
             let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-            assert_eq!(dir_contents.len(), 2);
+            assert_eq!(dir_contents.len(), 3);
 
             test.start_instance_and_wait_start(bar_component.moniker()).await.unwrap();
             let dir_contents = wait_for_dir_content_change(&dir_proxy, dir_contents).await;
-            assert_eq!(dir_contents.len(), 3);
+            assert_eq!(dir_contents.len(), 4);
         }
     }
 

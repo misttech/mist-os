@@ -1,4 +1,4 @@
-// Copyright 2020 The Fuchsia Authors. Al rights reserved.
+// Copyright 2020 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -203,6 +203,9 @@ where
                     OfferSource::Parent => {
                         members.push(AggregateMember::Parent);
                     }
+                    OfferSource::Self_ => {
+                        members.push(AggregateMember::Self_);
+                    }
                     _ => unreachable!("impossible source"),
                 }
             }
@@ -314,6 +317,9 @@ where
                                 .expect("child source should be convertible to ChildName"),
                         ));
                     }
+                    ExposeSource::Self_ => {
+                        members.push(AggregateMember::Self_);
+                    }
                     _ => unreachable!("this was checked before"),
                 }
             }
@@ -354,10 +360,30 @@ where
     V: Clone + Send + Sync + 'static,
 {
     mapper.add_use(target.moniker().clone(), &use_decl.clone().into());
+    route_from_self_by_name(use_decl.source_name(), target, sources, visitor, mapper).await
+}
+
+/// Routes a capability from a capability name to its source by capabilities declarations, i.e.
+/// whatever capabilities that this component itself provides.
+///
+/// `sources` defines what are the valid sources of the capability. See [`AllowedSourcesBuilder`].
+/// `visitor` is invoked for each `Capability` declaration if `sources` permits.
+pub async fn route_from_self_by_name<C, V>(
+    name: &Name,
+    target: Arc<C>,
+    sources: Sources,
+    visitor: &mut V,
+    mapper: &mut dyn DebugRouteMapper,
+) -> Result<CapabilitySource<C>, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+    V: CapabilityVisitor,
+    V: Clone + Send + Sync + 'static,
+{
     let target_capabilities = target.lock_resolved_state().await?.capabilities();
     Ok(CapabilitySource::<C>::Component {
         capability: sources.find_component_source(
-            use_decl.source_name(),
+            name,
             target.moniker(),
             &target_capabilities,
             visitor,

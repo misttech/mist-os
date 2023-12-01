@@ -39,7 +39,7 @@ use {
     moniker::{ExtendedMoniker, Moniker, MonikerBase},
     routing::{
         capability_source::{
-            AggregateCapability, CapabilitySource, ComponentCapability,
+            AggregateCapability, AggregateMember, CapabilitySource, ComponentCapability,
             FilteredAggregateCapabilityRouteData, InternalCapability,
         },
         component_instance::ComponentInstanceInterface,
@@ -2273,7 +2273,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     /// c d
     ///
     /// a: offers "foo" from self to `b`
-    /// b: offers "foo" from parent and c to d, forming an aggregate
+    /// b: offers "foo" from parent, c, and itself to d, forming an aggregate
     /// c: exposes "foo" to parent from self
     /// d: uses "foo" from parent
     /// routing an aggregate service without specifying a source_instance_filter should fail.
@@ -2296,6 +2296,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
+                    .service(expected_service_decl.clone())
                     .add_lazy_child("b")
                     .build(),
             ),
@@ -2322,6 +2323,17 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         renamed_instances: None,
                         availability: Availability::Required,
                     }))
+                    .offer(OfferDecl::Service(OfferServiceDecl {
+                        source: OfferSource::Self_,
+                        source_name: "foo".parse().unwrap(),
+                        source_dictionary: None,
+                        target_name: "foo".parse().unwrap(),
+                        target: OfferTarget::static_child("d".to_string()),
+                        source_instance_filter: None,
+                        renamed_instances: None,
+                        availability: Availability::Required,
+                    }))
+                    .service(expected_service_decl.clone())
                     .add_lazy_child("c")
                     .add_lazy_child("d")
                     .build(),
@@ -2378,11 +2390,17 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                         <<T as RoutingTestModelBuilder>::Model as RoutingTestModel>::C,
                     >::AnonymizedAggregate {
                         capability: AggregateCapability::Service(name),
+                        members,
                         ..
                     },
                 relative_path,
             } if relative_path == PathBuf::new() => {
                 assert_eq!(name, "foo");
+                assert_eq!(members.len(), 3);
+                for c in [AggregateMember::Child("c".try_into().unwrap()), AggregateMember::Parent,
+                AggregateMember::Self_] {
+                    assert!(members.contains(&c));
+                }
             }
             _ => panic!("bad capability source"),
         }
