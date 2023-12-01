@@ -61,8 +61,6 @@ syslog_visibility_allowlist += [ "//build/sdk:sdk_versioned_shared_libraries" ]
 
 syslog_static_visibility_allowlist = [ "//src/devices/tests/fx-logger:*" ]
 
-syslog_static_visibility_allowlist += [ "//third_party/*" ]
-
 # Syslog code can depend on syslog-static.
 syslog_static_visibility_allowlist += [ "//zircon/system/ulib/syslog:*" ]
 
