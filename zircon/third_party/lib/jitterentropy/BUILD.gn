@@ -6,8 +6,11 @@ import("//build/zircon/zircon_cpu.gni")
 import("//build/zircon/zx_library.gni")
 
 zx_library("jitterentropy") {
-  sources = [ "jitterentropy-base.c" ]
-  include_dirs = [ "arch/$zircon_cpu" ]
+  sources = [
+    "arch/$zircon_cpu/internal.cc",
+    "jitterentropy-base.c",
+  ]
+  include_dirs = [ "arch" ]
   deps = [ "//zircon/kernel/lib/arch" ]
 
   # According to its documentation, jitterentropy must be compiled at
