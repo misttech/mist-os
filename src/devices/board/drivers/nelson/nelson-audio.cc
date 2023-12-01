@@ -174,48 +174,38 @@ zx_status_t Nelson::AudioInit() {
       }},
   };
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
-  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
-  };
-
-  auto config_out = [](uint8_t output_value) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(output_value);
-  };
-
   auto sleep = [&arena = gpio_init_arena_](zx::duration delay) {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());
   };
 
   // TDM pin assignments.
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_SCLK, set_alt_function(S905D3_GPIOA_1_TDMB_SCLK_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_FS, set_alt_function(S905D3_GPIOA_2_TDMB_FS_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_DO0, set_alt_function(S905D3_GPIOA_3_TDMB_D0_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_SCLK, GpioSetAltFunction(S905D3_GPIOA_1_TDMB_SCLK_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_FS, GpioSetAltFunction(S905D3_GPIOA_2_TDMB_FS_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_DO0, GpioSetAltFunction(S905D3_GPIOA_3_TDMB_D0_FN)});
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_SCLK, set_drive_strength(ua)});
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_FS, set_drive_strength(ua)});
-  gpio_init_steps_.push_back({GPIO_SOC_I2S_DO0, set_drive_strength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_SCLK, GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_FS, GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_I2S_DO0, GpioSetDriveStrength(ua)});
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_IN, set_alt_function(S905D3_GPIOX_8_TDMA_DIN1_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_OUT, set_alt_function(S905D3_GPIOX_9_TDMA_D0_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_SYNC, set_alt_function(S905D3_GPIOX_10_TDMA_FS_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_CLK, set_alt_function(S905D3_GPIOX_11_TDMA_SCLK_FN)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_OUT, set_drive_strength(ua)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_SYNC, set_drive_strength(ua)});
-  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_CLK, set_drive_strength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_IN, GpioSetAltFunction(S905D3_GPIOX_8_TDMA_DIN1_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_OUT, GpioSetAltFunction(S905D3_GPIOX_9_TDMA_D0_FN)});
+  gpio_init_steps_.push_back(
+      {GPIO_SOC_BT_PCM_SYNC, GpioSetAltFunction(S905D3_GPIOX_10_TDMA_FS_FN)});
+  gpio_init_steps_.push_back(
+      {GPIO_SOC_BT_PCM_CLK, GpioSetAltFunction(S905D3_GPIOX_11_TDMA_SCLK_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_OUT, GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_SYNC, GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({GPIO_SOC_BT_PCM_CLK, GpioSetDriveStrength(ua)});
 #endif
 
   // PDM pin assignments
-  gpio_init_steps_.push_back({GPIO_SOC_MIC_DCLK, set_alt_function(S905D3_GPIOA_7_PDM_DCLK_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_MIC_DCLK, GpioSetAltFunction(S905D3_GPIOA_7_PDM_DCLK_FN)});
   // First 2 MICs.
-  gpio_init_steps_.push_back({GPIO_SOC_MICLR_DIN0, set_alt_function(S905D3_GPIOA_8_PDM_DIN0_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_MICLR_DIN0, GpioSetAltFunction(S905D3_GPIOA_8_PDM_DIN0_FN)});
   // Third MIC.
-  gpio_init_steps_.push_back({GPIO_SOC_MICLR_DIN1, set_alt_function(S905D3_GPIOA_9_PDM_DIN1_FN)});
+  gpio_init_steps_.push_back({GPIO_SOC_MICLR_DIN1, GpioSetAltFunction(S905D3_GPIOA_9_PDM_DIN1_FN)});
 
   // Board info.
   fidl::Arena<> fidl_arena;
@@ -276,8 +266,8 @@ zx_status_t Nelson::AudioInit() {
   controller_out.metadata() = tdm_metadata;
 
   // CODEC pin assignments.
-  gpio_init_steps_.push_back({GPIO_INRUSH_EN_SOC, set_alt_function(0)});  // BOOST_EN_SOC as GPIO.
-  gpio_init_steps_.push_back({GPIO_INRUSH_EN_SOC, config_out(1)});        // BOOST_EN_SOC to high.
+  gpio_init_steps_.push_back({GPIO_INRUSH_EN_SOC, GpioSetAltFunction(0)});  // BOOST_EN_SOC as GPIO.
+  gpio_init_steps_.push_back({GPIO_INRUSH_EN_SOC, GpioConfigOut(1)});       // BOOST_EN_SOC to high.
   // From the TAS5805m codec reference manual:
   // "9.5.3.1 Startup Procedures
   // 1. Configure ADR/FAULT pin with proper settings for I2C device address.
@@ -290,7 +280,7 @@ zx_status_t Nelson::AudioInit() {
   // state.
   // 6. The device is now in normal operation."
   // Step 3 PDN setup and 5ms delay is executed below.
-  gpio_init_steps_.push_back({GPIO_SOC_AUDIO_EN, config_out(1)});  // Set PDN_N to high.
+  gpio_init_steps_.push_back({GPIO_SOC_AUDIO_EN, GpioConfigOut(1)});  // Set PDN_N to high.
   gpio_init_steps_.push_back({GPIO_SOC_AUDIO_EN, sleep(zx::msec(5))});
   // I2S clocks are configured by the controller and the rest of the initialization is done
   // in the codec itself.

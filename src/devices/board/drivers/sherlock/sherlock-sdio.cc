@@ -155,17 +155,13 @@ zx_status_t Sherlock::SdioInit() {
   sdio_dev.irq() = sd_emmc_irqs;
   sdio_dev.metadata() = sd_emmc_metadata;
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
   // Configure eMMC-SD soc pads.
-  gpio_init_steps_.push_back({T931_SDIO_D0, set_alt_function(T931_SDIO_D0_FN)});
-  gpio_init_steps_.push_back({T931_SDIO_D1, set_alt_function(T931_SDIO_D1_FN)});
-  gpio_init_steps_.push_back({T931_SDIO_D2, set_alt_function(T931_SDIO_D2_FN)});
-  gpio_init_steps_.push_back({T931_SDIO_D3, set_alt_function(T931_SDIO_D3_FN)});
-  gpio_init_steps_.push_back({T931_SDIO_CLK, set_alt_function(T931_SDIO_CLK_FN)});
-  gpio_init_steps_.push_back({T931_SDIO_CMD, set_alt_function(T931_SDIO_CMD_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D0, GpioSetAltFunction(T931_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D1, GpioSetAltFunction(T931_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D2, GpioSetAltFunction(T931_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_D3, GpioSetAltFunction(T931_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_CLK, GpioSetAltFunction(T931_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({T931_SDIO_CMD, GpioSetAltFunction(T931_SDIO_CMD_FN)});
 
   zx::unowned_resource res(get_mmio_resource(parent()));
   zx::vmo vmo;
@@ -193,8 +189,8 @@ zx_status_t Sherlock::SdioInit() {
       .set_gpiox_5_select(PadDsReg2A::kDriveStrengthMax)
       .WriteTo(&(*buf));
 
-  gpio_init_steps_.push_back({T931_WIFI_REG_ON, set_alt_function(T931_WIFI_REG_ON_FN)});
-  gpio_init_steps_.push_back({T931_WIFI_HOST_WAKE, set_alt_function(T931_WIFI_HOST_WAKE_FN)});
+  gpio_init_steps_.push_back({T931_WIFI_REG_ON, GpioSetAltFunction(T931_WIFI_REG_ON_FN)});
+  gpio_init_steps_.push_back({T931_WIFI_HOST_WAKE, GpioSetAltFunction(T931_WIFI_HOST_WAKE_FN)});
 
   fdf::Arena sdio_arena('SDIO');
   auto result = pbus_.buffer(sdio_arena)

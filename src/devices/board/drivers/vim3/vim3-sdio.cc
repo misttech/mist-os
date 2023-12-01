@@ -117,38 +117,27 @@ zx_status_t Vim3::SdioInit() {
   sdio_dev.metadata() = sdio_metadata;
 
   using fuchsia_hardware_gpio::GpioFlags;
-  auto config_in = [](GpioFlags input_flags) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithInputFlags(input_flags);
-  };
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
+  gpio_init_steps_.push_back({A311D_SDIO_D0, GpioConfigIn(GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({A311D_SDIO_D1, GpioConfigIn(GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({A311D_SDIO_D2, GpioConfigIn(GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({A311D_SDIO_D3, GpioConfigIn(GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({A311D_SDIO_CLK, GpioConfigIn(GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({A311D_SDIO_CMD, GpioConfigIn(GpioFlags::kNoPull)});
 
-  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
-  };
+  gpio_init_steps_.push_back({A311D_SDIO_D0, GpioSetAltFunction(A311D_GPIOX_0_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({A311D_SDIO_D1, GpioSetAltFunction(A311D_GPIOX_1_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({A311D_SDIO_D2, GpioSetAltFunction(A311D_GPIOX_2_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({A311D_SDIO_D3, GpioSetAltFunction(A311D_GPIOX_3_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({A311D_SDIO_CLK, GpioSetAltFunction(A311D_GPIOX_4_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({A311D_SDIO_CMD, GpioSetAltFunction(A311D_GPIOX_5_SDIO_CMD_FN)});
 
-  gpio_init_steps_.push_back({A311D_SDIO_D0, config_in(GpioFlags::kNoPull)});
-  gpio_init_steps_.push_back({A311D_SDIO_D1, config_in(GpioFlags::kNoPull)});
-  gpio_init_steps_.push_back({A311D_SDIO_D2, config_in(GpioFlags::kNoPull)});
-  gpio_init_steps_.push_back({A311D_SDIO_D3, config_in(GpioFlags::kNoPull)});
-  gpio_init_steps_.push_back({A311D_SDIO_CLK, config_in(GpioFlags::kNoPull)});
-  gpio_init_steps_.push_back({A311D_SDIO_CMD, config_in(GpioFlags::kNoPull)});
-
-  gpio_init_steps_.push_back({A311D_SDIO_D0, set_alt_function(A311D_GPIOX_0_SDIO_D0_FN)});
-  gpio_init_steps_.push_back({A311D_SDIO_D1, set_alt_function(A311D_GPIOX_1_SDIO_D1_FN)});
-  gpio_init_steps_.push_back({A311D_SDIO_D2, set_alt_function(A311D_GPIOX_2_SDIO_D2_FN)});
-  gpio_init_steps_.push_back({A311D_SDIO_D3, set_alt_function(A311D_GPIOX_3_SDIO_D3_FN)});
-  gpio_init_steps_.push_back({A311D_SDIO_CLK, set_alt_function(A311D_GPIOX_4_SDIO_CLK_FN)});
-  gpio_init_steps_.push_back({A311D_SDIO_CMD, set_alt_function(A311D_GPIOX_5_SDIO_CMD_FN)});
-
-  gpio_init_steps_.push_back({A311D_SDIO_D0, set_drive_strength(4'000)});
-  gpio_init_steps_.push_back({A311D_SDIO_D1, set_drive_strength(4'000)});
-  gpio_init_steps_.push_back({A311D_SDIO_D2, set_drive_strength(4'000)});
-  gpio_init_steps_.push_back({A311D_SDIO_D3, set_drive_strength(4'000)});
-  gpio_init_steps_.push_back({A311D_SDIO_CLK, set_drive_strength(4'000)});
-  gpio_init_steps_.push_back({A311D_SDIO_CMD, set_drive_strength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_D0, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_D1, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_D2, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_D3, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_CLK, GpioSetDriveStrength(4'000)});
+  gpio_init_steps_.push_back({A311D_SDIO_CMD, GpioSetDriveStrength(4'000)});
 
   fdf::Arena sdio_arena('SDIO');
   auto result =

@@ -144,28 +144,20 @@ zx_status_t Nelson::SdioInit() {
   sd_emmc_dev.bti() = sd_emmc_btis;
   sd_emmc_dev.metadata() = sd_emmc_metadata;
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D0, GpioSetAltFunction(S905D3_WIFI_SDIO_D0_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D1, GpioSetAltFunction(S905D3_WIFI_SDIO_D1_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D2, GpioSetAltFunction(S905D3_WIFI_SDIO_D2_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D3, GpioSetAltFunction(S905D3_WIFI_SDIO_D3_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CLK, GpioSetAltFunction(S905D3_WIFI_SDIO_CLK_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CMD, GpioSetAltFunction(S905D3_WIFI_SDIO_CMD_FN)});
+  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_WAKE_HOST, GpioSetAltFunction(0)});
 
-  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
-  };
-
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D0, set_alt_function(S905D3_WIFI_SDIO_D0_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D1, set_alt_function(S905D3_WIFI_SDIO_D1_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D2, set_alt_function(S905D3_WIFI_SDIO_D2_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_D3, set_alt_function(S905D3_WIFI_SDIO_D3_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CLK, set_alt_function(S905D3_WIFI_SDIO_CLK_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_CMD, set_alt_function(S905D3_WIFI_SDIO_CMD_FN)});
-  gpio_init_steps_.push_back({S905D3_WIFI_SDIO_WAKE_HOST, set_alt_function(0)});
-
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D0, set_drive_strength(4000)});
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D1, set_drive_strength(4000)});
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D2, set_drive_strength(4000)});
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D3, set_drive_strength(4000)});
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CLK, set_drive_strength(4000)});
-  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CMD, set_drive_strength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D0, GpioSetDriveStrength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D1, GpioSetDriveStrength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D2, GpioSetDriveStrength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_D3, GpioSetDriveStrength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CLK, GpioSetDriveStrength(4000)});
+  gpio_init_steps_.push_back({GPIO_SOC_WIFI_SDIO_CMD, GpioSetDriveStrength(4000)});
 
   fdf::Arena sdio_arena('SDIO');
   auto result =

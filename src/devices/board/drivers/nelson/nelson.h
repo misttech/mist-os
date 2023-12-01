@@ -155,6 +155,23 @@ class Nelson : public NelsonType {
   zx_status_t EnableWifi32K(void);
   zx_status_t SdEmmcConfigurePortB(void);
 
+  static fuchsia_hardware_gpioimpl::wire::InitCall GpioConfigIn(
+      fuchsia_hardware_gpio::GpioFlags flags) {
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithInputFlags(flags);
+  }
+
+  static fuchsia_hardware_gpioimpl::wire::InitCall GpioConfigOut(uint8_t initial_value) {
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(initial_value);
+  }
+
+  fuchsia_hardware_gpioimpl::wire::InitCall GpioSetAltFunction(uint64_t function) {
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(gpio_init_arena_, function);
+  }
+
+  fuchsia_hardware_gpioimpl::wire::InitCall GpioSetDriveStrength(uint64_t ds_ua) {
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(gpio_init_arena_, ds_ua);
+  }
+
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   ddk::IommuProtocolClient iommu_;

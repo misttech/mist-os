@@ -202,20 +202,16 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Sherlock::I2cInit() {
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
   // setup pinmux for our I2C busses
   // i2c_ao_0
-  gpio_init_steps_.push_back({T931_GPIOAO(2), set_alt_function(1)});
-  gpio_init_steps_.push_back({T931_GPIOAO(3), set_alt_function(1)});
+  gpio_init_steps_.push_back({T931_GPIOAO(2), GpioSetAltFunction(1)});
+  gpio_init_steps_.push_back({T931_GPIOAO(3), GpioSetAltFunction(1)});
   // i2c2
-  gpio_init_steps_.push_back({T931_GPIOZ(14), set_alt_function(3)});
-  gpio_init_steps_.push_back({T931_GPIOZ(15), set_alt_function(3)});
+  gpio_init_steps_.push_back({T931_GPIOZ(14), GpioSetAltFunction(3)});
+  gpio_init_steps_.push_back({T931_GPIOZ(15), GpioSetAltFunction(3)});
   // i2c3
-  gpio_init_steps_.push_back({T931_GPIOA(14), set_alt_function(2)});
-  gpio_init_steps_.push_back({T931_GPIOA(15), set_alt_function(2)});
+  gpio_init_steps_.push_back({T931_GPIOA(14), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({T931_GPIOA(15), GpioSetAltFunction(2)});
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

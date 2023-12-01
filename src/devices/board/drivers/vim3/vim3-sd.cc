@@ -98,16 +98,12 @@ zx_status_t Vim3::SdInit() {
   sd_dev.bti() = sd_btis;
   sd_dev.metadata() = sd_metadata;
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
-  gpio_init_steps_.push_back({A311D_GPIOC(0), set_alt_function(A311D_GPIOC_0_SDCARD_D0_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOC(1), set_alt_function(A311D_GPIOC_1_SDCARD_D1_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOC(2), set_alt_function(A311D_GPIOC_2_SDCARD_D2_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOC(3), set_alt_function(A311D_GPIOC_3_SDCARD_D3_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOC(4), set_alt_function(A311D_GPIOC_4_SDCARD_CLK_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOC(5), set_alt_function(A311D_GPIOC_5_SDCARD_CMD_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(0), GpioSetAltFunction(A311D_GPIOC_0_SDCARD_D0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(1), GpioSetAltFunction(A311D_GPIOC_1_SDCARD_D1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(2), GpioSetAltFunction(A311D_GPIOC_2_SDCARD_D2_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(3), GpioSetAltFunction(A311D_GPIOC_3_SDCARD_D3_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(4), GpioSetAltFunction(A311D_GPIOC_4_SDCARD_CLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOC(5), GpioSetAltFunction(A311D_GPIOC_5_SDCARD_CMD_FN)});
 
   fdf::Arena arena('SD__');
   auto result = pbus_.buffer(arena)->AddCompositeImplicitPbusFragment(

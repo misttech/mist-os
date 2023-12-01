@@ -160,51 +160,39 @@ zx_status_t Astro::AudioInit() {
     return status;
   }
 
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
-  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
-  };
-
-  auto config_out = [](uint8_t output_value) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithOutputValue(output_value);
-  };
-
   auto sleep = [&arena = gpio_init_arena_](zx::duration delay) {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());
   };
 
   // TDM pin assignments
-  gpio_init_steps_.push_back({S905D2_GPIOA(1), set_alt_function(S905D2_GPIOA_1_TDMB_SCLK_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(2), set_alt_function(S905D2_GPIOA_2_TDMB_FS_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(3), set_alt_function(S905D2_GPIOA_3_TDMB_D0_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(6), set_alt_function(S905D2_GPIOA_6_TDMB_DIN3_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(1), GpioSetAltFunction(S905D2_GPIOA_1_TDMB_SCLK_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(2), GpioSetAltFunction(S905D2_GPIOA_2_TDMB_FS_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(3), GpioSetAltFunction(S905D2_GPIOA_3_TDMB_D0_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(6), GpioSetAltFunction(S905D2_GPIOA_6_TDMB_DIN3_FN)});
   constexpr uint64_t ua = 3000;
-  gpio_init_steps_.push_back({S905D2_GPIOA(1), set_drive_strength(ua)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(2), set_drive_strength(ua)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(3), set_drive_strength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(1), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(2), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(3), GpioSetDriveStrength(ua)});
 
 #ifdef ENABLE_BT
   // PCM pin assignments.
-  gpio_init_steps_.push_back({S905D2_GPIOX(8), set_alt_function(S905D2_GPIOX_8_TDMA_DIN1_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(9), set_alt_function(S905D2_GPIOX_9_TDMA_D0_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(10), set_alt_function(S905D2_GPIOX_10_TDMA_FS_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(11), set_alt_function(S905D2_GPIOX_11_TDMA_SCLK_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(9), set_drive_strength(ua)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(10), set_drive_strength(ua)});
-  gpio_init_steps_.push_back({S905D2_GPIOX(11), set_drive_strength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(8), GpioSetAltFunction(S905D2_GPIOX_8_TDMA_DIN1_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(9), GpioSetAltFunction(S905D2_GPIOX_9_TDMA_D0_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(10), GpioSetAltFunction(S905D2_GPIOX_10_TDMA_FS_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(11), GpioSetAltFunction(S905D2_GPIOX_11_TDMA_SCLK_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(9), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(10), GpioSetDriveStrength(ua)});
+  gpio_init_steps_.push_back({S905D2_GPIOX(11), GpioSetDriveStrength(ua)});
 #endif
 
   // PDM pin assignments
-  gpio_init_steps_.push_back({S905D2_GPIOA(7), set_alt_function(S905D2_GPIOA_7_PDM_DCLK_FN)});
-  gpio_init_steps_.push_back({S905D2_GPIOA(8), set_alt_function(S905D2_GPIOA_8_PDM_DIN0_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(7), GpioSetAltFunction(S905D2_GPIOA_7_PDM_DCLK_FN)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(8), GpioSetAltFunction(S905D2_GPIOA_8_PDM_DIN0_FN)});
 
   // Hardware Reset of the codec.
-  gpio_init_steps_.push_back({S905D2_GPIOA(5), config_out(0)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(5), GpioConfigOut(0)});
   gpio_init_steps_.push_back({S905D2_GPIOA(5), sleep(zx::msec(1))});
-  gpio_init_steps_.push_back({S905D2_GPIOA(5), config_out(1)});
+  gpio_init_steps_.push_back({S905D2_GPIOA(5), GpioConfigOut(1)});
 
   // Output devices.
 #ifdef ENABLE_BT

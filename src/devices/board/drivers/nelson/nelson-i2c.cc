@@ -234,31 +234,23 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Nelson::I2cInit() {
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
-  auto set_drive_strength = [&arena = gpio_init_arena_](uint64_t drive_strength_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(arena, drive_strength_ua);
-  };
-
   // setup pinmux for our I2C busses
 
   // i2c_ao_0
-  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, set_alt_function(1)});
-  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, set_drive_strength(2500)});
-  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, set_alt_function(1)});
-  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, set_drive_strength(2500)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, GpioSetAltFunction(1)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SCL, GpioSetDriveStrength(2500)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, GpioSetAltFunction(1)});
+  gpio_init_steps_.push_back({GPIO_SOC_SENSORS_I2C_SDA, GpioSetDriveStrength(2500)});
   // i2c2
-  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, set_alt_function(3)});
-  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, set_drive_strength(3000)});
-  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, set_alt_function(3)});
-  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, set_drive_strength(3000)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, GpioSetAltFunction(3)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SDA, GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, GpioSetAltFunction(3)});
+  gpio_init_steps_.push_back({GPIO_SOC_TOUCH_I2C_SCL, GpioSetDriveStrength(3000)});
   // i2c3
-  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, set_alt_function(2)});
-  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, set_drive_strength(3000)});
-  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, set_alt_function(2)});
-  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, set_drive_strength(3000)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SDA, GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({GPIO_SOC_AV_I2C_SCL, GpioSetDriveStrength(3000)});
 
   for (const auto& bus : buses) {
     AddI2cBus(bus, pbus_);

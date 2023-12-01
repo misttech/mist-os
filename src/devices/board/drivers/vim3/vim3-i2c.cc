@@ -191,18 +191,16 @@ zx_status_t AddI2cBus(const I2cBus& bus,
 }
 
 zx_status_t Vim3::I2cInit() {
-  auto set_alt_function = [&arena = gpio_init_arena_](uint64_t alt_function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(arena, alt_function);
-  };
-
   // AO
-  gpio_init_steps_.push_back({A311D_GPIOAO(2), set_alt_function(A311D_GPIOAO_2_M0_SCL_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOAO(3), set_alt_function(A311D_GPIOAO_3_M0_SDA_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOAO(2), GpioSetAltFunction(A311D_GPIOAO_2_M0_SCL_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOAO(3), GpioSetAltFunction(A311D_GPIOAO_3_M0_SDA_FN)});
 
   // EE - M3
   // Used on J13(pins 3,4), M.2 socket(pins 40,42), and J4(pins 22,23)
-  gpio_init_steps_.push_back({A311D_GPIOA(15), set_alt_function(A311D_GPIOA_15_I2C_EE_M3_SCL_FN)});
-  gpio_init_steps_.push_back({A311D_GPIOA(14), set_alt_function(A311D_GPIOA_14_I2C_EE_M3_SDA_FN)});
+  gpio_init_steps_.push_back(
+      {A311D_GPIOA(15), GpioSetAltFunction(A311D_GPIOA_15_I2C_EE_M3_SCL_FN)});
+  gpio_init_steps_.push_back(
+      {A311D_GPIOA(14), GpioSetAltFunction(A311D_GPIOA_14_I2C_EE_M3_SDA_FN)});
 
   for (const I2cBus& bus : kBuses) {
     AddI2cBus(bus, pbus_);
