@@ -22,6 +22,7 @@ use fuchsia_async::{DurationExt as _, TimeoutExt as _};
 use fuchsia_zircon as zx;
 
 use anyhow::Context as _;
+use assert_matches::assert_matches;
 use const_unwrap::const_unwrap_option;
 use fidl::endpoints::Proxy as _;
 use futures::{
@@ -268,9 +269,18 @@ async fn test_install_only_no_provisioning<M: Manager, N: Netstack>(name: &str) 
     .await;
 }
 
-/// Tests that stable interface name conflicts are handled gracefully.
+// A simplified version of an `fnet_interfaces_ext::Event` for
+// tracking only added and removed events.
+#[derive(Debug)]
+enum InterfaceWatcherEvent {
+    Added { id: u64, name: String },
+    Removed { id: u64 },
+}
+
+/// Tests that when two interfaces are added with the same PersistentIdentifier,
+/// that the first interface is removed prior to adding the second interface.
 #[netstack_test]
-async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
+async fn test_oir_interface_name_conflict_uninstall_existing<M: Manager, N: Netstack>(name: &str) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
@@ -306,10 +316,12 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
             )
             | fidl_fuchsia_net_interfaces::Event::Existing(
                 fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            ) => Some((id.expect("missing interface ID"), name.expect("missing interface name"))),
+            ) => Some(InterfaceWatcherEvent::Added {
+                id: id.expect("missing interface ID"),
+                name: name.expect("missing interface name"),
+            }),
             fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                let _: u64 = id;
-                None
+                Some(InterfaceWatcherEvent::Removed { id })
             }
             fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
             | fidl_fuchsia_net_interfaces::Event::Changed(
@@ -324,7 +336,10 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
     .fuse();
     futures::pin_mut!(interfaces_stream);
     // Observe the initially existing loopback interface.
-    let _: (u64, String) = interfaces_stream.select_next_some().await;
+    assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id: _, name: _ }
+    );
 
     // Add a device to the realm and wait for it to be added to the netstack.
     //
@@ -332,57 +347,55 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
     // Using the same MAC address for different devices will result in the same
     // interface name.
     let mac = || Some(fnet::MacAddress { octets: [2, 3, 4, 5, 6, 7] });
-    let ethx7 = sandbox
-        .create_endpoint_with("ep1", netemul::new_endpoint_config(1500, mac()))
+    let if1 = sandbox
+        .create_endpoint_with("ep1", netemul::new_endpoint_config(netemul::DEFAULT_MTU, mac()))
         .await
         .expect("create ethx7");
     let endpoint_mount_path = netemul::devfs_device_path("ep1");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&ethx7, endpoint_mount_path).await.unwrap_or_else(|e| {
+    let () = realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
     });
 
-    let (id_ethx7, name_ethx7) = interfaces_stream.select_next_some().await;
+    let (id1, name1) = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id, name } => (id, name)
+    );
     assert_eq!(
-        &name_ethx7, "ethx7",
+        &name1, "ethx7",
         "first interface should use a stable name based on its MAC address"
     );
 
-    // Create an interface that the network manager does not know about that will cause a
-    // name conflict with the first temporary name.
-    let name = "etht0";
-    let etht0 = sandbox.create_endpoint(name).await.expect("create eth0");
-    let etht0 = etht0
-        .into_interface_in_realm_with_name(
-            &realm,
-            netemul::InterfaceConfig { name: Some(name.into()), ..Default::default() },
-        )
-        .await
-        .expect("install interface");
-    let netstack_id_etht0 = etht0.id();
-
-    let (id_etht0, name_etht0) = interfaces_stream.select_next_some().await;
-    assert_eq!(id_etht0, u64::from(netstack_id_etht0));
-    assert_eq!(&name_etht0, "etht0");
-
     // Add another device from the network manager with the same MAC address and wait for it
-    // to be added to the netstack. Its first two attempts at adding a name should conflict
-    // with the above two devices.
-    let etht1 = sandbox
-        .create_endpoint_with("ep2", netemul::new_endpoint_config(1500, mac()))
+    // to be added to the netstack. Since the device has the same persistent identifier, the
+    // first interface should be removed prior to adding the second interface. The second
+    // interface should have the same name as the first.
+    let if2 = sandbox
+        .create_endpoint_with("ep2", netemul::new_endpoint_config(netemul::DEFAULT_MTU, mac()))
         .await
-        .expect("create etht1");
+        .expect("create ethx7");
     let endpoint_mount_path = netemul::devfs_device_path("ep2");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&etht1, endpoint_mount_path).await.unwrap_or_else(|e| {
+    let () = realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
     });
-    let (id_etht1, name_etht1) = interfaces_stream.select_next_some().await;
-    assert_ne!(id_ethx7, id_etht1, "interface IDs should be different");
-    assert_ne!(id_etht0, id_etht1, "interface IDs should be different");
+
+    let id_removed = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Removed { id } => id
+    );
     assert_eq!(
-        &name_etht1, "etht1",
-        "second interface from network manager should use a temporary name"
+        id_removed, id1,
+        "the initial interface should be removed prior to adding the second interface"
+    );
+
+    let (_id2, name2) = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id, name } => (id, name)
+    );
+    assert_eq!(
+        &name1, &name2,
+        "second interface should use the same name as the initial interface"
     );
 
     // Wait for orderly shutdown of the test realm to complete before allowing
@@ -394,12 +407,18 @@ async fn test_oir_interface_name_conflict<M: Manager, N: Netstack>(name: &str) {
     let () = realm.shutdown().await.expect("failed to shutdown realm");
 }
 
-/// Tests that stable interface name conflicts are handled gracefully.
-/// Different from `test_oir_interface_name_conflict` in that this test
-/// adds two interfaces that are both known by netcfg, and attempt to
-/// use the same name for both.
+/// Tests that when a conflicting interface already exists with the same name,
+/// that the new interface is rejected by Netcfg and not installed.
+/// The conflicting interface is either an interface installed through Netstack
+/// directly and not managed by the Netstack, or managed by Netcfg with a
+/// different PersistentIdentifier and the same name.
 #[netstack_test]
-async fn test_oir_interface_name_conflict_known_by_netcfg<M: Manager, N: Netstack>(name: &str) {
+#[test_case(true; "netcfg_managed")]
+#[test_case(false; "not_netcfg_managed")]
+async fn test_oir_interface_name_conflict_reject<M: Manager, N: Netstack>(
+    name: &str,
+    is_conflicting_iface_netcfg_managed: bool,
+) {
     let sandbox = netemul::TestSandbox::new().expect("create sandbox");
     let realm = sandbox
         .create_netstack_realm_with::<N, _, _>(
@@ -408,8 +427,6 @@ async fn test_oir_interface_name_conflict_known_by_netcfg<M: Manager, N: Netstac
                 KnownServiceProvider::Manager {
                     agent: M::MANAGEMENT_AGENT,
                     use_dhcp_server: false,
-                    // Use a ManagerConfig that prescribes for each interface
-                    // installed by netcfg to have the same name.
                     config: ManagerConfig::DuplicateNames,
                 },
                 KnownServiceProvider::DnsResolver,
@@ -437,10 +454,12 @@ async fn test_oir_interface_name_conflict_known_by_netcfg<M: Manager, N: Netstac
             )
             | fidl_fuchsia_net_interfaces::Event::Existing(
                 fidl_fuchsia_net_interfaces::Properties { id, name, .. },
-            ) => Some((id.expect("missing interface ID"), name.expect("missing interface name"))),
+            ) => Some(InterfaceWatcherEvent::Added {
+                id: id.expect("missing interface ID"),
+                name: name.expect("missing interface name"),
+            }),
             fidl_fuchsia_net_interfaces::Event::Removed(id) => {
-                let _: u64 = id;
-                None
+                Some(InterfaceWatcherEvent::Removed { id })
             }
             fidl_fuchsia_net_interfaces::Event::Idle(fidl_fuchsia_net_interfaces::Empty {})
             | fidl_fuchsia_net_interfaces::Event::Changed(
@@ -455,34 +474,70 @@ async fn test_oir_interface_name_conflict_known_by_netcfg<M: Manager, N: Netstac
     .fuse();
     futures::pin_mut!(interfaces_stream);
     // Observe the initially existing loopback interface.
-    let _: (u64, String) = interfaces_stream.select_next_some().await;
+    assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id: _, name: _ }
+    );
 
-    // Add a device to the realm and wait for it to be added to the netstack.
-    // All interfaces installed through the netstack should have a name of "x".
-    let if_x = sandbox.create_endpoint("ep1").await.expect("create x");
-    let endpoint_mount_path = netemul::devfs_device_path("ep1");
-    let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&if_x, endpoint_mount_path).await.unwrap_or_else(|e| {
-        panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
-    });
+    let _if1 = if is_conflicting_iface_netcfg_managed {
+        // Add a device to the realm for it to be discovered by Netcfg
+        // then added to the netstack. All interfaces installed through the
+        // Netcfg should have a name of "x".
+        const MAC1: Option<fnet::MacAddress> =
+            Some(fnet::MacAddress { octets: [2, 3, 4, 5, 6, 8] });
+        let if1 = sandbox
+            .create_endpoint_with("ep1", netemul::new_endpoint_config(netemul::DEFAULT_MTU, MAC1))
+            .await
+            .expect("create x");
+        let endpoint_mount_path = netemul::devfs_device_path("ep1");
+        let endpoint_mount_path = endpoint_mount_path.as_path();
+        let () = realm.add_virtual_device(&if1, endpoint_mount_path).await.unwrap_or_else(|e| {
+            panic!("add virtual device1 {}: {:?}", endpoint_mount_path.display(), e)
+        });
+        either::Either::Left(if1)
+    } else {
+        // Create an interface that the network manager does not know about that will conflict
+        // with the name generated for the second device.
+        let name = "x";
+        let if1 = sandbox.create_endpoint(name).await.expect("create x");
+        let if1 = if1
+            .into_interface_in_realm_with_name(
+                &realm,
+                netemul::InterfaceConfig { name: Some(name.into()), ..Default::default() },
+            )
+            .await
+            .expect("install interface");
+        either::Either::Right(if1)
+    };
 
-    let (id_if_x, name_if_x) = interfaces_stream.select_next_some().await;
-    assert_eq!(&name_if_x, "x", "first interface should use the configuration based static name");
+    // The device should have been installed into the Netstack.
+    let (_id1, name1) = assert_matches!(
+        interfaces_stream.select_next_some().await,
+        InterfaceWatcherEvent::Added { id, name } => (id, name)
+    );
+    assert_eq!(&name1, "x", "first interface should use the configuration based static name");
 
-    // Add another device from the network manager with the same name and
-    // ensure that the component continues to run.
-    let if_other = sandbox.create_endpoint("ep2").await.expect("create other");
+    // The following device should attempt to use the same name as the previous interface.
+    const MAC2: Option<fnet::MacAddress> = Some(fnet::MacAddress { octets: [2, 3, 4, 5, 6, 7] });
+    let if2 = sandbox
+        .create_endpoint_with("ep2", netemul::new_endpoint_config(netemul::DEFAULT_MTU, MAC2))
+        .await
+        .expect("create x");
     let endpoint_mount_path = netemul::devfs_device_path("ep2");
     let endpoint_mount_path = endpoint_mount_path.as_path();
-    let () = realm.add_virtual_device(&if_other, endpoint_mount_path).await.unwrap_or_else(|e| {
+    let () = realm.add_virtual_device(&if2, endpoint_mount_path).await.unwrap_or_else(|e| {
         panic!("add virtual device2 {}: {:?}", endpoint_mount_path.display(), e)
     });
 
-    // TODO(fxbug.dev/56559): Update this assertion once Netcfg's temporary
-    // naming policy is removed.
-    let (id, name) = interfaces_stream.select_next_some().await;
-    assert_ne!(id, id_if_x);
-    assert_eq!(&name, "etht0", "second interface from network manager should use a temporary name");
+    // No interfaces should be added or removed as a result of this new device.
+    // The existing interface that is not managed by Netcfg will not be removed
+    // since it is not Netcfg-managed. The interface that is managed by
+    // Netcfg will not be removed due to having a different MAC address, which
+    // produces a different PersistentIdentifier.
+    assert_matches::assert_matches!(
+        interfaces_stream.next().on_timeout(ASYNC_EVENT_NEGATIVE_CHECK_TIMEOUT, || None).await,
+        None
+    );
 
     // Wait for orderly shutdown of the test realm to complete before allowing
     // test interfaces to be cleaned up.
