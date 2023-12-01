@@ -13,10 +13,32 @@ const CONGRATULATIONS = [
   'Great job!', 'Well done!', 'Nailed it!', 'Nice!', 'GG!', '👏👏👏', '🎉🎉🎉', '🙌',
   'Sweet!', 'Fantastic!'];
 
+const ACCESS_TOKEN_URL =
+  'https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/rfcbot@fuchsia-infra.iam.gserviceaccount.com:generateAccessToken';
+
+// Returns an OAuth token for rfcbot@fuchsia-infra.iam.gserviceaccount.com,
+// which can be used to post comments to gerrit.
+function getRobotOAuthToken() {
+  const payload = {
+    scope: ['https://www.googleapis.com/auth/gerritcodereview']
+  };
+
+  const response = UrlFetchApp.fetch(ACCESS_TOKEN_URL, {
+    'method': 'post',
+    'contentType': 'application/json',
+    'headers': {
+      // This OAuth token is for the user the script is running as.
+      'Authorization': `Bearer ${ScriptApp.getOAuthToken()}`,
+    },
+    'payload': JSON.stringify(payload),
+  });
+
+  const parsed = JSON.parse(response);
+  return parsed.accessToken;
+}
+
 // Post `message` as a top-level comment to the current revision of `changeId`.
 function _postComment(changeId, message) {
-  const accessToken = ScriptApp.getOAuthToken();
-
   const payload = { message };
 
   var options = {
@@ -27,7 +49,7 @@ function _postComment(changeId, message) {
 
   const response = UrlFetchApp.fetch(GERRIT_API_URL
     + `/a/changes/${changeId}/revisions/current/review?access_token=`
-    + accessToken,
+    + getRobotOAuthToken(),
     options);
 
   console.log("Post comment response: " + response.getResponseCode());
