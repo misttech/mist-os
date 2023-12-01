@@ -6,8 +6,6 @@
 // preconditions:
 //   - saved rbp in (%rsp)
 //   - faulting address in %rax
-// postconditions:
-//   - retq
 //
 // TODO: Is it safe to assume that the hermetic copy function
 // will always have a frame pointer and nothing else on the stack?

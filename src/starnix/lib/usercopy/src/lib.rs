@@ -11,7 +11,7 @@ use fuchsia_zircon as zx;
 use zerocopy::FromBytes;
 use zx::{AsHandleRef, HandleBased, Task};
 
-#[cfg(target_arch = "x86_64")]
+#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
 extern "C" {
     // This function generates a "return" from the usercopy routine with an error.
     fn hermetic_copy_error();
@@ -48,6 +48,48 @@ pub struct Usercopy {
 
     // The range of the restricted address space.
     restricted_address_range: Range<usize>,
+}
+
+/// Parses a fault exception.
+///
+/// Returns `(pc, fault_address)`, where `pc` is the address of the instruction
+/// that triggered the fault and `fault_address` is the address that faulted.
+fn parse_fault_exception(
+    regs: &mut zx::sys::zx_thread_state_general_regs_t,
+    report: zx::sys::zx_exception_report_t,
+) -> (usize, usize) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        let pc = regs.rip as usize;
+        let fault_address = unsafe { report.context.arch.x86_64.cr2 };
+
+        regs.rip = hermetic_copy_error as u64;
+        regs.rax = fault_address;
+
+        (pc, fault_address as usize)
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        let pc = regs.pc as usize;
+        let fault_address = unsafe { report.context.arch.arm_64.far };
+
+        regs.pc = hermetic_copy_error as u64;
+        regs.r[0] = fault_address;
+
+        (pc, fault_address as usize)
+    }
+
+    #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
+    {
+        // Avoid unused errors.
+        let _ = regs;
+        let _ = report;
+
+        unreachable!(
+            "Should not have started usercopy exception thread on unsupported architecture"
+        )
+    }
 }
 
 fn get_hermetic_copy_bin(path: &str) -> Result<Range<usize>, zx::Status> {
@@ -126,7 +168,7 @@ impl Usercopy {
     /// Returns a new instance of `Usercopy` if unified address spaces is
     /// supported on the target architecture.
     pub fn new(restricted_address_range: Range<usize>) -> Result<Option<Self>, zx::Status> {
-        if cfg!(not(target_arch = "x86_64")) {
+        if cfg!(not(any(target_arch = "x86_64", target_arch = "aarch64"))) {
             return Ok(None);
         }
 
@@ -190,35 +232,38 @@ impl Usercopy {
                 }
 
                 let excp = zx::Exception::from_handle(buf.take_handle(0).unwrap());
+                let thread = excp.get_thread().unwrap();
+                let mut regs = thread.read_state_general_regs().unwrap();
+                let report = thread.get_exception_report().unwrap();
 
-                #[cfg(target_arch = "x86_64")]
+                // Get the address of the instruction that triggered the fault and
+                // the address that faulted. Setup the registers such that execution
+                // restarts in the `hermetic_copy_error` method with the faulting
+                // address in the platform-specific register where the first argument
+                // is held.
+                //
+                // Note that even though the registers are modified, the registers
+                // are not written to the thread's CPU until some checks below are
+                // performed.
+                let (pc, fault_address) = parse_fault_exception(&mut regs, report);
+
+                // Only handle faults that occur within the hermetic copy methods.
+                if !hermetic_copy_addr_range.contains(&pc)
+                    && !hermetic_copy_until_null_byte_addr_range.contains(&pc)
                 {
-                    let thread = excp.get_thread().unwrap();
-                    let mut regs = thread.read_state_general_regs().unwrap();
-
-                    let pc = regs.rip as usize;
-                    if !hermetic_copy_addr_range.contains(&pc)
-                        && !hermetic_copy_until_null_byte_addr_range.contains(&pc)
-                    {
-                        continue;
-                    }
-
-                    let report = thread.get_exception_report().unwrap();
-
-                    let fault_address = unsafe { report.context.arch.x86_64.cr2 };
-                    if !faultable_addresses.contains(&(fault_address as usize)) {
-                        continue;
-                    }
-
-                    regs.rip = hermetic_copy_error as u64;
-                    regs.rax = fault_address;
-                    thread.write_state_general_regs(regs).unwrap();
+                    continue;
                 }
 
-                // To avoid unused errors.
-                #[cfg(not(target_arch = "x86_64"))]
-                let _ = faultable_addresses;
+                // Only handle faults if the faulting address is within the range
+                // of faultable addresses.
+                if !faultable_addresses.contains(&fault_address) {
+                    continue;
+                }
 
+                // The fault is within the scope of these usercopy utilities;
+                // write the update registers so that execution resumes in
+                // `hermetic_copy_error` as described above.
+                thread.write_state_general_regs(regs).unwrap();
                 excp.set_exception_state(&zx::sys::ZX_EXCEPTION_STATE_HANDLED).unwrap();
             }
         });
@@ -344,7 +389,7 @@ mod test {
     macro_rules! new_usercopy_for_test {
         ($stmt:expr) => {{
             let usercopy = $stmt.unwrap();
-            if cfg!(target_arch = "x86_64") {
+            if cfg!(any(target_arch = "x86_64", target_arch = "aarch64")) {
                 usercopy.unwrap()
             } else {
                 // Skip test if not a supported architecture
