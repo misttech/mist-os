@@ -731,52 +731,6 @@ pub(crate) trait Ipv6DeviceConfigurationContext<C: IpDeviceNonSyncContext<Ipv6, 
     ) -> O;
 }
 
-/// Provides access to an IPv4 device configuration, with a buffer.
-pub(crate) trait BufferIpv4DeviceConfigurationContext<
-    C: IpDeviceNonSyncContext<Ipv4, Self::DeviceId>,
-    B: BufferMut,
->: IpDeviceConfigurationContext<Ipv4, C>
-{
-    type Ipv4DeviceStateCtx<'s>: IpDeviceStateContext<Ipv4, C, DeviceId = Self::DeviceId>
-        + IgmpPacketHandler<C, Self::DeviceId, B>
-        + 's;
-
-    /// Calls the function with an immutable reference to the IPv4 device
-    /// configuration and an `Ipv4DeviceStateCtx`.
-    fn with_ipv4_device_configuration<
-        O,
-        F: FnOnce(&Ipv4DeviceConfiguration, Self::Ipv4DeviceStateCtx<'_>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O;
-}
-
-impl<
-        C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-        B: BufferMut,
-        SC: IpDeviceConfigurationContext<Ipv4, C>,
-    > BufferIpv4DeviceConfigurationContext<C, B> for SC
-where
-    for<'s> SC::WithIpDeviceConfigurationInnerCtx<'s>: IpDeviceStateContext<Ipv4, C, DeviceId = SC::DeviceId>
-        + IgmpPacketHandler<C, SC::DeviceId, B>
-        + 's,
-{
-    type Ipv4DeviceStateCtx<'s> = SC::WithIpDeviceConfigurationInnerCtx<'s>;
-
-    fn with_ipv4_device_configuration<
-        O,
-        F: FnOnce(&Ipv4DeviceConfiguration, Self::Ipv4DeviceStateCtx<'_>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O {
-        self.with_ip_device_configuration(device_id, cb)
-    }
-}
-
 /// The execution context for an IPv6 device.
 pub(crate) trait Ipv6DeviceContext<C: IpDeviceNonSyncContext<Ipv6, Self::DeviceId>>:
     IpDeviceStateContext<Ipv6, C>
@@ -839,44 +793,23 @@ impl<
     }
 }
 
-/// An implementation of an IPv4 device with a buffer, `B`.
-pub(crate) trait BufferIpv4DeviceHandler<C, B>: IpDeviceHandler<Ipv4, C> {
-    /// Receive an IGMP packet.
-    fn receive_igmp_packet(
-        &mut self,
-        ctx: &mut C,
-        device: &Self::DeviceId,
-        src_ip: Ipv4Addr,
-        dst_ip: SpecifiedAddr<Ipv4Addr>,
-        buffer: B,
-    );
-}
-
-impl<
-        C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
-        SC: IpDeviceHandler<Ipv4, C> + BufferIpv4DeviceConfigurationContext<C, B>,
-        B: BufferMut,
-    > BufferIpv4DeviceHandler<C, B> for SC
+pub(crate) fn receive_igmp_packet<SC, C, B>(
+    sync_ctx: &mut SC,
+    ctx: &mut C,
+    device: &SC::DeviceId,
+    src_ip: Ipv4Addr,
+    dst_ip: SpecifiedAddr<Ipv4Addr>,
+    buffer: B,
+) where
+    SC: IpDeviceConfigurationContext<Ipv4, C>,
+    C: IpDeviceNonSyncContext<Ipv4, SC::DeviceId>,
+    for<'a> SC::WithIpDeviceConfigurationInnerCtx<'a>:
+        IpDeviceStateContext<Ipv4, C, DeviceId = SC::DeviceId> + IgmpPacketHandler<C, SC::DeviceId>,
+    B: BufferMut,
 {
-    fn receive_igmp_packet(
-        &mut self,
-        ctx: &mut C,
-        device: &Self::DeviceId,
-        src_ip: Ipv4Addr,
-        dst_ip: SpecifiedAddr<Ipv4Addr>,
-        buffer: B,
-    ) {
-        self.with_ipv4_device_configuration(device, |_config, mut sync_ctx| {
-            IgmpPacketHandler::receive_igmp_packet(
-                &mut sync_ctx,
-                ctx,
-                device,
-                src_ip,
-                dst_ip,
-                buffer,
-            )
-        })
-    }
+    sync_ctx.with_ip_device_configuration(device, |_config, mut sync_ctx| {
+        IgmpPacketHandler::receive_igmp_packet(&mut sync_ctx, ctx, device, src_ip, dst_ip, buffer)
+    })
 }
 
 /// An implementation of an IPv6 device.

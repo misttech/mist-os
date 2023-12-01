@@ -107,9 +107,9 @@ pub(crate) trait IgmpContext<C: IgmpNonSyncContext<Self::DeviceId>>:
 /// A handler for incoming IGMP packets.
 ///
 /// A blanket implementation is provided for all `C: IgmpContext`.
-pub(crate) trait IgmpPacketHandler<C, DeviceId, B: BufferMut> {
+pub(crate) trait IgmpPacketHandler<C, DeviceId> {
     /// Receive an IGMP message in an IP packet.
-    fn receive_igmp_packet(
+    fn receive_igmp_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device: &DeviceId,
@@ -119,10 +119,10 @@ pub(crate) trait IgmpPacketHandler<C, DeviceId, B: BufferMut> {
     );
 }
 
-impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>, B: BufferMut>
-    IgmpPacketHandler<C, SC::DeviceId, B> for SC
+impl<C: IgmpNonSyncContext<SC::DeviceId>, SC: IgmpContext<C>> IgmpPacketHandler<C, SC::DeviceId>
+    for SC
 {
-    fn receive_igmp_packet(
+    fn receive_igmp_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device: &SC::DeviceId,

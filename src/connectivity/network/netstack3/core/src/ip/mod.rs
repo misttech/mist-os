@@ -68,8 +68,8 @@ use crate::{
     },
     ip::{
         device::{
-            slaac::SlaacCounters, state::IpDeviceStateIpExt, BufferIpv4DeviceHandler,
-            IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext,
+            slaac::SlaacCounters, state::IpDeviceStateIpExt, IpDeviceIpExt, IpDeviceNonSyncContext,
+            IpDeviceSendContext,
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
@@ -1013,9 +1013,7 @@ impl<
                 self, ctx, device, src_ip, dst_ip, body
             ),
             Ipv4Proto::Igmp => {
-                BufferIpv4DeviceHandler::receive_igmp_packet(
-                    self, ctx, device, src_ip, dst_ip, body,
-                );
+                device::receive_igmp_packet(self, ctx, device, src_ip, dst_ip, body);
                 Ok(())
             }
             Ipv4Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as BufferIpTransportContext<
