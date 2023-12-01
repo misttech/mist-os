@@ -207,13 +207,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
     }
 }
 
-pub(super) fn send_ip_frame<
-    B: BufferMut,
-    NonSyncCtx: NonSyncContext,
-    A: IpAddress,
-    S: Serializer<Buffer = B>,
-    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
->(
+pub(super) fn send_ip_frame<NonSyncCtx, A, S, L>(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
@@ -221,6 +215,11 @@ pub(super) fn send_ip_frame<
     packet: S,
 ) -> Result<(), S>
 where
+    NonSyncCtx: NonSyncContext,
+    A: IpAddress,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
     A::Version: EthernetIpExt,
 {
     send_as_ethernet_frame_to_dst(
@@ -233,19 +232,20 @@ where
     )
 }
 
-fn send_as_ethernet_frame_to_dst<
-    B: BufferMut,
-    NonSyncCtx: NonSyncContext,
-    S: Serializer<Buffer = B>,
-    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
->(
+fn send_as_ethernet_frame_to_dst<NonSyncCtx, S, L>(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
     device_id: &LoopbackDeviceId<NonSyncCtx>,
     packet: S,
     protocol: EtherType,
     dst_mac: Mac,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    NonSyncCtx: NonSyncContext,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    L: LockBefore<crate::lock_ordering::LoopbackTxQueue>,
+{
     /// The minimum length of bodies of Ethernet frames sent over the loopback
     /// device.
     ///

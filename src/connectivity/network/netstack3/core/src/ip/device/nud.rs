@@ -475,7 +475,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         I: Ip,
         D: LinkDevice,
         C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         let Self { pending_frames, notifiers, transmit_counter: _, _marker } = self;
 
@@ -912,7 +912,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     ) where
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         self.cancel_timer(ctx, device_id, neighbor);
 
@@ -956,7 +956,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     ) where
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId, Instant = Time>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         // TODO(https://fxbug.dev/124960): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
@@ -1023,7 +1023,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     ) where
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         // TODO(https://fxbug.dev/124960): if the new state matches the current state,
         // update the link address as necessary, but do not cancel + reschedule timers.
@@ -1124,7 +1124,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     /// address, and advance the NUD state machine accordingly.
     ///
     /// Returns whether a multicast neighbor probe should be sent as a result.
-    fn handle_packet_queued_to_send<B, I, C, SC, S>(
+    fn handle_packet_queued_to_send<I, C, SC, S>(
         &mut self,
         sync_ctx: &mut SC,
         ctx: &mut C,
@@ -1133,11 +1133,11 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
         body: S,
     ) -> Result<bool, S>
     where
-        B: BufferMut,
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudSenderContext<B, I, D, C>,
-        S: Serializer<Buffer = B>,
+        SC: NudSenderContext<I, D, C>,
+        S: Serializer,
+        S::Buffer: BufferMut,
     {
         match self {
             DynamicNeighborState::Incomplete(incomplete) => {
@@ -1198,7 +1198,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     ) where
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         // Per [RFC 4861 section 7.2.3] ("Receipt of Neighbor Solicitations"):
         //
@@ -1247,7 +1247,7 @@ impl<D: LinkDevice, Time: Instant, N: LinkResolutionNotifier<D>> DynamicNeighbor
     ) where
         I: Ip,
         C: NonSyncContext<I, D, SC::DeviceId, Instant = Time>,
-        SC: BufferNudSenderContext<Buf<Vec<u8>>, I, D, C>,
+        SC: NudSenderContext<I, D, C>,
     {
         let ConfirmationFlags { solicited_flag, override_flag } = flags;
         enum NewState<A> {
@@ -1554,6 +1554,19 @@ pub(crate) trait NudContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, Self::
 {
     type ConfigCtx<'a>: NudConfigContext<I>;
 
+    type SenderCtx<'a>: NudSenderContext<I, D, C, DeviceId = Self::DeviceId>;
+
+    /// Calls the function with a mutable reference to the NUD state and the
+    /// synchronized context.
+    fn with_nud_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(&mut NudState<I, D, C::Instant, C::Notifier>, &mut Self::SenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &Self::DeviceId,
+        cb: F,
+    ) -> O;
+
     /// Calls the function with a mutable reference to the NUD state and NUD
     /// configuration for the device.
     fn with_nud_state_mut<
@@ -1590,44 +1603,21 @@ pub(crate) trait NudConfigContext<I: Ip> {
     fn retransmit_timeout(&mut self) -> NonZeroDuration;
 }
 
-/// The execution context for NUD for a link device, with a buffer.
-pub(crate) trait BufferNudContext<
-    B: BufferMut,
-    I: Ip,
-    D: LinkDevice,
-    C: NonSyncContext<I, D, Self::DeviceId>,
->: NudContext<I, D, C>
-{
-    type BufferSenderCtx<'a>: BufferNudSenderContext<B, I, D, C, DeviceId = Self::DeviceId>;
-
-    /// Calls the function with a mutable reference to the NUD state and the
-    /// synchronized context.
-    fn with_nud_state_mut_and_buf_ctx<
-        O,
-        F: FnOnce(&mut NudState<I, D, C::Instant, C::Notifier>, &mut Self::BufferSenderCtx<'_>) -> O,
-    >(
-        &mut self,
-        device_id: &Self::DeviceId,
-        cb: F,
-    ) -> O;
-}
-
 /// The execution context for NUD for a link device that allows sending IP
 /// packets to specific neighbors.
-pub(crate) trait BufferNudSenderContext<
-    B: BufferMut,
-    I: Ip,
-    D: LinkDevice,
-    C: NonSyncContext<I, D, Self::DeviceId>,
->: NudConfigContext<I> + DeviceIdContext<D>
+pub(crate) trait NudSenderContext<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, Self::DeviceId>>:
+    NudConfigContext<I> + DeviceIdContext<D>
 {
     /// Send an IP frame to the neighbor with the specified link address.
-    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         ctx: &mut C,
         neighbor_link_addr: D::Address,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 /// An implementation of NUD for the IP layer.
@@ -1736,23 +1726,21 @@ pub(crate) trait NudHandler<I: Ip, D: LinkDevice, C: LinkResolutionContext<D>>:
         D::Address,
         <<C as LinkResolutionContext<D>>::Notifier as LinkResolutionNotifier<D>>::Observer,
     >;
-}
 
-/// An implementation of NUD for a link device, with a buffer.
-pub(crate) trait BufferNudHandler<B: BufferMut, I: Ip, D: LinkDevice, C>:
-    DeviceIdContext<D>
-{
     /// Send an IP packet to the neighbor.
     ///
     /// If the neighbor's link address is not known, link address resolution
     /// is performed.
-    fn send_ip_packet_to_neighbor<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor<S>(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         neighbor: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 enum TransmitProbe<A> {
@@ -1930,12 +1918,8 @@ fn handle_neighbor_timer<I, D, SC, C>(
     }
 }
 
-impl<
-        I: Ip,
-        D: LinkDevice,
-        C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudContext<Buf<Vec<u8>>, I, D, C>,
-    > NudHandler<I, D, C> for SC
+impl<I: Ip, D: LinkDevice, C: NonSyncContext<I, D, SC::DeviceId>, SC: NudContext<I, D, C>>
+    NudHandler<I, D, C> for SC
 {
     fn handle_neighbor_update(
         &mut self,
@@ -1946,7 +1930,7 @@ impl<
         source: DynamicNeighborUpdateSource,
     ) {
         tracing::debug!("received neighbor {:?} from {}", source, neighbor);
-        self.with_nud_state_mut_and_buf_ctx(
+        self.with_nud_state_mut_and_sender_ctx(
             device_id,
             |NudState { neighbors, last_gc }, sync_ctx| {
                 let num_entries = neighbors.len();
@@ -2022,7 +2006,7 @@ impl<
         neighbor: SpecifiedAddr<I::Addr>,
         link_address: D::Address,
     ) {
-        self.with_nud_state_mut_and_buf_ctx(
+        self.with_nud_state_mut_and_sender_ctx(
             device_id,
             |NudState { neighbors, last_gc: _ }, sync_ctx| match neighbors.entry(neighbor) {
                 Entry::Occupied(mut occupied) => {
@@ -2125,24 +2109,19 @@ impl<
 
         result
     }
-}
 
-impl<
-        B: BufferMut,
-        I: Ip,
-        D: LinkDevice,
-        C: NonSyncContext<I, D, SC::DeviceId>,
-        SC: BufferNudContext<B, I, D, C>,
-    > BufferNudHandler<B, I, D, C> for SC
-{
-    fn send_ip_packet_to_neighbor<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor<S>(
         &mut self,
         ctx: &mut C,
         device_id: &Self::DeviceId,
         lookup_addr: SpecifiedAddr<I::Addr>,
         body: S,
-    ) -> Result<(), S> {
-        let do_multicast_solicit = self.with_nud_state_mut_and_buf_ctx(
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
+        let do_multicast_solicit = self.with_nud_state_mut_and_sender_ctx(
             device_id,
             |NudState { neighbors, last_gc: _ }, sync_ctx| {
                 match neighbors.entry(lookup_addr) {
@@ -2224,9 +2203,9 @@ pub(crate) fn confirm_reachable<I, D, SC, C>(
     I: Ip,
     D: LinkDevice,
     C: NonSyncContext<I, D, SC::DeviceId>,
-    SC: BufferNudContext<Buf<Vec<u8>>, I, D, C>,
+    SC: NudContext<I, D, C>,
 {
-    sync_ctx.with_nud_state_mut_and_buf_ctx(
+    sync_ctx.with_nud_state_mut_and_sender_ctx(
         device_id,
         |NudState { neighbors, last_gc: _ }, sync_ctx| {
             match neighbors.entry(neighbor) {
@@ -2579,6 +2558,28 @@ mod tests {
     impl<I: Ip> NudContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeCtxImpl<I> {
         type ConfigCtx<'a> = FakeConfigContext;
 
+        type SenderCtx<'a> = FakeInnerCtxImpl<I>;
+
+        fn with_nud_state_mut_and_sender_ctx<
+            O,
+            F: FnOnce(
+                &mut NudState<
+                    I,
+                    FakeLinkDevice,
+                    FakeInstant,
+                    FakeLinkResolutionNotifier<FakeLinkDevice>,
+                >,
+                &mut Self::SenderCtx<'_>,
+            ) -> O,
+        >(
+            &mut self,
+            _device_id: &Self::DeviceId,
+            cb: F,
+        ) -> O {
+            let Self { outer, inner } = self;
+            cb(&mut outer.nud, inner)
+        }
+
         fn with_nud_state_mut<
             O,
             F: FnOnce(
@@ -2621,41 +2622,17 @@ mod tests {
         }
     }
 
-    impl<B: BufferMut, I: Ip> BufferNudContext<B, I, FakeLinkDevice, FakeNonSyncCtxImpl<I>>
-        for FakeCtxImpl<I>
-    {
-        type BufferSenderCtx<'a> = FakeInnerCtxImpl<I>;
-
-        fn with_nud_state_mut_and_buf_ctx<
-            O,
-            F: FnOnce(
-                &mut NudState<
-                    I,
-                    FakeLinkDevice,
-                    FakeInstant,
-                    FakeLinkResolutionNotifier<FakeLinkDevice>,
-                >,
-                &mut Self::BufferSenderCtx<'_>,
-            ) -> O,
-        >(
-            &mut self,
-            _device_id: &Self::DeviceId,
-            cb: F,
-        ) -> O {
-            let Self { outer, inner } = self;
-            cb(&mut outer.nud, inner)
-        }
-    }
-
-    impl<B: BufferMut, I: Ip> BufferNudSenderContext<B, I, FakeLinkDevice, FakeNonSyncCtxImpl<I>>
-        for FakeInnerCtxImpl<I>
-    {
-        fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    impl<I: Ip> NudSenderContext<I, FakeLinkDevice, FakeNonSyncCtxImpl<I>> for FakeInnerCtxImpl<I> {
+        fn send_ip_packet_to_neighbor_link_addr<S>(
             &mut self,
             ctx: &mut FakeNonSyncCtxImpl<I>,
             dst_link_address: FakeLinkAddress,
             body: S,
-        ) -> Result<(), S> {
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
             self.send_frame(ctx, FakeNudMessageMeta::IpFrame { dst_link_address }, body)
         }
     }
@@ -2786,7 +2763,7 @@ mod tests {
     ) {
         let body = [body];
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 sync_ctx,
                 non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -2924,7 +2901,7 @@ mod tests {
     ) {
         init_stale_neighbor_with_ip(sync_ctx, non_sync_ctx, ip_address, link_address);
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 sync_ctx,
                 non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -3675,7 +3652,7 @@ mod tests {
         // Send a packet to the neighbor.
         let body = 1;
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -3788,7 +3765,7 @@ mod tests {
         // Send a packet and ensure that we also transmit a multicast probe.
         const BODY: u8 = 0x33;
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -3827,7 +3804,7 @@ mod tests {
             // Send another packet before the retransmit timer expires: only the packet
             // should be sent (not a probe), and the `packet_sent` flag should be set.
             assert_eq!(
-                BufferNudHandler::send_ip_packet_to_neighbor(
+                NudHandler::send_ip_packet_to_neighbor(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -3875,7 +3852,7 @@ mod tests {
         // Finally, if another packet is sent, we resume transmitting multicast probes
         // and "reset" the exponential backoff.
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -3942,7 +3919,7 @@ mod tests {
 
         for body in expected_pending_frames.iter() {
             assert_eq!(
-                BufferNudHandler::send_ip_packet_to_neighbor(
+                NudHandler::send_ip_packet_to_neighbor(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -3968,7 +3945,7 @@ mod tests {
 
         // The next frame should be dropped.
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -5205,7 +5182,7 @@ mod tests {
         let body = [u8::MAX];
         let pending_frames = VecDeque::from([Buf::new(body.to_vec(), ..)]);
         assert_matches!(
-            BufferNudHandler::<_, Ipv6, EthernetLinkDevice, _>::send_ip_packet_to_neighbor(
+            NudHandler::<Ipv6, EthernetLinkDevice, _>::send_ip_packet_to_neighbor(
                 &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &eth_device_id,
@@ -5378,8 +5355,7 @@ mod tests {
             DeviceIdContext<
                     EthernetLinkDevice,
                     DeviceId = EthernetDeviceId<testutil::FakeNonSyncCtx>,
-                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>
-                + BufferNudContext<Buf<Vec<u8>>, I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
+                > + NudContext<I, EthernetLinkDevice, testutil::FakeNonSyncCtx>,
         testutil::FakeNonSyncCtx: TimerContext<
             NudTimerId<I, EthernetLinkDevice, EthernetDeviceId<testutil::FakeNonSyncCtx>>,
         >,

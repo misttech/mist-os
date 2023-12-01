@@ -34,10 +34,7 @@ use crate::{
     error::{ExistsError, NotFoundError},
     ip::device::{
         integration::SyncCtxWithIpDeviceConfiguration,
-        nud::{
-            BufferNudHandler, ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler,
-            NudIpHandler,
-        },
+        nud::{ConfirmationFlags, DynamicNeighborUpdateSource, NudHandler, NudIpHandler},
         state::{
             AssignedAddress as _, DualStackIpDeviceState, IpDeviceFlags, Ipv4AddressEntry,
             Ipv4AddressState, Ipv4DeviceConfiguration, Ipv6AddressEntry, Ipv6AddressState,
@@ -1138,14 +1135,7 @@ impl<NonSyncCtx: NonSyncContext> DualStackDeviceContext<NonSyncCtx>
     }
 }
 
-fn send_ip_frame<
-    B: BufferMut,
-    NonSyncCtx: NonSyncContext,
-    S: Serializer<Buffer = B>,
-    A: IpAddress,
-    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
-        + LockBefore<crate::lock_ordering::LoopbackTxQueue>,
->(
+fn send_ip_frame<NonSyncCtx, S, A, L>(
     sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
@@ -1153,17 +1143,23 @@ fn send_ip_frame<
     body: S,
 ) -> Result<(), S>
 where
+    NonSyncCtx: NonSyncContext,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    A: IpAddress,
+    L: LockBefore<crate::lock_ordering::IpState<A::Version>>
+        + LockBefore<crate::lock_ordering::LoopbackTxQueue>,
     A::Version: EthernetIpExt,
     for<'a> Locked<&'a SyncCtx<NonSyncCtx>, L>: EthernetIpLinkDeviceDynamicStateContext<NonSyncCtx, DeviceId = EthernetDeviceId<NonSyncCtx>>
-        + BufferNudHandler<B, A::Version, EthernetLinkDevice, NonSyncCtx>
+        + NudHandler<A::Version, EthernetLinkDevice, NonSyncCtx>
         + TransmitQueueHandler<EthernetLinkDevice, NonSyncCtx, Meta = ()>,
 {
     match device {
         DeviceId::Ethernet(id) => {
-            ethernet::send_ip_frame::<_, _, _, A, _>(sync_ctx, ctx, &id, local_addr, body)
+            ethernet::send_ip_frame::<_, _, A, _>(sync_ctx, ctx, &id, local_addr, body)
         }
         DeviceId::Loopback(id) => {
-            loopback::send_ip_frame::<_, _, A, _, _>(sync_ctx, ctx, id, local_addr, body)
+            loopback::send_ip_frame::<_, A, _, _>(sync_ctx, ctx, id, local_addr, body)
         }
     }
 }

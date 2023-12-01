@@ -64,9 +64,8 @@ use crate::{
     },
     ip::{
         device::nud::{
-            BufferNudContext, BufferNudHandler, BufferNudSenderContext, LinkResolutionContext,
-            LinkResolutionNotifier, LinkResolutionResult, NudConfigContext, NudContext, NudHandler,
-            NudState, NudTimerId,
+            LinkResolutionContext, LinkResolutionNotifier, LinkResolutionResult, NudConfigContext,
+            NudContext, NudHandler, NudSenderContext, NudState, NudTimerId,
         },
         icmp::NdpCounters,
         types::RawMetric,
@@ -196,6 +195,42 @@ impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv
         'a,
         Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>,
     >;
+
+    type SenderCtx<'a> = SyncCtxWithDeviceId<
+        'a,
+        Locked<&'a SyncCtx<NonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>,
+    >;
+
+    fn with_nud_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(
+            &mut NudState<Ipv6, EthernetLinkDevice, NonSyncCtx::Instant, NonSyncCtx::Notifier>,
+            &mut Self::SenderCtx<'_>,
+        ) -> O,
+    >(
+        &mut self,
+        device_id: &EthernetDeviceId<NonSyncCtx>,
+        cb: F,
+    ) -> O {
+        device::integration::with_ethernet_state_and_sync_ctx(
+            self,
+            device_id,
+            |mut state, sync_ctx| {
+                // We lock the state at the Ethernet IPv6 NUD lock level, but the
+                // callback needs access to the sync context as well as the NUD
+                // state, so we also cast its lock level to the same so that only
+                // locks that may be acquired _after_ the IPv6 NUD lock may be
+                // acquired in the callback.
+                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
+                let mut nud = state.lock::<LockLevel>();
+                let mut locked = SyncCtxWithDeviceId {
+                    device_id,
+                    sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
+                };
+                cb(&mut nud, &mut locked)
+            },
+        )
+    }
 
     fn with_nud_state_mut<
         O,
@@ -357,69 +392,20 @@ where
     }
 }
 
-impl<
-        B: BufferMut,
-        BufferNonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::IpState<Ipv6>>,
-    > BufferNudContext<B, Ipv6, EthernetLinkDevice, BufferNonSyncCtx>
-    for Locked<&SyncCtx<BufferNonSyncCtx>, L>
-{
-    type BufferSenderCtx<'a> = SyncCtxWithDeviceId<
-        'a,
-        Locked<&'a SyncCtx<BufferNonSyncCtx>, crate::lock_ordering::EthernetIpv6Nud>,
-    >;
-
-    fn with_nud_state_mut_and_buf_ctx<
-        O,
-        F: FnOnce(
-            &mut NudState<
-                Ipv6,
-                EthernetLinkDevice,
-                BufferNonSyncCtx::Instant,
-                BufferNonSyncCtx::Notifier,
-            >,
-            &mut Self::BufferSenderCtx<'_>,
-        ) -> O,
-    >(
-        &mut self,
-        device_id: &EthernetDeviceId<BufferNonSyncCtx>,
-        cb: F,
-    ) -> O {
-        device::integration::with_ethernet_state_and_sync_ctx(
-            self,
-            device_id,
-            |mut state, sync_ctx| {
-                // We lock the state at the Ethernet IPv6 NUD lock level, but the
-                // callback needs access to the sync context as well as the NUD
-                // state, so we also cast its lock level to the same so that only
-                // locks that may be acquired _after_ the IPv6 NUD lock may be
-                // acquired in the callback.
-                type LockLevel = crate::lock_ordering::EthernetIpv6Nud;
-                let mut nud = state.lock::<LockLevel>();
-                let mut locked = SyncCtxWithDeviceId {
-                    device_id,
-                    sync_ctx: &mut sync_ctx.cast_locked::<LockLevel>(),
-                };
-                cb(&mut nud, &mut locked)
-            },
-        )
-    }
-}
-
-impl<
-        'a,
-        B: BufferMut,
-        NonSyncCtx: NonSyncContext,
-        L: LockBefore<crate::lock_ordering::AllDeviceSockets>,
-    > BufferNudSenderContext<B, Ipv6, EthernetLinkDevice, NonSyncCtx>
+impl<'a, NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
+    NudSenderContext<Ipv6, EthernetLinkDevice, NonSyncCtx>
     for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<NonSyncCtx>, L>>
 {
-    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         ctx: &mut NonSyncCtx,
         dst_mac: Mac,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         let Self { device_id, sync_ctx } = self;
         send_as_ethernet_frame_to_dst(*sync_ctx, ctx, device_id, dst_mac, body, EtherType::Ipv6)
     }
@@ -815,16 +801,7 @@ impl_timer_context!(
 /// serializer. It computes the routing information, serializes
 /// the serializer, and sends the resulting buffer in a new Ethernet
 /// frame.
-pub(super) fn send_ip_frame<
-    B: BufferMut,
-    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
-    SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + BufferNudHandler<B, A::Version, EthernetLinkDevice, C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
-        + CounterContext<DeviceCounters>,
-    A: IpAddress,
-    S: Serializer<Buffer = B>,
->(
+pub(super) fn send_ip_frame<C, SC, A, S>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
@@ -832,6 +809,16 @@ pub(super) fn send_ip_frame<
     body: S,
 ) -> Result<(), S>
 where
+    C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>
+        + SocketNonSyncContext<SC::DeviceId>
+        + LinkResolutionContext<EthernetLinkDevice>,
+    SC: EthernetIpLinkDeviceDynamicStateContext<C>
+        + NudHandler<A::Version, EthernetLinkDevice, C>
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        + CounterContext<DeviceCounters>,
+    A: IpAddress,
+    S: Serializer,
+    S::Buffer: BufferMut,
     A::Version: EthernetIpExt,
 {
     sync_ctx.with_counters(|counters| {
@@ -852,7 +839,7 @@ where
             A::Version::ETHER_TYPE,
         )
     } else {
-        BufferNudHandler::<_, A::Version, _, _>::send_ip_packet_to_neighbor(
+        NudHandler::<A::Version, _, _>::send_ip_packet_to_neighbor(
             sync_ctx, ctx, device_id, local_addr, body,
         )
     }
@@ -1597,6 +1584,16 @@ mod tests {
             <<FakeNonSyncCtx as LinkResolutionContext<EthernetLinkDevice>>::Notifier as
                 LinkResolutionNotifier<EthernetLinkDevice>>::Observer
         >{
+            unimplemented!()
+        }
+
+        fn send_ip_packet_to_neighbor<S>(
+            &mut self,
+            _ctx: &mut FakeNonSyncCtx,
+            _device_id: &Self::DeviceId,
+            _neighbor: SpecifiedAddr<Ipv6Addr>,
+            _body: S,
+        ) -> Result<(), S> {
             unimplemented!()
         }
     }

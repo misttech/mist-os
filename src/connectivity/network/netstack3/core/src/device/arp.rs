@@ -29,9 +29,9 @@ use crate::{
         DeviceIdContext, FrameDestination,
     },
     ip::device::nud::{
-        self, BufferNudContext, BufferNudSenderContext, ConfirmationFlags,
-        DynamicNeighborUpdateSource, LinkResolutionContext, LinkResolutionNotifier,
-        NudConfigContext, NudContext, NudHandler, NudState, NudTimerId,
+        self, ConfirmationFlags, DynamicNeighborUpdateSource, LinkResolutionContext,
+        LinkResolutionNotifier, NudConfigContext, NudContext, NudHandler, NudSenderContext,
+        NudState, NudTimerId,
     },
     Instant, NonSyncContext, SyncCtx,
 };
@@ -233,6 +233,21 @@ impl<
 {
     type ConfigCtx<'a> = <SC as ArpContext<D, C>>::ConfigCtx<'a>;
 
+    type SenderCtx<'a> = <SC as ArpContext<D, C>>::ArpSenderCtx<'a>;
+
+    fn with_nud_state_mut_and_sender_ctx<
+        O,
+        F: FnOnce(&mut NudState<Ipv4, D, C::Instant, C::Notifier>, &mut Self::SenderCtx<'_>) -> O,
+    >(
+        &mut self,
+        device_id: &SC::DeviceId,
+        cb: F,
+    ) -> O {
+        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, sync_ctx| {
+            cb(nud, sync_ctx)
+        })
+    }
+
     fn with_nud_state_mut<
         O,
         F: FnOnce(&mut NudState<Ipv4, D, C::Instant, C::Notifier>, &mut Self::ConfigCtx<'_>) -> O,
@@ -261,41 +276,19 @@ impl<SC: ArpConfigContext> NudConfigContext<Ipv4> for SC {
     }
 }
 
-impl<
-        B: BufferMut,
-        D: ArpDevice,
-        C: ArpNonSyncCtx<D, SC::DeviceId>,
-        SC: ArpContext<D, C> + CounterContext<ArpCounters>,
-    > BufferNudContext<B, Ipv4, D, C> for SC
+impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>>
+    NudSenderContext<Ipv4, D, C> for SC
 {
-    type BufferSenderCtx<'a> = <SC as ArpContext<D, C>>::ArpSenderCtx<'a>;
-
-    fn with_nud_state_mut_and_buf_ctx<
-        O,
-        F: FnOnce(
-            &mut NudState<Ipv4, D, C::Instant, C::Notifier>,
-            &mut Self::BufferSenderCtx<'_>,
-        ) -> O,
-    >(
-        &mut self,
-        device_id: &SC::DeviceId,
-        cb: F,
-    ) -> O {
-        self.with_arp_state_mut_and_sender_ctx(device_id, |ArpState { nud }, sync_ctx| {
-            cb(nud, sync_ctx)
-        })
-    }
-}
-
-impl<B: BufferMut, D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>>
-    BufferNudSenderContext<B, Ipv4, D, C> for SC
-{
-    fn send_ip_packet_to_neighbor_link_addr<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_to_neighbor_link_addr<S>(
         &mut self,
         ctx: &mut C,
         dst_mac: D::HType,
         body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         ArpSenderContext::send_ip_packet_to_neighbor_link_addr(self, ctx, dst_mac, body)
     }
 }
@@ -664,7 +657,7 @@ mod tests {
                 assert_dynamic_neighbor_state, assert_dynamic_neighbor_with_addr,
                 assert_neighbor_unknown,
             },
-            BufferNudHandler, DynamicNeighborState, Reachable, Stale,
+            DynamicNeighborState, NudHandler, Reachable, Stale,
         },
         testutil::assert_empty,
     };
@@ -963,7 +956,7 @@ mod tests {
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
         );
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
@@ -1131,7 +1124,7 @@ mod tests {
                 SpecifiedAddr::new(requested_remote_proto_addr).unwrap(),
             );
             assert_eq!(
-                BufferNudHandler::send_ip_packet_to_neighbor(
+                NudHandler::send_ip_packet_to_neighbor(
                     sync_ctx,
                     non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -1265,7 +1258,7 @@ mod tests {
             SpecifiedAddr::new(TEST_REMOTE_IPV4).unwrap(),
         );
         assert_eq!(
-            BufferNudHandler::send_ip_packet_to_neighbor(
+            NudHandler::send_ip_packet_to_neighbor(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
