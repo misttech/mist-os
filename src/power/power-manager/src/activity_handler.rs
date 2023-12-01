@@ -9,7 +9,7 @@ use {
     anyhow::{format_err, Context, Result},
     async_trait::async_trait,
     fidl::endpoints::Proxy as _,
-    fidl_fuchsia_ui_activity as factivity,
+    fidl_fuchsia_ui_activity as factivity, fuchsia_async as fasync,
     fuchsia_component::client::connect_to_protocol,
     fuchsia_inspect::{self as inspect, Property},
     futures::future::{FutureExt as _, LocalBoxFuture},
@@ -164,6 +164,13 @@ impl ActivityHandler {
                     // available on this build variant).
                     None => {
                         tracing::error!("Listener stream closed. Reconnecting...");
+                        // In cases where the Listener stream closes because the device is
+                        // rebooting, it's possible that the Activity channel closes after the
+                        // Listener channel but not before attempting to establish a new Listener
+                        // channel. To mitigate chances of this happening and to prevent the async
+                        // task from spinning, only try to initialize a new Listener channel after
+                        // a short delay.
+                        fasync::Timer::new(std::time::Duration::from_secs(1)).await;
                         match Self::connect_activity_service(&self.activity_proxy) {
                             Ok(stream) => listener_stream = stream,
                             Err(e) => {
@@ -186,11 +193,7 @@ impl ActivityHandler {
     fn connect_activity_service(
         activity_provider: &factivity::ProviderProxy,
     ) -> Result<factivity::ListenerRequestStream> {
-        // TODO(b/311783026) Consider checking when the connection is initially established and/or
-        // adding reconnection logic. Even with this check it is still possible, due to racing,
-        // that the call to `watch_state` will be made on a closed connection, though that should
-        // only happen the first time, this check should prevent subsequent calls on the same
-        // closed connection.
+        // Check before attempting to establish Listener channel
         if activity_provider.is_closed() {
             return Err(format_err!(
                 "Cannot watch activity state, the activity provider connection is closed"
@@ -246,7 +249,6 @@ mod tests {
         crate::test::mock_node::{create_dummy_node, MessageMatcher, MockNodeMaker},
         crate::{msg_eq, msg_ok_return},
         diagnostics_assertions::assert_data_tree,
-        fuchsia_async as fasync,
     };
 
     // A fake Activity provider service implementation for testing
