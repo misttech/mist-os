@@ -118,6 +118,17 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
 
   const inspect::Inspector& inspector() const { return inspect_.inspector; }
 
+  // Visible for tests
+  const zx::bti& bti() const { return bti_; }
+  const fdf::MmioBuffer& mmio() TA_EXCL(lock_) {
+    fbl::AutoLock lock(&lock_);
+    return *mmio_;
+  }
+  void set_descs_buffer(std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) TA_EXCL(lock_) {
+    fbl::AutoLock lock(&lock_);
+    descs_buffer_ = std::move(descs_buffer);
+  }
+
  private:
   constexpr static size_t kResponseCount = 4;
 

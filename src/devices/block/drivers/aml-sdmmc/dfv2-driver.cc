@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/component/cpp/driver_export.h>
 #include <lib/mmio/mmio.h>
 #include <lib/zx/interrupt.h>
 
@@ -323,5 +322,3 @@ void Dfv2Driver::CompleteStart(zx::result<> result) {
 }
 
 }  // namespace aml_sdmmc
-
-FUCHSIA_DRIVER_EXPORT(aml_sdmmc::Dfv2Driver);

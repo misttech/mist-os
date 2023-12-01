@@ -119,6 +119,7 @@ group("tests") {
   deps = [
     ":aml-sdmmc-bind_test",
     ":aml-sdmmc-test-dfv1",
+    ":aml-sdmmc-test-dfv2",
   ]
 }
 
@@ -133,6 +134,7 @@ fuchsia_driver("aml-sdmmc-driver-dfv2") {
   ]
   sources = [
     "aml-sdmmc.cc",
+    "dfv2-driver-export.cc",
     "dfv2-driver.cc",
   ]
   deps = [
@@ -173,4 +175,54 @@ fuchsia_driver_component("aml-sdmmc-dfv2") {
 fuchsia_driver_package("package-dfv2") {
   package_name = "aml-sdmmc-dfv2"
   driver_components = [ ":aml-sdmmc-dfv2" ]
+}
+
+test("aml-sdmmc-test-bin-dfv2") {
+  output_name = "aml-sdmmc-test-dfv2"
+  sources = [
+    "aml-sdmmc.cc",
+    "dfv2-driver-test.cc",
+    "dfv2-driver.cc",
+  ]
+  deps = [
+    ":aml-sdmmc-bind",
+    "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_bindlib_cpp",
+    "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+    "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/testing/cpp:cpp",
+    "//sdk/lib/fit",
+    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//sdk/lib/inspect/testing/cpp:zxtest",
+    "//src/devices/block/lib/sdio",
+    "//src/devices/block/lib/sdmmc",
+    "//src/devices/bus/lib/device-protocol-pdev",
+    "//src/devices/bus/testing/fake-pdev",
+    "//src/devices/lib/amlogic",
+    "//src/devices/lib/dma-buffer",
+    "//src/devices/lib/mmio",
+    "//src/devices/lib/mmio:test_helper",
+    "//src/devices/testing/fake-bti",
+    "//src/lib/vmo_store",
+    "//zircon/system/ulib/hwreg",
+    "//zircon/system/ulib/inspect",
+    "//zircon/system/ulib/mmio-ptr:mmio-ptr-fake",
+    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zircon-internal",
+    "//zircon/system/ulib/zx",
+    "//zircon/system/ulib/zxtest",
+  ]
+}
+
+fuchsia_unittest_package("aml-sdmmc-test-dfv2") {
+  deps = [ ":aml-sdmmc-test-bin-dfv2" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
