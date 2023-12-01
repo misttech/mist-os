@@ -125,6 +125,7 @@ _sdk_versioned_shared_libraries_list = [
   "//zircon/system/ulib/syslog:syslog",
   "//zircon/system/ulib/trace-engine:trace-engine",
   "//zircon/system/ulib/trace-provider:trace-provider-so",
+  "//sdk/lib/syslog/cpp:backend_fuchsia_globals",
 ]
 
 group("sdk_versioned_shared_libraries") {

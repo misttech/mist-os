@@ -106,9 +106,13 @@ sdk_source_set("backend_host") {
 }
 
 sdk_shared_library("backend_fuchsia_globals") {
-  category = "internal"
+  category = "partner"
 
   libcxx_linkage = "static"
+
+  include_base = "//sdk"
+
+  symbols_api = "backend_fuchsia_globals.ifs"
 
   sources = [
     "logging_backend_fuchsia_globals.cc",
