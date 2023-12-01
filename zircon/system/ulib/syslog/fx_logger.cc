@@ -4,23 +4,19 @@
 
 #include "fx_logger.h"
 
-#include <memory>
-#include <string>
-
-#ifndef SYSLOG_STATIC
 #include <fidl/fuchsia.logger/cpp/wire.h>
 #include <lib/syslog/cpp/macros.h>  //nogncheck
-#include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
-#endif
-
 #include <lib/syslog/logger.h>
+#include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/syslog/wire_format.h>
 #include <stdio.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 #include <atomic>
+#include <memory>
 #include <optional>
+#include <string>
 
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
@@ -73,15 +69,8 @@ void fx_logger::ActivateFallback(int fallback_fd) {
 }
 
 zx_status_t fx_logger::Reconfigure(const fx_logger_config_t* config, bool is_structured) {
-  if ((config->num_tags > FX_LOG_MAX_TAGS) ||
-#ifndef SYSLOG_STATIC
-      (config->log_sink_channel != ZX_HANDLE_INVALID &&
-       config->log_sink_socket != ZX_HANDLE_INVALID)
-#else
-      // |log_sink_channel| is not supported by SYSLOG_STATIC.
-      config->log_sink_channel != ZX_HANDLE_INVALID
-#endif
-  ) {
+  if ((config->num_tags > FX_LOG_MAX_TAGS) || (config->log_sink_channel != ZX_HANDLE_INVALID &&
+                                               config->log_sink_socket != ZX_HANDLE_INVALID)) {
     if (config->log_sink_channel != ZX_HANDLE_INVALID) {
       zx_handle_close(config->log_sink_channel);
     }
@@ -95,7 +84,6 @@ zx_status_t fx_logger::Reconfigure(const fx_logger_config_t* config, bool is_str
   if (config->log_sink_socket != ZX_HANDLE_INVALID) {
     is_structured_ = is_structured;
     socket.reset(config->log_sink_socket);
-#ifndef SYSLOG_STATIC
   } else if (config->log_sink_channel != ZX_HANDLE_INVALID) {
     zx::socket remote;
     zx_status_t status = zx::socket::create(ZX_SOCKET_DATAGRAM, &socket, &remote);
@@ -111,7 +99,6 @@ zx_status_t fx_logger::Reconfigure(const fx_logger_config_t* config, bool is_str
       return result.status();
     }
     is_structured_ = true;
-#endif
   }
 
   if (socket.is_valid()) {
@@ -143,19 +130,16 @@ void fx_logger::SetLogConnection(zx_handle_t handle) {
   }
 }
 
-#ifndef SYSLOG_STATIC
 cpp17::optional<cpp17::string_view> ViewFromC(const char* c_str) {
   if (c_str) {
     return c_str;
   }
   return std::nullopt;
 }
-#endif
 
 zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char* tag,
                                          const char* file, uint32_t line, const char* msg,
                                          va_list args, bool perform_format) {
-#ifndef SYSLOG_STATIC
   if (syslog_backend::HasStructuredBackend() && this->socket_.is_valid()) {
     std::unique_ptr<syslog_backend::LogBuffer> buf_ptr =
         std::make_unique<syslog_backend::LogBuffer>();
@@ -252,8 +236,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     ActivateFallback(-1);
     return ZX_ERR_ASYNC;
   }
-
-#endif
   zx_time_t time = zx_clock_get_monotonic();
   fx_log_packet_t packet;
   memset(&packet, 0, sizeof(packet));

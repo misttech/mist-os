@@ -59,11 +59,6 @@ syslog_visibility_allowlist += [ "//zircon/system/ulib/syslog:*" ]
 
 syslog_visibility_allowlist += [ "//build/sdk:sdk_versioned_shared_libraries" ]
 
-syslog_static_visibility_allowlist = [ "//src/devices/tests/fx-logger:*" ]
-
-# Syslog code can depend on syslog-static.
-syslog_static_visibility_allowlist += [ "//zircon/system/ulib/syslog:*" ]
-
 syslog_headers_visibility_allowlist = [
   "//src/devices/lib/iommu:*",
   "//src/lib/ddk:*",
@@ -112,31 +107,6 @@ zx_library("syslog") {
   visibility = syslog_visibility_allowlist
 }
 
-# This static library should have no shared library dependencies,
-# except libzircon, so it may be used from magma client driver libraries
-# such as the Vulkan ICD.
-#
-# This library cannot connect to the logging service, so a log_sink_socket must
-# be provided at initialization.
-zx_library("syslog-static") {
-  sdk = "static"
-  sdk_headers = syslog_headers
-  sources = [
-    "fx_logger.cc",
-    "global.cc",
-    "logger.cc",
-  ]
-  deps = [
-    ":helpers",
-    "//sdk/lib/syslog:client_includes",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-  defines = [ "SYSLOG_STATIC" ]
-
-  visibility = syslog_static_visibility_allowlist
-}
-
 zx_library("syslog-headers") {
   sdk = "static"
   sdk_publishable = true
@@ -170,25 +140,12 @@ test("syslog-test") {
   deps = _test_deps + [ ":syslog" ]
 }
 
-test("syslog-static-test") {
-  sources = _test_sources
-  deps = _test_deps + [ ":syslog-static" ]
-  defines = [ "SYSLOG_STATIC" ]
-}
-
 fuchsia_unittest_component("c-syslog-test") {
   deps = [ ":syslog-test" ]
 }
 
-fuchsia_unittest_component("c-syslog-static-test") {
-  deps = [ ":syslog-static-test" ]
-}
-
 fuchsia_test_package("c-syslog-tests") {
-  test_components = [
-    ":c-syslog-test",
-    ":c-syslog-static-test",
-  ]
+  test_components = [ ":c-syslog-test" ]
 }
 
 group("tests") {
