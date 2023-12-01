@@ -705,8 +705,31 @@ zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {
   return zx::ok(byte);
 }
 
-zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwTxnRequest(
-    uint8_t fn_idx, const sdio_rw_txn_t& txn, SdioTxnPosition current_position) {
+// Use function overloads to convert the buffer depending on whether this is a Banjo or a FIDL call.
+// We use Banjo for tracking buffer positions, so there is no conversion necessary in that case.
+
+sdmmc_buffer_region_t GetBuffer(const fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion& buffer) {
+  sdmmc_buffer_region_t out{};
+  if (buffer.buffer.is_vmo_id()) {
+    out.type = SDMMC_BUFFER_TYPE_VMO_ID;
+    out.buffer.vmo = buffer.buffer.vmo().get();
+  } else if (buffer.buffer.is_vmo()) {
+    out.type = SDMMC_BUFFER_TYPE_VMO_HANDLE;
+    out.buffer.vmo_id = buffer.buffer.vmo_id();
+  } else {
+    out.type = 0;
+  }
+
+  out.offset = buffer.offset;
+  out.size = buffer.size;
+  return out;
+}
+
+sdmmc_buffer_region_t GetBuffer(const sdmmc_buffer_region_t& buffer) { return buffer; }
+
+template <typename T>
+zx::result<SdioControllerDevice::SdioTxnPosition<T>> SdioControllerDevice::DoOneRwTxnRequest(
+    uint8_t fn_idx, const SdioRwTxn<T>& txn, SdioTxnPosition<T> current_position) {
   const uint32_t func_blk_size = funcs_[fn_idx].cur_blk_size;
   const bool mbs = hw_info_.caps & SDIO_CARD_MULTI_BLOCK;
   const size_t max_transfer_size = func_blk_size * (mbs ? SDIO_IO_RW_EXTD_MAX_BLKS_PER_CMD : 1);
@@ -718,7 +741,11 @@ zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwT
 
   sdmmc_buffer_region_t buffers[SDIO_IO_RW_EXTD_MAX_BLKS_PER_CMD];
   for (size_t i = 0; i < std::size(buffers) && i < current_position.buffers.size(); i++) {
-    buffers[i] = current_position.buffers[i];
+    buffers[i] = GetBuffer(current_position.buffers[i]);
+    if (buffers[i].type == 0) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
+
     if (i == 0) {
       ZX_ASSERT(current_position.first_buffer_offset < buffers[i].size);
       buffers[i].offset += current_position.first_buffer_offset;
@@ -783,14 +810,21 @@ zx::result<SdioControllerDevice::SdioTxnPosition> SdioControllerDevice::DoOneRwT
     return zx::error(status);
   }
 
-  return zx::ok(SdioTxnPosition{
+  return zx::ok(SdioTxnPosition<T>{
       .buffers = current_position.buffers.subspan(last_block_buffer_index),
       .first_buffer_offset = last_block_buffer_size,
       .address = current_position.address + (txn.incr ? txn_size : 0),
   });
 }
 
-zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn) {
+// Explicit instantiation to ensure both methods are available to SdioFunctionDevice.
+template zx_status_t SdioControllerDevice::SdioDoRwTxn<>(uint8_t,
+                                                         const SdioRwTxn<sdmmc_buffer_region_t>&);
+template zx_status_t SdioControllerDevice::SdioDoRwTxn<>(
+    uint8_t, const SdioRwTxn<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion>&);
+
+template <typename T>
+zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>& txn) {
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
   }
@@ -799,14 +833,14 @@ zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_
   }
 
   fbl::AutoLock lock(&lock_);
-  SdioTxnPosition current_position = {
-      .buffers = cpp20::span(txn->buffers_list, txn->buffers_count),
+  SdioTxnPosition<T> current_position = {
+      .buffers = txn.buffers,
       .first_buffer_offset = 0,
-      .address = txn->addr,
+      .address = txn.addr,
   };
 
   while (!current_position.buffers.empty()) {
-    zx::result<SdioTxnPosition> status = DoOneRwTxnRequest(fn_idx, *txn, current_position);
+    zx::result<SdioTxnPosition<T>> status = DoOneRwTxnRequest<T>(fn_idx, txn, current_position);
     if (status.is_error()) {
       return status.error_value();
     }

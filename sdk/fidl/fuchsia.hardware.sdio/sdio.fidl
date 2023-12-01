@@ -6,9 +6,6 @@ library fuchsia.hardware.sdio;
 using fuchsia.hardware.sdmmc;
 using zx;
 
-// TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.
-const MAX_VMOS_PER_TRANSFER uint32 = 40;
-
 type SdioFuncHwInfo = struct {
     manufacturer_id uint32;
     product_id uint32;

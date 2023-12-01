@@ -190,44 +190,18 @@ void SdioFunctionDevice::GetBlockSize(GetBlockSizeCompleter::Sync& completer) {
 }
 
 void SdioFunctionDevice::DoRwTxn(DoRwTxnRequestView request, DoRwTxnCompleter::Sync& completer) {
-  auto fidl_buffers = request->txn.buffers;
-  // TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.
-  if (fidl_buffers.count() > fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer) {
-    zxlogf(ERROR, "Txn can only accept %u buffers req has %zu buffers",
-           fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer, request->txn.buffers.count());
-    completer.ReplyError(ZX_ERR_INTERNAL);
-  }
-  // TODO(bradenkell) Remove this limit once DoRwTxn accepts FIDL buffer type.
-  sdmmc_buffer_region_t buffers[fuchsia_hardware_sdio::wire::kMaxVmosPerTransfer];
-
-  uint8_t i = 0;
-  for (auto frame = fidl_buffers.begin(); frame != fidl_buffers.end(); frame++, i++) {
-    buffers[i] = {
-        .type = (frame->type == fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoId)
-                    ? SDMMC_BUFFER_TYPE_VMO_ID
-                    : SDMMC_BUFFER_TYPE_VMO_HANDLE,
-        .offset = frame->offset,
-        .size = frame->size,
-    };
-    if (frame->type == fuchsia_hardware_sdmmc::wire::SdmmcBufferType::kVmoHandle) {
-      buffers[i].buffer.vmo = std::move(frame->buffer.vmo().get());
-    } else {
-      buffers[i].buffer.vmo_id = frame->buffer.vmo_id();
-    }
-  }
-  sdio_rw_txn_t txn = {
+  const SdioControllerDevice::SdioRwTxn<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> txn{
       .addr = request->txn.addr,
       .incr = request->txn.incr,
       .write = request->txn.write,
-      .buffers_list = buffers,
-      .buffers_count = request->txn.buffers.count(),
+      .buffers = {request->txn.buffers.data(), request->txn.buffers.count()},
   };
 
-  zx_status_t status = SdioDoRwTxn(&txn);
-  if (status != ZX_OK)
-    completer.ReplyError(status);
-  else
+  if (zx_status_t status = sdio_parent_->SdioDoRwTxn(function_, txn); status == ZX_OK) {
     completer.ReplySuccess();
+  } else {
+    completer.ReplyError(status);
+  }
 }
 
 void SdioFunctionDevice::DoRwByte(DoRwByteRequestView request, DoRwByteCompleter::Sync& completer) {

@@ -33,6 +33,14 @@ using SdioControllerDeviceType = ddk::Device<SdioControllerDevice, ddk::Unbindab
 class SdioControllerDevice : public SdioControllerDeviceType,
                              public ddk::InBandInterruptProtocol<SdioControllerDevice> {
  public:
+  template <typename T>
+  struct SdioRwTxn {
+    uint32_t addr;
+    bool incr;
+    bool write;
+    cpp20::span<const T> buffers;
+  };
+
   SdioControllerDevice(zx_device_t* parent, std::unique_ptr<SdmmcDevice> sdmmc)
       : SdioControllerDeviceType(parent), sdmmc_(std::move(sdmmc)) {
     for (size_t i = 0; i < funcs_.size(); i++) {
@@ -70,11 +78,22 @@ class SdioControllerDevice : public SdioControllerDeviceType,
   zx_status_t SdioRegisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo vmo, uint64_t offset,
                               uint64_t size, uint32_t vmo_rights);
   zx_status_t SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo_id, zx::vmo* out_vmo);
-  zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn);
+  // TODO(b/309864701): Remove templating when Banjo support has been dropped.
+  template <typename T>
+  zx_status_t SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>& txn);
   zx_status_t SdioRequestCardReset() TA_EXCL(lock_);
   zx_status_t SdioPerformTuning();
 
   void InBandInterruptCallback();
+
+  zx_status_t SdioDoRwTxn(uint8_t fn_idx, const sdio_rw_txn_t* txn) {
+    return SdioDoRwTxn(fn_idx, SdioRwTxn<sdmmc_buffer_region_t>{
+                                   .addr = txn->addr,
+                                   .incr = txn->incr,
+                                   .write = txn->write,
+                                   .buffers = {txn->buffers_list, txn->buffers_count},
+                               });
+  }
 
   // Visible for testing.
   zx_status_t Init(bool use_fidl = false) TA_EXCL(lock_) {
@@ -137,15 +156,18 @@ class SdioControllerDevice : public SdioControllerDeviceType,
 
   zx::result<uint8_t> ReadCccrByte(uint32_t addr) TA_REQ(lock_);
 
+  template <typename T>
   struct SdioTxnPosition {
-    cpp20::span<const sdmmc_buffer_region_t> buffers;  // The buffers remaining to be processed.
-    uint64_t first_buffer_offset;                      // The offset into the first buffer.
-    uint32_t address;  // The current SDIO address, fixed if txn.incr is false.
+    cpp20::span<const T> buffers;  // The buffers remaining to be processed.
+    uint64_t first_buffer_offset;  // The offset into the first buffer.
+    uint32_t address;              // The current SDIO address, fixed if txn.incr is false.
   };
 
   // Returns an SdioTxnPosition representing the new position in the buffers list.
-  zx::result<SdioTxnPosition> DoOneRwTxnRequest(uint8_t fn_idx, const sdio_rw_txn_t& txn,
-                                                SdioTxnPosition current_position) TA_REQ(lock_);
+  template <typename T>
+  zx::result<SdioTxnPosition<T>> DoOneRwTxnRequest(uint8_t fn_idx, const SdioRwTxn<T>&,
+                                                   SdioTxnPosition<T> current_position)
+      TA_REQ(lock_);
 
   int SdioIrqThread();
   uint8_t interrupt_enabled_mask_ TA_GUARDED(lock_) = UINT8_MAX;
