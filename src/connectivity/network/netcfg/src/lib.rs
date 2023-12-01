@@ -1898,12 +1898,12 @@ impl<'a> NetCfg<'a> {
                 Ok(()) => {
                     break Ok(());
                 }
-                Err(devices::AddDeviceError::AlreadyExists) => {
+                Err(devices::AddDeviceError::AlreadyExists(name)) => {
                     i += 1;
                     if i == MAX_ADD_DEVICE_ATTEMPTS {
                         error!(
-                            "failed to add {:?} after {} attempts due to already exists error",
-                            instance, MAX_ADD_DEVICE_ATTEMPTS,
+                            "failed to add {instance:?} after {MAX_ADD_DEVICE_ATTEMPTS} \
+                            attempts due to already exists error and name ({name})",
                         );
 
                         break Ok(());

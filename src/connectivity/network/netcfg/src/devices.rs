@@ -17,7 +17,7 @@ use crate::{
 
 /// An error when adding a device.
 pub(super) enum AddDeviceError {
-    AlreadyExists,
+    AlreadyExists(String),
     Other(errors::Error),
 }
 
@@ -33,7 +33,7 @@ impl errors::ContextExt for AddDeviceError {
         C: Display + Send + Sync + 'static,
     {
         match self {
-            AddDeviceError::AlreadyExists => AddDeviceError::AlreadyExists,
+            AddDeviceError::AlreadyExists(name) => AddDeviceError::AlreadyExists(name),
             AddDeviceError::Other(e) => AddDeviceError::Other(e.context(context)),
         }
     }
@@ -44,7 +44,7 @@ impl errors::ContextExt for AddDeviceError {
         F: FnOnce() -> C,
     {
         match self {
-            AddDeviceError::AlreadyExists => AddDeviceError::AlreadyExists,
+            AddDeviceError::AlreadyExists(name) => AddDeviceError::AlreadyExists(name),
             AddDeviceError::Other(e) => AddDeviceError::Other(e.with_context(f)),
         }
     }
@@ -255,7 +255,7 @@ impl NetworkDeviceInstance {
                 &port_id,
                 control_server_end,
                 &fidl_fuchsia_net_interfaces_admin::Options {
-                    name: Some(name),
+                    name: Some(name.clone()),
                     metric: Some(metric),
                     ..Default::default()
                 },
@@ -269,7 +269,7 @@ impl NetworkDeviceInstance {
                 fidl_fuchsia_net_interfaces_ext::admin::TerminalError::Terminal(terminal_error) => {
                     match terminal_error {
                         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::DuplicateName => {
-                            return AddDeviceError::AlreadyExists;
+                            return AddDeviceError::AlreadyExists(name);
                         }
                         reason => {
                             anyhow::anyhow!("received terminal event {:?}", reason)
