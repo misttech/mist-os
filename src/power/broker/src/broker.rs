@@ -228,12 +228,10 @@ impl Broker {
         tracing::debug!("check_claims_to_activate: {:?}", claims);
         let mut claims_to_activate = Vec::new();
         for claim in claims {
-            let check_deps = self
-                .catalog
-                .topology
-                .get_direct_deps(&claim.dependency.requires)
-                .into_iter()
-                .try_for_each(|dep: Dependency| match self.current.get(&dep.requires.element_id) {
+            let active_dependencies =
+                self.catalog.topology.direct_active_dependencies(&claim.dependency.requires);
+            let check_deps = active_dependencies.into_iter().try_for_each(|dep: Dependency| {
+                match self.current.get(&dep.requires.element_id) {
                     Some(current) => {
                         if !current.satisfies(dep.requires.level) {
                             Err(anyhow!(
@@ -248,7 +246,8 @@ impl Broker {
                         }
                     }
                     None => Err(anyhow!("no current level for element")),
-                });
+                }
+            });
             // If there were any errors, some dependencies are not satisfied,
             // so we can't activate this claim.
             if let Err(err) = check_deps {
@@ -259,7 +258,7 @@ impl Broker {
             claims_to_activate.push(claim.clone());
         }
         for claim in &claims_to_activate {
-            self.catalog.activate_claim(&claim.id);
+            self.catalog.activate_pending_claim(&claim.id);
         }
         claims_to_activate
     }
@@ -285,7 +284,7 @@ impl Broker {
             claims_to_drop.push(claim_to_check.clone());
         }
         for claim in &claims_to_drop {
-            self.catalog.drop_claim(&claim.id);
+            self.catalog.drop_active_claim(&claim.id);
         }
         claims_to_drop
     }
@@ -306,7 +305,7 @@ impl Broker {
             if !credential.contains(Permissions::MODIFY_DEPENDENT) {
                 return Err(AddElementError::NotAuthorized);
             }
-            if let Err(err) = self.catalog.topology.add_direct_dep(&Dependency {
+            if let Err(err) = self.catalog.topology.add_active_dependency(&Dependency {
                 dependent: ElementLevel {
                     element_id: id.clone(),
                     level: dependency.dependent_level,
@@ -384,7 +383,7 @@ impl Broker {
         if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
             return Err(AddDependencyError::NotAuthorized);
         }
-        self.catalog.topology.add_direct_dep(&Dependency {
+        self.catalog.topology.add_active_dependency(&Dependency {
             dependent: ElementLevel {
                 element_id: dependent_cred.get_element().clone(),
                 level: dependent_level,
@@ -416,7 +415,7 @@ impl Broker {
         if !requires_cred.contains(Permissions::MODIFY_DEPENDENT) {
             return Err(RemoveDependencyError::NotAuthorized);
         }
-        self.catalog.topology.remove_direct_dep(&Dependency {
+        self.catalog.topology.remove_active_dependency(&Dependency {
             dependent: ElementLevel {
                 element_id: dependent_cred.get_element().clone(),
                 level: dependent_level,
@@ -473,7 +472,14 @@ struct Catalog {
     active_claims: ClaimTracker,
     /// Pending claims do not yet affect the required level communicated by
     /// Power Broker. Some dependencies of their required element are not met.
+    /// Once all dependencies are met, they will be moved to active claims.
     pending_claims: ClaimTracker,
+    /// Passive claims must be satisfied in order for their lease to be
+    /// satisfied but since they do not affect the required levels of the
+    /// element they depend upon, something else must raise the required
+    /// element's level in order for a passive claim to be satisfied (either
+    /// another active claim, or an unmanaged element raising its own level).
+    passive_claims: ClaimTracker,
 }
 
 impl Catalog {
@@ -483,6 +489,7 @@ impl Catalog {
             leases: HashMap::new(),
             active_claims: ClaimTracker::new(),
             pending_claims: ClaimTracker::new(),
+            passive_claims: ClaimTracker::new(),
         }
     }
 
@@ -517,7 +524,7 @@ impl Catalog {
 
     /// Creates a new lease for the given element and level along with all
     /// claims necessary to satisfy this lease and adds them to pending_claims.
-    /// Returns the new lease, and a Vec of all claims created.
+    /// Returns the new lease, and a Vec of pending claims created.
     fn create_lease_and_claims(
         &mut self,
         element_id: &ElementID,
@@ -527,19 +534,25 @@ impl Catalog {
         // TODO: Add lease validation and control.
         let lease = Lease::new(&element_id, level);
         self.leases.insert(lease.id.clone(), lease.clone());
-        // Create claims for all of the transitive dependencies.
-        let mut claims = Vec::new();
+        let mut pending_claims = Vec::new();
         let element_level = ElementLevel { element_id: element_id.clone(), level: level.clone() };
-        for dependency in self.topology.get_all_deps(&element_level) {
-            // TODO: Make sure this is permitted by Limiters (once we have them).
-            let dep_lease = Claim::new(dependency, &lease.id);
-            claims.push(dep_lease);
+        let (active_dependencies, passive_dependencies) =
+            self.topology.all_active_and_passive_dependencies(&element_level);
+        // Create pending claims for each of the active dependencies.
+        for dependency in active_dependencies {
+            let pending_claim = Claim::new(dependency, &lease.id);
+            pending_claims.push(pending_claim);
         }
-        for claim in claims.iter() {
+        for claim in pending_claims.iter() {
             tracing::debug!("adding pending claim: {:?}", &claim);
             self.pending_claims.add(claim.clone());
         }
-        (lease, claims)
+        // Create passive claims for each of the passive dependencies.
+        for dependency in passive_dependencies {
+            let passive_claim = Claim::new(dependency, &lease.id);
+            self.passive_claims.add(passive_claim);
+        }
+        (lease, pending_claims)
     }
 
     /// Drops an existing lease, and initiates process of releasing all
@@ -553,6 +566,8 @@ impl Catalog {
         tracing::debug!("active_claim_ids: {:?}", &active_claims);
         let pending_claims = self.pending_claims.for_lease(&lease.id);
         tracing::debug!("pending_claim_ids: {:?}", &pending_claims);
+        let passive_claims = self.passive_claims.for_lease(&lease.id);
+        tracing::debug!("pending_claim_ids: {:?}", &passive_claims);
         // Pending claims should be dropped immediately.
         for claim in pending_claims {
             if let Some(removed) = self.pending_claims.remove(&claim.id) {
@@ -561,19 +576,27 @@ impl Catalog {
                 tracing::error!("cannot remove pending claim: not found: {}", claim.id);
             }
         }
+        // Passive claims should be dropped immediately.
+        for claim in passive_claims {
+            if let Some(removed) = self.passive_claims.remove(&claim.id) {
+                tracing::debug!("removing passive claim: {:?}", &removed);
+            } else {
+                tracing::error!("cannot remove passive claim: not found: {}", claim.id);
+            }
+        }
         // Active claims should be marked to drop in an orderly sequence.
         let claims_marked_to_drop = self.active_claims.mark_lease_claims_to_drop(&lease.id);
         Ok((lease, claims_marked_to_drop))
     }
 
     /// Activates a pending claim, moving it to active_claims.
-    fn activate_claim(&mut self, claim_id: &ClaimID) {
+    fn activate_pending_claim(&mut self, claim_id: &ClaimID) {
         tracing::debug!("activate_claim: {:?}", claim_id);
         self.pending_claims.move_to(&claim_id, &mut self.active_claims);
     }
 
-    /// Drops a claim, removing it from active_claims.
-    fn drop_claim(&mut self, claim_id: &ClaimID) {
+    /// Drops an active claim, removing it from active_claims.
+    fn drop_active_claim(&mut self, claim_id: &ClaimID) {
         tracing::debug!("drop_claim: {:?}", claim_id);
         self.active_claims.remove(&claim_id);
     }
@@ -1228,7 +1251,7 @@ mod tests {
                     .into(),
                 PowerLevel::Binary(BinaryPowerLevel::On),
             )
-            .expect("add_direct_dep failed");
+            .expect("add_dependency failed");
         assert_eq!(
             broker.catalog.calculate_required_level(&parent),
             PowerLevel::Binary(BinaryPowerLevel::Off),
