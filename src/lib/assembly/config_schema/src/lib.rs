@@ -17,7 +17,7 @@ pub use board_config::{BoardInformation, BoardInputBundle, BoardProvidedConfig};
 pub use common::{
     DriverDetails, FeatureControl, FileEntry, PackageDetails, PackageSet, PackagedDriverDetails,
 };
-pub use image_assembly_config::{ImageAssemblyConfig, PartialImageAssemblyConfig};
+pub use image_assembly_config::ImageAssemblyConfig;
 pub use platform_config::{
     example_config::ExampleConfig,
     icu_config::{ICUConfig, Revision},

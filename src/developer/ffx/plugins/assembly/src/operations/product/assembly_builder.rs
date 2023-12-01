@@ -9,7 +9,7 @@ use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
     board_config::BoardInputBundle,
     common::PackagedDriverDetails,
-    image_assembly_config::PartialKernelConfig,
+    image_assembly_config::KernelConfig,
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
     DriverDetails, FileEntry, PackageDetails, PackageSet,
@@ -33,6 +33,7 @@ use assembly_util::{InsertAllUniqueExt, InsertUniqueExt, NamedMap};
 use camino::{Utf8Path, Utf8PathBuf};
 use fuchsia_pkg::PackageManifest;
 use fuchsia_url::UnpinnedAbsolutePackageUrl;
+use itertools::Itertools;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -748,25 +749,22 @@ impl ImageAssemblyConfigBuilder {
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
-        let partial = assembly_config_schema::PartialImageAssemblyConfig {
-            system: system.into_paths().collect(),
-            base: base.into_paths().collect(),
-            cache: cache.into_paths().collect(),
-            kernel: Some(PartialKernelConfig {
-                path: kernel_path,
+        let image_assembly_config = assembly_config_schema::ImageAssemblyConfig {
+            system: system.into_paths().sorted().collect(),
+            base: base.into_paths().sorted().collect(),
+            cache: cache.into_paths().sorted().collect(),
+            kernel: KernelConfig {
+                path: kernel_path.context("A kernel path must be specified")?,
                 args: kernel_args.into_iter().collect(),
-                clock_backstop: kernel_clock_backstop,
-            }),
-            qemu_kernel,
+                clock_backstop: kernel_clock_backstop
+                    .context("A kernel clock backstop time must be specified")?,
+            },
+            qemu_kernel: qemu_kernel.context("A qemu kernel configuration must be specified")?,
             boot_args: boot_args.into_iter().collect(),
             bootfs_files: bootfs_files.into_file_entries(),
-            bootfs_packages: bootfs_packages.into_paths().collect(),
+            bootfs_packages: bootfs_packages.into_paths().sorted().collect(),
+            images_config: Default::default(),
         };
-
-        let image_assembly_config = assembly_config_schema::ImageAssemblyConfig::try_from_partials(
-            std::iter::once(partial),
-        )?;
-
         Ok(image_assembly_config)
     }
 }
@@ -798,6 +796,7 @@ mod tests {
     use assembly_config_schema::assembly_config::{
         AdditionalPackageContents, MainPackageDefinition, ShellCommands,
     };
+    use assembly_config_schema::image_assembly_config::PartialKernelConfig;
     use assembly_driver_manifest::DriverManifest;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_named_file_map::SourceMerklePair;
@@ -810,7 +809,6 @@ mod tests {
     use fuchsia_pkg::{
         BlobInfo, MetaPackage, PackageBuilder, PackageManifest, PackageManifestBuilder,
     };
-    use itertools::Itertools;
     use serde_json::json;
     use std::fs::File;
     use std::io::BufReader;
