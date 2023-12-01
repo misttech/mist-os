@@ -391,8 +391,10 @@ where
                 ok => ok,
             };
 
-            current_task.release(());
             task_complete(run_result);
+            // `release` must be called as the absolute last action on this thread to ensure that
+            // any deferred release are done before it.
+            current_task.release(());
         })
         .expect("able to spawn threads");
 
