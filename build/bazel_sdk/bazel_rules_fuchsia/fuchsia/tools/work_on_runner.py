@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import re
-import signal
 import subprocess
 import time
 
@@ -155,6 +154,7 @@ class Context:
         )
         self.force_pb_download = args.force
         self.keep_build_config = args.keep_build_config
+        self.restore_original_build_config = args.restore_original_build_config
         self.target = Context.get_target(args, self._ffx_runner)
 
     def ffx(self):
@@ -248,10 +248,8 @@ class SetDefaults(Step):
             if not ctx.keep_build_config:
                 os.remove(config_file)
 
-            # Restore our original build config if we had one
-            if self.original_build_config:
+            if self.original_build_config and ctx.restore_original_build_config:
                 with open(config_file, "w") as f:
-                    print(self.original_build_config)
                     f.write(json.dumps(self.original_build_config, indent=2))
         except:
             pass
@@ -460,17 +458,23 @@ def main():
         action="store_true",
     )
 
+    parser.add_argument(
+        "--restore-original-build-config",
+        help="Restores the original build config if it is present",
+        required=False,
+        default=False,
+        action="store_true",
+    )
+
     parser.add_argument("product", help="The name of the product/board combo")
 
     args = parser.parse_args()
     runner = Runner(Context(args))
 
-    def handle_signal(signum, frame):
+    try:
+        runner.run()
+    except:
         runner.shutdown()
-        exit(1)
-
-    signal.signal(signal.SIGINT, handle_signal)
-    runner.run()
 
 
 if __name__ == "__main__":
