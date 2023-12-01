@@ -62,7 +62,7 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             if self.test_component_args:
                 test_args += self.test_component_args
 
-            results_file = f"results_process{i}.fuchsiaperf_full.json"
+            results_file: str = "results.fuchsiaperf.json"
             results_file_path = f"/custom_artifacts/{results_file}"
             if self.results_path_test_arg:
                 if self.results_path_test_arg.endswith("="):
@@ -94,7 +94,9 @@ class FuchsiaComponentPerfTest(fuchsia_base_test.FuchsiaBaseTest):
             )
             asserts.assert_equal(len(test_result_files), 1)
 
-            dest_file = os.path.join(self.test_case_path, results_file)
+            dest_file = os.path.join(
+                self.test_case_path, f"results_process{i}.fuchsiaperf_full.json"
+            )
             os.rename(test_result_files[0], dest_file)
             result_files.append(dest_file)
 
