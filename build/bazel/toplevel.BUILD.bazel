@@ -42,7 +42,10 @@ exports_files(
     glob(["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"]) +
 
     # vim3 bootloader
-    ["prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned"],
+    ["prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned"] +
+
+    # zoneinfo resources
+    glob(["prebuilt/third_party/zoneinfo/**"]),
 )
 
 linux_sysroot(
