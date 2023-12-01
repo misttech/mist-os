@@ -588,7 +588,8 @@ struct TypeTraits<::test_handlesintypes::wire::HandlesInTypes> {
   static constexpr uint32_t kMaxNumHandles = 4294967295;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 96;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 4294967295;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 4294967295;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -663,7 +664,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 1;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -717,7 +719,8 @@ struct TypeTraits<::test_handlesintypes::wire::TableWithHandle> {
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -809,7 +812,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceTable> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -889,7 +893,8 @@ struct TypeTraits<::test_handlesintypes::wire::UnionWithHandle> {
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -1004,7 +1009,8 @@ struct TypeTraits<::test_handlesintypes::wire::EmptyResourceUnion> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };

@@ -106,25 +106,35 @@ void fidl::WireServer<::test_bindingsdenylist::OnlyCppAndDeps>::dispatch_message
 
 namespace test_bindingsdenylist {
 
-[[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyDart_Ordinal = 8446571910689294295lu;
+[[maybe_unused]]
+constexpr uint64_t kDenyEachBinding_OnlyDenyDart_Ordinal = 8446571910689294295lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyDart_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyDart_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyGo_Ordinal = 7311125300308839833lu;
+[[maybe_unused]]
+constexpr uint64_t kDenyEachBinding_OnlyDenyGo_Ordinal = 7311125300308839833lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyGo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyGo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal = 2184115815603862302lu;
+[[maybe_unused]]
+constexpr uint64_t kDenyEachBinding_OnlyDenyLibfuzzer_Ordinal = 2184115815603862302lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyLibfuzzer_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyLibfuzzer_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenyRust_Ordinal = 3719805222870932662lu;
+[[maybe_unused]]
+constexpr uint64_t kDenyEachBinding_OnlyDenyRust_Ordinal = 3719805222870932662lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyRust_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenyRust_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr uint64_t kDenyEachBinding_OnlyDenySyzkaller_Ordinal = 2319043834522757514lu;
+[[maybe_unused]]
+constexpr uint64_t kDenyEachBinding_OnlyDenySyzkaller_Ordinal = 2319043834522757514lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenySyzkaller_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kDenyEachBinding_OnlyDenySyzkaller_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 #ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 
@@ -1084,13 +1094,17 @@ void fidl::WireServer<::test_bindingsdenylist::Allowed>::dispatch_message(
 
 namespace test_bindingsdenylist {
 
-[[maybe_unused]] constexpr uint64_t kImportsSameNameContext_Unattributed_Ordinal = 475191379775102607lu;
+[[maybe_unused]]
+constexpr uint64_t kImportsSameNameContext_Unattributed_Ordinal = 475191379775102607lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kImportsSameNameContext_Unattributed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kImportsSameNameContext_Unattributed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr uint64_t kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Ordinal = 2914965219653596920lu;
+[[maybe_unused]]
+constexpr uint64_t kImportsSameNameContext_AlwaysAppearsInImportingLibrary_Ordinal = 2914965219653596920lu;
 
-[[maybe_unused]] constexpr ::fidl::MessageDynamicFlags kImportsSameNameContext_AlwaysAppearsInImportingLibrary_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr ::fidl::MessageDynamicFlags kImportsSameNameContext_AlwaysAppearsInImportingLibrary_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 #ifdef __Fuchsia__
 }  // namespace test_bindingsdenylist
 

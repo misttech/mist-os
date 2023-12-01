@@ -11,13 +11,17 @@
 
 namespace test_requestflexibleenvelope {
 
-[[maybe_unused]] constexpr inline uint64_t kProtocol_RequestStrictResponseFlexible_Ordinal = 700529454616207123lu;
+[[maybe_unused]]
+constexpr inline uint64_t kProtocol_RequestStrictResponseFlexible_Ordinal = 700529454616207123lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_RequestStrictResponseFlexible_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kProtocol_RequestStrictResponseFlexible_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kProtocol_RequestFlexibleResponseStrict_Ordinal = 5191655763393883319lu;
+[[maybe_unused]]
+constexpr inline uint64_t kProtocol_RequestFlexibleResponseStrict_Ordinal = 5191655763393883319lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kProtocol_RequestFlexibleResponseStrict_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kProtocol_RequestFlexibleResponseStrict_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_requestflexibleenvelope

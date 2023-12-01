@@ -11,9 +11,11 @@
 
 namespace test_inheritance {
 
-[[maybe_unused]] constexpr inline uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
+[[maybe_unused]]
+constexpr inline uint64_t ksuper_foo_Ordinal = 7540745593380780216lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags ksuper_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_inheritance
@@ -119,9 +121,11 @@ void fidl::Server<::test_inheritance::Super>::dispatch_message(
 
 namespace test_inheritance {
 
-[[maybe_unused]] constexpr inline uint64_t ksub_foo_Ordinal = 7540745593380780216lu;
+[[maybe_unused]]
+constexpr inline uint64_t ksub_foo_Ordinal = 7540745593380780216lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags ksub_foo_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_inheritance

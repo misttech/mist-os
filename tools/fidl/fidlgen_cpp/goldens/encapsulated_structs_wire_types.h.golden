@@ -101,7 +101,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::Int8Int32> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 8;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -152,7 +153,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::Int16Int8> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 4;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -203,7 +205,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::ArrayInt16Int8> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 12;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -248,7 +251,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::StructPaddingTestStruct> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 24;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -305,7 +309,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::NonInlineStructTestStruct> {
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -362,7 +367,8 @@ struct TypeTraits<::test_encapsulatedstructs::wire::TopLevelStruct> {
   static constexpr uint32_t kMaxNumHandles = 1;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 40;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };

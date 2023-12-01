@@ -630,7 +630,8 @@ struct TypeTraits<::test_arrays::wire::StructSmallArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 8;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -675,7 +676,8 @@ struct TypeTraits<::test_arrays::wire::StructLargeArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 400;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -720,7 +722,8 @@ struct TypeTraits<::test_arrays::wire::TableSmallArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 16;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -806,7 +809,8 @@ struct TypeTraits<::test_arrays::wire::TableLargeArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 2;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 408;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 408;
   static constexpr bool kHasFlexibleEnvelope = true;
   static constexpr bool kHasPointer = true;
 };
@@ -892,7 +896,8 @@ struct TypeTraits<::test_arrays::wire::UnionSmallArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -1001,7 +1006,8 @@ struct TypeTraits<::test_arrays::wire::UnionLargeArray> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 400;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 400;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };

@@ -186,7 +186,8 @@ struct TypeTraits<::test_handles::wire::Handles> {
   static constexpr uint32_t kMaxNumHandles = 34;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 136;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -369,7 +370,8 @@ struct TypeTraits<::test_handles::wire::FdfHandles> {
   static constexpr uint32_t kMaxNumHandles = 3;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 12;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };

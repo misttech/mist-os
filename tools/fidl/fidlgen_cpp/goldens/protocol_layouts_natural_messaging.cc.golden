@@ -11,105 +11,155 @@
 
 namespace test_protocollayouts {
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayAnonComposed_Ordinal = 467706262354916833lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OneWayAnonComposed_Ordinal = 467706262354916833lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayAnonComposed_Ordinal = 1634702755099390832lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayAnonComposed_Ordinal = 1634702755099390832lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayAnonComposedWithError_Ordinal = 3374101322700362141lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayAnonComposedWithError_Ordinal = 3374101322700362141lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnAnonComposed_Ordinal = 9198778981238868491lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnAnonComposed_Ordinal = 9198778981238868491lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnAnonComposedWithError_Ordinal = 712214127111113275lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnAnonComposedWithError_Ordinal = 712214127111113275lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 6735359826241449560lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OneWayNamedComposed_Ordinal = 6735359826241449560lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayNamedComposed_Ordinal = 1110122450485917712lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayNamedComposed_Ordinal = 1110122450485917712lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayNamedComposedWithError_Ordinal = 3520341666774118271lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayNamedComposedWithError_Ordinal = 3520341666774118271lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnNamedComposed_Ordinal = 6802961197456477674lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnNamedComposed_Ordinal = 6802961197456477674lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposed_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnNamedComposedWithError_Ordinal = 7488207288618998795lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnNamedComposedWithError_Ordinal = 7488207288618998795lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnNamedComposedWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayImport_Ordinal = 374039999976906043lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OneWayImport_Ordinal = 374039999976906043lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayImport_Ordinal = 3167860988423964164lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayImport_Ordinal = 3167860988423964164lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayImportWithError_Ordinal = 4837028007581646602lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayImportWithError_Ordinal = 4837028007581646602lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnImport_Ordinal = 6584793811321990352lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnImport_Ordinal = 6584793811321990352lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImport_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnImportWithError_Ordinal = 1123803631971094487lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnImportWithError_Ordinal = 1123803631971094487lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnImportWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayLocal_Ordinal = 6085941264859402051lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OneWayLocal_Ordinal = 6085941264859402051lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayLocal_Ordinal = 7763901300032164763lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayLocal_Ordinal = 7763901300032164763lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayLocalWithError_Ordinal = 5609487496960056151lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayLocalWithError_Ordinal = 5609487496960056151lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnLocal_Ordinal = 4199259762307646332lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnLocal_Ordinal = 4199259762307646332lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocal_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnLocalWithError_Ordinal = 8767483445230259748lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnLocalWithError_Ordinal = 8767483445230259748lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnLocalWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OneWayAnon_Ordinal = 4203317713771984620lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OneWayAnon_Ordinal = 4203317713771984620lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OneWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayAnon_Ordinal = 7435080039097281487lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayAnon_Ordinal = 7435080039097281487lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_TwoWayAnonWithError_Ordinal = 7770394869745610225lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_TwoWayAnonWithError_Ordinal = 7770394869745610225lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_TwoWayAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnAnon_Ordinal = 7275479350674227467lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnAnon_Ordinal = 7275479350674227467lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnon_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kMainProtocol_OnAnonWithError_Ordinal = 3672186790919812761lu;
+[[maybe_unused]]
+constexpr inline uint64_t kMainProtocol_OnAnonWithError_Ordinal = 3672186790919812761lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kMainProtocol_OnAnonWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocollayouts
@@ -1166,41 +1216,59 @@ void fidl::Server<::test_protocollayouts::MainProtocol>::dispatch_message(
 
 namespace test_protocollayouts {
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleOneWay_Ordinal = 3516779973873009953lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_FlexibleOneWay_Ordinal = 3516779973873009953lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayNoError_Ordinal = 5572735551219638488lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayNoError_Ordinal = 5572735551219638488lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayWithError_Ordinal = 3504132377779779458lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_FlexibleTwoWayWithError_Ordinal = 3504132377779779458lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleEvent_Ordinal = 9152311661656086484lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_FlexibleEvent_Ordinal = 9152311661656086484lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictOneWay_Ordinal = 8790149921168801703lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_StrictOneWay_Ordinal = 8790149921168801703lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictOneWay_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictTwoWayNoError_Ordinal = 3690935745864999300lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_StrictTwoWayNoError_Ordinal = 3690935745864999300lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayNoError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictTwoWayWithError_Ordinal = 5364624536440098871lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_StrictTwoWayWithError_Ordinal = 5364624536440098871lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictTwoWayWithError_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_StrictEvent_Ordinal = 3921073878922106269lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_StrictEvent_Ordinal = 3921073878922106269lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_StrictEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 1525606789639046512lu;
+[[maybe_unused]]
+constexpr inline uint64_t kOpenProtocol_FlexibleOneWayNamedPayload_Ordinal = 1525606789639046512lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kOpenProtocol_FlexibleOneWayNamedPayload_DynamicFlags = ::fidl::MessageDynamicFlags::kFlexibleMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocollayouts

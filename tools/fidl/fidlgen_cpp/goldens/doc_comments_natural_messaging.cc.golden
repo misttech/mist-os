@@ -11,13 +11,17 @@
 
 namespace test_doccomments {
 
-[[maybe_unused]] constexpr inline uint64_t kInterface_Method_Ordinal = 5017051197196532121lu;
+[[maybe_unused]]
+constexpr inline uint64_t kInterface_Method_Ordinal = 5017051197196532121lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kInterface_Method_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kInterface_Method_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kInterface_OnEvent_Ordinal = 28780186509098736lu;
+[[maybe_unused]]
+constexpr inline uint64_t kInterface_OnEvent_Ordinal = 28780186509098736lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kInterface_OnEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kInterface_OnEvent_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_doccomments

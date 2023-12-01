@@ -34,9 +34,11 @@ void fdf::Server<::test_driverhandle::DriverProtocol>::dispatch_message(
 
 namespace test_driverhandle {
 
-[[maybe_unused]] constexpr inline uint64_t kHandlesInProtocol_SendHandles_Ordinal = 8904504160365833729lu;
+[[maybe_unused]]
+constexpr inline uint64_t kHandlesInProtocol_SendHandles_Ordinal = 8904504160365833729lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kHandlesInProtocol_SendHandles_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kHandlesInProtocol_SendHandles_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 #ifdef __Fuchsia__
 }  // namespace test_driverhandle
 

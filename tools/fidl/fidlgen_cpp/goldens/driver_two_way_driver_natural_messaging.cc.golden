@@ -6,9 +6,11 @@
 
 namespace test_drivertwoway {
 
-[[maybe_unused]] constexpr inline uint64_t kTwoWay_Add_Ordinal = 989730524426044687lu;
+[[maybe_unused]]
+constexpr inline uint64_t kTwoWay_Add_Ordinal = 989730524426044687lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTwoWay_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kTwoWay_Add_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 #ifdef __Fuchsia__
 }  // namespace test_drivertwoway
 

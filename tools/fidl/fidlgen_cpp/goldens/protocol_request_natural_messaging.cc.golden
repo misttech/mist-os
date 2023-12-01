@@ -54,21 +54,29 @@ void fidl::Server<::test_protocolrequest::Child>::dispatch_message(
 
 namespace test_protocolrequest {
 
-[[maybe_unused]] constexpr inline uint64_t kParent_GetChild_Ordinal = 881818649151440699lu;
+[[maybe_unused]]
+constexpr inline uint64_t kParent_GetChild_Ordinal = 881818649151440699lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kParent_GetChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kParent_GetChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kParent_GetChildRequest_Ordinal = 1096855814967598201lu;
+[[maybe_unused]]
+constexpr inline uint64_t kParent_GetChildRequest_Ordinal = 1096855814967598201lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kParent_GetChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kParent_GetChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kParent_TakeChild_Ordinal = 4470101341872267920lu;
+[[maybe_unused]]
+constexpr inline uint64_t kParent_TakeChild_Ordinal = 4470101341872267920lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kParent_TakeChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kParent_TakeChild_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kParent_TakeChildRequest_Ordinal = 2333981071306416007lu;
+[[maybe_unused]]
+constexpr inline uint64_t kParent_TakeChildRequest_Ordinal = 2333981071306416007lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kParent_TakeChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kParent_TakeChildRequest_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_protocolrequest

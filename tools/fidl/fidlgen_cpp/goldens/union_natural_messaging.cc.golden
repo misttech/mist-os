@@ -11,13 +11,17 @@
 
 namespace test_union {
 
-[[maybe_unused]] constexpr inline uint64_t kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal = 6628358876445129155lu;
+[[maybe_unused]]
+constexpr inline uint64_t kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_Ordinal = 6628358876445129155lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_StrictUnionHenceResponseMayBeStackAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal = 7588545459451501794lu;
+[[maybe_unused]]
+constexpr inline uint64_t kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_Ordinal = 7588545459451501794lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kTestProtocol_FlexibleUnionHenceResponseMustBeHeapAllocated_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_union

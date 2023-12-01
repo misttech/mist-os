@@ -310,7 +310,8 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize8Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 32;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -367,7 +368,8 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize12Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 32;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -424,7 +426,8 @@ struct TypeTraits<::test_unionsandwich::wire::StructSize16Alignment8> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 0;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = false;
 };
@@ -473,7 +476,8 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize24Alignment8> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 32;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 16;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -530,7 +534,8 @@ struct TypeTraits<::test_unionsandwich::wire::SandwichUnionSize36Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 32;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 32;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -587,7 +592,8 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize8Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 0;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 0;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -696,7 +702,8 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize12Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 8;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 8;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -805,7 +812,8 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize24Alignment8> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 16;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 16;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };
@@ -914,7 +922,8 @@ struct TypeTraits<::test_unionsandwich::wire::UnionSize36Alignment4> {
   static constexpr uint32_t kMaxNumHandles = 0;
   static constexpr uint32_t kMaxDepth = 1;
   static constexpr uint32_t kPrimarySize = 16;
-  [[maybe_unused]] static constexpr uint32_t kMaxOutOfLine = 32;
+  [[maybe_unused]]
+  static constexpr uint32_t kMaxOutOfLine = 32;
   static constexpr bool kHasFlexibleEnvelope = false;
   static constexpr bool kHasPointer = true;
 };

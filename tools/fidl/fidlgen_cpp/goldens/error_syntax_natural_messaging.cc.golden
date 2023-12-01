@@ -11,13 +11,17 @@
 
 namespace test_errorsyntax {
 
-[[maybe_unused]] constexpr inline uint64_t kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal = 3565108794310607393lu;
+[[maybe_unused]]
+constexpr inline uint64_t kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_Ordinal = 3565108794310607393lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_ComposedCallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
-[[maybe_unused]] constexpr inline uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 3757408930698888354lu;
+[[maybe_unused]]
+constexpr inline uint64_t kExampleUseOfErrorSyntax_CallWhichMayFail_Ordinal = 3757408930698888354lu;
 
-[[maybe_unused]] constexpr inline ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
+[[maybe_unused]]
+constexpr inline ::fidl::MessageDynamicFlags kExampleUseOfErrorSyntax_CallWhichMayFail_DynamicFlags = ::fidl::MessageDynamicFlags::kStrictMethod;
 
 #ifdef __Fuchsia__
 }  // namespace test_errorsyntax
