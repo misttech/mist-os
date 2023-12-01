@@ -91,7 +91,6 @@ pub type RecoveryProfile = fn(
 
 // This is available so that new products' behaviors can be characterized before enforcing any
 // recovery thresholds.  This will enable finding real bugs in a device's behavior.
-#[allow(unused)]
 fn recovery_disabled(
     _phy_id: u16,
     _defect_history: &mut EventHistory<Defect>,
@@ -101,11 +100,79 @@ fn recovery_disabled(
     None
 }
 
+// This recovery profile takes into account the various defect thresholds and remediation limits to
+// recommend a recovery solution when defects are encountered.
+fn thresholded_recovery(
+    phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    latest_defect: Defect,
+) -> Option<RecoveryAction> {
+    match latest_defect {
+        Defect::Phy(PhyFailure::IfaceCreationFailure { .. }) => {
+            thresholded_create_iface_failure_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Phy(PhyFailure::IfaceDestructionFailure { .. }) => {
+            thresholded_destroy_iface_failure_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Iface(IfaceFailure::CanceledScan { .. }) => {
+            thresholded_canceled_scan_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Iface(IfaceFailure::FailedScan { .. }) => {
+            thresholded_scan_failure_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Iface(IfaceFailure::EmptyScanResults { .. }) => {
+            thresholded_empty_scan_results_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Iface(IfaceFailure::ApStartFailure { .. }) => {
+            thresholded_ap_start_failure_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+        Defect::Iface(IfaceFailure::ConnectionFailure { .. }) => {
+            thresholded_connect_failure_recovery_profile(
+                phy_id,
+                defect_history,
+                recovery_history,
+                latest_defect,
+            )
+        }
+    }
+}
+
 // Enable the lookup of recovery profiles by description.
-#[allow(unused)]
 pub(crate) fn lookup_recovery_profile(profile_name: &str) -> RecoveryProfile {
     match profile_name {
         "" => recovery_disabled,
+        "thresholded_recovery" => thresholded_recovery,
         other => {
             warn!("Invalid recovery profile: {}.  Proceeding with default.", other);
             recovery_disabled
@@ -121,45 +188,28 @@ fn thresholded_iface_destruction_and_phy_reset(
     most_recent_defect: Defect,
     defect_count_threshold: usize,
 ) -> Option<RecoveryAction> {
-    // These are the potential remedies that this function will recommend.
-    let proposed_phy_reset_action =
-        RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id });
     let proposed_iface_destruction_action =
         RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id });
 
-    // If the threshold has not been crossed, don't recommend any recovery.
-    if defect_history.event_count(most_recent_defect) < defect_count_threshold {
-        return None;
-    }
-
-    // If interface destruction has already been attempted and further defects are observed,
-    // suggest performing PHY recovery.  This should only be allowed once every 24 hours.
     if recovery_history.event_count(proposed_iface_destruction_action) > 0 {
-        let phy_reset_allowed =
-            match recovery_history.time_since_last_event(proposed_phy_reset_action) {
-                None => true,
-                Some(time) => time.into_hours() > HOURS_BETWEEN_PHY_RESETS,
-            };
-
-        if phy_reset_allowed {
-            return Some(proposed_phy_reset_action);
+        if let Some(phy_reset_recovery) = thresholded_phy_reset(
+            phy_id,
+            defect_history,
+            recovery_history,
+            most_recent_defect,
+            defect_count_threshold,
+        ) {
+            return Some(phy_reset_recovery);
         }
     }
 
-    // After the threshold has been crossed, attempt to clear any bad state by destroying the
-    // interface.  This should be allowed once every 12 hours and should be the first thing to try
-    // to get the desired operation to work again.
-    let destroy_iface_allowed =
-        match recovery_history.time_since_last_event(proposed_iface_destruction_action) {
-            None => true,
-            Some(time) => time.into_hours() > HOURS_BETWEEN_IFACE_DESTRUCTIONS,
-        };
-
-    if destroy_iface_allowed {
-        return Some(proposed_iface_destruction_action);
-    }
-
-    None
+    thresholded_iface_destruction(
+        iface_id,
+        defect_history,
+        recovery_history,
+        most_recent_defect,
+        defect_count_threshold,
+    )
 }
 
 fn thresholded_phy_reset(
@@ -382,6 +432,7 @@ mod tests {
         fuchsia_async::{TestExecutor, Time},
         fuchsia_zircon::DurationNum,
         rand::Rng,
+        test_case::test_case,
     };
 
     #[fuchsia::test]
@@ -707,5 +758,62 @@ mod tests {
             defect_to_log,
             CANCELED_SCAN_RECOVERY_THRESHOLD,
         )
+    }
+
+    #[test_case(
+        Defect::Iface(IfaceFailure::FailedScan { iface_id: IFACE_ID }),
+        SCAN_FAILURE_RECOVERY_THRESHOLD ;
+        "scan failure threshold test"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::EmptyScanResults { iface_id: IFACE_ID }),
+        EMPTY_SCAN_RECOVERY_THRESHOLD ;
+        "empty scan threshold test"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::ConnectionFailure { iface_id: IFACE_ID }),
+        CONNECT_FAILURE_RECOVERY_THRESHOLD ;
+        "connection failure threshold test"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::ApStartFailure { iface_id: IFACE_ID }),
+        AP_START_FAILURE_RECOVERY_THRESHOLD ;
+        "start ap failure threshold test"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: PHY_ID }),
+        CREATE_IFACE_FAILURE_RECOVERY_THRESHOLD ;
+        "create iface failure threshold test"
+    )]
+    #[test_case(
+        Defect::Phy(PhyFailure::IfaceDestructionFailure { phy_id: PHY_ID }),
+        DESTROY_IFACE_FAILURE_RECOVERY_THRESHOLD ;
+        "destroy iface failure threshold test"
+    )]
+    #[test_case(
+        Defect::Iface(IfaceFailure::CanceledScan { iface_id: IFACE_ID }),
+        CANCELED_SCAN_RECOVERY_THRESHOLD ;
+        "canceled scan threshold test"
+    )]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_thresholded_recovery(defect: Defect, threshold: usize) {
+        let exec = TestExecutor::new_with_fake_time();
+        let profile = lookup_recovery_profile("thresholded_recovery");
+
+        match defect {
+            Defect::Iface(IfaceFailure::FailedScan { .. })
+            | Defect::Iface(IfaceFailure::EmptyScanResults { .. })
+            | Defect::Iface(IfaceFailure::ConnectionFailure { .. }) => {
+                test_thresholded_iface_destruction_and_phy_reset(&exec, profile, defect, threshold)
+            }
+            Defect::Iface(IfaceFailure::ApStartFailure { .. })
+            | Defect::Phy(PhyFailure::IfaceCreationFailure { .. })
+            | Defect::Phy(PhyFailure::IfaceDestructionFailure { .. }) => {
+                test_thresholded_phy_reset(&exec, profile, defect, threshold)
+            }
+            Defect::Iface(IfaceFailure::CanceledScan { .. }) => {
+                test_thresholded_destroy_iface(&exec, profile, defect, threshold)
+            }
+        }
     }
 }
