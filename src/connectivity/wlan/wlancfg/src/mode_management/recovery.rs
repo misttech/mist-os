@@ -5,7 +5,7 @@
 #![cfg(test)]
 
 use {
-    crate::mode_management::{Defect, EventHistory, IfaceFailure},
+    crate::mode_management::{Defect, EventHistory, IfaceFailure, PhyFailure},
     tracing::warn,
 };
 
@@ -27,6 +27,7 @@ const SCAN_FAILURE_RECOVERY_THRESHOLD: usize = 5;
 const EMPTY_SCAN_RECOVERY_THRESHOLD: usize = 10;
 const CONNECT_FAILURE_RECOVERY_THRESHOLD: usize = 15;
 const AP_START_FAILURE_RECOVERY_THRESHOLD: usize = 12;
+const CREATE_IFACE_FAILURE_RECOVERY_THRESHOLD: usize = 1;
 
 #[derive(Clone, Copy, Debug)]
 pub enum PhyRecoveryOperation {
@@ -280,6 +281,27 @@ fn thresholded_ap_start_failure_recovery_profile(
     }
 }
 
+fn thresholded_create_iface_failure_recovery_profile(
+    phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    create_iface_defect: Defect,
+) -> Option<RecoveryAction> {
+    match create_iface_defect {
+        Defect::Phy(PhyFailure::IfaceCreationFailure { .. }) => thresholded_phy_reset(
+            phy_id,
+            defect_history,
+            recovery_history,
+            create_iface_defect,
+            CREATE_IFACE_FAILURE_RECOVERY_THRESHOLD,
+        ),
+        other => {
+            warn!("Assessing invalid defect type for create iface failure recovery: {:?}", other);
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use {
@@ -522,6 +544,18 @@ mod tests {
             thresholded_ap_start_failure_recovery_profile,
             defect_to_log,
             AP_START_FAILURE_RECOVERY_THRESHOLD,
+        )
+    }
+
+    #[fuchsia::test]
+    fn test_create_iface_failure_recovery() {
+        let exec = TestExecutor::new_with_fake_time();
+        let defect_to_log = Defect::Phy(PhyFailure::IfaceCreationFailure { phy_id: PHY_ID });
+        test_thresholded_phy_reset(
+            &exec,
+            thresholded_create_iface_failure_recovery_profile,
+            defect_to_log,
+            CREATE_IFACE_FAILURE_RECOVERY_THRESHOLD,
         )
     }
 }
