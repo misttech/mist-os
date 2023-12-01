@@ -54,7 +54,7 @@ pub struct AdvertisingProxyServiceInfo {
 impl AdvertisingProxyServiceInfo {
     fn new(srp_service: &ot::SrpServerService) -> Self {
         AdvertisingProxyServiceInfo {
-            name: srp_service.full_name_cstr().to_owned(),
+            name: srp_service.instance_name_cstr().to_owned(),
             txt: srp_service.txt_entries().map(|x| x.unwrap().to_vec()).collect::<Vec<_>>(),
             port: srp_service.port(),
             priority: srp_service.priority(),
@@ -71,12 +71,11 @@ impl AdvertisingProxyServiceInfo {
         self.subtypes.contains(subtype)
     }
 
-    fn add_subtype(&mut self, subtype: &str) {
-        self.subtypes.insert(subtype.to_string());
-    }
-
-    fn remove_subtype(&mut self, subtype: &str) {
-        self.subtypes.remove(subtype);
+    fn set_subtypes(&mut self, subtypes: Vec<String>) {
+        self.subtypes.clear();
+        for subtype in subtypes {
+            self.subtypes.insert(subtype);
+        }
     }
 
     fn into_service_instance_publication(self) -> ServiceInstancePublication {
@@ -110,29 +109,11 @@ impl AdvertisingProxyService {
         self.reannounce()
     }
 
-    fn add_subtype(&self, subtype: &str) -> Result<(), anyhow::Error> {
-        let subtypes = {
+    fn set_subtypes(&self, subtypes: Vec<String>) -> Result<(), anyhow::Error> {
+        {
             let mut info = self.info.lock();
-            if info.has_subtype(subtype) {
-                return Ok(());
-            }
-            info.add_subtype(subtype);
-            info.subtypes.iter().map(String::clone).collect::<Vec<_>>()
-        };
-
-        self.control_handle.send_set_subtypes(&subtypes).map_err(Into::into)
-    }
-
-    fn remove_subtype(&self, subtype: &str) -> Result<(), anyhow::Error> {
-        let subtypes = {
-            let mut info = self.info.lock();
-            if !info.has_subtype(subtype) {
-                return Ok(());
-            }
-            info.remove_subtype(subtype);
-            info.subtypes.iter().map(String::clone).collect::<Vec<_>>()
-        };
-
+            info.set_subtypes(subtypes.clone());
+        }
         self.control_handle.send_set_subtypes(&subtypes).map_err(Into::into)
     }
 
@@ -417,11 +398,7 @@ impl AdvertisingProxyInner {
         let services = &mut host.services;
 
         // Handle adding/removing whole services
-        for srp_service in srp_host.find_services::<&CStr, &CStr>(
-            ot::SrpServerServiceFlags::BASE_TYPE_SERVICE_ONLY,
-            None,
-            None,
-        ) {
+        for srp_service in srp_host.services() {
             // The service name as a Rust string slice from the SRP service.
             let service_name = srp_service.service_name_cstr().as_ref().to_str()?;
 
@@ -431,7 +408,7 @@ impl AdvertisingProxyInner {
             // The instance name without the service name or domain,
             // without any trailing period, like "My-Service".
             let local_instance_name = srp_service
-                .full_name_cstr()
+                .instance_name_cstr()
                 .as_ref()
                 .to_str()?
                 .trim_end_matches(service_name)
@@ -439,18 +416,18 @@ impl AdvertisingProxyInner {
 
             if srp_service.is_deleted() {
                 // Delete the service.
-                if services.remove(srp_service.full_name_cstr()).is_some() {
+                if services.remove(srp_service.instance_name_cstr()).is_some() {
                     debug!(
                         tag = "srp_advertising_proxy",
                         "No longer advertising service {:?} on {:?}",
-                        srp_service.full_name_cstr(),
+                        srp_service.instance_name_cstr(),
                         LOCAL_DOMAIN
                     );
                 }
                 continue;
             }
 
-            let service_name = srp_service.full_name_cstr().to_owned();
+            let service_name = srp_service.instance_name_cstr().to_owned();
 
             if let Some(service) = services.get(&service_name) {
                 let service_info = AdvertisingProxyServiceInfo::new(srp_service);
@@ -607,7 +584,7 @@ impl AdvertisingProxyInner {
                 .map_ok(|_| ());
 
             services.insert(
-                srp_service.full_name_cstr().to_owned(),
+                srp_service.instance_name_cstr().to_owned(),
                 AdvertisingProxyService {
                     info: service_info,
                     control_handle: pub_responder_control,
@@ -617,49 +594,38 @@ impl AdvertisingProxyInner {
         }
 
         // Handle subtypes
-        for srp_service in srp_host.find_services::<&CStr, &CStr>(
-            ot::SrpServerServiceFlags::SUB_TYPE_SERVICE_ONLY,
-            None,
-            None,
-        ) {
-            let subtype = match srp_service.subtype_label() {
-                Ok(Some(x)) => x,
-                Ok(None) => continue,
-                Err(e) => {
-                    warn!(tag = "srp_advertising_proxy", "Error getting subtype label: {e:?}");
-                    continue;
-                }
-            };
-
-            let subtype_str = match subtype.to_str() {
-                Ok(x) => x,
-                Err(e) => {
-                    warn!(tag = "srp_advertising_proxy", "Unacceptable subtype {subtype:?}: {e:?}");
-                    continue;
-                }
-            };
-
-            let service_name = srp_service.full_name_cstr().to_owned();
+        for srp_service in srp_host.services() {
+            let service_name = srp_service.instance_name_cstr().to_owned();
 
             if let Some(service) = services.get(&service_name) {
                 if srp_service.is_deleted() {
-                    match service.remove_subtype(subtype_str) {
+                    match service.set_subtypes(vec![]) {
                         Ok(()) => {}
-                        Err(e) => {
-                            warn!(
-                                tag = "srp_advertising_proxy",
-                                "Can't remove subtype {subtype:?}: {e:?}"
-                            );
+                        Err(_) => {
+                            // Just ignore any errors here.
                             continue;
                         }
                     }
                 } else {
-                    match service.add_subtype(subtype_str) {
+                    let subtypes = srp_service
+                        .subtypes()
+                        .filter_map(|x: &CStr| match x.to_str() {
+                            Ok(x) => Some(x.to_string()),
+                            Err(err) => {
+                                warn!(
+                                    tag = "srp_advertising_proxy",
+                                    "Unacceptable subtype {x:?}: {err:?}"
+                                );
+                                None
+                            }
+                        })
+                        .collect();
+                    match service.set_subtypes(subtypes) {
                         Ok(()) => {}
-                        Err(e) => {
+                        Err(err) => {
                             warn!(
                                 tag = "srp_advertising_proxy",
-                                "Can't add subtype {subtype:?}: {e:?}"
+                                "Can't set subtypes on {service_name:?}: {err:?}"
                             );
                             continue;
                         }

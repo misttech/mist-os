@@ -90,24 +90,24 @@ impl std::fmt::Debug for OperationalDataset {
 impl OperationalDataset {
     /// Returns the channel index, if present.
     pub fn get_channel(&self) -> Option<ChannelIndex> {
-        self.0.mComponents.mIsChannelPresent().then(|| self.0.mChannel.try_into().unwrap())
+        self.0.mComponents.mIsChannelPresent.then(|| self.0.mChannel.try_into().unwrap())
     }
 
     /// Returns the channel mask, if present.
     pub fn get_channel_mask(&self) -> Option<ChannelMask> {
-        self.0.mComponents.mIsChannelMaskPresent().then(|| self.0.mChannelMask.into())
+        self.0.mComponents.mIsChannelMaskPresent.then(|| self.0.mChannelMask.into())
     }
 
     /// Returns the delay, if present.
     pub fn get_delay(&self) -> Option<u32> {
-        self.0.mComponents.mIsDelayPresent().then_some(self.0.mDelay)
+        self.0.mComponents.mIsDelayPresent.then_some(self.0.mDelay)
     }
 
     /// Returns the extended PAN-ID, if present.
     pub fn get_extended_pan_id(&self) -> Option<&ExtendedPanId> {
         self.0
             .mComponents
-            .mIsExtendedPanIdPresent()
+            .mIsExtendedPanIdPresent
             .then(|| ExtendedPanId::ref_from_ot_ref(&self.0.mExtendedPanId))
     }
 
@@ -115,43 +115,43 @@ impl OperationalDataset {
     pub fn get_network_key(&self) -> Option<&NetworkKey> {
         self.0
             .mComponents
-            .mIsNetworkKeyPresent()
+            .mIsNetworkKeyPresent
             .then(|| NetworkKey::ref_from_ot_ref(&self.0.mNetworkKey))
     }
 
     /// Returns the network key, if present.
     pub fn get_pskc(&self) -> Option<&Pskc> {
-        self.0.mComponents.mIsPskcPresent().then(|| Pskc::ref_from_ot_ref(&self.0.mPskc))
+        self.0.mComponents.mIsPskcPresent.then(|| Pskc::ref_from_ot_ref(&self.0.mPskc))
     }
 
     /// Returns the network name, if present.
     pub fn get_network_name(&self) -> Option<&NetworkName> {
         self.0
             .mComponents
-            .mIsNetworkNamePresent()
+            .mIsNetworkNamePresent
             .then(|| NetworkName::ref_from_ot_ref(&self.0.mNetworkName))
     }
 
     /// Returns the PAN-ID, if present.
     pub fn get_pan_id(&self) -> Option<PanId> {
-        self.0.mComponents.mIsPanIdPresent().then_some(self.0.mPanId)
+        self.0.mComponents.mIsPanIdPresent.then_some(self.0.mPanId)
     }
 
     /// Returns the active timestamp, if present.
     pub fn get_active_timestamp(&self) -> Option<Timestamp> {
-        self.0.mComponents.mIsActiveTimestampPresent().then(|| self.0.mActiveTimestamp.into())
+        self.0.mComponents.mIsActiveTimestampPresent.then(|| self.0.mActiveTimestamp.into())
     }
 
     /// Returns the pending timestamp, if present.
     pub fn get_pending_timestamp(&self) -> Option<Timestamp> {
-        self.0.mComponents.mIsPendingTimestampPresent().then(|| self.0.mPendingTimestamp.into())
+        self.0.mComponents.mIsPendingTimestampPresent.then(|| self.0.mPendingTimestamp.into())
     }
 
     /// Returns the security policy, if present.
     pub fn get_security_policy(&self) -> Option<&SecurityPolicy> {
         self.0
             .mComponents
-            .mIsSecurityPolicyPresent()
+            .mIsSecurityPolicyPresent
             .then(|| SecurityPolicy::ref_from_ot_ref(&self.0.mSecurityPolicy))
     }
 
@@ -159,7 +159,7 @@ impl OperationalDataset {
     pub fn get_mesh_local_prefix(&self) -> Option<&MeshLocalPrefix> {
         self.0
             .mComponents
-            .mIsMeshLocalPrefixPresent()
+            .mIsMeshLocalPrefixPresent
             .then_some(&self.0.mMeshLocalPrefix)
             .map(Into::into)
     }
@@ -170,9 +170,9 @@ impl OperationalDataset {
     pub fn set_channel(&mut self, opt: Option<ChannelIndex>) {
         if let Some(x) = opt {
             self.0.mChannel = x.into();
-            self.0.mComponents.set_mIsChannelPresent(true);
+            self.0.mComponents.mIsChannelPresent = true;
         } else {
-            self.0.mComponents.set_mIsChannelPresent(false);
+            self.0.mComponents.mIsChannelPresent = false;
         }
     }
 
@@ -180,9 +180,9 @@ impl OperationalDataset {
     pub fn set_channel_mask(&mut self, opt: Option<ChannelMask>) {
         if let Some(x) = opt {
             self.0.mChannelMask = x.into();
-            self.0.mComponents.set_mIsChannelMaskPresent(true);
+            self.0.mComponents.mIsChannelMaskPresent = true;
         } else {
-            self.0.mComponents.set_mIsChannelMaskPresent(false);
+            self.0.mComponents.mIsChannelMaskPresent = false;
         }
     }
 
@@ -190,9 +190,9 @@ impl OperationalDataset {
     pub fn set_delay(&mut self, opt: Option<u32>) {
         if let Some(x) = opt {
             self.0.mDelay = x;
-            self.0.mComponents.set_mIsDelayPresent(true);
+            self.0.mComponents.mIsDelayPresent = true;
         } else {
-            self.0.mComponents.set_mIsDelayPresent(false);
+            self.0.mComponents.mIsDelayPresent = false;
         }
     }
 
@@ -200,9 +200,9 @@ impl OperationalDataset {
     pub fn set_extended_pan_id(&mut self, opt: Option<&ExtendedPanId>) {
         if let Some(x) = opt {
             self.0.mExtendedPanId = *x.as_ot_ref();
-            self.0.mComponents.set_mIsExtendedPanIdPresent(true);
+            self.0.mComponents.mIsExtendedPanIdPresent = true;
         } else {
-            self.0.mComponents.set_mIsExtendedPanIdPresent(false);
+            self.0.mComponents.mIsExtendedPanIdPresent = false;
         }
     }
 
@@ -210,9 +210,9 @@ impl OperationalDataset {
     pub fn set_network_key(&mut self, opt: Option<&NetworkKey>) {
         if let Some(x) = opt {
             self.0.mNetworkKey = *x.as_ot_ref();
-            self.0.mComponents.set_mIsNetworkKeyPresent(true);
+            self.0.mComponents.mIsNetworkKeyPresent = true;
         } else {
-            self.0.mComponents.set_mIsNetworkKeyPresent(false);
+            self.0.mComponents.mIsNetworkKeyPresent = false;
         }
     }
 
@@ -220,9 +220,9 @@ impl OperationalDataset {
     pub fn set_network_name(&mut self, opt: Option<&NetworkName>) {
         if let Some(x) = opt {
             self.0.mNetworkName = *x.as_ot_ref();
-            self.0.mComponents.set_mIsNetworkNamePresent(true);
+            self.0.mComponents.mIsNetworkNamePresent = true;
         } else {
-            self.0.mComponents.set_mIsNetworkNamePresent(false);
+            self.0.mComponents.mIsNetworkNamePresent = false;
         }
     }
 
@@ -230,9 +230,9 @@ impl OperationalDataset {
     pub fn set_pan_id(&mut self, opt: Option<PanId>) {
         if let Some(x) = opt {
             self.0.mPanId = x;
-            self.0.mComponents.set_mIsPanIdPresent(true);
+            self.0.mComponents.mIsPanIdPresent = true;
         } else {
-            self.0.mComponents.set_mIsPanIdPresent(false);
+            self.0.mComponents.mIsPanIdPresent = false;
         }
     }
 
@@ -240,9 +240,9 @@ impl OperationalDataset {
     pub fn set_active_timestamp(&mut self, opt: Option<Timestamp>) {
         if let Some(x) = opt {
             self.0.mActiveTimestamp = x.into();
-            self.0.mComponents.set_mIsActiveTimestampPresent(true);
+            self.0.mComponents.mIsActiveTimestampPresent = true;
         } else {
-            self.0.mComponents.set_mIsActiveTimestampPresent(false);
+            self.0.mComponents.mIsActiveTimestampPresent = false;
         }
     }
 
@@ -250,9 +250,9 @@ impl OperationalDataset {
     pub fn set_pending_timestamp(&mut self, opt: Option<Timestamp>) {
         if let Some(x) = opt {
             self.0.mPendingTimestamp = x.into();
-            self.0.mComponents.set_mIsPendingTimestampPresent(true);
+            self.0.mComponents.mIsPendingTimestampPresent = true;
         } else {
-            self.0.mComponents.set_mIsPendingTimestampPresent(false);
+            self.0.mComponents.mIsPendingTimestampPresent = false;
         }
     }
 
@@ -260,9 +260,9 @@ impl OperationalDataset {
     pub fn set_security_policy(&mut self, opt: Option<SecurityPolicy>) {
         if let Some(x) = opt {
             self.0.mSecurityPolicy = *x.as_ot_ref();
-            self.0.mComponents.set_mIsSecurityPolicyPresent(true);
+            self.0.mComponents.mIsSecurityPolicyPresent = true;
         } else {
-            self.0.mComponents.set_mIsSecurityPolicyPresent(false);
+            self.0.mComponents.mIsSecurityPolicyPresent = false;
         }
     }
 
@@ -270,9 +270,9 @@ impl OperationalDataset {
     pub fn set_mesh_local_prefix(&mut self, opt: Option<&MeshLocalPrefix>) {
         if let Some(x) = opt {
             self.0.mMeshLocalPrefix = *x.as_ot_ref();
-            self.0.mComponents.set_mIsMeshLocalPrefixPresent(true);
+            self.0.mComponents.mIsMeshLocalPrefixPresent = true;
         } else {
-            self.0.mComponents.set_mIsMeshLocalPrefixPresent(false);
+            self.0.mComponents.mIsMeshLocalPrefixPresent = false;
         }
     }
 }

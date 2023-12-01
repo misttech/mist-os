@@ -11,28 +11,6 @@ use crate::prelude_internal::*;
 use std::ffi::CStr;
 use std::ptr::null;
 
-bitflags::bitflags! {
-#[repr(C)]
-#[derive(Default)]
-pub struct SrpServerServiceFlags : u8 {
-    const BASE_TYPE = OT_SRP_SERVER_SERVICE_FLAG_BASE_TYPE as u8;
-    const SUB_TYPE = OT_SRP_SERVER_SERVICE_FLAG_SUB_TYPE as u8;
-    const ACTIVE = OT_SRP_SERVER_SERVICE_FLAG_ACTIVE as u8;
-    const DELETED = OT_SRP_SERVER_SERVICE_FLAG_DELETED as u8;
-
-    const ANY_SERVICE =
-        Self::BASE_TYPE.bits | Self::SUB_TYPE.bits | Self::ACTIVE.bits | Self::DELETED.bits;
-    const BASE_TYPE_SERVICE_ONLY =
-        Self::BASE_TYPE.bits | Self::ACTIVE.bits | Self::DELETED.bits;
-    const SUB_TYPE_SERVICE_ONLY =
-        Self::SUB_TYPE.bits | Self::ACTIVE.bits | Self::DELETED.bits;
-    const ANY_TYPE_ACTIVE_SERVICE =
-        Self::BASE_TYPE.bits | Self::SUB_TYPE.bits | Self::ACTIVE.bits;
-    const ANY_TYPE_DELETED_SERVICE =
-        Self::BASE_TYPE.bits | Self::SUB_TYPE.bits | Self::ACTIVE.bits;
-}
-}
-
 /// Represents the SRP server state.
 ///
 /// Functional equivalent of [`otsys::otSrpServerState`](crate::otsys::otSrpServerState).
@@ -129,34 +107,6 @@ impl<'a> Iterator for SrpServerServiceIterator<'a> {
     }
 }
 
-/// Iterates over selected SRP services.
-#[derive(Debug, Clone)]
-pub struct SrpServerServiceFindIterator<'a, A, B> {
-    prev: Option<&'a SrpServerService>,
-    host: &'a SrpServerHost,
-    flags: SrpServerServiceFlags,
-    service_name: Option<A>,
-    instance_name: Option<B>,
-}
-
-impl<'a, A, B> Iterator for SrpServerServiceFindIterator<'a, A, B>
-where
-    A: AsRef<CStr>,
-    B: AsRef<CStr>,
-{
-    type Item = &'a SrpServerService;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.prev = self.host.find_next_service(
-            self.prev,
-            self.flags,
-            self.service_name.as_ref(),
-            self.instance_name.as_ref(),
-        );
-        self.prev
-    }
-}
-
 /// This opaque type (only used by reference) represents a SRP host.
 ///
 /// Functional equivalent of [`otsys::otSrpServerHost`](crate::otsys::otSrpServerHost).
@@ -186,6 +136,12 @@ impl SrpServerHost {
 
             std::slice::from_raw_parts(addresses_ptr as *const Ip6Address, addresses_len as usize)
         }
+    }
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerHostMatchesFullName`](crate::otsys::otSrpServerHostMatchesFullName).
+    pub fn matches_full_name_cstr(&self, full_name: &CStr) -> bool {
+        unsafe { otSrpServerHostMatchesFullName(self.as_ot_ptr(), full_name.as_ptr()) }
     }
 
     /// Functional equivalent of
@@ -222,44 +178,35 @@ impl SrpServerHost {
     pub fn services(&self) -> SrpServerServiceIterator<'_> {
         SrpServerServiceIterator { prev: None, host: self }
     }
+}
 
-    /// Functional equivalent of
-    /// [`otsys::otSrpServerHostFindNextService`](crate::otsys::otSrpServerHostFindNextService).
-    pub fn find_next_service<'a, A, B>(
-        &'a self,
-        prev: Option<&'a SrpServerService>,
-        flags: SrpServerServiceFlags,
-        service_name: Option<A>,
-        instance_name: Option<B>,
-    ) -> Option<&'a SrpServerService>
-    where
-        A: AsRef<CStr>,
-        B: AsRef<CStr>,
-    {
-        let prev = prev.map(|x| x.as_ot_ptr()).unwrap_or(null());
-        unsafe {
-            SrpServerService::ref_from_ot_ptr(otSrpServerHostFindNextService(
-                self.as_ot_ptr(),
-                prev,
-                flags.bits(),
-                service_name.map(|x| x.as_ref().as_ptr()).unwrap_or(null()),
-                instance_name.map(|x| x.as_ref().as_ptr()).unwrap_or(null()),
-            ))
+/// Iterates over all the available SRP services subtypes.
+#[derive(Clone)]
+pub struct SrpServerServiceSubtypeIterator<'a> {
+    service: &'a SrpServerService,
+    next_i: u16,
+}
+
+impl std::fmt::Debug for SrpServerServiceSubtypeIterator<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "[")?;
+        for item in self.clone() {
+            item.fmt(f)?;
+            write!(f, ",")?;
         }
+        write!(f, "]")
     }
+}
 
-    /// Returns an iterator over all of the services matching the given criteria.
-    pub fn find_services<A, B>(
-        &self,
-        flags: SrpServerServiceFlags,
-        service_name: Option<A>,
-        instance_name: Option<B>,
-    ) -> SrpServerServiceFindIterator<'_, A, B>
-    where
-        A: AsRef<CStr>,
-        B: AsRef<CStr>,
-    {
-        SrpServerServiceFindIterator { prev: None, host: self, flags, service_name, instance_name }
+impl<'a> Iterator for SrpServerServiceSubtypeIterator<'a> {
+    type Item = &'a CStr;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let ret = self.service.subtype_service_name_at(self.next_i);
+        if ret.is_some() {
+            self.next_i += 1;
+        }
+        ret
     }
 }
 
@@ -274,33 +221,27 @@ impl std::fmt::Debug for SrpServerService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.is_deleted() {
             f.debug_struct("otSrpServerService")
-                .field("full_name", &self.full_name_cstr())
+                .field("service_name", &self.service_name_cstr())
+                .field("instance_name", &self.instance_name_cstr())
                 .field("is_deleted", &self.is_deleted())
                 .finish()
         } else {
             f.debug_struct("otSrpServerService")
-                .field("full_name", &self.full_name_cstr())
+                .field("service_name", &self.service_name_cstr())
+                .field("instance_name", &self.instance_name_cstr())
                 .field("is_deleted", &self.is_deleted())
                 .field("txt_data", &ascii_dump(self.txt_data()))
                 .field("txt_entries", &self.txt_entries().collect::<Vec<_>>())
                 .field("port", &self.port())
                 .field("priority", &self.priority())
                 .field("weight", &self.weight())
-                .field("is_subtype", &self.is_subtype())
-                .field("service_name", &self.service_name_cstr())
-                .field("instance_name", &self.instance_name_cstr())
+                .field("subtypes", &self.subtypes())
                 .finish()
         }
     }
 }
 
 impl SrpServerService {
-    /// Functional equivalent of
-    /// [`otsys::otSrpServerServiceGetFullName`](crate::otsys::otSrpServerServiceGetFullName).
-    pub fn full_name_cstr(&self) -> &CStr {
-        unsafe { CStr::from_ptr(otSrpServerServiceGetFullName(self.as_ot_ptr())) }
-    }
-
     /// Functional equivalent of
     /// [`otsys::otSrpServerServiceGetPort`](crate::otsys::otSrpServerServiceGetPort).
     pub fn port(&self) -> u16 {
@@ -323,6 +264,30 @@ impl SrpServerService {
     /// [`otsys::otSrpServerServiceGetLeaseInfo`](crate::otsys::otSrpServerServiceGetLeaseInfo).
     pub fn get_lease_info(&self, lease_info: &mut SrpServerLeaseInfo) {
         unsafe { otSrpServerServiceGetLeaseInfo(self.as_ot_ptr(), lease_info.as_ot_mut_ptr()) }
+    }
+
+    /// Returns an iterator over all of the subtypes.
+    pub fn subtypes(&self) -> SrpServerServiceSubtypeIterator<'_> {
+        SrpServerServiceSubtypeIterator { service: self, next_i: 0 }
+    }
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerServiceGetNumberOfSubTypes`](crate::otsys::otSrpServerServiceGetNumberOfSubTypes).
+    pub fn number_of_subtypes(&self) -> u16 {
+        unsafe { otSrpServerServiceGetNumberOfSubTypes(self.as_ot_ptr()) }
+    }
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerServiceGetSubTypeServiceNameAt`](crate::otsys::otSrpServerServiceGetSubTypeServiceNameAt).
+    pub fn subtype_service_name_at(&self, i: u16) -> Option<&CStr> {
+        unsafe {
+            let ptr = otSrpServerServiceGetSubTypeServiceNameAt(self.as_ot_ptr(), i);
+            if ptr.is_null() {
+                None
+            } else {
+                Some(CStr::from_ptr(ptr))
+            }
+        }
     }
 
     /// Functional equivalent of
@@ -349,34 +314,6 @@ impl SrpServerService {
     }
 
     /// Functional equivalent of
-    /// [`otsys::otSrpServerServiceIsSubType`](crate::otsys::otSrpServerServiceIsSubType).
-    pub fn is_subtype(&self) -> bool {
-        unsafe { otSrpServerServiceIsSubType(self.as_ot_ptr()) }
-    }
-
-    /// Optionally returns the subtype label for this service.
-    pub fn subtype_label(&self) -> Result<Option<CString>, Error> {
-        if self.is_subtype() {
-            let mut bytes = [0 as c_char; 256];
-
-            // SAFETY: We are passing in valid pointers with a length one less than the array size.
-            Error::from(unsafe {
-                otSrpServerServiceGetServiceSubTypeLabel(
-                    self.as_ot_ptr(),
-                    (&mut bytes) as *mut c_char,
-                    255,
-                )
-            })
-            .into_result()?;
-
-            // SAFETY: `bytes` is guaranteed to be zero terminated because of the size of the array.
-            Ok(Some(unsafe { CStr::from_ptr(&bytes as *const c_char) }.to_owned()))
-        } else {
-            Ok(None)
-        }
-    }
-
-    /// Functional equivalent of
     /// [`otsys::otSrpServerServiceGetServiceName`](crate::otsys::otSrpServerServiceGetServiceName).
     pub fn service_name_cstr(&self) -> &CStr {
         unsafe { CStr::from_ptr(otSrpServerServiceGetServiceName(self.as_ot_ptr())) }
@@ -387,6 +324,33 @@ impl SrpServerService {
     pub fn instance_name_cstr(&self) -> &CStr {
         unsafe { CStr::from_ptr(otSrpServerServiceGetInstanceName(self.as_ot_ptr())) }
     }
+
+    /// Functional equivalent of
+    /// [`otsys::otSrpServerServiceGetInstanceLabel`](crate::otsys::otSrpServerServiceGetInstanceLabel).
+    pub fn instance_label_cstr(&self) -> &CStr {
+        unsafe { CStr::from_ptr(otSrpServerServiceGetInstanceLabel(self.as_ot_ptr())) }
+    }
+}
+
+/// Functional equivalent of
+/// [`otsys::otSrpServerParseSubTypeServiceName`](crate::otsys::otSrpServerParseSubTypeServiceName).
+pub fn parse_label_from_subtype_service_name(
+    subtype_service_name: &CStr,
+) -> Result<CString, Error> {
+    let mut bytes = [0 as c_char; 256];
+
+    // SAFETY: We are passing in valid pointers with a length one less than the array size.
+    Error::from(unsafe {
+        otSrpServerParseSubTypeServiceName(
+            subtype_service_name.as_ptr(),
+            (&mut bytes) as *mut c_char,
+            255,
+        )
+    })
+    .into_result()?;
+
+    // SAFETY: `bytes` is guaranteed to be zero terminated because of the size of the array.
+    Ok(unsafe { CStr::from_ptr(&bytes as *const c_char) }.to_owned())
 }
 
 /// The ID of a SRP service update transaction on the SRP Server.

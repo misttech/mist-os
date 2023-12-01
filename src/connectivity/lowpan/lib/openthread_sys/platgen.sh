@@ -44,7 +44,6 @@ $RUST_BINDGEN \
 	-o src/bindings.rs \
 	--raw-line "${RAW_LINES}" \
 	--verbose \
-	--size_t-is-usize \
 	--no-layout-tests \
 	--with-derive-default \
 	--opaque-type "otInstance" \
@@ -67,7 +66,6 @@ $RUST_BINDGEN \
 	"${OT_DIR}/src/lib/spinel/spinel.h" \
 	-o src/spinel.rs \
 	--raw-line "${RAW_LINES}" \
-	--size_t-is-usize \
 	--no-layout-tests \
 	--with-derive-default \
 	--allowlist-var "SPINEL_[A-Z].*" \
