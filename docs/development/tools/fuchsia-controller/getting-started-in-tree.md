@@ -274,6 +274,42 @@ If the code builds and runs so far, we can start writing code that speaks
 to Fuchsia devices through FIDL interfaces. Most code is similar, but
 there are some subtle differences to cover in this section.
 
+### Find component monikers {:.numbered}
+
+To bind to Fuchsia components, it is currently necessary to know the component's
+moniker. This can be done using `ffx`. To get the moniker for the build info
+provider, for example:
+
+```posix-terminal
+ffx component capability fuchsia.buildinfo.Provider
+```
+
+This command will print output similar to the following:
+
+```sh {:.devsite-disalbe-click-to-copy}
+Declarations:
+  `core/build-info` declared capability `fuchsia.buildinfo.Provider`
+
+Exposes:
+  `core/build-info` exposed `fuchsia.buildinfo.Provider` from self to parent
+
+Offers:
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#cobalt`
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#remote-control`
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#sshd-host`
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#test_manager`
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#testing`
+  `core` offered `fuchsia.buildinfo.Provider` from child `#build-info` to child `#toolbox`
+  `core/sshd-host` offered `fuchsia.buildinfo.Provider` from parent to collection `#shell`
+
+Uses:
+  `core/remote-control` used `fuchsia.buildinfo.Provider` from parent
+  `core/sshd-host/shell:sshd-0` used `fuchsia.buildinfo.Provider` from parent
+  `core/cobalt` used `fuchsia.buildinfo.Provider` from parent
+```
+
+The moniker you want is under the `Exposes` declaration: `core/build-info`.
+
 ### Get build information {:.numbered}
 
 We can start simple by getting a device's build information.
