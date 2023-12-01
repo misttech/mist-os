@@ -470,18 +470,6 @@ impl Sources {
         }
     }
 
-    /// Checks whether collection sources are supported, returning [`ModelError::Unsupported`]
-    /// if they are not.
-    // TODO(fxb/61861): Consider adding route mapping for collection sources, although we won't need this
-    // for the route static analyzer.
-    pub fn collection_source(&self) -> Result<(), RoutingError> {
-        if self.0.collection {
-            Ok(())
-        } else {
-            Err(RoutingError::unsupported_route_source("collection"))
-        }
-    }
-
     /// Checks whether namespace capability sources are supported.
     pub fn is_namespace_supported(&self) -> bool {
         self.0.namespace
