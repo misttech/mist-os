@@ -32,14 +32,13 @@ def _cc_std_version_transition_impl(settings, attr):
         fail("Unrecognized cpu %s." % input_cpu)
     fuchsia_platform = "@fuchsia_sdk//fuchsia/constraints/platforms:" + FUCHSIA_PLATFORMS_MAP[output_cpu]
 
-    cxxopts = settings["//command_line_option:cxxopt"]
-    if (len(cxxopts) == 0):
-        cxxopts.append("-std={}".format(attr.cc_version))
-        cxxopts.extend(attr.extra_copts)
+    cxxopts = settings["//command_line_option:cxxopt"] + [
+        "-std={}".format(attr.cc_version),
+    ] + attr.extra_cxxopts
 
-    copts = settings["//command_line_option:copt"]
-    if (len(copts) == 0):
-        copts.append("-ffuchsia-api-level={}".format(attr.api_level))
+    copts = settings["//command_line_option:copt"] + [
+        "-ffuchsia-api-level={}".format(attr.api_level),
+    ] + attr.extra_copts
 
     return {
         "//command_line_option:cpu": output_cpu,
@@ -169,6 +168,9 @@ _fuchsia_sdk_cc_source_library_test = rule(
             values = ["c++17", "c++20"],
         ),
         "extra_copts": attr.string_list(
+            default = [],
+        ),
+        "extra_cxxopts": attr.string_list(
             default = [],
         ),
         "ignored_deps": attr.string_list(
