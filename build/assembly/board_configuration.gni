@@ -24,7 +24,14 @@ import("//build/python/python_action.gni")
 #  hardware_info (optional)
 #    [scope]  Data provided via the 'fuchsia.hwinfo.Board' protocol.  Fields:
 #      - name [string] - The board name to provide via hwinfo, if different from
-#                        the name in build info (provided above).
+#                        the name in build info (provided above).  Must be 32
+#                        bytes or less.
+#      - vendor_id [u32] - Must be provided with 'product_id'.  Used to add a
+#                          platform_id item to the ZBI.
+#      - product_id [u32] - Must be provided with 'vendor_id'.  Used to add a
+#                           platform_id item to the ZBI.
+#      - revision [u32] - Must be provided with 'product_id' and 'vendor_id'.
+#                         Used to add a board_info item to the ZBI.
 #
 #  provided_features (optional)
 #    [list, strings] A list of strings which are named features, capabilities,
@@ -279,6 +286,16 @@ template("board_configuration") {
 
     if (defined(invoker.hardware_info)) {
       hardware_info = invoker.hardware_info
+
+      if (defined(hardware_info.vendor_id) ||
+          defined(hardware_info.product_id) ||
+          defined(hardware_info.revision)) {
+        assert(
+            defined(hardware_info.vendor_id) &&
+                defined(hardware_info.product_id) &&
+                defined(hardware_info.revision),
+            "If any of 'vendor_id', 'product_id' or 'revision' are set, then all are required")
+      }
     }
 
     if (defined(_filesystems)) {

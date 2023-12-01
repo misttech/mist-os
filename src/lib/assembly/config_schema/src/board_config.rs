@@ -19,9 +19,11 @@ pub struct BoardInformation {
     /// The name of the board.
     pub name: String,
 
-    /// Metadata about the board that's provided by the 'fuchsia.hwinfo.Board'
-    /// protocol.
-    pub hardware_info: Option<HardwareInfo>,
+    /// Metadata about the board that's provided to the 'fuchsia.hwinfo.Board'
+    /// protocol and to the Board Driver via the PlatformID and BoardInfo ZBI
+    /// items.
+    #[serde(default)]
+    pub hardware_info: HardwareInfo,
 
     /// The "features" that this board provides to the product.
     ///
@@ -64,11 +66,22 @@ pub struct BoardInformation {
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
 /// protocol.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HardwareInfo {
-    /// This is the value returned in the 'BoardInfo.name' field.
-    pub name: String,
+    /// This is the value returned in the 'BoardInfo.name' field, if different
+    /// from the name provided for the board itself.  It's also the name that's
+    /// set in the PLATFORM_ID ZBI Item.
+    pub name: Option<String>,
+
+    /// The vendor id to add to a PLATFORM_ID ZBI Item.
+    vendor_id: Option<u32>,
+
+    /// The product id to add to a PLATFORM_ID ZBI Item.
+    product_id: Option<u32>,
+
+    /// The board revision to add to a BOARD_INFO ZBI Item.
+    revision: Option<u32>,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board
@@ -136,7 +149,10 @@ mod test {
         let json = serde_json::json!({
             "name": "sample board",
             "hardware_info": {
-                "name": "hwinfo_name"
+                "name": "hwinfo_name",
+                "vendor_id": 1,
+                "product_id": 2,
+                "revision": 3,
             },
             "provided_features": [
                 "feature_a",
@@ -145,7 +161,7 @@ mod test {
             "input_bundles": [
                 "bundle_a",
                 "bundle_b"
-            ]
+            ],
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -153,7 +169,12 @@ mod test {
 
         let expected = BoardInformation {
             name: "sample board".to_owned(),
-            hardware_info: Some(HardwareInfo { name: "hwinfo_name".into() }),
+            hardware_info: HardwareInfo {
+                name: Some("hwinfo_name".into()),
+                vendor_id: Some(0x01),
+                product_id: Some(0x02),
+                revision: Some(0x03),
+            },
             provided_features: vec!["feature_a".into(), "feature_b".into()],
             input_bundles: vec![
                 FileRelativePathBuf::Resolved("some/path/to/board/bundle_a".into()),

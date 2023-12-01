@@ -726,7 +726,6 @@ mod tests {
     lazy_static! {
         pub(crate) static ref BOARD_INFORMATION_FOR_TESTS: BoardInformation = BoardInformation {
             name: "Test Board".into(),
-            hardware_info: None,
             provided_features: vec![],
             input_bundles: vec![],
             filesystems: BoardFilesystemConfig::default(),
