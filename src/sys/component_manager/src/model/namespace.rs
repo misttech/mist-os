@@ -16,7 +16,7 @@ use {
     ::routing::{
         capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
         mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
-        verify_instance_in_component_id_index, RouteRequest,
+        verify_instance_in_component_id_index, Completer, Request, RouteRequest,
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
     fidl::{endpoints::ClientEnd, prelude::*},
@@ -26,7 +26,7 @@ use {
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{AnyCapability, Completer, Directory, Open, Request, Sender},
+    sandbox::{AnyCapability, Directory, Open, Sender},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},

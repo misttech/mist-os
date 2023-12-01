@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use replace_with::replace_with;
-use sandbox::{Capability, Dict, Routable, Router};
+use routing::{Routable, Router};
+use sandbox::{Capability, Dict};
 use std::{
     fmt,
     ops::{Deref, DerefMut},
@@ -69,7 +70,7 @@ impl Inner {
 }
 
 impl Routable for Inner {
-    fn route(&self, request: sandbox::Request, completer: sandbox::Completer) {
+    fn route(&self, request: routing::Request, completer: routing::Completer) {
         // Start the program if not started, then forward the request to its output.
         let router = self.start();
         router.route(request, completer);

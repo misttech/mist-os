@@ -2,10 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        AnyCapability, AnyCast, Capability, CloneError, Completer, ConversionError, Directory,
-        Request, Routable,
-    },
+    crate::{AnyCast, Capability, CloneError, ConversionError, Directory},
     core::fmt,
     fidl::endpoints::{create_endpoints, ClientEnd, ServerEnd},
     fidl_fuchsia_io as fio, fuchsia_zircon as zx,
@@ -13,8 +10,11 @@ use {
     futures::future::BoxFuture,
     futures::FutureExt,
     futures::TryStreamExt,
-    std::sync::{Arc, OnceLock},
-    vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope, path::Path},
+    std::{
+        collections::VecDeque,
+        sync::{Arc, OnceLock},
+    },
+    vfs::{common::send_on_open_with_error, execution_scope::ExecutionScope},
 };
 
 /// An [Open] capability lets the holder obtain other capabilities by pipelining
@@ -56,7 +56,8 @@ pub struct Open {
 }
 
 /// The function that will be called when this capability is opened.
-pub type OpenFn = dyn Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync;
+pub type OpenFn =
+    dyn Fn(ExecutionScope, fio::OpenFlags, vfs::path::Path, zx::Channel) -> () + Send + Sync;
 
 impl fmt::Debug for Open {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -80,7 +81,10 @@ impl Open {
     ///
     pub fn new<F>(open: F, entry_type: fio::DirentType) -> Self
     where
-        F: Fn(ExecutionScope, fio::OpenFlags, Path, zx::Channel) -> () + Send + Sync + 'static,
+        F: Fn(ExecutionScope, fio::OpenFlags, vfs::path::Path, zx::Channel) -> ()
+            + Send
+            + Sync
+            + 'static,
     {
         Open { open_fn: Arc::new(open), entry_type }
     }
@@ -122,11 +126,11 @@ impl Open {
         Open::new(
             move |scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  path: Path,
+                  path: vfs::path::Path,
                   server_end: zx::Channel| {
                 let open = downscoped.get_or_init(|| {
                     let (downscoped_client_end, downscoped_server_end) = zx::Channel::create();
-                    self.open(scope.clone(), rights, Path::dot(), downscoped_server_end);
+                    self.open(scope.clone(), rights, vfs::path::Path::dot(), downscoped_server_end);
                     let openable: ClientEnd<fio::OpenableMarker> = downscoped_client_end.into();
                     Open::from(openable)
                 });
@@ -140,11 +144,11 @@ impl Open {
     /// `relative_path` if non-empty, from the base [`Open`] object.
     ///
     /// The base capability is lazily exercised when the returned capability is exercised.
-    pub fn downscope_path(self, relative_path: crate::router::Path) -> Open {
+    pub fn downscope_path(self, relative_path: Path) -> Open {
         Open::new(
             move |scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  new_path: Path,
+                  new_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 let path = join_path(&relative_path, new_path);
                 self.open(scope, flags, path.as_str(), server_end);
@@ -170,7 +174,7 @@ impl Open {
             Box::new(
                 move |scope: ExecutionScope,
                       flags: fio::OpenFlags,
-                      relative_path: Path,
+                      relative_path: vfs::path::Path,
                       server_end: ServerEnd<fio::NodeMarker>| {
                     open(scope, flags, relative_path, server_end.into_channel().into())
                 },
@@ -181,24 +185,61 @@ impl Open {
 }
 
 pub trait ValidatePath {
-    fn validate(self) -> Result<Path, zx::Status>;
+    fn validate(self) -> Result<vfs::path::Path, zx::Status>;
 }
 
-impl ValidatePath for Path {
-    fn validate(self) -> Result<Path, zx::Status> {
+impl ValidatePath for vfs::path::Path {
+    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
         Ok(self)
     }
 }
 
 impl ValidatePath for String {
-    fn validate(self) -> Result<Path, zx::Status> {
-        Path::validate_and_split(self)
+    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
+        vfs::path::Path::validate_and_split(self)
     }
 }
 
 impl ValidatePath for &str {
-    fn validate(self) -> Result<Path, zx::Status> {
-        Path::validate_and_split(self)
+    fn validate(self) -> Result<vfs::path::Path, zx::Status> {
+        vfs::path::Path::validate_and_split(self)
+    }
+}
+
+/// A path type that supports efficient prepending and appending.
+#[derive(Default, Debug, Clone)]
+pub struct Path {
+    pub segments: VecDeque<String>,
+}
+
+impl Path {
+    pub fn new(path: &str) -> Path {
+        Path { segments: path.split("/").map(|s| s.to_owned()).collect() }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.segments.is_empty()
+    }
+
+    pub fn next(&mut self) -> Option<String> {
+        self.segments.pop_front()
+    }
+
+    pub fn prepend(&mut self, segment: String) {
+        self.segments.push_front(segment);
+    }
+
+    pub fn append(&mut self, segment: String) {
+        self.segments.push_back(segment);
+    }
+
+    /// Returns a path that will be valid for using in a `fuchsia.io/Directory.Open` operation.
+    pub fn fuchsia_io_path(&self) -> String {
+        if self.is_empty() {
+            ".".to_owned()
+        } else {
+            self.segments.iter().map(String::as_str).collect::<Vec<&str>>().join("/")
+        }
     }
 }
 
@@ -217,7 +258,7 @@ impl From<ClientEnd<fio::OpenableMarker>> for Open {
         Open::new(
             move |_scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  relative_path: Path,
+                  relative_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 let _ = proxy.open(
                     flags,
@@ -279,18 +320,6 @@ impl Capability for Open {
     }
 }
 
-impl Routable for Open {
-    /// Each request from the router will yield an [`Open`]  with rights downscoped to
-    /// `request.rights` and paths relative to `request.relative_path`.
-    fn route(&self, request: Request, completer: Completer) {
-        let mut open = self.clone().downscope_path(request.relative_path);
-        if let Some(rights) = request.rights {
-            open = open.downscope_rights(rights)
-        }
-        completer.complete(Ok(Box::new(open) as AnyCapability));
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use {
@@ -314,7 +343,7 @@ mod tests {
         let open = Open::new(
             move |_scope: ExecutionScope,
                   _flags: fio::OpenFlags,
-                  relative_path: Path,
+                  relative_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 assert_eq!(relative_path.into_string(), "bar");
                 OPEN_COUNT.inc();
@@ -352,7 +381,7 @@ mod tests {
         let open = Open::new(
             move |_scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  relative_path: Path,
+                  relative_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 assert_eq!(relative_path.into_string(), "path");
                 assert_eq!(flags, fio::OpenFlags::DIRECTORY);
@@ -383,7 +412,7 @@ mod tests {
         let open = Open::new(
             move |_scope: ExecutionScope,
                   flags: fio::OpenFlags,
-                  relative_path: Path,
+                  relative_path: vfs::path::Path,
                   server_end: zx::Channel| {
                 assert_eq!(relative_path.into_string(), "");
                 assert_eq!(flags, fio::OpenFlags::DIRECTORY);
@@ -476,7 +505,7 @@ mod tests {
         assert_eq!(entries, vec!["foo".to_owned()]);
 
         // Downscope the path to `foo`.
-        let open = open.clone().downscope_path(crate::router::Path::new("foo"));
+        let open = open.clone().downscope_path(crate::Path::new("foo"));
         let directory = Directory::from_open(open, fio::OpenFlags::RIGHT_READABLE);
 
         // Verify that the connection does not have anymore children, since `foo` has no children.
@@ -489,7 +518,7 @@ mod tests {
         let open = Open::new(
             move |_scope: ExecutionScope,
                   _flags: fio::OpenFlags,
-                  _relative_path: Path,
+                  _relative_path: vfs::path::Path,
                   _server_end: zx::Channel| {
                 panic!("should not reach here");
             },

@@ -20,6 +20,9 @@ pub mod walk_state;
 #[cfg(target_os = "fuchsia")]
 pub mod router;
 
+#[cfg(target_os = "fuchsia")]
+pub use self::router::{route, Completer, Request, Routable, Router};
+
 #[cfg(not(target_os = "fuchsia"))]
 pub mod router {
     pub use crate::legacy_router::*;

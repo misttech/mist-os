@@ -2,11 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use {
-    crate::{
-        router::Routable, AnyCapability, AnyCast, Capability, CloneError, Completer,
-        ConversionError, Directory, Open, Request,
-    },
-    anyhow::{anyhow, Context, Error},
+    crate::{AnyCapability, AnyCast, Capability, CloneError, ConversionError, Directory, Open},
+    anyhow::{Context, Error},
     fidl::endpoints::create_request_stream,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon as zx,
@@ -173,25 +170,6 @@ impl TryInto<Open> for Dict {
             },
             fio::DirentType::Directory,
         ))
-    }
-}
-
-/// Dictionary supports routing requests:
-/// - Check if path is empty, then resolve the completer with the current object.
-/// - If not, see if there's a entry corresponding to the next path segment, and
-///   - Delegate the rest of the request to that entry.
-///   - If no entry found, close the completer with an error.
-impl Routable for Dict {
-    fn route(&self, mut request: Request, completer: Completer) {
-        let Some(name) = request.relative_path.next() else {
-            completer.complete(Ok(Box::new(self.try_clone().unwrap())));
-            return;
-        };
-        let Some(capability) = self.entries.get(&name) else {
-            completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
-            return;
-        };
-        capability.route(request, completer);
     }
 }
 

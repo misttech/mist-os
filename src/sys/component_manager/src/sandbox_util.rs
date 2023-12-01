@@ -4,7 +4,10 @@
 
 use {
     crate::model::component::{ComponentInstance, WeakComponentInstance},
-    ::routing::{capability_source::CapabilitySource, policy::GlobalPolicyChecker},
+    ::routing::{
+        capability_source::CapabilitySource, policy::GlobalPolicyChecker, Completer, Request,
+        Router,
+    },
     async_trait::async_trait,
     cm_types::Name,
     cm_util::WeakTaskGroup,
@@ -21,7 +24,7 @@ use {
     },
     lazy_static::lazy_static,
     moniker::Moniker,
-    sandbox::{AnyCapability, Capability, Completer, Dict, Receiver, Request, Router},
+    sandbox::{AnyCapability, Capability, Dict, Receiver},
     std::sync::Arc,
     tracing::warn,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},

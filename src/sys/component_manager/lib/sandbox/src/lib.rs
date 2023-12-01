@@ -19,7 +19,6 @@ mod lazy;
 mod open;
 mod optional;
 mod receiver;
-mod router;
 mod sender;
 
 pub use self::any::{AnyCapability, AnyCast, ErasedCapability};
@@ -29,8 +28,7 @@ pub use self::dict::{Dict, Key as DictKey, TryIntoOpenError};
 pub use self::directory::Directory;
 pub use self::handle::Handle;
 pub use self::lazy::Lazy;
-pub use self::open::Open;
+pub use self::open::{Open, Path};
 pub use self::optional::Optional;
 pub use self::receiver::Receiver;
-pub use self::router::{route, Completer, Path, Request, Routable, Router};
 pub use self::sender::Sender;

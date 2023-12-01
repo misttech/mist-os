@@ -7,7 +7,8 @@ use cm_types::Availability;
 use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
-use sandbox::{Capability, Data, Dict, Open, Routable, Router};
+use routing::{Routable, Router};
+use sandbox::{Capability, Data, Dict, Open};
 use std::{
     collections::HashMap,
     fmt,
@@ -262,7 +263,7 @@ fn resolve_impl(
 }
 
 impl Routable for Inner {
-    fn route(&self, request: sandbox::Request, completer: sandbox::Completer) {
+    fn route(&self, request: routing::Request, completer: routing::Completer) {
         // Resolve the component if not already, then forward the request to its output.
         let router = self.resolve();
         router.route(request, completer);
@@ -288,7 +289,7 @@ mod test {
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
     use moniker::MonikerBase;
-    use sandbox::Request;
+    use routing::Request;
     use serve_processargs::{ignore_not_found, NamespaceBuilder};
     use vfs::{
         directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
@@ -423,7 +424,7 @@ mod test {
             ]),
             availability: use_availability,
         };
-        let cap = sandbox::route(&router, request).await.context("route")?;
+        let cap = routing::route(&router, request).await.context("route")?;
         eprintln!("Obtained capability {:?}", cap);
         let cap: Data<String> = cap.try_into().context("convert to Data")?;
         assert_eq!(&cap.value, "hello");
