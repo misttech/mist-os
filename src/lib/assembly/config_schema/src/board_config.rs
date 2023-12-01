@@ -65,7 +65,7 @@ pub struct BoardInformation {
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
-/// protocol.
+/// protocol and for the Platform_ID and Board_Info ZBI items.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct HardwareInfo {
@@ -75,13 +75,13 @@ pub struct HardwareInfo {
     pub name: Option<String>,
 
     /// The vendor id to add to a PLATFORM_ID ZBI Item.
-    vendor_id: Option<u32>,
+    pub vendor_id: Option<u32>,
 
     /// The product id to add to a PLATFORM_ID ZBI Item.
-    product_id: Option<u32>,
+    pub product_id: Option<u32>,
 
     /// The board revision to add to a BOARD_INFO ZBI Item.
-    revision: Option<u32>,
+    pub revision: Option<u32>,
 }
 
 /// This struct defines a bundle of artifacts that can be included by the board

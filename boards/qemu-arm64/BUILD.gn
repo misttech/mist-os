@@ -5,10 +5,6 @@
 import("//build/assembly/board_configuration.gni")
 
 board_configuration("qemu-arm64") {
-  hardware_info = {
-    name = "default-board"
-  }
-
   provided_features = [ "fuchsia::driver_framework_v2_support" ]
 
   input_bundles = [

@@ -109,6 +109,11 @@ pub fn assemble(args: ProductArgs) -> Result<()> {
         .add_bundle(&kernel_aib_path)
         .with_context(|| format!("Adding kernel input bundle ({kernel_aib_path})"))?;
 
+    // Set the info used for BoardDriver arguments.
+    builder
+        .set_board_driver_arguments(&board_info)
+        .context("Setting arguments for the Board Driver")?;
+
     // Set the configuration for the rest of the packages.
     for (package, config) in configuration.package_configs {
         builder.set_package_config(package, config)?;

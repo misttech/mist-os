@@ -7,5 +7,6 @@
 //! Library for constructing the ZBI.
 
 mod zbi;
+mod zbi_items;
 
 pub use zbi::ZbiBuilder;

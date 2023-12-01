@@ -11,10 +11,6 @@ assert(current_cpu == "riscv64",
        "The riscv64 board can only be defined in an riscv64 toolchain.")
 
 board_configuration("riscv64") {
-  hardware_info = {
-    name = "default-board"
-  }
-
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::network_require_netstack3",

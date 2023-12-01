@@ -336,10 +336,10 @@ mod tests {
     use super::MultiFvmBuilder;
 
     use crate::base_package::BasePackage;
-    use assembly_config_schema::image_assembly_config::{ImageAssemblyConfig, KernelConfig};
+    use assembly_config_schema::image_assembly_config::ImageAssemblyConfig;
     use assembly_images_config::{
-        BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, ImagesConfig, NandFvm, Reserved,
-        SparseFvm, StandardFvm,
+        BlobFS, BlobfsLayout, EmptyData, FvmFilesystem, FvmOutput, NandFvm, Reserved, SparseFvm,
+        StandardFvm,
     };
     use assembly_manifest::AssemblyManifest;
     use assembly_tool::testing::FakeToolProvider;
@@ -356,21 +356,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig {
-            system: Vec::new(),
-            base: Vec::new(),
-            cache: Vec::new(),
-            bootfs_packages: Vec::new(),
-            kernel: KernelConfig {
-                path: "path/to/kernel".into(),
-                args: Vec::new(),
-                clock_backstop: 0,
-            },
-            qemu_kernel: "path/to/qemu/kernel".into(),
-            boot_args: Vec::new(),
-            bootfs_files: Vec::new(),
-            images_config: ImagesConfig::default(),
-        };
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
@@ -406,21 +393,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig {
-            system: Vec::new(),
-            base: Vec::new(),
-            cache: Vec::new(),
-            bootfs_packages: Vec::new(),
-            kernel: KernelConfig {
-                path: "path/to/kernel".into(),
-                args: Vec::new(),
-                clock_backstop: 0,
-            },
-            qemu_kernel: "path/to/qemu/kernel".into(),
-            boot_args: Vec::new(),
-            bootfs_files: Vec::new(),
-            images_config: ImagesConfig::default(),
-        };
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
@@ -474,21 +448,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig {
-            system: Vec::new(),
-            base: Vec::new(),
-            cache: Vec::new(),
-            bootfs_packages: Vec::new(),
-            kernel: KernelConfig {
-                path: "path/to/kernel".into(),
-                args: Vec::new(),
-                clock_backstop: 0,
-            },
-            qemu_kernel: "path/to/qemu/kernel".into(),
-            boot_args: Vec::new(),
-            bootfs_files: Vec::new(),
-            images_config: ImagesConfig::default(),
-        };
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+
         let mut assembly_manifest = AssemblyManifest::default();
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
@@ -599,21 +560,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig {
-            system: Vec::new(),
-            base: Vec::new(),
-            cache: Vec::new(),
-            bootfs_packages: Vec::new(),
-            kernel: KernelConfig {
-                path: "path/to/kernel".into(),
-                args: Vec::new(),
-                clock_backstop: 0,
-            },
-            qemu_kernel: "path/to/qemu/kernel".into(),
-            boot_args: Vec::new(),
-            bootfs_files: Vec::new(),
-            images_config: ImagesConfig::default(),
-        };
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+
         let mut assembly_manifest = AssemblyManifest::default();
 
         let base_package_path = dir.join("base.far");
@@ -715,21 +663,8 @@ mod tests {
         let tmp = tempdir().unwrap();
         let dir = Utf8Path::from_path(tmp.path()).unwrap();
 
-        let assembly_config = ImageAssemblyConfig {
-            system: Vec::new(),
-            base: Vec::new(),
-            cache: Vec::new(),
-            bootfs_packages: Vec::new(),
-            kernel: KernelConfig {
-                path: "path/to/kernel".into(),
-                args: Vec::new(),
-                clock_backstop: 0,
-            },
-            qemu_kernel: "path/to/qemu/kernel".into(),
-            boot_args: Vec::new(),
-            bootfs_files: Vec::new(),
-            images_config: ImagesConfig::default(),
-        };
+        let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel", 0);
+
         let mut assembly_manifest = AssemblyManifest::default();
 
         let base_package_path = dir.join("base.far");

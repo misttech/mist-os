@@ -55,6 +55,10 @@ pub struct ImageAssemblyConfig {
     /// Which images to produce and how.
     #[serde(default)]
     pub images_config: ImagesConfig,
+
+    /// Optionally-provided data to pass to the board's Board Driver via a ZBI
+    /// item.
+    pub board_driver_arguments: Option<BoardDriverArguments>,
 }
 
 impl ImageAssemblyConfig {
@@ -75,6 +79,7 @@ impl ImageAssemblyConfig {
             },
             qemu_kernel: "path/to/qemu/kernel".into(),
             images_config: ImagesConfig::default(),
+            board_driver_arguments: None,
         }
     }
 }
@@ -109,6 +114,22 @@ pub struct KernelConfig {
     /// The backstop UTC time for the clock.
     /// This is kept separate from the `args` to make it clear that this is a required argument.
     pub clock_backstop: u64,
+}
+
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct BoardDriverArguments {
+    /// The vendor id to add to a PLATFORM_ID ZBI Item.
+    pub vendor_id: u32,
+
+    /// The product id to add to a PLATFORM_ID ZBI Item.
+    pub product_id: u32,
+
+    /// The board name to add to a PLATFORM_ID ZBI Item.
+    pub name: String,
+
+    /// The board revision to add to a BOARD_INFO ZBI Item.
+    pub revision: u32,
 }
 
 #[cfg(test)]

@@ -7,12 +7,12 @@ use anyhow::{anyhow, bail, ensure, Context, Result};
 use assembly_config_data::ConfigDataBuilder;
 use assembly_config_schema::{
     assembly_config::{AssemblyInputBundle, CompiledPackageDefinition, ShellCommands},
-    board_config::BoardInputBundle,
+    board_config::{BoardInputBundle, HardwareInfo},
     common::PackagedDriverDetails,
-    image_assembly_config::KernelConfig,
+    image_assembly_config::{BoardDriverArguments, KernelConfig},
     platform_config::BuildType,
     product_config::{ProductConfigData, ProductPackageDetails, ProductPackagesConfig},
-    DriverDetails, FileEntry, PackageDetails, PackageSet,
+    BoardInformation, DriverDetails, FileEntry, PackageDetails, PackageSet,
 };
 use assembly_named_file_map::NamedFileMap;
 
@@ -89,6 +89,9 @@ pub struct ImageAssemblyConfigBuilder {
 
     /// The packages for assembly to create specified by AIBs
     packages_to_compile: BTreeMap<String, CompiledPackageBuilder>,
+
+    /// Data passed to the board's Board Driver, if provided.
+    board_driver_arguments: Option<BoardDriverArguments>,
 }
 
 impl ImageAssemblyConfigBuilder {
@@ -113,6 +116,7 @@ impl ImageAssemblyConfigBuilder {
             qemu_kernel: None,
             package_urls: BTreeSet::default(),
             packages_to_compile: BTreeMap::default(),
+            board_driver_arguments: None,
         }
     }
 
@@ -287,6 +291,31 @@ impl ImageAssemblyConfigBuilder {
             .try_insert_all_unique(bundle.kernel_boot_args)
             .map_err(|arg| anyhow!("duplicate boot_arg found: {}", arg))?;
 
+        Ok(())
+    }
+
+    /// Set the (optional) arguments for the Board Driver.
+    pub fn set_board_driver_arguments(&mut self, board_info: &BoardInformation) -> Result<()> {
+        if self.board_driver_arguments.is_some() {
+            bail!("Board driver arguments have already been set");
+        }
+        self.board_driver_arguments = match &board_info.hardware_info {
+            HardwareInfo {
+                name,
+                vendor_id: Some(vendor_id),
+                product_id: Some(product_id),
+                revision: Some(revision),
+            } => Some(BoardDriverArguments {
+                vendor_id: *vendor_id,
+                product_id: *product_id,
+                revision: *revision,
+                name: name.as_ref().unwrap_or(&board_info.name).clone(),
+            }),
+            HardwareInfo { name: _, vendor_id: None, product_id: None, revision: None } => None,
+            _ => {
+                bail!("If any of 'vendor_id', 'product_id', or 'revision' are set, all must be provided: {:?}", &board_info.hardware_info);
+            }
+        };
         Ok(())
     }
 
@@ -608,6 +637,7 @@ impl ImageAssemblyConfigBuilder {
             shell_commands,
             package_urls: _,
             packages_to_compile,
+            board_driver_arguments,
         } = self;
 
         let cmc_tool = tools.get_tool("cmc")?;
@@ -764,6 +794,7 @@ impl ImageAssemblyConfigBuilder {
             bootfs_files: bootfs_files.into_file_entries(),
             bootfs_packages: bootfs_packages.into_paths().sorted().collect(),
             images_config: Default::default(),
+            board_driver_arguments,
         };
         Ok(image_assembly_config)
     }

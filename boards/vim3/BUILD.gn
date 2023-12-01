@@ -11,10 +11,6 @@ assert(current_cpu == "arm64",
        "The vim3 board can only be defined in an arm64 toolchain.")
 
 _base = {
-  hardware_info = {
-    name = "default-board"
-  }
-
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",

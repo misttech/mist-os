@@ -2,13 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Context, Error, Result};
+use assembly_config_schema::BoardDriverArguments;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::Write;
 use tracing::debug;
+use zerocopy::AsBytes;
+
+use crate::zbi_items::{ZbiBoardInfo, ZbiPlatformId};
 
 /// Builder for the Zircon Boot Image (ZBI), which takes in a kernel, BootFS, boot args, and kernel
 /// command line.
@@ -21,6 +25,7 @@ pub struct ZbiBuilder {
     bootfs_files: BTreeMap<String, Utf8PathBuf>,
     bootargs: Vec<String>,
     cmdline: Vec<String>,
+    board_driver_arguments: Option<BoardDriverArguments>,
 
     // A ramdisk to add to the ZBI.
     ramdisk: Option<Utf8PathBuf>,
@@ -41,6 +46,7 @@ impl ZbiBuilder {
             bootfs_files: BTreeMap::default(),
             bootargs: Vec::default(),
             cmdline: Vec::default(),
+            board_driver_arguments: None,
             ramdisk: None,
             compression: None,
             output_manifest: None,
@@ -88,6 +94,11 @@ impl ZbiBuilder {
         self.cmdline.push(arg.to_string());
     }
 
+    /// Add optional board driver arguments to be added as ZBI items.
+    pub fn set_board_driver_arguments(&mut self, args: BoardDriverArguments) {
+        self.board_driver_arguments = Some(args);
+    }
+
     /// Add a ramdisk to the ZBI.
     pub fn add_ramdisk(&mut self, source: impl Into<Utf8PathBuf>) {
         self.ramdisk = Some(source.into());
@@ -104,7 +115,7 @@ impl ZbiBuilder {
     }
 
     /// Build the ZBI.
-    pub fn build(&self, gendir: impl AsRef<Utf8Path>, output: impl AsRef<Utf8Path>) -> Result<()> {
+    pub fn build(self, gendir: impl AsRef<Utf8Path>, output: impl AsRef<Utf8Path>) -> Result<()> {
         // Create the additional_boot_args.
         // TODO(fxbug.dev/77387): Switch to the boot args file once we are no longer
         // comparing to the GN build.
@@ -112,6 +123,27 @@ impl ZbiBuilder {
         let mut additional_boot_args = File::create(&additional_boot_args_path)
             .map_err(|e| Error::new(e).context("failed to create the additional boot args"))?;
         self.write_boot_args(&mut additional_boot_args)?;
+
+        let (platform_id_path, board_info_path) =
+            if let Some(BoardDriverArguments { vendor_id, product_id, revision, ref name }) =
+                self.board_driver_arguments
+            {
+                let platform_id = ZbiPlatformId::new(vendor_id, product_id, name)?;
+                let board_info = ZbiBoardInfo { revision };
+
+                let platform_id_path = gendir.as_ref().join("platform_id.bin");
+                let board_info_path = gendir.as_ref().join("board_info.bin");
+
+                std::fs::write(&platform_id_path, platform_id.as_bytes())
+                    .with_context(|| format!("writing platform_id to: {}", platform_id_path))?;
+
+                std::fs::write(&board_info_path, board_info.as_bytes())
+                    .with_context(|| format!("writing board_info to: {}", platform_id_path))?;
+
+                (Some(platform_id_path), Some(board_info_path))
+            } else {
+                (None, None)
+            };
 
         // Create the BootFS manifest file that lists all the files to insert
         // into BootFS.
@@ -121,7 +153,13 @@ impl ZbiBuilder {
         self.write_bootfs_manifest(additional_boot_args_path, &mut bootfs_manifest)?;
 
         // Run the zbi tool to construct the ZBI.
-        let zbi_args = self.build_zbi_args(&bootfs_manifest_path, None::<Utf8PathBuf>, output)?;
+        let zbi_args = self.build_zbi_args(
+            &bootfs_manifest_path,
+            None::<Utf8PathBuf>,
+            platform_id_path,
+            board_info_path,
+            output,
+        )?;
         debug!("ZBI command args: {:?}", zbi_args);
 
         self.tool.run(&zbi_args)
@@ -156,6 +194,8 @@ impl ZbiBuilder {
         &self,
         bootfs_manifest_path: impl AsRef<Utf8Path>,
         boot_args_path: Option<impl AsRef<Utf8Path>>,
+        platform_id_path: Option<impl AsRef<Utf8Path>>,
+        board_info_path: Option<impl AsRef<Utf8Path>>,
         output_path: impl AsRef<Utf8Path>,
     ) -> Result<Vec<String>> {
         // Ensure a kernel is supplied.
@@ -171,6 +211,16 @@ impl ZbiBuilder {
         args.push("--type=cmdline".to_string());
         for cmd in &self.cmdline {
             args.push(format!("--entry={}", cmd));
+        }
+
+        if let Some(platform_id_path) = platform_id_path {
+            args.push("--type=platform_id".to_string());
+            args.push(platform_id_path.as_ref().to_string());
+        }
+
+        if let Some(board_info_path) = board_info_path {
+            args.push("--type=drv_board_info".to_string());
+            args.push(board_info_path.as_ref().to_string());
         }
 
         // Then, add the bootfs files.
@@ -284,7 +334,9 @@ mod tests {
         let tools = FakeToolProvider::default();
         let zbi_tool = tools.get_tool("zbi").unwrap();
         let builder = ZbiBuilder::new(zbi_tool);
-        assert!(builder.build_zbi_args("bootfs", Some("bootargs"), "output").is_err());
+        assert!(builder
+            .build_zbi_args("bootfs", Some("bootargs"), None::<String>, None::<String>, "output")
+            .is_err());
     }
 
     #[test]
@@ -293,7 +345,9 @@ mod tests {
         let zbi_tool = tools.get_tool("zbi").unwrap();
         let mut builder = ZbiBuilder::new(zbi_tool);
         builder.set_kernel("path/to/kernel");
-        let args = builder.build_zbi_args("bootfs", Some("bootargs"), "output").unwrap();
+        let args = builder
+            .build_zbi_args("bootfs", Some("bootargs"), None::<String>, None::<String>, "output")
+            .unwrap();
         assert_eq!(
             args,
             [
@@ -318,7 +372,9 @@ mod tests {
         builder.set_kernel("path/to/kernel");
         builder.add_cmdline_arg("cmd-arg1");
         builder.add_cmdline_arg("cmd-arg2");
-        let args = builder.build_zbi_args("bootfs", Some("bootargs"), "output").unwrap();
+        let args = builder
+            .build_zbi_args("bootfs", Some("bootargs"), None::<String>, None::<String>, "output")
+            .unwrap();
         assert_eq!(
             args,
             [
@@ -345,7 +401,9 @@ mod tests {
         builder.set_kernel("path/to/kernel");
         builder.add_cmdline_arg("cmd-arg1");
         builder.add_cmdline_arg("cmd-arg2");
-        let args = builder.build_zbi_args("bootfs", None::<String>, "output").unwrap();
+        let args = builder
+            .build_zbi_args("bootfs", None::<String>, None::<String>, None::<String>, "output")
+            .unwrap();
         assert_eq!(
             args,
             [
@@ -371,7 +429,9 @@ mod tests {
         builder.add_cmdline_arg("cmd-arg1");
         builder.add_cmdline_arg("cmd-arg2");
         builder.set_compression("zstd.max");
-        let args = builder.build_zbi_args("bootfs", None::<String>, "output").unwrap();
+        let args = builder
+            .build_zbi_args("bootfs", None::<String>, None::<String>, None::<String>, "output")
+            .unwrap();
         assert_eq!(
             args,
             [
@@ -398,7 +458,9 @@ mod tests {
         builder.add_cmdline_arg("cmd-arg1");
         builder.add_cmdline_arg("cmd-arg2");
         builder.set_output_manifest("path/to/manifest");
-        let args = builder.build_zbi_args("bootfs", None::<String>, "output").unwrap();
+        let args = builder
+            .build_zbi_args("bootfs", None::<String>, None::<String>, None::<String>, "output")
+            .unwrap();
         assert_eq!(
             args,
             [
@@ -407,6 +469,42 @@ mod tests {
                 "--type=cmdline",
                 "--entry=cmd-arg1",
                 "--entry=cmd-arg2",
+                "--files",
+                "bootfs",
+                "--output",
+                "output",
+                "--json-output",
+                "path/to/manifest",
+            ]
+        );
+    }
+
+    #[test]
+    fn zbi_args_with_board_driver_args() {
+        let tools = FakeToolProvider::default();
+        let zbi_tool = tools.get_tool("zbi").unwrap();
+        let mut builder = ZbiBuilder::new(zbi_tool);
+        builder.set_kernel("path/to/kernel");
+        builder.set_output_manifest("path/to/manifest");
+        let args = builder
+            .build_zbi_args(
+                "bootfs",
+                None::<String>,
+                Some("gen/platform_id_path"),
+                Some("gen/board_info_path"),
+                "output",
+            )
+            .unwrap();
+        assert_eq!(
+            args,
+            [
+                "--type=container",
+                "path/to/kernel",
+                "--type=cmdline",
+                "--type=platform_id",
+                "gen/platform_id_path",
+                "--type=drv_board_info",
+                "gen/board_info_path",
                 "--files",
                 "bootfs",
                 "--output",

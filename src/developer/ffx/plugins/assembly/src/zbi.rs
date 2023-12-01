@@ -58,6 +58,10 @@ pub fn construct_zbi(
         zbi_builder.add_cmdline_arg(cmd);
     }
 
+    if let Some(args) = &product.board_driver_arguments {
+        zbi_builder.set_board_driver_arguments(args.clone());
+    }
+
     // Below, we generate the package index used by early boot to resolve
     // components. The index relies of assembly_base_package utility as it heavily
     // overlaps with the work done to generate cache and static indices.
