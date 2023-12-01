@@ -30,9 +30,9 @@ source_set("platform") {
   # Define during the soft-transition.
   # This allows for compilation work both before and after update
   # of third_party/openthread
-  if (openthread_upstream_version ==
-      "323ffd894ba9dfa6362ed0fa5d8eb9a4f9167d01") {
-    defines = [ "OPENTHREAD_USE_OLD_SETTING_API=1" ]
+  if (openthread_upstream_version !=
+      "11a38a63deb6828345097036b68775ce77506886") {
+    defines = [ "OPENTHREAD_SOFTTRANS_MIGRATION=1" ]
   }
 
   public_deps = [

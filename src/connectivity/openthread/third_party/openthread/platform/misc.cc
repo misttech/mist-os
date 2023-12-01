@@ -11,3 +11,13 @@ otPlatResetReason otPlatGetResetReason(otInstance *aInstance) {
 
   return sPlatResetReason;
 }
+
+// TODO: Remove this after soft transition!
+#if OPENTHREAD_SOFTTRANS_MIGRATION
+extern "C" {
+void otSrpServerServiceGetFullName() { abort(); }
+void otSrpServerServiceIsSubType() { abort(); }
+void otSrpServerServiceGetServiceSubTypeLabel() { abort(); }
+void otSrpServerHostFindNextService() { abort(); }
+}
+#endif
