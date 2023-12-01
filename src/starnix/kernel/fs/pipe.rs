@@ -32,6 +32,9 @@ use std::{convert::TryInto, sync::Arc};
 
 const ATOMIC_IO_BYTES: u16 = 4096;
 
+/// The maximum size of a pipe, independent of task capabilities and sysctl limits.
+const PIPE_MAX_SIZE: usize = 1 << 31;
+
 fn round_up(value: usize, increment: usize) -> usize {
     (value + (increment - 1)) & !(increment - 1)
 }
@@ -119,6 +122,9 @@ impl Pipe {
         task: &CurrentTask,
         mut requested_capacity: usize,
     ) -> Result<(), Errno> {
+        if requested_capacity > PIPE_MAX_SIZE {
+            return error!(EINVAL);
+        }
         if !task.creds().has_capability(CAP_SYS_RESOURCE)
             && requested_capacity
                 > task
@@ -127,7 +133,7 @@ impl Pipe {
                     .pipe_max_size
                     .load(std::sync::atomic::Ordering::Relaxed)
         {
-            return error!(EINVAL);
+            return error!(EPERM);
         }
         let page_size = *PAGE_SIZE as usize;
         if requested_capacity < page_size {
