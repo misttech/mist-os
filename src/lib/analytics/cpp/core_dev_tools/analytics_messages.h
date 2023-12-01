@@ -21,8 +21,7 @@ struct ToolInfo {
 
 void ShowMessageFirstRunOfFirstTool(const ToolInfo& tool_info);
 void ShowMessageFirstRunOfOtherTool(const ToolInfo& tool_info, AnalyticsStatus status);
-void ShowAnalytics(const ToolInfo& tool_info, AnalyticsStatus status,
-                   std::string_view analytics_list);
+void ShowAnalytics(const ToolInfo& tool_info, AnalyticsStatus status);
 
 void ShowAlready(AnalyticsStatus status);
 void ShowChangedTo(AnalyticsStatus status);

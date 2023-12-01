@@ -32,10 +32,6 @@ class Analytics : public analytics::core_dev_tools::Analytics<Analytics> {
   static constexpr char kEnableArgs[] = "--analytics=enable";
   static constexpr char kDisableArgs[] = "--analytics=disable";
   static constexpr char kStatusArgs[] = "--analytics-show";
-  static constexpr char kAnalyticsList[] = R"(1. For invocation of zxdb:
-   - The version of zxdb
-   - The output of "uname -ms" (CPU architecture and kernel name)
-2. Event of opting in/out of collection of analytics)";
 
   static bool IsEnabled(Session* session);
 };

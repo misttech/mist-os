@@ -48,8 +48,6 @@ namespace analytics::core_dev_tools {
 //       static constexpr char kEnableArgs[] = "--analytics=enable";
 //       static constexpr char kDisableArgs[] = "--analytics=disable";
 //       static constexpr char kStatusArgs[] = "--show-analytics";
-//       static constexpr char kAnalyticsList[] = R"(1. ...
-//     2. ...)";
 //     }
 //
 // One also needs to (if not already) add the following lines to the main() function before any
@@ -118,10 +116,9 @@ class Analytics {
   // Show the persistent analytics status and the what is collected
   static void ShowAnalytics() {
     internal::ToolInfo tool_info{T::kToolName, T::kEnableArgs, T::kDisableArgs, T::kStatusArgs};
-    internal::ShowAnalytics(tool_info,
-                            internal::PersistentStatus::IsEnabled() ? AnalyticsStatus::kEnabled
-                                                                    : AnalyticsStatus::kDisabled,
-                            T::kAnalyticsList);
+    internal::ShowAnalytics(tool_info, internal::PersistentStatus::IsEnabled()
+                                           ? AnalyticsStatus::kEnabled
+                                           : AnalyticsStatus::kDisabled);
   }
 
   static void IfEnabledSendInvokeEvent() {

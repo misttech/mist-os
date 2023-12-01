@@ -12,12 +12,10 @@ namespace analytics::core_dev_tools::internal {
 
 namespace {
 
-constexpr char kParticipatingTools[] = R"(  • device_launcher
-  • ffx
+constexpr char kParticipatingTools[] = R"(  • ffx
   • fidlcat
+  • foxtrot
   • Fuchsia extension for VS Code
-  • Fuchsia Snapshot Viewer
-  • scrutiny verify routes
   • symbolizer
   • zxdb)";
 
@@ -100,7 +98,6 @@ https://policies.google.com/privacy
 // $2: list of participating tools
 // $3: tool name
 // $4: enable args / disable args
-// $5: list of tool-specific analytics
 constexpr char kMessageShowAnalytics[] =
     R"(The collection of analytics is currently $0 for Fuchsia developer
 tools, including
@@ -111,10 +108,8 @@ To $1 analytics for all these tools, type
 
 When enabled, a random unique user ID (UUID) will be created for the current
 user and it is used to collect some anonymized analytics of the session and user
-workflow in order to improve the user experience. The analytics collected by
-$3 are:
-
-$5
+workflow in order to improve the user experience. To see what is collected:
+https://fuchsia.dev/fuchsia-src/contribute/governance/policy/analytics_collected_fuchsia_tools
 
 When analytics is disabled, any existing UUID is deleted, and a new
 UUID will be created if analytics is later re-enabled.
@@ -153,13 +148,12 @@ void ShowMessageFirstRunOfOtherTool(const ToolInfo& tool_info, AnalyticsStatus s
   }
 }
 
-void ShowAnalytics(const ToolInfo& tool_info, AnalyticsStatus status,
-                   std::string_view analytics_list) {
+void ShowAnalytics(const ToolInfo& tool_info, AnalyticsStatus status) {
   bool is_enabled = (status == AnalyticsStatus::kEnabled);
-  std::cout << fxl::Substitute(
-                   kMessageShowAnalytics, is_enabled ? "enabled" : "disabled",
-                   is_enabled ? "disable" : "enable", kParticipatingTools, tool_info.tool_name,
-                   is_enabled ? tool_info.disable_args : tool_info.enable_args, analytics_list)
+  std::cout << fxl::Substitute(kMessageShowAnalytics, is_enabled ? "enabled" : "disabled",
+                               is_enabled ? "disable" : "enable", kParticipatingTools,
+                               tool_info.tool_name,
+                               is_enabled ? tool_info.disable_args : tool_info.enable_args)
             << std::endl;
 }
 
