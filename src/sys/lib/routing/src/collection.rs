@@ -14,11 +14,11 @@ use {
             WeakComponentInstanceInterface,
         },
         error::RoutingError,
-        mapper::NoopRouteMapper,
-        router::{
+        legacy_router::{
             self, CapabilityVisitor, ErrorNotFoundFromParent, ErrorNotFoundInChild, ExposeVisitor,
             OfferVisitor, RouteBundle, Sources,
         },
+        mapper::NoopRouteMapper,
     },
     async_trait::async_trait,
     cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl},
@@ -103,7 +103,7 @@ where
             let child_exposes = child_component.lock_resolved_state().await.map(|c| c.exposes());
             match child_exposes {
                 Ok(child_exposes) => {
-                    if let Some(_) = router::find_matching_exposes(
+                    if let Some(_) = legacy_router::find_matching_exposes(
                         self.capability_type,
                         &self.capability_name,
                         &child_exposes,
@@ -120,7 +120,7 @@ where
             match parent_offers {
                 Ok(parent_offers) => {
                     let child_moniker = component.child_moniker().expect("ChildName should exist");
-                    if let Some(_) = router::find_matching_offers(
+                    if let Some(_) = legacy_router::find_matching_offers(
                         self.capability_type,
                         &self.capability_name,
                         &child_moniker,
@@ -178,7 +178,7 @@ where
             )?;
 
         let child_exposes = child_component.lock_resolved_state().await?.exposes();
-        let child_exposes = router::find_matching_exposes(
+        let child_exposes = legacy_router::find_matching_exposes(
             self.capability_type,
             &self.capability_name,
             &child_exposes,
@@ -190,7 +190,7 @@ where
                 self.capability_name.clone(),
             )
         })?;
-        router::route_from_expose(
+        legacy_router::route_from_expose(
             child_exposes,
             child_component,
             self.sources.clone(),
@@ -216,7 +216,7 @@ where
 
         let child_moniker = containing_component.child_moniker().expect("ChildName should exist");
         let parent_offers = parent.lock_resolved_state().await?.offers();
-        let parent_offers = router::find_matching_offers(
+        let parent_offers = legacy_router::find_matching_offers(
             self.capability_type,
             &self.capability_name,
             &child_moniker,
@@ -228,7 +228,7 @@ where
                 self.capability_name.clone(),
             )
         })?;
-        router::route_from_offer(
+        legacy_router::route_from_offer(
             parent_offers,
             parent,
             self.sources.clone(),
@@ -389,7 +389,7 @@ where
                         e
                     ))
                 })?;
-                let capability_source = router::route_from_offer(
+                let capability_source = legacy_router::route_from_offer(
                     RouteBundle::from_offer(offer_decl),
                     component,
                     self.sources.clone(),

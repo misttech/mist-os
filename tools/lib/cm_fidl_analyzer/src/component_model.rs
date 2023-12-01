@@ -32,11 +32,10 @@ use {
             component_has_relative_url, find_first_absolute_ancestor_url, RunnerRegistry,
         },
         error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
+        legacy_router::RouteBundle,
         mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
-        route_capability, route_event_stream,
-        router::RouteBundle,
-        RouteRequest, RouteSource,
+        route_capability, route_event_stream, RouteRequest, RouteSource,
     },
     serde::{Deserialize, Serialize},
     std::{

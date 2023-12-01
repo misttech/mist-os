@@ -1549,19 +1549,19 @@ impl NoopVisitor {
     }
 }
 
-impl crate::router::OfferVisitor for NoopVisitor {
+impl OfferVisitor for NoopVisitor {
     fn visit(&mut self, _: &OfferDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
-impl crate::router::ExposeVisitor for NoopVisitor {
+impl ExposeVisitor for NoopVisitor {
     fn visit(&mut self, _: &ExposeDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
-impl crate::router::CapabilityVisitor for NoopVisitor {
+impl CapabilityVisitor for NoopVisitor {
     fn visit(&mut self, _: &CapabilityDecl) -> Result<(), RoutingError> {
         Ok(())
     }

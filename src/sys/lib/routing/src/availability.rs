@@ -113,19 +113,19 @@ impl AvailabilityVisitor {
     }
 }
 
-impl crate::router::OfferVisitor for AvailabilityVisitor {
+impl crate::legacy_router::OfferVisitor for AvailabilityVisitor {
     fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_offer(offer).map_err(Into::into)
     }
 }
 
-impl crate::router::ExposeVisitor for AvailabilityVisitor {
+impl crate::legacy_router::ExposeVisitor for AvailabilityVisitor {
     fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), crate::RoutingError> {
         self.state.advance_with_expose(expose).map_err(Into::into)
     }
 }
 
-impl crate::router::CapabilityVisitor for AvailabilityVisitor {
+impl crate::legacy_router::CapabilityVisitor for AvailabilityVisitor {
     fn visit(&mut self, _: &cm_rust::CapabilityDecl) -> Result<(), crate::RoutingError> {
         Ok(())
     }

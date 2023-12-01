@@ -11,9 +11,9 @@ use {
     ::namespace::Namespace,
     ::routing::{
         capability_source::ComponentCapability,
+        legacy_router::RouteBundle,
         policy::ScopedPolicyChecker,
         resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage, ResolverError},
-        router::RouteBundle,
     },
     anyhow::format_err,
     assert_matches::assert_matches,

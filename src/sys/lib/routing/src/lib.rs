@@ -9,7 +9,7 @@ pub mod component_instance;
 pub mod environment;
 pub mod error;
 pub mod event;
-mod legacy_router;
+pub mod legacy_router;
 pub mod mapper;
 pub mod path;
 pub mod policy;
@@ -23,11 +23,6 @@ pub mod router;
 #[cfg(target_os = "fuchsia")]
 pub use self::router::{route, Completer, Request, Routable, Router};
 
-#[cfg(not(target_os = "fuchsia"))]
-pub mod router {
-    pub use crate::legacy_router::*;
-}
-
 use {
     crate::{
         availability::{AvailabilityState, AvailabilityVisitor},
@@ -37,13 +32,13 @@ use {
         },
         environment::DebugRegistration,
         error::RoutingError,
-        mapper::DebugRouteMapper,
-        path::PathBufExt,
-        rights::Rights,
-        router::{
+        legacy_router::{
             AllowedSourcesBuilder, CapabilityVisitor, ErrorNotFoundFromParent,
             ErrorNotFoundInChild, ExposeVisitor, NoopVisitor, OfferVisitor, RouteBundle,
         },
+        mapper::DebugRouteMapper,
+        path::PathBufExt,
+        rights::Rights,
         walk_state::WalkState,
     },
     cm_rust::{
@@ -417,7 +412,7 @@ where
         .namespace()
         .component()
         .capability();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -448,7 +443,7 @@ where
         .framework(InternalCapability::Directory)
         .namespace()
         .component();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -474,7 +469,7 @@ where
         AvailabilityVisitor::new(offer_bundle.iter().next().unwrap().availability);
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         offer_bundle.map(Into::into),
         target.clone(),
         allowed_sources.build(),
@@ -497,7 +492,7 @@ where
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
 
     let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -518,7 +513,7 @@ where
 {
     let mut availability_visitor = AvailabilityVisitor::new(offer_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -539,7 +534,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Runner).builtin().component();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -560,7 +555,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Resolver).builtin().component();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -581,7 +576,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Config).builtin().component();
-    let source = router::route_from_offer(
+    let source = legacy_router::route_from_offer(
         RouteBundle::from_offer(offer_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -651,7 +646,7 @@ where
             let env_moniker = env_component_instance.moniker();
 
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
-            let source = router::route_from_registration(
+            let source = legacy_router::route_from_registration(
                 registration_decl,
                 env_component_instance.clone(),
                 allowed_sources.build(),
@@ -677,7 +672,7 @@ where
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Protocol).component();
-            let source = router::route_from_self(
+            let source = legacy_router::route_from_self(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -689,7 +684,7 @@ where
         }
         _ => {
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
-            let source = router::route_from_use(
+            let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -720,7 +715,7 @@ where
         .namespace()
         .component()
         .capability();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -747,7 +742,7 @@ where
         .namespace()
         .component()
         .capability();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -774,7 +769,7 @@ where
         .namespace()
         .component()
         .capability();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -797,7 +792,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -823,7 +818,7 @@ where
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component();
-            let source = router::route_from_self(
+            let source = legacy_router::route_from_self(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -837,7 +832,7 @@ where
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
-            let source = router::route_from_use(
+            let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -863,7 +858,7 @@ where
     let mut availability_visitor = AvailabilityVisitor::new(expose_bundle.availability().clone());
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Service).component().collection();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         expose_bundle.map(Into::into),
         target.clone(),
         allowed_sources.build(),
@@ -979,7 +974,7 @@ where
             let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
             let allowed_sources =
                 AllowedSourcesBuilder::new(CapabilityTypeName::Dictionary).component();
-            let source = router::route_from_self(
+            let source = legacy_router::route_from_self(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -1002,7 +997,7 @@ where
                 .framework(InternalCapability::Directory)
                 .namespace()
                 .component();
-            let source = router::route_from_use(
+            let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -1037,7 +1032,7 @@ where
         .framework(InternalCapability::Directory)
         .namespace()
         .component();
-    let source = router::route_from_expose(
+    let source = legacy_router::route_from_expose(
         RouteBundle::from_expose(expose_decl.into()),
         target.clone(),
         allowed_sources.build(),
@@ -1091,7 +1086,7 @@ where
 {
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::Storage).component();
-    let source = router::route_from_use(
+    let source = legacy_router::route_from_use(
         use_decl.into(),
         target.clone(),
         allowed_sources.build(),
@@ -1132,7 +1127,7 @@ where
     let mut state = DirectoryState::new(fio::RW_STAR_DIR, None, &Availability::Required);
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Directory).component().namespace();
-    let source = router::route_from_registration(
+    let source = legacy_router::route_from_registration(
         StorageDeclAsRegistration::from(storage_decl.clone()),
         target.clone(),
         allowed_sources.build(),
@@ -1161,7 +1156,7 @@ where
     let source = match target.environment().get_registered_runner(&runner)? {
         // The runner was registered in the environment of some component instance..
         Some((ExtendedInstanceInterface::Component(env_component_instance), registration_decl)) => {
-            router::route_from_registration(
+            legacy_router::route_from_registration(
                 registration_decl,
                 env_component_instance,
                 allowed_sources,
@@ -1219,7 +1214,7 @@ where
                 .component();
             let mut availability_visitor =
                 AvailabilityVisitor::new(use_decl.availability().clone());
-            let source = router::route_from_use(
+            let source = legacy_router::route_from_use(
                 use_decl.into(),
                 target.clone(),
                 allowed_sources.build(),
@@ -1246,7 +1241,7 @@ where
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Config).component().capability();
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability().clone());
-    let source = router::route_from_use(
+    let source = legacy_router::route_from_use(
         use_decl.into(),
         target.clone(),
         allowed_sources.build(),
@@ -1270,7 +1265,7 @@ where
 {
     let allowed_sources =
         AllowedSourcesBuilder::new(CapabilityTypeName::Resolver).builtin().component();
-    let source = router::route_from_registration(
+    let source = legacy_router::route_from_registration(
         registration,
         target.clone(),
         allowed_sources.build(),
@@ -1297,7 +1292,7 @@ where
 {
     let allowed_sources = AllowedSourcesBuilder::new(CapabilityTypeName::EventStream).builtin();
     let mut availability_visitor = AvailabilityVisitor::new(use_decl.availability);
-    let source = router::route_from_use(
+    let source = legacy_router::route_from_use(
         use_decl.into(),
         target.clone(),
         allowed_sources.build(),
