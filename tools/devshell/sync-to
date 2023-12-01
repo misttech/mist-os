@@ -136,6 +136,8 @@ def colorize(text: str, color: Color) -> str:
 class SyncToCommand:
     def __init__(self, args: argparse.Namespace, fuchsia_dir: str):
         self.fuchsia_dir = pathlib.Path(fuchsia_dir)
+        # TODO(olivernewman): Infer the project name from the git remote
+        self.project = "integration"
         self.help: bool = args.help
         self.state: str = args.state
         self.dry_run: bool = args.dry_run
@@ -143,7 +145,7 @@ class SyncToCommand:
 
     @property
     def integration_dir(self) -> pathlib.Path:
-        return self.fuchsia_dir.joinpath("integration")
+        return self.fuchsia_dir.joinpath(self.project)
 
     @functools.cached_property
     def gsutil_path(self) -> str:
@@ -285,7 +287,7 @@ class SyncToCommand:
         integration_remote = (
             self.jiri(
                 "manifest",
-                "-element=integration",
+                "-element=" + self.project,
                 "-template={{.Remote}}",
                 snapshot_file,
                 dry_run_safe=True,
@@ -348,7 +350,7 @@ class SyncToCommand:
         local_remote = (
             self.jiri(
                 "manifest",
-                "-element=integration",
+                "-element=" + self.project,
                 "-template={{.Remote}}",
                 jiri_manifest,
                 dry_run_safe=True,
@@ -375,7 +377,7 @@ class SyncToCommand:
         local_manifest = (
             self.jiri(
                 "manifest",
-                "-element=integration",
+                "-element=" + self.project,
                 "-template={{.Manifest}}",
                 jiri_manifest,
                 dry_run_safe=True,
@@ -443,6 +445,7 @@ class SyncToCommand:
             # of downloading a Jiri snapshot from GCS.
             self.sync_to_legacy_build_id(build_id)
             return
+        self.project = checkout_info.get("manifest_project", "integration")
         integration_remote = checkout_info["manifest_remote"]
         self.assert_correct_integration_repo(integration_remote)
         self.assert_correct_integration_manifest(checkout_info)
@@ -451,7 +454,7 @@ class SyncToCommand:
         has_integration_patch = False
         for patch in checkout_info.get("patches", []):
             project = patch["project"]
-            if project == "integration":
+            if project == self.project:
                 has_integration_patch = True
             args = ["patch"]
             # Some old versions of recipes didn't emit `base_revision`. If no
