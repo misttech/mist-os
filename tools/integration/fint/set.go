@@ -342,8 +342,26 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	if staticSpec.EnableGoCache {
 		vars["gocache_dir"] = filepath.Join(contextSpec.CacheDir, "go_cache")
 	} else if staticSpec.UseTemporaryGoCache {
-		dir, err := os.MkdirTemp("", "go_cache")
-		if err != nil {
+		// We wish to have the go cache directory be deterministic,
+		// because the cache directory winds up in various ninja action
+		// commandlines, so having the cache directory change between
+		// builds means that those action's outputs are dirtied, and we
+		// re-run actions on incremental builds that differ only in go
+		// cache directory.
+		// However, we do still wish to preserve the invariant that the
+		// cache directory is empty when UseTemporaryGoCache is
+		// requested.  Thus, instead of generating a random directory
+		// with os.TempDir(), we generate a predictable, deterministic
+		// path to serve as the go cache directory, and ensure that it
+		// is empty at the time of `fint set`, which assuming no racing
+		// work is occurring on the same machine (which is a safe
+		// assumption in our build infra), is semantically equivalent
+		// while allowing better build caching.
+		dir := filepath.Join(os.TempDir(), "fuchsia_go_cache")
+		if err := os.RemoveAll(dir); err != nil {
+			return nil, err
+		}
+		if err := os.MkdirAll(dir, 0700); err != nil {
 			return nil, err
 		}
 		vars["gocache_dir"] = dir
