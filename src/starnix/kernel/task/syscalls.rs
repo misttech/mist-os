@@ -14,7 +14,7 @@ use crate::{
     execution::execute_task,
     fs::{FdNumber, FileHandle, MountNamespaceFile},
     lock_ordering::MmDumpable,
-    logging::{log_error, log_trace, not_implemented},
+    logging::{log_error, log_trace, not_implemented, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
@@ -903,8 +903,8 @@ pub fn sys_prctl(
             let string_end = name.iter().position(|&c| c == 0).unwrap();
 
             let name_str = CString::new(&mut name[0..string_end]).map_err(|_| errno!(EINVAL))?;
+            set_zx_name(&fuchsia_runtime::thread_self(), name_str.as_bytes());
             current_task.set_command_name(name_str);
-            crate::logging::set_current_task_info(current_task);
             Ok(0.into())
         }
         PR_GET_NAME => {

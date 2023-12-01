@@ -7,7 +7,7 @@
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
 use crate::{
     arch::execution::{generate_cfi_directives, restore_cfi_directives},
-    logging::{log_warn, set_current_task_info, set_zx_name},
+    logging::{log_warn, set_zx_name},
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
@@ -184,7 +184,8 @@ fn run_task(
     let mut profiling_guard = ProfileDuration::enter("TaskLoopSetup");
 
     set_zx_name(&fuchsia_runtime::thread_self(), current_task.command().as_bytes());
-    set_current_task_info(current_task);
+    let span = current_task.logging_span();
+    let _span_guard = span.enter();
 
     trace_duration!(trace_category_starnix!(), trace_name_run_task!());
 

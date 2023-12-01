@@ -5,7 +5,7 @@
 use crate::{
     fs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
     lock_ordering::MmDumpable,
-    logging::{log_debug, log_warn, set_zx_name},
+    logging::{self, log_debug, log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{SignalInfo, SignalState},
     task::{
@@ -20,6 +20,7 @@ use fuchsia_zircon::{
     AsHandleRef, Signals, Task as _, {self as zx},
 };
 use lock_sequence::{LockBefore, Locked};
+use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_uapi::{
     auth::{
@@ -588,6 +589,9 @@ pub struct Task {
     /// Variable that can tell you whether there are currently seccomp
     /// filters without holding a lock
     pub seccomp_filter_state: SeccompState,
+
+    /// Used to ensure that all logs related to this task carry the same metadata about the task.
+    logging_span: OnceCell<logging::Span>,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -764,6 +768,7 @@ impl Task {
             }),
             persistent_info: TaskPersistentInfoState::new(id, pid, command, creds, exit_signal),
             seccomp_filter_state,
+            logging_span: OnceCell::new(),
         };
         #[cfg(any(test, debug_assertions))]
         {
@@ -1066,13 +1071,18 @@ impl Task {
             set_zx_name(&self.thread_group.process, name.as_bytes());
         }
 
+        let debug_info =
+            logging::TaskDebugInfo { pid: self.thread_group.leader, tid: self.id, command: name };
+        self.update_logging_span(&debug_info);
+
         // Truncate to 16 bytes, including null byte.
-        let bytes = name.to_bytes();
+        let bytes = debug_info.command.to_bytes();
+
         self.persistent_info.lock().command = if bytes.len() > 15 {
             // SAFETY: Substring of a CString will contain no null bytes.
             CString::new(&bytes[..15]).unwrap()
         } else {
-            name
+            debug_info.command
         };
     }
 
@@ -1195,6 +1205,22 @@ impl Task {
             task_state.notify_ptracers();
         }
         false
+    }
+
+    pub fn logging_span(&self) -> logging::Span {
+        let logging_span = self.logging_span.get_or_init(|| {
+            logging::Span::new(&logging::TaskDebugInfo {
+                pid: self.thread_group.leader,
+                tid: self.id,
+                command: self.command(),
+            })
+        });
+        logging_span.clone()
+    }
+
+    fn update_logging_span(&self, debug_info: &logging::TaskDebugInfo) {
+        let logging_span = self.logging_span.get_or_init(|| logging::Span::new(&debug_info));
+        logging_span.update(debug_info);
     }
 }
 

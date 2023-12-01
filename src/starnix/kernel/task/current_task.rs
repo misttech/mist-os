@@ -25,7 +25,7 @@ use crate::{
     },
     loader::{load_executable, resolve_executable, ResolvedElf},
     lock_ordering::MmDumpable,
-    logging::{log_error, log_warn, not_implemented},
+    logging::{log_error, log_warn, not_implemented, set_zx_name},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
@@ -619,8 +619,8 @@ impl CurrentTask {
         } else {
             path
         };
+        set_zx_name(&fuchsia_runtime::thread_self(), basename.as_bytes());
         self.set_command_name(basename);
-        crate::logging::set_current_task_info(self);
 
         Ok(())
     }
