@@ -346,8 +346,10 @@ void Device::DestroyIface(DestroyIfaceRequestView request, fdf::Arena& arena,
       DestroyIface(&client_interface_, [&device_removal, completer = completer.ToAsync(),
                                         arena = std::move(arena), iface_id](auto status) mutable {
         if (status != ZX_OK) {
-          BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
-                    zx_status_get_string(status));
+          if (status != ZX_ERR_NOT_FOUND) {
+            BRCMF_ERR("Device::DestroyIface() Error destroying Client interface : %s",
+                      zx_status_get_string(status));
+          }
           completer.buffer(arena).ReplyError(status);
           device_removal.Signal();
           return;
@@ -562,7 +564,6 @@ void Device::DestroyIface(WlanInterface** iface_ptr, fit::callback<void(zx_statu
   WlanInterface* iface = *iface_ptr;
   zx_status_t status = ZX_OK;
   if (iface == nullptr) {
-    BRCMF_ERR("Invalid interface");
     respond(ZX_ERR_NOT_FOUND);
     return;
   }

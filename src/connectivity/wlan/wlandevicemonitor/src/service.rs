@@ -19,7 +19,7 @@ use {
         channel::mpsc, select, stream::FuturesUnordered, FutureExt, StreamExt, TryStreamExt,
     },
     std::sync::{atomic::Ordering, Arc},
-    tracing::{error, info},
+    tracing::{error, info, warn},
 };
 
 /// Thread-safe counter for spawned ifaces.
@@ -204,6 +204,9 @@ async fn handle_single_new_iface(
     }
     match destroy_iface(&phys, &ifaces, ifaces_node, new_iface.id).await {
         Ok(()) => info!("Destroyed iface {}", new_iface.id),
+        Err(e) if e == zx::Status::NOT_FOUND => {
+            warn!("destroy_iface - iface {} not found; assume success", new_iface.id)
+        }
         Err(e) => error!("Error while destroying iface {}: {}", new_iface.id, e),
     }
 }

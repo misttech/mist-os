@@ -211,7 +211,10 @@ void Device::DestroyIface(DestroyIfaceRequestView request, DestroyIfaceCompleter
           return;
         }
         if (result->is_error()) {
-          lerror("DestroyIface failed with error %s", zx_status_get_string(result->error_value()));
+          if (result->error_value() != ZX_ERR_NOT_FOUND) {
+            lerror("DestroyIface failed with error %s",
+                   zx_status_get_string(result->error_value()));
+          }
           completer.ReplyError(result->error_value());
           return;
         }
