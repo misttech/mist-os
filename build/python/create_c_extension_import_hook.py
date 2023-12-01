@@ -56,12 +56,13 @@ def main():
             f"""
 import importlib.util
 import importlib.machinery
+import os
 
 def _init():
     finder = importlib.machinery.PathFinder()
-    spec = finder.find_spec('{shlib_source}', path=['{shlib_source_dir}'])
+    spec = finder.find_spec('{shlib_source}', path=['{shlib_source_dir}', os.getcwd()])
     if spec is None:
-        raise Exception('Couldn\\'t load library "{shlib_source}" from {shlib_source_dir}')
+        raise Exception('Couldn\\'t load library "{shlib_source}" from {shlib_source_dir} or CWD"')
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     return mod
