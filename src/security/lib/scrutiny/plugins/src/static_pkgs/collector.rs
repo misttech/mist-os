@@ -10,14 +10,16 @@ use {
     anyhow::{Context, Result},
     fuchsia_archive::Utf8Reader as FarReader,
     fuchsia_hash::Hash,
-    fuchsia_merkle::MerkleTree,
     fuchsia_url::{PackageName, PackageVariant},
     maplit::hashset,
     scrutiny::model::{collector::DataCollector, model::DataModel},
     scrutiny_utils::{
         artifact::{ArtifactReader, FileArtifactReader},
         key_value::parse_key_value,
-        package::PackageIndexContents,
+        package::{
+            extract_system_image_hash_string, verify_package_merkle, PackageError,
+            PackageIndexContents,
+        },
         url::from_package_name_variant_path,
     },
     std::{
@@ -28,8 +30,6 @@ use {
     },
 };
 
-static PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY: &str = "zircon.system.pkgfs.cmd";
-static PKGFS_BINARY_PATH: &str = "bin/pkgsvr";
 static META_FAR_CONTENTS_LISTING_PATH: &str = "meta/contents";
 static STATIC_PKGS_LISTING_PATH: &str = "data/static_packages";
 
@@ -50,45 +50,40 @@ fn collect_static_pkgs(
     mut artifact_reader: Box<dyn ArtifactReader>,
 ) -> Result<StaticPkgsData, ErrorWithDeps> {
     // Get system image path from ["bin/pkgsvr", <system-image-hash>] cmd.
-    let pkgfs_cmd =
-        additional_boot_args.get(PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY).ok_or_else(|| {
-            ErrorWithDeps {
-                deps: artifact_reader.get_deps(),
-                error: StaticPkgsError::MissingPkgfsCmdEntry,
-            }
-        })?;
-
-    if pkgfs_cmd.len() != 2 {
-        return Err(ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::UnexpectedPkgfsCmdLen {
-                expected_len: 2,
-                actual_len: pkgfs_cmd.len(),
-            },
-        });
-    }
-    let (pkgfs_binary_path, system_image_merkle_string) = (&pkgfs_cmd[0], &pkgfs_cmd[1]);
-
-    if pkgfs_binary_path != PKGFS_BINARY_PATH {
-        return Err(ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::UnexpectedPkgfsCmd {
-                expected_cmd: PKGFS_BINARY_PATH.to_string(),
-                actual_cmd: pkgfs_binary_path.clone(),
-            },
-        });
-    }
-    let system_image_merkle =
-        Hash::from_str(system_image_merkle_string).map_err(|_| ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::MalformedSystemImageHash {
-                actual_hash: system_image_merkle_string.clone(),
-            },
-        })?;
+    let system_image_merkle_string = extract_system_image_hash_string(additional_boot_args)
+        .map_err(|err| ErrorWithDeps { deps: artifact_reader.get_deps(), error: err.into() })?;
 
     // Read system image package and verify its merkle.
-    let system_image_path = Path::new(system_image_merkle_string);
-    let mut system_image_pkg =
+    verify_package_merkle(&system_image_merkle_string, &mut artifact_reader).map_err(|err| {
+        let error = match err {
+            PackageError::MalformedPackageHash { actual_hash } => {
+                StaticPkgsError::MalformedSystemImageHash { actual_hash }
+            }
+            PackageError::FailedToOpenPackage { package_path, io_error } => {
+                StaticPkgsError::FailedToOpenSystemImage {
+                    system_image_path: package_path,
+                    io_error,
+                }
+            }
+            PackageError::FailedToReadPackage { package_path, io_error } => {
+                StaticPkgsError::FailedToReadSystemImage {
+                    system_image_path: package_path,
+                    io_error,
+                }
+            }
+            PackageError::FailedToVerifyPackage { expected_merkle_root, computed_merkle_root } => {
+                StaticPkgsError::FailedToVerifySystemImage {
+                    expected_merkle_root,
+                    computed_merkle_root,
+                }
+            }
+        };
+        ErrorWithDeps { deps: artifact_reader.get_deps(), error }
+    })?;
+
+    // Parse system image.
+    let system_image_path = Path::new(&system_image_merkle_string);
+    let system_image_pkg =
         artifact_reader.open(&Path::new(system_image_path)).map_err(|err| ErrorWithDeps {
             deps: artifact_reader.get_deps(),
             error: StaticPkgsError::FailedToReadSystemImage {
@@ -96,33 +91,7 @@ fn collect_static_pkgs(
                 io_error: err.to_string(),
             },
         })?;
-    let computed_system_image_merkle = MerkleTree::from_reader(&mut system_image_pkg)
-        .map_err(|err| ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::FailedToReadSystemImage {
-                system_image_path: system_image_path.to_path_buf(),
-                io_error: err.to_string(),
-            },
-        })?
-        .root();
-    if computed_system_image_merkle != system_image_merkle {
-        return Err(ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::FailedToVerifySystemImage {
-                expected_merkle_root: system_image_merkle,
-                computed_merkle_root: computed_system_image_merkle,
-            },
-        });
-    }
 
-    // Parse system image.
-    system_image_pkg.rewind().map_err(|err| ErrorWithDeps {
-        deps: artifact_reader.get_deps(),
-        error: StaticPkgsError::FailedToParseSystemImage {
-            system_image_path: system_image_path.to_path_buf(),
-            parse_error: err.to_string(),
-        },
-    })?;
     let mut system_image_far = FarReader::new(system_image_pkg).map_err(|err| ErrorWithDeps {
         deps: artifact_reader.get_deps(),
         error: StaticPkgsError::FailedToParseSystemImage {
@@ -169,17 +138,31 @@ fn collect_static_pkgs(
             },
         })?;
 
-    // Check static pkgs merkle format; determine path to static pkgs file.
-    let static_pkgs_merkle =
-        Hash::from_str(static_pkgs_merkle_string).map_err(|_| ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::MalformedStaticPkgsHash {
-                actual_hash: static_pkgs_merkle_string.clone(),
-            },
-        })?;
+    // Verify static pkgs merkle.
+    verify_package_merkle(static_pkgs_merkle_string, &mut artifact_reader).map_err(|err| {
+        let error = match err {
+            PackageError::MalformedPackageHash { actual_hash } => {
+                StaticPkgsError::MalformedStaticPkgsHash { actual_hash }
+            }
+            PackageError::FailedToOpenPackage { package_path, io_error } => {
+                StaticPkgsError::FailedToReadStaticPkgs { static_pkgs_path: package_path, io_error }
+            }
+            PackageError::FailedToReadPackage { package_path, io_error } => {
+                StaticPkgsError::FailedToReadStaticPkgs { static_pkgs_path: package_path, io_error }
+            }
+            PackageError::FailedToVerifyPackage { expected_merkle_root, computed_merkle_root } => {
+                StaticPkgsError::FailedToVerifyStaticPkgs {
+                    expected_merkle_root,
+                    computed_merkle_root,
+                }
+            }
+        };
+        ErrorWithDeps { deps: artifact_reader.get_deps(), error }
+    })?;
+
     let static_pkgs_path = Path::new(static_pkgs_merkle_string);
 
-    // Read static packages index, check its merkle, and parse it.
+    // Read static packages index and parse it.
     let mut static_pkgs = artifact_reader.open(static_pkgs_path).map_err(|err| ErrorWithDeps {
         deps: artifact_reader.get_deps(),
         error: StaticPkgsError::FailedToReadStaticPkgs {
@@ -187,31 +170,7 @@ fn collect_static_pkgs(
             io_error: err.to_string(),
         },
     })?;
-    let computed_static_pkgs_merkle = MerkleTree::from_reader(&mut static_pkgs)
-        .map_err(|err| ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::FailedToReadStaticPkgs {
-                static_pkgs_path: static_pkgs_path.to_path_buf(),
-                io_error: err.to_string(),
-            },
-        })?
-        .root();
-    if computed_static_pkgs_merkle != static_pkgs_merkle {
-        return Err(ErrorWithDeps {
-            deps: artifact_reader.get_deps(),
-            error: StaticPkgsError::FailedToVerifyStaticPkgs {
-                expected_merkle_root: static_pkgs_merkle,
-                computed_merkle_root: computed_static_pkgs_merkle,
-            },
-        });
-    }
-    static_pkgs.rewind().map_err(|err| ErrorWithDeps {
-        deps: artifact_reader.get_deps(),
-        error: StaticPkgsError::FailedToParseStaticPkgs {
-            static_pkgs_path: static_pkgs_path.to_path_buf(),
-            parse_error: err.to_string(),
-        },
-    })?;
+
     let mut static_pkgs_contents = String::new();
     static_pkgs.read_to_string(&mut static_pkgs_contents).map_err(|err| ErrorWithDeps {
         deps: artifact_reader.get_deps(),
@@ -321,8 +280,7 @@ mod tests {
     use {
         super::{
             collect_static_pkgs, ErrorWithDeps, StaticPkgsCollector,
-            META_FAR_CONTENTS_LISTING_PATH, PKGFS_BINARY_PATH,
-            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY, STATIC_PKGS_LISTING_PATH,
+            META_FAR_CONTENTS_LISTING_PATH, STATIC_PKGS_LISTING_PATH,
         },
         crate::{
             additional_boot_args::{AdditionalBootConfigCollection, AdditionalBootConfigError},
@@ -335,6 +293,7 @@ mod tests {
         maplit::{btreemap, hashmap, hashset},
         scrutiny::model::collector::DataCollector,
         scrutiny_testing::{artifact::MockArtifactReader, fake::fake_data_model},
+        scrutiny_utils::package::{PKGFS_BINARY_PATH, PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY},
         std::{
             collections::{BTreeMap, HashMap},
             io::{BufWriter, Read, Write},

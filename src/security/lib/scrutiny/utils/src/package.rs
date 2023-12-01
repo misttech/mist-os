@@ -11,18 +11,117 @@ use {
     serde::{
         de::{self, Deserializer, Error as _, MapAccess, Visitor},
         ser::Serializer,
+        Deserialize, Serialize,
     },
     std::{
         collections::HashMap,
         fmt,
         fs::File,
-        path::Path,
+        path::{Path, PathBuf},
         str::{from_utf8, FromStr},
     },
+    thiserror::Error,
 };
+
+#[derive(Debug, Deserialize, Serialize, Error)]
+#[serde(rename_all = "snake_case")]
+pub enum SystemImageError {
+    #[error("additional boot config is missing the pkgfs cmd entry")]
+    MissingPkgfsCmdEntry,
+    #[error("Unexpected number of pkgfs cmd entry arguments: expected {expected_len}; actual: {actual_len}")]
+    UnexpectedPkgfsCmdLen { expected_len: usize, actual_len: usize },
+    #[error("Unexpected pkgfs command: expected {expected_cmd}; actual {actual_cmd}")]
+    UnexpectedPkgfsCmd { expected_cmd: String, actual_cmd: String },
+}
+
+#[derive(Debug, Deserialize, Serialize, Error)]
+#[serde(rename_all = "snake_case")]
+pub enum PackageError {
+    #[error("Malformed package hash: expected hex-SHA256; actual {actual_hash}")]
+    MalformedPackageHash { actual_hash: String },
+    #[error("Failed to open package file: {package_path}: {io_error}")]
+    FailedToOpenPackage { package_path: PathBuf, io_error: String },
+    #[error("Failed to read package file: {package_path}: {io_error}")]
+    FailedToReadPackage { package_path: PathBuf, io_error: String },
+    #[error("Failed to verify package file: expected merkle root: {expected_merkle_root}; computed merkle root: {computed_merkle_root}")]
+    FailedToVerifyPackage { expected_merkle_root: Hash, computed_merkle_root: Hash },
+}
 
 /// Path within a Fuchsia package that contains the package contents manifest.
 pub static META_CONTENTS_PATH: &str = "meta/contents";
+pub static PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY: &str = "zircon.system.pkgfs.cmd";
+pub static PKGFS_BINARY_PATH: &str = "bin/pkgsvr";
+
+/// Parse the system image merkle hash from the zircon.system.pkgfs.cmd value in additional boot args.
+/// Assumption: the additional_boot_args provided have already split values by the `+` delimiter.
+/// Example: zircon.system.pkgfs.cmd=bin/pkgsvr+a5e7a3756cca7fc664de30d9fe6cec96f7923562763a4678b1a7c69f84aedce3
+pub fn extract_system_image_hash_string(
+    additional_boot_args: HashMap<String, Vec<String>>,
+) -> Result<String, SystemImageError> {
+    let pkgfs_cmd = additional_boot_args
+        .get(PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY)
+        .ok_or_else(|| SystemImageError::MissingPkgfsCmdEntry)?;
+
+    if pkgfs_cmd.len() != 2 {
+        return Err(SystemImageError::UnexpectedPkgfsCmdLen {
+            expected_len: 2,
+            actual_len: pkgfs_cmd.len(),
+        });
+    }
+    let (pkgfs_binary_path, system_image_merkle_string) = (&pkgfs_cmd[0], &pkgfs_cmd[1]);
+
+    if pkgfs_binary_path != PKGFS_BINARY_PATH {
+        return Err(SystemImageError::UnexpectedPkgfsCmd {
+            expected_cmd: PKGFS_BINARY_PATH.to_string(),
+            actual_cmd: pkgfs_binary_path.clone(),
+        });
+    }
+    Ok(system_image_merkle_string.to_string())
+}
+
+/// Verify that the merkle given for the package matches the computed merkle of the associated blob.
+///
+/// The merkle strings may be extracted from:
+/// 1. The zircon.system.pkgfs.cmd value from additional_boot_args for the system image blob.
+/// 2. The package listing in data/static_packages from the system image blob's data.
+/// 3. The bootfs package listing within a zbi from data/bootfs_packages.
+///
+/// The provided artifact_reader is assumed to have access to the set of blobs containing the package of interest.
+pub fn verify_package_merkle(
+    package_merkle_string: &String,
+    artifact_reader: &mut Box<dyn ArtifactReader>,
+) -> Result<(), PackageError> {
+    // First, ensure the given string for the package merkle is a valid hash.
+    let package_merkle = Hash::from_str(package_merkle_string).map_err(|_| {
+        PackageError::MalformedPackageHash { actual_hash: package_merkle_string.clone() }
+    })?;
+
+    // Next, open the blob corresponding to the package merkle from the artifact reader.
+    let package_path = Path::new(package_merkle_string);
+    let mut pkg = artifact_reader.open(&Path::new(package_path)).map_err(|err| {
+        PackageError::FailedToReadPackage {
+            package_path: package_path.to_path_buf(),
+            io_error: err.to_string(),
+        }
+    })?;
+
+    // Compute the merkle from the package blob.
+    let computed_package_merkle = MerkleTree::from_reader(&mut pkg)
+        .map_err(|err| PackageError::FailedToReadPackage {
+            package_path: package_path.to_path_buf(),
+            io_error: err.to_string(),
+        })?
+        .root();
+
+    // Make sure the computed merkle matches the given value.
+    if computed_package_merkle != package_merkle {
+        return Err(PackageError::FailedToVerifyPackage {
+            expected_merkle_root: package_merkle,
+            computed_merkle_root: computed_package_merkle,
+        });
+    }
+    Ok(())
+}
 
 pub fn open_update_package<P: AsRef<Path>>(
     update_package_path: P,
@@ -204,4 +303,177 @@ where
 
     let visitor = OptVisitor;
     deserializer.deserialize_option(visitor)
+}
+
+#[cfg(test)]
+mod tests {
+    use {
+        super::{
+            extract_system_image_hash_string, verify_package_merkle, PackageError,
+            SystemImageError, META_CONTENTS_PATH, PKGFS_BINARY_PATH,
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY,
+        },
+        crate::artifact::ArtifactReader,
+        crate::io::ReadSeek,
+        anyhow::{anyhow, Result},
+        fuchsia_archive::write as far_write,
+        fuchsia_merkle::{Hash, MerkleTree, HASH_SIZE},
+        maplit::{btreemap, hashmap},
+        std::{
+            collections::{BTreeMap, HashMap, HashSet},
+            io::{BufWriter, Cursor, Read},
+            path::{Path, PathBuf},
+        },
+    };
+
+    struct TestArtifactReader {
+        artifacts: HashMap<PathBuf, Vec<u8>>,
+    }
+
+    impl TestArtifactReader {
+        fn new(artifacts: HashMap<PathBuf, Vec<u8>>) -> Self {
+            Self { artifacts }
+        }
+    }
+
+    impl ArtifactReader for TestArtifactReader {
+        fn open(&mut self, path: &Path) -> Result<Box<dyn ReadSeek>> {
+            if let Some(bytes) = self.artifacts.get(path) {
+                return Ok(Box::new(Cursor::new(bytes.clone())));
+            }
+            Err(anyhow!("No artifact found for path: {:?}", path))
+        }
+
+        fn read_bytes(&mut self, _path: &Path) -> Result<Vec<u8>> {
+            panic!("not implemented");
+        }
+
+        fn get_deps(&self) -> HashSet<PathBuf> {
+            panic!("not implemented");
+        }
+    }
+
+    fn create_package_far() -> Vec<u8> {
+        let mut package_far = BufWriter::new(Vec::new());
+        let meta_contents = "".to_string();
+        let meta_contents_bytes = meta_contents.as_bytes();
+        let meta_contents_reader: Box<dyn Read> = Box::new(meta_contents_bytes);
+        let path_content_map: BTreeMap<&str, (u64, Box<dyn Read>)> = btreemap! {
+            META_CONTENTS_PATH =>
+                (meta_contents_bytes.len() as u64, meta_contents_reader),
+        };
+        far_write(&mut package_far, path_content_map).unwrap();
+        package_far.into_inner().unwrap()
+    }
+
+    // These pkgfs command parsing tests mirror the tests in static_pkgs collector, but are narrower in
+    // scope as they test smaller functions.
+    #[fuchsia::test]
+    fn test_missing_pkgfs_cmd_entry() {
+        let additional_boot_args = hashmap! {};
+        let result = extract_system_image_hash_string(additional_boot_args);
+        match result {
+            Err(SystemImageError::MissingPkgfsCmdEntry { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_pkgfs_cmd_too_short() {
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![PKGFS_BINARY_PATH.to_string()],
+        };
+        let result = extract_system_image_hash_string(additional_boot_args);
+        match result {
+            Err(SystemImageError::UnexpectedPkgfsCmdLen { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_pkgfs_cmd_too_long() {
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
+                PKGFS_BINARY_PATH.to_string(),
+                "param1".to_string(),
+                "param2".to_string(),
+            ],
+        };
+        let result = extract_system_image_hash_string(additional_boot_args);
+        match result {
+            Err(SystemImageError::UnexpectedPkgfsCmdLen { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_bad_pkgfs_cmd() {
+        let bad_cmd_name = "unexpected/pkgsvr/path";
+        let additional_boot_args = hashmap! {
+            PKGFS_CMD_ADDITIONAL_BOOT_CONFIG_KEY.to_string() => vec![
+                bad_cmd_name.to_string(),
+                Hash::from([0; HASH_SIZE]).to_string(),
+            ],
+        };
+        let result = extract_system_image_hash_string(additional_boot_args);
+        match result {
+            Err(SystemImageError::UnexpectedPkgfsCmd { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_invalid_package_merkle() {
+        let mut test_artifact_reader: Box<dyn ArtifactReader> =
+            Box::new(TestArtifactReader::new(HashMap::new()));
+        let bad_merkle_root = "I am not a merkle root".to_string();
+        let result = verify_package_merkle(&bad_merkle_root, &mut test_artifact_reader);
+        match result {
+            Err(PackageError::MalformedPackageHash { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_missing_package() {
+        let mut test_artifact_reader: Box<dyn ArtifactReader> =
+            Box::new(TestArtifactReader::new(HashMap::new()));
+        let designated_system_image_hash = Hash::from([0; HASH_SIZE]);
+        let result = verify_package_merkle(
+            &designated_system_image_hash.to_string(),
+            &mut test_artifact_reader,
+        );
+        match result {
+            Err(PackageError::FailedToReadPackage { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
+
+    #[fuchsia::test]
+    fn test_incorrect_package_merkle() {
+        // This test sets up a TestArtifactReader to contain a representative artifact that
+        // we can calculate a merkle hash for. The code under test will use this to compute
+        // a merkle and match it against the given value (the `designated_package_hash`).
+        let designated_package_hash = Hash::from([0; HASH_SIZE]);
+        let package_contents = create_package_far();
+        let package_hash = MerkleTree::from_reader(package_contents.as_slice()).unwrap().root();
+        assert!(designated_package_hash != package_hash);
+
+        // Incorrectly map designated_package_hash` to `package_contents` (that's not its
+        // content hash!).
+        let test_artifacts = hashmap! {
+            PathBuf::from(designated_package_hash.to_string()) => package_contents,
+        };
+
+        let mut test_artifact_reader: Box<dyn ArtifactReader> =
+            Box::new(TestArtifactReader::new(test_artifacts));
+
+        let result =
+            verify_package_merkle(&designated_package_hash.to_string(), &mut test_artifact_reader);
+
+        match result {
+            Err(PackageError::FailedToVerifyPackage { .. }) => return,
+            _ => panic!("Unexpected result: {:?}", result),
+        };
+    }
 }

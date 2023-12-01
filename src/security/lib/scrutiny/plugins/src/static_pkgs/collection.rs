@@ -6,7 +6,9 @@ use {
     crate::additional_boot_args::AdditionalBootConfigError,
     fuchsia_merkle::Hash,
     scrutiny::prelude::DataCollection,
-    scrutiny_utils::package::{deserialize_pkg_index, serialize_pkg_index, PackageIndexContents},
+    scrutiny_utils::package::{
+        deserialize_pkg_index, serialize_pkg_index, PackageIndexContents, SystemImageError,
+    },
     serde::{Deserialize, Serialize},
     std::{collections::HashSet, path::PathBuf},
     thiserror::Error,
@@ -71,6 +73,21 @@ pub enum StaticPkgsError {
     FailedToVerifyStaticPkgs { expected_merkle_root: Hash, computed_merkle_root: Hash },
     #[error("Failed to parse static packages file: {static_pkgs_path}: {parse_error}")]
     FailedToParseStaticPkgs { static_pkgs_path: PathBuf, parse_error: String },
+}
+
+// SystemImageError is reported from utils function to extract system img hash from pkgfs cmd.
+impl From<SystemImageError> for StaticPkgsError {
+    fn from(err: SystemImageError) -> Self {
+        match err {
+            SystemImageError::MissingPkgfsCmdEntry => StaticPkgsError::MissingPkgfsCmdEntry,
+            SystemImageError::UnexpectedPkgfsCmdLen { expected_len, actual_len } => {
+                StaticPkgsError::UnexpectedPkgfsCmdLen { expected_len, actual_len }
+            }
+            SystemImageError::UnexpectedPkgfsCmd { expected_cmd, actual_cmd } => {
+                StaticPkgsError::UnexpectedPkgfsCmd { expected_cmd, actual_cmd }
+            }
+        }
+    }
 }
 
 #[derive(Deserialize, Serialize)]
