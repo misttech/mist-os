@@ -154,7 +154,9 @@ def build_targets(output_files, build_dir, fuchsia_dir, verbose, quiet, raw):
     if quiet:
         ninja += ["--quiet"]
     output = sys.stderr if raw else None
-    return subprocess.run(ninja + output_files, stdout=output)
+    env = os.environ
+    env.setdefault("NINJA_PERSISTENT_MODE", "1")
+    return subprocess.run(ninja + output_files, stdout=output, env=env)
 
 
 def get_targets(source_map, input_files, build_dir, get_all=False):
