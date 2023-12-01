@@ -345,7 +345,7 @@ pub trait FileOps: Send + Sync + AsAny + 'static {
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<Option<zx::Handle>, Errno> {
-        serve_file(current_task, file).map(|c| Some(c.into_handle()))
+        serve_file(current_task, file).map(|c| Some(c.0.into_handle()))
     }
 
     /// Returns the associated pid_t.

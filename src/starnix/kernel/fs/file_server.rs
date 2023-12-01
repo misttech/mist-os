@@ -35,30 +35,33 @@ use vfs::{
 pub fn serve_file(
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<ClientEnd<fio::NodeMarker>, Errno> {
+) -> Result<(ClientEnd<fio::NodeMarker>, execution_scope::ExecutionScope), Errno> {
     let (client_end, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
-    serve_file_at(server_end, current_task, file)?;
-    Ok(client_end)
+    let scope = serve_file_at(server_end, current_task, file)?;
+    Ok((client_end, scope))
 }
 
 pub fn serve_file_at(
     server_end: ServerEnd<fio::NodeMarker>,
     current_task: &CurrentTask,
     file: &FileObject,
-) -> Result<(), Errno> {
+) -> Result<execution_scope::ExecutionScope, Errno> {
     // Reopen file object to not share state with the given FileObject.
     let file = file.name.open(current_task, file.flags(), false)?;
     let open_flags = file.flags();
     let kernel = current_task.kernel();
     let starnix_file = StarnixNodeConnection::new(Arc::downgrade(kernel), file);
+    let scope = execution_scope::ExecutionScope::new();
     // TODO(security): Switching to the `system_task` here loses track of the credentials from
     //                 `current_task`. Do we need to retain these credentials?
-    kernel.kthreads.spawn_future(async move {
-        let scope = execution_scope::ExecutionScope::new();
-        starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
-        scope.wait().await;
+    kernel.kthreads.spawn_future({
+        let scope = scope.clone();
+        async move {
+            starnix_file.open(scope.clone(), open_flags.into(), path::Path::dot(), server_end);
+            scope.wait().await;
+        }
     });
-    Ok(())
+    Ok(scope)
 }
 
 /// A representation of `file` for the rust vfs.
@@ -688,7 +691,7 @@ mod tests {
         let (kernel, current_task) = create_kernel_and_task();
         let fs = TmpFs::new_fs(&kernel);
 
-        let root_handle = serve_file(
+        let (root_handle, scope) = serve_file(
             &current_task,
             &fs.root().open_anonymous(&current_task, OpenFlags::RDWR).expect("open"),
         )
@@ -808,5 +811,6 @@ mod tests {
             assert_directory_content(&baz_zxio, &[b"."]);
         })
         .await;
+        scope.shutdown();
     }
 }
