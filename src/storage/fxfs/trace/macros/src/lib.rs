@@ -11,7 +11,8 @@ use {
         parse::{Parse, ParseStream},
         parse_macro_input, parse_quote,
         spanned::Spanned,
-        Attribute, Block, Ident, ImplItem, ItemFn, ItemImpl, LitStr, Token, Type,
+        visit_mut::VisitMut,
+        Attribute, Block, Ident, ImplItem, ItemFn, ItemImpl, LitStr, ReturnType, Token, Type,
     },
 };
 
@@ -143,10 +144,47 @@ fn remove_trace_attribute(attrs: &mut Vec<Attribute>) -> syn::Result<Option<Trac
     Ok(Some(syn::parse2(tokens)?))
 }
 
-fn add_tracing_to_async_block(block: &mut Block, name: &str) {
+/// Replaces `impl Trait` with `_` in `Type` objects.
+struct RemoveImplTrait;
+impl VisitMut for RemoveImplTrait {
+    fn visit_type_mut(&mut self, node: &mut Type) {
+        if let Type::ImplTrait(..) = node {
+            *node = Type::Infer(syn::TypeInfer { underscore_token: Token![_](node.span()) });
+        } else {
+            syn::visit_mut::visit_type_mut(self, node);
+        }
+    }
+}
+
+fn add_tracing_to_async_block(return_type: &ReturnType, block: &mut Block, name: &str) {
+    let return_type = if let ReturnType::Type(_, return_type) = return_type {
+        let mut return_type = *return_type.clone();
+        // `impl Trait` can't appear in the type of a variable binding. Replace all `impl Trait`s
+        // with `_`.
+        RemoveImplTrait.visit_type_mut(&mut return_type);
+        quote!( #return_type )
+    } else {
+        quote!(())
+    };
+
+    // Rust uses the type of the first `return` statement to determine the output type of the future
+    // created by the `async move {}' block. If the function returns `Box<dyn Trait>` and has
+    // multiple `return` points with different implementations of `Trait` then the generated future
+    // will have the type of the first `return` and compilation may fail on the other `return`
+    // statements. Placing an unreachable `return` statement with the correct `return` type at the
+    // top of the `async move {}` block gives the generated future the correct return type.
+    let type_inference_fix = quote! {
+        #[allow(unreachable_code)]
+        if false {
+            let _type_inference_fix: #return_type = unreachable!();
+            return _type_inference_fix;
+        }
+    };
+
     let stmts = &block.stmts;
     block.stmts = parse_quote!(
         ::fxfs_trace::FxfsTraceFutureExt::trace(async move {
+            #type_inference_fix
             #(#stmts)*
         }, ::fxfs_trace::cstr!(#name)).await
     );
@@ -199,7 +237,7 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
                 format!("{}::{}", prefix, method.sig.ident)
             };
             if method.sig.asyncness.is_some() {
-                add_tracing_to_async_block(&mut method.block, &trace_name);
+                add_tracing_to_async_block(&method.sig.output, &mut method.block, &trace_name);
             } else {
                 add_tracing_to_sync_block(&mut method.block, &trace_name);
             }
@@ -211,7 +249,7 @@ fn add_tracing_to_impl(mut item_impl: ItemImpl, args: TraceImplArgs) -> syn::Res
 fn add_tracing_to_fn(mut item_fn: ItemFn, args: TraceFnArgs) -> syn::Result<TokenStream2> {
     let trace_name = if let Some(name) = args.name { name } else { item_fn.sig.ident.to_string() };
     if item_fn.sig.asyncness.is_some() {
-        add_tracing_to_async_block(&mut item_fn.block, &trace_name);
+        add_tracing_to_async_block(&item_fn.sig.output, &mut item_fn.block, &trace_name);
     } else {
         add_tracing_to_sync_block(&mut item_fn.block, &trace_name);
     }

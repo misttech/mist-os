@@ -23,6 +23,45 @@ async fn test_fn_attr_async() {
 }
 
 #[fuchsia::test]
+async fn test_fn_attr_async_with_dyn_return_type() {
+    trait TestTrait {}
+    struct S1;
+    impl TestTrait for S1 {}
+    struct S2;
+    impl TestTrait for S2 {}
+
+    #[fxfs_trace::trace]
+    async fn test_fn(b: bool) -> Box<dyn TestTrait> {
+        if b {
+            return Box::new(S1);
+        } else {
+            return Box::new(S2);
+        }
+    }
+    test_fn(true).await;
+}
+
+#[fuchsia::test]
+async fn test_fn_attr_async_with_impl_return_type() {
+    trait TestTrait {}
+    struct S1;
+    impl TestTrait for S1 {}
+
+    #[fxfs_trace::trace]
+    async fn test_fn() -> impl TestTrait {
+        S1
+    }
+    test_fn().await;
+}
+
+#[fuchsia::test]
+async fn test_fn_attr_async_with_no_return_type() {
+    #[fxfs_trace::trace]
+    async fn test_fn() {}
+    test_fn().await;
+}
+
+#[fuchsia::test]
 fn test_fn_attr_with_name() {
     #[fxfs_trace::trace(name = "trace-name")]
     fn test_fn() -> u64 {
