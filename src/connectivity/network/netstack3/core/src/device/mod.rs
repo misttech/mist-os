@@ -46,7 +46,7 @@ use crate::{
             LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
         },
         queue::{
-            rx::ReceiveQueueHandler,
+            rx::ReceiveQueueApi,
             tx::{TransmitQueueApi, TransmitQueueConfiguration, TransmitQueueHandler},
         },
         socket::HeldSockets,
@@ -667,7 +667,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     ctx: &mut NonSyncCtx,
     device: &LoopbackDeviceId<NonSyncCtx>,
 ) -> crate::WorkQueueReport {
-    ReceiveQueueHandler::<LoopbackDevice, _>::handle_queued_rx_frames(
+    ReceiveQueueApi::<_, _, LoopbackDevice>::handle_queued_rx_frames(
         &mut Locked::new(sync_ctx),
         ctx,
         device,

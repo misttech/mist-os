@@ -4,6 +4,9 @@
 
 //! RX device queues.
 
+use core::convert::Infallible as Never;
+use core::marker::PhantomData;
+
 #[cfg(test)]
 use assert_matches::assert_matches;
 use derivative::Derivative;
@@ -114,20 +117,8 @@ pub(crate) trait ReceiveDequeContext<D: Device, C>: ReceiveQueueTypes<D, C> {
     ) -> O;
 }
 
-/// An implementation of a receive queue.
-pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
-    /// Handle any queued RX frames.
-    fn handle_queued_rx_frames(
-        &mut self,
-        ctx: &mut C,
-        device_id: &Self::DeviceId,
-    ) -> crate::WorkQueueReport;
-}
-
 /// An implementation of a receive queue, with a buffer.
-pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
-    ReceiveQueueTypes<D, C>
-{
+pub(crate) trait ReceiveQueueHandler<D: Device, C>: ReceiveQueueTypes<D, C> {
     /// Queues a frame for reception.
     ///
     /// # Errors
@@ -138,19 +129,26 @@ pub(crate) trait BufferReceiveQueueHandler<D: Device, B: ParseBuffer, C>:
         ctx: &mut C,
         device_id: &Self::DeviceId,
         meta: Self::Meta,
-        body: B,
-    ) -> Result<(), ReceiveQueueFullError<(Self::Meta, B)>>;
+        body: Self::Buffer,
+    ) -> Result<(), ReceiveQueueFullError<(Self::Meta, Self::Buffer)>>;
 }
 
-impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDequeContext<D, C>>
-    ReceiveQueueHandler<D, C> for SC
+/// Crate-internal receive queue API interaction.
+pub(crate) struct ReceiveQueueApi<SC, C, D>(Never, PhantomData<(SC, C, D)>);
+
+impl<SC, C, D> ReceiveQueueApi<SC, C, D>
+where
+    D: Device,
+    C: ReceiveQueueNonSyncContext<D, SC::DeviceId>,
+    SC: ReceiveDequeContext<D, C>,
 {
-    fn handle_queued_rx_frames(
-        &mut self,
+    /// Handle any queued RX frames.
+    pub(crate) fn handle_queued_rx_frames(
+        sync_ctx: &mut SC,
         ctx: &mut C,
         device_id: &SC::DeviceId,
     ) -> crate::WorkQueueReport {
-        self.with_dequed_frames_and_rx_queue_ctx(
+        sync_ctx.with_dequed_frames_and_rx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames }, rx_queue_ctx| {
                 assert_eq!(
@@ -177,7 +175,7 @@ impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveDeque
 }
 
 impl<D: Device, C: ReceiveQueueNonSyncContext<D, SC::DeviceId>, SC: ReceiveQueueContext<D, C>>
-    BufferReceiveQueueHandler<D, SC::Buffer, C> for SC
+    ReceiveQueueHandler<D, C> for SC
 {
     fn queue_rx_frame(
         &mut self,
@@ -288,7 +286,7 @@ mod tests {
             for i in 0..MAX_RX_QUEUED_LEN {
                 let body = Buf::new(vec![i as u8], ..);
                 assert_eq!(
-                    BufferReceiveQueueHandler::queue_rx_frame(
+                    ReceiveQueueHandler::queue_rx_frame(
                         &mut sync_ctx,
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
@@ -304,7 +302,7 @@ mod tests {
 
             let body = Buf::new(vec![131], ..);
             assert_eq!(
-                BufferReceiveQueueHandler::queue_rx_frame(
+                ReceiveQueueHandler::queue_rx_frame(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
@@ -323,7 +321,7 @@ mod tests {
             assert!(MAX_RX_QUEUED_LEN > MAX_BATCH_SIZE);
             for i in (0..(MAX_RX_QUEUED_LEN - MAX_BATCH_SIZE)).step_by(MAX_BATCH_SIZE) {
                 assert_eq!(
-                    ReceiveQueueHandler::handle_queued_rx_frames(
+                    ReceiveQueueApi::handle_queued_rx_frames(
                         &mut sync_ctx,
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
@@ -339,7 +337,7 @@ mod tests {
             }
 
             assert_eq!(
-                ReceiveQueueHandler::handle_queued_rx_frames(
+                ReceiveQueueApi::handle_queued_rx_frames(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,

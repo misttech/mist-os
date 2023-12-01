@@ -25,8 +25,8 @@ use crate::{
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
         queue::{
             rx::{
-                BufferReceiveQueueHandler, ReceiveDequeContext, ReceiveDequeFrameContext,
-                ReceiveQueue, ReceiveQueueContext, ReceiveQueueNonSyncContext, ReceiveQueueState,
+                ReceiveDequeContext, ReceiveDequeFrameContext, ReceiveQueue, ReceiveQueueContext,
+                ReceiveQueueHandler, ReceiveQueueNonSyncContext, ReceiveQueueState,
                 ReceiveQueueTypes,
             },
             tx::{
@@ -478,7 +478,7 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::LoopbackTxQueue>>
         // which may need to be delivered to the sending socket itself. Without
         // this decoupling of RX/TX paths, sending a packet while holding onto
         // the socket lock will result in a deadlock.
-        match BufferReceiveQueueHandler::queue_rx_frame(self, ctx, device_id, meta, buf) {
+        match ReceiveQueueHandler::queue_rx_frame(self, ctx, device_id, meta, buf) {
             Ok(()) => {}
             Err(ReceiveQueueFullError(((), _frame))) => {
                 // RX queue is full - there is nothing further we can do here.
