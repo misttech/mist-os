@@ -246,6 +246,7 @@ rustc_binary("starnix_kernel_bin") {
     "device/wayland/image_file.rs",
     "device/wayland/mod.rs",
     "device/wayland/vulkan.rs",
+    "device/zram.rs",
     "diagnostics/mod.rs",
     "dynamic_thread_spawner.rs",
     "execution/component_runner.rs",

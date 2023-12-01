@@ -518,7 +518,7 @@ macro_rules! fileops_impl_dataless {
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::InputBuffer,
-        ) -> Result<usize, Errno> {
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
 
@@ -528,7 +528,7 @@ macro_rules! fileops_impl_dataless {
             _current_task: &crate::task::CurrentTask,
             _offset: usize,
             _data: &mut dyn crate::fs::buffers::OutputBuffer,
-        ) -> Result<usize, Errno> {
+        ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
     };

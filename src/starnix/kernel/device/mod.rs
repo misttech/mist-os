@@ -27,3 +27,4 @@ pub mod sync_file;
 pub mod terminal;
 pub mod uinput;
 pub mod wayland;
+pub mod zram;
