@@ -20,11 +20,15 @@ rustc_binary("fuchsia-sdk-run-bin") {
   deps = [
     "//src/developer/ffx/command:lib",
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/config/domain:lib",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:camino",
+    "//third_party/rust_crates:tracing",
   ]
+
+  test_deps = [ ":sdk_exported" ]
 
   sources = [ "src/main.rs" ]
 }
@@ -32,6 +36,12 @@ rustc_binary("fuchsia-sdk-run-bin") {
 install_host_tools("host-tool") {
   deps = [ ":fuchsia-sdk-run-bin" ]
   outputs = [ "fuchsia-sdk-run" ]
+}
+
+host_test_data("sdk_exported") {
+  sources = [ get_label_info("//sdk:core($default_toolchain)", "root_out_dir") +
+              "/sdk/exported/core" ]
+  deps = [ "//sdk:core($default_toolchain)" ]
 }
 
 group("tests") {

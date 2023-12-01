@@ -27,6 +27,25 @@ pub enum ConfigPath {
     OutDirRef { out_dir_ref: Utf8PathBuf },
 }
 
+impl ConfigPath {
+    // convenience constructor to produce a relative path
+    pub fn relative(path: impl Into<Utf8PathBuf>) -> Self {
+        Self::Relative(path.into())
+    }
+
+    // convenience constructor to produce a path_ref path
+    pub fn path_ref(path_ref: impl Into<Utf8PathBuf>) -> Self {
+        let path_ref = path_ref.into();
+        Self::PathRef { path_ref }
+    }
+
+    // convenience constructor to produce an out_dir_ref path
+    pub fn out_dir_ref(out_dir_ref: impl Into<Utf8PathBuf>) -> Self {
+        let out_dir_ref = out_dir_ref.into();
+        Self::OutDirRef { out_dir_ref }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct FuchsiaProject {
     /// In order to support build-level configuration (which will usually

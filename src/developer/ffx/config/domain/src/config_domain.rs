@@ -33,6 +33,8 @@ pub enum LoadError {
     InvalidCommand,
     #[error("Error reading file")]
     Io(#[from] std::io::Error),
+    #[error("Path is not absolute")]
+    NotAbsolute,
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -126,9 +128,22 @@ impl ConfigDomain {
                 ParseError::UnknownFormat(loading_extension.to_owned()),
             )),
         }?;
+
         let path = path
             .canonicalize_utf8()
             .map_err(|e| FileError::with_path(path, LoadError::PathError(e)))?;
+
+        Self::load_from_contents(path, contents)
+    }
+
+    /// Loads the [`FuchsiaEnv`] object as if it were at the given path. Mostly
+    /// useful for testing, but may also be useful for creating 'virtual' config
+    /// domains.
+    pub fn load_from_contents(path: Utf8PathBuf, contents: FuchsiaEnv) -> Result<Self, FileError> {
+        if !path.is_absolute() {
+            return Err(FileError::with_path(&path, LoadError::NotAbsolute));
+        }
+
         let root = path
             .parent()
             .ok_or_else(|| {
@@ -183,18 +198,28 @@ impl ConfigDomain {
 
     /// If the files necessary to find project-specific configuration aren't
     /// available, return the configured command to make them exist.
-    pub fn needs_config_bootstrap(&self) -> Option<Command> {
+    pub fn needs_config_bootstrap(&mut self) -> Option<Command> {
         // don't even bother if we don't have a bootstrap command configured
         let bootstrap_cmd = basic_command_args(self, self.bootstrap_cmd.as_ref()?);
+        let build_dir_config = self.contents.fuchsia.project.build_out_dir.as_ref();
+        let build_config_file_config = self.contents.fuchsia.project.build_config_path.as_ref();
+
+        // update the build dir and config paths if necessary
+        if self.build_dir.is_none() {
+            self.build_dir = resolve_path(&self.root, build_dir_config, None);
+        }
+        if self.build_config_file.is_none() {
+            self.build_config_file =
+                resolve_path(&self.root, build_config_file_config, self.build_dir.as_deref());
+        }
 
         // see if the files exist or not.
-        let wants_bootstrap = config_path_needs_bootstrap(
-            self.contents.fuchsia.project.build_out_dir.as_ref(),
-            self.build_dir.as_deref(),
-        ) || config_path_needs_bootstrap(
-            self.contents.fuchsia.project.build_config_path.as_ref(),
-            self.build_config_file.as_deref(),
-        );
+        let wants_bootstrap =
+            config_path_needs_bootstrap(build_dir_config, self.build_dir.as_deref())
+                || config_path_needs_bootstrap(
+                    build_config_file_config,
+                    self.build_config_file.as_deref(),
+                );
 
         wants_bootstrap.then_some(bootstrap_cmd)
     }
@@ -207,7 +232,7 @@ impl ConfigDomain {
     ///
     /// `known_states` will be updated with the new states if they've changed.
     pub fn needs_sdk_update(
-        &self,
+        &mut self,
         sdk_root: &sdk::SdkRoot,
         known_states: &mut FileStates,
     ) -> Option<Command> {
@@ -218,16 +243,16 @@ impl ConfigDomain {
 
         // check that the SDK exists at the given path.
         if !sdk_root.manifest_exists() {
-            tracing::debug!("SDK manifest didn't exist for {sdk_root:?}");
+            tracing::trace!("SDK manifest didn't exist for {sdk_root:?}");
             return Some(update_cmd);
         } else {
-            tracing::debug!("SDK manifest existed for {sdk_root:?}");
+            tracing::trace!("SDK manifest existed for {sdk_root:?}");
         }
 
-        tracing::debug!("checking files: {files:?}");
+        tracing::trace!("checking files: {files:?}");
         match FileStates::check_paths(self.root.to_owned(), files) {
             Ok(new_states) => {
-                tracing::debug!("comparing file state: {known_states:?} == {new_states:?}");
+                tracing::trace!("comparing file state: {known_states:?} == {new_states:?}");
                 if let Err(changed) = known_states.changed_files(&new_states) {
                     update_cmd.env("FUCHSIA_VERSION_CHECK_FILES_DIRTY", join_paths(changed.iter()));
                     *known_states = new_states;
@@ -308,7 +333,6 @@ fn resolve_command(cmd_slice: Option<&[String]>) -> Result<Option<ConfigCommand>
 }
 
 fn config_path_needs_bootstrap(config: Option<&ConfigPath>, path: Option<&Utf8Path>) -> bool {
-    tracing::debug!("{config:?} vs. {path:?}");
     match (config, path) {
         // needs bootstrap if it's set and the directory doesn't exist or isn't valid
         (Some(_), Some(path)) if !path.exists() => true,
@@ -397,7 +421,7 @@ mod tests {
             Some(&basic_root_env)
         );
 
-        let domain = ConfigDomain::load_from(&basic_root_env).unwrap();
+        let mut domain = ConfigDomain::load_from(&basic_root_env).unwrap();
         assert_eq!(
             domain.get_build_config_file(),
             Some(basic_root.join(".fuchsia-build-config.json")).as_deref()
@@ -419,7 +443,7 @@ mod tests {
         assert_eq!(ConfigDomain::find_root(&rfc_root).as_ref(), Some(&rfc_root_env));
         assert_eq!(ConfigDomain::find_root(&rfc_root.join("stuff")).as_ref(), Some(&rfc_root_env));
 
-        let domain = ConfigDomain::load_from(&rfc_root_env).unwrap();
+        let mut domain = ConfigDomain::load_from(&rfc_root_env).unwrap();
         assert_eq!(domain.get_build_dir(), Some(rfc_root.join("out")).as_deref());
         assert_eq!(
             domain.get_build_config_file(),
@@ -431,12 +455,12 @@ mod tests {
             "sdk example has a config file, so would not need bootstrap"
         );
 
-        let rfc_root_sdk = domain.get_build_dir().unwrap();
+        let rfc_root_sdk = domain.get_build_dir().unwrap().to_owned();
         let rfc_root_states =
             FileStates::check_paths(rfc_root.clone(), &["manifest/bazel_sdk.ensure"]).unwrap();
         let mut known_state = FileStates::default();
         assert_matches!(
-            domain.needs_sdk_update(&SdkRoot::Full(rfc_root_sdk.into()), &mut known_state),
+            domain.needs_sdk_update(&SdkRoot::Full(rfc_root_sdk.clone().into()), &mut known_state),
             Some(_),
             "sdk example with different existing state should need updating"
         );
