@@ -25,6 +25,7 @@ const HOURS_BETWEEN_IFACE_DESTRUCTIONS: i64 = 12;
 // recommended.
 const SCAN_FAILURE_RECOVERY_THRESHOLD: usize = 5;
 const EMPTY_SCAN_RECOVERY_THRESHOLD: usize = 10;
+const CANCELED_SCAN_RECOVERY_THRESHOLD: usize = 9;
 const CONNECT_FAILURE_RECOVERY_THRESHOLD: usize = 15;
 const AP_START_FAILURE_RECOVERY_THRESHOLD: usize = 12;
 const CREATE_IFACE_FAILURE_RECOVERY_THRESHOLD: usize = 1;
@@ -189,6 +190,35 @@ fn thresholded_phy_reset(
     None
 }
 
+fn thresholded_iface_destruction(
+    iface_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    most_recent_defect: Defect,
+    defect_count_threshold: usize,
+) -> Option<RecoveryAction> {
+    let proposed_iface_destruction_action =
+        RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id });
+
+    if defect_history.event_count(most_recent_defect) < defect_count_threshold {
+        return None;
+    }
+
+    // If the threshold has been crossed and sufficient time has passed since the last iface
+    // destruction, recommend that the iface be destroyed.
+    let recovery_allowed =
+        match recovery_history.time_since_last_event(proposed_iface_destruction_action) {
+            None => true,
+            Some(time) => time.into_hours() > HOURS_BETWEEN_IFACE_DESTRUCTIONS,
+        };
+
+    if recovery_allowed {
+        return Some(proposed_iface_destruction_action);
+    }
+
+    None
+}
+
 fn thresholded_scan_failure_recovery_profile(
     phy_id: u16,
     defect_history: &mut EventHistory<Defect>,
@@ -319,6 +349,27 @@ fn thresholded_destroy_iface_failure_recovery_profile(
         ),
         other => {
             warn!("Assessing invalid defect type for destroy iface failure recovery: {:?}", other);
+            None
+        }
+    }
+}
+
+fn thresholded_canceled_scan_recovery_profile(
+    _phy_id: u16,
+    defect_history: &mut EventHistory<Defect>,
+    recovery_history: &mut EventHistory<RecoveryAction>,
+    destroy_iface_defect: Defect,
+) -> Option<RecoveryAction> {
+    match destroy_iface_defect {
+        Defect::Iface(IfaceFailure::CanceledScan { iface_id }) => thresholded_iface_destruction(
+            iface_id,
+            defect_history,
+            recovery_history,
+            destroy_iface_defect,
+            CANCELED_SCAN_RECOVERY_THRESHOLD,
+        ),
+        other => {
+            warn!("Assessing invalid defect type for canceled scan recovery: {:?}", other);
             None
         }
     }
@@ -521,6 +572,59 @@ mod tests {
         );
     }
 
+    fn test_thresholded_destroy_iface(
+        exec: &TestExecutor,
+        recovery_fn: RecoveryProfile,
+        defect_to_log: Defect,
+        defect_threshold: usize,
+    ) {
+        // Set the test time to start at time zero.
+        let start_time = Time::from_nanos(0);
+        exec.set_fake_time(start_time);
+
+        // The iface destruction intervention that is expected.
+        let destroy_iface_recommendation =
+            RecoveryAction::PhyRecovery(PhyRecoveryOperation::DestroyIface { iface_id: IFACE_ID });
+
+        // Retain defects and recovery actions for 48 hours.
+        let mut defects = EventHistory::<Defect>::new(48 * 60 * 60);
+        let mut recoveries = EventHistory::<RecoveryAction>::new(48 * 60 * 60);
+
+        // Add failures until just under the threshold.
+        for _ in 0..(defect_threshold - 1) {
+            defects.add_event(defect_to_log);
+
+            // Verify that there is no recovery recommended
+            assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+        }
+
+        // Add one more failure and verify that a destroy iface was recommended.
+        defects.add_event(defect_to_log);
+        assert_eq!(
+            Some(destroy_iface_recommendation),
+            recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,)
+        );
+        recoveries.add_event(destroy_iface_recommendation);
+
+        // Add another defect and verify that no recovery is recommended.
+        defects.add_event(defect_to_log);
+        assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+
+        // Advance the clock 11 hours, log another defect, and verify no recovery is recommended.
+        exec.set_fake_time(Time::after(11.hours()));
+        defects.add_event(defect_to_log);
+        assert_eq!(None, recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,));
+
+        // Advance the clock another 2 hours to get beyond the 12 hour throttle and verify that
+        // another occurrence of the defect results in a destroy iface recovery recommendation.
+        exec.set_fake_time(Time::after(2.hours()));
+        defects.add_event(defect_to_log);
+        assert_eq!(
+            Some(destroy_iface_recommendation),
+            recovery_fn(PHY_ID, &mut defects, &mut recoveries, defect_to_log,)
+        );
+    }
+
     #[fuchsia::test]
     fn test_scan_failure_recovery() {
         let exec = TestExecutor::new_with_fake_time();
@@ -590,6 +694,18 @@ mod tests {
             thresholded_destroy_iface_failure_recovery_profile,
             defect_to_log,
             DESTROY_IFACE_FAILURE_RECOVERY_THRESHOLD,
+        )
+    }
+
+    #[fuchsia::test]
+    fn test_canceled_scan_recovery() {
+        let exec = TestExecutor::new_with_fake_time();
+        let defect_to_log = Defect::Iface(IfaceFailure::CanceledScan { iface_id: IFACE_ID });
+        test_thresholded_destroy_iface(
+            &exec,
+            thresholded_canceled_scan_recovery_profile,
+            defect_to_log,
+            CANCELED_SCAN_RECOVERY_THRESHOLD,
         )
     }
 }
