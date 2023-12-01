@@ -445,6 +445,10 @@ macro_rules! no_update_filter_rules {
 
 #[derive(Debug)]
 struct InterfaceState {
+    // TODO(fxb/56559): Use this field in the removal of
+    // the temporary naming policy, and drop the Option
+    #[allow(unused)]
+    persistent_id: Option<interface::PersistentIdentifier>,
     // Hold on to control to enforce interface ownership, even if unused.
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
     device_class: DeviceClass,
@@ -472,12 +476,14 @@ struct WlanApInterfaceState {}
 
 impl InterfaceState {
     fn new_host(
+        persistent_id: Option<interface::PersistentIdentifier>,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
         provisioning: interface::ProvisioningAction,
     ) -> Self {
         Self {
+            persistent_id,
             control,
             config: InterfaceConfigState::Host(HostInterfaceState {
                 dhcpv4_client: None,
@@ -490,11 +496,13 @@ impl InterfaceState {
     }
 
     fn new_wlan_ap(
+        persistent_id: Option<interface::PersistentIdentifier>,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         provisioning: interface::ProvisioningAction,
     ) -> Self {
         Self {
+            persistent_id,
             control,
             device_class,
             config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
@@ -503,7 +511,7 @@ impl InterfaceState {
     }
 
     fn is_wlan_ap(&self) -> bool {
-        let Self { config, control: _, device_class: _, provisioning: _ } = self;
+        let Self { config, .. } = self;
         match config {
             InterfaceConfigState::Host(_) => false,
             InterfaceConfigState::WlanAp(_) => true,
@@ -520,7 +528,7 @@ impl InterfaceState {
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
     ) -> Result<(), errors::Error> {
-        let Self { config, control: _, device_class: _, provisioning } = self;
+        let Self { config, provisioning, .. } = self;
         let fnet_interfaces_ext::Properties { online, .. } = properties;
 
         // Netcfg won't handle interface update results for a delegated
@@ -927,7 +935,7 @@ impl<'a> NetCfg<'a> {
             DnsServersUpdateSource::Netstack => Ok(()),
             DnsServersUpdateSource::Dhcpv6 { interface_id } => {
                 let interface_id = interface_id.try_into().expect("should be nonzero");
-                let InterfaceState { config, control: _, device_class: _, provisioning } = self
+                let InterfaceState { config, provisioning, .. } = self
                     .interface_states
                     .get_mut(&interface_id)
                     .unwrap_or_else(|| panic!("no interface state found for id={}", interface_id));
@@ -1570,8 +1578,7 @@ impl<'a> NetCfg<'a> {
                                 dhcpv6_pd_config,
                             }),
                         control,
-                        device_class: _,
-                        provisioning: _,
+                        ..
                     }) => {
                         if previous_online.is_some() {
                             Self::handle_dhcpv4_client_update(
@@ -1679,9 +1686,7 @@ impl<'a> NetCfg<'a> {
                     }
                     Some(InterfaceState {
                         config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
-                        control: _,
-                        device_class: _,
-                        provisioning: _,
+                        ..
                     }) => {
                         // TODO(fxbug.dev/55879): Stop the DHCP server when the address it is
                         // listening on is removed.
@@ -1727,7 +1732,7 @@ impl<'a> NetCfg<'a> {
                     // An interface netcfg was not responsible for configuring was removed, do
                     // nothing.
                     None => Ok(()),
-                    Some(InterfaceState { config, control, device_class: _, provisioning: _ }) => {
+                    Some(InterfaceState { config, control, .. }) => {
                         match config {
                             InterfaceConfigState::Host(HostInterfaceState {
                                 mut dhcpv4_client,
@@ -1950,22 +1955,26 @@ impl<'a> NetCfg<'a> {
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
         }
         .into();
-        let interface_name = if stable_name {
+        let (interface_name, persistent_id) = if stable_name {
             match self.persisted_interface_config.generate_stable_name(
                 &topological_path,
                 &mac,
                 *device_class,
                 &self.interface_naming_policy,
             ) {
-                Ok(name) => name.to_string(),
-                Err(interface::NameGenerationError::FileUpdateError { name, err }) => {
+                Ok((name, persistent_id)) => (name.to_string(), Some(persistent_id)),
+                Err(interface::NameGenerationError::FileUpdateError {
+                    name,
+                    persistent_id,
+                    err,
+                }) => {
                     warn!(
                         "failed to update interface \
                             (topo path = {}, mac = {}, interface_type = {:?}) \
                             with new name = {}: {}",
                         topological_path, mac, interface_type, name, err
                     );
-                    name.to_string()
+                    (name.to_string(), Some(persistent_id))
                 }
                 Err(interface::NameGenerationError::GenerationError(e)) => {
                     return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
@@ -1988,6 +1997,7 @@ impl<'a> NetCfg<'a> {
             interface_id.try_into().expect("interface ID should be nonzero"),
             control,
             interface_name,
+            persistent_id,
             &device_info,
             &mac,
         )
@@ -2006,6 +2016,7 @@ impl<'a> NetCfg<'a> {
         interface_id: NonZeroU64,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         interface_name: String,
+        persistent_id: Option<interface::PersistentIdentifier>,
         // TODO(fxbug.dev/136874): Use DeviceInfoRef directly when the
         // same functions are  implemented for `is_wlan_ap`, `interface_type`
         device_info: &DeviceInfo,
@@ -2066,10 +2077,7 @@ impl<'a> NetCfg<'a> {
                     id
                 )));
             }
-            let InterfaceState { control, config: _, device_class: _, provisioning: _ } = match self
-                .interface_states
-                .entry(interface_id)
-            {
+            let InterfaceState { control, .. } = match self.interface_states.entry(interface_id) {
                 Entry::Occupied(entry) => {
                     panic!(
                         "multiple interfaces with the same ID = {}; \
@@ -2078,9 +2086,12 @@ impl<'a> NetCfg<'a> {
                         entry.get(),
                     );
                 }
-                Entry::Vacant(entry) => {
-                    entry.insert(InterfaceState::new_wlan_ap(control, class, provisioning_action))
-                }
+                Entry::Vacant(entry) => entry.insert(InterfaceState::new_wlan_ap(
+                    persistent_id,
+                    control,
+                    class,
+                    provisioning_action,
+                )),
             };
 
             info!("discovered WLAN AP (interface ID={})", interface_id);
@@ -2107,10 +2118,7 @@ impl<'a> NetCfg<'a> {
                 );
             }
         } else {
-            let InterfaceState { control, config: _, device_class: _, provisioning: _ } = match self
-                .interface_states
-                .entry(interface_id)
-            {
+            let InterfaceState { control, .. } = match self.interface_states.entry(interface_id) {
                 Entry::Occupied(entry) => {
                     panic!(
                         "multiple interfaces with the same ID = {}; \
@@ -2144,6 +2152,7 @@ impl<'a> NetCfg<'a> {
                         )
                     };
                     entry.insert(InterfaceState::new_host(
+                        persistent_id,
                         control,
                         class,
                         dhcpv6_pd_config,
@@ -2441,13 +2450,7 @@ impl<'a> NetCfg<'a> {
             {
                 // It is invalid to acquire a prefix over an interface that netcfg doesn't own,
                 // or a WLAN AP interface.
-                None
-                | Some(InterfaceState {
-                    config: InterfaceConfigState::WlanAp(_),
-                    control: _,
-                    device_class: _,
-                    provisioning: _,
-                }) => {
+                None | Some(InterfaceState { config: InterfaceConfigState::WlanAp(_), .. }) => {
                     return control_handle
                         .send_on_exit(fnet_dhcpv6::PrefixControlExitReason::InvalidInterface)
                         .context("failed to send InvalidInterface terminal event")
@@ -2460,9 +2463,7 @@ impl<'a> NetCfg<'a> {
                             dhcpv6_client_state: _,
                             dhcpv6_pd_config: _,
                         }),
-                    control: _,
-                    device_class: _,
-                    provisioning: _,
+                    ..
                 }) => dhcpv6::AcquirePrefixInterfaceConfig::Id(interface_id),
             }
         } else {
@@ -2506,9 +2507,7 @@ impl<'a> NetCfg<'a> {
             ),
         };
         // Look for all eligible interfaces and start/restart DHCPv6 client as needed.
-        for (id, InterfaceState { config, control: _, device_class: _, provisioning: _ }) in
-            interface_state_iter
-        {
+        for (id, InterfaceState { config, .. }) in interface_state_iter {
             let HostInterfaceState { dhcpv4_client: _, dhcpv6_client_state, dhcpv6_pd_config } =
                 match config {
                     InterfaceConfigState::Host(state) => state,
@@ -2625,9 +2624,7 @@ impl<'a> NetCfg<'a> {
             .expect("DHCPv6 prefix provider handler must be present");
         let dhcpv6_client_provider =
             self.dhcpv6_client_provider.as_ref().expect("DHCPv6 client provider must be present");
-        for (id, InterfaceState { config, control: _, device_class: _, provisioning: _ }) in
-            self.interface_states.iter_mut()
-        {
+        for (id, InterfaceState { config, .. }) in self.interface_states.iter_mut() {
             let dhcpv6_client_state = match config {
                 InterfaceConfigState::WlanAp(WlanApInterfaceState {}) => {
                     continue;
@@ -2705,7 +2702,7 @@ impl<'a> NetCfg<'a> {
         };
 
         let (dhcpv4_client, control) = {
-            let InterfaceState { config, control, device_class: _, provisioning: _ } = self
+            let InterfaceState { config, control, .. } = self
                 .interface_states
                 .get_mut(&interface_id)
                 .unwrap_or_else(|| panic!("interface {} not found", interface_id));
@@ -2769,7 +2766,7 @@ impl<'a> NetCfg<'a> {
             }
             Ok(prefixes_map) => prefixes_map,
         };
-        let InterfaceState { config, control: _, device_class: _, provisioning: _ } = self
+        let InterfaceState { config, .. } = self
             .interface_states
             .get_mut(&interface_id)
             .unwrap_or_else(|| panic!("interface {} not found", interface_id));
@@ -3231,6 +3228,12 @@ mod tests {
         )
     }
 
+    fn test_persistent_id() -> interface::PersistentIdentifier {
+        interface::PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
+            octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
+        })
+    }
+
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_stopping_dhcpv6_with_down_lookup_admin() {
         let (
@@ -3255,10 +3258,11 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
+                    Some(test_persistent_id()),
                     control,
                     device_class.into(),
                     None,
-                    interface::ProvisioningAction::Local
+                    interface::ProvisioningAction::Local,
                 )
             ),
             None
@@ -3416,10 +3420,11 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
+                    Some(test_persistent_id()),
                     control,
                     device_class.into(),
                     None,
-                    interface::ProvisioningAction::Local
+                    interface::ProvisioningAction::Local,
                 )
             ),
             None
@@ -3675,10 +3680,11 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
+                    Some(test_persistent_id()),
                     control,
                     device_class.into(),
                     None,
-                    interface::ProvisioningAction::Local
+                    interface::ProvisioningAction::Local,
                 )
             ),
             None
@@ -3817,10 +3823,11 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
+                    Some(test_persistent_id()),
                     control,
                     device_class.into(),
                     None,
-                    interface::ProvisioningAction::Local
+                    interface::ProvisioningAction::Local,
                 )
             ),
             None
@@ -4118,6 +4125,7 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_wlan_ap(
+                                Some(test_persistent_id()),
                                 control,
                                 device_class,
                                 interface::ProvisioningAction::Local
@@ -4140,10 +4148,11 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_host(
+                                Some(test_persistent_id()),
                                 control,
                                 device_class,
                                 None,
-                                interface::ProvisioningAction::Local
+                                interface::ProvisioningAction::Local,
                             )
                         ),
                         None
@@ -4538,12 +4547,13 @@ mod tests {
                 netcfg.interface_states.insert(
                     id,
                     InterfaceState::new_host(
+                        Some(test_persistent_id()),
                         control,
                         device_class,
                         upstream.then_some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
                             fnet_dhcpv6::Empty
                         )),
-                        interface::ProvisioningAction::Local
+                        interface::ProvisioningAction::Local,
                     )
                 ),
                 None

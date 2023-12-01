@@ -17,7 +17,7 @@ const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone)]
-enum PersistentIdentifier {
+pub(crate) enum PersistentIdentifier {
     MacAddress(fidl_fuchsia_net_ext::MacAddress),
     TopologicalPath(String),
 }
@@ -278,7 +278,7 @@ impl<'a> FileBackedConfig<'a> {
         mac: &fidl_fuchsia_net_ext::MacAddress,
         device_class: fidl_fuchsia_hardware_network::DeviceClass,
         naming_rules: &[NamingRule],
-    ) -> Result<&str, NameGenerationError> {
+    ) -> Result<(&str, PersistentIdentifier), NameGenerationError> {
         let persistent_id = self.config.generate_identifier(topological_path, mac);
         let info = DeviceInfoRef { topological_path, mac, device_class };
         let interface_type: crate::InterfaceType = device_class.into();
@@ -287,7 +287,7 @@ impl<'a> FileBackedConfig<'a> {
             if name_matches_interface_type(&name, &interface_type) {
                 // Need to take a new reference to appease the borrow checker.
                 let InterfaceConfig { name, .. } = &self.config.interfaces[index];
-                return Ok(&name);
+                return Ok((&name, persistent_id));
             }
             // Identifier was found in the vector, but device class does not match interface
             // name. Remove and generate a new name.
@@ -295,23 +295,24 @@ impl<'a> FileBackedConfig<'a> {
         }
         let generated_name = self.config.generate_name(&info, naming_rules)?;
         let () = self.config.interfaces.push(InterfaceConfig {
-            id: persistent_id,
+            id: persistent_id.clone(),
             name: generated_name,
             device_class: interface_type,
         });
         let interface_config = &self.config.interfaces[self.config.interfaces.len() - 1];
         let () = self.store().map_err(|err| NameGenerationError::FileUpdateError {
             name: interface_config.name.to_owned(),
+            persistent_id: persistent_id.clone(),
             err,
         })?;
-        Ok(&interface_config.name)
+        Ok((&interface_config.name, persistent_id))
     }
 
     /// Returns a temporary name for an interface.
     pub(crate) fn generate_temporary_name(
         &mut self,
         interface_type: crate::InterfaceType,
-    ) -> String {
+    ) -> (String, Option<PersistentIdentifier>) {
         let id = self.temp_id;
         self.temp_id += 1;
 
@@ -319,7 +320,7 @@ impl<'a> FileBackedConfig<'a> {
             crate::InterfaceType::Wlan => "wlant",
             crate::InterfaceType::Ethernet => "etht",
         };
-        format!("{}{}", prefix, id)
+        (format!("{}{}", prefix, id), None)
     }
 }
 
@@ -327,7 +328,7 @@ impl<'a> FileBackedConfig<'a> {
 #[derive(Debug)]
 pub enum NameGenerationError {
     GenerationError(anyhow::Error),
-    FileUpdateError { name: String, err: anyhow::Error },
+    FileUpdateError { name: String, persistent_id: PersistentIdentifier, err: anyhow::Error },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Deserialize)]
@@ -912,7 +913,7 @@ mod tests {
             let mut interface_config =
                 FileBackedConfig::load(&path).expect("failed to load the interface config");
 
-            let name = interface_config
+            let (name, _identifier) = interface_config
                 .generate_stable_name(
                     topological_path,
                     &fidl_fuchsia_net_ext::MacAddress { octets: mac },
@@ -934,11 +935,14 @@ mod tests {
         let path = temp_dir.path().join("net.config.json");
         let mut interface_config =
             FileBackedConfig::load(&path).expect("failed to load the interface config");
-        assert_eq!(
-            &interface_config.generate_temporary_name(crate::InterfaceType::Ethernet),
-            "etht0"
-        );
-        assert_eq!(&interface_config.generate_temporary_name(crate::InterfaceType::Wlan), "wlant1");
+        let (name_0, id_0) =
+            interface_config.generate_temporary_name(crate::InterfaceType::Ethernet);
+        assert_eq!(&name_0, "etht0");
+        assert_matches!(id_0, None);
+
+        let (name_1, id_1) = interface_config.generate_temporary_name(crate::InterfaceType::Wlan);
+        assert_eq!(&name_1, "wlant1");
+        assert_matches!(id_1, None);
     }
 
     #[test]

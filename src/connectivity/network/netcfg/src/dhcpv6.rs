@@ -164,7 +164,7 @@ fn get_suitable_dhcpv6_prefix(
     interface_config: AcquirePrefixInterfaceConfig,
 ) -> Option<PrefixOnInterface> {
     if let Some(PrefixOnInterface { interface_id, prefix, lifetimes: _ }) = current_prefix {
-        let crate::InterfaceState { config, control: _, device_class: _, provisioning: _ } =
+        let crate::InterfaceState { config, .. } =
             interface_states.get(&interface_id).unwrap_or_else(|| {
                 panic!(
                     "interface {} cannot be found but provides current prefix = {:?}",
@@ -200,42 +200,37 @@ fn get_suitable_dhcpv6_prefix(
 
     interface_states
         .iter()
-        .filter_map(
-            |(
-                interface_id,
-                crate::InterfaceState { config, device_class, control: _, provisioning: _ },
-            )| {
-                let prefixes = match config {
-                    crate::InterfaceConfigState::Host(crate::HostInterfaceState {
-                        dhcpv4_client: _,
-                        dhcpv6_client_state,
-                        dhcpv6_pd_config: _,
-                    }) => {
-                        if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
-                            prefixes
-                        } else {
-                            return None;
-                        }
-                    }
-                    crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {}) => {
+        .filter_map(|(interface_id, crate::InterfaceState { config, device_class, .. })| {
+            let prefixes = match config {
+                crate::InterfaceConfigState::Host(crate::HostInterfaceState {
+                    dhcpv4_client: _,
+                    dhcpv6_client_state,
+                    dhcpv6_pd_config: _,
+                }) => {
+                    if let Some(ClientState { prefixes, sockaddr: _ }) = dhcpv6_client_state {
+                        prefixes
+                    } else {
                         return None;
                     }
-                };
-                match interface_config {
-                    AcquirePrefixInterfaceConfig::Upstreams => {
-                        allowed_upstream_device_classes.contains(&device_class)
-                    }
-                    AcquirePrefixInterfaceConfig::Id(want_id) => interface_id.get() == want_id,
                 }
-                .then(|| {
-                    prefixes.iter().map(|(&prefix, &lifetimes)| PrefixOnInterface {
-                        interface_id: *interface_id,
-                        prefix,
-                        lifetimes,
-                    })
+                crate::InterfaceConfigState::WlanAp(crate::WlanApInterfaceState {}) => {
+                    return None;
+                }
+            };
+            match interface_config {
+                AcquirePrefixInterfaceConfig::Upstreams => {
+                    allowed_upstream_device_classes.contains(&device_class)
+                }
+                AcquirePrefixInterfaceConfig::Id(want_id) => interface_id.get() == want_id,
+            }
+            .then(|| {
+                prefixes.iter().map(|(&prefix, &lifetimes)| PrefixOnInterface {
+                    interface_id: *interface_id,
+                    prefix,
+                    lifetimes,
                 })
-            },
-        )
+            })
+        })
         .flatten()
         .max_by(
             |PrefixOnInterface {
@@ -367,8 +362,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        interface::ProvisioningAction, DeviceClass, HostInterfaceState, InterfaceConfigState,
-        InterfaceState,
+        interface::{PersistentIdentifier, ProvisioningAction},
+        DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState,
     };
 
     use super::*;
@@ -386,6 +381,7 @@ mod tests {
 
     impl InterfaceState {
         fn new_host_with_state(
+            persistent_id: Option<PersistentIdentifier>,
             control: fidl_fuchsia_net_interfaces_ext::admin::Control,
             device_class: DeviceClass,
             dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -393,6 +389,7 @@ mod tests {
             provisioning: ProvisioningAction,
         ) -> Self {
             Self {
+                persistent_id,
                 control,
                 config: InterfaceConfigState::Host(HostInterfaceState {
                     dhcpv4_client: None,
@@ -511,6 +508,9 @@ mod tests {
                     fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                         .expect("create endpoints");
                 InterfaceState::new_host_with_state(
+                    Some(PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
+                        octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
+                    })),
                     control,
                     device_class,
                     None,
