@@ -121,7 +121,11 @@ impl Pipe {
     ) -> Result<(), Errno> {
         if !task.creds().has_capability(CAP_SYS_RESOURCE)
             && requested_capacity
-                > task.kernel().pipe_max_size.load(std::sync::atomic::Ordering::Relaxed)
+                > task
+                    .kernel()
+                    .system_limits
+                    .pipe_max_size
+                    .load(std::sync::atomic::Ordering::Relaxed)
         {
             return error!(EINVAL);
         }

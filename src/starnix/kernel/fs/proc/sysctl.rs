@@ -4,9 +4,10 @@
 
 use crate::{
     fs::{
-        fs_args, inotify, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle, FsNodeInfo,
-        FsNodeOps, StaticDirectoryBuilder,
+        fs_args, inotify, inotify::InotifyLimits, BytesFile, BytesFileOps, FileSystemHandle,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, StaticDirectoryBuilder,
     },
+    mm::PAGE_SIZE,
     task::{
         ptrace_get_scope, ptrace_set_scope, CurrentTask, NetstackDevicesDirectory, SeccompAction,
     },
@@ -20,7 +21,7 @@ use starnix_uapi::{
 };
 use std::{
     borrow::Cow,
-    sync::atomic::{AtomicUsize, Ordering},
+    sync::atomic::{AtomicI32, AtomicUsize, Ordering},
 };
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
@@ -97,6 +98,27 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         dir.entry(current_task, b"pipe-max-size", PipeMaxSizeFile::new_node(), mode);
     });
     dir.build(current_task)
+}
+
+pub struct SystemLimits {
+    /// Limits applied to inotify objects.
+    pub inotify: InotifyLimits,
+
+    /// The maximum size of pipes in the system.
+    pub pipe_max_size: AtomicUsize,
+}
+
+impl Default for SystemLimits {
+    fn default() -> SystemLimits {
+        SystemLimits {
+            inotify: InotifyLimits {
+                max_queued_events: AtomicI32::new(16384),
+                max_user_instances: AtomicI32::new(128),
+                max_user_watches: AtomicI32::new(1048576),
+            },
+            pipe_max_size: AtomicUsize::new((*PAGE_SIZE * 256) as usize),
+        }
+    }
 }
 
 struct StubSysctl {
@@ -296,7 +318,7 @@ trait AtomicGetter {
 struct PipeMaxSizeGetter;
 impl AtomicGetter for PipeMaxSizeGetter {
     fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicUsize {
-        &current_task.kernel().pipe_max_size
+        &current_task.kernel().system_limits.pipe_max_size
     }
 }
 

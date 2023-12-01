@@ -105,7 +105,7 @@ impl InotifyFileObject {
         let flags =
             OpenFlags::RDONLY | if non_blocking { OpenFlags::NONBLOCK } else { OpenFlags::empty() };
         let max_queued_events =
-            current_task.kernel().inotify_limits.max_queued_events.load(Ordering::Relaxed);
+            current_task.kernel().system_limits.inotify.max_queued_events.load(Ordering::Relaxed);
         assert!(max_queued_events >= 0);
         Anon::new_file(
             current_task,
@@ -525,21 +525,21 @@ pub trait AtomicGetter {
 pub struct MaxQueuedEventsGetter;
 impl AtomicGetter for MaxQueuedEventsGetter {
     fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
-        &current_task.kernel().inotify_limits.max_queued_events
+        &current_task.kernel().system_limits.inotify.max_queued_events
     }
 }
 
 pub struct MaxUserInstancesGetter;
 impl AtomicGetter for MaxUserInstancesGetter {
     fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
-        &current_task.kernel().inotify_limits.max_user_instances
+        &current_task.kernel().system_limits.inotify.max_user_instances
     }
 }
 
 pub struct MaxUserWatchesGetter;
 impl AtomicGetter for MaxUserWatchesGetter {
     fn get_atomic<'a>(current_task: &'a CurrentTask) -> &'a AtomicI32 {
-        &current_task.kernel().inotify_limits.max_user_watches
+        &current_task.kernel().system_limits.inotify.max_user_watches
     }
 }
 

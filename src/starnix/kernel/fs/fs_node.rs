@@ -1034,7 +1034,7 @@ impl FsNode {
             let mut default_pipe_capacity = (*PAGE_SIZE * 16) as usize;
             if !credentials.has_capability(CAP_SYS_RESOURCE) {
                 let kernel = kernel.upgrade().expect("Invalid kernel when creating fs node");
-                let max_size = kernel.pipe_max_size.load(Ordering::Relaxed);
+                let max_size = kernel.system_limits.pipe_max_size.load(Ordering::Relaxed);
                 default_pipe_capacity = std::cmp::min(default_pipe_capacity, max_size);
             }
 

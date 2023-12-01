@@ -9,7 +9,7 @@ use crate::{
     },
     diagnostics::CoreDumpList,
     fs::{
-        inotify::InotifyLimits,
+        proc::SystemLimits,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,
@@ -18,7 +18,7 @@ use crate::{
     },
     lock_ordering::KernelIpTables,
     logging::log_error,
-    mm::{FutexTable, SharedFutexKey, PAGE_SIZE},
+    mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
@@ -47,7 +47,7 @@ use starnix_uapi::{
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicI32, AtomicU16, AtomicU8, AtomicUsize},
+        atomic::{AtomicU16, AtomicU8},
         Arc, Weak,
     },
 };
@@ -170,12 +170,12 @@ pub struct Kernel {
     /// Diagnostics information about crashed tasks.
     pub core_dumps: CoreDumpList,
 
-    // The kinds of seccomp action that gets logged, stored as a bit vector.
-    // Each potential SeccompAction gets a bit in the vector, as specified by
-    // SeccompAction::logged_bit_offset.  If the bit is set, that means the
-    // action should be logged when it is taken, subject to the caveats
-    // described in seccomp(2).  The value of the bit vector is exposed to users
-    // in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
+    /// The kinds of seccomp action that gets logged, stored as a bit vector.
+    /// Each potential SeccompAction gets a bit in the vector, as specified by
+    /// SeccompAction::logged_bit_offset.  If the bit is set, that means the
+    /// action should be logged when it is taken, subject to the caveats
+    /// described in seccomp(2).  The value of the bit vector is exposed to users
+    /// in a text form in the file /proc/sys/kernel/seccomp/actions_logged.
     pub actions_logged: AtomicU16,
 
     /// The manager for power subsystems including reboot and suspend.
@@ -192,16 +192,14 @@ pub struct Kernel {
     /// Unique cookie used to link two inotify events, usually an IN_MOVE_FROM/IN_MOVE_TO pair.
     pub next_inotify_cookie: AtomicU32Counter,
 
-    pub inotify_limits: InotifyLimits,
-
-    /// The maximum size of pipes in the system.
-    pub pipe_max_size: AtomicUsize,
-
-    // Controls which processes a process is allowed to ptrace.  See Documentation/security/Yama.txt
+    /// Controls which processes a process is allowed to ptrace.  See Documentation/security/Yama.txt
     pub ptrace_scope: AtomicU8,
 
     // The Fuchsia build version returned by `fuchsia.buildinfo.Provider`.
     pub build_version: OnceCell<String>,
+
+    /// Resource limits that are exposed, for example, via sysctl.
+    pub system_limits: SystemLimits,
 
     // The service to handle delayed releases. This is required for elements that requires to
     // execute some code when released and requires a known context (both in term of lock context,
@@ -323,12 +321,7 @@ impl Kernel {
             next_namespace_id: AtomicU64Counter::new(1),
             next_inotify_cookie: AtomicU32Counter::new(1),
             next_file_object_id: Default::default(),
-            inotify_limits: InotifyLimits {
-                max_queued_events: AtomicI32::new(16384),
-                max_user_instances: AtomicI32::new(128),
-                max_user_watches: AtomicI32::new(1048576),
-            },
-            pipe_max_size: AtomicUsize::new((*PAGE_SIZE * 256) as usize),
+            system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
             delayed_releaser: Default::default(),
