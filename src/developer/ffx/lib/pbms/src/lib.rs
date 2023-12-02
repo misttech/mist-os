@@ -807,6 +807,7 @@ mod tests {
         assert!(make_way_for_output(&test_dir.path(), /*force=*/ false).await.is_err());
     }
 
+    #[cfg(feature = "build_pb_v1")]
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_load_product_bundle_v1() {
         let env = ffx_config::test_init().await.expect("create test config");

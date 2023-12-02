@@ -17,10 +17,8 @@ if (is_host) {
     ]
     deps = [
       "//build/sdk/meta:rust",
-      "//src/developer/ffx/config:lib",
       "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
       "//src/developer/ffx/lib/emulator_instance:lib",
-      "//src/developer/ffx/lib/pbms:lib",
       "//src/lib/assembly/assembly_manifest",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:async-trait",
@@ -36,7 +34,11 @@ if (is_host) {
     inputs = [ "//build/sdk/meta/test_data/virtual_device.json" ]
     if (build_pb_v1) {
       features = [ "build_pb_v1" ]
-      deps += [ "//src/developer/ffx/lib/fms" ]
+      deps += [
+        "//src/developer/ffx/config:lib",
+        "//src/developer/ffx/lib/fms",
+        "//src/developer/ffx/lib/pbms:lib",
+      ]
     }
   }
 

@@ -12,6 +12,7 @@ use camino::Utf8PathBuf;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
+#[cfg(feature = "build_pb_v1")]
 use pbms::ListingMode;
 #[cfg(feature = "build_pb_v1")]
 use pbms::{fms_entries_from, get_images_dir, select_product_bundle};
@@ -30,6 +31,7 @@ pub async fn convert_bundle_to_configs(
     device_name: Option<String>,
     verbose: bool,
 ) -> Result<EmulatorConfiguration> {
+    #[cfg(feature = "build_pb_v1")]
     let sdk = ffx_config::global_env_context()
         .context("loading global environment context")?
         .get_sdk()

@@ -261,9 +261,11 @@ group("default-images") {
 
   deps = default_image_deps
 
-  # Downstream tools (e.g. bundle_fetcher in infra) relies on metadata generated
-  # by product_metadata, so keeping this dep for Bazel assembly.
-  deps += [ "//build/images/flash:product_metadata" ]
+  if (build_pb_v1) {
+    # Downstream tools (e.g. bundle_fetcher in infra) relies on metadata generated
+    # by product_metadata, so keeping this dep for Bazel assembly.
+    deps += [ "//build/images/flash:product_metadata" ]
+  }
 
   # Prune unsupported targets when Bazel assembly is enabled. This makes sure
   # the build:
