@@ -164,15 +164,16 @@ class _AsyncKey:
 
 def convert_trace_file_to_json(
     trace_path: Union[str, os.PathLike],
-    trace2json_path: Union[str, os.PathLike] | None = None,
     compressed_input: bool = False,
     compressed_output: bool = False,
+    trace2json_path: Union[str, os.PathLike] | None = None,
 ) -> str:
     """Converts the specified trace file to JSON.
 
     Args:
       trace_path: The path to the trace file to convert.
-      trace2json_path: The path to the trace2json executable.
+      trace2json_path: The path to the trace2json executable. When unset, find
+          at a runtime_deps/trace2json location in a parent directory.
       compressed_input: Whether the input file is compressed.
       compressed_output: Whether the output file should be compressed.
 

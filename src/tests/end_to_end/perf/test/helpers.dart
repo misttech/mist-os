@@ -207,23 +207,6 @@ class PerfTestHelper {
       expect(result.exitCode, equals(0));
     }
   }
-
-  // Runs a component without processing any results.  This is useful when
-  // the caller retrieves performance results via tracing.
-  Future<void> runTestComponentWithNoResults(
-      {required String packageName,
-      required String componentName,
-      String? realm,
-      required String commandArgs}) async {
-    String command = 'run-test-suite'
-        ' fuchsia-pkg://fuchsia.com/$packageName#meta/$componentName';
-    if (realm != null) {
-      command += ' --realm $realm';
-    }
-    command += ' -- $commandArgs';
-    final result = await sl4fDriver.ssh.run(command);
-    expect(result.exitCode, equals(0));
-  }
 }
 
 // Runs a component and publishes the performance test results that it

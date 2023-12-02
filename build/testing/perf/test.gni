@@ -17,7 +17,7 @@ import("//build/testing/host_test_data.gni")
 #     The entrypoint that contains the __main__ to execute the test.
 #     Type: path
 #
-#   expected_metric_names_filepath (required)
+#   expected_metric_names_filepath (optional)
 #     The absolute path to the file containing the expected metrics.
 #     Type: string
 #
@@ -43,18 +43,19 @@ import("//build/testing/host_test_data.gni")
 template("python_perf_test") {
   if (is_host) {
     assert(defined(invoker.main_source), "main_source is required")
-    assert(defined(invoker.expected_metric_names_filepath),
-           "expected_metric_names_filepath is required")
 
     _test_target_name = "${target_name}_test"
     _runtime_deps_target = "${_test_target_name}_runtime_deps"
     _runtime_deps_dir = "${target_out_dir}/${_test_target_name}/runtime_deps"
     host_test_data(_runtime_deps_target) {
       sources = [
-        "${invoker.expected_metric_names_filepath}",
         "${root_out_dir}/catapult_converter",
         "${root_out_dir}/trace2json",
       ]
+
+      if (defined(invoker.expected_metric_names_filepath)) {
+        sources += [ "${invoker.expected_metric_names_filepath}" ]
+      }
       outputs = [ "${_runtime_deps_dir}/{{source_file_part}}" ]
       deps = [
         "//src/performance/trace2json:bin",
@@ -62,21 +63,24 @@ template("python_perf_test") {
       ]
     }
 
-    # This action checks that expected_metric_names_filepath refers to a file in
-    # an allowlisted directory. Ideally we would do this check directly in GN.
-    python_action("${_test_target_name}_verify") {
-      binary_label = "//build/testing/perf:verify_expected_metric_path"
+    if (defined(invoker.expected_metric_names_filepath)) {
+      # This action checks that expected_metric_names_filepath refers to a file
+      # in an allowlisted directory. Ideally we would do this check directly in
+      # GN.
+      python_action("${_test_target_name}_verify") {
+        binary_label = "//build/testing/perf:verify_expected_metric_path"
 
-      output_file = "$target_gen_dir/$target_name.verified"
+        output_file = "$target_gen_dir/$target_name.verified"
 
-      inputs = [ invoker.expected_metric_names_filepath ]
-      outputs = [ output_file ]
-      args = [
-        "--expected-metric-names-filepath",
-        invoker.expected_metric_names_filepath,
-        "--output-file",
-        rebase_path(output_file, root_build_dir),
-      ]
+        inputs = [ invoker.expected_metric_names_filepath ]
+        outputs = [ output_file ]
+        args = [
+          "--expected-metric-names-filepath",
+          invoker.expected_metric_names_filepath,
+          "--output-file",
+          rebase_path(output_file, root_build_dir),
+        ]
+      }
     }
 
     python_mobly_test("${_test_target_name}") {
@@ -118,10 +122,11 @@ template("python_perf_test") {
 
   group("${target_name}") {
     testonly = true
-    deps = [
-      ":${target_name}_test($host_toolchain)",
-      ":${target_name}_test_verify($host_toolchain)",
-    ]
+    deps = [ ":${target_name}_test($host_toolchain)" ]
+
+    if (defined(invoker.expected_metric_names_filepath)) {
+      deps += [ ":${target_name}_test_verify($host_toolchain)" ]
+    }
     if (defined(invoker.target_deps)) {
       foreach(target_dep, invoker.target_deps) {
         deps += [ "${target_dep}($target_toolchain)" ]
@@ -196,7 +201,10 @@ template("fuchsia_component_perf_test") {
     contents = {
       ffx_test_url =
           "fuchsia-pkg://fuchsia.com/${_package}#meta/${_component}.cm"
-      expected_metric_names_filepath = invoker.expected_metric_names_filepath
+
+      if (defined(invoker.expected_metric_names_filepath)) {
+        expected_metric_names_filepath = invoker.expected_metric_names_filepath
+      }
 
       if (defined(invoker.process_runs)) {
         process_runs = invoker.process_runs

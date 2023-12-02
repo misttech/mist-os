@@ -24,7 +24,6 @@ test_list = [
   "netstack_benchmarks_test",
   "netstack_benchmarks_with_tracing_test",
   "netstack_tun_socket_benchmarks_test",
-  "perftest_trace_events_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 
@@ -168,6 +167,10 @@ _tests = [
     expected_metric_filename = "fuchsia.example.txt"
     libraries = [ "//src/performance/lib/perf_publish" ]
   },
+  {
+    name = "perftest_trace_events_test"
+    libraries = [ "//src/performance/lib/trace_processing" ]
+  },
 ]
 
 _python_benchmarks = []
@@ -177,14 +180,14 @@ foreach(test, _tests) {
   if (is_host) {
     python_perf_test(_test_name) {
       main_source = "test/${_name}.py"
-      expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/${test.expected_metric_filename}"
+      forward_variables_from(test, [ "transport" ])
+      if (defined(test.expected_metric_filename)) {
+        expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/${test.expected_metric_filename}"
+      }
       libraries =
           [ "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test" ]
       if (defined(test.libraries)) {
         libraries += test.libraries
-      }
-      if (defined(test.transport)) {
-        transport = test.transport
       }
     }
   }
