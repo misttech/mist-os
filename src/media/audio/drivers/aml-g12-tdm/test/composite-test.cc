@@ -138,6 +138,14 @@ class AmlG12CompositeTest : public zxtest::Test {
   fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
   FakePlatformDevice platform_device_;
 
+  fuchsia_hardware_audio::DaiFormat GetDefaultDaiFormat() {
+    return fuchsia_hardware_audio::DaiFormat(
+        2, 3, fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
+        fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+            fuchsia_hardware_audio::DaiFrameFormatStandard::kI2S),
+        48'000, 16, 16);
+  }
+
  private:
   async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
   async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
@@ -288,6 +296,123 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
       auto set_element_result = signal_client->SetElementState(std::move(request));
       ASSERT_TRUE(set_element_result.is_ok());
     }
+  }
+}
+
+TEST_F(AmlG12CompositeTest, GetDaiFormats) {
+  // Only ids 1, 2, and 3 provide DAI formats.
+  {
+    auto dai_formats_result = client_->GetDaiFormats(0);
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto dai_formats_result = client_->GetDaiFormats(4);
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto dai_formats_result = client_->GetDaiFormats(1);
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
+  }
+  {
+    auto dai_formats_result = client_->GetDaiFormats(2);
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
+  }
+  {
+    auto dai_formats_result = client_->GetDaiFormats(3);
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    ASSERT_EQ(1, dai_formats_result->dai_formats().size());
+  }
+}
+
+TEST_F(AmlG12CompositeTest, SetDaiFormats) {
+  // Only ids 1, 2, and 3 configure HW DAI formats.
+  {
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(0, GetDefaultDaiFormat());
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(4, GetDefaultDaiFormat());
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(1, GetDefaultDaiFormat());
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+
+    // Configure TDM A for 16 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
+    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN A, 16 bits per slot.
+    ASSERT_EQ(0x7003'000F, platform_device_.mmio()[0x300 / 4]);
+  }
+  {
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(2, GetDefaultDaiFormat());
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    // Configure TDM B for 16 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
+    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x540 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN B, 16 bits per slot.
+    ASSERT_EQ(0x7013'000F, platform_device_.mmio()[0x340 / 4]);
+  }
+  {
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, GetDefaultDaiFormat());
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_TRUE(dai_formats_result.is_ok());
+    // Configure TDM C for 16 bits I2S:
+    // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot is 0x3001002F.
+    ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x580 / 4]);
+    // TDM IN CTRL0 config, PAD_TDMIN C, 16 bits per slot.
+    ASSERT_EQ(0x7023'000F, platform_device_.mmio()[0x380 / 4]);
+  }
+
+  // Any DAI field not in the supported ones returns an error.
+  {
+    auto format = GetDefaultDaiFormat();
+    format.number_of_channels(123);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto format = GetDefaultDaiFormat();
+    format.sample_format(fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto format = GetDefaultDaiFormat();
+    format.frame_format(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
+        fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2));
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto format = GetDefaultDaiFormat();
+    format.frame_rate(123);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto format = GetDefaultDaiFormat();
+    format.bits_per_slot(123);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
+  }
+  {
+    auto format = GetDefaultDaiFormat();
+    format.bits_per_sample(123);
+    fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
+    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    ASSERT_FALSE(dai_formats_result.is_ok());
   }
 }
 

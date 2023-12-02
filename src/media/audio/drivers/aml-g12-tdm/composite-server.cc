@@ -6,7 +6,15 @@
 
 #include <lib/driver/component/cpp/driver_base.h>
 
+#include <algorithm>
+
 namespace audio::aml_g12 {
+
+// In C++23 we can remove this and just use std::ranges::contains.
+template <typename Container, typename T>
+bool contains(Container c, T v) {
+  return std::find(std::begin(c), std::end(c), v) != std::end(c);
+}
 
 // TODO(fxbug.dev/132252): Implement audio-composite server support.
 Server::Server(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
@@ -183,11 +191,81 @@ void Server::CreateRingBuffer(CreateRingBufferRequest& request,
 }
 
 void Server::GetDaiFormats(GetDaiFormatsRequest& request, GetDaiFormatsCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  auto dai = std::find(kDaiIds.begin(), kDaiIds.end(), request.processing_element_id());
+  if (dai == kDaiIds.end()) {
+    FDF_LOG(ERROR, "Unknown DAI id (%lu) for GetDaiFormats", request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  size_t dai_index = dai - kDaiIds.begin();
+  ZX_ASSERT(dai_index < kNumberOfPipelines);
+  fuchsia_hardware_audio::CompositeGetDaiFormatsResponse response;
+  response.dai_formats(std::vector{supported_dai_formats_[dai_index]});
+  completer.Reply(zx::ok(std::move(response)));
 }
 
 void Server::SetDaiFormat(SetDaiFormatRequest& request, SetDaiFormatCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  auto dai = std::find(kDaiIds.begin(), kDaiIds.end(), request.processing_element_id());
+  if (dai == kDaiIds.end()) {
+    FDF_LOG(ERROR, "Unknown DAI id (%lu) for SetDaiFormat", request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  size_t dai_index = dai - kDaiIds.begin();
+  ZX_ASSERT(dai_index < kNumberOfPipelines);
+  auto& supported = supported_dai_formats_[dai_index];
+
+  if (!contains(supported.number_of_channels(), request.format().number_of_channels())) {
+    FDF_LOG(ERROR, "DAI format number of channels for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (!contains(supported.sample_formats(), request.format().sample_format())) {
+    FDF_LOG(ERROR, "DAI format sample format for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (!contains(supported.frame_formats(), request.format().frame_format())) {
+    FDF_LOG(ERROR, "DAI format frame format for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (!contains(supported.frame_rates(), request.format().frame_rate())) {
+    FDF_LOG(ERROR, "DAI format frame rate for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (!contains(supported.bits_per_slot(), request.format().bits_per_slot())) {
+    FDF_LOG(ERROR, "DAI format bits per slot for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+
+  if (!contains(supported.bits_per_sample(), request.format().bits_per_sample())) {
+    FDF_LOG(ERROR, "DAI format bits per sample for DAI id (%lu) not supported",
+            request.processing_element_id());
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
+  }
+  current_dai_formats_[dai_index] = request.format();
+  for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
+    if (engines_[i].dai_index == dai_index) {
+      if (zx_status_t status = ResetEngine(i); status != ZX_OK) {
+        completer.Reply(zx::error(status));
+        return;
+      }
+    }
+  }
+  completer.Reply(zx::ok());
 }
 
 void Server::GetProperties(
