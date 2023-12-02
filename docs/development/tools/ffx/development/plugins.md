@@ -186,6 +186,9 @@ instructions in this section.
 1.  Import the necessary bindings int your plugin implementation. The following
     example imports `NameProviderProxy` from `fuchsia.device`:
 
+    Note: The struct `NameProviderProxy` is generated as part of the rust bindings to the FIDL `fuchsia.device`,
+    [`NameProviderProxy](/sdk/fidl/fuchsia.device/name-provider.fidl)
+
     ```rust
     use {
         anyhow::Result,
