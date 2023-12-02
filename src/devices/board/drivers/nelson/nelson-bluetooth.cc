@@ -15,6 +15,7 @@
 #include <unistd.h>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/pwm/cpp/bind.h>
 #include <sdk/lib/driver/component/cpp/composite_node_spec.h>
 #include <sdk/lib/driver/component/cpp/node_add_args.h>
@@ -77,28 +78,11 @@ static const fpbus::Node bt_uart_dev = []() {
 }();
 
 zx_status_t Nelson::BluetoothInit() {
-  zx_status_t status;
-
   // set alternate functions to enable Bluetooth UART
-  status = gpio_impl_.SetAltFunction(S905D3_UART_TX_A, S905D3_UART_TX_A_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(S905D3_UART_RX_A, S905D3_UART_RX_A_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(S905D3_UART_CTS_A, S905D3_UART_CTS_A_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(S905D3_UART_RTS_A, S905D3_UART_RTS_A_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
+  gpio_init_steps_.push_back({S905D3_UART_TX_A, GpioSetAltFunction(S905D3_UART_TX_A_FN)});
+  gpio_init_steps_.push_back({S905D3_UART_RX_A, GpioSetAltFunction(S905D3_UART_RX_A_FN)});
+  gpio_init_steps_.push_back({S905D3_UART_CTS_A, GpioSetAltFunction(S905D3_UART_CTS_A_FN)});
+  gpio_init_steps_.push_back({S905D3_UART_RTS_A, GpioSetAltFunction(S905D3_UART_RTS_A_FN)});
 
   // Bind UART for Bluetooth HCI
   fdf::Arena arena('BLUE');
@@ -113,6 +97,15 @@ zx_status_t Nelson::BluetoothInit() {
       fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_pwm::BIND_INIT_STEP_PWM),
   };
 
+  fuchsia_driver_framework::wire::BindRule kGpioBindRules[] = {
+      fidl::ToWire(arena, fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                                  bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)),
+  };
+
+  fuchsia_driver_framework::wire::NodeProperty kGpioProperties[] = {
+      fdf::MakeProperty(arena, bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
   auto parents = std::vector{
       fuchsia_driver_framework::wire::ParentSpec{
           .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
@@ -120,6 +113,13 @@ zx_status_t Nelson::BluetoothInit() {
           .properties =
               fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
                   kPwmProperties, 1),
+      },
+      fuchsia_driver_framework::wire::ParentSpec{
+          .bind_rules = fidl::VectorView<fuchsia_driver_framework::wire::BindRule>::FromExternal(
+              kGpioBindRules, 1),
+          .properties =
+              fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>::FromExternal(
+                  kGpioProperties, 1),
       },
   };
 

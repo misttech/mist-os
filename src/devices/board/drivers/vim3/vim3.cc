@@ -103,6 +103,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = BluetoothInit()) != ZX_OK) {
+    zxlogf(ERROR, "BluetoothInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -185,12 +190,6 @@ int Vim3::Thread() {
   }
   if ((status = VideoInit()) != ZX_OK) {
     zxlogf(ERROR, "VideoInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-
-  if ((status = BluetoothInit()) != ZX_OK) {
-    zxlogf(ERROR, "BluetoothInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

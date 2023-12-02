@@ -72,6 +72,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
+  if ((status = BluetoothInit()) != ZX_OK) {
+    zxlogf(ERROR, "BluetoothInit failed: %d", status);
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -181,12 +185,6 @@ int Astro::Thread() {
 
   if ((status = RamCtlInit()) != ZX_OK) {
     zxlogf(ERROR, "RamCtlInit failed: %d", status);
-  }
-
-  // This function includes some non-trivial delays, so lets run this last
-  // to avoid slowing down the rest of the boot.
-  if ((status = BluetoothInit()) != ZX_OK) {
-    zxlogf(ERROR, "BluetoothInit failed: %d", status);
   }
 
   return ZX_OK;

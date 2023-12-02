@@ -4,8 +4,9 @@
 
 composite bt_uart;
 
-using fuchsia.platform;
 using fuchsia.amlogic.platform;
+using fuchsia.gpio;
+using fuchsia.platform;
 using fuchsia.pwm;
 
 primary node "pdev" {
@@ -17,4 +18,8 @@ primary node "pdev" {
 
 node "pwm" {
   fuchsia.BIND_INIT_STEP == fuchsia.pwm.BIND_INIT_STEP.PWM;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

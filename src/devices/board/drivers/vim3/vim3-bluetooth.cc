@@ -76,28 +76,11 @@ static const fpbus::Node bt_uart_dev = []() {
 }();
 
 zx_status_t Vim3::BluetoothInit() {
-  zx_status_t status;
-
   // set alternate functions to enable Bluetooth UART
-  status = gpio_impl_.SetAltFunction(A311D_UART_EE_A_TX, A311D_UART_EE_A_TX_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(A311D_UART_EE_A_RX, A311D_UART_EE_A_RX_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(A311D_UART_EE_A_CTS, A311D_UART_EE_A_CTS_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  status = gpio_impl_.SetAltFunction(A311D_UART_EE_A_RTS, A311D_UART_EE_A_RTS_FN);
-  if (status != ZX_OK) {
-    return status;
-  }
+  gpio_init_steps_.push_back({A311D_UART_EE_A_TX, GpioSetAltFunction(A311D_UART_EE_A_TX_FN)});
+  gpio_init_steps_.push_back({A311D_UART_EE_A_RX, GpioSetAltFunction(A311D_UART_EE_A_RX_FN)});
+  gpio_init_steps_.push_back({A311D_UART_EE_A_CTS, GpioSetAltFunction(A311D_UART_EE_A_CTS_FN)});
+  gpio_init_steps_.push_back({A311D_UART_EE_A_RTS, GpioSetAltFunction(A311D_UART_EE_A_RTS_FN)});
 
   // Bind UART for Bluetooth HCI
   fdf::Arena arena('BLUE');

@@ -150,6 +150,10 @@ int Sherlock::Thread() {
     zxlogf(ERROR, "SdioInit() failed");
   }
 
+  if (BluetoothInit() != ZX_OK) {
+    zxlogf(ERROR, "BluetoothInit() failed");
+  }
+
   if (AudioInit() != ZX_OK) {
     zxlogf(ERROR, "AudioInit() failed");
   }
@@ -207,10 +211,6 @@ int Sherlock::Thread() {
   // Then the platform device drivers.
   if (UsbInit() != ZX_OK) {
     zxlogf(ERROR, "UsbInit() failed");
-  }
-
-  if (BluetoothInit() != ZX_OK) {
-    zxlogf(ERROR, "BluetoothInit() failed");
   }
 
   if (CameraInit() != ZX_OK) {
