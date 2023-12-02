@@ -25,7 +25,7 @@ type DelayInfo = table {
     ///
     /// This delay must not include the inherent delay added by the temporary buffering needed
     /// to copy data in and out of the ring buffer, which is contained in `RingBufferProperties`
-    /// `driver_transfer_bytes`.
+    /// field `driver_transfer_bytes`.
     ///
     /// Required.
     1: internal_delay zx.Duration;
@@ -153,10 +153,21 @@ type RingBufferProperties = table {
     /// ## Playback
     ///
     /// Before they start the ring buffer, clients may safely write any ring buffer location. It is
-    /// recommended that they write at least `driver_transfer_bytes` of initial audio (since they
-    /// must always stay at least that far ahead of where the driver/HW is reading). Otherwise the
+    /// recommended that they write at least `driver_transfer_bytes` of initial audio, since they
+    /// must always stay at least that far ahead of where the driver/HW is reading, and upon `Start`
+    /// the hardware might immediately consume that much data from the ring buffer. Otherwise, the
     /// client relies on the zeroed-out contents of the VMO to be the initial audio read by the
     /// driver/HW.
+    ///
+    /// ```
+    ///                                       Ring Buffer
+    ///  +-------------------------+-------------------------------------------------------------+
+    ///  |<---                                 safe to write                                 --->|
+    ///  |             (to pre-populate the ring buffer before starting the hardware)            |
+    ///  +-------------------------+-------------------------------------------------------------+
+    ///  0=P                       S                                                             0
+    /// ```
+    ///
     /// Once the ring buffer is started, it is not safe for the client to write data to the ring
     /// buffer between 'P' and 'S', because this represents data already in use (potentially already
     /// consumed). The client may safely write the rest of the ring buffer (between 'S' and '0/P').
@@ -164,8 +175,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +-------------------------+-------------------------------------------------------------+
-    ///  |<---      unsafe     --->|<---     safe (empty unless prewritten by the client)    --->|
-    ///  |<`driver_transfer_bytes`>|                                                             |
+    ///  |<--- unsafe to write --->|<---                    safe to write                    --->|
+    ///  |< driver_transfer_bytes >|           (empty unless prewritten by the client)           |
     ///  +-------------------------+-------------------------------------------------------------+
     ///  0=P                       S                                                             0
     /// ```
@@ -179,8 +190,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +------------+-------------------------+------------------------------------------------+
-    ///  |<-- safe -->|<---      unsafe     --->|<--      safe (empty unless prewritten)      -->|
-    ///  |            |<`driver_transfer_bytes`>|                                                |
+    ///  |<-- safe -->|<--- unsafe to write --->|<--               safe to write              -->|
+    ///  |  to write  |< driver_transfer_bytes >|       (not yet consumed by the hardware)       |
     ///  +------------+-------------------------+------------------------------------------------+
     ///  0            P                         S                                                0
     /// ```
@@ -191,8 +202,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +---------------+------------------------------------------------------------+----------+
-    ///  |<--- unsafe -->|<---                        safe                        --->|<-unsafe->|
-    ///  |<`driver_transf|                                                            |er_bytes`>|
+    ///  |<--- unsafe -->|<---                   safe to write                    --->|<-unsafe->|
+    ///  |< driver_transf|                                                            |er_bytes >|
     ///  +---------------+------------------------------------------------------------+----------+
     ///  0               S                                                            P          0
     /// ```
@@ -202,8 +213,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +--------------------------------+-------------------------+----------------------------+
-    ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
-    ///  |                                |<`driver_transfer_bytes`>|                            |
+    ///  [<--       safe to write      -->|<--- unsafe to write --->|<--     safe to write    -->|
+    ///  |  (prior data already consumed) |< driver_transfer_bytes >|                            |
     ///  +--------------------------------+-------------------------+----------------------------+
     ///  0                                P                         S                            0
     /// ```
@@ -219,7 +230,7 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +---------------------------------------------------------------------------------------+
-    ///  [<---                                   empty                                        -->|
+    ///  [<---                     empty (not yet written by the hardware)                    -->|
     ///  +---------------------------------------------------------------------------------------+
     /// 0=S=P                                                                                    0
     /// ```
@@ -227,16 +238,16 @@ type RingBufferProperties = table {
     /// Once capture begins, the driver/HW acquires frames, eventually making its first data
     /// transfer to the ring buffer starting at '0'. These transfers are of unknown size but may be
     /// as large as `driver_transfer_bytes`; they occur at the rate specified in `CreateRingBuffer`.
-    /// Before the driver/HW writes at least `driver_transfer_bytes` into the ring buffer, the
+    /// Before the driver/HW has written at least `driver_transfer_bytes` into the ring buffer, the
     /// client cannot yet safely read any of the newly captured frames:
     ///
     /// ```
     ///                                       Ring Buffer
-    ///  +----------------+----------------------------------------------------------------------+
-    ///  [<--- unsafe --->|<--                               empty                            -->|
-    ///  |<`driver_transfer_bytes`>|                                                             |
-    ///  +----------------+----------------------------------------------------------------------+
-    /// 0=S               P                                                                      0
+    ///  +--------------+------------------------------------------------------------------------+
+    ///  [<-- unsafe -->|<--                           safe to read                           -->|
+    ///  |< driver_transfer_bytes >|     (but empty, not yet written by the hardware)            |
+    ///  +--------------+------------------------------------------------------------------------+
+    /// 0=S             P                                                                        0
     /// ```
     ///
     /// Once the driver/HW has written at least `driver_transfer_bytes` of data into the ring
@@ -249,11 +260,11 @@ type RingBufferProperties = table {
     ///
     /// ```
     ///                                       Ring Buffer
-    ///  +----------------------+-------------------------+--------------------------------------+
-    ///  [<--      safe      -->|<---      unsafe     --->|<--             empty              -->|
-    ///  |                      |<`driver_transfer_bytes`>|                                      |
-    ///  +----------------------+-------------------------+--------------------------------------+
-    ///  0                      S                         P                                      0
+    ///  +----------------+-------------------------+--------------------------------------------+
+    ///  [< safe to read >|<---  unsafe to read --->|<--             safe to read             -->|
+    ///  | captured audio |< driver_transfer_bytes >|      (not yet written by the hardware)     |
+    ///  +----------------+-------------------------+--------------------------------------------+
+    ///  0                S                         P                                            0
     /// ```
     ///
     /// Later, 'P' wraps around the ring buffer before 'S' does. Note that the region from 0 to 'P',
@@ -262,8 +273,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +-----------+------------------------------------------------------------+--------------+
-    ///  |<--unsafe->|<---                        safe                        --->|<---unsafe--->|
-    ///  |<`driver_tr|                                                            |ansfer_bytes`>|
+    ///  |<--unsafe->|<---                    safe to read                    --->|<---unsafe--->|
+    ///  |< driver_tr|                      (captured audio)                      |ansfer_bytes >|
     ///  +-----------+------------------------------------------------------------+--------------+
     ///  0           P                                                            S              0
     /// ```
@@ -274,8 +285,8 @@ type RingBufferProperties = table {
     /// ```
     ///                                       Ring Buffer
     ///  +--------------------------------+-------------------------+----------------------------+
-    ///  [<--           safe           -->|<---      unsafe     --->|<--         safe         -->|
-    ///  |                                |<`driver_transfer_bytes`>|                            |
+    ///  [<--       safe to read       -->|<---      unsafe     --->|<--     safe to read     -->|
+    ///  |                                |< driver_transfer_bytes >|                            |
     ///  +--------------------------------+-------------------------+----------------------------+
     ///  0                                S                         P                            0
     /// ```
