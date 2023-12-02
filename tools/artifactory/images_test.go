@@ -77,11 +77,6 @@ func TestImageUploads(t *testing.T) {
 				Path: "disk.raw",
 				Type: "blk",
 			},
-			{
-				Name: "product_bundle",
-				Path: "product_bundle.json",
-				Type: "manifest",
-			},
 		},
 	}
 	want := []Upload{

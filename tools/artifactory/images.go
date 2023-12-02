@@ -48,11 +48,6 @@ func imageUploads(mods imgModules, namespace string) ([]Upload, error) {
 	seen := make(map[string]struct{})
 	var elfSizesPath string
 	for _, img := range mods.Images() {
-		// Skip uploading product_bundle as they are uploaded by ProductBundleUpload.
-		if img.Name == productBundleName && img.Type == productBundleType {
-			continue
-		}
-
 		if _, ok := seen[img.Path]; ok {
 			continue
 		}

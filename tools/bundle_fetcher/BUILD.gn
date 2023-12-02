@@ -19,8 +19,6 @@ go_library("main") {
   source_dir = "cmd"
 
   sources = [
-    "download.go",
-    "download_test.go",
     "main.go",
     "product_list.go",
     "product_list_test.go",

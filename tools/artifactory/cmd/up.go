@@ -236,15 +236,6 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	}
 	uploads = append(uploads, images...)
 
-	productBundle, err := artifactory.ProductBundleUploads(m, packageNamespaceDir, blobDirName, imageNamespaceDir)
-	if err != nil {
-		return err
-	}
-	// Check that an upload isn't nil as product bundle doesn't exist for "bringup" and SDK builds.
-	if productBundle != nil {
-		uploads = append(uploads, *productBundle)
-	}
-
 	licenses, err := artifactory.LicenseUploads(m, licenseNamespaceDir)
 	if err != nil {
 		return err
