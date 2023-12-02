@@ -82,7 +82,7 @@ class UsbMassStorageDevice : public scsi::Controller, public MassStorageDeviceTy
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp* disk_op) override;
+                           uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) override;
 
   // Performs the object initialization.
   zx_status_t Init(bool is_test_mode);

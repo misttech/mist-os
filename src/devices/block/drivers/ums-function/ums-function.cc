@@ -163,21 +163,49 @@ void UmsFunction::StartTransfer(DataState state, uint64_t lba, uint32_t blocks) 
 
 void UmsFunction::HandleInquiry(ums_cbw_t* cbw) {
   zxlogf(DEBUG, "HandleInquiry");
+  scsi::InquiryCDB cmd;
+  memcpy(&cmd, cbw->CBWCB, sizeof(cmd));
 
   usb::Request<>* req = &data_req_.value();
-  scsi::InquiryData* data;
-  req->Mmap(reinterpret_cast<void**>(&data));
+  void* data;
+  req->Mmap(&data);
   memset(data, 0, UMS_INQUIRY_TRANSFER_LENGTH);
   req->request()->header.length = UMS_INQUIRY_TRANSFER_LENGTH;
 
   // fill in inquiry result
-  data->peripheral_device_type = 0;  // Peripheral Device Type: Direct access block device
-  data->removable = 0x80;            // Removable
-  data->version = 6;                 // Version SPC-4
-  data->response_data_format_and_control = 0x12;  // Response Data Format
-  memcpy(data->t10_vendor_id, "Google  ", 8);
-  memcpy(data->product_id, "Zircon UMS      ", 16);
-  memcpy(data->product_revision, "1.00", 4);
+  if (!cmd.reserved_and_evpd) {
+    scsi::InquiryData* inquiry_data = reinterpret_cast<scsi::InquiryData*>(data);
+    inquiry_data->peripheral_device_type = 0;  // Peripheral Device Type: Direct access block device
+    inquiry_data->removable = 0x80;            // Removable
+    inquiry_data->version = 6;                 // Version SPC-4
+    inquiry_data->response_data_format_and_control = 0x12;  // Response Data Format
+    memcpy(inquiry_data->t10_vendor_id, "Google  ", 8);
+    memcpy(inquiry_data->product_id, "Zircon UMS      ", 16);
+    memcpy(inquiry_data->product_revision, "1.00", 4);
+  } else {
+    if (cmd.page_code == scsi::InquiryCDB::kPageListVpdPageCode) {
+      auto vpd_page_list = reinterpret_cast<scsi::VPDPageList*>(data);
+      vpd_page_list->peripheral_qualifier_device_type = 0;
+      vpd_page_list->page_code = 0x00;
+      vpd_page_list->page_length = 2;
+      vpd_page_list->pages[0] = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+      vpd_page_list->pages[1] = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+    } else if (cmd.page_code == scsi::InquiryCDB::kBlockLimitsVpdPageCode) {
+      auto block_limits = reinterpret_cast<scsi::VPDBlockLimits*>(data);
+      block_limits->peripheral_qualifier_device_type = 0;
+      block_limits->page_code = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+      block_limits->maximum_unmap_lba_count = htobe32(UINT32_MAX);
+    } else if (cmd.page_code == scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode) {
+      auto provisioning = reinterpret_cast<scsi::VPDLogicalBlockProvisioning*>(data);
+      provisioning->peripheral_qualifier_device_type = 0;
+      provisioning->page_code = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+      provisioning->set_lbpu(true);
+      provisioning->set_provisioning_type(0x02);  // The logical unit is thin provisioned
+    } else {
+      zxlogf(ERROR, "Unsupported Inquiry page code=0x%x", cmd.page_code);
+      return;
+    }
+  }
 
   QueueData(req);
 }

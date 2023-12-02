@@ -48,7 +48,7 @@ zx::result<InquiryData> Controller::Inquiry(uint8_t target, uint16_t lun) {
   return zx::ok(data);
 }
 
-zx::result<uint32_t> Controller::InquiryMaxTransferBlocks(uint8_t target, uint16_t lun) {
+zx::result<VPDBlockLimits> Controller::InquiryBlockLimits(uint8_t target, uint16_t lun) {
   InquiryCDB cdb = {};
   cdb.opcode = Opcode::INQUIRY;
   // Query for all supported VPD pages.
@@ -65,7 +65,7 @@ zx::result<uint32_t> Controller::InquiryMaxTransferBlocks(uint8_t target, uint16
   }
 
   uint8_t i;
-  for (i = 0; i < vpd_pagelist.page_length; i++) {
+  for (i = 0; i < vpd_pagelist.page_length; ++i) {
     if (vpd_pagelist.pages[i] == InquiryCDB::kBlockLimitsVpdPageCode) {
       break;
     }
@@ -87,7 +87,50 @@ zx::result<uint32_t> Controller::InquiryMaxTransferBlocks(uint8_t target, uint16
     return zx::error(status);
   }
 
-  return zx::ok(betoh32(block_limits.max_xfer_length_blocks));
+  return zx::ok(block_limits);
+}
+
+zx::result<bool> Controller::InquirySupportUnmapCommand(uint8_t target, uint16_t lun) {
+  InquiryCDB cdb = {};
+  cdb.opcode = Opcode::INQUIRY;
+  // Query for all supported VPD pages.
+  cdb.reserved_and_evpd = 0x1;
+  cdb.page_code = 0x00;
+  VPDPageList vpd_pagelist = {};
+  cdb.allocation_length = htobe16(sizeof(vpd_pagelist));
+  zx_status_t status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false,
+                                          {&vpd_pagelist, sizeof(vpd_pagelist)});
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "INQUIRY failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  uint8_t i;
+  for (i = 0; i < vpd_pagelist.page_length; ++i) {
+    if (vpd_pagelist.pages[i] == InquiryCDB::kLogicalBlockProvisioningVpdPageCode) {
+      break;
+    }
+  }
+  if (i == vpd_pagelist.page_length) {
+    zxlogf(ERROR, "The Logical Block Provisioning VPD page is not supported for target %u, lun %u.",
+           target, lun);
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // The Block Limits VPD page is supported, fetch it.
+  cdb.page_code = InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+  VPDLogicalBlockProvisioning provisioning = {};
+  cdb.allocation_length = htobe16(sizeof(provisioning));
+  status = ExecuteCommandSync(target, lun, {&cdb, sizeof(cdb)}, /*is_write=*/false,
+                              {&provisioning, sizeof(provisioning)});
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "INQUIRY failed for target %u, lun %u: %s", target, lun,
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  return zx::ok(provisioning.lbpu());
 }
 
 zx::result<ModeSense6ParameterHeader> Controller::ModeSense(uint8_t target, uint16_t lun) {

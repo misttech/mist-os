@@ -28,7 +28,7 @@ class ScsiCommandTest : public UfsTest {
     ASSERT_OK(zx::vmo::create(kMockBlockSize, 0, &vmo_));
     zx::unowned_vmo unowned_vmo(vmo_);
 
-    ASSERT_OK(MapVmo(ZX_BTI_PERM_WRITE, unowned_vmo, mapper_, 0, block_count_ * block_size_));
+    ASSERT_OK(MapVmo(unowned_vmo, mapper_, 0, block_count_ * block_size_));
   }
 
   void TearDown() override { UfsTest::TearDown(); }

@@ -60,6 +60,20 @@ zx_status_t Ufs::WaitWithTimeout(fit::function<zx_status_t()> wait_for, uint32_t
   }
 }
 
+zx::result<> Ufs::AllocatePages(zx::vmo& vmo, fzl::VmoMapper& mapper, size_t size) {
+  const uint32_t data_size =
+      fbl::round_up(safemath::checked_cast<uint32_t>(size), zx_system_get_page_size());
+  if (zx_status_t status = zx::vmo::create(data_size, 0, &vmo); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  if (zx_status_t status = mapper.Map(vmo, 0, data_size); status != ZX_OK) {
+    zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+  return zx::ok();
+}
+
 void Ufs::ProcessIoSubmissions() {
   while (true) {
     IoCommand* io_cmd;
@@ -80,11 +94,30 @@ void Ufs::ProcessIoSubmissions() {
     }
 
     std::optional<zx::unowned_vmo> vmo_optional = std::nullopt;
+    uint32_t transfer_bytes = 0;
     if (data_direction != DataDirection::kNone) {
-      vmo_optional = zx::unowned_vmo(io_cmd->disk_op.op.rw.vmo);
+      if (io_cmd->disk_op.op.command.opcode == BLOCK_OPCODE_TRIM) {
+        // For the UNMAP command, a data buffer is required for the parameter list.
+        zx::vmo data_vmo;
+        fzl::VmoMapper mapper;
+        if (zx::result<> result = AllocatePages(data_vmo, mapper, io_cmd->data_length);
+            result.is_error()) {
+          zxlogf(ERROR, "Failed to allocate data buffer (command %p): %s", io_cmd,
+                 result.status_string());
+          return;
+        }
+        memcpy(mapper.start(), io_cmd->data_buffer, io_cmd->data_length);
+        vmo_optional = zx::unowned_vmo(data_vmo);
+        io_cmd->data_vmo = std::move(data_vmo);
+
+        transfer_bytes = io_cmd->data_length;
+      } else {
+        vmo_optional = zx::unowned_vmo(io_cmd->disk_op.op.rw.vmo);
+
+        transfer_bytes = io_cmd->disk_op.op.rw.length * io_cmd->block_size_bytes;
+      }
     }
 
-    const uint32_t transfer_bytes = io_cmd->disk_op.op.rw.length * io_cmd->block_size_bytes;
     if (transfer_bytes > max_transfer_bytes_) {
       zxlogf(ERROR,
              "Request exceeding max transfer size. transfer_bytes=%d, max_transfer_bytes_=%d",
@@ -105,6 +138,7 @@ void Ufs::ProcessIoSubmissions() {
       zxlogf(ERROR, "Failed to submit SCSI command (command %p): %s", io_cmd,
              response.status_string());
       io_cmd->disk_op.Complete(response.error_value());
+      io_cmd->data_vmo.reset();
     }
   }
 }
@@ -210,7 +244,7 @@ int Ufs::IoLoop() {
 }
 
 void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                              uint32_t block_size_bytes, scsi::DiskOp* disk_op) {
+                              uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
   IoCommand* io_cmd = containerof(disk_op, IoCommand, disk_op);
   if (lun > UINT8_MAX) {
     disk_op->Complete(ZX_ERR_OUT_OF_RANGE);
@@ -226,6 +260,19 @@ void Ufs::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_w
   io_cmd->lun = safemath::checked_cast<uint8_t>(lun);
   io_cmd->block_size_bytes = block_size_bytes;
   io_cmd->is_write = is_write;
+
+  // Currently, data is only used in the UNMAP command.
+  if (disk_op->op.command.opcode == BLOCK_OPCODE_TRIM && data.iov_len != 0) {
+    if (sizeof(io_cmd->data_buffer) != data.iov_len) {
+      zxlogf(ERROR,
+             "The size of the requested data buffer(%zu) and data_buffer(%lu) are different.",
+             data.iov_len, sizeof(io_cmd->data_buffer));
+      disk_op->Complete(ZX_ERR_INVALID_ARGS);
+      return;
+    }
+    memcpy(io_cmd->data_buffer, data.iov_base, data.iov_len);
+    io_cmd->data_length = safemath::checked_cast<uint8_t>(data.iov_len);
+  }
 
   // Queue transaction.
   {
@@ -261,16 +308,8 @@ zx_status_t Ufs::ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, boo
     // Allocate a response data buffer.
     // TODO(fxbug.dev/124835): We need to pre-allocate a data buffer that will be used in the Sync
     // command.
-    const uint32_t data_buffer_size =
-        fbl::round_up(safemath::checked_cast<uint32_t>(data.iov_len), zx_system_get_page_size());
-    if (zx_status_t status = zx::vmo::create(data_buffer_size, 0, &data_vmo); status != ZX_OK) {
-      return status;
-    }
-
-    // Allocate a buffer for SCSI response data.
-    if (zx_status_t status = mapper.Map(data_vmo, 0, data_buffer_size); status != ZX_OK) {
-      zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
-      return status;
+    if (zx::result<> result = AllocatePages(data_vmo, mapper, data.iov_len); result.is_error()) {
+      return result.error_value();
     }
     vmo_optional = zx::unowned_vmo(data_vmo);
   }
@@ -577,7 +616,8 @@ zx::result<uint8_t> Ufs::AddLogicalUnits() {
       return zx::error(status);
     }
 
-    zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_);
+    zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_,
+                                       scsi::DiskOptions(/*support_unmap=*/true));
     if (disk.is_error()) {
       zxlogf(ERROR, "UFS: device_add for block device failed: %s", disk.status_string());
       return disk.take_error();

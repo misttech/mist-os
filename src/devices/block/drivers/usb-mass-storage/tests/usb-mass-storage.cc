@@ -257,10 +257,12 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
         case scsi::Opcode::INQUIRY: {
           scsi::InquiryCDB cmd;
           memcpy(&cmd, cbw.CBWCB, sizeof(cmd));
-          if (be16toh(cmd.allocation_length) == UMS_INQUIRY_TRANSFER_LENGTH) {
-            // Push reply
-            fbl::Array<unsigned char> reply(new unsigned char[UMS_INQUIRY_TRANSFER_LENGTH],
-                                            UMS_INQUIRY_TRANSFER_LENGTH);
+
+          // Push reply
+          fbl::Array<unsigned char> reply(new unsigned char[UMS_INQUIRY_TRANSFER_LENGTH],
+                                          UMS_INQUIRY_TRANSFER_LENGTH);
+          if (!cmd.reserved_and_evpd) {
+            memset(reply.data(), 0, UMS_INQUIRY_TRANSFER_LENGTH);
             reply[0] = 0;     // Peripheral Device Type: Direct access block device
             reply[1] = 0x80;  // Removable
             reply[2] = 6;     // Version SPC-4
@@ -268,16 +270,42 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
             memcpy(reply.data() + 8, "Google  ", 8);
             memcpy(reply.data() + 16, "Zircon UMS      ", 16);
             memcpy(reply.data() + 32, "1.00", 4);
-            memset(reply.data(), 0, UMS_INQUIRY_TRANSFER_LENGTH);
-            context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
-            // Push CSW
-            fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
-            context->csw.dCSWDataResidue = 0;
-            context->csw.dCSWTag = context->tag++;
-            context->csw.bmCSWStatus = CSW_SUCCESS;
-            memcpy(csw.data(), &context->csw, sizeof(context->csw));
-            context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
+          } else {
+            if (cmd.page_code == scsi::InquiryCDB::kPageListVpdPageCode) {
+              auto vpd_page_list = reinterpret_cast<scsi::VPDPageList*>(reply.data());
+              vpd_page_list->peripheral_qualifier_device_type = 0;
+              vpd_page_list->page_code = 0x00;
+              vpd_page_list->page_length = 2;
+              vpd_page_list->pages[0] = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+              vpd_page_list->pages[1] = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+            } else if (cmd.page_code == scsi::InquiryCDB::kBlockLimitsVpdPageCode) {
+              auto block_limits = reinterpret_cast<scsi::VPDBlockLimits*>(reply.data());
+              block_limits->peripheral_qualifier_device_type = 0;
+              block_limits->page_code = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+              block_limits->maximum_unmap_lba_count = htobe32(UINT32_MAX);
+            } else if (cmd.page_code == scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode) {
+              auto provisioning =
+                  reinterpret_cast<scsi::VPDLogicalBlockProvisioning*>(reply.data());
+              provisioning->peripheral_qualifier_device_type = 0;
+              provisioning->page_code = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+              provisioning->set_lbpu(true);
+              provisioning->set_provisioning_type(0x02);  // The logical unit is thin provisioned
+            } else {
+              usb_request->response.status = ZX_ERR_NOT_SUPPORTED;
+              usb_request->response.actual = 0;
+              complete_cb->callback(complete_cb->ctx, usb_request);
+              return;
+            }
           }
+          context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(reply)));
+          // Push CSW
+          fbl::Array<unsigned char> csw(new unsigned char[sizeof(ums_csw_t)], sizeof(ums_csw_t));
+          context->csw.dCSWDataResidue = 0;
+          context->csw.dCSWTag = context->tag++;
+          context->csw.bmCSWStatus = CSW_SUCCESS;
+          memcpy(csw.data(), &context->csw, sizeof(context->csw));
+          context->pending_packets.push_back(fbl::MakeRefCounted<Packet>(std::move(csw)));
+
           usb_request->response.status = ZX_OK;
           complete_cb->callback(complete_cb->ctx, usb_request);
           break;
@@ -412,6 +440,7 @@ static void RequestQueue(void* ctx, usb_request_t* usb_request,
       complete_cb->callback(complete_cb->ctx, usb_request);
   }
 }
+
 static void CompletionCallback(void* ctx, zx_status_t status, block_op_t* op) {
   Context* context = reinterpret_cast<Context*>(ctx);
   context->status = status;

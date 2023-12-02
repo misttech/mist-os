@@ -37,7 +37,6 @@ device. The UIC layer automatically detects and recovers I/O errors through the 
 and provides reliable data transfer through the M-PHY physical layer.
 
 ## TODO
-* Support TRIM command (unmap)
 * Support write booster
 * Support Power Mode
 * Support RPMB logical unit

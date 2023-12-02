@@ -41,7 +41,7 @@ class WaiterImpl : public WaiterInterface {
 
 void UsbMassStorageDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb,
                                                bool is_write, uint32_t block_size_bytes,
-                                               scsi::DiskOp* disk_op) {
+                                               scsi::DiskOp* disk_op, iovec data) {
   Transaction* txn = containerof(disk_op, Transaction, disk_op);
 
   if (lun > UINT8_MAX) {
@@ -528,8 +528,8 @@ zx_status_t UsbMassStorageDevice::CheckLunsReady() {
       break;
     }
     if (ready && !block_devs_[lun]) {
-      zx::result disk =
-          scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun, max_transfer_bytes_);
+      zx::result disk = scsi::Disk::Bind(zxdev(), this, kPlaceholderTarget, lun,
+                                         max_transfer_bytes_, scsi::DiskOptions::Default());
       if (disk.is_ok() && disk->block_size_bytes() != 0) {
         block_devs_[lun] = disk.value();
         scsi::Disk* dev = block_devs_[lun].get();

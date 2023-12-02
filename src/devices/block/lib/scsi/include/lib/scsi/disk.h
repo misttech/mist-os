@@ -27,6 +27,15 @@ struct DiskOp {
   void* cookie;
 };
 
+struct DiskOptions {
+  static DiskOptions Default() { return DiskOptions(/*support_unmap=*/false); }
+
+  explicit DiskOptions(bool support_unmap) : check_unmap_support_(support_unmap) {}
+  DiskOptions() = delete;
+
+  bool check_unmap_support_;
+};
+
 class Disk;
 using DeviceType = ddk::Device<Disk>;
 
@@ -39,12 +48,13 @@ class Disk : public DeviceType,
   // Public so that we can use make_unique.
   // Clients should use Disk::Bind().
   Disk(zx_device_t* parent, Controller* controller, uint8_t target, uint16_t lun,
-       uint32_t max_transfer_bytes)
+       uint32_t max_transfer_bytes, DiskOptions disk_options)
       : DeviceType(parent),
         controller_(controller),
         target_(target),
         lun_(lun),
-        max_transfer_bytes_(max_transfer_bytes) {}
+        max_transfer_bytes_(max_transfer_bytes),
+        disk_options_(disk_options) {}
 
   // Create a Disk at a specific target/lun.
   // |controller| is a pointer to the scsi::Controller this disk is attached to.
@@ -55,7 +65,7 @@ class Disk : public DeviceType,
   // Returns a Disk* to allow for removal of removable media disks.
   static zx::result<fbl::RefPtr<Disk>> Bind(zx_device_t* parent, Controller* controller,
                                             uint8_t target, uint16_t lun,
-                                            uint32_t max_transfer_bytes);
+                                            uint32_t max_transfer_bytes, DiskOptions disk_options);
 
   fbl::String DiskName() const { return fbl::StringPrintf("scsi-disk-%u-%u", target_, lun_); }
 
@@ -93,8 +103,13 @@ class Disk : public DeviceType,
   bool dpo_fua_available_;
   bool write_protected_;
   bool write_cache_enabled_;
+
+  bool unmap_command_supported_ = false;
+
   uint64_t block_count_;
   uint32_t block_size_bytes_;
+
+  DiskOptions disk_options_;
 };
 
 }  // namespace scsi

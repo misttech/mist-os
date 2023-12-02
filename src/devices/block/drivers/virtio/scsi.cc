@@ -160,14 +160,14 @@ static void DiskOpCompletionCb(void* cookie, zx_status_t status) {
 }
 
 void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                     uint32_t block_size_bytes, scsi::DiskOp* disk_op) {
+                                     uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) {
   const block_read_write_t& rw = disk_op->op.rw;
   const zx_handle_t data_vmo = rw.vmo;
   const zx_off_t vmo_offset_bytes = rw.offset_vmo * block_size_bytes;
   const size_t transfer_bytes = rw.length * block_size_bytes;
 
   // Map IO data into process memory.
-  void* data = nullptr;
+  void* rw_data = nullptr;
   bool vmar_mapped = false;
   if (data_vmo != ZX_HANDLE_INVALID) {
     // To use zx_vmar_map, offset, length must be page aligned. If it isn't (uncommon),
@@ -184,14 +184,14 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
         disk_op->Complete(status);
         return;
       }
-      data = reinterpret_cast<void*>(mapped_addr);
+      rw_data = reinterpret_cast<void*>(mapped_addr);
     } else {
       // This is later freed in IrqRingUpdate().
-      data = calloc(1, transfer_bytes);
+      rw_data = calloc(1, transfer_bytes);
       if (is_write) {
-        status = zx_vmo_read(data_vmo, data, vmo_offset_bytes, transfer_bytes);
+        status = zx_vmo_read(data_vmo, rw_data, vmo_offset_bytes, transfer_bytes);
         if (status != ZX_OK) {
-          free(data);
+          free(rw_data);
           disk_op->Complete(status);
           return;
         }
@@ -200,7 +200,7 @@ void ScsiDevice::ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bo
   }
 
   return QueueCommand(target, lun, cdb, is_write, zx::unowned_vmo(data_vmo), vmo_offset_bytes,
-                      transfer_bytes, DiskOpCompletionCb, static_cast<void*>(disk_op), data,
+                      transfer_bytes, DiskOpCompletionCb, static_cast<void*>(disk_op), rw_data,
                       vmar_mapped);
 }
 
@@ -379,10 +379,11 @@ zx_status_t ScsiDevice::WorkerThread() {
         if (max_xfer_size_sectors == 0) {
           // If we haven't queried the VPD pages for the target's xfer size
           // yet, do it now. We only query this once per target.
-          zx::result target_max_xfer_sectors = InquiryMaxTransferBlocks(target, lun);
-          if (target_max_xfer_sectors.is_ok()) {
+          zx::result<scsi::VPDBlockLimits> block_limits = InquiryBlockLimits(target, lun);
+          if (block_limits.is_ok()) {
             // Smaller of |max_sectors| and target's max transfer sectors.
-            max_xfer_size_sectors = std::min(max_sectors, target_max_xfer_sectors.value());
+            max_xfer_size_sectors =
+                std::min(max_sectors, betoh32(block_limits->maximum_transfer_blocks));
           } else {
             max_xfer_size_sectors = max_sectors;
           }
@@ -390,7 +391,8 @@ zx_status_t ScsiDevice::WorkerThread() {
         zxlogf(INFO, "Virtio SCSI %u:%u Max Xfer Size %u bytes", target, lun,
                max_xfer_size_sectors * SCSI_SECTOR_SIZE);
         zx::result result =
-            scsi::Disk::Bind(device_, this, target, lun, max_xfer_size_sectors * SCSI_SECTOR_SIZE);
+            scsi::Disk::Bind(device_, this, target, lun, max_xfer_size_sectors * SCSI_SECTOR_SIZE,
+                             scsi::DiskOptions::Default());
         if (result.is_error()) {
           return result.status_value();
         }

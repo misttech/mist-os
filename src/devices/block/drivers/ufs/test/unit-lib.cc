@@ -55,8 +55,8 @@ zx::result<> UfsTest::FillDescriptorAndSendRequest(uint8_t slot, DataDirection d
       slot, ddir, resp_offset, resp_len, prdt_offset, prdt_entry_count);
 }
 
-zx::result<> UfsTest::MapVmo(uint32_t option, zx::unowned_vmo &vmo, fzl::VmoMapper &mapper,
-                             uint64_t offset, uint64_t length) {
+zx::result<> UfsTest::MapVmo(zx::unowned_vmo &vmo, fzl::VmoMapper &mapper, uint64_t offset,
+                             uint64_t length) {
   if (zx_status_t status = mapper.Map(*vmo, offset, length); status != ZX_OK) {
     zxlogf(ERROR, "Failed to map IO buffer: %s", zx_status_get_string(status));
     return zx::error(status);

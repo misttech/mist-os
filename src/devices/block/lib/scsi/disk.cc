@@ -17,11 +17,11 @@
 namespace scsi {
 
 zx::result<fbl::RefPtr<Disk>> Disk::Bind(zx_device_t* parent, Controller* controller,
-                                         uint8_t target, uint16_t lun,
-                                         uint32_t max_transfer_bytes) {
+                                         uint8_t target, uint16_t lun, uint32_t max_transfer_bytes,
+                                         DiskOptions disk_options) {
   fbl::AllocChecker ac;
-  auto disk =
-      fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun, max_transfer_bytes);
+  auto disk = fbl::MakeRefCountedChecked<Disk>(&ac, parent, controller, target, lun,
+                                               max_transfer_bytes, disk_options);
   if (!ac.check()) {
     return zx::error(ZX_ERR_NO_MEMORY);
   }
@@ -55,6 +55,20 @@ zx_status_t Disk::AddDisk() {
          vendor_id.c_str(), product_id.c_str());
 
   removable_ = inquiry_data.value().removable_media();
+
+  if (disk_options_.check_unmap_support_) {
+    zx::result<VPDBlockLimits> block_limits = controller_->InquiryBlockLimits(target_, lun_);
+    if (block_limits.is_error()) {
+      return block_limits.status_value();
+    }
+    uint32_t maximum_unmap_lba_count = betoh32(block_limits->maximum_unmap_lba_count);
+
+    zx::result unmap_command_supported = controller_->InquirySupportUnmapCommand(target_, lun_);
+    if (unmap_command_supported.is_error()) {
+      return unmap_command_supported.status_value();
+    }
+    unmap_command_supported_ = unmap_command_supported.value() && maximum_unmap_lba_count;
+  }
 
   zx::result mode_sense_data = controller_->ModeSense(target_, lun_);
   if (mode_sense_data.is_error()) {
@@ -159,7 +173,7 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       }
       ZX_ASSERT(cdb_length <= sizeof(cdb_buffer));
       controller_->ExecuteCommandAsync(target_, lun_, {cdb_buffer, cdb_length}, is_write,
-                                       block_size_bytes_, disk_op);
+                                       block_size_bytes_, disk_op, {nullptr, 0});
       return;
     }
     case BLOCK_OPCODE_FLUSH: {
@@ -181,7 +195,44 @@ void Disk::BlockImplQueue(block_op_t* op, block_impl_queue_callback completion_c
       cdb.logical_block_address = 0;
       cdb.num_blocks = 0;
       controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)},
-                                       /*is_write=*/false, block_size_bytes_, disk_op);
+                                       /*is_write=*/false, block_size_bytes_, disk_op,
+                                       {nullptr, 0});
+      return;
+    }
+    case BLOCK_OPCODE_TRIM: {
+      if (!unmap_command_supported_) {
+        completion_cb(cookie, ZX_ERR_NOT_SUPPORTED, op);
+        return;
+      }
+      if (zx_status_t status = block::CheckIoRange(op->trim, block_count_, max_transfer_blocks_);
+          status != ZX_OK) {
+        completion_cb(cookie, status, op);
+        return;
+      }
+      UnmapCDB cdb = {};
+      cdb.opcode = Opcode::UNMAP;
+
+      // block_trim can only pass a single block slice.
+      constexpr uint32_t block_descriptor_count = 1;
+      // The SCSI UNMAP command requires separate data to be sent for the UNMAP parameter list.
+      uint8_t data[sizeof(UnmapParameterListHeader) +
+                   (sizeof(UnmapBlockDescriptor) * block_descriptor_count)] = {};
+      cdb.parameter_list_length = htobe16(sizeof(data));
+
+      UnmapParameterListHeader* patameter_list_header =
+          reinterpret_cast<UnmapParameterListHeader*>(data);
+      patameter_list_header->data_length =
+          htobe16(sizeof(UnmapParameterListHeader) - sizeof(patameter_list_header->data_length) +
+                  sizeof(UnmapBlockDescriptor));
+      patameter_list_header->block_descriptor_data_length = htobe16(sizeof(UnmapBlockDescriptor));
+
+      UnmapBlockDescriptor* block_descriptor =
+          reinterpret_cast<UnmapBlockDescriptor*>(data + sizeof(UnmapParameterListHeader));
+      block_descriptor->logical_block_address = htobe64(op->trim.offset_dev);
+      block_descriptor->blocks = htobe32(op->trim.length);
+
+      controller_->ExecuteCommandAsync(target_, lun_, {&cdb, sizeof(cdb)}, /*is_write=*/true,
+                                       block_size_bytes_, disk_op, {&data, sizeof(data)});
       return;
     }
     default:

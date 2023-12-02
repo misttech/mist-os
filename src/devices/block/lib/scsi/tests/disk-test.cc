@@ -65,7 +65,7 @@ class ControllerForTest : public Controller {
   }
 
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, DiskOp* disk_op) override {
+                           uint32_t block_size_bytes, DiskOp* disk_op, iovec data) override {
     // In the caller, enqueue the request for the worker thread,
     // poke the worker thread and return. The worker thread, on
     // waking up, will do the actual IO and call the callback.
@@ -213,6 +213,65 @@ class DiskTest : public zxtest::Test {
             }
             case 1: {
               EXPECT_EQ(cdb.iov_len, 6);
+              InquiryCDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
+              EXPECT_EQ(decoded_cdb.page_code, scsi::InquiryCDB::kPageListVpdPageCode);
+              EXPECT_FALSE(is_write);
+              VPDPageList vpd_page_list = {};
+              vpd_page_list.peripheral_qualifier_device_type = 0;
+              vpd_page_list.page_code = InquiryCDB::kPageListVpdPageCode;
+              vpd_page_list.page_length = 2;
+              vpd_page_list.pages[0] = InquiryCDB::kBlockLimitsVpdPageCode;
+              vpd_page_list.pages[1] = InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+              memcpy(data.iov_base, reinterpret_cast<char*>(&vpd_page_list), sizeof(vpd_page_list));
+              break;
+            }
+            case 2: {
+              EXPECT_EQ(cdb.iov_len, 6);
+              InquiryCDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
+              EXPECT_EQ(decoded_cdb.page_code, InquiryCDB::kBlockLimitsVpdPageCode);
+              EXPECT_FALSE(is_write);
+              VPDBlockLimits block_limits = {};
+              block_limits.peripheral_qualifier_device_type = 0;
+              block_limits.page_code = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+              block_limits.maximum_unmap_lba_count = htobe32(UINT32_MAX);
+              break;
+            }
+            case 3: {
+              EXPECT_EQ(cdb.iov_len, 6);
+              InquiryCDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
+              EXPECT_EQ(decoded_cdb.page_code, InquiryCDB::kPageListVpdPageCode);
+              EXPECT_FALSE(is_write);
+              VPDPageList vpd_page_list = {};
+              vpd_page_list.peripheral_qualifier_device_type = 0;
+              vpd_page_list.page_code = InquiryCDB::kPageListVpdPageCode;
+              vpd_page_list.page_length = 2;
+              vpd_page_list.pages[0] = InquiryCDB::kBlockLimitsVpdPageCode;
+              vpd_page_list.pages[1] = InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+              memcpy(data.iov_base, reinterpret_cast<char*>(&vpd_page_list), sizeof(vpd_page_list));
+              break;
+            }
+            case 4: {
+              EXPECT_EQ(cdb.iov_len, 6);
+              InquiryCDB decoded_cdb = {};
+              memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
+              EXPECT_EQ(decoded_cdb.opcode, Opcode::INQUIRY);
+              EXPECT_EQ(decoded_cdb.page_code, InquiryCDB::kLogicalBlockProvisioningVpdPageCode);
+              EXPECT_FALSE(is_write);
+              VPDLogicalBlockProvisioning provisioning = {};
+              provisioning.peripheral_qualifier_device_type = 0;
+              provisioning.page_code = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+              provisioning.set_lbpu(true);
+              provisioning.set_provisioning_type(0x02);  // The logical unit is thin provisioned
+              break;
+            }
+            case 5: {
+              EXPECT_EQ(cdb.iov_len, 6);
               ModeSense6CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
               EXPECT_EQ(decoded_cdb.opcode, Opcode::MODE_SENSE_6);
@@ -223,7 +282,7 @@ class DiskTest : public zxtest::Test {
               memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
               break;
             }
-            case 2: {
+            case 6: {
               EXPECT_EQ(cdb.iov_len, 6);
               ModeSense6CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -236,7 +295,7 @@ class DiskTest : public zxtest::Test {
               memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
               break;
             }
-            case 3: {
+            case 7: {
               EXPECT_EQ(cdb.iov_len, 10);
               ReadCapacity10CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -248,7 +307,7 @@ class DiskTest : public zxtest::Test {
               memcpy(data.iov_base, reinterpret_cast<char*>(&response), sizeof(response));
               break;
             }
-            case 4: {
+            case 8: {
               EXPECT_EQ(cdb.iov_len, 16);
               ReadCapacity16CDB decoded_cdb = {};
               memcpy(&decoded_cdb, cdb.iov_base, cdb.iov_len);
@@ -266,7 +325,7 @@ class DiskTest : public zxtest::Test {
 
           return ZX_OK;
         },
-        /*times=*/5);
+        /*times=*/9);
   }
 
   ControllerForTest controller_;
@@ -276,14 +335,16 @@ class DiskTest : public zxtest::Test {
 // Test that we can create a disk when the underlying controller successfully executes CDBs.
 TEST_F(DiskTest, TestCreateDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize));
+  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                       DiskOptions(/*support_unmap=*/true)));
   ASSERT_EQ(1, fake_parent->child_count());
 }
 
 // Test creating a disk and executing read commands.
 TEST_F(DiskTest, TestCreateReadDestroy) {
   std::shared_ptr<MockDevice> fake_parent = MockDevice::FakeRootParent();
-  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize));
+  ASSERT_OK(Disk::Bind(fake_parent.get(), &controller_, kTarget, kLun, kTransferSize,
+                       DiskOptions(/*support_unmap=*/true)));
   ASSERT_EQ(1, fake_parent->child_count());
   auto* dev = fake_parent->GetLatestChild()->GetDeviceContext<Disk>();
   block_info_t info;

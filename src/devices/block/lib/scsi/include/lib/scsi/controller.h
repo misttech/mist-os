@@ -87,7 +87,9 @@ struct TestUnitReadyCDB {
 static_assert(sizeof(TestUnitReadyCDB) == 6, "TestUnitReady CDB must be 6 bytes");
 
 struct InquiryCDB {
+  static constexpr uint8_t kPageListVpdPageCode = 0x00;
   static constexpr uint8_t kBlockLimitsVpdPageCode = 0xB0;
+  static constexpr uint8_t kLogicalBlockProvisioningVpdPageCode = 0xB2;
 
   Opcode opcode;
   // reserved_and_evpd(0) is 'Enable Vital Product Data'
@@ -126,18 +128,48 @@ static_assert(sizeof(InquiryData) == 36, "Inquiry data must be 36 bytes");
 static_assert(offsetof(InquiryData, t10_vendor_id) == 8, "T10 Vendor ID is at offset 8");
 static_assert(offsetof(InquiryData, product_id) == 16, "Product ID is at offset 16");
 
+// SBC-3, section 6.6.3 "Block Limits VPD page".
 struct VPDBlockLimits {
   uint8_t peripheral_qualifier_device_type;
   uint8_t page_code;
-  uint8_t reserved1;
-  uint8_t page_length;
-  uint8_t reserved2[2];
-  uint16_t optimal_xfer_granularity;
-  uint32_t max_xfer_length_blocks;
-  uint32_t optimal_xfer_length;
+  uint16_t page_length;
+  uint8_t reserved;
+  uint8_t maximum_compare_and_write_blocks;
+  uint16_t optimal_transfer_blocks_granularity;
+  uint32_t maximum_transfer_blocks;
+  uint32_t optimal_transfer_blocks;
+  uint32_t maximum_prefetch_blocks;
+  uint32_t maximum_unmap_lba_count;
+  uint32_t maximum_unmap_block_descriptor_count;
+  uint32_t optimal_unmap_granularity;
+  uint32_t unmap_granularity_alignment;
+  uint64_t maximum_write_same_blocks;
 } __PACKED;
 
-static_assert(sizeof(VPDBlockLimits) == 16, "BlockLimits Page must be 16 bytes");
+static_assert(sizeof(VPDBlockLimits) == 44, "BlockLimits Page must be 44 bytes");
+
+// SBC-3, section 6.6.4 "Logical Block Provisioning VPD page".
+struct VPDLogicalBlockProvisioning {
+  uint8_t peripheral_qualifier_device_type;
+  uint8_t page_code;
+  uint16_t page_length;
+  uint8_t threshold_exponent;
+  uint8_t lbpu_lbpws_lbprz_anc_sup_dp;
+  uint8_t reserved_provisioning_type;
+  uint8_t reserved;
+  uint8_t provisioning_group_descriptor[];
+
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 7, lbpu);     // Logical block provisioning UNMAP
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 6, lbpws);    // Logical block provisioning WRITE SAME(16)
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 5, lbpws10);  // Logical block provisioning WRITE SAME(10)
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 2, lbprz);    // Logical block provisioning read zeros
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 1, anc_sup);  // Anchor supported
+  DEF_SUBBIT(lbpu_lbpws_lbprz_anc_sup_dp, 0, dp);       // Descriptor present
+  DEF_SUBFIELD(reserved_provisioning_type, 2, 0, provisioning_type);
+} __PACKED;
+
+static_assert(sizeof(VPDLogicalBlockProvisioning) == 8,
+              "LogicalBlockProvisioning Page must be 8 bytes");
 
 struct VPDPageList {
   uint8_t peripheral_qualifier_device_type;
@@ -538,15 +570,6 @@ struct UnmapCDB {
 
 static_assert(sizeof(UnmapCDB) == 10, "Unmap CDB must be 10 bytes");
 
-struct UnmapParameterListHeader {
-  uint16_t data_length;
-  uint16_t block_descriptor_data_length;
-  uint8_t reserved[4];
-  // Unmap block descriptors follow after 8 bytes.
-} __PACKED;
-
-static_assert(sizeof(UnmapParameterListHeader) == 8, "Unmap parameter list header must be 8 bytes");
-
 struct UnmapBlockDescriptor {
   uint64_t logical_block_address;
   uint32_t blocks;
@@ -554,6 +577,17 @@ struct UnmapBlockDescriptor {
 } __PACKED;
 
 static_assert(sizeof(UnmapBlockDescriptor) == 16, "Unmap block decriptor must be 16 bytes");
+
+struct UnmapParameterListHeader {
+  uint16_t data_length;
+  uint16_t block_descriptor_data_length;
+  uint8_t reserved[4];
+
+  // Unmap block descriptors follow after 8 bytes.
+  UnmapBlockDescriptor block_descriptors[];
+} __PACKED;
+
+static_assert(sizeof(UnmapParameterListHeader) == 8, "Unmap parameter list header must be 8 bytes");
 
 struct WriteBufferCDB {
   Opcode opcode;
@@ -593,8 +627,13 @@ class Controller {
   // |disk_op|, |block_size_bytes|, and |is_write| specify optional data-out or data-in regions.
   // Command execution status is returned by invoking |disk_op|->Complete(status).
   // Typically used for IO commands where data may not reside in process memory.
+  // The |data| is used when there is an additional data buffer to pass. For example, an operation
+  // like TRIM(block_trim_t) does not have a data vmo, but the SCSI UNMAP command requires a data
+  // vmo to record the address and length of the block to be trimmed. In this case, the additional
+  // buffer is passed through |data| and the device driver creates and manages the data vmo.
   virtual void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                                   uint32_t block_size_bytes, DiskOp* disk_op) = 0;
+                                   uint32_t block_size_bytes, DiskOp* disk_op,
+                                   iovec data = {nullptr, 0}) = 0;
 
   // Test whether the target-lun is ready.
   zx_status_t TestUnitReady(uint8_t target, uint16_t lun);
@@ -607,7 +646,10 @@ class Controller {
 
   // Read Block Limits VPD Page (0xB0), if supported and return the max transfer size
   // (in blocks) supported by the target.
-  zx::result<uint32_t> InquiryMaxTransferBlocks(uint8_t target, uint16_t lun);
+  zx::result<VPDBlockLimits> InquiryBlockLimits(uint8_t target, uint16_t lun);
+
+  // Read Logical Block Provisioning VPD Page (0xB2), check that it supports the UNMAP command.
+  zx::result<bool> InquirySupportUnmapCommand(uint8_t target, uint16_t lun);
 
   // Return ModeSense6ParameterHeader for the specified lun.
   zx::result<ModeSense6ParameterHeader> ModeSense(uint8_t target, uint16_t lun);

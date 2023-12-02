@@ -57,7 +57,7 @@ class ScsiDevice : public virtio::Device, public scsi::Controller, public ddk::D
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp* disk_op) override;
+                           uint32_t block_size_bytes, scsi::DiskOp* disk_op, iovec data) override;
 
   const char* tag() const override { return "virtio-scsi"; }
 

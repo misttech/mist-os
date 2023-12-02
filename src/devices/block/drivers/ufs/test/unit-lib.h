@@ -34,8 +34,8 @@ class UfsTest : public zxtest::Test {
   // Map the data vmo to the address space and assign physical addresses. Currently, it only
   // supports 8KB vmo. So, we get two physical addresses. The return value is the physical address
   // of the pinned memory.
-  zx::result<> MapVmo(uint32_t option, zx::unowned_vmo &vmo, fzl::VmoMapper &mapper,
-                      uint64_t offset_vmo, uint64_t length);
+  zx::result<> MapVmo(zx::unowned_vmo &vmo, fzl::VmoMapper &mapper, uint64_t offset_vmo,
+                      uint64_t length);
 
   uint8_t GetSlotStateCount(SlotState slot_state);
 

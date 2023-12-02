@@ -68,6 +68,10 @@ class ScsiCommandProcessor {
       UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
       cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
 
+  static zx::result<std::vector<uint8_t>> DefaultUnmapHandler(
+      UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+      cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius);
+
   DEF_DEFAULT_HANDLER_BEGIN(scsi::Opcode, ScsiCommandHandler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::REQUEST_SENSE, DefaultRequestSenseHandler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::READ_10, DefaultRead10Handler)
@@ -77,6 +81,7 @@ class ScsiCommandProcessor {
   DEF_DEFAULT_HANDLER(scsi::Opcode::TEST_UNIT_READY, DefaultTestUnitReadyHandler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::INQUIRY, DefaultInquiryHandler)
   DEF_DEFAULT_HANDLER(scsi::Opcode::MODE_SENSE_6, DefaultModeSense6Handler)
+  DEF_DEFAULT_HANDLER(scsi::Opcode::UNMAP, DefaultUnmapHandler)
   DEF_DEFAULT_HANDLER_END()
 
  private:

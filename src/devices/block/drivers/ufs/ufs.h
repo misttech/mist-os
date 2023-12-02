@@ -61,6 +61,11 @@ struct IoCommand {
   uint32_t block_size_bytes;
   bool is_write;
 
+  // Currently, data_buffer is only used by the UNMAP command and has a maximum size of 24 byte.
+  uint8_t data_buffer[24];
+  uint8_t data_length;
+  zx::vmo data_vmo;
+
   list_node_t node;
 };
 
@@ -94,7 +99,7 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
   zx_status_t ExecuteCommandSync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
                                  iovec data) override;
   void ExecuteCommandAsync(uint8_t target, uint16_t lun, iovec cdb, bool is_write,
-                           uint32_t block_size_bytes, scsi::DiskOp *disk_op) override;
+                           uint32_t block_size_bytes, scsi::DiskOp *disk_op, iovec data) override;
 
   // TODO(fxbug.dev/124835): Implement inspector.
 
@@ -157,6 +162,8 @@ class Ufs : public scsi::Controller, public UfsDeviceType {
 
   zx_status_t EnableHostController();
   zx_status_t DisableHostController();
+
+  zx::result<> AllocatePages(zx::vmo &vmo, fzl::VmoMapper &mapper, size_t size);
 
   ddk::Pci pci_;
   fdf::MmioBuffer mmio_;

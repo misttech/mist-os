@@ -278,13 +278,45 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultTestUnitReadyHandl
 zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultInquiryHandler(
     UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
     cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
-  std::vector<uint8_t> data_buffer(sizeof(scsi::InquiryData));
+  ScsiCommandUpiu Inquiry_command(command_upiu);
+  scsi::InquiryCDB *scsi_cdb =
+      reinterpret_cast<scsi::InquiryCDB *>(Inquiry_command.GetData<CommandUpiuData>()->cdb);
 
-  auto *inquiry_data = reinterpret_cast<scsi::InquiryData *>(data_buffer.data());
+  std::vector<uint8_t> data_buffer;
+  if (!scsi_cdb->reserved_and_evpd) {
+    data_buffer.resize(sizeof(scsi::InquiryData));
+    auto *inquiry_data = reinterpret_cast<scsi::InquiryData *>(data_buffer.data());
 
-  std::strncpy(inquiry_data->t10_vendor_id, "Fuchsia", sizeof(inquiry_data->t10_vendor_id));
-  std::strncpy(inquiry_data->product_id, "ufs-mock-device", sizeof(inquiry_data->product_id));
-
+    std::strncpy(inquiry_data->t10_vendor_id, "Fuchsia", sizeof(inquiry_data->t10_vendor_id));
+    std::strncpy(inquiry_data->product_id, "ufs-mock-device", sizeof(inquiry_data->product_id));
+    std::strncpy(inquiry_data->product_revision, "1.00", sizeof(inquiry_data->product_revision));
+  } else {
+    if (scsi_cdb->page_code == scsi::InquiryCDB::kPageListVpdPageCode) {
+      data_buffer.resize(sizeof(scsi::VPDPageList));
+      auto *vpd_page_list = reinterpret_cast<scsi::VPDPageList *>(data_buffer.data());
+      vpd_page_list->peripheral_qualifier_device_type = 0;
+      vpd_page_list->page_code = scsi::InquiryCDB::kPageListVpdPageCode;
+      vpd_page_list->page_length = 2;
+      vpd_page_list->pages[0] = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+      vpd_page_list->pages[1] = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+    } else if (scsi_cdb->page_code == scsi::InquiryCDB::kBlockLimitsVpdPageCode) {
+      data_buffer.resize(sizeof(scsi::VPDBlockLimits));
+      auto *block_limits = reinterpret_cast<scsi::VPDBlockLimits *>(data_buffer.data());
+      block_limits->peripheral_qualifier_device_type = 0;
+      block_limits->page_code = scsi::InquiryCDB::kBlockLimitsVpdPageCode;
+      block_limits->maximum_unmap_lba_count = htobe32(UINT32_MAX);
+    } else if (scsi_cdb->page_code == scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode) {
+      data_buffer.resize(sizeof(scsi::VPDLogicalBlockProvisioning));
+      auto *provisioning =
+          reinterpret_cast<scsi::VPDLogicalBlockProvisioning *>(data_buffer.data());
+      provisioning->peripheral_qualifier_device_type = 0;
+      provisioning->page_code = scsi::InquiryCDB::kLogicalBlockProvisioningVpdPageCode;
+      provisioning->set_lbpu(true);
+      provisioning->set_provisioning_type(0x02);  // The logical unit is thin provisioned
+    } else {
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    }
+  }
   ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
 
   return zx::ok(std::move(data_buffer));
@@ -312,6 +344,41 @@ zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultModeSense6Handler(
   }
 
   ZX_DEBUG_ASSERT(command_upiu.header_flags_r());
+
+  return zx::ok(std::move(data_buffer));
+}
+
+zx::result<std::vector<uint8_t>> ScsiCommandProcessor::DefaultUnmapHandler(
+    UfsMockDevice &mock_device, CommandUpiuData &command_upiu, ResponseUpiuData &response_upiu,
+    cpp20::span<PhysicalRegionDescriptionTableEntry> &prdt_upius) {
+  uint8_t lun = command_upiu.header.lun;
+  ScsiCommandUpiu unmap_command(command_upiu);
+
+  constexpr uint32_t parameter_list_length =
+      sizeof(scsi::UnmapParameterListHeader) + sizeof(scsi::UnmapBlockDescriptor);
+
+  scsi::UnmapCDB *scsi_cdb =
+      reinterpret_cast<scsi::UnmapCDB *>(unmap_command.GetData<CommandUpiuData>()->cdb);
+  ZX_DEBUG_ASSERT(betoh16(scsi_cdb->parameter_list_length) == parameter_list_length);
+
+  std::vector<uint8_t> data_buffer(parameter_list_length);
+  ZX_DEBUG_ASSERT(command_upiu.header_flags_w());
+  if (auto status = CopyPhysicalRegionToBuffer(mock_device, data_buffer, prdt_upius);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  auto *header = reinterpret_cast<scsi::UnmapParameterListHeader *>(data_buffer.data());
+
+  size_t block_count = betoh32(header->block_descriptors[0].blocks);
+  off_t start_lba =
+      safemath::checked_cast<off_t>(betoh64(header->block_descriptors[0].logical_block_address));
+
+  uint8_t zero_buf[block_count * kMockBlockSize];
+  std::memset(zero_buf, 0, block_count * kMockBlockSize);
+  if (auto status = mock_device.BufferWrite(lun, zero_buf, block_count, start_lba);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
 
   return zx::ok(std::move(data_buffer));
 }
