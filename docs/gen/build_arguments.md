@@ -90,7 +90,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2087
+From //build/config/BUILDCONFIG.gn:2088
 
 ### allowed_test_device_types
 
@@ -839,7 +839,7 @@ From //build/input/BUILD.gn:9
 
 Whether to build product bundle version 1 related tools and artifacts.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //build/product.gni:7
 
@@ -3092,7 +3092,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1822
+From //build/config/BUILDCONFIG.gn:1823
 
 ### extra_vbmeta_descriptors
 
@@ -4206,7 +4206,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1627
+From //build/config/BUILDCONFIG.gn:1628
 
 ### legacy_base_driver_package_labels
 
@@ -7654,7 +7654,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2077
+From //build/config/BUILDCONFIG.gn:2078
 
 ### select_variant_canonical
 
@@ -7664,7 +7664,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2082
+From //build/config/BUILDCONFIG.gn:2083
 
 ### select_variant_shortcuts
 
@@ -7722,7 +7722,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1868
+From //build/config/BUILDCONFIG.gn:1869
 
 ### size_checker_input
 
@@ -8186,7 +8186,7 @@ for details and documentation for each field.
 }
 ```
 
-From //build/config/BUILDCONFIG.gn:107
+From //build/config/BUILDCONFIG.gn:105
 
 ### truncate_build_info_commit_date
 
@@ -8248,7 +8248,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1852
+From //build/config/BUILDCONFIG.gn:1853
 
 ### universe_package_labels
 
@@ -8971,7 +8971,7 @@ This allows testing for a Zircon-specific toolchain with:
 
 **Current value (from the default):** `false`
 
-From //build/config/BUILDCONFIG.gn:124
+From //build/config/BUILDCONFIG.gn:122
 
 ### zircon_tracelog
 
