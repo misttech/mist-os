@@ -107,6 +107,19 @@ impl BlockDeviceDirectory {
     }
 }
 
+impl BlockDeviceDirectory {
+    pub fn create_file_ops_entries() -> Vec<VecDirectoryEntry> {
+        // Start with the entries provided by the base directory and then add our own.
+        let mut entries = DeviceDirectory::create_file_ops_entries();
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::DIR,
+            name: b"queue".to_vec(),
+            inode: None,
+        });
+        entries
+    }
+}
+
 impl SysFsOps for BlockDeviceDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.base_dir.kobject()
@@ -122,14 +135,7 @@ impl FsNodeOps for BlockDeviceDirectory {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        // Start with the entries provided by the base directory and then add our own.
-        let mut entries = DeviceDirectory::create_file_ops_entries();
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::DIR,
-            name: b"queue".to_vec(),
-            inode: None,
-        });
-        Ok(VecDirectory::new_file(entries))
+        Ok(VecDirectory::new_file(Self::create_file_ops_entries()))
     }
 
     fn lookup(

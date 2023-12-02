@@ -9,7 +9,7 @@ use crate::{
             KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
         },
         sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
-        FileOps, FsNode, FsStr,
+        FileOps, FsNode, FsNodeOps, FsStr,
     },
     logging::log_error,
     task::CurrentTask,
@@ -26,7 +26,7 @@ use starnix_lock::{MappedMutexGuard, Mutex, MutexGuard, RwLock};
 use std::{
     collections::btree_map::{BTreeMap, Entry},
     marker::{Send, Sync},
-    sync::Arc,
+    sync::{Arc, Weak},
 };
 
 use dyn_clone::{clone_trait_object, DynClone};
@@ -249,18 +249,29 @@ impl DeviceRegistry {
         current_task: &CurrentTask,
         dev_attr: KObjectDeviceAttribute,
     ) -> KObjectHandle {
-        let kobj_device = match dev_attr.device.mode {
-            DeviceMode::Char => dev_attr.class.get_or_create_child(
-                &dev_attr.name,
-                KType::Device(dev_attr.device.clone()),
-                DeviceDirectory::new,
-            ),
-            DeviceMode::Block => dev_attr.class.get_or_create_child(
-                &dev_attr.name,
-                KType::Device(dev_attr.device.clone()),
-                BlockDeviceDirectory::new,
-            ),
-        };
+        match dev_attr.device.mode {
+            DeviceMode::Char => {
+                self.add_device_with_directory(current_task, dev_attr, DeviceDirectory::new)
+            }
+            DeviceMode::Block => {
+                self.add_device_with_directory(current_task, dev_attr, BlockDeviceDirectory::new)
+            }
+        }
+    }
+
+    pub fn add_device_with_directory<F, N>(
+        &self,
+        current_task: &CurrentTask,
+        dev_attr: KObjectDeviceAttribute,
+        create_fs_node_ops: F,
+    ) -> KObjectHandle
+    where
+        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
+        N: FsNodeOps,
+    {
+        let ktype = KType::Device(dev_attr.device.clone());
+        let kobj_device =
+            dev_attr.class.get_or_create_child(&dev_attr.name, ktype, create_fs_node_ops);
         self.class_subsystem_kobject
             .get_child(&dev_attr.class.name())
             .expect("no associated collection exists")

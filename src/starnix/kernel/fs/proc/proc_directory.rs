@@ -17,11 +17,11 @@ use crate::{
         SymlinkTarget,
     },
     logging::{log_error, not_implemented},
-    task::{CurrentTask, EventHandler, Kernel, TaskStateCode, WaitCanceler, Waiter},
+    task::{CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter},
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
-use once_cell::sync::{Lazy, OnceCell};
+use once_cell::sync::Lazy;
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
     pid_t, time::duration_to_scheduler_clock,
@@ -49,8 +49,6 @@ impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
     pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> Arc<ProcDirectory> {
         let kernel = current_task.kernel();
-        // TODO: Move somewhere where it can be shared with other consumers.
-        let kernel_stats = Arc::new(KernelStatsStore::default());
 
         let nodes = btreemap! {
             &b"cpuinfo"[..] => fs.create_node(current_task, CpuinfoFile::new_node(), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
@@ -61,7 +59,7 @@ impl ProcDirectory {
             &b"self"[..] => SelfSymlink::new_node(current_task, fs),
             &b"thread-self"[..] => ThreadSelfSymlink::new_node(current_task, fs),
             &b"meminfo"[..] =>
-                fs.create_node(current_task, MeminfoFile::new_node(&kernel_stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+                fs.create_node(current_task, MeminfoFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             // Fake kmsg as being empty.
             &b"kmsg"[..] =>
                 fs.create_node(current_task, SimpleFileNode::new(|| Ok(ProcKmsgFile)), FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root())),
@@ -69,12 +67,12 @@ impl ProcDirectory {
             // File must exist to pass the CgroupsAvailable check, which is a little bit optional
             // for init but not optional for a lot of the system!
             &b"cgroups"[..] => fs.create_node(current_task, BytesFile::new_node(vec![]), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
-            &b"stat"[..] =>  fs.create_node(current_task, StatFile::new_node(&kernel_stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+            &b"stat"[..] =>  fs.create_node(current_task, StatFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"sys"[..] => sysctl_directory(current_task, fs),
             &b"pressure"[..] => pressure_directory(current_task, fs),
             &b"net"[..] => net_directory(current_task, fs),
             &b"uptime"[..] =>
-                fs.create_node(current_task, UptimeFile::new_node(&kernel_stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
+                fs.create_node(current_task, UptimeFile::new_node(&kernel.stats), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
             &b"loadavg"[..] =>
                 fs.create_node(current_task, LoadavgFile::new_node(kernel), FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root())),
         };
@@ -350,18 +348,6 @@ impl FileOps for PressureFile {
     }
 }
 
-#[derive(Default)]
-struct KernelStatsStore(OnceCell<fidl_fuchsia_kernel::StatsSynchronousProxy>);
-
-impl KernelStatsStore {
-    pub fn get(&self) -> &fidl_fuchsia_kernel::StatsSynchronousProxy {
-        self.0.get_or_init(|| {
-            connect_to_protocol_sync::<fidl_fuchsia_kernel::StatsMarker>()
-                .expect("Failed to connect to fuchsia.kernel.Stats.")
-        })
-    }
-}
-
 struct SysInfo {
     board_name: String,
 }
@@ -419,10 +405,10 @@ impl DynamicFileSource for CpuinfoFile {
 
 #[derive(Clone)]
 struct MeminfoFile {
-    kernel_stats: Arc<KernelStatsStore>,
+    kernel_stats: Arc<KernelStats>,
 }
 impl MeminfoFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
         DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
     }
 }
@@ -449,11 +435,11 @@ impl DynamicFileSource for MeminfoFile {
 
 #[derive(Clone)]
 struct UptimeFile {
-    kernel_stats: Arc<KernelStatsStore>,
+    kernel_stats: Arc<KernelStats>,
 }
 
 impl UptimeFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
         DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
     }
 }
@@ -477,10 +463,10 @@ impl DynamicFileSource for UptimeFile {
 
 #[derive(Clone)]
 struct StatFile {
-    kernel_stats: Arc<KernelStatsStore>,
+    kernel_stats: Arc<KernelStats>,
 }
 impl StatFile {
-    pub fn new_node(kernel_stats: &Arc<KernelStatsStore>) -> impl FsNodeOps {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
         DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
     }
 }

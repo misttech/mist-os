@@ -22,7 +22,8 @@ use crate::{
     power::PowerManager,
     task::{
         AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, IpTables,
-        KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace, UtsNamespaceHandle,
+        KernelStats, KernelThreads, NetstackDevices, PidTable, StopState, UtsNamespace,
+        UtsNamespaceHandle,
     },
     vdso::vdso_loader::Vdso,
 };
@@ -198,6 +199,8 @@ pub struct Kernel {
     // The Fuchsia build version returned by `fuchsia.buildinfo.Provider`.
     pub build_version: OnceCell<String>,
 
+    pub stats: Arc<KernelStats>,
+
     /// Resource limits that are exposed, for example, via sysctl.
     pub system_limits: SystemLimits,
 
@@ -324,6 +327,7 @@ impl Kernel {
             system_limits: SystemLimits::default(),
             ptrace_scope: AtomicU8::new(0),
             build_version: OnceCell::new(),
+            stats: Arc::new(KernelStats::default()),
             delayed_releaser: Default::default(),
             profile_provider,
         });

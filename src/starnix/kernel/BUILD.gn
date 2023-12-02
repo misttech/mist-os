@@ -374,6 +374,7 @@ rustc_binary("starnix_kernel_bin") {
     "task/interval_timer.rs",
     "task/iptables.rs",
     "task/kernel.rs",
+    "task/kernel_stats.rs",
     "task/kernel_threads.rs",
     "task/mod.rs",
     "task/net.rs",

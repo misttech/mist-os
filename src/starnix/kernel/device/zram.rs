@@ -4,10 +4,26 @@
 
 use crate::{
     device::{simple_device_ops, DeviceMode},
-    fs::{fileops_impl_dataless, fileops_impl_seekless, kobject::KObjectDeviceAttribute, FileOps},
-    task::CurrentTask,
+    fs::{
+        fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
+        kobject::{KObject, KObjectDeviceAttribute},
+        sysfs::BlockDeviceDirectory,
+        DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileOps, FsNode,
+        FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    },
+    logging::log_error,
+    task::{CurrentTask, KernelStats},
 };
-use starnix_uapi::device_type::{DeviceType, ZRAM_MAJOR};
+use fuchsia_zircon as zx;
+use starnix_uapi::{
+    auth::FsCred,
+    device_type::{DeviceType, ZRAM_MAJOR},
+    errno,
+    errors::Errno,
+    file_mode::mode,
+    open_flags::OpenFlags,
+};
+use std::sync::{Arc, Weak};
 
 #[derive(Default)]
 pub struct DevZram;
@@ -17,12 +33,101 @@ impl FileOps for DevZram {
     fileops_impl_dataless!();
 }
 
+pub struct ZramDeviceDirectory {
+    base_dir: BlockDeviceDirectory,
+}
+
+impl ZramDeviceDirectory {
+    pub fn new(kobject: Weak<KObject>) -> Self {
+        Self { base_dir: BlockDeviceDirectory::new(kobject) }
+    }
+}
+
+impl FsNodeOps for ZramDeviceDirectory {
+    fs_node_impl_dir_readonly!();
+
+    fn create_file_ops(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        let mut entries = BlockDeviceDirectory::create_file_ops_entries();
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::REG,
+            name: b"mm_stat".to_vec(),
+            inode: None,
+        });
+        Ok(VecDirectory::new_file(entries))
+    }
+
+    fn lookup(
+        &self,
+        node: &FsNode,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<FsNodeHandle, Errno> {
+        match name {
+            b"mm_stat" => Ok(node.fs().create_node(
+                current_task,
+                MmStatFile::new_node(&current_task.kernel().stats),
+                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            )),
+            _ => self.base_dir.lookup(node, current_task, name),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct MmStatFile {
+    kernel_stats: Arc<KernelStats>,
+}
+impl MmStatFile {
+    pub fn new_node(kernel_stats: &Arc<KernelStats>) -> impl FsNodeOps {
+        DynamicFile::new_node(Self { kernel_stats: kernel_stats.clone() })
+    }
+}
+impl DynamicFileSource for MmStatFile {
+    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        let stats =
+            self.kernel_stats.get().get_memory_stats_compression(zx::Time::INFINITE).map_err(
+                |e| {
+                    log_error!("FIDL error getting memory compression stats: {e}");
+                    errno!(EIO)
+                },
+            )?;
+
+        let compressed_storage_bytes = stats.compressed_storage_bytes.unwrap_or_default();
+        let compressed_fragmentation_bytes =
+            stats.compressed_fragmentation_bytes.unwrap_or_default();
+
+        let orig_data_size = stats.uncompressed_storage_bytes.unwrap_or_default();
+        // This value isn't entirely correct because we're still counting metadata and other
+        // non-fragmentation usage.
+        let compr_data_size = compressed_storage_bytes - compressed_fragmentation_bytes;
+        let mem_used_total = compressed_storage_bytes;
+        // The remaining values are not yet available from Zircon.
+        let mem_limit = 0;
+        let mem_used_max = 0;
+        let same_pages = 0;
+        let pages_compacted = 0;
+        let huge_pages = 0;
+
+        writeln!(sink, "{orig_data_size} {compr_data_size} {mem_used_total} {mem_limit} {mem_used_max} {same_pages} {pages_compacted} {huge_pages}")?;
+        Ok(())
+    }
+}
+
 pub fn zram_device_init(system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
     let virtual_block_class = registry.add_class(b"block", registry.virtual_bus());
-    registry.add_and_register_device(
+    registry
+        .register_device(ZRAM_MAJOR, 0, 1, simple_device_ops::<DevZram>, DeviceMode::Block)
+        .expect("Failed to register zram device.");
+
+    registry.add_device_with_directory(
         system_task,
         KObjectDeviceAttribute::new(
             virtual_block_class,
@@ -31,6 +136,6 @@ pub fn zram_device_init(system_task: &CurrentTask) {
             DeviceType::new(ZRAM_MAJOR, 0),
             DeviceMode::Block,
         ),
-        simple_device_ops::<DevZram>,
+        ZramDeviceDirectory::new,
     );
 }
