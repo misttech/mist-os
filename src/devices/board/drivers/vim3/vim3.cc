@@ -83,6 +83,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = EthInit()) != ZX_OK) {
+    zxlogf(ERROR, "EthInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   if ((status = EmmcInit()) != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed: %d\n", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -117,11 +122,6 @@ int Vim3::Thread() {
   }
   if ((status = RegistersInit()) != ZX_OK) {
     zxlogf(ERROR, "RegistersInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = EthInit()) != ZX_OK) {
-    zxlogf(ERROR, "EthInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

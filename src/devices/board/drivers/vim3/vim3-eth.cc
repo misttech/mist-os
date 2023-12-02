@@ -17,6 +17,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/designware/platform/cpp/bind.h>
 #include <bind/fuchsia/ethernet/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <soc/aml-a311d/a311d-gpio.h>
 #include <soc/aml-a311d/a311d-hw.h>
@@ -130,8 +131,18 @@ static const zx_bind_inst_t gpio_int_match[] = {
 static const device_fragment_part_t gpio_int_fragment[] = {
     {std::size(gpio_int_match), gpio_int_match},
 };
+
+static const zx_bind_inst_t gpio_init_match[] = {
+    BI_MATCH_IF(EQ, BIND_INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+static const device_fragment_part_t gpio_init_fragment[] = {
+    {std::size(gpio_init_match), gpio_init_match},
+};
+
 static const device_fragment_t eth_fragments[] = {
     {"gpio-int", std::size(gpio_int_fragment), gpio_int_fragment},
+    {"gpio-init", std::size(gpio_init_fragment), gpio_init_fragment},
 };
 
 const std::vector<fuchsia_driver_framework::BindRule> kEthBoardRules = {
@@ -154,37 +165,37 @@ const std::vector<fuchsia_driver_framework::ParentSpec> kEthBoardParents = {
 
 zx_status_t Vim3::EthInit() {
   // setup pinmux for RGMII connections
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(0), A311D_GPIOZ_0_ETH_MDIO_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(1), A311D_GPIOZ_1_ETH_MDC_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(2), A311D_GPIOZ_2_ETH_RX_CLK_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(3), A311D_GPIOZ_3_ETH_RX_DV_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(4), A311D_GPIOZ_4_ETH_RXD0_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(5), A311D_GPIOZ_5_ETH_RXD1_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(6), A311D_GPIOZ_6_ETH_RXD2_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(7), A311D_GPIOZ_7_ETH_RXD3_FN);
+  gpio_init_steps_.push_back({A311D_GPIOZ(0), GpioSetAltFunction(A311D_GPIOZ_0_ETH_MDIO_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(1), GpioSetAltFunction(A311D_GPIOZ_1_ETH_MDC_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(2), GpioSetAltFunction(A311D_GPIOZ_2_ETH_RX_CLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(3), GpioSetAltFunction(A311D_GPIOZ_3_ETH_RX_DV_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(4), GpioSetAltFunction(A311D_GPIOZ_4_ETH_RXD0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(5), GpioSetAltFunction(A311D_GPIOZ_5_ETH_RXD1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(6), GpioSetAltFunction(A311D_GPIOZ_6_ETH_RXD2_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(7), GpioSetAltFunction(A311D_GPIOZ_7_ETH_RXD3_FN)});
 
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(8), A311D_GPIOZ_8_ETH_TX_CLK_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(9), A311D_GPIOZ_9_ETH_TX_EN_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(10), A311D_GPIOZ_10_ETH_TXD0_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(11), A311D_GPIOZ_11_ETH_TXD1_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(12), A311D_GPIOZ_12_ETH_TXD2_FN);
-  gpio_impl_.SetAltFunction(A311D_GPIOZ(13), A311D_GPIOZ_13_ETH_TXD3_FN);
+  gpio_init_steps_.push_back({A311D_GPIOZ(8), GpioSetAltFunction(A311D_GPIOZ_8_ETH_TX_CLK_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(9), GpioSetAltFunction(A311D_GPIOZ_9_ETH_TX_EN_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(10), GpioSetAltFunction(A311D_GPIOZ_10_ETH_TXD0_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(11), GpioSetAltFunction(A311D_GPIOZ_11_ETH_TXD1_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(12), GpioSetAltFunction(A311D_GPIOZ_12_ETH_TXD2_FN)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(13), GpioSetAltFunction(A311D_GPIOZ_13_ETH_TXD3_FN)});
 
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(0), 2500, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(1), 2500, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(2), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(3), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(4), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(5), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(6), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(7), 3000, nullptr);
+  gpio_init_steps_.push_back({A311D_GPIOZ(0), GpioSetDriveStrength(2500)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(1), GpioSetDriveStrength(2500)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(2), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(3), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(4), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(5), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(6), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(7), GpioSetDriveStrength(3000)});
 
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(8), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(9), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(10), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(11), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(12), 3000, nullptr);
-  gpio_impl_.SetDriveStrength(A311D_GPIOZ(13), 3000, nullptr);
+  gpio_init_steps_.push_back({A311D_GPIOZ(8), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(9), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(10), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(11), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(12), GpioSetDriveStrength(3000)});
+  gpio_init_steps_.push_back({A311D_GPIOZ(13), GpioSetDriveStrength(3000)});
 
   // Add a composite device for ethernet board in a new devhost.
   fidl::Arena<> fidl_arena;
