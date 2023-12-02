@@ -42,15 +42,33 @@ zx_status_t AmlUartV1::Create(void* ctx, zx_device_t* parent) {
   }
 
   fbl::AllocChecker ac;
-  auto* uart = new (&ac) AmlUartV1(parent, std::move(pdev), info, *std::move(mmio));
+  auto* uart = new (&ac) AmlUartV1(parent);
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
-  return uart->Init();
+
+  return uart->Init(std::move(pdev), info, *std::move(mmio));
+}
+
+void AmlUartV1::DdkUnbind(ddk::UnbindTxn txn) {
+  unbind_txn_.emplace(std::move(txn));
+
+  if (irq_dispatcher_.has_value()) {
+    // The shutdown is async. When it is done, the dispatcher's shutdown callback will complete
+    // the unbind txn.
+    irq_dispatcher_->ShutdownAsync();
+  } else {
+    // No inner aml_uart, just reply to the unbind txn.
+    unbind_txn_->Reply();
+    unbind_txn_.reset();
+  }
 }
 
 void AmlUartV1::DdkRelease() {
-  aml_uart_.SerialImplAsyncEnable(false);
+  if (aml_uart_.has_value()) {
+    aml_uart_->SerialImplAsyncEnable(false);
+  }
+
   delete this;
 }
 
@@ -59,22 +77,43 @@ zx_status_t AmlUartV1::DdkGetProtocol(uint32_t proto_id, void* out) {
     return ZX_ERR_PROTOCOL_NOT_SUPPORTED;
   }
 
+  if (!aml_uart_.has_value()) {
+    return ZX_ERR_NOT_FOUND;
+  }
+
   serial_impl_async_protocol_t* hci_proto = static_cast<serial_impl_async_protocol_t*>(out);
-  hci_proto->ops = static_cast<const serial_impl_async_protocol_ops_t*>(aml_uart_.get_ops());
+  hci_proto->ops = static_cast<const serial_impl_async_protocol_ops_t*>(aml_uart_->get_ops());
   hci_proto->ctx = &aml_uart_;
   return ZX_OK;
 }
 
-zx_status_t AmlUartV1::Init() {
+zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev, const serial_port_info_t& serial_port_info,
+                            fdf::MmioBuffer mmio) {
+  zx::result irq_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
+        if (unbind_txn_) {
+          unbind_txn_->Reply();
+          unbind_txn_.reset();
+        }
+      });
+  if (irq_dispatcher_result.is_error()) {
+    zxlogf(ERROR, "%s: Failed to create irq dispatcher: %s", __func__,
+           irq_dispatcher_result.status_string());
+    return irq_dispatcher_result.error_value();
+  }
+
+  irq_dispatcher_.emplace(std::move(irq_dispatcher_result.value()));
+  aml_uart_.emplace(std::move(pdev), serial_port_info, std::move(mmio), irq_dispatcher_->borrow());
+
   auto cleanup = fit::defer([this]() { DdkRelease(); });
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;
   constexpr uint32_t kDefaultConfig = SERIAL_DATA_BITS_8 | SERIAL_STOP_BITS_1 | SERIAL_PARITY_NONE;
-  aml_uart_.SerialImplAsyncConfig(kDefaultBaudRate, kDefaultConfig);
+  aml_uart_->SerialImplAsyncConfig(kDefaultBaudRate, kDefaultConfig);
   zx_device_prop_t props[] = {
       {BIND_PROTOCOL, 0, ZX_PROTOCOL_SERIAL_IMPL_ASYNC},
-      {BIND_SERIAL_CLASS, 0, aml_uart_.serial_port_info().serial_class},
+      {BIND_SERIAL_CLASS, 0, aml_uart_->serial_port_info().serial_class},
   };
   auto status = DdkAdd(ddk::DeviceAddArgs("aml-uart")
                            .set_props(props)

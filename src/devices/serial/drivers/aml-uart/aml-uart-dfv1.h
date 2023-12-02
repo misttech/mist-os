@@ -12,30 +12,32 @@
 namespace serial {
 
 class AmlUartV1;
-using DeviceType = ddk::Device<AmlUartV1, ddk::GetProtocolable>;
+using DeviceType = ddk::Device<AmlUartV1, ddk::GetProtocolable, ddk::Unbindable>;
 
 class AmlUartV1 : public DeviceType {
  public:
   // Spawns device node.
   static zx_status_t Create(void* ctx, zx_device_t* parent);
 
-  explicit AmlUartV1(zx_device_t* parent, ddk::PDevFidl pdev,
-                     const serial_port_info_t& serial_port_info, fdf::MmioBuffer mmio)
-      : DeviceType(parent), aml_uart_(std::move(pdev), serial_port_info, std::move(mmio)) {}
+  explicit AmlUartV1(zx_device_t* parent) : DeviceType(parent) {}
 
   // Device protocol implementation.
+  void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
   // ddk::GetProtocolable
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
 
-  zx_status_t Init();
+  zx_status_t Init(ddk::PDevFidl pdev, const serial_port_info_t& serial_port_info,
+                   fdf::MmioBuffer mmio);
 
   // Used by the unit test to access the device.
-  AmlUart& aml_uart_for_testing() { return aml_uart_; }
+  AmlUart& aml_uart_for_testing() { return aml_uart_.value(); }
 
  private:
-  AmlUart aml_uart_;
+  std::optional<fdf::SynchronizedDispatcher> irq_dispatcher_;
+  std::optional<AmlUart> aml_uart_;
+  std::optional<ddk::UnbindTxn> unbind_txn_;
 };
 
 }  // namespace serial

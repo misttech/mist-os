@@ -46,13 +46,18 @@ class AmlUartHarness : public zxtest::Test {
     });
     ASSERT_NO_FATAL_FAILURE();
 
-    auto uart = std::make_unique<serial::AmlUartV1>(
-        fake_parent_.get(), ddk::PDevFidl(std::move(pdev->client)), kSerialInfo, state_.GetMmio());
-    zx_status_t status = uart->Init();
+    auto uart = std::make_unique<serial::AmlUartV1>(fake_parent_.get());
+    zx_status_t status =
+        uart->Init(ddk::PDevFidl(std::move(pdev->client)), kSerialInfo, state_.GetMmio());
     ASSERT_OK(status);
     device_ = uart.get();
     // The AmlUart* is now owned by the fake_ddk.
     uart.release();
+  }
+
+  void TearDown() override {
+    device_async_remove(device_->zxdev());
+    ASSERT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));
   }
 
   serial::AmlUart& Device() { return device_->aml_uart_for_testing(); }

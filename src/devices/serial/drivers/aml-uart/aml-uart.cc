@@ -50,23 +50,6 @@ uint32_t AmlUart::ReadStateAndNotify() {
   return state;
 }
 
-int AmlUart::IrqThread() {
-  zxlogf(INFO, "%s start", __func__);
-
-  while (1) {
-    zx_status_t status;
-    status = irq_.wait(nullptr);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: irq.wait() got %d", __func__, status);
-      break;
-    }
-    // This will call the notify_cb if the serial state has changed.
-    ReadStateAndNotify();
-  }
-
-  return 0;
-}
-
 zx_status_t AmlUart::SerialImplAsyncGetInfo(serial_port_info_t* info) {
   memcpy(info, &serial_port_info_, sizeof(*info));
   return ZX_OK;
@@ -232,15 +215,10 @@ zx_status_t AmlUart::SerialImplAsyncEnable(bool enable) {
 
     EnableLocked(true);
 
-    auto start_thread = [](void* arg) { return static_cast<AmlUart*>(arg)->IrqThread(); };
-    int rc = thrd_create_with_name(&irq_thread_, start_thread, this, "aml_uart_irq_thread");
-    if (rc != thrd_success) {
-      EnableLocked(false);
-      return thrd_status_to_zx_status(rc);
-    }
+    irq_handler_.set_object(irq_.get());
+    irq_handler_.Begin(irq_dispatcher_->async_dispatcher());
   } else if (!enable && enabled_) {
-    irq_.destroy();
-    thrd_join(irq_thread_, nullptr);
+    irq_handler_.Cancel();
     EnableLocked(false);
   }
 
@@ -373,6 +351,17 @@ void AmlUart::SerialImplAsyncWriteAsync(const uint8_t* buf, size_t length,
   write_pending_ = true;
   lock.release();
   HandleTX();
+}
+
+void AmlUart::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                        const zx_packet_interrupt_t* interrupt) {
+  if (status != ZX_OK) {
+    return;
+  }
+
+  // This will call the notify_cb if the serial state has changed.
+  ReadStateAndNotify();
+  irq_.ack();
 }
 
 }  // namespace serial

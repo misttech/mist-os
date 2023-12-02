@@ -40,7 +40,6 @@ config("dfv1") {
 source_set("aml-uart-source") {
   configs += [
     ":dfv1",
-    "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
   sources = [
@@ -52,6 +51,7 @@ source_set("aml-uart-source") {
   ]
   deps = [
     "//sdk/lib/fit",
+    "//src/devices/bin/driver_runtime",
     "//src/devices/lib/driver",
     "//src/lib/ddk",
   ]
@@ -60,6 +60,7 @@ source_set("aml-uart-source") {
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
     "//src/lib/ddktl",
+    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zircon-internal",
@@ -88,10 +89,7 @@ fuchsia_driver_package("package") {
 
 test("aml-uart-test-bin") {
   output_name = "aml-uart-test"
-  configs += [
-    ":dfv1",
-    "//build/config:all_source",
-  ]
+  configs += [ ":dfv1" ]
   sources = [
     "tests/aml-uart-dfv1-test.cc",
     "tests/device_state.h",
@@ -125,10 +123,7 @@ fuchsia_unittest_package("aml-uart-test") {
 # -----
 
 source_set("aml-uart-dfv2-source") {
-  configs += [
-    "//build/config:all_source",
-    "//build/config/fuchsia:enable_zircon_asserts",
-  ]
+  configs += [ "//build/config/fuchsia:enable_zircon_asserts" ]
   sources = [
     "aml-uart-dfv2.cc",
     "aml-uart-dfv2.h",
@@ -146,6 +141,7 @@ source_set("aml-uart-dfv2-source") {
     "//sdk/lib/driver/component/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
+    "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zircon-internal",
@@ -174,7 +170,6 @@ fuchsia_driver_package("package-dfv2") {
 
 test("aml-uart-dfv2-test-bin") {
   output_name = "aml-uart-dfv2-test"
-  configs += [ "//build/config:all_source" ]
   sources = [
     "tests/aml-uart-dfv2-test.cc",
     "tests/device_state.h",

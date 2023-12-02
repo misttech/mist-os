@@ -41,13 +41,21 @@ void AmlUartV2::Start(fdf::StartCompleter completer) {
 }
 
 void AmlUartV2::PrepareStop(fdf::PrepareStopCompleter completer) {
+  prepare_stop_completer_.emplace(std::move(completer));
+
   if (aml_uart_.has_value()) {
     aml_uart_->SerialImplAsyncEnable(false);
-  } else {
-    FDF_LOG(WARNING, "AmlUartV2::PrepareStop - no aml_uart_ instance available.");
   }
 
-  completer(zx::ok());
+  if (irq_dispatcher_.has_value()) {
+    // The shutdown is async. When it is done, the dispatcher's shutdown callback will complete
+    // the PrepareStopCompleter.
+    irq_dispatcher_->ShutdownAsync();
+  } else {
+    // No irq_dispatcher_, just reply to the PrepareStopCompleter.
+    prepare_stop_completer_.value()(zx::ok());
+    prepare_stop_completer_.reset();
+  }
 }
 
 AmlUart& AmlUartV2::aml_uart_for_testing() {
@@ -126,7 +134,22 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
     return;
   }
 
-  aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()));
+  zx::result irq_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create({}, "aml_uart_irq", [this](fdf_dispatcher_t*) {
+        if (prepare_stop_completer_.has_value()) {
+          prepare_stop_completer_.value()(zx::ok());
+          prepare_stop_completer_.reset();
+        }
+      });
+  if (irq_dispatcher_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create irq dispatcher: %s", irq_dispatcher_result.status_string());
+    CompleteStart(irq_dispatcher_result.take_error());
+    return;
+  }
+
+  irq_dispatcher_.emplace(std::move(irq_dispatcher_result.value()));
+  aml_uart_.emplace(std::move(pdev), serial_port_info_, std::move(mmio.value()),
+                    irq_dispatcher_->borrow());
 
   // Default configuration for the case that serial_impl_config is not called.
   constexpr uint32_t kDefaultBaudRate = 115200;
