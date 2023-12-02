@@ -17,7 +17,7 @@ source_set("mocks") {
 
   deps = [
     "//sdk/lib/sys/cpp/testing:unit",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//src/ui/input/lib/injector",
   ]
 }

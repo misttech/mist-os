@@ -36,7 +36,7 @@ source_set("simple_present") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp:cpp",
-    "//sdk/lib/syslog/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
   ]
 }
 

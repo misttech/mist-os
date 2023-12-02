@@ -46,38 +46,6 @@ sdk_source_set("cpp") {
   public_configs = [ "//sdk/config" ]
 }
 
-# Needed to export macros without relying on a specific backend
-# otherwise libraries can't include macros.h
-sdk_source_set("cpp-macros") {
-  # TODO(fxbug.dev/59937): Remove when Mac links OK against this.
-  if ((current_toolchain == "//build/toolchain:host_x64" && host_os == "mac") ||
-      (current_toolchain == "//build/toolchain:host_arm64" &&
-       host_os == "mac")) {
-    build_as_static = true
-  }
-
-  # Keep internal for now until the API stabilizes.
-  category = "internal"
-
-  sdk_name = "syslog_cpp"
-
-  include_base = "//sdk"
-
-  sources = [
-    "log_level.h",
-    "log_settings.h",
-    "logging_backend.h",
-    "macros.h",
-  ]
-
-  public_deps = [
-    "//sdk/lib/fit-promise",
-    "//sdk/lib/stdcompat",
-  ]
-
-  public_configs = [ "//sdk/config" ]
-}
-
 sdk_source_set("backend_host") {
   # TODO(fxbug.dev/59937): Remove when Mac links OK against this.
   if ((current_toolchain == "//build/toolchain:host_x64" && host_os == "mac") ||

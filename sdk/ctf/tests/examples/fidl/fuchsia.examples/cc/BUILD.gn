@@ -19,7 +19,7 @@ executable("bin") {
     "//sdk/ctf/tests/examples/fidl/fuchsia.examples/testing/fidl:test.example_hlcpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zxtest",

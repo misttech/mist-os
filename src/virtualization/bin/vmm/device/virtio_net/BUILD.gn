@@ -23,7 +23,7 @@ static_library("guest-ethernet") {
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_hlcpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//src/connectivity/network/drivers/network-device/device",
     "//src/connectivity/network/lib/net_interfaces/cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

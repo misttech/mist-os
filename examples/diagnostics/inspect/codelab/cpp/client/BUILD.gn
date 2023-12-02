@@ -14,7 +14,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/zx",
   ]
 }

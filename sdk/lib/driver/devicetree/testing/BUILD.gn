@@ -10,7 +10,7 @@ source_set("board-test-helper") {
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver_test_realm/realm_builder/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

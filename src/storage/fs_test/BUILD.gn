@@ -117,7 +117,7 @@ test("corrupt_tests") {
   deps = [
     ":fs_test",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/fbl",
   ]
@@ -437,7 +437,7 @@ static_library("crypt_service") {
   deps = [
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
     "//zircon/system/ulib/zx",
   ]

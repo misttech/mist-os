@@ -16,7 +16,7 @@ shared_library("agent") {
     "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/fbl",
   ]
 }
@@ -34,7 +34,7 @@ static_library("device") {
     "//sdk/fidl/fuchsia.tpm:fuchsia.tpm_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/fbl",
   ]
 }

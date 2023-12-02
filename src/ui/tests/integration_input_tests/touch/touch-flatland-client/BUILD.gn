@@ -28,7 +28,7 @@ executable("touch-flatland-client-binary") {
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/cpp",
-    "//sdk/lib/syslog/cpp:cpp-macros",
+    "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/ui/flatland-frame-scheduling:simple_present",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
