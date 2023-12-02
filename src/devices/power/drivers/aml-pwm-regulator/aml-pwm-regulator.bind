@@ -4,6 +4,7 @@
 
 composite aml_pwm_regulator;
 
+using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.pwm;
 
@@ -22,4 +23,8 @@ node "pdev" {
     fuchsia.BIND_PLATFORM_DEV_VID == fuchsia.platform.BIND_PLATFORM_DEV_VID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.platform.BIND_PLATFORM_DEV_DID.PWM_VREG;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

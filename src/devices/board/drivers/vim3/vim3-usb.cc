@@ -16,6 +16,7 @@
 #include <cstring>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
@@ -128,9 +129,24 @@ const std::vector<fuchsia_driver_framework::NodeProperty> kResetRegisterProperti
                       bind_fuchsia_register::BIND_FIDL_PROTOCOL_DEVICE),
     fdf::MakeProperty(bind_fuchsia::REGISTER_ID, aml_registers::REGISTER_USB_PHY_V2_RESET)};
 
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {
-    fuchsia_driver_framework::ParentSpec{
-        {.bind_rules = kResetRegisterRules, .properties = kResetRegisterProperties}}};
+    fuchsia_driver_framework::ParentSpec{{
+        .bind_rules = kResetRegisterRules,
+        .properties = kResetRegisterProperties,
+    }},
+    fuchsia_driver_framework::ParentSpec{{
+        .bind_rules = kGpioInitRules,
+        .properties = kGpioInitProperties,
+    }},
+};
 
 static const std::vector<fpbus::Mmio> dwc2_mmios{
     {{
@@ -346,7 +362,7 @@ zx_status_t Vim3::UsbInit() {
   }
 
   // Power on USB.
-  gpio_impl_.ConfigOut(VIM3_USB_PWR, 1);
+  gpio_init_steps_.push_back({VIM3_USB_PWR, GpioConfigOut(1)});
 
   // Create USB Phy Device
   fidl::Arena<> fidl_arena;

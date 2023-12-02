@@ -5,6 +5,7 @@
 composite vim3_usb_phy;
 
 using fuchsia.amlogic.platform;
+using fuchsia.gpio;
 using fuchsia.khadas.platform;
 using fuchsia.platform;
 using fuchsia.register;
@@ -20,4 +21,8 @@ primary node "pdev" {
 node "register-reset" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.register.BIND_FIDL_PROTOCOL.DEVICE;
   fuchsia.BIND_REGISTER_ID == fuchsia.amlogic.platform.BIND_REGISTER_ID.USB_PHY_V2_RESET;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

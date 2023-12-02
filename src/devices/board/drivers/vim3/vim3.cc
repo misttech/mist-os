@@ -103,6 +103,16 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = UsbInit()) != ZX_OK) {
+    zxlogf(ERROR, "UsbInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
+  if ((status = PowerInit()) != ZX_OK) {
+    zxlogf(ERROR, "PowerInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   if ((status = AudioInit()) != ZX_OK) {
     zxlogf(ERROR, "AudioInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -138,11 +148,6 @@ int Vim3::Thread() {
     init_txn_->Reply(result.error_value());
     return result.error_value();
   }
-  if ((status = UsbInit()) != ZX_OK) {
-    zxlogf(ERROR, "UsbInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
   if ((status = CanvasInit()) != ZX_OK) {
     zxlogf(ERROR, "CanvasInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -170,11 +175,6 @@ int Vim3::Thread() {
   }
   if ((status = BacklightInit()) != ZX_OK) {
     zxlogf(ERROR, "BacklightInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = PowerInit()) != ZX_OK) {
-    zxlogf(ERROR, "PowerInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

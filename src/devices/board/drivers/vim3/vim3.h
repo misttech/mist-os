@@ -131,7 +131,6 @@ class Vim3 : public Vim3Type {
 
   std::optional<ddk::InitTxn> init_txn_;
   ddk::IommuProtocolClient iommu_;
-  ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
   fidl::Arena<> gpio_init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;

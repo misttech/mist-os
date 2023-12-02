@@ -226,34 +226,17 @@ zx_status_t AddLittleCore(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pla
 }  // namespace
 
 zx_status_t Vim3::PowerInit() {
-  zx_status_t st;
-  st = gpio_impl_.ConfigOut(A311D_GPIOE(1), 0);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, st);
-    return st;
-  }
+  gpio_init_steps_.push_back({A311D_GPIOE(1), GpioConfigOut(0)});
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A53 cluster (Small)
-  st = gpio_impl_.SetAltFunction(A311D_GPIOE(1), A311D_GPIOE_1_PWM_D_FN);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: SetAltFunction failed: %d", __func__, st);
-    return st;
-  }
+  gpio_init_steps_.push_back({A311D_GPIOE(1), GpioSetAltFunction(A311D_GPIOE_1_PWM_D_FN)});
 
-  st = gpio_impl_.ConfigOut(A311D_GPIOE(2), 0);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, st);
-    return st;
-  }
+  gpio_init_steps_.push_back({A311D_GPIOE(2), GpioConfigOut(0)});
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A73 cluster (Big)
-  st = gpio_impl_.SetAltFunction(A311D_GPIOE(2), A311D_GPIOE_2_PWM_D_FN);
-  if (st != ZX_OK) {
-    zxlogf(ERROR, "%s: SetAltFunction failed: %d", __func__, st);
-    return st;
-  }
+  gpio_init_steps_.push_back({A311D_GPIOE(2), GpioSetAltFunction(A311D_GPIOE_2_PWM_D_FN)});
 
   // Add voltage regulator
   fidl::Arena<2048> allocator;
@@ -309,9 +292,16 @@ zx_status_t Vim3::PowerInit() {
                                        bind_fuchsia_pwm::PWM_ID_FUNCTION_CORE_POWER_BIG_CLUSTER)},
   }};
 
+  auto gpio_init_node = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules = {fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                             bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+      .properties = {fdf::MakeProperty(bind_fuchsia::INIT_STEP,
+                                       bind_fuchsia_gpio::BIND_INIT_STEP_GPIO)},
+  }};
+
   auto vreg_node_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "vreg",
-      .parents = {{vreg_pwm_9_node, vreg_pwm_0_node}},
+      .parents = {{vreg_pwm_9_node, vreg_pwm_0_node, gpio_init_node}},
   }};
 
   fidl::Arena<> fidl_arena;
@@ -323,7 +313,7 @@ zx_status_t Vim3::PowerInit() {
   if (!vreg_result.ok() || vreg_result.value().is_error()) {
     zxlogf(ERROR, "AddCompositeNodeSpec for vreg failed, error = %s",
            vreg_result.FormatDescription().c_str());
-    return st;
+    return vreg_result.ok() ? vreg_result->error_value() : vreg_result.status();
   }
 
   fidl_arena.Reset();
@@ -345,7 +335,7 @@ zx_status_t Vim3::PowerInit() {
     return result->error_value();
   }
 
-  st = AddBigCore(pbus_);
+  zx_status_t st = AddBigCore(pbus_);
   if (st != ZX_OK) {
     zxlogf(ERROR, "%s: CompositeDeviceAdd for power domain Big Arm Core failed, st = %d",
            __FUNCTION__, st);
