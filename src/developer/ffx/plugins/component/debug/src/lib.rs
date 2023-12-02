@@ -21,7 +21,7 @@ pub struct DebugTool {
     #[command]
     cmd: ComponentDebugCommand,
 
-    #[with(moniker("/core/debug_agent"))]
+    #[with(moniker("/core/debugger"))]
     debugger_proxy: fidl_fuchsia_debugger::LauncherProxy,
 
     rcs: rc::RemoteControlProxy,

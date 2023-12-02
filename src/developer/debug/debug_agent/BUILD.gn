@@ -132,6 +132,7 @@ static_library("lib") {
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
       "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
       "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_cpp",
+      "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/syslog/cpp",
       "//src/lib/fxl",
       "//src/lib/process",
@@ -216,10 +217,17 @@ executable("bin") {
 
 executable("launcher") {
   output_name = "debug_agent_launcher"
-  sources = [ "main_launcher.cc" ]
+  sources = [
+    "launcher.cc",
+    "launcher.h",
+    "main_launcher.cc",
+  ]
 
   deps = [
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.debugger:fuchsia.debugger_cpp",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async-default",
@@ -228,11 +236,17 @@ executable("launcher") {
   ]
 }
 
-fuchsia_component("debug_agent-component") {
+fuchsia_component("debug_agent_component") {
   component_name = "debug_agent"
   manifest = "meta/debug_agent.cml"
+  deps = [ ":bin" ]
+}
+
+fuchsia_component("debug_agent_launcher_component") {
+  component_name = "debug_agent_launcher"
+  manifest = "meta/debug_agent_launcher.cml"
   deps = [
-    ":bin",
+    ":debug_agent_component",
     ":launcher",
   ]
 }
@@ -251,7 +265,10 @@ if (current_cpu == "riscv64") {
   }
 } else {
   fuchsia_package("debug_agent") {
-    deps = [ ":debug_agent-component" ]
+    deps = [
+      ":debug_agent_component",
+      ":debug_agent_launcher_component",
+    ]
 
     # Set manually to true to compile helper executables for manual debugger
     # testing of various conditions. Use `ffx component explore /core/debug_agent`

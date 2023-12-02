@@ -23,6 +23,8 @@
 
 #include <map>
 
+#include "src/developer/debug/debug_agent/launcher.h"
+
 namespace {
 
 zx_status_t LaunchDebugAgent(fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end) {
@@ -50,26 +52,6 @@ zx_status_t LaunchDebugAgent(fidl::ServerEnd<fuchsia_debugger::DebugAgent> serve
 
   return status;
 }
-
-// This implements the |Launcher| fidl protocol, and manages instance(s) of DebugAgent. When a
-// |Launch| request is received, a new DebugAgent process is spun up and passed the server_end of
-// the DebugAgent protocol as a startup handle. That handle is bound to the MessageLoop and serves
-// requests from the corresponding client.
-class DebugAgentLauncher : public fidl::Server<fuchsia_debugger::Launcher> {
- public:
-  void Launch(LaunchRequest& request, LaunchCompleter::Sync& completer) override {
-    FX_CHECK(request.agent().channel().is_valid());
-
-    zx_status_t status = LaunchDebugAgent(std::move(request.agent()));
-
-    completer.Reply(zx::make_result(status));
-  }
-
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_debugger::Launcher> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FX_LOGS(WARNING) << "Unknown method: " << metadata.method_ordinal;
-  }
-};
 
 // To support a soft transition to the Launcher protocol, this class implements the |DebugAgent|
 // protocol, but is also a client of the actual server in DebugAgentServer. This launcher will keep
@@ -99,6 +81,7 @@ class DebugAgentLegacyLauncher : public fidl::Server<fuchsia_debugger::DebugAgen
             }
           });
     }
+
     void on_fidl_error(fidl::UnbindInfo info) override {
       if (info.is_peer_closed()) {
         // When the server closes the channel report ourselves as ready to be destructed.
@@ -167,13 +150,9 @@ int main() {
   fuchsia_logging::SetLogSettings(fuchsia_logging::LogSettings{});
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
-  zx::result res = outgoing.ServeFromStartupInfo();
-  if (res.is_error()) {
-    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << res.status_string();
-    return -1;
-  }
 
-  res = outgoing.AddProtocol<fuchsia_debugger::Launcher>(std::make_unique<DebugAgentLauncher>());
+  zx::result res =
+      outgoing.AddProtocol<fuchsia_debugger::Launcher>(std::make_unique<DebugAgentLauncher>());
   if (res.is_error()) {
     FX_LOGS(ERROR) << "Failed to add Launcher protocol: " << res.status_string();
     return -1;
@@ -183,6 +162,12 @@ int main() {
       std::make_unique<DebugAgentLegacyLauncher>());
   if (res.is_error()) {
     FX_LOGS(ERROR) << "Failed to add DebugAgent protocol: " << res.status_string();
+    return -1;
+  }
+
+  res = outgoing.ServeFromStartupInfo();
+  if (res.is_error()) {
+    FX_LOGS(ERROR) << "Failed to serve outgoing directory: " << res.status_string();
     return -1;
   }
 

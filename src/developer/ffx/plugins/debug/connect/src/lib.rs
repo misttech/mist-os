@@ -21,7 +21,7 @@ pub use ffx_zxdb::debug_agent::DebugAgentSocket;
 pub struct ConnectTool {
     #[command]
     cmd: ConnectCommand,
-    #[with(moniker("/core/debug_agent"))]
+    #[with(moniker("/core/debugger"))]
     debugger_proxy: fdebugger::LauncherProxy,
 }
 

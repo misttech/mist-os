@@ -19,7 +19,7 @@ pub struct StartTool {
     #[command]
     cmd: ComponentStartCommand,
 
-    #[with(moniker("/core/debug_agent"))]
+    #[with(moniker("/core/debugger"))]
     debugger_proxy: fidl_fuchsia_debugger::LauncherProxy,
 
     rcs: rc::RemoteControlProxy,

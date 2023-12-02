@@ -1,17 +1,33 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
+    include: [ "syslog/client.shard.cml" ],
+    program: {
+        runner: "elf",
+        binary: "bin/debug_agent_launcher",
+    },
+    collections: [
         {
-            name: "debugger",
-            url: "fuchsia-pkg://fuchsia.com/debug_agent#meta/debug_agent_launcher.cm",
-            environment: "#core-env",
+            name: "agents",
+            durability: "single_run",
+        },
+    ],
+    capabilities: [
+        {
+            protocol: [ "fuchsia.debugger.Launcher" ],
+        },
+    ],
+    use: [
+        {
+            protocol: "fuchsia.component.Realm",
+            from: "framework",
         },
     ],
     offer: [
         {
             protocol: [
+                "fuchsia.exception.ProcessLimbo",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
@@ -19,7 +35,7 @@
                 "fuchsia.sys2.RealmQuery.root",
             ],
             from: "parent",
-            to: "#debugger",
+            to: "#agents",
         },
         {
             event_stream: [
@@ -27,26 +43,27 @@
                 "stopped",
             ],
             from: "parent",
-            to: "#debugger",
+            to: "#agents",
         },
         {
             protocol: [
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
             ],
-            from: "#test_manager",
-            to: "#debugger",
+            from: "parent",
+            to: "#agents",
             source_availability: "unknown",
-        },
-        {
-            protocol: [ "fuchsia.exception.ProcessLimbo" ],
-            from: "#exceptions",
-            to: "#debugger",
         },
         {
             directory: "boot",
             from: "parent",
-            to: "#debugger",
+            to: "#agents",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.debugger.Launcher",
+            from: "self",
         },
     ],
 }

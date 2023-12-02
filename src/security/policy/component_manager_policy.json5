@@ -137,7 +137,7 @@
                 target_monikers: [
                     "/core/process_explorer",
                     "/core/profiler",
-                    "/core/debug_agent",
+                    "/core/debugger/agents:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
 

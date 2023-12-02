@@ -172,7 +172,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/core/process_explorer",
-                    "/core/debug_agent",
+                    "/core/debugger/agents:**",
                     "/core/testing/vfs-compliance-tests:**",
 
                     // TODO(fxbug.dev/130576): Remove once the shell tools that use this

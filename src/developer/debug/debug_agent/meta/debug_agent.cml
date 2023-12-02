@@ -5,14 +5,11 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/debug_agent_launcher",
+        binary: "bin/debug_agent",
     },
     capabilities: [
         {
-            protocol: [
-                "fuchsia.debugger.DebugAgent",
-                "fuchsia.debugger.Launcher",
-            ],
+            protocol: [ "fuchsia.debugger.DebugAgent" ],
         },
     ],
     use: [
@@ -55,10 +52,6 @@
     expose: [
         {
             protocol: "fuchsia.debugger.DebugAgent",
-            from: "self",
-        },
-        {
-            protocol: "fuchsia.debugger.Launcher",
             from: "self",
         },
     ],

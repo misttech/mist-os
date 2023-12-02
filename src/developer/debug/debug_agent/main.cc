@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.debugger/cpp/fidl.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <zircon/processargs.h>
 
 #include <memory>
@@ -21,6 +22,8 @@ int main(int argc, const char* argv[]) {
     return 1;
   }
 
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(message_loop.dispatcher());
+
   // The scope ensures the objects are destroyed before calling Cleanup on the MessageLoop.
   {
     // Take the server_end of the DebugAgent protocol we are handed from the launcher.
@@ -30,6 +33,14 @@ int main(int argc, const char* argv[]) {
     auto zircon_system_interface = std::make_unique<debug_agent::ZirconSystemInterface>();
     debug_agent::DebugAgent debug_agent(std::move(zircon_system_interface));
 
+    auto res = outgoing.AddProtocol<fuchsia_debugger::DebugAgent>(
+        std::make_unique<debug_agent::DebugAgentServer>(debug_agent.GetWeakPtr()));
+    FX_CHECK(res.is_ok()) << res.error_value();
+
+    res = outgoing.ServeFromStartupInfo();
+    FX_CHECK(res.is_ok()) << res.error_value();
+
+    // Now explicitly bind to the given server_end from the startup handles.
     auto debug_agent_server =
         std::make_unique<debug_agent::DebugAgentServer>(debug_agent.GetWeakPtr());
 

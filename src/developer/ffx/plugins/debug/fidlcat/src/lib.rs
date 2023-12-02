@@ -51,7 +51,7 @@ pub struct FidlTool {
     #[command]
     cmd: ffx_debug_fidlcat_args::FidlcatCommand,
     sdk: ffx_config::Sdk,
-    #[with(deferred(moniker("/core/debug_agent")))]
+    #[with(deferred(moniker("/core/debugger")))]
     launcher_proxy: Deferred<LauncherProxy>,
 }
 
