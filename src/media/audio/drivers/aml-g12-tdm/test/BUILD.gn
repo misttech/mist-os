@@ -109,6 +109,7 @@ test("aml-g12-composite-test-bin") {
     "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/incoming/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zxtest",
   ]
 }
@@ -138,4 +139,10 @@ fuchsia_unittest_package("dai-test-package") {
 fuchsia_unittest_package("composite-test-package") {
   package_name = "aml-g12-composite-test"
   deps = [ ":aml-g12-composite-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

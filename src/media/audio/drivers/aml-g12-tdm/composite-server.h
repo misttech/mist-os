@@ -7,13 +7,29 @@
 #include <fidl/fuchsia.hardware.audio/cpp/fidl.h>
 #include <lib/zx/result.h>
 
+#include <unordered_map>
+
+#include <ddktl/metadata/audio.h>
+
+#include "src/media/audio/drivers/aml-g12-tdm/aml-tdm-config-device.h"
+
 namespace audio::aml_g12 {
+
+constexpr size_t kNumberOfPipelines = 3;
+constexpr size_t kNumberOfTdmEngines = 2 * kNumberOfPipelines;  // 2, 1 for input 1 for output.
+
+struct Engine {
+  size_t dai_index;
+  std::optional<AmlTdmConfigDevice> device;
+  metadata::AmlConfig config;
+};
 
 class Server : public fidl::Server<fuchsia_hardware_audio::Composite>,
                public fidl::Server<fuchsia_hardware_audio::RingBuffer>,
                public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
  public:
-  explicit Server(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  Server(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
+         async_dispatcher_t* dispatcher);
   async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  protected:
@@ -58,11 +74,23 @@ class Server : public fidl::Server<fuchsia_hardware_audio::Composite>,
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
 
  private:
+  static constexpr std::array<uint64_t, kNumberOfPipelines> kDaiIds = {1, 2, 3};
+  static constexpr std::array<uint64_t, kNumberOfTdmEngines> kRingBufferIds = {4, 5, 6, 7, 8, 9};
+  static constexpr uint64_t kTopologyId = 1;
+
   void OnSignalProcessingClosed(fidl::UnbindInfo info);
+  zx_status_t ResetEngine(size_t index);
+  zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio);
 
   async_dispatcher_t* dispatcher_;
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
+
+  std::array<Engine, kNumberOfTdmEngines> engines_;
+  std::array<fuchsia_hardware_audio::DaiSupportedFormats, kNumberOfPipelines>
+      supported_dai_formats_;
+  std::array<std::optional<fuchsia_hardware_audio::DaiFormat>, kNumberOfPipelines>
+      current_dai_formats_;
 };
 
 }  // namespace audio::aml_g12

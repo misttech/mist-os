@@ -380,30 +380,6 @@ zx_status_t Vim3::AudioInit() {
             .bti_id = BTI_AUDIO_COMPOSITE,
         }},
     };
-    // This metadata is restrictive for audio-composite devices but not incompatible.
-    // TODO(fxbug.dev/132252): Allow different configurations for multiple Ring Buffers and DAIs.
-    metadata::AmlConfig metadata = {};
-    snprintf(metadata.manufacturer, sizeof(metadata.manufacturer), "Spacely Sprockets");
-    snprintf(metadata.product_name, sizeof(metadata.product_name), "vim3");
-    metadata.mClockDivFactor = 10;
-    metadata.sClockDivFactor = 25;
-    metadata.version = metadata::AmlVersion::kA311D;
-    metadata.bus = metadata::AmlBus::TDM_B;
-    metadata.dai.type = metadata::DaiType::Tdm1;
-    metadata.dai.sclk_on_raising = true;
-    metadata.dai.bits_per_sample = 16;
-    metadata.dai.bits_per_slot = 16;
-    metadata.ring_buffer.number_of_channels = 2;
-    metadata.dai.number_of_channels = 2;
-    metadata.lanes_enable_mask[0] = 3;
-    std::vector<fpbus::Metadata> tdm_metadata{
-        {{
-            .type = DEVICE_METADATA_PRIVATE,
-            .data = std::vector<uint8_t>(
-                reinterpret_cast<const uint8_t*>(&metadata),
-                reinterpret_cast<const uint8_t*>(&metadata) + sizeof(metadata)),
-        }},
-    };
 
     const auto composite_spec = fdf::CompositeNodeSpec{{
         "audio-composite-composite-spec",
@@ -417,7 +393,6 @@ zx_status_t Vim3::AudioInit() {
     tdm_dev.did() = PDEV_DID_AMLOGIC_AUDIO_COMPOSITE;
     tdm_dev.mmio() = audio_mmios;
     tdm_dev.bti() = composite_btis;
-    tdm_dev.metadata() = tdm_metadata;
     auto result = pbus_.buffer(fdf_arena)->AddCompositeNodeSpec(
         fidl::ToWire(fidl_arena, tdm_dev), fidl::ToWire(fidl_arena, composite_spec));
     if (!result.ok()) {

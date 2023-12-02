@@ -54,7 +54,46 @@ zx::result<> Driver::CreateDevfsNode() {
 }
 
 zx::result<> Driver::Start() {
-  server_ = std::make_unique<Server>(dispatcher());
+  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev.is_error() || !pdev->is_valid()) {
+    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
+    return pdev.take_error();
+  }
+  pdev_.Bind(std::move(pdev.value()));
+  // We get one MMIO per engine.
+  // TODO(fxbug.dev/132252): If we change the engines underlying AmlTdmDevice objects such that
+  // they take an MmioView, then we can get only one MmioBuffer here, own it in this driver and
+  // pass MmioViews to the underlying AmlTdmDevice objects.
+  std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios;
+  for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
+    // There is one MMIO region with index 0 used by this driver.
+    auto get_mmio_result = pdev_->GetMmio(0);
+    if (!get_mmio_result.ok()) {
+      FDF_LOG(ERROR, "Call to get MMIO failed: %s", get_mmio_result.status_string());
+      return zx::error(get_mmio_result.status());
+    }
+    if (!get_mmio_result->is_ok()) {
+      FDF_LOG(ERROR, "Failed to get MMIO: %s",
+              zx_status_get_string(get_mmio_result->error_value()));
+      return zx::error(get_mmio_result->error_value());
+    }
+
+    const auto& mmio_params = get_mmio_result->value();
+    if (!mmio_params->has_offset() || !mmio_params->has_size() || !mmio_params->has_vmo()) {
+      FDF_LOG(ERROR, "Platform device provided invalid MMIO");
+      return zx::error(ZX_ERR_BAD_STATE);
+    };
+
+    auto mmio =
+        fdf::MmioBuffer::Create(mmio_params->offset(), mmio_params->size(),
+                                std::move(mmio_params->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    if (mmio.is_error()) {
+      FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio.status_string());
+      return zx::error(mmio.error_value());
+    }
+    mmios[i] = std::make_optional(std::move(*mmio));
+  }
+  server_ = std::make_unique<Server>(std::move(mmios), dispatcher());
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

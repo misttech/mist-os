@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
@@ -40,6 +41,7 @@ class Driver : public fdf::DriverBase {
   fidl::ServerBindingGroup<fuchsia_hardware_audio::Composite> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
+  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   driver_devfs::Connector<fuchsia_hardware_audio::Composite> devfs_connector_;
 };
 
