@@ -78,6 +78,19 @@ class Server : public fidl::Server<fuchsia_hardware_audio::Composite>,
   static constexpr std::array<uint64_t, kNumberOfTdmEngines> kRingBufferIds = {4, 5, 6, 7, 8, 9};
   static constexpr uint64_t kTopologyId = 1;
 
+  struct ElementCompleter {
+    // One-shot flag that indicates whether or not WatchElementState has been called
+    // for this element yet.
+    bool first_response;
+    std::optional<WatchElementStateCompleter::Async> completer;
+  };
+  struct TopologyCompleter {
+    // One-shot flag that indicates whether or not WatchTopology has been called
+    // for this topology yet.
+    bool first_response;
+    std::optional<WatchTopologyCompleter::Async> completer;
+  };
+
   void OnSignalProcessingClosed(fidl::UnbindInfo info);
   zx_status_t ResetEngine(size_t index);
   zx_status_t ConfigEngine(size_t index, size_t dai_index, bool input, fdf::MmioBuffer mmio);
@@ -86,6 +99,9 @@ class Server : public fidl::Server<fuchsia_hardware_audio::Composite>,
   std::optional<fidl::ServerBinding<fuchsia_hardware_audio_signalprocessing::SignalProcessing>>
       signal_;
 
+  TopologyCompleter topology_completer_ = {};
+
+  std::unordered_map<uint64_t, ElementCompleter> element_completers_;
   std::array<Engine, kNumberOfTdmEngines> engines_;
   std::array<fuchsia_hardware_audio::DaiSupportedFormats, kNumberOfPipelines>
       supported_dai_formats_;

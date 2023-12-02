@@ -184,4 +184,111 @@ TEST_F(AmlG12CompositeTest, Reset) {
   ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x050 / 4]);  // C.
 }
 
+TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
+  auto endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  auto connect_result = client_->SignalProcessingConnect(std::move(endpoints->server));
+  ASSERT_TRUE(connect_result.is_ok());
+  fidl::SyncClient signal_client{std::move(endpoints->client)};
+  auto elements_result = signal_client->GetElements();
+  ASSERT_TRUE(elements_result.is_ok());
+
+  // Got ring buffer and DAIs for all engines input and output.
+  constexpr size_t kNumberOfElements = 9;
+  ASSERT_EQ(kNumberOfElements, elements_result->processing_elements().size());
+  for (size_t i = 0; i < kNumberOfElements; ++i) {
+    auto& element = elements_result->processing_elements()[i];
+    ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint, element.type());
+    ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired,
+              element.type_specific()->endpoint()->plug_detect_capabilities());
+    auto watch_element_result = signal_client->WatchElementState(*element.id());
+    ASSERT_TRUE(watch_element_result.is_ok());
+    ASSERT_EQ(true,
+              watch_element_result->state().type_specific()->endpoint()->plug_state()->plugged());
+  }
+  auto& element0 = elements_result->processing_elements()[0];
+  auto& element1 = elements_result->processing_elements()[1];
+  auto& element2 = elements_result->processing_elements()[2];
+  auto& element3 = elements_result->processing_elements()[3];
+  auto& element4 = elements_result->processing_elements()[4];
+  auto& element5 = elements_result->processing_elements()[5];
+  auto& element6 = elements_result->processing_elements()[6];
+  auto& element7 = elements_result->processing_elements()[7];
+  auto& element8 = elements_result->processing_elements()[8];
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element0.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element1.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element2.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element3.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element4.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer,
+            element5.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
+            element6.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
+            element7.type_specific()->endpoint()->type());
+  ASSERT_EQ(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect,
+            element8.type_specific()->endpoint()->type());
+
+  auto topology_result = signal_client->GetTopologies();
+  ASSERT_TRUE(topology_result.is_ok());
+  ASSERT_EQ(1, topology_result->topologies().size());
+  auto& topology = topology_result->topologies()[0];
+  ASSERT_EQ(1, topology.id());
+
+  // Get edges for ring buffer and DAIs for all engines.
+  constexpr size_t kNumberOfEdges = 6;
+  ASSERT_EQ(kNumberOfEdges, topology.processing_elements_edge_pairs()->size());
+  auto& edge0 = (*topology.processing_elements_edge_pairs())[0];
+  auto& edge1 = (*topology.processing_elements_edge_pairs())[1];
+  auto& edge2 = (*topology.processing_elements_edge_pairs())[2];
+  auto& edge3 = (*topology.processing_elements_edge_pairs())[3];
+  auto& edge4 = (*topology.processing_elements_edge_pairs())[4];
+  auto& edge5 = (*topology.processing_elements_edge_pairs())[5];
+
+  // Output.
+  ASSERT_EQ(4, edge0.processing_element_id_from());
+  ASSERT_EQ(1, edge0.processing_element_id_to());
+  ASSERT_EQ(5, edge1.processing_element_id_from());
+  ASSERT_EQ(2, edge1.processing_element_id_to());
+  ASSERT_EQ(6, edge2.processing_element_id_from());
+  ASSERT_EQ(3, edge2.processing_element_id_to());
+
+  // Input.
+  ASSERT_EQ(1, edge3.processing_element_id_from());
+  ASSERT_EQ(7, edge3.processing_element_id_to());
+  ASSERT_EQ(2, edge4.processing_element_id_from());
+  ASSERT_EQ(8, edge4.processing_element_id_to());
+  ASSERT_EQ(3, edge5.processing_element_id_from());
+  ASSERT_EQ(9, edge5.processing_element_id_to());
+
+  auto watch_topology_result = signal_client->WatchTopology();
+  ASSERT_TRUE(watch_topology_result.is_ok());
+  ASSERT_EQ(1, watch_topology_result->topology_id());
+}
+
+TEST_F(AmlG12CompositeTest, ElementsState) {
+  auto endpoints =
+      fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
+  auto connect_result = client_->SignalProcessingConnect(std::move(endpoints->server));
+  ASSERT_TRUE(connect_result.is_ok());
+  fidl::SyncClient signal_client{std::move(endpoints->client)};
+  auto elements_result = signal_client->GetElements();
+  ASSERT_TRUE(elements_result.is_ok());
+
+  // Able to set element state for all (endpoint) elements with no parameters.
+  for (auto element : elements_result->processing_elements()) {
+    if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint) {
+      fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request;
+      request.processing_element_id(*element.id());
+      auto set_element_result = signal_client->SetElementState(std::move(request));
+      ASSERT_TRUE(set_element_result.is_ok());
+    }
+  }
+}
+
 }  // namespace audio::aml_g12

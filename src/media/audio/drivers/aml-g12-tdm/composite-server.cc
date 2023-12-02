@@ -12,6 +12,15 @@ namespace audio::aml_g12 {
 Server::Server(std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios,
                async_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher) {
+  for (auto& dai : kDaiIds) {
+    element_completers_[dai].first_response = false;
+    element_completers_[dai].completer = {};
+  }
+  for (auto& ring_buffer : kRingBufferIds) {
+    element_completers_[ring_buffer].first_response = false;
+    element_completers_[ring_buffer].completer = {};
+  }
+
   // TODO(fxbug.dev/132252): Configure this driver with passed in metadata.
   for (size_t i = 0; i < kNumberOfPipelines; ++i) {
     // Default supported DAI formats.
@@ -209,24 +218,128 @@ void Server::SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChanne
 }
 
 void Server::GetElements(GetElementsCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  std::vector<fuchsia_hardware_audio_signalprocessing::Element> elements;
+
+  // One ring buffer per TDM engine.
+  for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
+    fuchsia_hardware_audio_signalprocessing::Element ring_buffer;
+    fuchsia_hardware_audio_signalprocessing::Endpoint ring_buffer_endpoint;
+    ring_buffer_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kRingBuffer)
+        .plug_detect_capabilities(
+            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+    ring_buffer.id(kRingBufferIds[i])
+        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
+        .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
+            std::move(ring_buffer_endpoint)));
+    elements.push_back(std::move(ring_buffer));
+  }
+  // One DAI per pipeline.
+  for (size_t i = 0; i < kNumberOfPipelines; ++i) {
+    fuchsia_hardware_audio_signalprocessing::Element dai;
+    fuchsia_hardware_audio_signalprocessing::Endpoint dai_endpoint;
+    dai_endpoint.type(fuchsia_hardware_audio_signalprocessing::EndpointType::kDaiInterconnect)
+        .plug_detect_capabilities(
+            fuchsia_hardware_audio_signalprocessing::PlugDetectCapabilities::kHardwired);
+    dai.id(kDaiIds[i])
+        .type(fuchsia_hardware_audio_signalprocessing::ElementType::kEndpoint)
+        .type_specific(fuchsia_hardware_audio_signalprocessing::TypeSpecificElement::WithEndpoint(
+            std::move(dai_endpoint)));
+    elements.push_back(std::move(dai));
+  }
+
+  completer.Reply(zx::ok(elements));
 }
 
 void Server::WatchElementState(WatchElementStateRequest& request,
                                WatchElementStateCompleter::Sync& completer) {
-  completer.Reply({});
+  auto element_completer = element_completers_.find(request.processing_element_id());
+  if (element_completer == element_completers_.end()) {
+    FDF_LOG(ERROR, "Unknown process element id (%lu) for WatchElementState",
+            request.processing_element_id());
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  auto& element = element_completer->second;
+  if (!element.first_response) {
+    element.first_response = true;
+    // All elements are endpoints, hardwired hence plugged at time 0.
+    fuchsia_hardware_audio_signalprocessing::PlugState plug_state;
+    plug_state.plugged(true).plug_state_time(0);
+    fuchsia_hardware_audio_signalprocessing::EndpointElementState endpoint_state;
+    endpoint_state.plug_state(std::move(plug_state));
+    fuchsia_hardware_audio_signalprocessing::ElementState element_state;
+    element_state.type_specific(
+        fuchsia_hardware_audio_signalprocessing::TypeSpecificElementState::WithEndpoint(
+            std::move(endpoint_state)));
+    completer.Reply(std::move(element_state));
+  } else if (element.completer) {
+    // The client called WatchElement when another hanging get was pending.
+    // This is an error condition and hence we unbind the channel.
+    FDF_LOG(ERROR, "WatchElement was re-called while the previous call was still pending");
+    completer.Close(ZX_ERR_BAD_STATE);
+  } else {
+    // This completer is kept but never used since we are not updating the state of the elements.
+    element.completer = completer.ToAsync();
+  }
 }
 
 void Server::SetElementState(SetElementStateRequest& request,
                              SetElementStateCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  auto element_completer = element_completers_.find(request.processing_element_id());
+  if (element_completer == element_completers_.end()) {
+    FDF_LOG(ERROR, "Unknown process element id (%lu) for SetElementState",
+            request.processing_element_id());
+    completer.Close(ZX_ERR_INVALID_ARGS);
+    return;
+  }
+  // All elements are endpoints, no field is expected or acted upon.
+  completer.Reply(zx::ok());
 }
 
 void Server::GetTopologies(GetTopologiesCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  fuchsia_hardware_audio_signalprocessing::Topology topology;
+  topology.id(kTopologyId);
+  std::vector<fuchsia_hardware_audio_signalprocessing::EdgePair> edges;
+  for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
+    if (!engines_[i].config.is_input) {
+      //                        +-----------+    +-----------+
+      //        Source       -> |  ENDPOINT | -> +  ENDPOINT | ->     Destination
+      //      from client       | RingBuffer|    +    DAI    |    e.g. Bluetooth chip
+      //                        +-----------+    +-----------+
+      fuchsia_hardware_audio_signalprocessing::EdgePair pair;
+      pair.processing_element_id_from(kRingBufferIds[i])
+          .processing_element_id_to(kDaiIds[engines_[i].dai_index]);
+      edges.push_back(std::move(pair));
+    } else {
+      //                        +-----------+    +-----------+
+      //       Source        -> |  ENDPOINT | -> +  ENDPOINT | ->     Destination
+      // e.g. Bluetooth chip    |    DAI    |    + RingBuffer|         to client
+      //                        +-----------+    +-----------+
+      fuchsia_hardware_audio_signalprocessing::EdgePair pair;
+      pair.processing_element_id_from(kDaiIds[engines_[i].dai_index])
+          .processing_element_id_to(kRingBufferIds[i]);
+      edges.push_back(std::move(pair));
+    }
+  }
+
+  topology.processing_elements_edge_pairs(edges);
+  completer.Reply(zx::ok(std::vector{std::move(topology)}));
 }
 
-void Server::WatchTopology(WatchTopologyCompleter::Sync& completer) { completer.Reply({}); }
+void Server::WatchTopology(WatchTopologyCompleter::Sync& completer) {
+  if (!topology_completer_.first_response) {
+    topology_completer_.first_response = true;
+    completer.Reply(kTopologyId);
+  } else if (topology_completer_.completer) {
+    // The client called WatchTopology when another hanging get was pending.
+    // This is an error condition and hence we unbind the channel.
+    FDF_LOG(ERROR, "WatchTopology was re-called while the previous call was still pending");
+    completer.Close(ZX_ERR_BAD_STATE);
+  } else {
+    // This completer is kept but never used since we are not updating the topology.
+    topology_completer_.completer.emplace(completer.ToAsync());
+  }
+}
 
 void Server::SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) {
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
