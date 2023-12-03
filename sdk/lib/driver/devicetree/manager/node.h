@@ -54,7 +54,7 @@ class Node {
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,
                        fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager>& mgr);
 
-  std::string_view name() const { return name_; }
+  const std::string& name() const { return name_; }
 
   ParentNode parent() const;
 
@@ -70,7 +70,7 @@ class Node {
 
  private:
   Node* parent_;
-  const std::string_view name_;
+  std::string name_;
   std::unordered_map<std::string_view, devicetree::PropertyValue> properties_;
   std::optional<Phandle> phandle_;
   std::vector<Node*> children_;
@@ -104,7 +104,7 @@ class ReferenceNode {
     return node_->properties();
   }
 
-  std::string_view name() const { return node_->name(); }
+  const std::string& name() const { return node_->name(); }
 
   std::optional<Phandle> phandle() const { return node_->phandle(); }
 
@@ -118,7 +118,7 @@ class ParentNode {
  public:
   explicit ParentNode(Node* node) : node_(node) {}
 
-  std::string_view name() const { return node_->name(); }
+  const std::string& name() const { return node_->name(); }
 
   explicit operator bool() const { return (node_ != nullptr); }
 
@@ -138,7 +138,7 @@ class ChildNode {
  public:
   explicit ChildNode(Node* node) : node_(node) {}
 
-  std::string_view name() const { return node_->name(); }
+  const std::string& name() const { return node_->name(); }
 
   explicit operator bool() const { return (node_ != nullptr); }
 

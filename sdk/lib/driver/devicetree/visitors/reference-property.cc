@@ -33,10 +33,9 @@ zx::result<> ReferencePropertyParser::Visit(Node& node,
       auto phandle = cells[cell_idx];
       auto reference = node.GetReferenceNode(*phandle);
       if (reference.is_error()) {
-        FDF_LOG(ERROR, "Node '%.*s' has invalid reference in '%.*s' property to %d.",
-                static_cast<int>(node.name().length()), node.name().data(),
-                static_cast<int>(reference_property_.length()), reference_property_.data(),
-                *phandle);
+        FDF_LOG(ERROR, "Node '%s' has invalid reference in '%.*s' property to %d.",
+                node.name().c_str(), static_cast<int>(reference_property_.length()),
+                reference_property_.data(), *phandle);
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
       // Advance past phandle index.
@@ -44,16 +43,16 @@ zx::result<> ReferencePropertyParser::Visit(Node& node,
 
       auto cell_specifier = reference->properties().find(cell_specifier_);
       if (cell_specifier == reference->properties().end()) {
-        FDF_LOG(ERROR, "Reference node '%.*s' does not have '%.*s' property.",
-                static_cast<int>(reference->name().length()), reference->name().data(),
-                static_cast<int>(cell_specifier_.length()), cell_specifier_.data());
+        FDF_LOG(ERROR, "Reference node '%s' does not have '%.*s' property.",
+                reference->name().c_str(), static_cast<int>(cell_specifier_.length()),
+                cell_specifier_.data());
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
       auto cell_width = cell_specifier->second.AsUint32();
       if (!cell_width) {
-        FDF_LOG(ERROR, "Reference node '%.*s' has invalid '%.*s' property.",
-                static_cast<int>(reference->name().length()), reference->name().data(),
-                static_cast<int>(cell_specifier_.length()), cell_specifier_.data());
+        FDF_LOG(ERROR, "Reference node '%s' has invalid '%.*s' property.",
+                reference->name().c_str(), static_cast<int>(cell_specifier_.length()),
+                cell_specifier_.data());
 
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
@@ -72,10 +71,9 @@ zx::result<> ReferencePropertyParser::Visit(Node& node,
         zx::result result = reference_child_callback_(node, *reference, reference_cells);
         if (result.is_error()) {
           FDF_LOG(ERROR,
-                  "Reference child callback failed for node '%.*s' and reference node '%.*s': %s.",
-                  static_cast<int>(node.name().length()), node.name().data(),
-                  static_cast<int>(reference->name().length()), reference->name().data(),
-                  result.status_string());
+                  "Reference child callback failed for node '%s' and reference node '%.*s': %s.",
+                  node.name().c_str(), static_cast<int>(reference->name().length()),
+                  reference->name().data(), result.status_string());
           return result.take_error();
         }
       }

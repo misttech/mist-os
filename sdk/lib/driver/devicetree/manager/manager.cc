@@ -140,8 +140,7 @@ zx::result<> Manager::Walk(Visitor& visitor) {
   // all references to the node is known and so the visitor can use that information to update any
   // Node properties if needed.
   for (auto& node : nodes_publish_order_) {
-    FDF_LOG(DEBUG, "Finalize node - %.*s", static_cast<int>(node->name().length()),
-            node->name().data());
+    FDF_LOG(DEBUG, "Finalize node - %s", node->name().c_str());
     zx::result finalize_status = visitor.FinalizeNode(*node);
     if (finalize_status.is_error()) {
       FDF_SLOG(ERROR, "Node finalize failed.", KV("node_name", node->name()),

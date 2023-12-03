@@ -118,9 +118,8 @@ zx::result<> ArmGicV2Visitor::ChildParser(fdf_devicetree::Node& child,
   if (interrupt_cells.size() != (3 * sizeof(uint32_t))) {
     FDF_LOG(
         ERROR,
-        "Incorrect number of cells (expected %zu, found %zu) for arm,gic v2 interrupt in node '%.*s",
-        3 * sizeof(uint32_t), interrupt_cells.size(), static_cast<int>(child.name().length()),
-        child.name().data());
+        "Incorrect number of cells (expected %zu, found %zu) for arm,gic v2 interrupt in node '%s",
+        3 * sizeof(uint32_t), interrupt_cells.size(), child.name().c_str());
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -128,8 +127,8 @@ zx::result<> ArmGicV2Visitor::ChildParser(fdf_devicetree::Node& child,
 
   zx::result mode = interrupt.mode();
   if (mode.is_error()) {
-    FDF_LOG(ERROR, "Failed to parse mode for interrupt %d of node '%.*s - %s", interrupt.irq(),
-            static_cast<int>(child.name().length()), child.name().data(), mode.status_string());
+    FDF_LOG(ERROR, "Failed to parse mode for interrupt %d of node '%s - %s", interrupt.irq(),
+            child.name().c_str(), mode.status_string());
     return mode.take_error();
   }
 
@@ -138,7 +137,7 @@ zx::result<> ArmGicV2Visitor::ChildParser(fdf_devicetree::Node& child,
       .mode = *mode,
   }};
   FDF_LOG(DEBUG, "IRQ 0x%0x with mode 0x%0x added to node '%s'.", *irq.irq(), *irq.mode(),
-          child.name().data());
+          child.name().c_str());
   child.AddIrq(irq);
   return zx::ok();
 }

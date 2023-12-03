@@ -42,7 +42,7 @@ TEST(ArmGicV2VisitorTest, TestInterruptProperty) {
     auto node =
         irq_tester->env().SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i);
 
-    if (node.name() == "sample-device@1") {
+    if (node.name() == "sample-device-1") {
       auto irq = irq_tester->env()
                      .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i)
                      .irq();
@@ -56,7 +56,7 @@ TEST(ArmGicV2VisitorTest, TestInterruptProperty) {
       node_tested_count++;
     }
 
-    if (node.name() == "sample-device@2") {
+    if (node.name() == "sample-device-2") {
       auto irq = irq_tester->env()
                      .SyncCall(&fdf_devicetree::testing::FakeEnvWrapper::pbus_nodes_at, i)
                      .irq();

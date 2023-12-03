@@ -37,7 +37,9 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
   pbus_node_.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE;
   pbus_node_.vid() = bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC;
   pbus_node_.instance_id() = id;
-  pbus_node_.name() = std::string(name_);
+  // '@' is not a valid character in Node names as per driver framework.
+  std::replace(name_.begin(), name_.end(), '@', '-');
+  pbus_node_.name() = name_;
 
   for (auto property : properties) {
     properties_.emplace(property.name, property.value);
@@ -49,8 +51,7 @@ Node::Node(Node *parent, const std::string_view name, devicetree::Properties pro
     if (phandle_prop->second.AsUint32() != std::nullopt) {
       phandle_ = phandle_prop->second.AsUint32();
     } else {
-      FDF_LOG(WARNING, "Node '%.*s' has invalid phandle property", static_cast<int>(name_.size()),
-              name_.data());
+      FDF_LOG(WARNING, "Node '%s' has invalid phandle property", name_.c_str());
     }
   }
 }
@@ -111,8 +112,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     pbus_node_.properties() = node_properties_;
   }
 
-  FDF_LOG(DEBUG, "Adding node '%.*s' to pbus with instance id %d.", static_cast<int>(name().size()),
-          name().data(), id_);
+  FDF_LOG(DEBUG, "Adding node '%s' to pbus with instance id %d.", name().c_str(), id_);
   fdf::Arena arena('PBUS');
   fidl::Arena fidl_arena;
   auto result = pbus.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, pbus_node_));
@@ -146,10 +146,7 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
     parents_.insert(parents_.begin(), std::move(platform_node));
 
     fdf::CompositeNodeSpec group;
-    std::string name_final(name());
-    // '@' is not a valid character in Node names as per driver framework.
-    std::replace(name_final.begin(), name_final.end(), '@', '-');
-    group.name() = name_final;
+    group.name() = name() + "_group";
     group.parents() = std::move(parents_);
 
     auto devicegroup_result = mgr->AddSpec({std::move(group)});
