@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
@@ -31,4 +32,16 @@ pub struct SetUiConfig {
     /// setui without camera.
     #[serde(default)]
     pub with_camera: bool,
+
+    #[serde(default)]
+    pub display: Option<Utf8PathBuf>,
+
+    #[serde(default)]
+    pub interface: Option<Utf8PathBuf>,
+
+    #[serde(default)]
+    pub light_sensor: Option<Utf8PathBuf>,
+
+    #[serde(default)]
+    pub agent: Option<Utf8PathBuf>,
 }
