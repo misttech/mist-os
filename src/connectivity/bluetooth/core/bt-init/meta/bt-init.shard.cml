@@ -32,6 +32,12 @@
         runner: "elf",
         binary: "bin/bt_init",
     },
+    collections: [
+        {
+            name: "bt-host-collection",
+            durability: "single_run",
+        },
+    ],
     capabilities: [
         {
             protocol: [
@@ -50,8 +56,18 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            directory: "dev-bt-hci",
+            rights: [ "r*" ],
+            path: "/dev/class/bt-hci",
+        },
     ],
     offer: [
+        {
+            directory: "dev-bt-hci",
+            from: "parent",
+            to: [ "#bt-host-collection" ],
+        },
         {
             directory: "dev-bt-host",
             from: "parent",
