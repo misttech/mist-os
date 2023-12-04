@@ -7,7 +7,7 @@
 #include <lib/acpi_lite/testing/test_data.h>
 #include <lib/boot-shim/acpi.h>
 #include <lib/boot-shim/boot-shim.h>
-#include <lib/boot-shim/test-helper.h>
+#include <lib/boot-shim/testing/test-helper.h>
 
 #include <zxtest/zxtest.h>
 

@@ -23,8 +23,6 @@
 
 #include <zxtest/zxtest.h>
 
-#include "lib/boot-shim/devicetree.h"
-
 namespace {
 
 class FakeMatcher : public boot_shim::DevicetreeItemBase<FakeMatcher, 2> {

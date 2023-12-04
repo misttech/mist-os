@@ -5,11 +5,15 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/devicetree/testing/loaded-dtb.h>
+#include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 
 #include <zxtest/zxtest.h>
 
-namespace devicetree_test {
+#ifndef ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TESTING_DEVICETREE_TEST_FIXTURE_H_
+#define ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TESTING_DEVICETREE_TEST_FIXTURE_H_
+
+namespace boot_shim::testing {
 
 using devicetree::testing::LoadDtb;
 using devicetree::testing::LoadedDtb;
@@ -134,4 +138,6 @@ class TestMixin : public zxtest::Test, public Base... {
 void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
                       cpp20::span<const zbi_topology_node_t> expected_nodes);
 
-}  // namespace devicetree_test
+}  // namespace boot_shim::testing
+
+#endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_TESTING_DEVICETREE_TEST_FIXTURE_H_

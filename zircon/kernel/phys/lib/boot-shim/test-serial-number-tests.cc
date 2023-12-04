@@ -5,8 +5,8 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/boot-shim/boot-shim.h>
-#include <lib/boot-shim/test-helper.h>
 #include <lib/boot-shim/test-serial-number.h>
+#include <lib/boot-shim/testing/test-helper.h>
 #include <lib/zbitl/item.h>
 
 #include <zxtest/zxtest.h>

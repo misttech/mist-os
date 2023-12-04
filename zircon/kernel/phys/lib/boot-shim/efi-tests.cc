@@ -8,7 +8,7 @@
 #include <lib/acpi_lite/structures.h>
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/efi.h>
-#include <lib/boot-shim/test-helper.h>
+#include <lib/boot-shim/testing/test-helper.h>
 #include <lib/zbi-format/zbi.h>
 
 #include <efi/boot-services.h>

@@ -103,22 +103,22 @@ if (!is_kernel) {
     testonly = true
 
     sdk = "source"
-    sdk_headers = [ "lib/boot-shim/test-helper.h" ]
-
-    sources = [ "test-helper.cc" ]
-    deps = [
-      "//src/lib/zbitl",
-      "//zircon/system/ulib/zxtest",
+    sdk_headers = [
+      "lib/boot-shim/testing/test-helper.h",
+      "lib/boot-shim/testing/devicetree-test-fixture.h",
     ]
-  }
 
-  source_set("devicetree-test-fixture") {
-    testonly = true
-    sources = [ "devicetree-test-fixture.cc" ]
-    public = [ "devicetree-test-fixture.h" ]
+    sources = [
+      "devicetree-test-fixture.cc",
+      "test-helper.cc",
+    ]
     public_deps = [
+      "//sdk/lib/stdcompat",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/devicetree/testing",
+    ]
+    deps = [
+      "//src/lib/zbitl",
       "//zircon/system/ulib/zxtest",
     ]
   }
@@ -139,9 +139,10 @@ if (!is_kernel) {
     ]
     deps = [
       ":boot-shim",
-      ":devicetree-test-fixture",
+      ":boot-shim-test",
       "//sdk/lib/fit",
       "//src/lib/zbitl",
+      "//zircon/system/ulib/zxtest",
     ]
   }
 

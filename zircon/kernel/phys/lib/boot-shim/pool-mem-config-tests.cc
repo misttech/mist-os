@@ -6,7 +6,7 @@
 
 #include <lib/boot-shim/boot-shim.h>
 #include <lib/boot-shim/pool-mem-config.h>
-#include <lib/boot-shim/test-helper.h>
+#include <lib/boot-shim/testing/test-helper.h>
 #include <lib/memalloc/pool.h>
 
 #include <forward_list>

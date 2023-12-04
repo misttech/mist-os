@@ -5,7 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/acpi_lite/testing/test_data.h>
-#include <lib/boot-shim/test-helper.h>
+#include <lib/boot-shim/testing/test-helper.h>
 #include <lib/uart/ns8250.h>
 #include <stdio.h>
 

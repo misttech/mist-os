@@ -4,7 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include <lib/boot-shim/test-helper.h>
+#include <lib/boot-shim/testing/test-helper.h>
 #include <lib/zbitl/image.h>
 #include <stdio.h>
 

@@ -4,9 +4,9 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#include "devicetree-test-fixture.h"
+#include "lib/boot-shim/testing/devicetree-test-fixture.h"
 
-namespace devicetree_test {
+namespace boot_shim::testing {
 
 std::optional<LoadedDtb> SyntheticDevicetreeTest::empty_dtb_ = std::nullopt;
 
@@ -70,4 +70,4 @@ void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
   }
 }
 
-}  // namespace devicetree_test
+}  // namespace boot_shim::testing

@@ -6,19 +6,18 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
+#include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/fit/defer.h>
 #include <lib/zbitl/image.h>
 
-#include "devicetree-test-fixture.h"
-
 namespace {
 
-using devicetree_test::LoadDtb;
-using devicetree_test::LoadedDtb;
+using boot_shim::testing::LoadDtb;
+using boot_shim::testing::LoadedDtb;
 
 class ArmDevicetreeTimerItemTest
-    : public devicetree_test::TestMixin<devicetree_test::ArmDevicetreeTest,
-                                        devicetree_test::SyntheticDevicetreeTest> {
+    : public boot_shim::testing::TestMixin<boot_shim::testing::ArmDevicetreeTest,
+                                           boot_shim::testing::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     Mixin::SetUpTestSuite();

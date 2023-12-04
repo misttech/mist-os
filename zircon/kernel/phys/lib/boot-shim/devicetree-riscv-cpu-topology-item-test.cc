@@ -6,19 +6,18 @@
 
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
+#include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/fit/defer.h>
+#include <lib/zbi-format/cpu.h>
 #include <lib/zbitl/image.h>
 
-#include "devicetree-test-fixture.h"
-#include "lib/zbi-format/cpu.h"
-
 namespace {
-using devicetree_test::LoadDtb;
-using devicetree_test::LoadedDtb;
+using boot_shim::testing::LoadDtb;
+using boot_shim::testing::LoadedDtb;
 
 class RiscvDevictreeCpuTopologyItemTest
-    : public devicetree_test::TestMixin<devicetree_test::RiscvDevicetreeTest,
-                                        devicetree_test::SyntheticDevicetreeTest> {
+    : public boot_shim::testing::TestMixin<boot_shim::testing::RiscvDevicetreeTest,
+                                           boot_shim::testing::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
     TestMixin<RiscvDevicetreeTest>::SetUpTestSuite();
@@ -249,7 +248,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpusWithCpuMap) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -466,7 +465,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithNestedClusters) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -598,7 +597,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, CpuNodesWithoutCpuMap) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -743,7 +742,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, Qemu) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -898,7 +897,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, VisionFive2) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
@@ -1066,7 +1065,7 @@ TEST_F(RiscvDevictreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
       present = true;
       cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
                                              payload.size() / sizeof(zbi_topology_node_t));
-      devicetree_test::CheckCpuTopology(nodes, kExpectedTopology);
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
     }
   }
   ASSERT_TRUE(present);
