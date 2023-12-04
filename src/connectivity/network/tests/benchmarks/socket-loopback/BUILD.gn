@@ -181,6 +181,7 @@ if (target_cpu != "riscv64") {
   ns2_test_targets = []
 }
 
+# TODO(b/298565565): Enable these on vim3.
 if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
   starnix_host_test_component("loopback-socket-benchmarks-starnix") {
     test_label = ":loopback_socket_benchmarks"
@@ -257,6 +258,53 @@ if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
     ":loopback-socket-benchmarks-starnix-with-netstack3-pkg",
     ":loopback-socket-benchmarks-starnix-with-fake-netstack-pkg",
   ]
+
+  # TODO(https://issuetracker.google.com/296292263): The run count can be
+  # doubled once the pathological slow-down has been addressed, because the
+  # bulk of runtime is spent in these cases for NS3 and we expect runtime to
+  # approximately halve.
+  #
+  # Reduce the number of runs for the starnix benchmarks to avoid hitting a
+  # timeout in Infra.
+  _starnix_runs = 120
+  benchmark_test_configs += [
+    {
+      package = ":loopback-socket-benchmarks-starnix"
+      runs = _starnix_runs
+      test_type = "starnix"
+      tests = [
+        {
+          name = "loopback_socket_benchmarks_starnix"
+          component = "loopback-socket-benchmarks-starnix"
+          expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.starnix.txt"
+        },
+      ]
+    },
+    {
+      package = ":loopback-socket-benchmarks-starnix-with-netstack3"
+      runs = _starnix_runs
+      test_type = "starnix"
+      tests = [
+        {
+          name = "loopback_socket_benchmarks_starnix_with_netstack3"
+          component = "loopback-socket-benchmarks-starnix-with-netstack3"
+          expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.starnix.netstack3.txt"
+        },
+      ]
+    },
+    {
+      package = ":loopback-socket-benchmarks-starnix-with-fake-netstack"
+      runs = _starnix_runs
+      test_type = "starnix"
+      tests = [
+        {
+          name = "loopback_socket_benchmarks_starnix_with_fake_netstack"
+          component = "loopback-socket-benchmarks-starnix-with-fake-netstack"
+          expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.starnix.fake_netstack.txt"
+        },
+      ]
+    },
+  ]
 } else {
   starnix_benchmarks = []
 }
@@ -279,6 +327,18 @@ foreach(test_config, benchmark_test_configs) {
         "-p",
         "--quiet",
       ]
+
+      if (defined(test_config.runs)) {
+        test_component_args += [
+          "--runs",
+          "${test_config.runs}",
+        ]
+      }
+
+      if (defined(test_config.test_type)) {
+        test_type = test_config.test_type
+      }
+
       results_path_test_arg = "--out"
     }
 

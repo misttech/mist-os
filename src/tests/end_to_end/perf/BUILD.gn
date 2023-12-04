@@ -31,11 +31,6 @@ test_list = [
 
 if (!is_asan && host_os == "linux") {
   test_list += [ "storage_starnix_benchmarks_test" ]
-
-  # TODO(b/298565565): Enable these on vim3.
-  if (target_cpu == "x64") {
-    test_list += [ "netstack_starnix_benchmarks_test" ]
-  }
 }
 
 foreach(target_name, test_list) {
@@ -218,9 +213,6 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.localhost_tcp.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
     "fuchsia.netstack3.core.txt",
-    "fuchsia.network.socket.loopback.starnix.fake_netstack.txt",
-    "fuchsia.network.socket.loopback.starnix.netstack3.txt",
-    "fuchsia.network.socket.loopback.starnix.txt",
     "fuchsia.network.socket.tun.netstack3.txt",
     "fuchsia.network.socket.tun.txt",
     "fuchsia.starnix.gvisor_benchmarks.clock_getres.txt",
