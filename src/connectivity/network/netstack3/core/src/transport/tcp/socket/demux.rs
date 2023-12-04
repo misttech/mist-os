@@ -11,11 +11,11 @@ use core::{convert::TryFrom, fmt::Debug, num::NonZeroU16};
 use tracing::{error, trace};
 
 use net_types::{ip::IpAddress, SpecifiedAddr};
-use packet::{BufferMut, EmptyBuf, InnerPacketBuilder as _, Serializer};
+use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder as _, Serializer};
 use packet_formats::{
     ip::IpProto,
     tcp::{
-        TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
+        TcpFlowAndSeqNum, TcpOptionsTooLongError, TcpParseArgs, TcpSegment, TcpSegmentBuilder,
         TcpSegmentBuilderWithOptions,
     },
 };
@@ -26,7 +26,7 @@ use crate::{
     error::NotFoundError,
     ip::{
         socket::{DefaultSendOptions, DeviceIpSocketHandler as _, IpSocketHandler as _, MmsError},
-        BufferIpTransportContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
+        EitherDeviceId, IpExt, IpLayerIpExt, IpTransportContext, TransportIpContext,
         TransportReceiveError,
     },
     socket::{
@@ -45,12 +45,12 @@ use crate::{
         socket::{
             do_send_inner, isn::IsnGenerator, BoundSocketState, Connection, DemuxState,
             DemuxSyncContext as _, HandshakeStatus, Listener, ListenerAddrState,
-            ListenerSharingState, MaybeListener, NonSyncContext, PrimaryRc, SyncContext,
-            TcpBindingsTypes, TcpIpTransportContext, TcpPortSpec, TcpSocketId, TcpSocketSetEntry,
-            TcpSocketState,
+            ListenerSharingState, MaybeListener, NonSyncContext, PrimaryRc, SeqNum, SocketHandler,
+            SyncContext, TcpBindingsTypes, TcpIpTransportContext, TcpPortSpec, TcpSocketId,
+            TcpSocketSetEntry, TcpSocketState,
         },
         state::{BufferProvider, Closed, DataAcked, Initial, State, TimeWait},
-        BufferSizes, ConnectionError, Control, Mss, SocketOptions,
+        BufferSizes, ConnectionError, Control, IcmpErrorCode, Mss, SocketOptions,
     },
 };
 
@@ -66,10 +66,10 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
     }
 }
 
-impl<I, B, C, SC> BufferIpTransportContext<I, C, SC, B> for TcpIpTransportContext
+impl<I, C, SC> IpTransportContext<I, C, SC> for TcpIpTransportContext
 where
     I: IpLayerIpExt,
-    B: BufferMut,
+    I::ErrorCode: Into<IcmpErrorCode>,
     C: NonSyncContext<I, SC::WeakDeviceId>
         + BufferProvider<
             C::ReceiveBuffer,
@@ -79,7 +79,39 @@ where
         >,
     SC: SyncContext<I, C>,
 {
-    fn receive_ip_packet(
+    fn receive_icmp_error(
+        sync_ctx: &mut SC,
+        ctx: &mut C,
+        _device: &SC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+        original_dst_ip: SpecifiedAddr<I::Addr>,
+        mut original_body: &[u8],
+        err: I::ErrorCode,
+    ) {
+        let mut buffer = &mut original_body;
+        let Some(flow_and_seqnum) = buffer.take_obj_front::<TcpFlowAndSeqNum>() else {
+            error!("received an ICMP error but its body is less than 8 bytes");
+            return;
+        };
+
+        let Some(original_src_ip) = original_src_ip else { return };
+        let Some(original_src_port) = NonZeroU16::new(flow_and_seqnum.src_port()) else { return };
+        let Some(original_dst_port) = NonZeroU16::new(flow_and_seqnum.dst_port()) else { return };
+        let original_seqnum = SeqNum::new(flow_and_seqnum.sequence_num());
+
+        SocketHandler::on_icmp_error(
+            sync_ctx,
+            ctx,
+            original_src_ip,
+            original_dst_ip,
+            original_src_port,
+            original_dst_port,
+            original_seqnum,
+            err.into(),
+        );
+    }
+
+    fn receive_ip_packet<B: BufferMut>(
         sync_ctx: &mut SC,
         ctx: &mut C,
         device: &SC::DeviceId,

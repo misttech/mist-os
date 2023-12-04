@@ -43,8 +43,7 @@ use crate::{
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        BufferIpTransportContext, IpTransportContext, MulticastMembershipHandler,
-        TransportIpContext, TransportReceiveError,
+        IpTransportContext, MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -1236,33 +1235,6 @@ pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<
 /// An implementation of [`IpTransportContext`] for UDP.
 pub(crate) enum UdpIpTransportContext {}
 
-impl<
-        I: IpExt,
-        C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-        SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
-    > IpTransportContext<I, C, SC> for UdpIpTransportContext
-{
-    fn receive_icmp_error(
-        sync_ctx: &mut SC,
-        _ctx: &mut C,
-        _device: &SC::DeviceId,
-        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
-        original_dst_ip: SpecifiedAddr<I::Addr>,
-        _original_udp_packet: &[u8],
-        err: I::ErrorCode,
-    ) {
-        sync_ctx.with_counters(|counters| {
-            counters.rx_icmp_error.increment();
-        });
-        // NB: At the moment bindings has no need to consume ICMP errors, so we
-        // swallow them here.
-        debug!(
-            "UDP received ICMP error {:?} from {:?} to {:?}",
-            err, original_dst_ip, original_src_ip
-        );
-    }
-}
-
 fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
@@ -1500,15 +1472,34 @@ fn try_dual_stack_deliver<
 
 impl<
         I: IpExt,
-        B: BufferMut,
         C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
         SC: StateContext<I, C>
             + StateContext<I::OtherVersion, C>
             + NonTestCtxMarker
             + CounterContext<UdpCounters<I>>,
-    > BufferIpTransportContext<I, C, SC, B> for UdpIpTransportContext
+    > IpTransportContext<I, C, SC> for UdpIpTransportContext
 {
-    fn receive_ip_packet(
+    fn receive_icmp_error(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        _device: &SC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+        original_dst_ip: SpecifiedAddr<I::Addr>,
+        _original_udp_packet: &[u8],
+        err: I::ErrorCode,
+    ) {
+        sync_ctx.with_counters(|counters| {
+            counters.rx_icmp_error.increment();
+        });
+        // NB: At the moment bindings has no need to consume ICMP errors, so we
+        // swallow them here.
+        debug!(
+            "UDP received ICMP error {:?} from {:?} to {:?}",
+            err, original_dst_ip, original_src_ip
+        );
+    }
+
+    fn receive_ip_packet<B: BufferMut>(
         sync_ctx: &mut SC,
         ctx: &mut C,
         device: &SC::DeviceId,
@@ -3145,11 +3136,22 @@ mod tests {
     }
 
     /// Ip packet delivery for the [`FakeUdpSyncCtx`].
-    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
-        BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpSyncCtx<D>, B>
-        for UdpIpTransportContext
+    impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId>
+        IpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpSyncCtx<D>> for UdpIpTransportContext
     {
-        fn receive_ip_packet(
+        fn receive_icmp_error(
+            _sync_ctx: &mut FakeUdpSyncCtx<D>,
+            _ctx: &mut FakeUdpNonSyncCtx,
+            _device: &D,
+            _original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+            _original_dst_ip: SpecifiedAddr<I::Addr>,
+            _original_udp_packet: &[u8],
+            _err: I::ErrorCode,
+        ) {
+            unimplemented!()
+        }
+
+        fn receive_ip_packet<B: BufferMut>(
             sync_ctx: &mut FakeUdpSyncCtx<D>,
             ctx: &mut FakeUdpNonSyncCtx,
             device: &D,
@@ -3275,8 +3277,7 @@ mod tests {
         body: &[u8],
     ) where
         A::Version: TestIpExt,
-        UdpIpTransportContext:
-            BufferIpTransportContext<A::Version, FakeUdpNonSyncCtx, SC, Buf<Vec<u8>>>,
+        UdpIpTransportContext: IpTransportContext<A::Version, FakeUdpNonSyncCtx, SC>,
     {
         let builder =
             UdpPacketBuilder::new(src_ip, dst_ip, NonZeroU16::new(src_port.into()), dst_port);
@@ -3285,7 +3286,7 @@ mod tests {
             .serialize_vec_outer()
             .unwrap()
             .into_inner();
-        <UdpIpTransportContext as BufferIpTransportContext<A::Version, _, _, _>>::receive_ip_packet(
+        <UdpIpTransportContext as IpTransportContext<A::Version, _, _>>::receive_ip_packet(
             sync_ctx,
             ctx,
             &device,

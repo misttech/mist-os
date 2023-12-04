@@ -19,7 +19,6 @@
 
 mod accept_queue;
 pub(crate) mod demux;
-mod icmp;
 pub(crate) mod isn;
 
 use alloc::collections::{hash_map, HashMap};
@@ -3453,8 +3452,8 @@ mod tests {
                 IpSocketContext, IpSocketNonSyncContext, MmsError, SendOptions,
             },
             types::ResolvedRoute,
-            BufferIpTransportContext as _, HopLimits, IpCounters, IpTransportContext,
-            ResolveRouteError, SendIpPacketMeta, TransportIpContext,
+            HopLimits, IpCounters, IpTransportContext, ResolveRouteError, SendIpPacketMeta,
+            TransportIpContext,
         },
         sync::Mutex,
         testutil::ContextPair,

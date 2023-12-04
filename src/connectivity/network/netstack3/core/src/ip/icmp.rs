@@ -61,10 +61,9 @@ use crate::{
         },
         path_mtu::PmtuHandler,
         socket::{DefaultSendOptions, IpSock, IpSocketHandler},
-        AddressStatus, AnyDevice, BufferIpTransportContext, DeviceIdContext, EitherDeviceId,
-        IpDeviceStateContext, IpExt, IpLayerHandler, IpTransportContext, Ipv6PresentAddressStatus,
-        MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
-        IPV6_DEFAULT_SUBNET,
+        AddressStatus, AnyDevice, DeviceIdContext, EitherDeviceId, IpDeviceStateContext, IpExt,
+        IpLayerHandler, IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler,
+        SendIpPacketMeta, TransportIpContext, TransportReceiveError, IPV6_DEFAULT_SUBNET,
     },
     socket::{
         self,
@@ -1279,8 +1278,12 @@ impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::IcmpSendTimestampRe
     }
 }
 
-impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
-    InnerIcmpv4Context<C> for Locked<&SyncCtx<C>, L>
+impl<
+        C: NonSyncContext,
+        L: LockBefore<crate::lock_ordering::IcmpBoundMap<Ipv4>>
+            + LockBefore<crate::lock_ordering::TcpAllSocketsSet<Ipv4>>
+            + LockBefore<crate::lock_ordering::UdpSocketsTable<Ipv4>>,
+    > InnerIcmpv4Context<C> for Locked<&SyncCtx<C>, L>
 {
     fn should_send_timestamp_reply(&self) -> bool {
         *self.unlocked_access::<crate::lock_ordering::IcmpSendTimestampReply<Ipv4>>()
@@ -1338,29 +1341,24 @@ macro_rules! try_send_error {
 /// An implementation of [`IpTransportContext`] for ICMP.
 pub(crate) enum IcmpIpTransportContext {}
 
-impl<
-        I: IcmpIpExt + IpExt,
-        C: IcmpNonSyncCtx<I, SC::DeviceId>,
-        SC: InnerIcmpContext<I, C> + CounterContext<IcmpRxCounters<I>>,
-    > IpTransportContext<I, C, SC> for IcmpIpTransportContext
-{
-    fn receive_icmp_error(
-        sync_ctx: &mut SC,
-        _ctx: &mut C,
-        _device: &SC::DeviceId,
-        original_src_ip: Option<SpecifiedAddr<I::Addr>>,
-        original_dst_ip: SpecifiedAddr<I::Addr>,
-        mut original_body: &[u8],
-        err: I::ErrorCode,
-    ) {
-        sync_ctx.with_counters(|counters| {
-            counters.error_at_transport_layer.increment();
-        });
-        trace!("IcmpIpTransportContext::receive_icmp_error({:?})", err);
+fn receive_ip_transport_icmp_error<
+    I: IcmpIpExt + IpExt,
+    SC: InnerIcmpContext<I, C> + CounterContext<IcmpRxCounters<I>>,
+    C: IcmpNonSyncCtx<I, SC::DeviceId>,
+>(
+    sync_ctx: &mut SC,
+    original_src_ip: Option<SpecifiedAddr<I::Addr>>,
+    original_dst_ip: SpecifiedAddr<I::Addr>,
+    mut original_body: &[u8],
+    err: I::ErrorCode,
+) {
+    sync_ctx.with_counters(|counters| {
+        counters.error_at_transport_layer.increment();
+    });
+    trace!("IcmpIpTransportContext::receive_icmp_error({:?})", err);
 
-        let echo_request = if let Ok(echo_request) =
-            original_body.parse::<IcmpPacketRaw<I, _, IcmpEchoRequest>>()
-        {
+    let echo_request =
+        if let Ok(echo_request) = original_body.parse::<IcmpPacketRaw<I, _, IcmpEchoRequest>>() {
             echo_request
         } else {
             // NOTE: This might just mean that the error message was in response
@@ -1369,30 +1367,30 @@ impl<
             return;
         };
 
-        let original_src_ip = match original_src_ip {
-            Some(ip) => ip,
-            None => {
-                trace!("IcmpIpTransportContext::receive_icmp_error: unspecified source IP address");
-                return;
-            }
-        };
-        let original_src_ip: SocketIpAddr<_> = match original_src_ip.try_into() {
-            Ok(ip) => ip,
-            Err(AddrIsMappedError {}) => {
-                trace!("IcmpIpTransportContext::receive_icmp_error: mapped source IP address");
-                return;
-            }
-        };
-        let original_dst_ip: SocketIpAddr<_> = match original_dst_ip.try_into() {
-            Ok(ip) => ip,
-            Err(AddrIsMappedError {}) => {
-                trace!("IcmpIpTransportContext::receive_icmp_error: mapped destination IP address");
-                return;
-            }
-        };
+    let original_src_ip = match original_src_ip {
+        Some(ip) => ip,
+        None => {
+            trace!("IcmpIpTransportContext::receive_icmp_error: unspecified source IP address");
+            return;
+        }
+    };
+    let original_src_ip: SocketIpAddr<_> = match original_src_ip.try_into() {
+        Ok(ip) => ip,
+        Err(AddrIsMappedError {}) => {
+            trace!("IcmpIpTransportContext::receive_icmp_error: mapped source IP address");
+            return;
+        }
+    };
+    let original_dst_ip: SocketIpAddr<_> = match original_dst_ip.try_into() {
+        Ok(ip) => ip,
+        Err(AddrIsMappedError {}) => {
+            trace!("IcmpIpTransportContext::receive_icmp_error: mapped destination IP address");
+            return;
+        }
+    };
 
-        let id = echo_request.message().id();
-        sync_ctx.with_icmp_ctx_and_sockets_mut(|sync_ctx, sockets| {
+    let id = echo_request.message().id();
+    sync_ctx.with_icmp_ctx_and_sockets_mut(|sync_ctx, sockets| {
             if let Some(conn) = sockets.socket_map.conns().get_by_addr(&ConnAddr {
                 ip: ConnIpAddr {
                     local: (original_src_ip, NonZeroU16::new(id).unwrap()),
@@ -1416,19 +1414,35 @@ impl<
                 trace!("IcmpIpTransportContext::receive_icmp_error: Got ICMP error message for nonexistent ICMP echo socket; either the socket responsible has since been removed, or the error message was sent in error or corrupted");
             }
         })
-    }
 }
 
 impl<
-        B: BufferMut,
         C: IcmpNonSyncCtx<Ipv4, SC::DeviceId>,
         SC: InnerIcmpv4Context<C>
             + PmtuHandler<Ipv4, C>
             + CounterContext<IcmpRxCounters<Ipv4>>
             + CounterContext<IcmpTxCounters<Ipv4>>,
-    > BufferIpTransportContext<Ipv4, C, SC, B> for IcmpIpTransportContext
+    > IpTransportContext<Ipv4, C, SC> for IcmpIpTransportContext
 {
-    fn receive_ip_packet(
+    fn receive_icmp_error(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        _device: &SC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<Ipv4Addr>>,
+        original_dst_ip: SpecifiedAddr<Ipv4Addr>,
+        original_body: &[u8],
+        err: Icmpv4ErrorCode,
+    ) {
+        receive_ip_transport_icmp_error(
+            sync_ctx,
+            original_src_ip,
+            original_dst_ip,
+            original_body,
+            err,
+        )
+    }
+
+    fn receive_ip_packet<B: BufferMut>(
         sync_ctx: &mut SC,
         ctx: &mut C,
         device: &SC::DeviceId,
@@ -1437,7 +1451,7 @@ impl<
         mut buffer: B,
     ) -> Result<(), (B, TransportReceiveError)> {
         trace!(
-            "<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet({}, {})",
+            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet({}, {})",
             src_ip,
             dst_ip
         );
@@ -1459,28 +1473,35 @@ impl<
                     let (local_ip, remote_ip) = (dst_ip, src_ip);
                     // TODO(joshlf): Do something if send_icmp_reply returns an
                     // error?
-                    let _ = send_icmp_reply(sync_ctx, ctx,Some(device), remote_ip, local_ip, |src_ip| {
-                        buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                            src_ip,
-                            remote_ip,
-                            code,
-                            req.reply(),
-                        ))
-                    });
+                    let _ = send_icmp_reply(
+                        sync_ctx,
+                        ctx,
+                        Some(device),
+                        remote_ip,
+                        local_ip,
+                        |src_ip| {
+                            buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                                src_ip,
+                                remote_ip,
+                                code,
+                                req.reply(),
+                            ))
+                        },
+                    );
                 } else {
-                    trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received echo request with an unspecified source address");
                 }
             }
             Icmpv4Packet::EchoReply(echo_reply) => {
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv4>| {
                     counters.echo_reply.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received an EchoReply message");
                 let id = echo_reply.message().id();
                 let meta = echo_reply.parse_metadata();
                 buffer.undo_parse(meta);
                 let device = sync_ctx.downgrade_device_id(device);
-                receive_icmp_echo_reply(sync_ctx,ctx, src_ip, dst_ip, id, buffer, device);
+                receive_icmp_echo_reply(sync_ctx, ctx, src_ip, dst_ip, id, buffer, device);
             }
             Icmpv4Packet::TimestampRequest(timestamp_request) => {
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv4>| {
@@ -1488,7 +1509,7 @@ impl<
                 });
                 if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                     if sync_ctx.should_send_timestamp_reply() {
-                        trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Responding to Timestamp Request message");
+                        trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Responding to Timestamp Request message");
                         // We're supposed to respond with the time that we
                         // processed this message as measured in milliseconds
                         // since midnight UT. However, that would require that
@@ -1519,33 +1540,40 @@ impl<
                         buffer.shrink_front_to(0);
                         // TODO(joshlf): Do something if send_icmp_reply returns
                         // an error?
-                        let _ = send_icmp_reply(sync_ctx, ctx, Some(device), remote_ip, local_ip, |src_ip| {
-                            buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                                src_ip,
-                                remote_ip,
-                                IcmpUnusedCode,
-                                reply,
-                            ))
-                        });
+                        let _ = send_icmp_reply(
+                            sync_ctx,
+                            ctx,
+                            Some(device),
+                            remote_ip,
+                            local_ip,
+                            |src_ip| {
+                                buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                                    src_ip,
+                                    remote_ip,
+                                    IcmpUnusedCode,
+                                    reply,
+                                ))
+                            },
+                        );
                     } else {
                         trace!(
-                            "<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Silently ignoring Timestamp Request message"
+                            "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Silently ignoring Timestamp Request message"
                         );
                     }
                 } else {
-                    trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received timestamp request with an unspecified source address");
+                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received timestamp request with an unspecified source address");
                 }
             }
             Icmpv4Packet::TimestampReply(_) => {
                 // TODO(joshlf): Support sending Timestamp Requests and
                 // receiving Timestamp Replies?
-                debug!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received unsolicited Timestamp Reply message");
+                debug!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received unsolicited Timestamp Reply message");
             }
             Icmpv4Packet::DestUnreachable(dest_unreachable) => {
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv4>| {
                     counters.dest_unreachable.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received a Destination Unreachable message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Destination Unreachable message");
 
                 if dest_unreachable.code() == Icmpv4DestUnreachableCode::FragmentationRequired {
                     if let Some(next_hop_mtu) = dest_unreachable.message().next_hop_mtu() {
@@ -1592,17 +1620,23 @@ impl<
                             // We need the first 4 bytes as the total length
                             // field is at bytes 2/3 of the original packet
                             // buffer.
-                            let total_len = u16::from_be_bytes(original_packet_buf[2..4].try_into().unwrap());
+                            let total_len =
+                                u16::from_be_bytes(original_packet_buf[2..4].try_into().unwrap());
 
-                            trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU value from {}", total_len);
+                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Next-Hop MTU is 0 so using the next best PMTU value from {}", total_len);
 
-                            sync_ctx.update_pmtu_next_lower(ctx, dst_ip.get(), src_ip, Mtu::new(u32::from(total_len)));
+                            sync_ctx.update_pmtu_next_lower(
+                                ctx,
+                                dst_ip.get(),
+                                src_ip,
+                                Mtu::new(u32::from(total_len)),
+                            );
                         } else {
                             // Ok to silently ignore as RFC 792 requires nodes
                             // to send the original IP packet header + 64 bytes
                             // of the original IP packet's body so the node
                             // itself is already violating the RFC.
-                            trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Original packet buf is too small to get original packet len so ignoring");
+                            trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Original packet buf is too small to get original packet len so ignoring");
                         }
                     }
                 }
@@ -1619,7 +1653,7 @@ impl<
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv4>| {
                     counters.time_exceeded.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received a Time Exceeded message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Time Exceeded message");
 
                 receive_icmpv4_error(
                     sync_ctx,
@@ -1629,12 +1663,15 @@ impl<
                     Icmpv4ErrorCode::TimeExceeded(time_exceeded.code()),
                 );
             }
-            Icmpv4Packet::Redirect(_) => log_unimplemented!((), "<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet::redirect"),
+            Icmpv4Packet::Redirect(_) => log_unimplemented!(
+                (),
+                "<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet::redirect"
+            ),
             Icmpv4Packet::ParameterProblem(parameter_problem) => {
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv4>| {
                     counters.parameter_problem.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv4>>::receive_ip_packet: Received a Parameter Problem message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv4>>::receive_ip_packet: Received a Parameter Problem message");
 
                 receive_icmpv4_error(
                     sync_ctx,
@@ -2168,7 +2205,6 @@ fn receive_ndp_packet<
 }
 
 impl<
-        B: BufferMut,
         C: IcmpNonSyncCtx<Ipv6, SC::DeviceId>,
         SC: InnerIcmpv6Context<C>
             + InnerIcmpContext<Ipv6, C>
@@ -2181,9 +2217,27 @@ impl<
             + CounterContext<IcmpRxCounters<Ipv6>>
             + CounterContext<IcmpTxCounters<Ipv6>>
             + CounterContext<NdpCounters>,
-    > BufferIpTransportContext<Ipv6, C, SC, B> for IcmpIpTransportContext
+    > IpTransportContext<Ipv6, C, SC> for IcmpIpTransportContext
 {
-    fn receive_ip_packet(
+    fn receive_icmp_error(
+        sync_ctx: &mut SC,
+        _ctx: &mut C,
+        _device: &SC::DeviceId,
+        original_src_ip: Option<SpecifiedAddr<Ipv6Addr>>,
+        original_dst_ip: SpecifiedAddr<Ipv6Addr>,
+        original_body: &[u8],
+        err: Icmpv6ErrorCode,
+    ) {
+        receive_ip_transport_icmp_error(
+            sync_ctx,
+            original_src_ip,
+            original_dst_ip,
+            original_body,
+            err,
+        )
+    }
+
+    fn receive_ip_packet<B: BufferMut>(
         sync_ctx: &mut SC,
         ctx: &mut C,
         device: &SC::DeviceId,
@@ -2192,7 +2246,7 @@ impl<
         mut buffer: B,
     ) -> Result<(), (B, TransportReceiveError)> {
         trace!(
-            "<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet({:?}, {})",
+            "<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet({:?}, {})",
             src_ip,
             dst_ip
         );
@@ -2232,14 +2286,14 @@ impl<
                         },
                     );
                 } else {
-                    trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address");
+                    trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received echo request with an unspecified source address");
                 }
             }
             Icmpv6Packet::EchoReply(echo_reply) => {
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv6>| {
                     counters.echo_reply.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received an EchoReply message");
                 // We don't allow creating echo sockets connected to the
                 // unspecified address, so it's OK to bail early here if the
                 // source address is unspecified.
@@ -2264,7 +2318,7 @@ impl<
                 sync_ctx.with_counters(|counters: &IcmpRxCounters<Ipv6>| {
                     counters.packet_too_big.increment();
                 });
-                trace!("<IcmpIpTransportContext as BufferIpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
+                trace!("<IcmpIpTransportContext as IpTransportContext<Ipv6>>::receive_ip_packet: Received a Packet Too Big message");
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     // We are updating the path MTU from the destination address
                     // of this `packet` (which is an IP address on this node) to
@@ -3408,7 +3462,7 @@ fn receive_icmp_echo_reply<
         // If we do decide to send an ICMP error message, the appropriate
         // thing to do is probably to have this function return a `Result`,
         // and then have the top-level implementation of
-        // `BufferIpTransportContext::receive_ip_packet` return the
+        // `IpTransportContext::receive_ip_packet` return the
         // appropriate error.
         trace!("receive_icmp_echo_reply: Received echo reply with no local socket");
     })
@@ -4219,8 +4273,8 @@ mod tests {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx;
         fn receive_icmp_error(
             &mut self,
-            ctx: &mut FakeIcmpNonSyncCtx<I>,
-            device: &Self::DeviceId,
+            _ctx: &mut FakeIcmpNonSyncCtx<I>,
+            _device: &Self::DeviceId,
             original_src_ip: Option<SpecifiedAddr<I::Addr>>,
             original_dst_ip: SpecifiedAddr<I::Addr>,
             original_proto: I::Proto,
@@ -4233,15 +4287,13 @@ mod tests {
             });
             outer.receive_icmp_error.push(err);
             if original_proto == I::ICMP_IP_PROTO {
-                <IcmpIpTransportContext as IpTransportContext<I, _, _>>::receive_icmp_error(
+                receive_ip_transport_icmp_error(
                     self,
-                    ctx,
-                    device,
                     original_src_ip,
                     original_dst_ip,
                     original_body,
                     err,
-                );
+                )
             }
         }
 
@@ -5366,7 +5418,7 @@ mod tests {
             )
             .unwrap();
 
-            <IcmpIpTransportContext as BufferIpTransportContext<Ipv4, _, _, _>>::receive_ip_packet(
+            <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
                 &mut sync_ctx.inner,
                 non_sync_ctx,
                 &FakeDeviceId,
@@ -5667,7 +5719,7 @@ mod tests {
             )
             .unwrap();
 
-            <IcmpIpTransportContext as BufferIpTransportContext<Ipv6, _, _, _>>::receive_ip_packet(
+            <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
                 &mut sync_ctx.inner,
                 non_sync_ctx,
                 &FakeDeviceId,

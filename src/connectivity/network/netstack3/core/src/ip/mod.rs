@@ -142,7 +142,7 @@ enum TransportReceiveErrorInner {
 /// An [`Ip`] extension trait adding functionality specific to the IP layer.
 pub trait IpExt: packet_formats::ip::IpExt + IcmpIpExt {
     /// The type used to specify an IP packet's source address in a call to
-    /// [`BufferIpTransportContext::receive_ip_packet`].
+    /// [`IpTransportContext::receive_ip_packet`].
     ///
     /// For IPv4, this is `Ipv4Addr`. For IPv6, this is [`Ipv6SourceAddr`].
     type RecvSrcAddr: Into<Self::Addr>;
@@ -172,7 +172,7 @@ impl IpExt for Ipv6 {
 ///
 /// An implementation for `()` is provided which indicates that a particular
 /// transport layer protocol is unsupported.
-pub(crate) trait IpTransportContext<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> {
+pub(crate) trait IpTransportContext<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> {
     /// Receive an ICMP error message.
     ///
     /// All arguments beginning with `original_` are fields from the IP packet
@@ -195,23 +195,13 @@ pub(crate) trait IpTransportContext<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevi
         original_body: &[u8],
         err: I::ErrorCode,
     );
-}
 
-/// The execution context provided by a transport layer protocol to the IP layer
-/// when a buffer is required.
-pub(crate) trait BufferIpTransportContext<
-    I: IpExt,
-    C,
-    SC: DeviceIdContext<AnyDevice> + ?Sized,
-    B: BufferMut,
->: IpTransportContext<I, C, SC>
-{
     /// Receive a transport layer packet in an IP packet.
     ///
     /// In the event of an unreachable port, `receive_ip_packet` returns the
     /// buffer in its original state (with the transport packet un-parsed) in
     /// the `Err` variant.
-    fn receive_ip_packet(
+    fn receive_ip_packet<B: BufferMut>(
         sync_ctx: &mut SC,
         ctx: &mut C,
         device: &SC::DeviceId,
@@ -221,7 +211,7 @@ pub(crate) trait BufferIpTransportContext<
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
-impl<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, C, SC> for () {
+impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContext<I, C, SC> for () {
     fn receive_icmp_error(
         _sync_ctx: &mut SC,
         _ctx: &mut C,
@@ -233,12 +223,8 @@ impl<I: IcmpIpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized> IpTransportContex
     ) {
         trace!("IpTransportContext::receive_icmp_error: Received ICMP error message ({:?}) for unsupported IP protocol", err);
     }
-}
 
-impl<I: IpExt, C, SC: DeviceIdContext<AnyDevice> + ?Sized, B: BufferMut>
-    BufferIpTransportContext<I, C, SC, B> for ()
-{
-    fn receive_ip_packet(
+    fn receive_ip_packet<B: BufferMut>(
         _sync_ctx: &mut SC,
         _ctx: &mut C,
         _device: &SC::DeviceId,
@@ -1015,34 +1001,25 @@ impl<
         // sockets.
 
         match proto {
-            Ipv4Proto::Icmp => <IcmpIpTransportContext as BufferIpTransportContext<
-                Ipv4,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv4Proto::Icmp => {
+                <IcmpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
             Ipv4Proto::Igmp => {
                 device::receive_igmp_packet(self, ctx, device, src_ip, dst_ip, body);
                 Ok(())
             }
-            Ipv4Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as BufferIpTransportContext<
-                Ipv4,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
-            Ipv4Proto::Proto(IpProto::Tcp) => <TcpIpTransportContext as BufferIpTransportContext<
-                Ipv4,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv4Proto::Proto(IpProto::Udp) => {
+                <UdpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
+            Ipv4Proto::Proto(IpProto::Tcp) => {
+                <TcpIpTransportContext as IpTransportContext<Ipv4, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
             // TODO(joshlf): Once all IP protocol numbers are covered, remove
             // this default case.
             _ => Err((
@@ -1072,34 +1049,25 @@ impl<
         // sockets.
 
         match proto {
-            Ipv6Proto::Icmpv6 => <IcmpIpTransportContext as BufferIpTransportContext<
-                Ipv6,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv6Proto::Icmpv6 => {
+                <IcmpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
             // A value of `Ipv6Proto::NoNextHeader` tells us that there is no
             // header whatsoever following the last lower-level header so we stop
             // processing here.
             Ipv6Proto::NoNextHeader => Ok(()),
-            Ipv6Proto::Proto(IpProto::Tcp) => <TcpIpTransportContext as BufferIpTransportContext<
-                Ipv6,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
-            Ipv6Proto::Proto(IpProto::Udp) => <UdpIpTransportContext as BufferIpTransportContext<
-                Ipv6,
-                _,
-                _,
-                _,
-            >>::receive_ip_packet(
-                self, ctx, device, src_ip, dst_ip, body
-            ),
+            Ipv6Proto::Proto(IpProto::Tcp) => {
+                <TcpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
+            Ipv6Proto::Proto(IpProto::Udp) => {
+                <UdpIpTransportContext as IpTransportContext<Ipv6, _, _>>::receive_ip_packet(
+                    self, ctx, device, src_ip, dst_ip, body,
+                )
+            }
             // TODO(joshlf): Once all IP Next Header numbers are covered, remove
             // this default case.
             _ => Err((
