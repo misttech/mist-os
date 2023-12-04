@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::sysfs::SysFsOps,
     logging::not_implemented,
     task::CurrentTask,
     vfs::{
         buffers::InputBuffer,
         fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
         kobject::{KObject, KObjectHandle, KType, UEventFsNode},
-        sysfs::SysFsOps,
         BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
         FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory,
         VecDirectoryEntry,

@@ -10,7 +10,7 @@ use zerocopy::AsBytes;
 
 use crate::{
     device::{init_common_devices, Features},
-    fs::tmpfs::TmpFs,
+    fs::{fuchsia::RemoteFs, tmpfs::TmpFs},
     mm::{
         syscalls::{do_mmap, sys_mremap},
         MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE,
@@ -18,10 +18,8 @@ use crate::{
     task::{CurrentTask, Kernel, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_not_dir,
-        fuchsia::RemoteFs,
-        Anon, FdNumber, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
-        FsContext, FsNode, FsNodeOps,
+        fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, FdNumber, FileHandle, FileObject,
+        FileOps, FileSystemHandle, FileSystemOptions, FsContext, FsNode, FsNodeOps,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};

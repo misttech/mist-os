@@ -404,7 +404,7 @@ mod test {
     use super::*;
     use std::sync::Arc;
 
-    use crate::{task::*, testing::*, vfs::fuchsia::SyslogFile};
+    use crate::{fs::fuchsia::SyslogFile, task::*, testing::*};
 
     fn add(
         current_task: &CurrentTask,

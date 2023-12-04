@@ -294,11 +294,11 @@ impl VsockSocketInner {
 mod tests {
     use super::*;
     use crate::{
+        fs::fuchsia::create_fuchsia_pipe,
         mm::PAGE_SIZE,
         testing::*,
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
-            fuchsia::create_fuchsia_pipe,
             EpollFileObject,
         },
     };

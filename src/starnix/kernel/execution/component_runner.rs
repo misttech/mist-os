@@ -5,10 +5,11 @@
 use crate::{
     device::run_component_features,
     execution::{create_filesystem_from_spec, execute_task, parse_numbered_handles},
+    fs::fuchsia::RemoteFs,
     logging::{log_error, log_info},
     signals,
     task::{CurrentTask, ExitStatus, Task},
-    vfs::{fuchsia::RemoteFs, FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
+    vfs::{FileSystemOptions, LookupContext, NamespaceNode, WhatToMount},
 };
 use ::runner::{get_program_string, get_program_strvec, StartInfoProgramError};
 use anyhow::{anyhow, bail, Error};

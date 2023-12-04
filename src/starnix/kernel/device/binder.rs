@@ -6,6 +6,7 @@
 
 use crate::{
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
+    fs::fuchsia::new_remote_file,
     logging::{log_error, log_trace, log_warn, not_implemented},
     mm::{
         vmo::round_up_to_increment, DesiredAddress, MappingName, MappingOptions, MemoryAccessor,
@@ -17,12 +18,10 @@ use crate::{
     },
     vfs::{
         buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-        fuchsia::new_remote_file,
-        CacheMode, DirectoryEntryType, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
-        VecDirectory, VecDirectoryEntry,
+        fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirectoryEntryType,
+        FdEvents, FdFlags, FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
 use derivative::Derivative;

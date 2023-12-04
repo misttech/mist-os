@@ -4,8 +4,10 @@
 
 use crate::{
     device::BinderFs,
-    fs::proc::proc_fs,
-    fs::{devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, overlayfs::OverlayFs, tmpfs::TmpFs},
+    fs::{
+        devpts::dev_pts_fs, devtmpfs::dev_tmp_fs, ext4::ExtFilesystem, overlayfs::OverlayFs,
+        proc::proc_fs, sysfs::sys_fs, tmpfs::TmpFs, tracefs::trace_fs,
+    },
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::selinux_fs,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
@@ -13,13 +15,10 @@ use crate::{
     vfs::{
         bpf::BpfFs,
         buffers::InputBuffer,
-        ext4::ExtFilesystem,
         fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
         fs_node_impl_not_dir,
         fuse::new_fuse_fs,
         socket::{SocketAddress, SocketHandle, UnixSocket},
-        sysfs::sys_fs,
-        tracefs::trace_fs,
         DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FdEvents,
         FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
         FsNodeOps, FsStr, FsString, InotifyMask, PathBuilder, RenameFlags, SimpleFileNode,

@@ -4,6 +4,7 @@
 
 use crate::{
     device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
+    fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
     logging::{impossible_error, log_warn},
     mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
@@ -12,7 +13,6 @@ use crate::{
         default_ioctl, default_seek, fileops_impl_directory, fileops_impl_nonseekable,
         fileops_impl_seekable, fs_args, fs_node_impl_not_dir, fs_node_impl_symlink,
         fsverity::FsVerityState,
-        zxio::{zxio_query_events, zxio_wait_async},
         Anon, CacheConfig, CacheMode, DirectoryEntryType, DirentSink, FallocMode, FdEvents,
         FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,

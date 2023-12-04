@@ -3,12 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::tmpfs::TmpfsDirectory,
+    fs::{sysfs::SysFsOps, tmpfs::TmpfsDirectory},
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly,
         kobject::{KObject, KObjectHandle},
-        sysfs::SysFsOps,
         BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
         VecDirectory, VecDirectoryEntry,
     },

@@ -10,12 +10,12 @@ use std::{
 
 use crate::{
     device::DeviceMode,
+    fs::sysfs::SysFsDirectory,
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable, fs_node_impl_not_dir,
-        sysfs::SysFsDirectory,
-        FileObject, FileOps, FsNode, FsNodeOps, FsStr, FsString,
+        fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps, FsStr,
+        FsString,
     },
 };
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
@@ -400,7 +400,7 @@ pub struct UEventContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::vfs::sysfs::DeviceDirectory;
+    use crate::fs::sysfs::DeviceDirectory;
 
     #[::fuchsia::test]
     fn kobject_create_child() {

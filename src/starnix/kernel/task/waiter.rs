@@ -1019,11 +1019,11 @@ impl WaitQueue {
 mod tests {
     use super::*;
     use crate::{
+        fs::fuchsia::*,
         testing::*,
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
-            fuchsia::*,
             FdEvents,
         },
     };

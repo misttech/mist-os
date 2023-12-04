@@ -488,12 +488,12 @@ impl FileOps for EpollFileObject {
 mod tests {
     use super::{epoll_event, EpollFileObject, EventHandler, OpenFlags};
     use crate::{
+        fs::fuchsia::create_fuchsia_pipe,
         task::Waiter,
         testing::{create_kernel_and_task, create_task},
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
-            fuchsia::create_fuchsia_pipe,
             pipe::new_pipe,
             socket::{SocketDomain, SocketType, UnixSocket},
             FdEvents,

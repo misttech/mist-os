@@ -5,12 +5,12 @@
 use crate::{
     execution::execute_task,
     fs::devpts::create_main_and_replica,
+    fs::fuchsia::create_fuchsia_pipe,
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel},
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         file_server::serve_file_at,
-        fuchsia::create_fuchsia_pipe,
         socket::VsockSocket,
         FdFlags, FileHandle,
     },

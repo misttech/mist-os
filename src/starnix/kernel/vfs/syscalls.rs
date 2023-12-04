@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::fuchsia::{TimerFile, TimerFileClock},
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     vfs::{
         buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer},
         eventfd::{new_eventfd, EventFdType},
-        fuchsia::{TimerFile, TimerFileClock},
         inotify::InotifyFileObject,
         namespace::FileSystemCreator,
         new_memfd,

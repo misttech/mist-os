@@ -14,6 +14,7 @@ use std::{convert::TryFrom, sync::Arc};
 
 use crate::{
     arch::execution::new_syscall,
+    fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
     logging::log_trace,
     mm::MemoryManager,
     signals::{dequeue_signal, prepare_to_restart_syscall},
@@ -22,10 +23,7 @@ use crate::{
         CurrentTask, ExitStatus, Kernel, SeccompStateValue, StopState, TaskFlags, ThreadGroup,
         ThreadState, Waiter,
     },
-    vfs::{
-        fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile},
-        FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions,
-    },
+    vfs::{FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions},
 };
 use starnix_syscalls::{
     decls::{Syscall, SyscallDecl},

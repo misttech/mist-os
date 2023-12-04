@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
     logging::not_implemented,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
@@ -11,7 +12,6 @@ use crate::{
             Socket, SocketAddress, SocketDomain, SocketHandle, SocketMessageFlags, SocketOps,
             SocketPeer, SocketProtocol, SocketShutdownFlags, SocketType,
         },
-        zxio::{zxio_query_events, zxio_wait_async},
         AncillaryData, FdEvents, InputBuffer, MessageReadInfo, OutputBuffer,
     },
 };

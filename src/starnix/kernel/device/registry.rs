@@ -3,14 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
+    fs::{
+        devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
+        sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
+    },
     logging::log_error,
     task::CurrentTask,
     vfs::{
         kobject::{
             KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
         },
-        sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FsNode, FsNodeOps, FsStr,
     },
 };

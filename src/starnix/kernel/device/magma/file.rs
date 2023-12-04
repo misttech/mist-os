@@ -17,14 +17,14 @@ use crate::{
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
         wayland::image_file::{ImageFile, ImageInfo},
     },
+    fs::fuchsia::RemoteFileObject,
     logging::{impossible_error, log_error, log_warn, set_zx_name},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable,
-        fuchsia::RemoteFileObject,
-        Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
+        fileops_impl_nonseekable, Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode,
+        VmoFileObject,
     },
 };
 use fidl_fuchsia_logger;

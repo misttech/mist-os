@@ -3,17 +3,18 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::fuchsia::update_info_from_attrs,
     impossible_error,
     logging::log_warn,
     mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vfs::{
         default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable,
-        fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
-        fuchsia::update_info_from_attrs, CacheConfig, CacheMode, DirectoryEntryType, DirentSink,
-        FdEvents, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-        FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-        InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget, ValueOrSize,
+        fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink, CacheConfig,
+        CacheMode, DirectoryEntryType, DirentSink, FdEvents, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, FsString, InputBuffer, OutputBuffer, SeekTarget, SymlinkTarget,
+        ValueOrSize,
     },
 };
 use anyhow::{anyhow, ensure, Error};
@@ -503,10 +504,11 @@ fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsN
 #[cfg(test)]
 mod test {
     use crate::{
+        fs::fuchsia::RemoteBundle,
         testing::create_kernel_and_task,
         vfs::{
-            buffers::VecOutputBuffer, fuchsia::RemoteBundle, DirectoryEntryType, DirentSink, FsStr,
-            LookupContext, Namespace, SymlinkMode, SymlinkTarget,
+            buffers::VecOutputBuffer, DirectoryEntryType, DirentSink, FsStr, LookupContext,
+            Namespace, SymlinkMode, SymlinkTarget,
         },
     };
     use fidl_fuchsia_io as fio;

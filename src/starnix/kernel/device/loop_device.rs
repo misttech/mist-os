@@ -575,10 +575,10 @@ fn get_or_create_loop_device(
 mod tests {
     use super::*;
     use crate::{
+        fs::fuchsia::new_remote_file,
         testing::*,
         vfs::{
-            buffers::*, fuchsia::new_remote_file, Anon, DynamicFile, DynamicFileBuf,
-            DynamicFileSource, FdFlags, FsNodeOps,
+            buffers::*, Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
         },
     };
     use fidl::endpoints::Proxy;

@@ -11,6 +11,8 @@ mod remote_bundle;
 mod syslog;
 mod timer;
 
+pub mod zxio;
+
 pub use remote::*;
 pub use remote_bundle::RemoteBundle;
 pub use syslog::*;

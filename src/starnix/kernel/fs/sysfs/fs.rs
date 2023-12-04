@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::sysfs::{sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
         cgroup::CgroupDirectoryNode,
         kobject::{KObjectHandle, KType},
-        sysfs::{sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
         CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
         FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },

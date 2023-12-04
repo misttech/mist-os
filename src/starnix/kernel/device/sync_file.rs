@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::fuchsia::RemoteFileObject,
     logging::{impossible_error, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::{
@@ -11,9 +12,7 @@ use crate::{
     },
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable,
-        fuchsia::RemoteFileObject,
-        Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
+        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
     },
 };
 use fidl::HandleBased;

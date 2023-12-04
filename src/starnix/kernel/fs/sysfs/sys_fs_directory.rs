@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::sysfs::SysFsOps,
     task::CurrentTask,
     vfs::{
         fs_node_impl_dir_readonly,
         kobject::{KObject, KObjectHandle},
-        sysfs::SysFsOps,
         DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
         VecDirectory, VecDirectoryEntry,
     },
@@ -15,23 +15,23 @@ use crate::{
 use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};
 use std::sync::Weak;
 
-pub struct ClassCollectionDirectory {
+pub struct SysFsDirectory {
     kobject: Weak<KObject>,
 }
 
-impl ClassCollectionDirectory {
+impl SysFsDirectory {
     pub fn new(kobject: Weak<KObject>) -> Self {
         Self { kobject }
     }
 }
 
-impl SysFsOps for ClassCollectionDirectory {
+impl SysFsOps for SysFsDirectory {
     fn kobject(&self) -> KObjectHandle {
         self.kobject.upgrade().expect("Weak references to kobject must always be valid")
     }
 }
 
-impl FsNodeOps for ClassCollectionDirectory {
+impl FsNodeOps for SysFsDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -45,7 +45,7 @@ impl FsNodeOps for ClassCollectionDirectory {
                 .get_children_names()
                 .into_iter()
                 .map(|name| VecDirectoryEntry {
-                    entry_type: DirectoryEntryType::LNK,
+                    entry_type: DirectoryEntryType::DIR,
                     name,
                     inode: None,
                 })
@@ -63,7 +63,7 @@ impl FsNodeOps for ClassCollectionDirectory {
             Some(child_kobject) => Ok(node.fs().create_node(
                 current_task,
                 child_kobject.ops(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o777), FsCred::root()),
+                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             None => error!(ENOENT),
         }
