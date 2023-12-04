@@ -325,7 +325,7 @@ impl HostPipeChild {
         node: Arc<overnet_core::Router>,
     ) -> Result<(Option<HostAddr>, HostPipeChild), PipeError> {
         if verbose_ssh {
-            args.insert(0, "-v");
+            args.insert(0, "-vv");
         }
 
         let mut ssh = tokio::process::Command::from(
