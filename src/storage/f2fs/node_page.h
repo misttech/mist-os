@@ -21,7 +21,7 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
   NodePage &operator=(const NodePage &&) = delete;
   void fbl_recycle() { RecyclePage(); }
 
-  void FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs);
+  void FillNodeFooter(nid_t nid, nid_t ino, size_t ofs);
   void CopyNodeFooterFrom(NodePage &src);
   void FillNodeFooterBlkaddr(block_t blkaddr, uint64_t ver);
   nid_t InoOfNode() const;
@@ -45,7 +45,7 @@ class NodePage : public Page, public fbl::Recyclable<NodePage> {
   // It returns the starting file offset that |node_page| indicates.
   // The file offset can be calcuated by using the node offset that |node_page| has.
   // See NodePage::IsDnode().
-  uint32_t StartBidxOfNode(const uint32_t num_addrs) const;
+  size_t StartBidxOfNode(size_t num_addrs) const;
 
   void SetNid(size_t off, nid_t nid);
   nid_t GetNid(size_t off) const;

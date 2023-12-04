@@ -206,7 +206,7 @@ class SegmentManager {
   pgoff_t NextSitAddr(pgoff_t block_addr);
   void SetToNextSit(uint32_t start);
   uint64_t GetMtime();
-  void SetSummary(Summary *sum, nid_t nid, uint32_t ofs_in_node, uint8_t version);
+  void SetSummary(Summary *sum, nid_t nid, size_t ofs_in_node, uint8_t version);
   block_t StartSumBlock();
   block_t SumBlkAddr(int base, int type);
   bool SecUsageCheck(uint32_t secno);
@@ -246,7 +246,7 @@ class SegmentManager {
   zx::result<block_t> GetBlockAddrOnSegment(LockedPage &page, block_t old_blkaddr, Summary *sum,
                                             PageType p_type);
   zx::result<block_t> GetBlockAddrForNodePage(LockedPage &page, uint32_t nid, block_t old_blkaddr);
-  zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page, nid_t nid, uint32_t ofs_in_node,
+  zx::result<block_t> GetBlockAddrForDataPage(LockedPage &page, nid_t nid, size_t ofs_in_node,
                                               block_t old_blkaddr);
   zx::result<block_t> GetBlockAddrForDirtyMetaPage(LockedPage &page, bool is_reclaim = false);
   zx::result<PageList> GetBlockAddrsForDirtyDataPages(std::vector<LockedPage> pages,

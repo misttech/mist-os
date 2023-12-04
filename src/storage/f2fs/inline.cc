@@ -133,19 +133,17 @@ zx_status_t Dir::ConvertInlineDir() {
     return ret;
   }
 
-  LockedPage dnode_page;
-  if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, 0, &dnode_page);
-      err != ZX_OK) {
-    return err;
+  auto path_or = GetNodePath(*this, 0);
+  if (path_or.is_error()) {
+    return path_or.error_value();
   }
-
-  uint32_t ofs_in_dnode;
-  if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, 0); result.is_error()) {
-    return result.error_value();
-  } else {
-    ofs_in_dnode = result.value();
+  auto dnode_page_or = fs()->GetNodeManager().GetLockedDnodePage(*path_or, IsDir());
+  if (dnode_page_or.is_error()) {
+    return dnode_page_or.error_value();
   }
-
+  IncBlocks(path_or->num_new_nodes);
+  LockedPage dnode_page = std::move(*dnode_page_or);
+  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
   NodePage *ipage = &dnode_page.GetPage<NodePage>();
   block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);
@@ -368,6 +366,9 @@ zx_status_t File::ReadInline(void *data, size_t len, size_t off, size_t *out_act
 }
 
 zx_status_t File::ConvertInlineData() {
+  if (!TestFlag(InodeInfoFlag::kInlineData)) {
+    return ZX_OK;
+  }
   LockedPage page;
   if (TestFlag(InodeInfoFlag::kDataExist)) {
     if (zx_status_t ret = GrabCachePage(0, &page); ret != ZX_OK) {
@@ -375,23 +376,17 @@ zx_status_t File::ConvertInlineData() {
     }
   }
 
-  LockedPage dnode_page;
-  if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, 0, &dnode_page);
-      err != ZX_OK) {
-    return err;
+  auto path_or = GetNodePath(*this, 0);
+  if (path_or.is_error()) {
+    return path_or.error_value();
   }
-
-  if (!TestFlag(InodeInfoFlag::kInlineData)) {
-    return ZX_OK;
+  auto dnode_page_or = fs()->GetNodeManager().GetLockedDnodePage(*path_or, IsDir());
+  if (dnode_page_or.is_error()) {
+    return dnode_page_or.error_value();
   }
-
-  uint32_t ofs_in_dnode;
-  if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, 0); result.is_error()) {
-    return result.error_value();
-  } else {
-    ofs_in_dnode = result.value();
-  }
-
+  IncBlocks(path_or->num_new_nodes);
+  LockedPage dnode_page = std::move(*dnode_page_or);
+  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
   NodePage *ipage = &dnode_page.GetPage<NodePage>();
   block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);

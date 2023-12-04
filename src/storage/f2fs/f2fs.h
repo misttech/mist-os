@@ -144,22 +144,6 @@ class F2fs final {
 
   // For testing Reset() and TakeBc()
   bool IsValid() const;
-  void ResetPsuedoVnodes() {
-    root_vnode_.reset();
-    meta_vnode_.reset();
-    node_vnode_.reset();
-  }
-  void ResetSuperblockInfo() { superblock_info_.reset(); }
-  void ResetSegmentManager() {
-    segment_manager_->DestroySegmentManager();
-    segment_manager_.reset();
-  }
-  void ResetNodeManager() {
-    node_manager_->DestroyNodeManager();
-    node_manager_.reset();
-  }
-  void ResetGcManager() { gc_manager_.reset(); }
-
   zx_status_t LoadSuper(std::unique_ptr<Superblock> sb);
   void Reset();
   zx_status_t GrabMetaPage(pgoff_t index, LockedPage *out);

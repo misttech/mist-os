@@ -9,14 +9,14 @@
 namespace f2fs {
 
 zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
-  nid_t ino;
   fbl::RefPtr<VnodeF2fs> vnode;
 
-  if (fs()->GetNodeManager().AllocNid(ino).is_error()) {
+  auto ino_or = fs()->GetNodeManager().AllocNid();
+  if (ino_or.is_error()) {
     return ZX_ERR_NO_SPACE;
   }
 
-  if (auto ret = VnodeF2fs::Allocate(fs(), ino, mode, &vnode); ret != ZX_OK) {
+  if (auto ret = VnodeF2fs::Allocate(fs(), *ino_or, mode, &vnode); ret != ZX_OK) {
     return ret;
   }
   vnode->SetUid(getuid());

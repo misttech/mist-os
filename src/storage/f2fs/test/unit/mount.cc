@@ -62,7 +62,7 @@ void MountTestDisableExt(F2fs *fs, uint32_t expectation) {
     // create regular files with cold file extensions
     ASSERT_EQ(root_dir->Create(name, S_IFREG, &vnode), ZX_OK);
     File *file = static_cast<File *>(vnode.get());
-    ASSERT_EQ(NodeManager::IsColdFile(*file), result);
+    ASSERT_EQ(file->IsColdFile(), result);
     vnode->Close();
   }
 

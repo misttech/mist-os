@@ -132,16 +132,13 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   size_t blkoff =
       segment_manager_->GetSegOffFromSeg0(blkaddr) & (superblock_info_->GetBlocksPerSeg() - 1);
   Summary sum;
-  nid_t ino;
-  block_t bidx;
-  int i;
-
   SegmentEntry &sentry = GetSegmentManager().GetSegmentEntry(segno);
   if (!sentry.cur_valid_map.GetOne(ToMsbFirst(blkoff))) {
     return;
   }
 
   // Get the previous summary
+  int i;
   for (i = static_cast<int>(CursegType::kCursegWarmData);
        i <= static_cast<int>(CursegType::kCursegColdData); ++i) {
     CursegInfo *curseg = segment_manager_->CURSEG_I(static_cast<CursegType>(i));
@@ -159,6 +156,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
   }
 
   fbl::RefPtr<VnodeF2fs> vnode_refptr;
+  size_t bidx;
   // Get the node page
   {
     LockedPage node_page;
@@ -167,7 +165,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
       FX_LOGS(ERROR) << "F2fs::CheckIndexInPrevNodes, GetNodePage Error!!!";
       return;
     }
-    ino = node_page.GetPage<NodePage>().InoOfNode();
+    nid_t ino = node_page.GetPage<NodePage>().InoOfNode();
     ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode_refptr) == ZX_OK);
     bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_refptr->GetAddrsPerInode()) +
            LeToCpu(sum.ofs_in_node);
@@ -179,7 +177,7 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
 }
 
 void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
-  uint32_t start, end;
+  size_t start, end;
   Summary sum;
   NodeInfo ni;
 
@@ -195,22 +193,23 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
     end = start + kAddrsPerBlock;
   }
 
-  LockedPage dnode_page;
-  if (GetNodeManager().GetLockedDnodePage(vnode, start, &dnode_page) != ZX_OK) {
+  auto path_or = GetNodePath(vnode, start);
+  if (path_or.is_error()) {
     return;
   }
-
+  auto page_or = GetNodeManager().GetLockedDnodePage(*path_or, vnode.IsDir());
+  if (page_or.is_error()) {
+    return;
+  }
+  vnode.IncBlocks(path_or->num_new_nodes);
+  LockedPage dnode_page = std::move(*page_or);
   dnode_page->WaitOnWriteback();
 
   GetNodeManager().GetNodeInfo(dnode_page.GetPage<NodePage>().NidOfNode(), ni);
   ZX_DEBUG_ASSERT(ni.ino == page.InoOfNode());
   ZX_DEBUG_ASSERT(dnode_page.GetPage<NodePage>().OfsOfNode() == page.OfsOfNode());
 
-  zx::result<uint32_t> result;
-  if (result = GetNodeManager().GetOfsInDnode(vnode, start); result.is_error()) {
-    return;
-  }
-  uint32_t offset_in_dnode = result.value();
+  size_t offset_in_dnode = GetOfsInDnode(*path_or);
 
   for (; start < end; ++start) {
     block_t src, dest;

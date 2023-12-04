@@ -67,14 +67,12 @@ class VnodeF2fs : public fs::PagedVnode,
     return kPageSize - sizeof(NodeFooter) -
            sizeof(uint32_t) * (kAddrsPerInode + kNidsPerInode - 1) + GetExtraISize();
   }
-  size_t MaxInlineData() const {
-    return safemath::CheckMul<size_t>(sizeof(uint32_t), (GetAddrsPerInode() - 1)).ValueOrDie();
-  }
+  size_t MaxInlineData() const { return sizeof(uint32_t) * (GetAddrsPerInode() - 1); }
   size_t MaxInlineDentry() const {
     return GetBitSize(MaxInlineData()) / (GetBitSize(kSizeOfDirEntry + kDentrySlotLen) + 1);
   }
-  uint32_t GetAddrsPerInode() const {
-    return safemath::checked_cast<uint32_t>(
+  size_t GetAddrsPerInode() const {
+    return safemath::checked_cast<size_t>(
         (safemath::CheckSub(kAddrsPerInode, safemath::CheckDiv(GetExtraISize(), sizeof(uint32_t))) -
          GetInlineXattrAddrs())
             .ValueOrDie());
@@ -128,11 +126,19 @@ class VnodeF2fs : public fs::PagedVnode,
   //      buffer_head *bh_result, int create);
 #endif
 
+  zx::result<LockedPage> NewInodePage();
+  zx_status_t RemoveInodePage();
   void UpdateInodePage(LockedPage &inode_page);
 
+  void TruncateNode(LockedPage &page);
+
+  block_t TruncateDnodeAddrs(LockedPage &dnode, size_t offset, size_t count);
+  zx::result<size_t> TruncateDnode(nid_t nid);
+  zx::result<size_t> TruncateNodes(nid_t start_nid, size_t nofs, size_t ofs, size_t depth);
+  zx_status_t TruncatePartialNodes(const Inode &inode, const size_t (&offset)[4], size_t depth);
+  zx_status_t TruncateInodeBlocks(pgoff_t from);
+
   zx_status_t DoTruncate(size_t len) __TA_EXCLUDES(f2fs::GetGlobalLock());
-  // Caller should ensure node_page is locked.
-  int TruncateDataBlocksRange(LockedPage &node_page, uint32_t ofs_in_node, uint32_t count);
   zx_status_t TruncateBlocks(uint64_t from) __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero = true)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
@@ -142,19 +148,26 @@ class VnodeF2fs : public fs::PagedVnode,
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
   // Caller should ensure node_page is locked.
-  zx_status_t ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node);
+  zx_status_t ReserveNewBlock(NodePage &node_page, size_t ofs_in_node);
 
   zx::result<block_t> FindDataBlkAddr(pgoff_t index);
   void UpdateExtentCache(block_t blk_addr, pgoff_t file_offset);
   zx::result<LockedPage> FindDataPage(pgoff_t index, bool do_read = true);
   // This function returns block addresses and LockedPages for requested offsets. If there is no
   // node page of a offset or the block address is not assigned, this function adds null LockedPage
-  // and kNullAddr to LockedPagesAndAddrs struct. The handling of null LockedPage and kNullAddr is
-  // responsible for StorageBuffer::ReserveReadOperations().
+  // and kNullAddr to LockedPagesAndAddrs struct. A caller should consider the null LockedPage and
+  // kNullAddr.
   zx::result<LockedPagesAndAddrs> FindDataBlockAddrsAndPages(const pgoff_t start,
                                                              const pgoff_t end);
   zx_status_t GetLockedDataPage(pgoff_t index, LockedPage *out);
   zx::result<std::vector<LockedPage>> GetLockedDataPages(pgoff_t start, pgoff_t end);
+
+  // It returns block addrs for file data blocks at |indices|. |read_only| is used to determine
+  // whether it allocates a new addr if a block of |indices| has not been assigned a valid addr.
+  zx::result<std::vector<block_t>> GetDataBlockAddresses(const std::vector<pgoff_t> &indices,
+                                                         bool read_only = false);
+  zx::result<std::vector<block_t>> GetDataBlockAddresses(pgoff_t index, size_t count,
+                                                         bool read_only = false);
 
   zx::result<block_t> GetBlockAddrForDirtyDataPage(LockedPage &page, bool is_reclaim);
   zx::result<std::vector<LockedPage>> WriteBegin(const size_t offset, const size_t len)
@@ -190,6 +203,12 @@ class VnodeF2fs : public fs::PagedVnode,
   bool HasGid() const;
   bool IsMeta() const;
   bool IsNode() const;
+
+  // Coldness identification:
+  //  - Mark cold files in InodeInfo
+  //  - Mark cold node blocks in their node footer
+  //  - Mark cold data pages in page cache
+  bool IsColdFile() { return IsAdviseSet(FAdvise::kCold); }
 
   void SetName(std::string_view name) __TA_EXCLUDES(info_mutex_) {
     std::lock_guard lock(info_mutex_);

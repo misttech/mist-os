@@ -74,7 +74,9 @@ TEST(Teardown, ShutdownOnNoConnections) {
 
   // Create root directory connection.
   nid_t root_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(root_nid).is_ok());
+  auto nid_or = fs->GetNodeManager().AllocNid();
+  ASSERT_TRUE(nid_or.is_ok());
+  root_nid = *nid_or;
   auto root_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, root_nid, root_completions));
   root_dir->SetMode(S_IFDIR);
 
@@ -92,7 +94,9 @@ TEST(Teardown, ShutdownOnNoConnections) {
 
   // Create child vnode connection.
   nid_t child_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(child_nid).is_ok());
+  nid_or = fs->GetNodeManager().AllocNid();
+  ASSERT_TRUE(nid_or.is_ok());
+  child_nid = *nid_or;
   auto child_dir = fbl::AdoptRef(new AsyncTearDownVnode(fs, child_nid, child_completions));
   child_dir->SetMode(S_IFDIR);
 

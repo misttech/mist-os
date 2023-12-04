@@ -108,13 +108,11 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
     vnode->ClearDirty();
     return ZX_OK;
   });
-  fs->ResetPsuedoVnodes();
   fs->GetVCache().Reset();
   fs->GetDirEntryCache().Reset();
 
   // destroy f2fs internal modules
-  fs->GetNodeManager().DestroyNodeManager();
-  fs->GetSegmentManager().DestroySegmentManager();
+  fs->Reset();
 
   auto vfs_for_tests = fs->TakeVfsForTests();
   ASSERT_TRUE(vfs_for_tests.is_ok());
@@ -185,7 +183,9 @@ void FileTester::DeleteChildren(std::vector<fbl::RefPtr<VnodeF2fs>> &vnodes,
 
 void FileTester::VnodeWithoutParent(F2fs *fs, uint32_t mode, fbl::RefPtr<VnodeF2fs> &vnode) {
   nid_t inode_nid;
-  ASSERT_TRUE(fs->GetNodeManager().AllocNid(inode_nid).is_ok());
+  auto nid_or = fs->GetNodeManager().AllocNid();
+  ASSERT_TRUE(nid_or.is_ok());
+  inode_nid = *nid_or;
 
   VnodeF2fs::Allocate(fs, inode_nid, static_cast<umode_t>(mode), &vnode);
   ASSERT_EQ(vnode->Open(vnode->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),

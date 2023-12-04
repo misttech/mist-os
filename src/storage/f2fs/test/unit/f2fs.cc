@@ -119,15 +119,7 @@ TEST(SuperblockTest, Reset) {
   fs->GetVCache().Reset();
 
   ASSERT_TRUE(fs->IsValid());
-  fs->ResetGcManager();
-  ASSERT_FALSE(fs->IsValid());
-  fs->ResetNodeManager();
-  ASSERT_FALSE(fs->IsValid());
-  fs->ResetSegmentManager();
-  ASSERT_FALSE(fs->IsValid());
-  fs->ResetPsuedoVnodes();
-  ASSERT_FALSE(fs->IsValid());
-  fs->ResetSuperblockInfo();
+  fs->Reset();
   ASSERT_FALSE(fs->IsValid());
   ASSERT_TRUE(fs->GetRootVnode().is_error());
 

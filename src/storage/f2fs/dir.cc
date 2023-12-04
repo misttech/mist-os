@@ -309,7 +309,7 @@ void Dir::InitDentInode(VnodeF2fs *vnode, NodePage &ipage) {
 
 zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
   if (vnode->TestFlag(InodeInfoFlag::kNewInode)) {
-    if (auto page_or = fs()->GetNodeManager().NewInodePage(*vnode); page_or.is_error()) {
+    if (auto page_or = vnode->NewInodePage(); page_or.is_error()) {
       return page_or.error_value();
     } else {
       InitDentInode(vnode, (*page_or).GetPage<NodePage>());
@@ -317,7 +317,7 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
 
     if (vnode->IsDir()) {
       if (zx_status_t err = MakeEmpty(vnode); err != ZX_OK) {
-        fs()->GetNodeManager().RemoveInodePage(vnode);
+        vnode->RemoveInodePage();
         return err;
       }
     }

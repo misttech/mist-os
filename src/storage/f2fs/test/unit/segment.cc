@@ -472,12 +472,9 @@ TEST(SegmentManagerOptionTest, DestroySegmentManagerExceptionCase) {
   fs->GetSegmentManager().SetFreeSegmentInfo(nullptr);
   fs->GetSegmentManager().SetSitInfo(nullptr);
 
-  fs->ResetPsuedoVnodes();
   fs->GetVCache().Reset();
-  fs->GetNodeManager().DestroyNodeManager();
-
   // test exception case
-  fs->GetSegmentManager().DestroySegmentManager();
+  fs->Reset();
 }
 
 TEST(SegmentManagerOptionTest, ModeLfs) {

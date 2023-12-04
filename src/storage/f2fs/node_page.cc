@@ -5,11 +5,12 @@
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
-void NodePage::FillNodeFooter(nid_t nid, nid_t ino, uint32_t ofs) {
+void NodePage::FillNodeFooter(nid_t nid, nid_t ino, size_t ofs) {
   NodeFooter &raw_footer = node().footer;
   raw_footer.nid = CpuToLe(nid);
   raw_footer.ino = CpuToLe(ino);
-  raw_footer.flag = CpuToLe(ofs << static_cast<int>(BitShift::kOffsetBitShift));
+  raw_footer.flag = CpuToLe(
+      safemath::checked_cast<uint32_t>(ofs << static_cast<uint32_t>(BitShift::kOffsetBitShift)));
 }
 
 void NodePage::CopyNodeFooterFrom(NodePage &src) {
@@ -139,8 +140,8 @@ void NodePage::SetDentryMark(bool mark) {
   raw_node.footer.flag = CpuToLe(flag);
 }
 
-uint32_t NodePage::StartBidxOfNode(const uint32_t num_addrs) const {
-  uint32_t node_ofs = OfsOfNode(), NumOfIndirectNodes = 0;
+size_t NodePage::StartBidxOfNode(size_t num_addrs) const {
+  size_t node_ofs = OfsOfNode(), NumOfIndirectNodes = 0;
 
   if (node_ofs == kOfsInode) {
     return 0;
@@ -154,7 +155,7 @@ uint32_t NodePage::StartBidxOfNode(const uint32_t num_addrs) const {
     NumOfIndirectNodes = (node_ofs - kOfsDoubleIndirectNode - 2) / (kNidsPerBlock + 1);
   }
 
-  uint32_t bidx = node_ofs - NumOfIndirectNodes - 1;
+  size_t bidx = node_ofs - NumOfIndirectNodes - 1;
   return (num_addrs + safemath::CheckMul(bidx, kAddrsPerBlock)).ValueOrDie();
 }
 
@@ -184,11 +185,8 @@ void NodePage::SetBlockAddr(const size_t offset, const block_t new_addr) const {
 void NodePage::SetDataBlkaddr(size_t ofs_in_node, block_t new_addr) {
   WaitOnWriteback();
   ZX_DEBUG_ASSERT(IsLocked());
-  if (new_addr == kNewAddr) {
-    ZX_DEBUG_ASSERT(GetBlockAddr(ofs_in_node) == kNullAddr);
-  } else {
-    ZX_DEBUG_ASSERT(GetBlockAddr(ofs_in_node) != kNullAddr);
-  }
+  ZX_DEBUG_ASSERT((new_addr == kNewAddr && GetBlockAddr(ofs_in_node) == kNullAddr) ||
+                  (new_addr != kNewAddr && GetBlockAddr(ofs_in_node) != kNullAddr));
 
   SetBlockAddr(ofs_in_node, new_addr);
   SetDirty();

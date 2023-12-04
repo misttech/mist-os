@@ -182,8 +182,7 @@ zx::result<size_t> VnodeF2fs::CreateAndPopulateVmo(zx::vmo &vmo, const size_t of
 
   // Read blocks only for valid block addrs unless regarding pages are subject to writeback.
   if (block_bitmap.size()) {
-    auto addrs =
-        fs()->GetNodeManager().GetDataBlockAddresses(*this, start_block, num_read_blocks, true);
+    auto addrs = GetDataBlockAddresses(start_block, num_read_blocks, true);
     if (addrs.is_error()) {
       return addrs.take_error();
     }
@@ -599,28 +598,6 @@ zx_status_t VnodeF2fs::DoTruncate(size_t len) {
   return ZX_OK;
 }
 
-int VnodeF2fs::TruncateDataBlocksRange(LockedPage &page, uint32_t ofs_in_node, uint32_t count) {
-  NodePage &node_page = page.GetPage<NodePage>();
-  int nr_free = 0;
-  for (; count > 0; --count, ++ofs_in_node) {
-    block_t blkaddr = node_page.GetBlockAddr(ofs_in_node);
-    if (blkaddr == kNullAddr) {
-      continue;
-    }
-    node_page.SetDataBlkaddr(ofs_in_node, kNullAddr);
-    UpdateExtentCache(kNullAddr, node_page.StartBidxOfNode(GetAddrsPerInode()) + ofs_in_node);
-    fs()->GetSegmentManager().InvalidateBlocks(blkaddr);
-    superblock_info_.DecValidBlockCount(1);
-    DecBlocks(1);
-    ++nr_free;
-  }
-  if (nr_free) {
-    page.SetDirty();
-    SetDirty();
-  }
-  return nr_free;
-}
-
 zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   uint32_t blocksize = superblock_info_.GetBlocksize();
   if (from > GetSize()) {
@@ -634,36 +611,32 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
   // block addrs before purging the addrs in nodes.
   InvalidatePages(free_from);
   {
-    LockedPage node_page;
-    if (zx_status_t err = fs()->GetNodeManager().FindLockedDnodePage(*this, free_from, &node_page);
-        err == ZX_OK) {
-      uint32_t ofs_in_node;
-      if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, free_from); result.is_error()) {
-        return result.error_value();
-      } else {
-        ofs_in_node = result.value();
-      }
-
+    auto path_or = GetNodePath(*this, free_from);
+    if (path_or.is_error()) {
+      return path_or.error_value();
+    }
+    auto node_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
+    if (node_page_or.is_ok()) {
+      size_t ofs_in_node = GetOfsInDnode(*path_or);
       // If |from| starts from inode or the middle of dnode, purge the addrs in the start dnode.
-      NodePage &node = node_page.GetPage<NodePage>();
+      NodePage &node = (*node_page_or).GetPage<NodePage>();
       if (ofs_in_node || node.IsInode()) {
-        uint32_t count = 0;
+        size_t count = 0;
         if (node.IsInode()) {
           count = safemath::CheckSub(GetAddrsPerInode(), ofs_in_node).ValueOrDie();
         } else {
           count = safemath::CheckSub(kAddrsPerBlock, ofs_in_node).ValueOrDie();
         }
-        TruncateDataBlocksRange(node_page, ofs_in_node, count);
+        TruncateDnodeAddrs(*node_page_or, ofs_in_node, count);
         free_from += count;
       }
-    } else if (err != ZX_ERR_NOT_FOUND) {
-      return err;
+    } else if (node_page_or.error_value() != ZX_ERR_NOT_FOUND) {
+      return node_page_or.error_value();
     }
   }
 
   // Invalidate the rest nodes.
-  if (zx_status_t err = fs()->GetNodeManager().TruncateInodeBlocks(*this, free_from);
-      err != ZX_OK) {
+  if (zx_status_t err = TruncateInodeBlocks(free_from); err != ZX_OK) {
     return err;
   }
   return ZX_OK;
@@ -672,27 +645,26 @@ zx_status_t VnodeF2fs::TruncateBlocks(uint64_t from) {
 zx_status_t VnodeF2fs::TruncateHole(pgoff_t pg_start, pgoff_t pg_end, bool zero) {
   InvalidatePages(pg_start, pg_end, zero);
   for (pgoff_t index = pg_start; index < pg_end; ++index) {
-    LockedPage dnode_page;
-    if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, index, &dnode_page);
-        err != ZX_OK) {
-      if (err == ZX_ERR_NOT_FOUND) {
+    auto path_or = GetNodePath(*this, index);
+    if (path_or.is_error()) {
+      if (path_or.error_value() == ZX_ERR_NOT_FOUND) {
         continue;
       }
-      return err;
+      return path_or.error_value();
     }
-
-    uint32_t ofs_in_dnode;
-    if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, index); result.is_error()) {
-      if (result.error_value() == ZX_ERR_NOT_FOUND) {
+    auto page_or = fs()->GetNodeManager().GetLockedDnodePage(*path_or, IsDir());
+    if (page_or.is_error()) {
+      if (page_or.error_value() == ZX_ERR_NOT_FOUND) {
         continue;
       }
-      return result.error_value();
-    } else {
-      ofs_in_dnode = result.value();
+      return page_or.error_value();
     }
-
-    if (dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode) != kNullAddr) {
-      TruncateDataBlocksRange(dnode_page, ofs_in_dnode, 1);
+    IncBlocks(path_or->num_new_nodes);
+    LockedPage dnode_page = std::move(*page_or);
+    size_t ofs_in_dnode = GetOfsInDnode(*path_or);
+    NodePage &node = dnode_page.GetPage<NodePage>();
+    if (node.GetBlockAddr(ofs_in_dnode) != kNullAddr) {
+      TruncateDnodeAddrs(dnode_page, ofs_in_dnode, 1);
     }
   }
   return ZX_OK;
@@ -736,7 +708,7 @@ void VnodeF2fs::EvictVnode() {
   if (HasBlocks()) {
     TruncateToSize();
   }
-  fs()->GetNodeManager().RemoveInodePage(this);
+  RemoveInodePage();
   fs()->EvictVnode(this);
 }
 
@@ -835,7 +807,6 @@ uint64_t VnodeF2fs::GetSize() const {
 }
 
 zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
-  // When kCpErrorFlag is set, write is not allowed.
   if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
@@ -845,25 +816,26 @@ zx_status_t VnodeF2fs::SyncFile(loff_t start, loff_t end, int datasync) {
     return ZX_OK;
   }
 
-  // Write out dirty data pages and wait for completion
   WritebackOperation op = {.bSync = true};
   Writeback(op);
 
-  // Currently, only POSIX mode is supported.
   bool need_cp = NeedToCheckpoint();
-
   if (need_cp) {
     fs()->SyncFs();
     ClearFlag(InodeInfoFlag::kNeedCp);
-    // Check if checkpoint errors happen during fsync().
     if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
       return ZX_ERR_BAD_STATE;
     }
   } else {
-    // Write dnode pages
     fs::SharedLock lock(f2fs::GetGlobalLock());
-    fs()->GetNodeManager().FsyncNodePages(*this);
-
+    {
+      LockedPage page;
+      if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(ino_, &page); ret != ZX_OK) {
+        return ret;
+      }
+      UpdateInodePage(page);
+    }
+    fs()->GetNodeManager().FsyncNodePages(Ino());
     // TODO: Add flags to log recovery information to NAT entries and decide whether to write
     // inode or not.
   }
@@ -933,6 +905,290 @@ void VnodeF2fs::SetOrphan() {
     ZX_ASSERT(fs()->GetNodeManager().GetNodePage(GetKey(), &node_page) == ZX_OK);
     UpdateInodePage(node_page);
   }
+}
+
+void VnodeF2fs::TruncateNode(LockedPage &page) {
+  nid_t nid = static_cast<nid_t>(page->GetKey());
+  fs_->GetNodeManager().TruncateNode(nid);
+  if (nid == Ino()) {
+    fs_->RemoveFromVnodeSet(VnodeSet::kOrphan, nid);
+    superblock_info_.DecValidInodeCount();
+  } else {
+    DecBlocks(1);
+    SetDirty();
+  }
+  page->Invalidate();
+  superblock_info_.SetDirty();
+}
+
+block_t VnodeF2fs::TruncateDnodeAddrs(LockedPage &dnode, size_t offset, size_t count) {
+  block_t nr_free = 0;
+  NodePage &node = dnode.GetPage<NodePage>();
+  for (; count > 0; --count, ++offset) {
+    block_t blkaddr = node.GetBlockAddr(offset);
+    if (blkaddr == kNullAddr) {
+      continue;
+    }
+    node.SetDataBlkaddr(offset, kNullAddr);
+    UpdateExtentCache(kNullAddr, node.StartBidxOfNode(GetAddrsPerInode()) + offset);
+    ++nr_free;
+    if (blkaddr != kNewAddr) {
+      fs()->GetSegmentManager().InvalidateBlocks(blkaddr);
+    }
+  }
+  if (nr_free) {
+    fs()->GetSuperblockInfo().DecValidBlockCount(nr_free);
+    DecBlocks(nr_free);
+    node.SetDirty();
+    SetDirty();
+  }
+  return nr_free;
+}
+
+zx::result<size_t> VnodeF2fs::TruncateDnode(nid_t nid) {
+  if (!nid) {
+    return zx::ok(1);
+  }
+
+  LockedPage page;
+  // get direct node
+  if (zx_status_t err = fs_->GetNodeManager().GetNodePage(nid, &page); err != ZX_OK) {
+    // It is already invalid.
+    if (err == ZX_ERR_NOT_FOUND) {
+      return zx::ok(1);
+    }
+    return zx::error(err);
+  }
+
+  TruncateDnodeAddrs(page, 0, kAddrsPerBlock);
+  TruncateNode(page);
+  return zx::ok(1);
+}
+
+zx::result<size_t> VnodeF2fs::TruncateNodes(nid_t start_nid, size_t nofs, size_t ofs,
+                                            size_t depth) {
+  ZX_DEBUG_ASSERT(depth == 2 || depth == 3);
+  if (unlikely(depth < 2 || depth > 3)) {
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  constexpr size_t kInvalidatedNids = kNidsPerBlock + 1;
+  if (start_nid == 0) {
+    return zx::ok(kInvalidatedNids);
+  }
+
+  LockedPage page;
+  if (zx_status_t ret = fs_->GetNodeManager().GetNodePage(start_nid, &page); ret != ZX_OK) {
+    if (ret != ZX_ERR_NOT_FOUND) {
+      return zx::error(ret);
+    }
+    if (depth == 2) {
+      return zx::ok(kInvalidatedNids);
+    }
+    return zx::ok(kInvalidatedNids * kNidsPerBlock + 1);
+  }
+
+  size_t child_nofs = 0, freed = 0;
+  nid_t child_nid;
+  IndirectNode &indirect_node = page->GetAddress<Node>()->in;
+  if (depth < 3) {
+    for (size_t i = ofs; i < kNidsPerBlock; ++i, ++freed) {
+      child_nid = LeToCpu(indirect_node.nid[i]);
+      if (child_nid == 0) {
+        continue;
+      }
+      if (auto ret = TruncateDnode(child_nid); ret.is_error()) {
+        return ret;
+      }
+      ZX_ASSERT(!page.GetPage<NodePage>().IsInode());
+      page.GetPage<NodePage>().SetNid(i, 0);
+      page.SetDirty();
+    }
+  } else {
+    child_nofs = nofs + ofs * kInvalidatedNids + 1;
+    for (size_t i = ofs; i < kNidsPerBlock; ++i) {
+      child_nid = LeToCpu(indirect_node.nid[i]);
+      auto freed_or = TruncateNodes(child_nid, child_nofs, 0, depth - 1);
+      if (freed_or.is_error()) {
+        return freed_or.take_error();
+      }
+      ZX_DEBUG_ASSERT(*freed_or == kInvalidatedNids);
+      ZX_DEBUG_ASSERT(!page.GetPage<NodePage>().IsInode());
+      page.GetPage<NodePage>().SetNid(i, 0);
+      page.SetDirty();
+      child_nofs += kInvalidatedNids;
+      freed += kInvalidatedNids;
+    }
+  }
+
+  if (!ofs) {
+    TruncateNode(page);
+    ++freed;
+  }
+  return zx::ok(freed);
+}
+
+zx_status_t VnodeF2fs::TruncatePartialNodes(const Inode &inode, const size_t (&offset)[4],
+                                            size_t depth) {
+  LockedPage pages[2];
+  nid_t nid[3];
+  size_t idx = depth - 2;
+
+  if (nid[0] = LeToCpu(inode.i_nid[offset[0] - kNodeDir1Block]); !nid[0]) {
+    return ZX_OK;
+  }
+
+  // get indirect nodes in the path
+  for (size_t i = 0; i < idx + 1; ++i) {
+    if (auto ret = fs_->GetNodeManager().GetNodePage(nid[i], &pages[i]); ret != ZX_OK) {
+      return ret;
+    }
+    nid[i + 1] = pages[i].GetPage<NodePage>().GetNid(offset[i + 1]);
+  }
+
+  // free direct nodes linked to a partial indirect node
+  for (auto i = offset[idx + 1]; i < kNidsPerBlock; ++i) {
+    nid_t child_nid = pages[idx].GetPage<NodePage>().GetNid(i);
+    if (!child_nid) {
+      continue;
+    }
+    if (auto ret = TruncateDnode(child_nid); ret.is_error()) {
+      return ret.error_value();
+    }
+    ZX_ASSERT(!pages[idx].GetPage<NodePage>().IsInode());
+    pages[idx].GetPage<NodePage>().SetNid(i, 0);
+    pages[idx].SetDirty();
+  }
+
+  if (offset[idx + 1] == 0) {
+    TruncateNode(pages[idx]);
+  }
+  return ZX_OK;
+}
+
+// All the block addresses of data and nodes should be nullified.
+zx_status_t VnodeF2fs::TruncateInodeBlocks(pgoff_t from) {
+  auto node_path = GetNodePath(*this, from);
+  if (node_path.is_error()) {
+    return node_path.error_value();
+  }
+
+  const size_t level = node_path->depth;
+  const size_t(&node_offsets)[kMaxNodeBlockLevel] = node_path->node_offset;
+  size_t(&offsets_in_node)[kMaxNodeBlockLevel] = node_path->offset_in_node;
+  size_t node_offset = 0;
+
+  LockedPage locked_ipage;
+  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &locked_ipage); ret != ZX_OK) {
+    return ret;
+  }
+  locked_ipage->WaitOnWriteback();
+  Inode &inode = locked_ipage->GetAddress<Node>()->i;
+  switch (level) {
+    case 0:
+      node_offset = 1;
+      break;
+    case 1:
+      node_offset = node_offsets[1];
+      break;
+    case 2:
+      node_offset = node_offsets[1];
+      if (!offsets_in_node[1]) {
+        break;
+      }
+      if (zx_status_t ret = TruncatePartialNodes(inode, offsets_in_node, level);
+          ret != ZX_OK && ret != ZX_ERR_NOT_FOUND) {
+        return ret;
+      }
+      ++offsets_in_node[level - 2];
+      offsets_in_node[level - 1] = 0;
+      node_offset += 1 + kNidsPerBlock;
+      break;
+    case 3:
+      node_offset = 5 + 2 * kNidsPerBlock;
+      if (!offsets_in_node[2]) {
+        break;
+      }
+      if (zx_status_t ret = TruncatePartialNodes(inode, offsets_in_node, level);
+          ret != ZX_OK && ret != ZX_ERR_NOT_FOUND) {
+        return ret;
+      }
+      ++offsets_in_node[level - 2];
+      offsets_in_node[level - 1] = 0;
+      break;
+    default:
+      ZX_ASSERT(0);
+  }
+
+  bool run = true;
+  while (run) {
+    zx::result<size_t> freed_or;
+    nid_t nid = LeToCpu(inode.i_nid[offsets_in_node[0] - kNodeDir1Block]);
+    switch (offsets_in_node[0]) {
+      case kNodeDir1Block:
+      case kNodeDir2Block:
+        freed_or = TruncateDnode(nid);
+        break;
+
+      case kNodeInd1Block:
+      case kNodeInd2Block:
+        freed_or = TruncateNodes(nid, node_offset, offsets_in_node[1], 2);
+        break;
+
+      case kNodeDIndBlock:
+        freed_or = TruncateNodes(nid, node_offset, offsets_in_node[1], 3);
+        run = false;
+        break;
+
+      default:
+        ZX_ASSERT(0);
+    }
+    if (freed_or.is_error()) {
+      ZX_DEBUG_ASSERT(freed_or.error_value() != ZX_ERR_NOT_FOUND);
+      return freed_or.error_value();
+    }
+    if (offsets_in_node[1] == 0) {
+      inode.i_nid[offsets_in_node[0] - kNodeDir1Block] = 0;
+      locked_ipage.SetDirty();
+    }
+    offsets_in_node[1] = 0;
+    ++offsets_in_node[0];
+    node_offset += *freed_or;
+  }
+  return ZX_OK;
+}
+
+zx_status_t VnodeF2fs::RemoveInodePage() {
+  LockedPage ipage;
+  nid_t ino = Ino();
+  if (zx_status_t err = fs()->GetNodeManager().GetNodePage(ino, &ipage); err != ZX_OK) {
+    return err;
+  }
+
+  if (nid_t nid = GetXattrNid(); nid > 0) {
+    LockedPage page;
+    if (zx_status_t err = fs()->GetNodeManager().GetNodePage(nid, &page); err != ZX_OK) {
+      return err;
+    }
+    ClearXattrNid();
+    TruncateNode(page);
+  }
+  ZX_DEBUG_ASSERT(!GetBlocks());
+  TruncateNode(ipage);
+  return ZX_OK;
+}
+
+zx::result<LockedPage> VnodeF2fs::NewInodePage() {
+  if (TestFlag(InodeInfoFlag::kNoAlloc)) {
+    return zx::error(ZX_ERR_ACCESS_DENIED);
+  }
+  // allocate inode page for new inode
+  auto page_or = fs()->GetNodeManager().NewNodePage(Ino(), Ino(), IsDir(), 0);
+  if (page_or.is_error()) {
+    return page_or.take_error();
+  }
+  SetDirty();
+  return zx::ok(std::move(*page_or));
 }
 
 }  // namespace f2fs

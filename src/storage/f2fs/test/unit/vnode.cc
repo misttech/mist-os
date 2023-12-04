@@ -179,7 +179,9 @@ TEST_F(VnodeTest, VgetExceptionCase) {
   nid_t nid;
 
   // 1. Check Create() GetNodePage() exception
-  ASSERT_TRUE(node_manager.AllocNid(nid).is_ok());
+  auto nid_or = node_manager.AllocNid();
+  ASSERT_TRUE(nid_or.is_ok());
+  nid = *nid_or;
   ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), nid, &test_vnode), ZX_ERR_NOT_FOUND);
 
   // 2. Check Create() namelen exception

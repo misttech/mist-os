@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <numeric>
+
 #include "src/storage/f2fs/f2fs.h"
 
 namespace f2fs {
 
-zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, uint32_t ofs_in_node) {
+zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, size_t ofs_in_node) {
   if (TestFlag(InodeInfoFlag::kNoAlloc)) {
     return ZX_ERR_ACCESS_DENIED;
   }
@@ -126,20 +128,16 @@ void VnodeF2fs::UpdateExtentCache(block_t blk_addr, pgoff_t file_offset) {
 }
 
 zx::result<block_t> VnodeF2fs::FindDataBlkAddr(pgoff_t index) {
-  uint32_t ofs_in_dnode;
-  if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, index); result.is_error()) {
-    return result.take_error();
-  } else {
-    ofs_in_dnode = result.value();
+  auto path_or = GetNodePath(*this, index);
+  if (path_or.is_error()) {
+    return path_or.take_error();
   }
-
-  LockedPage dnode_page;
-  if (zx_status_t err = fs()->GetNodeManager().FindLockedDnodePage(*this, index, &dnode_page);
-      err != ZX_OK) {
-    return zx::error(err);
+  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
+  auto dnode_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
+  if (dnode_page_or.is_error()) {
+    return dnode_page_or.take_error();
   }
-
-  return zx::ok(dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode));
+  return zx::ok((*dnode_page_or).GetPage<NodePage>().GetBlockAddr(ofs_in_dnode));
 }
 
 zx::result<LockedPage> VnodeF2fs::FindDataPage(pgoff_t index, bool do_read) {
@@ -207,7 +205,7 @@ zx::result<LockedPagesAndAddrs> VnodeF2fs::FindDataBlockAddrsAndPages(const pgof
   if (offsets.empty()) {
     return zx::ok(std::move(addrs_and_pages));
   }
-  auto addrs_or = fs()->GetNodeManager().GetDataBlockAddresses(*this, offsets, true);
+  auto addrs_or = GetDataBlockAddresses(offsets, true);
   if (addrs_or.is_error()) {
     return addrs_or.take_error();
   }
@@ -287,19 +285,17 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::GetLockedDataPages(const pgoff_t 
 zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out) {
   block_t data_blkaddr;
   {
-    LockedPage dnode_page;
-    if (zx_status_t err = fs()->GetNodeManager().GetLockedDnodePage(*this, index, &dnode_page);
-        err != ZX_OK) {
-      return err;
+    auto path_or = GetNodePath(*this, index);
+    if (path_or.is_error()) {
+      return path_or.status_value();
     }
-
-    uint32_t ofs_in_dnode;
-    if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, index); result.is_error()) {
-      return result.error_value();
-    } else {
-      ofs_in_dnode = result.value();
+    auto page_or = fs()->GetNodeManager().GetLockedDnodePage(*path_or, IsDir());
+    if (page_or.is_error()) {
+      return page_or.error_value();
     }
-
+    IncBlocks(path_or->num_new_nodes);
+    LockedPage dnode_page = std::move(*page_or);
+    size_t ofs_in_dnode = GetOfsInDnode(*path_or);
     data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
     if (data_blkaddr == kNullAddr) {
       if (zx_status_t ret = ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
@@ -397,22 +393,17 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
 #endif
 
 zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
-  LockedPage dnode_page;
-  if (zx_status_t err =
-          fs()->GetNodeManager().FindLockedDnodePage(*this, page->GetIndex(), &dnode_page);
-      err != ZX_OK) {
-    return zx::error(err);
+  size_t index = page->GetIndex();
+  auto path_or = GetNodePath(*this, index);
+  if (path_or.is_error()) {
+    return path_or.take_error();
   }
-
-  uint32_t ofs_in_dnode;
-  if (auto result = fs()->GetNodeManager().GetOfsInDnode(*this, page->GetIndex());
-      result.is_error()) {
-    return result.take_error();
-  } else {
-    ofs_in_dnode = result.value();
+  auto dnode_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
+  if (dnode_page_or.is_error()) {
+    return dnode_page_or.take_error();
   }
-
-  block_t old_blk_addr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
+  size_t ofs_in_dnode = GetOfsInDnode(*path_or);
+  block_t old_blk_addr = (*dnode_page_or).GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
   // This page is already truncated
   if (old_blk_addr == kNullAddr) {
     return zx::error(ZX_ERR_NOT_FOUND);
@@ -425,10 +416,10 @@ zx::result<block_t> VnodeF2fs::GetBlockAddrForDataPage(LockedPage &page) {
   } else {
     pgoff_t file_offset = page->GetIndex();
     auto addr_or = fs()->GetSegmentManager().GetBlockAddrForDataPage(
-        page, dnode_page.GetPage<NodePage>().NidOfNode(), ofs_in_dnode, old_blk_addr);
+        page, (*dnode_page_or).GetPage<NodePage>().NidOfNode(), ofs_in_dnode, old_blk_addr);
     ZX_ASSERT(addr_or.is_ok());
     new_blk_addr = *addr_or;
-    dnode_page.GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_blk_addr);
+    (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_blk_addr);
     UpdateExtentCache(new_blk_addr, file_offset);
     UpdateVersion(superblock_info_.GetCheckpointVer());
   }
@@ -495,12 +486,70 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
     page.SetDirty();
   }
   std::vector<block_t> data_block_addresses;
-  if (auto result =
-          fs()->GetNodeManager().GetDataBlockAddresses(*this, index_start, index_end - index_start);
+  if (auto result = GetDataBlockAddresses(index_start, index_end - index_start);
       result.is_error()) {
     return result.take_error();
   }
   return zx::ok(std::move(data_pages));
+}
+
+zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(
+    const std::vector<pgoff_t> &indices, bool read_only) {
+  std::vector<block_t> data_block_addresses(indices.size());
+  uint32_t prev_node_offset = kInvalidNodeOffset;
+  LockedPage dnode_page;
+
+  for (uint32_t iter = 0; iter < indices.size(); ++iter) {
+    auto path_or = GetNodePath(*this, indices[iter]);
+    if (path_or.is_error()) {
+      return path_or.take_error();
+    }
+    if (!IsSameDnode(*path_or, prev_node_offset)) {
+      dnode_page.reset();
+      if (read_only) {
+        auto dnode_page_or = fs()->GetNodeManager().FindLockedDnodePage(*path_or);
+        if (dnode_page_or.is_error()) {
+          if (dnode_page_or.error_value() == ZX_ERR_NOT_FOUND) {
+            prev_node_offset = kInvalidNodeOffset;
+            data_block_addresses[iter] = kNullAddr;
+            continue;
+          }
+          return dnode_page_or.take_error();
+        }
+        dnode_page = std::move(*dnode_page_or);
+      } else {
+        auto dnode_page_or = fs()->GetNodeManager().GetLockedDnodePage(*path_or, IsDir());
+        if (dnode_page_or.is_error()) {
+          return dnode_page_or.take_error();
+        }
+        IncBlocks(path_or->num_new_nodes);
+        dnode_page = std::move(*dnode_page_or);
+      }
+      prev_node_offset = dnode_page.GetPage<NodePage>().OfsOfNode();
+    }
+    ZX_DEBUG_ASSERT(dnode_page != nullptr);
+
+    size_t ofs_in_dnode = GetOfsInDnode(*path_or);
+    block_t data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
+
+    if (!read_only && data_blkaddr == kNullAddr) {
+      if (zx_status_t err = ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
+          err != ZX_OK) {
+        return zx::error(err);
+      }
+      data_blkaddr = kNewAddr;
+    }
+
+    data_block_addresses[iter] = data_blkaddr;
+  }
+  return zx::ok(std::move(data_block_addresses));
+}
+
+zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(pgoff_t index, size_t count,
+                                                                  bool read_only) {
+  std::vector<pgoff_t> indices(count);
+  std::iota(indices.begin(), indices.end(), index);
+  return GetDataBlockAddresses(indices, read_only);
 }
 
 }  // namespace f2fs

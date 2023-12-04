@@ -285,9 +285,9 @@ uint64_t SegmentManager::GetMtime() {
   return sit_info_->elapsed_time + cur_time - sit_info_->mounted_time;
 }
 
-void SegmentManager::SetSummary(Summary *sum, nid_t nid, uint32_t ofs_in_node, uint8_t version) {
+void SegmentManager::SetSummary(Summary *sum, nid_t nid, size_t ofs_in_node, uint8_t version) {
   sum->nid = CpuToLe(nid);
-  sum->ofs_in_node = CpuToLe(static_cast<uint16_t>(ofs_in_node));
+  sum->ofs_in_node = CpuToLe(safemath::checked_cast<uint16_t>(ofs_in_node));
   sum->version = version;
 }
 
@@ -323,8 +323,7 @@ void SegmentManager::BalanceFs() {
   fs_->WaitForAvailableMemory();
   if (HasNotEnoughFreeSecs()) {
     if (auto ret = fs_->GetGcManager().Run(); ret.is_error()) {
-      // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise
-      // BUG
+      // Run() returns ZX_ERR_UNAVAILABLE when there is no available victim section, otherwise BUG
       ZX_DEBUG_ASSERT(ret.error_value() == ZX_ERR_UNAVAILABLE);
     }
   }
@@ -840,7 +839,7 @@ CursegType SegmentManager::GetSegmentType6(Page &page, PageType p_type) {
 
     if (vnode.IsDir()) {
       return CursegType::kCursegHotData;
-    } else if (page.IsColdData() || NodeManager::IsColdFile(vnode)) {
+    } else if (page.IsColdData() || vnode.IsColdFile()) {
       return CursegType::kCursegColdData;
     }
     return CursegType::kCursegWarmData;
@@ -964,7 +963,7 @@ zx::result<block_t> SegmentManager::GetBlockAddrForNodePage(LockedPage &page, ui
 }
 
 zx::result<block_t> SegmentManager::GetBlockAddrForDataPage(LockedPage &page, nid_t nid,
-                                                            uint32_t ofs_in_node,
+                                                            size_t ofs_in_node,
                                                             block_t old_blkaddr) {
   Summary sum;
   NodeInfo ni;

@@ -206,17 +206,9 @@ void F2fs::PutSuper() {
   SetTearDown();
   writer_.reset();
   reader_.reset();
-  ResetPsuedoVnodes();
   GetVCache().Reset();
   GetDirEntryCache().Reset();
-
-  node_manager_->DestroyNodeManager();
-  segment_manager_->DestroySegmentManager();
-
-  node_manager_.reset();
-  segment_manager_.reset();
-  gc_manager_.reset();
-  superblock_info_.reset();
+  Reset();
 }
 
 void F2fs::ScheduleWriteback(size_t num_pages) {
@@ -359,11 +351,10 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
 #endif
 
 void F2fs::Reset() {
-  ResetPsuedoVnodes();
-  if (node_manager_) {
-    node_manager_->DestroyNodeManager();
-    node_manager_.reset();
-  }
+  root_vnode_.reset();
+  meta_vnode_.reset();
+  node_vnode_.reset();
+  node_manager_.reset();
   if (segment_manager_) {
     segment_manager_->DestroySegmentManager();
     segment_manager_.reset();
