@@ -18,6 +18,7 @@ use {
         channel::mpsc, future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt,
     },
     std::sync::Arc,
+    tracing::info,
 };
 
 /// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
@@ -251,6 +252,8 @@ impl LocalRoamManagerService {
         loop {
             select! {
                 req  = self.roam_search_receiver.select_next_some() => {
+                    info!("Performing scan to find proactive local roaming candidates.");
+
                     let roam_fut = get_connection_selection_future(
                         self.connection_selector.clone(),
                         req.network,
