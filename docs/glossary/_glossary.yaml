@@ -2273,9 +2273,9 @@
   core of Fuchsia."
   full_description: "In a traditional monolithic kernel, many of
   the userspace components of Zircon would be part of the kernel itself."
-  see_also: ["<a href=\"/zircon/README.md\">Zircon documentation</a>",
+  see_also: ["<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/README.md\">Zircon documentation</a>",
              "<a href=\"/docs/concepts/kernel/concepts.md\">Zircon concepts</a>",
-             "<a href=\"/zircon/\">Source code</a>"]
+             "<a href=\"https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/\">Source code</a>"]
   related_guides: [""]
   area: ["Zircon"]
 
