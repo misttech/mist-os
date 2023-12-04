@@ -7,6 +7,7 @@ pub mod merge;
 use {
     crate::{
         debug_assert_not_too_long,
+        drop_event::DropEvent,
         errors::FxfsError,
         filesystem::{ApplyContext, ApplyMode, FxFilesystem, JournalingObject, SyncOptions},
         log::*,
@@ -37,6 +38,7 @@ use {
     anyhow::{anyhow, bail, ensure, Context, Error},
     async_trait::async_trait,
     either::Either::{Left, Right},
+    event_listener::EventListener,
     fprint::TypeFingerprint,
     fuchsia_inspect::ArrayProperty,
     futures::FutureExt,
@@ -450,7 +452,13 @@ pub struct SimpleAllocator {
     object_id: u64,
     max_extent_size_bytes: u64,
     tree: LSMTree<AllocatorKey, AllocatorValue>,
-    reserved_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
+    // A list of allocations which are temporary; i.e. they are not actually stored in the LSM tree,
+    // but we still don't want to be able to allocate over them.  This layer is merged into the
+    // allocator's LSM tree whilst reading it, so the allocations appear to exist in the LSM tree.
+    // This is used in a few places, for example to hold back allocations that have been added to a
+    // transaction but are not yet committed yet, or to prevent the allocation of a deleted extent
+    // until the device is flushed.
+    temporary_allocations: Arc<SkipListLayer<AllocatorKey, AllocatorValue>>,
     inner: Mutex<Inner>,
     allocation_mutex: futures::lock::Mutex<()>,
     counters: Mutex<SimpleAllocatorCounters>,
@@ -490,6 +498,12 @@ impl ByteTracking {
             + self.uncommitted_allocated_bytes
             + self.committed_deallocated_bytes
     }
+
+    // Like `unavailable_bytes`, but treats as available the bytes which have been deallocated and
+    // require a device flush to be reused.
+    fn unavailable_after_sync_bytes(&self) -> u64 {
+        self.allocated_bytes as u64 + self.uncommitted_allocated_bytes
+    }
 }
 
 struct CommittedDeallocation {
@@ -508,8 +522,8 @@ struct Inner {
     opened: bool,
     // When a transaction is dropped, we need to release the reservation, but that requires the use
     // of async methods which we can't use when called from drop.  To workaround that, we keep an
-    // array of dropped_allocations and update reserved_allocations the next time we try to
-    // allocate.
+    // array of dropped_allocations and remove them from temporary_allocations the next time we
+    // try to allocate.
     dropped_allocations: Vec<AllocatorItem>,
     // The per-owner counters for bytes at various stages of the data life-cycle. From initial
     // reservation through until the bytes are unallocated and eventually uncommitted.
@@ -519,11 +533,19 @@ struct Inner {
     unattributed_reserved_bytes: u64,
     // Committed deallocations that we cannot use until they are flushed to the device.
     committed_deallocated: VecDeque<CommittedDeallocation>,
-    // A map of of |owner_object_id| to log offset and bytes allocated.
+    // A map of of |owner_object_id| to log offset and bytes allocated which indicates the object
+    // was deleted at that log offset.
     // Once the journal has been flushed beyond 'log_offset', we replace entries here with
     // an entry in AllocatorInfo to have all iterators ignore owner_object_id. That entry is
     // then cleaned up at next (major) compaction time.
     committed_marked_for_deletion: BTreeMap<u64, (/*log_offset:*/ u64, /*bytes:*/ u64)>,
+    // Bytes which are currently being trimmed.  These can still be allocated from, but the
+    // allocation will block until the current batch of trimming is finished.
+    trim_reserved_bytes: u64,
+    // While a trim is being performed, this listener is set.  When the current batch of extents
+    // being trimmed have been released (and trim_reserved_bytes is 0), this is signaled.
+    // This should only be listened to while the allocation_mutex is held.
+    trim_listener: Option<EventListener>,
 }
 
 impl Inner {
@@ -576,6 +598,20 @@ impl Inner {
             + self.unattributed_reserved_bytes
     }
 
+    // Like `unavailable_bytes`, but treats as available the bytes which have been deallocated and
+    // require a device flush to be reused.
+    fn unavailable_after_sync_bytes(&self) -> u64 {
+        self.owner_bytes.values().map(|x| x.unavailable_after_sync_bytes()).sum::<u64>()
+    }
+
+    // Returns the number of bytes which will be available after the current batch of trimming
+    // completes.
+    fn bytes_available_not_being_trimmed(&self, device_size: u64) -> Result<u64, Error> {
+        device_size
+            .checked_sub(self.unavailable_after_sync_bytes() + self.trim_reserved_bytes)
+            .ok_or(anyhow!(FxfsError::Inconsistent))
+    }
+
     fn add_reservation(&mut self, owner_object_id: Option<u64>, amount: u64) {
         match owner_object_id {
             Some(owner) => self.owner_bytes.entry(owner).or_default().reserved_bytes += amount,
@@ -608,11 +644,16 @@ impl Inner {
     }
 }
 
-/// A container for a set of extents which are known to be free.  Returned by `collect_free_extents`
-/// (e.g. to trim the extents).  The extents will not be allocated while this object exists.
-/// TODO(b/293964968): We might want to let the allocator block until these are released if there's
-/// no other free space, so that trimming doesn't prevent normal usage.
-pub struct FreeExtents<'a>(&'a SimpleAllocator, Vec<Range<u64>>);
+/// A container for a set of extents which are known to be free and can be trimmed.  Returned by
+/// `take_for_trimming`.  The extents will not be allocated while this object exists.
+pub struct TrimmableExtents<'a> {
+    allocator: &'a SimpleAllocator,
+    extents: Vec<Range<u64>>,
+    // The allocator can subscribe to this event to wait until these extents are dropped.  This way,
+    // we don't fail an allocation attempt if blocks are tied up for trimming; rather, we just wait
+    // until the batch is finished with and then proceed.
+    _drop_event: DropEvent,
+}
 
 fn allocator_item(device_range: Range<u64>, owner_object_id: u64) -> AllocatorItem {
     AllocatorItem::new(
@@ -621,30 +662,38 @@ fn allocator_item(device_range: Range<u64>, owner_object_id: u64) -> AllocatorIt
     )
 }
 
-impl<'a> FreeExtents<'a> {
+impl<'a> TrimmableExtents<'a> {
     pub fn extents(&self) -> &Vec<Range<u64>> {
-        &self.1
+        &self.extents
+    }
+
+    // Also returns an EventListener which is signaled when this is dropped.
+    fn new(allocator: &'a SimpleAllocator) -> (Self, EventListener) {
+        let drop_event = DropEvent::new();
+        let listener = drop_event.listen();
+        (Self { allocator, extents: vec![], _drop_event: drop_event }, listener)
     }
 
     async fn add_extent(&mut self, device_range: Range<u64>) {
         // The mutation will never be used in a transaction, so we can use a fake object ID.
         let owner_object_id = INVALID_OBJECT_ID;
-        self.0
-            .reserved_allocations
+        self.allocator
+            .temporary_allocations
             .insert(allocator_item(device_range.clone(), owner_object_id))
             .await
             .expect("Reserved an in-use range.");
-        self.1.push(device_range);
+        self.extents.push(device_range);
     }
 }
 
-impl<'a> Drop for FreeExtents<'a> {
+impl<'a> Drop for TrimmableExtents<'a> {
     fn drop(&mut self) {
-        let mut inner = self.0.inner.lock().unwrap();
+        let mut inner = self.allocator.inner.lock().unwrap();
         let owner_object_id = INVALID_OBJECT_ID;
-        for device_range in &self.1 {
+        for device_range in &self.extents {
             inner.dropped_allocations.push(allocator_item(device_range.clone(), owner_object_id));
         }
+        inner.trim_reserved_bytes = 0;
     }
 }
 
@@ -658,7 +707,7 @@ impl SimpleAllocator {
             object_id,
             max_extent_size_bytes,
             tree: LSMTree::new(merge, Box::new(NullCache {})),
-            reserved_allocations: SkipListLayer::new(1024), // TODO(fxbug.dev/95981): magic numbers
+            temporary_allocations: SkipListLayer::new(1024), // TODO(fxbug.dev/95981): magic numbers
             inner: Mutex::new(Inner {
                 info: AllocatorInfo::default(),
                 opened: false,
@@ -667,6 +716,8 @@ impl SimpleAllocator {
                 unattributed_reserved_bytes: 0,
                 committed_deallocated: VecDeque::new(),
                 committed_marked_for_deletion: BTreeMap::new(),
+                trim_reserved_bytes: 0,
+                trim_listener: None,
             }),
             allocation_mutex: futures::lock::Mutex::new(()),
             counters: Mutex::new(SimpleAllocatorCounters::default()),
@@ -682,7 +733,7 @@ impl SimpleAllocator {
     pub fn layer_set(&self) -> LayerSet<AllocatorKey, AllocatorValue> {
         let tree = &self.tree;
         let mut layer_set = tree.empty_layer_set();
-        layer_set.layers.push((self.reserved_allocations.clone() as Arc<dyn Layer<_, _>>).into());
+        layer_set.layers.push((self.temporary_allocations.clone() as Arc<dyn Layer<_, _>>).into());
         tree.add_all_layers_to_layer_set(&mut layer_set);
         layer_set
     }
@@ -813,15 +864,17 @@ impl SimpleAllocator {
 
     /// Collects up to `extents_per_batch` free extents of size up to `max_extent_size` from
     /// `offset`.  The extents will be reserved.
-    pub async fn collect_free_extents(
+    /// Note that only one `FreeExtents` can exist for the allocator at any time.
+    pub async fn take_for_trimming(
         &self,
         offset: u64,
         max_extent_size: usize,
         extents_per_batch: usize,
-    ) -> Result<FreeExtents<'_>, Error> {
+    ) -> Result<TrimmableExtents<'_>, Error> {
         let _guard = self.allocation_mutex.lock().await;
 
         let mut free_extents = vec![];
+        let mut bytes = 0;
         {
             let layer_set = self.layer_set();
             let mut merger = layer_set.merger();
@@ -853,6 +906,7 @@ impl SimpleAllocator {
                         let sub_range = range_offset
                             ..std::cmp::min(free_range.end, range_offset + max_extent_size as u64);
                         range_offset = sub_range.end;
+                        bytes += sub_range.length()?;
                         free_extents.push(sub_range);
                     }
                 }
@@ -863,7 +917,16 @@ impl SimpleAllocator {
                 iter.advance().await?;
             }
         }
-        let mut result = FreeExtents(self, vec![]);
+        let (mut result, listener) = TrimmableExtents::new(self);
+        {
+            let mut inner = self.inner.lock().unwrap();
+            assert!(inner.trim_reserved_bytes == 0, "Multiple trims ongoing");
+            inner.trim_listener = Some(listener);
+            inner.trim_reserved_bytes = bytes;
+            debug_assert!(
+                inner.trim_reserved_bytes + inner.unavailable_bytes() <= self.device_size
+            );
+        }
         for extent in free_extents {
             result.add_extent(extent).await;
         }
@@ -1089,12 +1152,33 @@ impl Allocator for SimpleAllocator {
             );
         };
 
+        let mut trim_listener = None;
+        {
+            let mut inner = self.inner.lock().unwrap();
+            // If trimming would be the reason that this allocation gets cut short, wait for
+            // trimming to complete before proceeding.
+            let avail = self
+                .device_size
+                .checked_sub(inner.unavailable_bytes())
+                .ok_or(FxfsError::Inconsistent)?;
+            let free_and_not_being_trimmed =
+                inner.bytes_available_not_being_trimmed(self.device_size)?;
+            if free_and_not_being_trimmed < std::cmp::min(len, avail) {
+                debug_assert!(inner.trim_reserved_bytes > 0);
+                trim_listener = std::mem::take(&mut inner.trim_listener);
+            }
+        }
+
+        if let Some(listener) = trim_listener {
+            listener.await;
+        }
+
         let dropped_allocations =
             std::mem::take(&mut self.inner.lock().unwrap().dropped_allocations);
 
-        // Update reserved_allocations using dropped_allocations.
+        // Update temporary_allocations using dropped_allocations.
         for item in dropped_allocations {
-            self.reserved_allocations.erase(&item.key).await;
+            self.temporary_allocations.erase(&item.key).await;
         }
 
         let result = {
@@ -1160,7 +1244,7 @@ impl Allocator for SimpleAllocator {
         );
         let mutation =
             AllocatorMutation::Allocate { device_range: result.clone().into(), owner_object_id };
-        self.reserved_allocations.insert(item).await.expect("Allocated over an in-use range.");
+        self.temporary_allocations.insert(item).await.expect("Allocated over an in-use range.");
         assert!(transaction.add(self.object_id(), Mutation::Allocator(mutation)).is_none());
 
         Ok(result)
@@ -1198,7 +1282,7 @@ impl Allocator for SimpleAllocator {
         );
         let mutation =
             AllocatorMutation::Allocate { device_range: device_range.into(), owner_object_id };
-        self.reserved_allocations.insert(item).await.expect("Allocated over an in-use range.");
+        self.temporary_allocations.insert(item).await.expect("Allocated over an in-use range.");
         transaction.add(self.object_id(), Mutation::Allocator(mutation));
         Ok(())
     }
@@ -1334,13 +1418,13 @@ impl Allocator for SimpleAllocator {
             }
             break std::mem::take(&mut inner.committed_deallocated);
         };
-        // Now we can erase those elements from reserved_allocations (whilst we're not holding the
+        // Now we can erase those elements from temporary_allocations (whilst we're not holding the
         // lock on inner).
         let mut totals = BTreeMap::<u64, u64>::new();
         for dealloc in deallocs {
             *(totals.entry(dealloc.owner_object_id).or_default()) +=
                 dealloc.range.length().unwrap();
-            self.reserved_allocations.erase(&AllocatorKey { device_range: dealloc.range }).await;
+            self.temporary_allocations.erase(&AllocatorKey { device_range: dealloc.range }).await;
         }
 
         let mut inner = self.inner.lock().unwrap();
@@ -1477,7 +1561,7 @@ impl JournalingObject for SimpleAllocator {
                 let lower_bound = item.key.lower_bound_for_merge_into();
                 self.tree.merge_into(item.clone(), &lower_bound).await;
                 if context.mode.is_live() {
-                    self.reserved_allocations.erase(&item.key).await;
+                    self.temporary_allocations.erase(&item.key).await;
                 }
                 let mut inner = self.inner.lock().unwrap();
                 let entry = inner.owner_bytes.entry(owner_object_id).or_default();
@@ -1506,7 +1590,7 @@ impl JournalingObject for SimpleAllocator {
                     let mut item = item.clone();
                     // Note that the point of this reservation is to avoid premature reuse.
                     item.value = AllocatorValue::Abs { count: 1, owner_object_id };
-                    self.reserved_allocations
+                    self.temporary_allocations
                         .insert(item)
                         .await
                         .expect("Allocated over an in-use range.");
@@ -1552,7 +1636,7 @@ impl JournalingObject for SimpleAllocator {
                     // After we seal the tree, we will start adding mutations to the new mutable
                     // layer, but we cannot safely do that whilst we are attempting to allocate
                     // because there is a chance it might miss an allocation and also not see the
-                    // allocation in reserved_allocations.
+                    // allocation in temporary_allocations.
                     let _guard = debug_assert_not_too_long!(self.allocation_mutex.lock());
                     self.tree.seal().await;
                 }
@@ -1832,10 +1916,11 @@ mod tests {
             },
             range::RangeExt,
         },
+        fuchsia_async as fasync,
         std::{
             cmp::{max, min},
             ops::{Bound, Range},
-            sync::Arc,
+            sync::{Arc, Mutex},
         },
         storage_device::{fake_device::FakeDevice, DeviceHolder},
     };
@@ -2476,7 +2561,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_collect_free_extents() {
+    async fn test_take_for_trimming() {
         const STORE_OBJECT_ID: u64 = 99;
 
         // Allocate a large chunk, then free a few bits of it, so we have free chunks interleaved
@@ -2541,9 +2626,9 @@ mod tests {
         let mut offset = allocated_range.start;
         while offset < allocated_range.end {
             let free = allocator
-                .collect_free_extents(offset, max_extent_size, EXTENTS_PER_BATCH)
+                .take_for_trimming(offset, max_extent_size, EXTENTS_PER_BATCH)
                 .await
-                .expect("collect_free_extents failed");
+                .expect("take_for_trimming failed");
             free_ranges.extend(
                 free.extents().iter().filter(|range| range.end <= allocated_range.end).cloned(),
             );
@@ -2553,30 +2638,56 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_reserved_free_extents_released_on_drop() {
+    async fn test_allocations_wait_for_free_extents() {
         const STORE_OBJECT_ID: u64 = 99;
         let (fs, allocator) = test_fs().await;
+        let allocator_clone = allocator.clone();
 
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
-        {
-            // Tie up all of the free extents on the device, and make sure allocations fail.
-            let max_extent_size = fs.device().size() as usize;
-            const EXTENTS_PER_BATCH: usize = usize::MAX;
-            let _free_extents = allocator
-                .collect_free_extents(0, max_extent_size, EXTENTS_PER_BATCH)
-                .await
-                .expect("collect_free_extents failed");
-            allocator
-                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
-                .await
-                .expect_err("allocate should fail");
-        }
-        // Once the free extents are released, we should be able to allocate again.
-        allocator
-            .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+
+        // Tie up all of the free extents on the device, and make sure allocations block.
+        let max_extent_size = fs.device().size() as usize;
+        const EXTENTS_PER_BATCH: usize = usize::MAX;
+
+        // HACK: Treat `trimmable_extents` as being locked by `trim_done` (i.e. it should only be
+        // accessed whilst `trim_done` is locked). We can't combine them into the same mutex,
+        // because the inner type would be "poisoned" by the lifetime parameter of
+        // `trimmable_extents` (which is in the lifetime of `allocator`), and then we can't move it
+        // into `alloc_task` which would require a `'static` lifetime.
+        let trim_done = Arc::new(Mutex::new(false));
+        let trimmable_extents = allocator
+            .take_for_trimming(0, max_extent_size, EXTENTS_PER_BATCH)
             .await
-            .expect("allocate failed");
-        transaction.commit().await.expect("commit failed");
+            .expect("take_for_trimming failed");
+
+        let trim_done_clone = trim_done.clone();
+        let bs = fs.block_size();
+        let alloc_task = fasync::Task::spawn(async move {
+            allocator_clone
+                .allocate(&mut transaction, STORE_OBJECT_ID, bs)
+                .await
+                .expect("allocate should fail");
+            {
+                assert!(
+                    *trim_done_clone.lock().unwrap(),
+                    "Allocation finished before trim completed"
+                );
+            }
+            transaction.commit().await.expect("commit failed");
+        });
+
+        // Add a small delay to simulate the trim taking some nonzero amount of time.  Otherwise,
+        // this will almost certainly always beat the allocation attempt.
+        fasync::Timer::new(std::time::Duration::from_millis(100)).await;
+
+        // Once the free extents are released, the task should unblock.
+        {
+            let mut trim_done = trim_done.lock().unwrap();
+            std::mem::drop(trimmable_extents);
+            *trim_done = true;
+        }
+
+        alloc_task.await;
     }
 }

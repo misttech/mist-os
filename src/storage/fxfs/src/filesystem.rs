@@ -654,14 +654,13 @@ impl FxFilesystem {
                 return Ok(bytes_trimmed);
             }
             let allocator = self.allocator();
-            let free_extents = allocator
-                .collect_free_extents(offset, MAX_EXTENT_SIZE, MAX_EXTENTS_PER_BATCH)
-                .await?;
-            for device_range in free_extents.extents() {
+            let trimmable_extents =
+                allocator.take_for_trimming(offset, MAX_EXTENT_SIZE, MAX_EXTENTS_PER_BATCH).await?;
+            for device_range in trimmable_extents.extents() {
                 self.device.trim(device_range.clone()).await?;
                 bytes_trimmed += device_range.length()? as usize;
             }
-            if let Some(device_range) = free_extents.extents().last() {
+            if let Some(device_range) = trimmable_extents.extents().last() {
                 offset = device_range.end;
             } else {
                 break;
