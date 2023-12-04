@@ -73,7 +73,7 @@ use crate::{
         },
         forwarding::{ForwardingTable, IpForwardingDeviceContext},
         icmp::{
-            BufferIcmpHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters,
+            IcmpErrorHandler, IcmpHandlerIpExt, IcmpIpExt, IcmpIpTransportContext, IcmpRxCounters,
             IcmpTxCounters, Icmpv4Error, Icmpv4ErrorCode, Icmpv4ErrorKind, Icmpv4State,
             Icmpv4StateBuilder, Icmpv6ErrorCode, Icmpv6ErrorKind, Icmpv6State, Icmpv6StateBuilder,
             InnerIcmpContext, NdpCounters,
@@ -994,7 +994,7 @@ pub(crate) trait BufferIpLayerContext<
     BufferTransportContext<I, C, B>
     + IpDeviceStateContext<I, C>
     + IpDeviceSendContext<I, C>
-    + BufferIcmpHandler<I, C, B>
+    + IcmpErrorHandler<I, C>
     + IpLayerContext<I, C>
     + FragmentHandler<I, C>
 {
@@ -1007,7 +1007,7 @@ impl<
         SC: BufferTransportContext<I, C, B>
             + IpDeviceStateContext<I, C>
             + IpDeviceSendContext<I, C>
-            + BufferIcmpHandler<I, C, B>
+            + IcmpErrorHandler<I, C>
             + IpLayerContext<I, C>
             + FragmentHandler<I, C>,
     > BufferIpLayerContext<I, C, B> for SC
@@ -2054,7 +2054,7 @@ pub(crate) fn receive_ipv4_packet<
                     return;
                 }
             };
-            BufferIcmpHandler::<Ipv4, _, _>::send_icmp_error_message(
+            IcmpErrorHandler::<Ipv4, _>::send_icmp_error_message(
                 sync_ctx,
                 ctx,
                 device,
@@ -2173,7 +2173,7 @@ pub(crate) fn receive_ipv4_packet<
                         return;
                     }
                 };
-                BufferIcmpHandler::<Ipv4, _, _>::send_icmp_error_message(
+                IcmpErrorHandler::<Ipv4, _>::send_icmp_error_message(
                     sync_ctx,
                     ctx,
                     device,
@@ -2207,7 +2207,7 @@ pub(crate) fn receive_ipv4_packet<
                     return;
                 }
             };
-            BufferIcmpHandler::<Ipv4, _, _>::send_icmp_error_message(
+            IcmpErrorHandler::<Ipv4, _>::send_icmp_error_message(
                 sync_ctx,
                 ctx,
                 device,
@@ -2300,7 +2300,7 @@ pub(crate) fn receive_ipv6_packet<
                     return;
                 }
             };
-            BufferIcmpHandler::<Ipv6, _, _>::send_icmp_error_message(
+            IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
                 sync_ctx,
                 ctx,
                 device,
@@ -2483,7 +2483,7 @@ pub(crate) fn receive_ipv6_packet<
                         // MTU. This may break other logic, though, so we should
                         // still fix it eventually.
                         let mtu = sync_ctx.get_mtu(&device);
-                        BufferIcmpHandler::<Ipv6, _, _>::send_icmp_error_message(
+                        IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
                             sync_ctx,
                             ctx,
                             device,
@@ -2510,7 +2510,7 @@ pub(crate) fn receive_ipv6_packet<
                 if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                     let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
                         drop_packet_and_undo_parse!(packet, buffer);
-                    BufferIcmpHandler::<Ipv6, _, _>::send_icmp_error_message(
+                    IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
                         sync_ctx,
                         ctx,
                         device,
@@ -2532,7 +2532,7 @@ pub(crate) fn receive_ipv6_packet<
             debug!("received IPv6 packet with no known route to destination {}", dst_ip);
 
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                BufferIcmpHandler::<Ipv6, _, _>::send_icmp_error_message(
+                IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
                     sync_ctx,
                     ctx,
                     device,
