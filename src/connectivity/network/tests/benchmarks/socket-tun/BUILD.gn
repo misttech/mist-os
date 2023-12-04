@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
+import("//build/testing/perf/test.gni")
 
 rustc_binary("tun_socket_benchmarks") {
   testonly = true
@@ -77,6 +78,13 @@ fuchsia_test_package("tun-socket-benchmarks-tests-netstack3") {
   ]
 }
 
+fuchsia_component_perf_test("tun_socket_benchmarks_with_netstack3") {
+  package = ":tun-socket-benchmarks-tests-netstack3"
+  component_name = "tun-socket-benchmarks-netstack3"
+  expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.tun.netstack3.txt"
+  test_component_args = [ "--output-fuchsiaperf" ]
+}
+
 # The Go runtime on Fuchsia does not support RISC-V.
 if (target_cpu != "riscv64") {
   fuchsia_test_component("tun-socket-benchmarks-netstack2") {
@@ -98,17 +106,29 @@ if (target_cpu != "riscv64") {
     ]
   }
 
+  fuchsia_component_perf_test("tun_socket_benchmarks_test") {
+    package = ":tun-socket-benchmarks-tests-netstack2"
+    component_name = "tun-socket-benchmarks-netstack2"
+    expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.tun.txt"
+    test_component_args = [ "--output-fuchsiaperf" ]
+  }
+
   ns2_test_targets = [ ":tun-socket-benchmarks-tests-netstack2" ]
+  ns2_benchmark_targets = [ ":tun_socket_benchmarks_test($host_toolchain)" ]
 } else {
   ns2_test_targets = []
+  ns2_benchmark_targets = []
 }
 
 all_test_targets =
     [ ":tun-socket-benchmarks-tests-netstack3" ] + ns2_test_targets
+all_benchmark_targets =
+    [ ":tun_socket_benchmarks_with_netstack3($host_toolchain)" ] +
+    ns2_benchmark_targets
 
 group("benchmarks") {
   testonly = true
-  deps = all_test_targets
+  deps = all_benchmark_targets
 }
 
 group("tests") {

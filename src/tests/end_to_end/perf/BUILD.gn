@@ -22,7 +22,6 @@ test_list = [
   "input_latency_benchmarks_test",
   "netstack3_benchmarks_test",
   "netstack_benchmarks_with_tracing_test",
-  "netstack_tun_socket_benchmarks_test",
   "storage_benchmarks_test",
   "tracing_microbenchmarks_test",
 
@@ -213,8 +212,6 @@ if (is_host) {
     "fuchsia.netstack.iperf_benchmarks.localhost_tcp.txt",
     "fuchsia.netstack.iperf_benchmarks.localhost_udp.txt",
     "fuchsia.netstack3.core.txt",
-    "fuchsia.network.socket.tun.netstack3.txt",
-    "fuchsia.network.socket.tun.txt",
     "fuchsia.starnix.gvisor_benchmarks.clock_getres.txt",
     "fuchsia.starnix.gvisor_benchmarks.clock_gettime.txt",
     "fuchsia.starnix.gvisor_benchmarks.dup.txt",
