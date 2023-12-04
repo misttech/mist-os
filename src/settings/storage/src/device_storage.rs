@@ -266,11 +266,27 @@ impl DeviceStorage {
         inspect_handle: Arc<Mutex<StashInspectLogger>>,
         setting_key: String,
     ) {
-        if matches!(stash_proxy.flush().await, Ok(Err(_)) | Err(_)) {
-            // TODO(fxbug.dev/89083): save a record of the recent error messages as well.
-            // Record the write failure to inspect.
-            inspect_handle.lock().await.record_flush_failure(setting_key);
+        let flush_result = stash_proxy.flush().await;
+        match flush_result {
+            Ok(Err(err)) => {
+                Self::handle_flush_failure(inspect_handle, setting_key, format!("{:?}", err)).await;
+            }
+            Err(err) => {
+                Self::handle_flush_failure(inspect_handle, setting_key, format!("{:?}", err)).await;
+            }
+            _ => {}
         }
+    }
+
+    async fn handle_flush_failure(
+        inspect_handle: Arc<Mutex<StashInspectLogger>>,
+        setting_key: String,
+        err: String,
+    ) {
+        tracing::error!("Failed to flush to stash: {:?}", err);
+
+        // Record the write failure to inspect.
+        inspect_handle.lock().await.record_flush_failure(setting_key);
     }
 
     async fn inner_write(
