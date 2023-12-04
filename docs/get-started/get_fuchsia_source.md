@@ -86,7 +86,8 @@ To download the Fuchsia source, do the following:
 
 1.  Run the bootstrap script:
 
-    Note: Downloading the Fuchsia source code can take up to 60 minutes.
+    Note: Depending on your network speed, downloading the Fuchsia source code
+    (which is about 2 GB) can take a while.
 
     ```posix-terminal
     curl -s "https://fuchsia.googlesource.com/fuchsia/+/HEAD/scripts/bootstrap?format=TEXT" | base64 --decode | bash
