@@ -84,16 +84,13 @@ class TiTca6408aDevice : public fdf::DriverBase {
   void Stop() override;
 
  private:
-  zx::result<> ServeMetadata(
-      fidl::WireSyncClient<fuchsia_driver_compat::Device>& compat,
-      const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata);
   zx::result<> CreateNode();
 
   std::unique_ptr<TiTca6408a> device_;
   fdf::ServerBindingGroup<fuchsia_hardware_gpioimpl::GpioImpl> bindings_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  compat::DeviceServer compat_server_;
+  std::optional<compat::DeviceServer> compat_server_;
 };
 
 }  // namespace gpio

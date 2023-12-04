@@ -5,6 +5,7 @@
 #include "ti-tca6408a.h"
 
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 
@@ -15,37 +16,6 @@ namespace {
 // Arbitrary values for I2C retries.
 constexpr uint8_t kI2cRetries = 10;
 constexpr zx::duration kI2cRetryDelay = zx::usec(1);
-
-zx::result<uint32_t> ParseMetadata(
-    const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
-  for (const auto& m : metadata) {
-    if (m.type == DEVICE_METADATA_PRIVATE) {
-      size_t size;
-      auto status = m.data.get_prop_content_size(&size);
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to get_prop_content_size %s", zx_status_get_string(status));
-        continue;
-      }
-
-      if (size != sizeof(uint32_t)) {
-        FDF_LOG(ERROR, "Unexpected metadata size: got %zu, expected %zu", size, sizeof(uint32_t));
-        continue;
-      }
-
-      uint32_t data;
-      status = m.data.read(&data, 0, sizeof(data));
-      if (status != ZX_OK) {
-        FDF_LOG(ERROR, "Failed to read %s", zx_status_get_string(status));
-        continue;
-      }
-
-      return zx::ok(data);
-    }
-  }
-
-  FDF_LOG(ERROR, "Failed to find matching metadata!");
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
 
 }  // namespace
 
@@ -68,46 +38,17 @@ zx::result<> TiTca6408aDevice::Start() {
     i2c.WriteSyncRetries(write_buf, sizeof(write_buf), kI2cRetries, kI2cRetryDelay);
   }
 
-  // Get metadata.
-  uint32_t pin_index_offset = 0;
-  {
-    zx::result result = incoming()->Connect<fuchsia_driver_compat::Service::Device>("pdev");
-    if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to open pdev service: %s", result.status_string());
-      return result.take_error();
-    }
-    auto compat = fidl::WireSyncClient(std::move(result.value()));
-    if (!compat.is_valid()) {
-      FDF_LOG(ERROR, "Failed to get compat");
-      return zx::error(ZX_ERR_NO_RESOURCES);
-    }
-
-    auto metadata = compat->GetMetadata();
-    if (!metadata.ok()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", metadata.FormatDescription().data());
-      return zx::error(metadata.status());
-    }
-    if (metadata->is_error()) {
-      FDF_LOG(ERROR, "Failed to GetMetadata %s", zx_status_get_string(metadata->error_value()));
-      return metadata->take_error();
-    }
-
-    auto vals = ParseMetadata(metadata.value()->metadata);
-    if (vals.is_error()) {
-      FDF_LOG(ERROR, "Failed to ParseMetadata %s", zx_status_get_string(vals.error_value()));
-      return vals.take_error();
-    }
-    pin_index_offset = vals.value();
-
-    auto serve_result = ServeMetadata(compat, metadata.value()->metadata);
-    if (serve_result.is_error()) {
-      FDF_LOG(ERROR, "Failed to ServeMetadata %s",
-              zx_status_get_string(serve_result.error_value()));
-      return serve_result.take_error();
-    }
+  zx::result pin_index_offset =
+      compat::GetMetadata<uint32_t>(incoming(), DEVICE_METADATA_PRIVATE, "pdev");
+  if (pin_index_offset.is_error()) {
+    FDF_LOG(ERROR, "Failed to get pin_index_offset  %s", pin_index_offset.status_string());
+    return pin_index_offset.take_error();
   }
 
-  device_ = std::make_unique<TiTca6408a>(std::move(i2c), pin_index_offset);
+  compat_server_.emplace(incoming(), outgoing(), node_name(), kDeviceName, std::nullopt,
+                         compat::ForwardMetadata::All());
+
+  device_ = std::make_unique<TiTca6408a>(std::move(i2c), *pin_index_offset.value());
 
   auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(
       fuchsia_hardware_gpioimpl::Service::InstanceHandler({
@@ -129,63 +70,9 @@ void TiTca6408aDevice::Stop() {
   }
 }
 
-zx::result<> TiTca6408aDevice::ServeMetadata(
-    fidl::WireSyncClient<fuchsia_driver_compat::Device>& compat,
-    const fidl::VectorView<fuchsia_driver_compat::wire::Metadata>& metadata) {
-  // Start compat_server_.
-  fidl::WireResult topo = compat->GetTopologicalPath();
-  if (!topo.ok()) {
-    FDF_LOG(WARNING, "GetTopologicalPath failed: %s", topo.FormatDescription().c_str());
-    return zx::error(topo.error().status());
-  }
-
-  auto node_name_val = node_name().value_or("NA");
-
-  std::string topological_path(topo.value().path.get());
-  topological_path += "/";
-  topological_path += node_name_val;
-  compat_server_.Init("default", topological_path);
-
-  // Serve Metadata.
-  for (auto& meta : metadata) {
-    uint64_t meta_size;
-    auto status = meta.data.get_property(ZX_PROP_VMO_CONTENT_SIZE, &meta_size, sizeof(meta_size));
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Could not read ZX_PROP_VMO_CONTENT_SIZE, st = %s",
-              zx_status_get_string(status));
-      return zx::error(status);
-    }
-
-    zx_vaddr_t buffer;
-    status = zx_vmar_map(zx_vmar_root_self(), ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0,
-                         meta.data.get(), 0, meta_size, &buffer);
-
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Unable to map metadata vmo, st = %d\n", status);
-      continue;
-    }
-
-    // Add metadata the same way as in the root_driver.
-    compat_server_.AddMetadata(meta.type, reinterpret_cast<void*>(buffer), meta_size);
-
-    status = zx_vmar_unmap(zx_vmar_root_self(), buffer, meta_size);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "Unable to unmap metadata vmo, st = %d\n", status);
-    }
-  }
-
-  zx_status_t status = compat_server_.Serve(dispatcher(), outgoing().get());
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Could not start compat server service. st = %d", status);
-    return zx::error(status);
-  }
-
-  return zx::ok();
-}
-
 zx::result<> TiTca6408aDevice::CreateNode() {
   fidl::Arena arena;
-  auto offers = compat_server_.CreateOffers(arena);
+  auto offers = compat_server_->CreateOffers(arena);
   offers.push_back(
       fdf::MakeOffer<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
   auto properties =
