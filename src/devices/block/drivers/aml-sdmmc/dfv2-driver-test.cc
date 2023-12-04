@@ -38,9 +38,9 @@ class TestDfv2Driver : public Dfv2Driver {
   TestDfv2Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : Dfv2Driver(std::move(start_args), std::move(dispatcher)) {}
 
-  void SetTestHooks(std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) {
+  void* SetTestHooks() {
     view_.emplace(mmio().View(0));
-    set_descs_buffer(std::move(descs_buffer));
+    return descs_buffer();
   }
 
   const inspect::Hierarchy* GetInspectRoot(const std::string& suffix) {
@@ -171,13 +171,6 @@ class AmlSdmmcTest : public zxtest::Test {
       ASSERT_OK(fake_bti_create(bti.reset_and_get_address()));
     }
 
-    // Replace driver's descs_buffer with this one for visibility during testing.
-    auto buffer_factory = dma_buffer::CreateBufferFactory();
-    std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer;
-    EXPECT_OK(buffer_factory->CreateContiguous(
-        bti, AmlSdmmc::kMaxDmaDescriptors * sizeof(aml_sdmmc_desc_t), 0, &descs_buffer));
-    descs_ = descs_buffer->virt();
-
     // Initialize driver test environment.
     fuchsia_driver_framework::DriverStartArgs start_args;
     fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
@@ -193,18 +186,14 @@ class AmlSdmmcTest : public zxtest::Test {
       start_args = std::move(start_args_result->start_args);
       outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
 
-      auto init_result =
-          incoming->env.Initialize(std::move(start_args_result->incoming_directory_server));
-      ASSERT_TRUE(init_result.is_ok());
+      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
 
       incoming->device_server.Init("default", "");
       // Serve metadata.
-      auto status =
-          incoming->device_server.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata, sizeof(metadata));
-      EXPECT_OK(status);
-      status = incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                             &incoming->env.incoming_directory());
-      EXPECT_OK(status);
+      ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_PRIVATE, &metadata,
+                                                    sizeof(metadata)));
+      ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                              &incoming->env.incoming_directory()));
 
       // Serve (fake) pdev_server.
       fake_pdev::FakePDevFidl::Config config;
@@ -225,10 +214,9 @@ class AmlSdmmcTest : public zxtest::Test {
     });
 
     // Start dut_.
-    auto result = runtime_.RunToCompletion(dut_.Start(std::move(start_args)));
-    ASSERT_OK(result);
+    ASSERT_OK(runtime_.RunToCompletion(dut_.Start(std::move(start_args))));
 
-    dut_->SetTestHooks(std::move(descs_buffer));
+    descs_ = dut_->SetTestHooks();
 
     dut_->set_board_config({
         .min_freq = 400000,
@@ -264,24 +252,23 @@ class AmlSdmmcTest : public zxtest::Test {
   }
 
   void InitializeContiguousPaddrs(const size_t vmos) {
-    // Start at 2 because two paddr(s) have already been read to create the DMA descriptor buffer -
-    // once during driver initialization and another during test descs_buffer creation.
+    // Start at 1 because one paddr has already been read to create the DMA descriptor buffer.
     for (size_t i = 0; i < vmos; i++) {
-      bti_paddrs_[i + 2] = (i << 24) | zx_system_get_page_size();
+      bti_paddrs_[i + 1] = (i << 24) | zx_system_get_page_size();
     }
   }
 
   void InitializeSingleVmoPaddrs(const size_t pages) {
-    // Start at 2 (see comment above).
+    // Start at 1 (see comment above).
     for (size_t i = 0; i < pages; i++) {
-      bti_paddrs_[i + 2] = zx_system_get_page_size() * (i + 1);
+      bti_paddrs_[i + 1] = zx_system_get_page_size() * (i + 1);
     }
   }
 
   void InitializeNonContiguousPaddrs(const size_t vmos) {
-    // Start at 2 (see comment above).
+    // Start at 1 (see comment above).
     for (size_t i = 0; i < vmos; i++) {
-      bti_paddrs_[i + 2] = zx_system_get_page_size() * (i + 1) * 2;
+      bti_paddrs_[i + 1] = zx_system_get_page_size() * (i + 1) * 2;
     }
   }
 
@@ -1865,11 +1852,10 @@ TEST_F(AmlSdmmcTest, ResetCmdInfoBits) {
 
   ASSERT_OK(dut_->Init({}));
 
-  // Start at 2 because two paddr(s) have already been read to create the DMA descriptor buffer -
-  // once during driver initialization and another during test descs_buffer creation.
-  bti_paddrs_[2] = 0x1897'7000;
-  bti_paddrs_[3] = 0x1997'8000;
-  bti_paddrs_[4] = 0x1997'e000;
+  // Start at 1 because one paddr has already been read to create the DMA descriptor buffer.
+  bti_paddrs_[1] = 0x1897'7000;
+  bti_paddrs_[2] = 0x1997'8000;
+  bti_paddrs_[3] = 0x1997'e000;
 
   // Make sure the appropriate cmd_info bits get cleared.
   descriptors()[0].cmd_info = 0xffff'ffff;

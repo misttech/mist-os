@@ -124,9 +124,9 @@ class AmlSdmmc : public fdf::WireServer<fuchsia_hardware_sdmmc::Sdmmc> {
     fbl::AutoLock lock(&lock_);
     return *mmio_;
   }
-  void set_descs_buffer(std::unique_ptr<dma_buffer::ContiguousBuffer> descs_buffer) TA_EXCL(lock_) {
+  void* descs_buffer() TA_EXCL(lock_) {
     fbl::AutoLock lock(&lock_);
-    descs_buffer_ = std::move(descs_buffer);
+    return descs_buffer_->virt();
   }
 
  private:
