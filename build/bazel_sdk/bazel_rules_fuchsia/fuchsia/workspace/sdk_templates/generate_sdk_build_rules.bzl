@@ -443,6 +443,13 @@ def _fuchsia_api_level_constraint(api_level):
 def _to_fuchsia_api_level_name(api_level):
     return "unspecified" if api_level == "-1" else api_level
 
+# We can't just do f"//:{file}" for file srcs, since the relative dir may have a
+# BUILD.bazel file, making that subdir its own Bazel package.
+def _bazel_file_path(relative_dir, file):
+    prefix = relative_dir if file.startswith(relative_dir) else ""
+    suffix = file[len(prefix):].lstrip("/")
+    return "//%s:%s" % (prefix, suffix)
+
 def _generate_cc_prebuilt_library_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
     tmpl = ctx.path(ctx.attr._cc_prebuilt_library_template)
     tmpl_linklib = ctx.path(ctx.attr._cc_prebuilt_library_linklib_subtemplate)
@@ -535,19 +542,12 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
     # TODO(chandarren): Remove once variants in IDK metadata are deduplicated.
     package_variants = [variant for i, variant in enumerate(package_variants) if variant.name not in [variant.name for variant in package_variants[:i]]]
 
-    # We can't just do f"//:{file}", since the relative dir may have a
-    # BUILD.bazel file, making that subdir its own Bazel package.
-    def _bazel_file_path(file):
-        prefix = relative_dir if file.startswith(relative_dir) else ""
-        suffix = file[len(prefix):].lstrip("/")
-        return "//%s:%s" % (prefix, suffix)
-
     for variant in package_variants:
         # Write build defs for each package variant.
         _merge_template(ctx, build_file, package_template, {
             "{{name}}": variant.name,
-            "{{files}}": _get_starlark_list([_bazel_file_path(file) for file in variant.files]),
-            "{{manifest}}": _bazel_file_path(variant.manifest),
+            "{{files}}": _get_starlark_list([_bazel_file_path(relative_dir, file) for file in variant.files]),
+            "{{manifest}}": _bazel_file_path(relative_dir, variant.manifest),
         })
         process_context.files_to_copy[meta["_meta_sdk_root"]].extend(variant.files)
 
@@ -569,6 +569,17 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
         }),
     })
 
+# buildifier: disable=unused-variable
+def _generate_config_build_rules(ctx, meta, relative_dir, build_file, process_context, parent_sdk_contents):
+    filegroup_template = ctx.path(ctx.attr._filegroup_template)
+
+    process_context.files_to_copy[meta["_meta_sdk_root"]].extend(meta["data"])
+
+    _merge_template(ctx, build_file, filegroup_template, {
+        "{{name}}": _get_target_name(meta["name"]),
+        "{{srcs}}": _get_starlark_list([_bazel_file_path(relative_dir, src) for src in meta["data"]]),
+    })
+
 def _merge_template(ctx, target_build_file, template_file, subs = {}):
     if ctx.path(target_build_file).exists:
         existing_content = ctx.read(target_build_file)
@@ -583,6 +594,7 @@ def _merge_template(ctx, target_build_file, template_file, subs = {}):
 
 def _process_dir(ctx, relative_dir, libraries, process_context, parent_sdk_contents):
     generators = {
+        "config": _generate_config_build_rules,
         "sysroot": _generate_sysroot_build_rules,
         "fidl_library": _generate_fidl_library_build_rules,
         "companion_host_tool": _generate_companion_host_tool_build_rules,

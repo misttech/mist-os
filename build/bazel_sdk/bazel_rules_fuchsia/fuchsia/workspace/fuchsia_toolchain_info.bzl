@@ -46,6 +46,7 @@ def _fuchsia_toolchain_info_impl(ctx):
         pm = ctx.executable.pm,
         symbolizer = ctx.executable.symbolizer,
         symbolizer_manifest = ctx.file.symbolizer_manifest,
+        symbol_index_config = ctx.runfiles(ctx.files.symbol_index_config),
         zbi = ctx.executable.zbi,
         zbi_manifest = ctx.file.zbi_manifest,
         default_api_level = ctx.attr.default_target_api,
@@ -278,6 +279,11 @@ included in the Fuchsia IDK.
             mandatory = True,
             cfg = "exec",
             allow_single_file = True,
+        ),
+        "symbol_index_config": attr.label(
+            doc = "symbol-index config files, required by symbolizer.",
+            mandatory = True,
+            cfg = "exec",
         ),
         "zbi": attr.label(
             doc = "zbi tool executable.",

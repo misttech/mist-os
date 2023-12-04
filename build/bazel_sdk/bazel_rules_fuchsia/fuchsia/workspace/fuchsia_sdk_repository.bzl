@@ -197,6 +197,10 @@ Loads a particular version of the Fuchsia IDK.
             default = "//fuchsia/workspace/sdk_templates:component_manifest_collection_template.BUILD",
             allow_single_file = True,
         ),
+        "_filegroup_template": attr.label(
+            default = "//fuchsia/workspace/sdk_templates:filegroup_template.BUILD",
+            allow_single_file = True,
+        ),
         "_ffx_tool_template": attr.label(
             default = "//fuchsia/workspace/sdk_templates:ffx_tool_template.BUILD",
             allow_single_file = True,
