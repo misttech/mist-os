@@ -418,6 +418,7 @@ sdk_molecule("core_bindlib") {
 
 sdk_molecule("core_packages") {
   deps = [
+    "//src/graphics/magma/tests/integration:magma_conformance_tests_sdk",
     "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_sdk",
     "//src/performance/memory/heapdump/collector:collector_sdk",
   ]

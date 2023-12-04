@@ -21,7 +21,11 @@ config("gtest_config") {
 
 static_library("gtest_no_testonly") {
   # In-tree tests should prefer //third_party/googletest:gtest.
-  visibility = [ ":*" ]
+  visibility = [
+    ":*",
+    "//src/graphics/magma/tests/integration:*",
+    "//src/lib/testing/loop_fixture:*",
+  ]
 
   public = [
     "src/googletest/include/gtest/gtest-spi.h",
