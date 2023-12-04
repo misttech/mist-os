@@ -18,6 +18,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
+    "//sdk/fidl/fuchsia.net.name:fuchsia.net.name_rust",
     "//sdk/fidl/fuchsia.net.neighbor:fuchsia.net.neighbor_rust",
     "//src/connectivity/lib/fidl_fuchsia_net_neighbor_ext",
     "//src/connectivity/lib/net-declare",
@@ -29,6 +30,7 @@ rustc_library("lib") {
     "//src/lib/fake-clock/named-timer",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
@@ -57,6 +59,7 @@ rustc_library("lib") {
   ]
 
   sources = [
+    "src/dig.rs",
     "src/inspect.rs",
     "src/lib.rs",
     "src/neighbor_cache.rs",
