@@ -19,7 +19,7 @@ use {
     serde::{de::DeserializeOwned, Deserialize},
     serde_yaml::{Mapping, Value},
     std::{
-        collections::HashSet,
+        collections::{HashMap, HashSet},
         ffi::OsStr,
         path::{self, Path, PathBuf},
     },
@@ -190,6 +190,15 @@ struct ToolsEntry {
     related: Option<Vec<String>>,
 }
 
+#[derive(Debug, Clone)]
+// Represents a yaml file included in another yaml file.
+// The container is the file with the reference to the
+// included_file.
+pub(crate) struct IncludedYaml {
+    pub(crate) container: PathBuf,
+    pub(crate) included_file: PathBuf,
+}
+
 #[derive(Debug)]
 pub(crate) struct YamlChecker {
     root_dir: PathBuf,
@@ -251,7 +260,7 @@ impl DocYamlCheck for YamlChecker {
         _yaml_files: &[PathBuf],
     ) -> Result<Option<Vec<DocCheckError>>> {
         let mut yaml_file_set: HashSet<&PathBuf> = HashSet::from_iter(_yaml_files.iter());
-        let mut visited: HashSet<PathBuf> = HashSet::new();
+        let mut visited: HashMap<PathBuf, IncludedYaml> = HashMap::new();
         let mut markdown_file_set: HashSet<&PathBuf> = HashSet::from_iter(_markdown_files.iter());
         let mut errors = vec![];
         let mut external_links = vec![];
@@ -263,10 +272,13 @@ impl DocYamlCheck for YamlChecker {
         markdown_file_set.insert(&contrib_md);
 
         // Start with //docs/_toc.yaml
-        let mut toc_stack = vec![self.root_dir.join("docs/_toc.yaml")];
+        let mut toc_stack: Vec<IncludedYaml> = vec![IncludedYaml {
+            container: self.root_dir.join("docs/_toc.yaml").into(),
+            included_file: self.root_dir.join("docs/_toc.yaml").into(),
+        }];
         while let Some(current_yaml) = toc_stack.pop() {
-            if let Some(yaml_doc) = yaml_file_set.take(&current_yaml) {
-                visited.insert(yaml_doc.clone());
+            if let Some(yaml_doc) = yaml_file_set.take(&current_yaml.included_file) {
+                visited.insert(yaml_doc.clone(), current_yaml.clone());
                 let toc = Toc::from(yaml_doc)?;
                 // remove paths to markdown
                 if let Some(path_list) = toc.get_paths() {
@@ -278,7 +290,7 @@ impl DocYamlCheck for YamlChecker {
                                         link: format!("https://{}{}", PUBLISHED_DOCS_HOST, p),
                                         location: DocLine {
                                             line_num: 0,
-                                            file_name: current_yaml.clone(),
+                                            file_name: current_yaml.included_file.clone(),
                                         },
                                     });
                                 } else if p.starts_with("https://") || p.starts_with("http://") {
@@ -286,7 +298,7 @@ impl DocYamlCheck for YamlChecker {
                                         link: p.to_string(),
                                         location: DocLine {
                                             line_num: 0,
-                                            file_name: current_yaml.clone(),
+                                            file_name: current_yaml.included_file.clone(),
                                         },
                                     });
                                 } else if p.starts_with("//") {
@@ -294,7 +306,7 @@ impl DocYamlCheck for YamlChecker {
                                         link: format!("https:{}", p),
                                         location: DocLine {
                                             line_num: 0,
-                                            file_name: current_yaml.clone(),
+                                            file_name: current_yaml.included_file.clone(),
                                         },
                                     });
                                 }
@@ -308,7 +320,7 @@ impl DocYamlCheck for YamlChecker {
                             }
 
                             if markdown_file_set.take(&file_path).is_none()
-                                && !visited.contains(&file_path)
+                                && !visited.contains_key(&file_path)
                             {
                                 errors.push(DocCheckError::new_error(
                                     0,
@@ -316,7 +328,7 @@ impl DocYamlCheck for YamlChecker {
                                     &format!("Reference to missing file: {}", p),
                                 ));
                             } else {
-                                visited.insert(file_path);
+                                visited.insert(file_path, current_yaml.clone());
                             }
                         }
                     }
@@ -326,30 +338,37 @@ impl DocYamlCheck for YamlChecker {
                     // All includes are /docs/... so just append the root.
                     let additional_paths = includes
                         .iter()
+                        // TODO(wilkinsonclay): Followup with ignoring yaml included from /reference.
+                        //.filter(|p| !p.starts_with("/reference"))
                         .map(|p| self.root_dir.join(p.strip_prefix('/').unwrap_or(p.as_str())))
                         .filter(|p| {
-                            if p == &current_yaml {
+                            if p == &current_yaml.included_file {
                                 errors.push(DocCheckError::new_error(
                                     0,
-                                    current_yaml.clone(),
-                                    &format!(
-                                        "YAML files cannot include themselves {:?}",
-                                        &current_yaml
-                                    ),
+                                    p.clone(),
+                                    &format!("YAML files cannot include themselves {p:?}"),
                                 ));
                                 false
                             } else {
                                 true
                             }
                         });
-                    toc_stack.extend(additional_paths);
+                    toc_stack.extend(
+                        additional_paths.map(|f| IncludedYaml {
+                            container: yaml_doc.clone(),
+                            included_file: f,
+                        }),
+                    );
                 }
-            } else if !visited.contains(&current_yaml) {
-                return Ok(Some(vec![DocCheckError::new_error(
+            } else if !visited.contains_key(&current_yaml.included_file) {
+                errors.push(DocCheckError::new_error(
                     0,
-                    current_yaml.clone(),
-                    &format!("Cannot find {:?} at {:?}", &current_yaml, &yaml_file_set),
-                )]));
+                    current_yaml.container.clone(),
+                    &format!(
+                        "Cannot find file {:?} included in {:?}",
+                        &current_yaml.included_file, &current_yaml.container
+                    ),
+                ));
             }
         }
 

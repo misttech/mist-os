@@ -363,6 +363,8 @@ mod test {
                 "Cannot normalize /docs/../../missing.md, references parent beyond root."),
             DocCheckError::new_error(1, PathBuf::from("doc_checker_test_data/docs/unused/_toc.yaml"),
                 "in-tree link to /docs/unused could not be found at \"doc_checker_test_data/docs/unused\" or  \"doc_checker_test_data/docs/unused/README.md\""),
+            DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/_toc.yaml"),
+                "Cannot find file \"doc_checker_test_data/docs/missing/_toc.yaml\" included in \"doc_checker_test_data/docs/_toc.yaml\""),
             DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/cycle/_toc.yaml"),
                 "YAML files cannot include themselves \"doc_checker_test_data/docs/cycle/_toc.yaml\""),
             DocCheckError::new_error(0, PathBuf::from("doc_checker_test_data/docs/unreachable.md"),

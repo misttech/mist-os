@@ -13,4 +13,6 @@ toc:
     include: /docs/cycle/_toc.yaml
   - title: include test
     path: /docs/include_here.md
+  - title: missing toc test
+    include: /docs/missing/_toc.yaml
 

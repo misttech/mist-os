@@ -72,6 +72,7 @@ if (is_host) {
       "doc_checker_test_data/docs/_toc.yaml",
       "doc_checker_test_data/docs/cycle/_toc.yaml",
       "doc_checker_test_data/docs/cycle/nested/_toc.yaml",
+      "doc_checker_test_data/docs/gen/build_arguments.md",
       "doc_checker_test_data/docs/images/fuchsia_icon_256x256.png",
       "doc_checker_test_data/docs/include_here.md",
       "doc_checker_test_data/docs/no_readme/_toc.yaml",

@@ -188,36 +188,9 @@ impl DocCheck for LinkChecker {
                             LinkType::Inline => link_url,
                             LinkType::Reference => link_url,
                             LinkType::ReferenceUnknown => {
-                                let text = elements
-                                    .iter()
-                                    .map(|e| e.get_contents())
-                                    .collect::<Vec<String>>()
-                                    .join("");
-                                if link_url.starts_with("\"") && link_url.ends_with("\"") {
-                                    // This is not a link but an array of quoted strings.
-                                    continue;
-                                }
-                                if text == link_url.to_string() && link_url == link_title {
-                                    errors.push(DocCheckError::new_info_helpful(
-                                            ele.doc_line().line_num,
-                                            ele.doc_line().file_name.clone(),
-                                            &format!(
-                                                "unescaped [{}] not treating this as a reference link. this is brackets ",
-                                                link_url),
-                                            &format!("escaped \\[{}\\] or make a link [{}](/docs/{}", link_title, link_url,link_url)
-                                        ));
-                                } else {
-                                    errors.push(DocCheckError::new_error_helpful(
-                                            ele.doc_line().line_num,
-                                            ele.doc_line().file_name.clone(),
-                                            &format!(
-                                                "Unknown reference link to [{}][{}]",
-                                                text ,link_url
-                                            ),
-                                        &format!(
-                                            "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
-                                        link_url)));
-                                }
+                                errors.extend(handle_shortcut_unknown(
+                                    ele, link_url, link_title, elements,
+                                ));
                                 continue;
                             }
                             LinkType::Collapsed => link_url,
@@ -234,42 +207,9 @@ impl DocCheck for LinkChecker {
                             }
                             LinkType::Shortcut => link_url,
                             LinkType::ShortcutUnknown => {
-                                // Check if this is a case where the text is in [].
-                                let text = elements
-                                    .iter()
-                                    .map(|e| e.get_contents())
-                                    .collect::<Vec<String>>()
-                                    .join("");
-                                if link_url.starts_with("\"") && link_url.ends_with("\"") {
-                                    // This is not a link but an array of quoted strings.
-                                    continue;
-                                }
-                                if text == link_url.to_string() && link_url == link_title {
-                                    errors.push(DocCheckError::new_info_helpful(
-                                        ele.doc_line().line_num,
-                                        ele.doc_line().file_name.clone(),
-                                        &format!(
-                                            "unescaped [{}] not treating this as a shortcut link.",
-                                            link_url
-                                        ),
-                                        &format!(
-                                            "escaped \\[{}\\] or make a link [{}](/docs/{}",
-                                            link_title, link_url, link_url
-                                        ),
-                                    ));
-                                } else {
-                                    errors.push(DocCheckError::new_error_helpful(
-                                            ele.doc_line().line_num,
-                                            ele.doc_line().file_name.clone(),
-                                            &format!(
-                                                "Unknown reference link to [{}][{}]",
-                                                text ,link_url
-                                            ),
-                                        &format!(
-                                            "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
-                                        link_url)));
-                                }
-
+                                errors.extend(handle_shortcut_unknown(
+                                    ele, link_url, link_title, elements,
+                                ));
                                 continue;
                             }
                             LinkType::Autolink => link_url,
@@ -690,6 +630,50 @@ fn check_link_authority(
         }
     }
     None
+}
+
+fn handle_shortcut_unknown(
+    ele: &Element<'_>,
+    link_url: &CowStr<'_>,
+    link_title: &CowStr<'_>,
+    elements: &Vec<Element<'_>>,
+) -> Vec<DocCheckError> {
+    let mut errors: Vec<DocCheckError> = vec![];
+    // Check if this is a case where the text is in [].
+    // Skip gen/build_arguments.md - since it is mostly code and generates a lot of noise.
+    if ele.doc_line().file_name.ends_with("gen/build_arguments.md") {
+        return errors;
+    }
+    let text = elements.iter().map(|e| e.get_contents()).collect::<Vec<String>>().join("");
+    let trimmed_link_url = link_url.trim();
+    if trimmed_link_url.starts_with("\"")
+        && (trimmed_link_url.ends_with("\"") || trimmed_link_url.ends_with(","))
+    {
+        // This is not a link but an array of quoted strings.
+        return errors;
+    }
+    if text == link_url.to_string() && link_url == link_title {
+        errors.push(DocCheckError::new_info_helpful(
+            ele.doc_line().line_num,
+            ele.doc_line().file_name.clone(),
+            &format!("unescaped [{}] not treating this as a shortcut link.", link_url),
+            &format!(
+                "escaped \\[{}\\] or make a link [{}](/docs/{}",
+                link_title, link_url, link_url
+            ),
+        ));
+    } else {
+        errors.push(DocCheckError::new_error_helpful(
+            ele.doc_line().line_num,
+            ele.doc_line().file_name.clone(),
+            &format!("Unknown reference link to [{}][{}]", text, link_url),
+            &format!(
+                "making sure you added a matching [{}]: YOUR_LINK_HERE below this reference",
+                link_url
+            ),
+        ));
+    }
+    errors
 }
 
 /// Checks whether the URI points to the master branch of a Gerrit (i.e.,
