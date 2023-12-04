@@ -17,6 +17,7 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
+// TODO(fxbug.dev/314347639): Build Router and sandbox for host.
 #[cfg(target_os = "fuchsia")]
 pub mod router;
 
