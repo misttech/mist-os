@@ -697,6 +697,9 @@ mod tests {
         )
         .expect("serve");
 
+        // Capture information from the filesystem in the main thread. The filesystem must not be
+        // transferred to the other thread.
+        let fs_dev_id = fs.dev_id;
         fasync::unblock(move || {
             let root_zxio = Zxio::create(root_handle.into_handle()).expect("create");
 
@@ -707,7 +710,7 @@ mod tests {
             let attrs = root_zxio
                 .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
                 .expect("attr_get");
-            assert_eq!(attrs.id, fs.dev_id.bits());
+            assert_eq!(attrs.id, fs_dev_id.bits());
 
             let mut attrs = syncio::zxio_node_attributes_t::default();
             attrs.has.creation_time = true;
@@ -753,7 +756,7 @@ mod tests {
             let attrs = foo_zxio
                 .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
                 .expect("attr_get");
-            assert_eq!(attrs.id, fs.dev_id.bits());
+            assert_eq!(attrs.id, fs_dev_id.bits());
 
             let mut attrs = syncio::zxio_node_attributes_t::default();
             attrs.has.creation_time = true;
@@ -812,5 +815,7 @@ mod tests {
         })
         .await;
         scope.shutdown();
+        // This ensures fs cannot be captures in the thread.
+        std::mem::drop(fs);
     }
 }
