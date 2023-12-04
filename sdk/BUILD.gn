@@ -630,16 +630,45 @@ if (is_host) {
 
 # Host tools necessary to build the IDK. Keep this minimal, so IDK subbuilds can
 # start running as quickly as possible.
-group("idk_build_tools") {
+#
+# This rule copies each of the tools listed below into
+# `$root_build_dir/sdk/idk_build_tools`. For example, a tool like `cmc` will
+# appear in `$root_build_dir/sdk/idk_build_tools/host_x64/cmc` on an x64 host.
+# SDK subbuilds will look for host tools in that directory, so they will only
+# have access to binaries that they explicitly depend on via this rule.
+copy("idk_build_tools") {
   visibility += [
     "//build/*",
     "//vendor/*",
   ]
 
+  sources = [
+    "$host_out_dir/bindc",
+    "$host_out_dir/cmc",
+    "$host_out_dir/far",
+    "$host_out_dir/ffx-package_unversioned",
+    "$host_out_dir/fidl-format",
+    "$host_out_dir/fidl-lint",
+    "$host_out_dir/fidl_api_diff",
+    "$host_out_dir/fidl_api_summarize",
+    "$host_out_dir/fidlc",
+    "$host_out_dir/fidlgen_cpp",
+    "$host_out_dir/fidlgen_hlcpp",
+    "$host_out_dir/fidlgen_rust",
+    "$host_out_dir/json_merge",
+    "$host_out_dir/measure-tape",
+    "$host_out_dir/package-tool",
+    "$host_out_dir/zither",
+  ]
+
+  # Looks like `host_x64`.
+  _rebased_host_dir = rebase_path(host_out_dir, root_build_dir)
+  outputs = [ "$root_build_dir/sdk/idk_build_tools/${_rebased_host_dir}/{{source_file_part}}" ]
+
   deps = [
     "//build/tools/json_merge($host_toolchain)",
     "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)",
-    "//src/sys/pkg/bin/far:host($host_toolchain)",
+    "//src/sys/pkg/bin/far:bin($host_toolchain)",
     "//src/sys/pkg/bin/package-tool($host_toolchain)",
     "//tools/bindc:bin($host_toolchain)",
     "//tools/cmc:cmc($host_toolchain)",
@@ -651,6 +680,7 @@ group("idk_build_tools") {
     "//tools/fidl/fidlgen_cpp($host_toolchain)",
     "//tools/fidl/fidlgen_hlcpp($host_toolchain)",
     "//tools/fidl/fidlgen_rust($host_toolchain)",
+    "//tools/fidl/measure-tape/src:measure-tape($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
 }
