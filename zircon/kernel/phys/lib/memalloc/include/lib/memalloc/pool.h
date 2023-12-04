@@ -18,7 +18,6 @@
 #include <array>
 #include <cstdint>
 #include <optional>
-#include <string_view>
 
 #include <fbl/intrusive_double_list.h>
 
@@ -279,6 +278,12 @@ class Pool {
                                                               : std::nullopt;
     });
   }
+
+  // Returns `fit::success` if the provided range was succesully marked as peripheral. This requires
+  // that `range.type` is `memalloc::Type::kPeripheral` and that there are no ranges of type
+  // `memalloc::Type::kFreeRam` or extended types overlapping in the range, otherwise `fit::failed`
+  // is returned.
+  fit::result<fit::failed> MarkAsPeripheral(const memalloc::Range& range);
 
   // Pretty-prints the memory ranges contained in the pool.
   void PrintMemoryRanges(const char* prefix, FILE* f = stdout) const;

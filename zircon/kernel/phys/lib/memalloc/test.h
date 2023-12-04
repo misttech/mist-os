@@ -74,7 +74,7 @@ inline void CompareRanges(cpp20::span<const memalloc::Range> expected,
   EXPECT_EQ(expected.size(), actual.size());
   size_t num_comparable = std::min(expected.size(), actual.size());
   for (size_t i = 0; i < num_comparable; ++i) {
-    EXPECT_EQ(expected[i], actual[i]);
+    EXPECT_EQ(expected[i], actual[i]) << i;
   }
 
   if (expected.size() > num_comparable) {

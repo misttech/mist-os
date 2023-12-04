@@ -6,6 +6,7 @@
 
 #include <lib/fit/defer.h>
 #include <lib/memalloc/pool.h>
+#include <lib/memalloc/range.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/assert.h>
@@ -19,7 +20,6 @@
 
 #include <gtest/gtest.h>
 
-#include "lib/memalloc/range.h"
 #include "test.h"
 
 namespace {
@@ -2008,6 +2008,535 @@ TEST(MemallocPoolTests, NormalizeRanges) {
     };
     CompareRanges(cpp20::span{kExpected}, {normalized});
   }
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralBeforeFirstRange) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [10, 12)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // free ram: [12, 14)
+      {
+          .addr = 12 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [8, 10)
+  constexpr Range kPeripheralRange = {
+      .addr = 8 * kChunkSize,
+      .size = 2 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      kPeripheralRange,
+      {
+          .addr = 10 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 11 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralAfterLastRange) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [10, 12)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // free ram: [12, 14)
+      {
+          .addr = 12 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [14, 16)
+  constexpr Range kPeripheralRange = {
+      .addr = 14 * kChunkSize,
+      .size = 2 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+  constexpr Range kExpected[] = {
+      {
+          .addr = 10 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 11 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      kPeripheralRange,
+  };
+
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralBetweenRanges) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [4, 6)
+      {
+          .addr = 4 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // free ram: [8, 10)
+      {
+          .addr = 8 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [6, 8)
+  constexpr Range kPeripheralRange = {
+      .addr = 6 * kChunkSize,
+      .size = 2 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 5 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      kPeripheralRange,
+      {
+          .addr = 8 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralBetweenRangesMerging) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [2, 4)]
+      {
+          .addr = 2 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // peripheral: [4,6)
+      {
+          .addr = 4 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // peripheral: [7, 10)
+      {
+          .addr = 7 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // free ram: [10, 12)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [5, 8)
+  constexpr Range kPeripheralRange = {
+      .addr = 5 * kChunkSize,
+      .size = 2 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 4 * kChunkSize,
+          .size = 6 * kChunkSize,
+          .type = Type::kPeripheral,
+      },
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralBetweenRangesNoMerging) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [2, 4)
+      {
+          .addr = 2 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // peripheral: [4, 5)
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // peripheral: [8, 9)
+      {
+          .addr = 8 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // free ram: [10, 12)
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  // peripheral: [6,7)
+  constexpr Range kPeripheralRange = {
+      .addr = 6 * kChunkSize,
+      .size = kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      kPeripheralRange,
+      {
+          .addr = 8 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      {
+          .addr = 10 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralBeforeRangesWithMerging) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // peripheral: [2, 3)
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // peripheral: [4, 5)
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // free ram: [5, 8)
+      {
+          .addr = 5 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  // peripheral: [1, 5)
+  constexpr Range kPeripheralRange = {
+      .addr = kChunkSize,
+      .size = 4 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = kChunkSize,
+          .size = 4 * kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      {
+          .addr = 5 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 6 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralAdjacentBounds) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [2, 4)
+      {
+          .addr = 2 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // peripheral: [4, 5)
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // peripheral: [8, 9)
+      {
+          .addr = 8 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      // free ram: [9, 12)
+      {
+          .addr = 9 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [5, 8)
+  constexpr Range kPeripheralRange = {
+      .addr = 5 * kChunkSize,
+      .size = 3 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 4 * kChunkSize,
+          .size = 5 * kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      {
+          .addr = 9 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralAdjacentBoundsWithIntersectingRange) {
+  PoolContext ctx;
+  Range ranges[] = {
+      // free ram: [2, 4)
+      {
+          .addr = 2 * kChunkSize,
+          .size = 2 * kChunkSize,
+          .type = memalloc::Type::kFreeRam,
+      },
+      // peripheral: [4, 5)
+      {
+          .addr = 4 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+
+      // peripheral: [6, 7)
+      {
+          .addr = 6 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+
+      // peripheral: [8, 9)
+      {
+          .addr = 8 * kChunkSize,
+          .size = kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+
+      // free ram: [9, 12)
+      {
+          .addr = 9 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+  // peripheral: [5, 8)
+  constexpr Range kPeripheralRange = {
+      .addr = 5 * kChunkSize,
+      .size = 3 * kChunkSize,
+      .type = memalloc::Type::kPeripheral,
+  };
+
+  ASSERT_TRUE(ctx.pool.MarkAsPeripheral(kPeripheralRange).is_ok());
+
+  constexpr Range kExpected[] = {
+      {
+          .addr = 2 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kPoolBookkeeping,
+      },
+      {
+          .addr = 3 * kChunkSize,
+          .size = kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      {
+          .addr = 4 * kChunkSize,
+          .size = 5 * kChunkSize,
+          .type = memalloc::Type::kPeripheral,
+      },
+      {
+          .addr = 9 * kChunkSize,
+          .size = 3 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+  TestPoolContents(ctx.pool, kExpected);
+}
+
+TEST(MemallocPoolTests, MarkAsPeripheralOverlapsWithNonPeripheral) {
+  PoolContext ctx;
+
+  Range ranges[] = {
+      // free ram: [0, 5)]
+      {
+          .addr = 0,
+          .size = 4 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+      // reserved: [5, 9)
+      {
+          .addr = 5 * kChunkSize,
+          .size = 4 * kChunkSize,
+          .type = Type::kFreeRam,
+      },
+  };
+
+  ASSERT_NO_FATAL_FAILURE(TestPoolInit(ctx.pool, {ranges}));
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 0,
+                      .size = kChunkSize,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_error());
+
+  ASSERT_TRUE(ctx.pool
+                  .MarkAsPeripheral({
+                      .addr = 5 * kChunkSize,
+                      .size = kChunkSize,
+                      .type = memalloc::Type::kPeripheral,
+                  })
+                  .is_error());
+}
+
+TEST(RangeTest, IntersectsWith) {
+  Range a = {
+      .addr = 0,
+      .size = 2,
+      .type = memalloc::Type::kFreeRam,
+  };
+
+  Range b = {
+      .addr = 2,
+      .size = 4,
+      .type = memalloc::Type::kFreeRam,
+  };
+
+  Range c = {
+      .addr = 1,
+      .size = 3,
+      .type = memalloc::Type::kFreeRam,
+  };
+
+  EXPECT_TRUE(a.IntersectsWith(a));
+  EXPECT_FALSE(a.IntersectsWith(b));
+  EXPECT_TRUE(a.IntersectsWith(c));
+
+  EXPECT_FALSE(b.IntersectsWith(a));
+  EXPECT_TRUE(b.IntersectsWith(b));
+  EXPECT_TRUE(b.IntersectsWith(c));
+
+  EXPECT_TRUE(c.IntersectsWith(a));
+  EXPECT_TRUE(c.IntersectsWith(b));
+  EXPECT_TRUE(c.IntersectsWith(c));
 }
 
 }  // namespace

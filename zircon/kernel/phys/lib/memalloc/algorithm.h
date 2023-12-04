@@ -83,7 +83,7 @@ constexpr size_t FindNormalizedRangesScratchSize(size_t n) { return 4 * n; }
 // A variant of the above algorithm that finds all of the normalized ranges in
 // order. It also runs in O(n*log(n)) time but with O(n) space. In particular,
 // a void* buffer of scratch of size `FindNormalizedRangesScratchSize()` must
-// be.
+// be provided.
 //
 // Ranges may overlap only if they are of the same type or one type is
 // kFreeRam; otherwise fit::failed is returned.

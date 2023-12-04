@@ -135,6 +135,13 @@ struct Range {
   constexpr bool operator<(const Range& other) const {
     return addr < other.addr || (addr == other.addr && size < other.size);
   }
+
+  constexpr bool IntersectsWith(const Range& other) const {
+    const auto [left, right] =
+        *this < other ? std::make_tuple(this, &other) : std::make_tuple(&other, this);
+    // Note: Until cpp20 reference wrappers are not constexpr.
+    return left->end() > right->addr;
+  }
 };
 
 // We have constrained Type so that the ZBI memory type's value space

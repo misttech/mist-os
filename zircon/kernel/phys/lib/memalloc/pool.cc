@@ -5,12 +5,16 @@
 // https://opensource.org/licenses/MIT
 
 #include <inttypes.h>
+#include <lib/fit/defer.h>
+#include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <lib/memalloc/pool.h>
+#include <lib/memalloc/range.h>
 #include <lib/stdcompat/bit.h>
 #include <lib/stdcompat/span.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <zircon/assert.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -50,8 +54,8 @@ constexpr int kSizeColWidth = 7;
 // A shared routine for the const and mutable versions of
 // Pool::FindContainingRange() below.
 template <class Ranges>
-auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr, uint64_t size)
-    -> decltype(ranges.begin()) {
+auto FindContainingRangeAmong(Ranges&& ranges, uint64_t addr,
+                              uint64_t size) -> decltype(ranges.begin()) {
   ZX_DEBUG_ASSERT(size <= kMax - addr);
 
   // Despite the name, this function gives us the first range that is
@@ -201,6 +205,105 @@ fit::result<fit::failed, uint64_t> Pool::Allocate(Type type, uint64_t size, uint
     Coalesce(it);
   }
   return fit::ok(addr);
+}
+
+fit::result<fit::failed> Pool::MarkAsPeripheral(const memalloc::Range& range) {
+  ZX_ASSERT(range.type == memalloc::Type::kPeripheral);
+  if (range.size == 0) {
+    return fit::success();
+  }
+
+  // Find the `lower_bound` such that it is the first range intersecting with
+  // `range` or the greatest lower bound of `range` in `ranges_`.
+  mutable_iterator lower_bound = ranges_.end();
+  for (mutable_iterator it = ranges_.begin(); it != ranges_.end(); ++it) {
+    // First interseting range.
+    if (it->IntersectsWith(range)) {
+      if (it->type != memalloc::Type::kPeripheral) {
+        return fit::failed();
+      }
+      lower_bound = it;
+      break;
+    }
+
+    // Previous *it is the greatest lower bound for `range` in `ranges_`,
+    // and `lower_bound` is already set to it.
+    if (!(*it < range)) {
+      break;
+    }
+    lower_bound = it;
+  }
+
+  // Find an `upper_bound` such that is the last intersecting range with `range`
+  // or is the least upper bound of `range` in `ranges_`.
+  mutable_iterator upper_bound = ranges_.end();
+  for (mutable_iterator it = lower_bound; it != ranges_.end(); ++it) {
+    if (it->IntersectsWith(range)) {
+      // An overlapping range MUST be of the same type.
+      if (it->type != memalloc::Type::kPeripheral) {
+        return fit::failed();
+      }
+    } else if (range < *it) {
+      upper_bound = it;
+      break;
+    }
+  }
+
+  // NOTE:
+  // At this point, there are no 'non-Peripheral' intersecting with `range` within [`lower_bound`,
+  // `upper_bound`]. This has been verified when searching for both bounds.
+
+  auto insert_range_at = [&range, this](mutable_iterator it) -> fit::result<fit::failed> {
+    Node* node = nullptr;
+    if (auto result = NewNode(range); result.is_ok()) {
+      node = std::move(result).value();
+    } else {
+      return result.take_error();
+    }
+
+    ZX_DEBUG_ASSERT(node);
+    TryToEnsureTwoBookkeepingNodes();
+    Coalesce(InsertNodeAt(node, it));
+    return fit::success();
+  };
+
+  if (lower_bound == ranges_.end()) {
+    return insert_range_at(ranges_.begin());
+  }
+
+  // The `first_intersecting_range` can be reused for merging range, and any
+  // overlapping ranges into it.
+  auto first_intersecting_range =
+      std::find_if(lower_bound, upper_bound,
+                   [&range](const auto& other) { return range.IntersectsWith(other); });
+
+  // The result of std::find_if means "not found" if returns `upper_bound` and
+  // that points to end() or to a non-intersecting range.
+  if (first_intersecting_range == ranges_.end() ||
+      !first_intersecting_range->IntersectsWith(range)) {
+    return insert_range_at(std::next(lower_bound));
+  }
+
+  auto merge_ranges = [](mutable_iterator accumulator, const memalloc::Range& range) {
+    uint64_t accumulator_end = accumulator->end();
+    accumulator->addr = std::min(accumulator->addr, range.addr);
+    accumulator->size =
+        static_cast<size_t>(std::max(accumulator_end, range.end()) - accumulator->addr);
+  };
+
+  // Make sure that the node reused for storage, contains range.
+  merge_ranges(first_intersecting_range, range);
+
+  for (auto it = std::next(first_intersecting_range); it != upper_bound;) {
+    merge_ranges(first_intersecting_range, *it);
+    auto remove_it = it++;
+    RemoveNodeAt(remove_it);
+  }
+
+  // Try merge with adjacent ranges if applicable, when `lower_bound` or `upper_bound` are
+  // peripheral ranges adjacent to `range`.
+  Coalesce(first_intersecting_range);
+  return fit::success();
 }
 
 fit::result<fit::failed, uint64_t> Pool::FindAllocatable(Type type, uint64_t size,
