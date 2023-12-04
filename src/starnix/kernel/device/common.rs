@@ -7,8 +7,8 @@ use crate::{
         loop_device::loop_device_init, mem::mem_device_init, misc::misc_device_init,
         zram::zram_device_init,
     },
-    fs::devpts::tty_device_init,
     task::CurrentTask,
+    vfs::devpts::tty_device_init,
 };
 
 /// Initializes common devices in `Kernel`.

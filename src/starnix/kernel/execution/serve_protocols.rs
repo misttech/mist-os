@@ -4,7 +4,9 @@
 
 use crate::{
     execution::execute_task,
-    fs::{
+    logging::log_error,
+    task::{CurrentTask, ExitStatus, Kernel},
+    vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         devpts::create_main_and_replica,
         file_server::serve_file_at,
@@ -12,8 +14,6 @@ use crate::{
         socket::VsockSocket,
         FdFlags, FileHandle,
     },
-    logging::log_error,
-    task::{CurrentTask, ExitStatus, Kernel},
 };
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;

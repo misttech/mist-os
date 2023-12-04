@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
     lock_ordering::MmDumpable,
     logging::{self, log_debug, log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
@@ -14,6 +13,7 @@ use crate::{
         SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadState,
         UtsNamespaceHandle, Waiter,
     },
+    vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsString},
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{

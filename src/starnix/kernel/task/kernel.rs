@@ -8,14 +8,6 @@ use crate::{
         BinderDriver, DeviceMode, DeviceRegistry, Features,
     },
     diagnostics::CoreDumpList,
-    fs::{
-        proc::SystemLimits,
-        socket::{
-            GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
-            SocketAddress,
-        },
-        DelayedReleaser, FileOps, FileSystemHandle, FsNode,
-    },
     lock_ordering::KernelIpTables,
     logging::log_error,
     mm::{FutexTable, SharedFutexKey},
@@ -26,6 +18,14 @@ use crate::{
         UtsNamespaceHandle,
     },
     vdso::vdso_loader::Vdso,
+    vfs::{
+        proc::SystemLimits,
+        socket::{
+            GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
+            SocketAddress,
+        },
+        DelayedReleaser, FileOps, FileSystemHandle, FsNode,
+    },
 };
 use bstr::BString;
 use fidl::{

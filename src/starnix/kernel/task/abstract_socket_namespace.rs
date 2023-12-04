@@ -9,8 +9,8 @@ use std::{
 };
 
 use crate::{
-    fs::socket::{Socket, SocketAddress, SocketHandle},
     task::CurrentTask,
+    vfs::socket::{Socket, SocketAddress, SocketHandle},
 };
 use starnix_uapi::{errno, error, errors::Errno};
 

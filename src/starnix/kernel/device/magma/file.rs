@@ -17,15 +17,15 @@ use crate::{
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
         wayland::image_file::{ImageFile, ImageInfo},
     },
-    fs::{
+    logging::{impossible_error, log_error, log_warn, set_zx_name},
+    mm::{MemoryAccessorExt, ProtectionFlags},
+    task::CurrentTask,
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
         fuchsia::RemoteFileObject,
         Anon, FdFlags, FdNumber, FileObject, FileOps, FsNode, VmoFileObject,
     },
-    logging::{impossible_error, log_error, log_warn, set_zx_name},
-    mm::{MemoryAccessorExt, ProtectionFlags},
-    task::CurrentTask,
 };
 use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;

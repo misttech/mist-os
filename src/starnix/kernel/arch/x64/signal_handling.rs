@@ -177,11 +177,11 @@ mod tests {
 
     use super::*;
     use crate::{
-        fs::FileWriteGuardRef,
         mm::{DesiredAddress, MappingName, MappingOptions, ProtectionFlags},
         signals::{restore_from_signal_handler, testing::dequeue_signal_for_test, SignalDetail},
         task::Kernel,
         testing::*,
+        vfs::FileWriteGuardRef,
     };
     use starnix_uapi::{
         __NR_rt_sigreturn,

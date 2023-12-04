@@ -5,7 +5,6 @@
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
 use crate::{
-    fs::{FdFlags, FdNumber},
     logging::not_implemented,
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{
@@ -16,6 +15,7 @@ use crate::{
         CurrentTask, ProcessEntryRef, ProcessSelector, Task, TaskMutableState, ThreadGroup,
         WaitResult, Waiter,
     },
+    vfs::{FdFlags, FdNumber},
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};

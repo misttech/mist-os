@@ -6,15 +6,6 @@
 
 use crate::{
     device::{mem::new_null_file, remote_binder::RemoteBinderDevice, DeviceOps},
-    fs::{
-        buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-        fuchsia::new_remote_file,
-        CacheMode, DirectoryEntryType, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
-        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
-        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
-        VecDirectory, VecDirectoryEntry,
-    },
     logging::{log_error, log_trace, log_warn, not_implemented},
     mm::{
         vmo::round_up_to_increment, DesiredAddress, MappingName, MappingOptions, MemoryAccessor,
@@ -23,6 +14,15 @@ use crate::{
     mutable_state::Guard,
     task::{
         CurrentTask, EventHandler, Kernel, SimpleWaiter, Task, WaitCanceler, WaitQueue, Waiter,
+    },
+    vfs::{
+        buffers::{InputBuffer, OutputBuffer, VecInputBuffer},
+        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
+        fuchsia::new_remote_file,
+        CacheMode, DirectoryEntryType, FdEvents, FdFlags, FdNumber, FileHandle, FileObject,
+        FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+        FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+        VecDirectory, VecDirectoryEntry,
     },
 };
 use derivative::Derivative;
@@ -4353,9 +4353,9 @@ impl BinderFs {
 pub mod tests {
     use super::*;
     use crate::{
-        fs::FdFlags,
         mm::{MemoryAccessor, PAGE_SIZE},
         testing::*,
+        vfs::FdFlags,
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, RequestStream, ServerEnd};

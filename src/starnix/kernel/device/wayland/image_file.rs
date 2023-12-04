@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    mm::ProtectionFlags,
+    task::CurrentTask,
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_seekable, Anon, FileHandle, FileObject, FileOps, FsNodeInfo, VmoFileObject,
     },
-    mm::ProtectionFlags,
-    task::CurrentTask,
 };
 use fidl_fuchsia_ui_composition as fuicomp;
 use fuchsia_zircon as zx;

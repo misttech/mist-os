@@ -3,12 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    signals::SignalDetail,
+    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, Anon, FdEvents, FileHandle, FileObject, FileOps,
     },
-    signals::SignalDetail,
-    task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
 };
 use starnix_lock::Mutex;
 use starnix_uapi::{

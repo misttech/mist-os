@@ -4,17 +4,17 @@
 
 use crate::{
     device::{simple_device_ops, DeviceMode},
-    fs::{
-        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless,
-        kobject::KObjectDeviceAttribute,
-        Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
-    },
     logging::{log, log_info},
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
     task::CurrentTask,
+    vfs::{
+        buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
+        fileops_impl_seekless,
+        kobject::KObjectDeviceAttribute,
+        Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
+    },
 };
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},

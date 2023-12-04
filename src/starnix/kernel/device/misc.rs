@@ -7,8 +7,8 @@ use crate::{
         create_unknown_device, loop_device::create_loop_control_device, mem::DevRandom,
         simple_device_ops, uinput::create_uinput_device, DeviceMode,
     },
-    fs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
     task::CurrentTask,
+    vfs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
 };
 use starnix_uapi::device_type::DeviceType;
 

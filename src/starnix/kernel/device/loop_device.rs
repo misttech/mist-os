@@ -4,15 +4,15 @@
 use super::DeviceMode;
 
 use crate::{
-    fs::{
+    logging::not_implemented,
+    mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
+    task::CurrentTask,
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless,
         kobject::KObjectDeviceAttribute,
         FdNumber, FileHandle, FileObject, FileOps, FsNode,
     },
-    logging::not_implemented,
-    mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
-    task::CurrentTask,
 };
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
@@ -575,11 +575,11 @@ fn get_or_create_loop_device(
 mod tests {
     use super::*;
     use crate::{
-        fs::{
+        testing::*,
+        vfs::{
             buffers::*, fuchsia::new_remote_file, Anon, DynamicFile, DynamicFileBuf,
             DynamicFileSource, FdFlags, FsNodeOps,
         },
-        testing::*,
     };
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_io as fio;

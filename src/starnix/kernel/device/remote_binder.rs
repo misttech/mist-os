@@ -4,13 +4,13 @@
 
 use crate::{
     device::{DeviceOps, RemoteBinderConnection},
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
-    },
     logging::{log_error, log_warn},
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
+    vfs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode, NamespaceNode,
+    },
 };
 use anyhow::{Context, Error};
 use derivative::Derivative;
@@ -1056,9 +1056,9 @@ mod tests {
     use super::*;
     use crate::{
         device::{binder::tests::run_process_accessor, BinderFs},
-        fs::{FileSystemOptions, WhatToMount},
         mm::MemoryAccessor,
         testing::*,
+        vfs::{FileSystemOptions, WhatToMount},
     };
     use fidl::{
         endpoints::{create_endpoints, create_proxy, Proxy},

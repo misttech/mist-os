@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable,
-        fuchsia::RemoteFileObject,
-        Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
-    },
     logging::{impossible_error, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
         WaitCanceler, Waiter,
+    },
+    vfs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable,
+        fuchsia::RemoteFileObject,
+        Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
     },
 };
 use fidl::HandleBased;

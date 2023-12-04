@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::socket::{SocketDomain, SocketHandle, SocketType},
     logging::{log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::CurrentTask,
+    vfs::socket::{SocketDomain, SocketHandle, SocketType},
 };
 use starnix_uapi::{
     c_char, errno, error, errors::Errno, ip6t_get_entries, ip6t_getinfo, ip6t_replace,

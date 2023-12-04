@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    logging::log_error,
+    task::CurrentTask,
+    vfs::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         kobject::{
             KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
@@ -11,8 +13,6 @@ use crate::{
         sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
         FileOps, FsNode, FsNodeOps, FsStr,
     },
-    logging::log_error,
-    task::CurrentTask,
 };
 use assert_matches::assert_matches;
 use starnix_uapi::{
@@ -479,7 +479,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{device::mem::DevNull, fs::*, testing::*};
+    use crate::{device::mem::DevNull, testing::*, vfs::*};
     use starnix_uapi::device_type::{INPUT_MAJOR, MEM_MAJOR};
 
     #[::fuchsia::test]

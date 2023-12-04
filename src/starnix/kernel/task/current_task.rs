@@ -19,10 +19,6 @@ use crate::{
         task::{decode_page_fault_exception_report, get_signal_for_general_exception},
     },
     execution::{create_zircon_process, TaskInfo},
-    fs::{
-        FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
-        SymlinkTarget,
-    },
     loader::{load_executable, resolve_executable, ResolvedElf},
     lock_ordering::MmDumpable,
     logging::{log_error, log_warn, not_implemented, set_zx_name},
@@ -31,6 +27,10 @@ use crate::{
     task::{
         Kernel, PidTable, ProcessGroup, SeccompFilter, SeccompFilterContainer,
         SeccompNotifierHandle, SeccompState, SeccompStateValue, Task, TaskFlags, ThreadGroup,
+    },
+    vfs::{
+        FdNumber, FdTable, FileHandle, FsContext, FsStr, LookupContext, NamespaceNode, SymlinkMode,
+        SymlinkTarget,
     },
 };
 use starnix_syscalls::{decls::Syscall, SyscallResult};

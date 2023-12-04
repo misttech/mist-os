@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::parse_unsigned_file,
     lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessorExt},
     not_implemented,
@@ -12,6 +11,7 @@ use crate::{
         SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
     },
     task::{waiter::WaitQueue, CurrentTask, Kernel, StopState, Task, ThreadGroup},
+    vfs::parse_unsigned_file,
 };
 use lock_sequence::{LockBefore, Locked};
 use starnix_uapi::{

@@ -7,10 +7,10 @@ use crate::{
         input::{add_and_register_input_device, InputFile},
         DeviceOps,
     },
-    fs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
     logging::{log_info, log_warn},
     mm::MemoryAccessorExt,
     task::CurrentTask,
+    vfs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
@@ -205,10 +205,10 @@ impl FileOps for Arc<UinputDevice> {
 
     fn write(
         &self,
-        _file: &crate::fs::FileObject,
+        _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::fs::buffers::InputBuffer,
+        _data: &mut dyn crate::vfs::buffers::InputBuffer,
     ) -> Result<usize, Errno> {
         // TODO(b/308160735): impl write() for uinput FD.
         log_info!("write()");
@@ -217,10 +217,10 @@ impl FileOps for Arc<UinputDevice> {
 
     fn read(
         &self,
-        _file: &crate::fs::FileObject,
+        _file: &crate::vfs::FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::fs::buffers::OutputBuffer,
+        _data: &mut dyn crate::vfs::buffers::OutputBuffer,
     ) -> Result<usize, Errno> {
         log_warn!("uinput FD does not support read().");
         error!(EINVAL)
@@ -261,10 +261,10 @@ impl DeviceOps for VirtualDevice {
 mod test {
     use super::*;
     use crate::{
-        fs::FileHandle,
         mm::MemoryAccessor,
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        vfs::FileHandle,
     };
     use starnix_uapi::user_address::UserAddress;
     use test_case::test_case;

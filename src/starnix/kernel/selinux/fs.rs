@@ -3,7 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    logging::not_implemented,
+    task::{CurrentTask, Task},
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
         parse_unsigned_file, serialize_u32_file, BytesFile, BytesFileOps, CacheMode,
@@ -11,8 +13,6 @@ use crate::{
         FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
         StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry, VmoFileNode,
     },
-    logging::not_implemented,
-    task::{CurrentTask, Task},
 };
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;

@@ -40,7 +40,6 @@ mod device;
 mod diagnostics;
 mod dynamic_thread_spawner;
 mod execution;
-mod fs;
 mod loader;
 mod lock_ordering;
 mod logging;
@@ -53,6 +52,7 @@ mod syscalls;
 mod task;
 mod time;
 mod vdso;
+mod vfs;
 
 #[cfg(test)]
 mod testing;

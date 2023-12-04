@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{syscalls::sys_renameat2, FdNumber},
     task::{syscalls::do_clone, CurrentTask},
+    vfs::{syscalls::sys_renameat2, FdNumber},
 };
 use lock_sequence::{Locked, Unlocked};
 use starnix_uapi::{

@@ -8,13 +8,13 @@ use crate::{
         create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
         serve_component_runner, serve_container_controller, serve_graphical_presenter,
     },
-    fs::{
-        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
-        WhatToMount,
-    },
     logging::{log_error, log_info, log_warn},
     task::{set_thread_role, CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
+    vfs::{
+        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
+        WhatToMount,
+    },
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -535,8 +535,8 @@ async fn wait_for_init_file(
 mod test {
     use super::wait_for_init_file;
     use crate::{
-        fs::FdNumber,
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked},
+        vfs::FdNumber,
     };
     use fuchsia_async as fasync;
     use futures::{SinkExt, StreamExt};

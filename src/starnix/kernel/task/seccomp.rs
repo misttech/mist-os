@@ -3,16 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
-        buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
-    },
     logging::log_warn,
     mm::MemoryAccessorExt,
     signals::{send_standard_signal, SignalDetail, SignalInfo},
     task::{
         CurrentTask, EventHandler, ExitStatus, Kernel, Task, TaskFlags, WaitCanceler, WaitQueue,
         Waiter,
+    },
+    vfs::{
+        buffers::{InputBuffer, OutputBuffer},
+        fileops_impl_nonseekable, Anon, FdEvents, FdFlags, FdNumber, FileObject, FileOps,
     },
 };
 use bstr::ByteSlice;

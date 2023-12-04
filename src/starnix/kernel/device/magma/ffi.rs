@@ -13,9 +13,9 @@ use crate::{
         },
         wayland::image_file::{ImageFile, ImageInfo},
     },
-    fs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
+    vfs::{Anon, FdFlags, FsNodeInfo, VmoFileObject},
 };
 use fuchsia_zircon::{
     AsHandleRef, HandleBased, {self as zx},

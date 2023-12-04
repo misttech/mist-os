@@ -4,8 +4,8 @@
 
 use crate::{
     device::{magma::MagmaFile, DeviceMode},
-    fs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
     task::CurrentTask,
+    vfs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
 };
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 

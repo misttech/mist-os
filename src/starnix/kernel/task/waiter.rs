@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{FdEvents, FdNumber},
     signals::RunState,
     task::CurrentTask,
+    vfs::{FdEvents, FdNumber},
 };
 use fidl::AsHandleRef as _;
 use fuchsia_zircon as zx;
@@ -1019,13 +1019,13 @@ impl WaitQueue {
 mod tests {
     use super::*;
     use crate::{
-        fs::{
+        testing::*,
+        vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
             eventfd::{new_eventfd, EventFdType},
             fuchsia::*,
             FdEvents,
         },
-        testing::*,
     };
     use starnix_uapi::open_flags::OpenFlags;
 

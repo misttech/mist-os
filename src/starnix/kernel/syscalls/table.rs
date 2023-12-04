@@ -46,32 +46,6 @@ pub fn dispatch_syscall(
     syscall: &Syscall,
 ) -> Result<SyscallResult, Errno> {
     use crate::{
-        fs::{
-            bpf::sys_bpf,
-            socket::syscalls::{
-                sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
-                sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,
-                sys_sendmsg, sys_sendto, sys_setsockopt, sys_shutdown, sys_socket, sys_socketpair,
-            },
-            syscalls::{
-                sys_chdir, sys_chroot, sys_close, sys_close_range, sys_dup, sys_dup3,
-                sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
-                sys_faccessat, sys_faccessat2, sys_fadvise64, sys_fallocate, sys_fchdir,
-                sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fcntl, sys_fdatasync,
-                sys_fgetxattr, sys_flistxattr, sys_flock, sys_fremovexattr, sys_fsetxattr,
-                sys_fstat, sys_fstatfs, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64,
-                sys_getxattr, sys_inotify_add_watch, sys_inotify_init1, sys_inotify_rm_watch,
-                sys_ioctl, sys_lgetxattr, sys_linkat, sys_listxattr, sys_llistxattr,
-                sys_lremovexattr, sys_lseek, sys_lsetxattr, sys_memfd_create, sys_mkdirat,
-                sys_mknodat, sys_mount, sys_newfstatat, sys_openat, sys_pidfd_getfd,
-                sys_pidfd_open, sys_pipe2, sys_ppoll, sys_pread64, sys_preadv, sys_preadv2,
-                sys_pselect6, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readlinkat,
-                sys_readv, sys_removexattr, sys_renameat2, sys_sendfile, sys_setxattr, sys_splice,
-                sys_statfs, sys_statx, sys_symlinkat, sys_sync, sys_syncfs, sys_timerfd_create,
-                sys_timerfd_gettime, sys_timerfd_settime, sys_truncate, sys_umask, sys_umount2,
-                sys_unlinkat, sys_utimensat, sys_write, sys_writev,
-            },
-        },
         mm::syscalls::{
             sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mmap,
             sys_mprotect, sys_mremap, sys_msync, sys_munmap, sys_process_vm_readv,
@@ -105,6 +79,32 @@ pub fn dispatch_syscall(
             sys_setfsgid, sys_setfsuid, sys_setgid, sys_setgroups, sys_setns, sys_setpgid,
             sys_setpriority, sys_setregid, sys_setresgid, sys_setresuid, sys_setreuid,
             sys_setrlimit, sys_setsid, sys_setuid, sys_unshare,
+        },
+        vfs::{
+            bpf::sys_bpf,
+            socket::syscalls::{
+                sys_accept, sys_accept4, sys_bind, sys_connect, sys_getpeername, sys_getsockname,
+                sys_getsockopt, sys_listen, sys_recvfrom, sys_recvmmsg, sys_recvmsg, sys_sendmmsg,
+                sys_sendmsg, sys_sendto, sys_setsockopt, sys_shutdown, sys_socket, sys_socketpair,
+            },
+            syscalls::{
+                sys_chdir, sys_chroot, sys_close, sys_close_range, sys_dup, sys_dup3,
+                sys_epoll_create1, sys_epoll_ctl, sys_epoll_pwait, sys_epoll_pwait2, sys_eventfd2,
+                sys_faccessat, sys_faccessat2, sys_fadvise64, sys_fallocate, sys_fchdir,
+                sys_fchmod, sys_fchmodat, sys_fchown, sys_fchownat, sys_fcntl, sys_fdatasync,
+                sys_fgetxattr, sys_flistxattr, sys_flock, sys_fremovexattr, sys_fsetxattr,
+                sys_fstat, sys_fstatfs, sys_fsync, sys_ftruncate, sys_getcwd, sys_getdents64,
+                sys_getxattr, sys_inotify_add_watch, sys_inotify_init1, sys_inotify_rm_watch,
+                sys_ioctl, sys_lgetxattr, sys_linkat, sys_listxattr, sys_llistxattr,
+                sys_lremovexattr, sys_lseek, sys_lsetxattr, sys_memfd_create, sys_mkdirat,
+                sys_mknodat, sys_mount, sys_newfstatat, sys_openat, sys_pidfd_getfd,
+                sys_pidfd_open, sys_pipe2, sys_ppoll, sys_pread64, sys_preadv, sys_preadv2,
+                sys_pselect6, sys_pwrite64, sys_pwritev, sys_pwritev2, sys_read, sys_readlinkat,
+                sys_readv, sys_removexattr, sys_renameat2, sys_sendfile, sys_setxattr, sys_splice,
+                sys_statfs, sys_statx, sys_symlinkat, sys_sync, sys_syncfs, sys_timerfd_create,
+                sys_timerfd_gettime, sys_timerfd_settime, sys_truncate, sys_umask, sys_umount2,
+                sys_unlinkat, sys_utimensat, sys_write, sys_writev,
+            },
         },
     };
 
@@ -178,7 +178,7 @@ pub fn dispatch_syscall(
     #[cfg(target_arch = "x86_64")]
     use crate::arch::syscalls::sys_vfork;
     #[cfg(target_arch = "x86_64")]
-    use crate::fs::syscalls::sys_select;
+    use crate::vfs::syscalls::sys_select;
 
     let args = (syscall.arg0, syscall.arg1, syscall.arg2, syscall.arg3, syscall.arg4, syscall.arg5);
     syscall_match! {

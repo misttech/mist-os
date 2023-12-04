@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    logging::log_error,
+    task::{CurrentTask, EventHandler, Kernel, Waiter},
+    vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
         socket::{resolve_unix_socket_address, syscalls::sys_socket, SocketPeer},
         FdEvents, FileHandle,
     },
-    logging::log_error,
-    task::{CurrentTask, EventHandler, Kernel, Waiter},
 };
 use lock_sequence::{Locked, Unlocked};
 use once_cell::sync::OnceCell;

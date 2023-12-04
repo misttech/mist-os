@@ -8,16 +8,16 @@ use lock_sequence::{Locked, Unlocked};
 
 use crate::{
     execution::notify_debugger_of_module_list,
-    fs::{
-        buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
-        FdNumber,
-    },
     logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{
         DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
         MremapFlags, ProtectionFlags, PAGE_SIZE,
     },
     task::{CurrentTask, Task},
+    vfs::{
+        buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer},
+        FdNumber,
+    },
 };
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},

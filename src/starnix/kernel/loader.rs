@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
     logging::{log_error, log_warn},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE,
     },
     task::CurrentTask,
+    vfs::{FileHandle, FileWriteGuardMode, FileWriteGuardRef},
 };
 use fuchsia_zircon::{
     HandleBased, {self as zx},

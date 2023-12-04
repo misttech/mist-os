@@ -12,7 +12,6 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 
 use crate::{
     execution::execute_task,
-    fs::{FdNumber, FileHandle, MountNamespaceFile},
     lock_ordering::MmDumpable,
     logging::{log_error, log_trace, not_implemented, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
@@ -22,6 +21,7 @@ use crate::{
         PtraceAttachType, SchedulerPolicy, SeccompAction, SeccompStateValue, Task,
         PR_SET_PTRACER_ANY,
     },
+    vfs::{FdNumber, FileHandle, MountNamespaceFile},
 };
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{

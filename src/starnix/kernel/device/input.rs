@@ -8,15 +8,15 @@ use crate::{
         input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
         registry::DeviceOps, DeviceMode,
     },
-    fs::{
+    logging::{log_info, log_warn, not_implemented},
+    mm::MemoryAccessorExt,
+    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
+    vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable,
         kobject::KObjectDeviceAttribute,
         FdEvents, FileObject, FileOps, FsNode,
     },
-    logging::{log_info, log_warn, not_implemented},
-    mm::MemoryAccessorExt,
-    task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
@@ -896,9 +896,9 @@ mod test {
 
     use super::*;
     use crate::{
-        fs::{buffers::VecOutputBuffer, FileHandle},
         task::Kernel,
         testing::{create_kernel_and_task, map_memory, AutoReleasableTask},
+        vfs::{buffers::VecOutputBuffer, FileHandle},
     };
     use anyhow::anyhow;
     use assert_matches::assert_matches;

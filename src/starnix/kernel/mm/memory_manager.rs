@@ -3,15 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
-        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsString, NamespaceNode,
-        SequenceFileSource,
-    },
     lock_ordering::MmDumpable,
     logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
     signals::{SignalDetail, SignalInfo},
     task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
+    vfs::{
+        DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsString, NamespaceNode,
+        SequenceFileSource,
+    },
 };
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
@@ -3089,7 +3089,7 @@ pub fn create_anonymous_mapping_vmo(size: u64) -> Result<Arc<zx::Vmo>, Errno> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{fs::FdNumber, mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*};
+    use crate::{mm::syscalls::do_mmap, task::syscalls::sys_prctl, testing::*, vfs::FdNumber};
     use assert_matches::assert_matches;
     use itertools::assert_equal;
     use starnix_uapi::{

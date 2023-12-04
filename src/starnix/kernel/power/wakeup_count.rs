@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    fs::{
+    task::CurrentTask,
+    vfs::{
         fileops_impl_seekable, FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer,
         SimpleFileNode,
     },
-    task::CurrentTask,
 };
 use starnix_uapi::{errno, error, errors::Errno};
 

@@ -7,7 +7,12 @@ use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
-    fs::{
+    logging::not_implemented,
+    mm::MemoryAccessorExt,
+    signals::{syscalls::sys_signalfd4, RunState},
+    task::{syscalls::do_clone, CurrentTask},
+    time::utc,
+    vfs::{
         syscalls::{
             poll, sys_dup3, sys_epoll_create1, sys_epoll_pwait, sys_eventfd2, sys_faccessat,
             sys_fchmodat, sys_fchownat, sys_inotify_init1, sys_linkat, sys_mkdirat, sys_mknodat,
@@ -16,11 +21,6 @@ use crate::{
         },
         DirentSink32, FdNumber,
     },
-    logging::not_implemented,
-    mm::MemoryAccessorExt,
-    signals::{syscalls::sys_signalfd4, RunState},
-    task::{syscalls::do_clone, CurrentTask},
-    time::utc,
 };
 use starnix_uapi::{
     __kernel_time_t, clone_args,
@@ -474,9 +474,9 @@ pub fn sys_vfork(
 mod tests {
     use super::*;
     use crate::{
-        fs::FdFlags,
         mm::{MemoryAccessor, PAGE_SIZE},
         testing::*,
+        vfs::FdFlags,
     };
 
     #[::fuchsia::test]
