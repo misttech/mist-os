@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <zircon/errors.h>
 
@@ -88,6 +89,11 @@ void Node::AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata) {
   pbus_node_.metadata()->emplace_back(std::move(metadata));
 }
 
+void Node::AddNodeSpec(fuchsia_driver_framework::ParentSpec spec) {
+  parents_.emplace_back(spec);
+  composite_ = true;
+}
+
 zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> &pbus,
                            fidl::SyncClient<fuchsia_driver_framework::CompositeNodeManager> &mgr) {
   if (node_properties_.empty()) {
@@ -129,12 +135,21 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
   if (composite_) {
     // Construct the platform bus node.
     fdf::ParentSpec platform_node;
-    platform_node.properties() = std::vector<fdf::NodeProperty>(node_properties_);
-    platform_node.properties().emplace_back(fdf::NodeProperty{{
-        .key = fdf::NodePropertyKey::WithIntValue(BIND_PROTOCOL),
-        .value = fdf::NodePropertyValue::WithIntValue(bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
-    }});
+    platform_node.properties() = node_properties_;
+    auto additional_node_properties = std::vector<fdf::NodeProperty>{
+        fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+        fdf::MakeProperty(BIND_PLATFORM_DEV_VID,
+                          bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
+        fdf::MakeProperty(BIND_PLATFORM_DEV_DID,
+                          bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_DEVICETREE),
+        fdf::MakeProperty(BIND_PLATFORM_DEV_INSTANCE_ID, id_),
+    };
+    platform_node.properties().insert(platform_node.properties().end(),
+                                      additional_node_properties.begin(),
+                                      additional_node_properties.end());
+
     platform_node.bind_rules() = std::vector<fdf::BindRule>{
+        fdf::MakeAcceptBindRule(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
         fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_VID,
                                 bind_fuchsia_platform::BIND_PLATFORM_DEV_VID_GENERIC),
         fdf::MakeAcceptBindRule(BIND_PLATFORM_DEV_DID,
@@ -144,6 +159,9 @@ zx::result<> Node::Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Pl
 
     // pbus node is always the primary parent for now.
     parents_.insert(parents_.begin(), std::move(platform_node));
+
+    FDF_LOG(DEBUG, "Adding composite node spec to '%.*s' with %zu parents.",
+            static_cast<int>(name().size()), name().data(), parents_.size());
 
     fdf::CompositeNodeSpec group;
     group.name() = name() + "_group";

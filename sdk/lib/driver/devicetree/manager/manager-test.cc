@@ -5,6 +5,8 @@
 #include "manager.h"
 
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/visitors/default/default.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/devicetree/visitors/registry.h>
@@ -18,9 +20,11 @@
 #include <bind/fuchsia/devicetree/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 
 #include "manager-test-helper.h"
 #include "test-data/basic-properties.h"
+#include "test-data/simple.h"
 #include "visitor.h"
 
 namespace fdf_devicetree {
@@ -106,7 +110,7 @@ TEST_F(ManagerTest, TestPublishesSimpleNode) {
           .value =
               fuchsia_driver_framework::NodePropertyValue::WithStringValue("fuchsia,sample-device"),
       }}},
-      *pbus_node.properties()));
+      *pbus_node.properties(), false));
 }
 
 TEST_F(ManagerTest, DriverVisitorTest) {
@@ -333,6 +337,58 @@ TEST_F(ManagerTest, TestSkipDisabledNodes) {
   auto pbus_node2 = env().SyncCall(&testing::FakeEnvWrapper::pbus_nodes_at, 2);
   ASSERT_TRUE(pbus_node2.name().has_value());
   ASSERT_NE(nullptr, strstr("status-none-device", pbus_node2.name()->data()));
+}
+
+TEST_F(ManagerTest, TestCompositeSpec) {
+  Manager manager(testing::LoadTestBlob("/pkg/test-data/simple.dtb"));
+
+  class TestDriverVisitor final : public DriverVisitor {
+   public:
+    TestDriverVisitor() : DriverVisitor({SAMPLE_DEVICE_COMPATIBILITY}) {}
+
+    zx::result<> DriverVisit(Node& node, const devicetree::PropertyDecoder& decoder) override {
+      visited = true;
+      parent_spec.bind_rules({fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                                      SAMPLE_DEVICE_COMPATIBILITY)});
+      parent_spec.properties({fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                                SAMPLE_DEVICE_COMPATIBILITY)});
+      node.AddNodeSpec(parent_spec);
+      return zx::ok();
+    }
+    bool visited = false;
+    fuchsia_driver_framework::ParentSpec parent_spec;
+  };
+
+  DefaultVisitors<TestDriverVisitor> visitor;
+
+  ASSERT_EQ(ZX_OK, manager.Walk(visitor).status_value());
+  ASSERT_TRUE(DoPublish(manager).is_ok());
+
+  ASSERT_EQ(2lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(1lu, env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_size));
+
+  auto mgr_request = env().SyncCall(&testing::FakeEnvWrapper::mgr_requests_at, 0);
+  ASSERT_TRUE(mgr_request.parents().has_value());
+  ASSERT_EQ(2lu, mgr_request.parents()->size());
+
+  EXPECT_TRUE(testing::CheckHasProperties(
+      {{
+          fdf::MakeProperty(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+      }},
+      (*mgr_request.parents())[0].properties(), true));
+  EXPECT_TRUE(testing::CheckHasBindRules(
+      {
+          fdf::MakeAcceptBindRule(BIND_PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+      },
+      (*mgr_request.parents())[0].bind_rules(), true));
+
+  EXPECT_TRUE(testing::CheckHasProperties(
+      {{fdf::MakeProperty(bind_fuchsia_devicetree::FIRST_COMPATIBLE, SAMPLE_DEVICE_COMPATIBILITY)}},
+      (*mgr_request.parents())[1].properties(), false));
+  EXPECT_TRUE(testing::CheckHasBindRules(
+      {{fdf::MakeAcceptBindRule(bind_fuchsia_devicetree::FIRST_COMPATIBLE,
+                                SAMPLE_DEVICE_COMPATIBILITY)}},
+      (*mgr_request.parents())[1].bind_rules(), false));
 }
 
 }  // namespace

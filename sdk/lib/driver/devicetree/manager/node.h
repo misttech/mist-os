@@ -49,6 +49,8 @@ class Node {
 
   void AddMetadata(fuchsia_hardware_platform_bus::Metadata metadata);
 
+  void AddNodeSpec(fuchsia_driver_framework::ParentSpec spec);
+
   // Publish this node.
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient when it's available.
   zx::result<> Publish(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus,

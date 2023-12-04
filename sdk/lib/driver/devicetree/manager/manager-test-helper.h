@@ -21,9 +21,16 @@ std::vector<uint8_t> LoadTestBlob(const char* name);
 
 bool CheckHasProperties(
     std::vector<fuchsia_driver_framework::NodeProperty> expected,
-    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties);
+    const std::vector<::fuchsia_driver_framework::NodeProperty>& node_properties,
+    bool allow_additional_properties);
 
-std::string DebugStringifyProperty(const fuchsia_driver_framework::NodeProperty& prop);
+bool CheckHasBindRules(std::vector<fuchsia_driver_framework::BindRule> expected,
+                       const std::vector<::fuchsia_driver_framework::BindRule>& node_rules,
+                       bool allow_additional_rules);
+
+std::string DebugStringifyProperty(
+    const fuchsia_driver_framework::NodePropertyKey& key,
+    const std::vector<fuchsia_driver_framework::NodePropertyValue>& values);
 
 class FakePlatformBus final : public fdf::Server<fuchsia_hardware_platform_bus::PlatformBus> {
  public:
