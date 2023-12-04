@@ -22,7 +22,6 @@ pub mod loop_device;
 pub mod magma;
 pub mod mem;
 pub mod misc;
-pub mod starnix;
 pub mod sync_file;
 pub mod terminal;
 pub mod uinput;

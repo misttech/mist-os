@@ -4,8 +4,8 @@
 
 use crate::{
     device::{
-        framebuffer::fb_device_init, input::init_input_devices,
-        perfetto_consumer::start_perfetto_consumer_thread, starnix::magma_device_init,
+        framebuffer::fb_device_init, input::init_input_devices, magma::magma_device_init,
+        perfetto_consumer::start_perfetto_consumer_thread,
     },
     task::{CurrentTask, Kernel},
 };

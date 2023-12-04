@@ -4,7 +4,9 @@
 
 mod ffi;
 mod file;
+mod init;
 #[allow(clippy::module_inception)]
 mod magma;
 
 pub use file::MagmaFile;
+pub use init::magma_device_init;
