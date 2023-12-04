@@ -106,6 +106,14 @@ class LexTests(unittest.TestCase):
                 )
             ]
         )
+        self._test_tokens(
+            [
+                textpb.Token(
+                    text='"-DFOO=\\"https://b.f.org/e.cgi\\\\?prod=gShoe\\" "',
+                    type=textpb.TokenType.STRING_VALUE,
+                )
+            ]
+        )
 
     def test_nonstring_values(self):
         self._test_tokens(

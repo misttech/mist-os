@@ -35,7 +35,7 @@ class Token(object):
 _FIELD_NAME_RE = re.compile(r"[a-zA-Z_][a-zA-Z0-9_]*:")
 _SPACE_RE = re.compile(r"[ \t]+")
 _NEWLINE_RE = re.compile(r"\r?\n")
-_STRING_RE = re.compile(r'\"([^"\\]|\\")*\"')  # Allow escaped quotes inside
+_STRING_RE = re.compile(r'"([^\\"]|\\.)*"')  # Allow escaped quotes inside
 _VALUE_RE = re.compile(r"[^ \t\r\n]+")  # Anything text that is not space
 
 
@@ -89,6 +89,12 @@ def _lex_line(line: str) -> Iterable[Token]:
             continue
 
         raise ValueError(f'[textpb.lex] Unrecognized text: "{line}"')
+
+
+def yield_verbose(items: Iterable[Any]) -> Iterable[Any]:
+    for item in items:
+        print(f"{item}")
+        yield item
 
 
 def _lex(lines: Iterable[str]) -> Iterable[Token]:
