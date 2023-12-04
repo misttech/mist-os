@@ -7,6 +7,7 @@ group("drivers") {
   testonly = true
   deps = [
     "//src/devices/acpi:drivers",
+    "//src/devices/adc:drivers",
     "//src/devices/bin/driver-index:test-bind-component",
     "//src/devices/bin/driver-index:test-bind2-component",
     "//src/devices/bin/driver-index:test-fallback-component",

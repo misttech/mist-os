@@ -1,4 +1,5 @@
 ACPI
+ADC
 Audio
 Block
 Bluetooth

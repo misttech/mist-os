@@ -67,6 +67,7 @@
 //src/devices/acpi/drivers/acpi-battery:driver
 //src/devices/acpi/drivers/acpi-lid:driver
 //src/devices/acpi/drivers/intel-thermal:driver
+//src/devices/adc/drivers/aml-saradc:aml-saradc-driver
 //src/devices/bin/driver-index:fake-driver
 //src/devices/bin/driver-index:fake-driver2
 //src/devices/bin/driver-index:fake-fallback-driver
