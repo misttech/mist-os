@@ -8,17 +8,19 @@
 #include <zircon/errors.h>
 
 #include <cstdint>
+#include <optional>
 
 namespace fdf_devicetree {
 
 InterruptParser::InterruptParser(ReferenceNodeMatchCallback node_matcher,
                                  ReferenceChildCallback child_callback)
     : ReferencePropertyParser(
-          "interrupts-extended", "#interrupt-cells",
+          "interrupts-extended", "#interrupt-cells", std::nullopt,
           [this](fdf_devicetree::ReferenceNode& node) { return this->node_matcher_(node); },
           [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers) {
-            return this->child_callback_(child, parent, specifiers);
+                 fdf_devicetree::PropertyCells specifiers,
+                 std::optional<std::string> reference_name) {
+            return this->child_callback_(child, parent, specifiers, reference_name);
           }),
       node_matcher_(std::move(node_matcher)),
       child_callback_(std::move(child_callback)) {}
@@ -109,7 +111,7 @@ zx::result<> InterruptParser::Visit(fdf_devicetree::Node& node,
   for (size_t idx = 0; idx < cell_count; idx += cell_width.value()) {
     PropertyCells interrupt = interrupts_property->second.AsBytes().subspan(
         idx * sizeof(uint32_t), (*cell_width) * sizeof(uint32_t));
-    auto status = child_callback_(node, interrupt_parent, interrupt);
+    auto status = child_callback_(node, interrupt_parent, interrupt, std::nullopt);
     if (status.is_error()) {
       FDF_LOG(ERROR, "Failed to parse interrupt elements of node '%s' - %s", node.name().c_str(),
               status.status_string());

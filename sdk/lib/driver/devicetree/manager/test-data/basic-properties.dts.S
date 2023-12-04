@@ -18,20 +18,31 @@
         device_specific_prop = <DEVICE_SPECIFIC_PROP_VALUE>;
     };
 
-    sample_parent:reference-parent {
+    sample_parent1:reference-parent-1 {
         compatible = "fuchsia,reference-parent";
         #property1-cells = <PROPERTY1_CELLS>;
         #property2-cells = <PROPERTY2_CELLS>;
     };
 
+    sample_parent2:reference-parent-2 {
+        compatible = "fuchsia,reference-parent";
+        #property2-cells = <PROPERTY2_CELLS>;
+    };
+
+    sample_parent3:reference-parent-3 {
+        compatible = "fuchsia,reference-parent";
+        #property2-cells = <PROPERTY2_CELLS>;
+    };
+
     sample-property1-child {
         compatible = "fuchsia,property1-child";
-        property1 = <&sample_parent PROPERTY1_SPECIFIER>;
+        property1 = <&sample_parent1 PROPERTY1_SPECIFIER>;
     };
 
     property2-child {
         compatible = "fuchsia,property2-child";
-        property2 = <&sample_parent>;
+        property2 = <&sample_parent1 &sample_parent2 &sample_parent3>;
+        property2-names = PROPERTY2_NAME1, PROPERTY2_NAME2, PROPERTY2_NAME3;
     };
 
     parent-device {

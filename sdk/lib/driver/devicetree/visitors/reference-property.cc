@@ -2,23 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/devicetree/visitors/common-types.h>
 #include <lib/driver/devicetree/visitors/reference-property.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
-namespace {
-
-using Uint32ArrayElement = devicetree::PropEncodedArrayElement<1>;
-class Uint32Array : public devicetree::PropEncodedArray<Uint32ArrayElement, 1> {
- public:
-  explicit constexpr Uint32Array(devicetree::ByteView data) : PropEncodedArray(data, 1) {}
-
-  std::optional<uint32_t> operator[](size_t index) const {
-    return PropEncodedArray::operator[](0)[0];
-  }
-};
-
-}  // namespace
+#include <optional>
 
 namespace fdf_devicetree {
 
@@ -27,15 +16,29 @@ zx::result<> ReferencePropertyParser::Visit(Node& node,
   auto reference_property = node.properties().find(reference_property_);
 
   if (reference_property != node.properties().end()) {
+    std::optional<devicetree::StringList<>> reference_names;
+    if (names_property_) {
+      auto names_property = node.properties().find(*names_property_);
+      if (names_property != node.properties().end()) {
+        reference_names = names_property->second.AsStringList();
+      } else {
+        FDF_LOG(DEBUG, "Node '%s' does not have reference names property '%.*s'",
+                node.name().c_str(), static_cast<int>(names_property_->length()),
+                names_property_->data());
+      }
+    }
+    std::optional reference_names_iter =
+        reference_names ? std::make_optional(reference_names->begin()) : std::nullopt;
+
     auto cells = Uint32Array(reference_property->second.AsBytes());
 
     for (size_t cell_idx = 0; cell_idx < cells.size();) {
       auto phandle = cells[cell_idx];
-      auto reference = node.GetReferenceNode(*phandle);
+      auto reference = node.GetReferenceNode(phandle);
       if (reference.is_error()) {
         FDF_LOG(ERROR, "Node '%s' has invalid reference in '%.*s' property to %d.",
                 node.name().c_str(), static_cast<int>(reference_property_.length()),
-                reference_property_.data(), *phandle);
+                reference_property_.data(), phandle);
         return zx::error(ZX_ERR_INVALID_ARGS);
       }
       // Advance past phandle index.
@@ -67,16 +70,35 @@ zx::result<> ReferencePropertyParser::Visit(Node& node,
       PropertyCells reference_cells = reference_property->second.AsBytes().subspan(
           byteview_offset, (*cell_width) * sizeof(uint32_t));
 
+      std::optional<std::string> reference_name;
+      if (reference_names_iter) {
+        if (reference_names_iter == reference_names->end()) {
+          FDF_LOG(ERROR, "Reference child node '%s' has too few reference property names '%.*s'.",
+                  node.name().c_str(), static_cast<int>(names_property_->length()),
+                  names_property_->data());
+          return zx::error(ZX_ERR_INVALID_ARGS);
+        }
+        reference_name = **reference_names_iter;
+        (*reference_names_iter)++;
+      }
+
       if (reference_child_callback_) {
-        zx::result result = reference_child_callback_(node, *reference, reference_cells);
+        zx::result result =
+            reference_child_callback_(node, *reference, reference_cells, reference_name);
         if (result.is_error()) {
           FDF_LOG(ERROR,
-                  "Reference child callback failed for node '%s' and reference node '%.*s': %s.",
-                  node.name().c_str(), static_cast<int>(reference->name().length()),
-                  reference->name().data(), result.status_string());
+                  "Reference child callback failed for node '%s' and reference node '%s': %s.",
+                  node.name().c_str(), reference->name().c_str(), result.status_string());
           return result.take_error();
         }
       }
+    }
+
+    if (reference_names_iter && reference_names_iter != reference_names->end()) {
+      FDF_LOG(ERROR, "Reference child node '%s' has too many reference property names '%.*s'.",
+              node.name().c_str(), static_cast<int>(names_property_->length()),
+              names_property_->data());
+      return zx::error(ZX_ERR_INVALID_ARGS);
     }
   }
   return zx::ok();

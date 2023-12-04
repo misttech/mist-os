@@ -46,7 +46,6 @@ resource("bti-dtb-file") {
   deps = [ ":bti-dtb" ]
 }
 
-# can the two targets below be combined?
 fuchsia_unittest_package("bti-visitor-test") {
   component_name = "bti-visitor-test"
   deps = [

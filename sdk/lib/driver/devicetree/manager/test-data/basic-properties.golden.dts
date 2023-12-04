@@ -19,14 +19,27 @@
 
 	property2-child {
 		compatible = "fuchsia,property2-child";
-		property2 = <0x01>;
+		property2 = <0x01 0x02 0x03>;
+		property2-names = "test1\0test2\0test3";
 	};
 
-	reference-parent {
+	reference-parent-1 {
 		#property1-cells = <0x01>;
 		#property2-cells = <0x00>;
 		compatible = "fuchsia,reference-parent";
 		phandle = <0x01>;
+	};
+
+	reference-parent-2 {
+		#property2-cells = <0x00>;
+		compatible = "fuchsia,reference-parent";
+		phandle = <0x02>;
+	};
+
+	reference-parent-3 {
+		#property2-cells = <0x00>;
+		compatible = "fuchsia,reference-parent";
+		phandle = <0x03>;
 	};
 
 	sample-device@0 {

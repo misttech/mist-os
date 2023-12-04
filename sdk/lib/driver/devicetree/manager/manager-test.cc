@@ -14,7 +14,9 @@
 
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include <bind/fuchsia/devicetree/cpp/bind.h>
@@ -162,7 +164,7 @@ TEST_F(ManagerTest, TestMetadata) {
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 
-  ASSERT_EQ(8lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
+  ASSERT_EQ(10lu, env().SyncCall(&testing::FakeEnvWrapper::pbus_node_size));
 
   // First node is devicetree root. Second one is the sample-device. Check
   // metadata of sample-device.
@@ -184,16 +186,19 @@ TEST_F(ManagerTest, TestReferences) {
 
     ReferenceParentVisitor() : DriverVisitor({"fuchsia,reference-parent"}) {
       parser1_ = std::make_unique<ReferencePropertyParser>(
-          "property1", "#property1-cells",
+          "property1", "#property1-cells", std::nullopt,
           [this](ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells) {
+          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells,
+                 std::optional<std::string> reference_name) {
             return this->Property1ReferenceChildVisit(child, parent, reference_cells);
           });
       parser2_ = std::make_unique<ReferencePropertyParser>(
-          "property2", "#property2-cells",
+          "property2", "#property2-cells", "property2-names",
           [this](ReferenceNode& node) { return this->is_match(node.properties()); },
-          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells) {
-            return this->Property2ReferenceChildVisit(child, parent, reference_cells);
+          [this](Node& child, ReferenceNode& parent, devicetree::ByteView reference_cells,
+                 std::optional<std::string> reference_name) {
+            return this->Property2ReferenceChildVisit(child, parent, reference_cells,
+                                                      std::move(reference_name));
           });
       DriverVisitor::AddReferencePropertyParser(parser1_.get());
       DriverVisitor::AddReferencePropertyParser(parser2_.get());
@@ -206,7 +211,7 @@ TEST_F(ManagerTest, TestReferences) {
 
     zx::result<> DriverFinalizeNode(Node& node) override {
       ZX_ASSERT(reference1_count == 1u);
-      ZX_ASSERT(reference2_count == 1u);
+      ZX_ASSERT(reference2_count == 3u);
       finalize_called++;
       return zx::ok();
     }
@@ -219,7 +224,10 @@ TEST_F(ManagerTest, TestReferences) {
     }
 
     zx::result<> Property2ReferenceChildVisit(Node& child, ReferenceNode& parent,
-                                              PropertyCells reference_cells) {
+                                              PropertyCells reference_cells,
+                                              std::optional<std::string> reference_name) {
+      reference2_names.push_back(*reference_name);
+      reference2_parent_names.push_back(parent.name());
       reference2_count++;
       return zx::ok();
     }
@@ -229,6 +237,8 @@ TEST_F(ManagerTest, TestReferences) {
     size_t reference1_count = 0;
     size_t reference2_count = 0;
     devicetree::PropEncodedArray<Property1Specifier> reference1_specifier;
+    std::vector<std::string> reference2_names;
+    std::vector<std::string> reference2_parent_names;
 
    private:
     std::unique_ptr<ReferencePropertyParser> parser1_;
@@ -243,10 +253,18 @@ TEST_F(ManagerTest, TestReferences) {
 
   ASSERT_EQ(ZX_OK, manager.Walk(visitors).status_value());
 
-  ASSERT_EQ(parent_visitor_ptr->visit_called, 1u);
-  ASSERT_EQ(parent_visitor_ptr->finalize_called, 1u);
+  ASSERT_EQ(parent_visitor_ptr->visit_called, 3u);
+  ASSERT_EQ(parent_visitor_ptr->finalize_called, 3u);
+
   ASSERT_EQ(parent_visitor_ptr->reference1_specifier.size(), 1u);
   ASSERT_EQ(parent_visitor_ptr->reference1_specifier[0][0], PROPERTY1_SPECIFIER);
+
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[0], "reference-parent-1");
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[1], "reference-parent-2");
+  ASSERT_EQ(parent_visitor_ptr->reference2_parent_names[2], "reference-parent-3");
+  ASSERT_EQ(parent_visitor_ptr->reference2_names[0], PROPERTY2_NAME1);
+  ASSERT_EQ(parent_visitor_ptr->reference2_names[1], PROPERTY2_NAME2);
+  ASSERT_EQ(parent_visitor_ptr->reference2_names[2], PROPERTY2_NAME3);
 
   ASSERT_TRUE(DoPublish(manager).is_ok());
 }

@@ -59,7 +59,10 @@ source_set("registration") {
 source_set("reference-property") {
   sources = [ "reference-property.cc" ]
   public = [ "reference-property.h" ]
-  deps = [ "//sdk/lib/driver/logging/cpp" ]
+  deps = [
+    ":common-types",
+    "//sdk/lib/driver/logging/cpp",
+  ]
   public_deps = [
     "//sdk/lib/driver/devicetree/manager",
     "//zircon/system/ulib/zx",
@@ -71,4 +74,9 @@ source_set("interrupt-parser") {
   public = [ "interrupt-parser.h" ]
   deps = [ "//sdk/lib/driver/logging/cpp" ]
   public_deps = [ ":reference-property" ]
+}
+
+source_set("common-types") {
+  public = [ "common-types.h" ]
+  public_deps = [ "//zircon/kernel/lib/devicetree" ]
 }

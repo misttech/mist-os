@@ -44,9 +44,10 @@ class IommuCell {
 
 BtiVisitor::BtiVisitor()
     : reference_parser_(
-          kBtiProp, kIommuCellsProp,
+          kBtiProp, kIommuCellsProp, std::nullopt,
           [this](ReferenceNode& node) { return this->IsIommu(node.name()); },
-          [this](Node& child, ReferenceNode& parent, PropertyCells reference_cells) {
+          [this](Node& child, ReferenceNode& parent, PropertyCells reference_cells,
+                 std::optional<std::string> reference_name) {
             return this->ReferenceChildVisit(child, parent, reference_cells);
           }) {}
 

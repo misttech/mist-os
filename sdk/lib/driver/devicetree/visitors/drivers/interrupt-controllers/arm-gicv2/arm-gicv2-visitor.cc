@@ -101,7 +101,8 @@ ArmGicV2Visitor::ArmGicV2Visitor()
       interrupt_parser_(
           [this](fdf_devicetree::ReferenceNode& node) { return this->is_match(node.properties()); },
           [this](fdf_devicetree::Node& child, fdf_devicetree::ReferenceNode& parent,
-                 fdf_devicetree::PropertyCells specifiers) {
+                 fdf_devicetree::PropertyCells specifiers,
+                 std::optional<std::string> reference_name) {
             return this->ChildParser(child, parent, specifiers);
           }) {
   fdf_devicetree::DriverVisitor::AddReferencePropertyParser(&interrupt_parser_);
