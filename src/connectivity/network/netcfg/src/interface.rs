@@ -171,55 +171,65 @@ fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<Strin
 pub struct FileBackedConfig<'a> {
     path: &'a path::Path,
     config: Config,
+    temp_id: u64,
 }
 
 impl<'a> FileBackedConfig<'a> {
     /// Loads the persistent/stable interface names from the backing file.
     pub fn load<P: AsRef<path::Path>>(path: &'a P) -> Result<Self, anyhow::Error> {
+        const INITIAL_TEMP_ID: u64 = 0;
+
         let path = path.as_ref();
         match fs::File::open(path) {
             Ok(mut file) => {
-                Config::load(&file).map(|config| Self { path, config }).or_else(|_| {
-                    // Since deserialization as Config failed, try loading the file
-                    // as the legacy config format.
-                    let _seek = file.seek(SeekFrom::Start(0))?;
-                    let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
-                    // Transfer the values from the old format to the new format.
-                    let new_config = Self {
-                        config: Config {
-                            interfaces: legacy_config
-                                .names
-                                .into_iter()
-                                .map(|(id, name)| InterfaceConfig {
-                                    id,
-                                    device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
-                                        crate::InterfaceType::Wlan
-                                    } else {
-                                        crate::InterfaceType::Ethernet
-                                    },
-                                    name,
-                                })
-                                .collect::<Vec<_>>(),
-                        },
-                        path,
-                    };
-                    // Overwrite the legacy config file with the current format.
-                    //
-                    // TODO(https://fxbug.dev/118197): Remove this logic once all devices
-                    // persist interface configuration in the current format.
-                    new_config.store().unwrap_or_else(|e| {
-                        tracing::error!(
-                            "failed to overwrite legacy interface config with current \
+                Config::load(&file)
+                    .map(|config| Self { path, config, temp_id: INITIAL_TEMP_ID })
+                    .or_else(|_| {
+                        // Since deserialization as Config failed, try loading the file
+                        // as the legacy config format.
+                        let _seek = file.seek(SeekFrom::Start(0))?;
+                        let legacy_config: LegacyConfig = serde_json::from_reader(&file)?;
+                        // Transfer the values from the old format to the new format.
+                        let new_config = Self {
+                            config: Config {
+                                interfaces: legacy_config
+                                    .names
+                                    .into_iter()
+                                    .map(|(id, name)| InterfaceConfig {
+                                        id,
+                                        device_class: if name.starts_with(INTERFACE_PREFIX_WLAN) {
+                                            crate::InterfaceType::Wlan
+                                        } else {
+                                            crate::InterfaceType::Ethernet
+                                        },
+                                        name,
+                                    })
+                                    .collect::<Vec<_>>(),
+                            },
+                            path,
+                            temp_id: INITIAL_TEMP_ID,
+                        };
+                        // Overwrite the legacy config file with the current format.
+                        //
+                        // TODO(https://fxbug.dev/118197): Remove this logic once all devices
+                        // persist interface configuration in the current format.
+                        new_config.store().unwrap_or_else(|e| {
+                            tracing::error!(
+                                "failed to overwrite legacy interface config with current \
                                 format: {:?}",
-                            e
-                        )
-                    });
-                    Ok(new_config)
-                })
+                                e
+                            )
+                        });
+                        Ok(new_config)
+                    })
             }
             Err(error) => {
                 if error.kind() == io::ErrorKind::NotFound {
-                    Ok(Self { path, config: Config { interfaces: vec![] } })
+                    Ok(Self {
+                        path,
+                        temp_id: INITIAL_TEMP_ID,
+                        config: Config { interfaces: vec![] },
+                    })
                 } else {
                     Err(error)
                         .with_context(|| format!("could not open config file {}", path.display()))
@@ -230,7 +240,7 @@ impl<'a> FileBackedConfig<'a> {
 
     /// Stores the persistent/stable interface names to the backing file.
     pub fn store(&self) -> Result<(), anyhow::Error> {
-        let Self { path, config } = self;
+        let Self { path, config, temp_id: _ } = self;
         let temp_file_path = match path.file_name() {
             None => Err(anyhow::format_err!("unexpected non-file path {}", path.display())),
             Some(file_name) => {
@@ -298,13 +308,19 @@ impl<'a> FileBackedConfig<'a> {
         Ok((&interface_config.name, persistent_id))
     }
 
-    // Proxy the call to `Config::generate_identifier`.
-    pub(crate) fn generate_identifier(
-        &self,
-        topological_path: &str,
-        mac_address: &fidl_fuchsia_net_ext::MacAddress,
-    ) -> PersistentIdentifier {
-        self.config.generate_identifier(topological_path, mac_address)
+    /// Returns a temporary name for an interface.
+    pub(crate) fn generate_temporary_name(
+        &mut self,
+        interface_type: crate::InterfaceType,
+    ) -> (String, Option<PersistentIdentifier>) {
+        let id = self.temp_id;
+        self.temp_id += 1;
+
+        let prefix = match interface_type {
+            crate::InterfaceType::Wlan => "wlant",
+            crate::InterfaceType::Ethernet => "etht",
+        };
+        (format!("{}{}", prefix, id), None)
     }
 }
 
@@ -911,6 +927,22 @@ mod tests {
                 FileBackedConfig::load(&path).expect("failed to load the interface config");
             assert_eq!(interface_config.config.interfaces.len(), expected_size);
         }
+    }
+
+    #[test]
+    fn test_generate_temporary_name() {
+        let temp_dir = tempfile::tempdir_in("/tmp").expect("failed to create the temp dir");
+        let path = temp_dir.path().join("net.config.json");
+        let mut interface_config =
+            FileBackedConfig::load(&path).expect("failed to load the interface config");
+        let (name_0, id_0) =
+            interface_config.generate_temporary_name(crate::InterfaceType::Ethernet);
+        assert_eq!(&name_0, "etht0");
+        assert_matches!(id_0, None);
+
+        let (name_1, id_1) = interface_config.generate_temporary_name(crate::InterfaceType::Wlan);
+        assert_eq!(&name_1, "wlant1");
+        assert_matches!(id_1, None);
     }
 
     #[test]

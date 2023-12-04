@@ -381,7 +381,7 @@ mod tests {
 
     impl InterfaceState {
         fn new_host_with_state(
-            persistent_id: PersistentIdentifier,
+            persistent_id: Option<PersistentIdentifier>,
             control: fidl_fuchsia_net_interfaces_ext::admin::Control,
             device_class: DeviceClass,
             dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -508,9 +508,9 @@ mod tests {
                     fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                         .expect("create endpoints");
                 InterfaceState::new_host_with_state(
-                    PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
+                    Some(PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
                         octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
-                    }),
+                    })),
                     control,
                     device_class,
                     None,
