@@ -14,9 +14,9 @@
 namespace compat {
 
 namespace internal {
-template <typename FidlType, typename Unpersist>
-zx::result<FidlType> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming, uint32_t type,
-                                 std::string_view instance, Unpersist unpersist) {
+template <typename ReturnType, typename Unpersist>
+zx::result<ReturnType> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming, uint32_t type,
+                                   std::string_view instance, Unpersist unpersist) {
   zx::result compat = incoming->Connect<fuchsia_driver_compat::Service::Device>(instance);
   if (compat.is_error()) {
     return compat.take_error();
@@ -49,7 +49,7 @@ zx::result<FidlType> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming
 }  // namespace internal
 
 // Attempts to talk to a parent to acquire metadata with |type| and then decodes it into |FidlType|.
-template <typename FidlType>
+template <typename FidlType, typename = std::enable_if_t<fidl::IsFidlObject<FidlType>::value>>
 zx::result<FidlType> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming, uint32_t type,
                                  std::string_view instance = "default") {
   return internal::GetMetadata<FidlType>(
@@ -74,6 +74,9 @@ template <typename FidlType>
 zx::result<fidl::ObjectView<FidlType>> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming,
                                                    fidl::AnyArena& arena, uint32_t type,
                                                    std::string_view instance = "default") {
+  static_assert(
+      fidl::IsFidlObject<FidlType>::value,
+      "GetMetadata with arena only supported for FIDL types. Check FidlType is correct or remove arena parameter.");
   return internal::GetMetadata<fidl::ObjectView<FidlType>>(
       incoming, type, instance,
       [&arena](const zx::vmo& vmo, size_t size) -> zx::result<fidl::ObjectView<FidlType>> {
@@ -88,6 +91,26 @@ zx::result<fidl::ObjectView<FidlType>> GetMetadata(const std::shared_ptr<fdf::Na
           return zx::error(result.error_value().status());
         }
         return zx::ok(*result);
+      });
+}
+
+// Attempts to talk to a parent to acquire metadata with |type| and then casts it into |ReturnType|.
+template <typename ReturnType, typename = std::enable_if_t<!fidl::IsFidlObject<ReturnType>::value>>
+zx::result<std::unique_ptr<ReturnType>> GetMetadata(const std::shared_ptr<fdf::Namespace>& incoming,
+                                                    uint32_t type,
+                                                    std::string_view instance = "default") {
+  return internal::GetMetadata<std::unique_ptr<ReturnType>>(
+      incoming, type, instance,
+      [](const zx::vmo& vmo, size_t size) -> zx::result<std::unique_ptr<ReturnType>> {
+        if (size != sizeof(ReturnType)) {
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+        auto ret = std::make_unique<ReturnType>();
+        zx_status_t status = vmo.read(ret.get(), 0, size);
+        if (status != ZX_OK) {
+          return zx::error(status);
+        }
+        return zx::ok(std::move(ret));
       });
 }
 
