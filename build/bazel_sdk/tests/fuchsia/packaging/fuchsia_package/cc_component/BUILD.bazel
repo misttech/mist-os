@@ -17,6 +17,14 @@ fuchsia_package(
     visibility = ["//visibility:public"],
 )
 
+fuchsia_package(
+    name = "pkg_with_subpkg",
+    package_name = "pkg_with_subpkg_for_test",
+    components = [":empty_component"],
+    subpackages = [":pkg"],
+    visibility = ["//visibility:public"],
+)
+
 # Test Resources
 make_file(
     name = "simple_file",

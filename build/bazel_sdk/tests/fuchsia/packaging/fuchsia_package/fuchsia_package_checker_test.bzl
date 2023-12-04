@@ -49,6 +49,9 @@ def _fuchsia_package_checker_test_impl(ctx):
     if ctx.attr.bind_bytecode:
         args.append("--bind_bytecode={}".format(ctx.attr.bind_bytecode))
 
+    # append the subpackages
+    args.extend(["--subpackages={}".format(s) for s in ctx.attr.expected_subpackages])
+
     populate_py_test_sh_script(ctx, script, ctx.executable._package_checker, args)
 
     return [
@@ -88,6 +91,10 @@ fuchsia_package_checker_test = rule(
 
             The key is the install location and the value is the local file name.
             """,
+            mandatory = False,
+        ),
+        "expected_subpackages": attr.string_list(
+            doc = "A list of expected subpackage names",
             mandatory = False,
         ),
         "_package_checker": attr.label(

@@ -47,6 +47,7 @@ def fuchsia_package(
         components = [],
         resources = [],
         tools = [],
+        subpackages = [],
         **kwargs):
     """Builds a fuchsia package.
 
@@ -83,6 +84,7 @@ def fuchsia_package(
         resources: A list of additional resources to add to this package. These
           resources will not have debug symbols stripped.
         tools: Additional tools that should be added to this package.
+        subpackages: Additional subpackages that should be added to this package.
         package_name: An optional name to use for this package, defaults to name.
         archive_name: An option name for the far file.
         fuchsia_api_level: The API level to build for.
@@ -104,6 +106,7 @@ def fuchsia_package(
         components = components,
         resources = resources,
         tools = tools,
+        subpackages = subpackages,
         package_name = package_name or name,
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
@@ -131,6 +134,7 @@ def _fuchsia_test_package(
         platform = None,
         _test_component_mapping,
         _components = [],
+        subpackages = [],
         **kwargs):
     """Defines test variants of fuchsia_package.
 
@@ -146,6 +150,7 @@ def _fuchsia_test_package(
         test_components = _test_component_mapping.values(),
         components = _components,
         resources = resources,
+        subpackages = subpackages,
         package_name = package_name or name,
         archive_name = archive_name,
         fuchsia_api_level = fuchsia_api_level,
@@ -190,6 +195,7 @@ def fuchsia_unittest_package(
         fuchsia_api_level = None,
         platform = None,
         resources = [],
+        subpackages = [],
         unit_tests,
         **kwargs):
     # buildifier: disable=function-docstring-args
@@ -213,6 +219,7 @@ def fuchsia_unittest_package(
         package_name = package_name,
         archive_name = archive_name,
         resources = resources,
+        subpackages = subpackages,
         fuchsia_api_level = fuchsia_api_level,
         platform = platform,
         _test_component_mapping = test_component_mapping,
@@ -320,8 +327,28 @@ def _build_fuchsia_package_impl(ctx):
     ]
 
     repo_name_args = []
-    if (ctx.attr.package_repository_name != None) and (ctx.attr.package_repository_name != ""):
+    if ctx.attr.package_repository_name:
         repo_name_args = ["--repository", ctx.attr.package_repository_name]
+
+    subpackages_args = []
+    subpackages_inputs = []
+    subpackages = ctx.attr.subpackages
+    if subpackages:
+        # Create the subpackages file
+        subpackages_json = ctx.actions.declare_file(pkg_dir + "/subpackages.json")
+        ctx.actions.write(
+            subpackages_json,
+            content = json.encode_indent([{
+                "package_manifest_file": subpackage[FuchsiaPackageInfo].package_manifest.path,
+            } for subpackage in subpackages]),
+        )
+
+        subpackages_args = ["--subpackages-build-manifest-path", subpackages_json.path]
+        subpackages_inputs = [subpackages_json] + [
+            file
+            for subpackage in subpackages
+            for file in subpackage[FuchsiaPackageInfo].files
+        ]
 
     # Build the package
     ctx.actions.run(
@@ -336,8 +363,8 @@ def _build_fuchsia_package_impl(ctx):
             output_package_manifest.dirname,
             "--published-name",  # name of package
             ctx.attr.package_name,
-        ] + api_level_input + repo_name_args,
-        inputs = build_inputs,
+        ] + subpackages_args + api_level_input + repo_name_args,
+        inputs = build_inputs + subpackages_inputs,
         outputs = [
             output_package_manifest,
             meta_far,
@@ -350,7 +377,7 @@ def _build_fuchsia_package_impl(ctx):
     artifact_inputs = [r.src for r in package_resources] + [
         output_package_manifest,
         meta_far,
-    ]
+    ] + subpackages_inputs
 
     # Create the far file.
     ctx.actions.run(
@@ -444,6 +471,10 @@ _build_fuchsia_package, _build_fuchsia_package_test = rule_variants(
         "tools": attr.label_list(
             doc = "The list of tools included in this package",
             providers = [FuchsiaDriverToolInfo],
+        ),
+        "subpackages": attr.label_list(
+            doc = "The list of subpackages included in this package",
+            providers = [FuchsiaPackageInfo],
         ),
         "fuchsia_api_level": attr.string(
             doc = """The Fuchsia API level to use when building this package.

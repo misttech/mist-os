@@ -27,6 +27,17 @@ fuchsia_package_checker_test(
 )
 
 fuchsia_package_checker_test(
+    name = "subpkg_test",
+    package_name = "pkg_with_subpkg_for_test",
+    size = "small",
+    expected_blobs_to_file_names = {},
+    expected_subpackages = ["pkg_for_test"],
+    manifests = ["meta/empty_component.cm"],
+    package_under_test = "//fuchsia/packaging/fuchsia_package/cc_component:pkg_with_subpkg",
+    visibility = ["//visibility:public"],
+)
+
+fuchsia_package_checker_test(
     name = "cc_driver_pkg_test",
     package_name = "test_driver",
     size = "small",

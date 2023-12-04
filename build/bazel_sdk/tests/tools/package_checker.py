@@ -36,6 +36,13 @@ def parse_args():
         required=False,
     )
     parser.add_argument(
+        "--subpackages",
+        help="The expected subpackage names",
+        action="append",
+        default=[],
+        required=False,
+    )
+    parser.add_argument(
         "--bind_bytecode",
         help="The expected bind bytecode paths (meta/bind/foo.bindbc)",
         default=None,
@@ -109,9 +116,34 @@ def list_contents(args):
     ).split("\n")
 
 
+def list_subpackage_names(args):
+    return (
+        json.loads(
+            run(
+                args.far,
+                "cat",
+                f"--archive={args.meta_far}",
+                "--file=meta/fuchsia.pkg/subpackages",
+            )
+        )["subpackages"].keys()
+        if "meta/fuchsia.pkg/subpackages" in list_contents(args)
+        else []
+    )
+
+
 def check_contents_for_component_manifests(contents, manifests):
     for manifest in manifests:
         _assert_in(manifest, contents, "Failed to find component manifest")
+
+
+def check_contents_for_subpackage_names(args):
+    actual = list_subpackage_names(args)
+    expected = args.subpackages
+    _assert_eq(
+        sorted(actual),
+        sorted(expected),
+        "Expected subpackages not in package",
+    )
 
 
 def check_contents_for_bind_bytecode(contents, bind):
@@ -143,9 +175,10 @@ def check_package_name(args):
 def check_package_has_all_blobs(args):
     dest_to_merkle = dest_merkle_pair_for_blobs(args.blobs, args.ffx)
 
-    contents = run(
+    contents_str = run(
         args.far, "cat", "--archive=" + args.meta_far, "--file=meta/contents"
-    ).split("\n")
+    )
+    contents = contents_str.split("\n") if contents_str else []
 
     _assert_eq(
         sorted(contents),
@@ -160,6 +193,7 @@ def main():
 
     # TODO: add components as an arg
     check_contents_for_component_manifests(contents, args.manifests)
+    check_contents_for_subpackage_names(args)
     check_contents_for_bind_bytecode(contents, args.bind_bytecode)
     check_for_abi_revision(contents)
     check_package_name(args)
