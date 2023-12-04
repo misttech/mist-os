@@ -244,7 +244,10 @@ impl<
         trace!(id, "Get first response");
         let next_payload = self.get_next(&mut get_receptor).await?;
         if let Some(response) = self.process_response(next_payload, &mut store) {
-            self.responder.respond(response.map(R::from).map_err(E::from));
+            self.responder.respond(response.map(R::from).map_err(|err| {
+                tracing::error!("First watch response has an error: {:?}", err);
+                E::from(err)
+            }));
             return Ok(());
         }
 
@@ -253,7 +256,10 @@ impl<
             trace!(id, "Get looped response");
             let next_payload = self.get_next(&mut listen_receptor).await?;
             if let Some(response) = self.process_response(next_payload, &mut store) {
-                self.responder.respond(response.map(R::from).map_err(E::from));
+                self.responder.respond(response.map(R::from).map_err(|err| {
+                    tracing::error!("Updated watch response has an error: {:?}", err);
+                    E::from(err)
+                }));
                 return Ok(());
             }
         }
