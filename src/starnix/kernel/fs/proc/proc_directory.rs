@@ -3,20 +3,19 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::proc::{
+        pid_directory::pid_directory,
+        sysctl::{net_directory, sysctl_directory},
+    },
     logging::{log_error, not_implemented},
     task::{CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-        fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink,
-        proc::{
-            pid_directory::pid_directory,
-            sysctl::{net_directory, sysctl_directory},
-        },
-        unbounded_seek, BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf,
-        DynamicFileSource, FdEvents, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, SeekTarget, SimpleFileNode, StaticDirectoryBuilder,
-        SymlinkTarget,
+        fileops_impl_seekless, fs_node_impl_dir_readonly, fs_node_impl_symlink, unbounded_seek,
+        BytesFile, DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource,
+        FdEvents, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, SeekTarget, SimpleFileNode, StaticDirectoryBuilder, SymlinkTarget,
     },
 };
 use fuchsia_component::client::connect_to_protocol_sync;

@@ -8,6 +8,7 @@ use crate::{
         BinderDriver, DeviceMode, DeviceRegistry, Features,
     },
     diagnostics::CoreDumpList,
+    fs::proc::SystemLimits,
     lock_ordering::KernelIpTables,
     logging::log_error,
     mm::{FutexTable, SharedFutexKey},
@@ -19,7 +20,6 @@ use crate::{
     },
     vdso::vdso_loader::Vdso,
     vfs::{
-        proc::SystemLimits,
         socket::{
             GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
             SocketAddress,

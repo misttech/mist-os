@@ -7,5 +7,5 @@ mod pid_directory;
 mod proc_directory;
 mod sysctl;
 
-pub use fs::*;
+pub use fs::proc_fs;
 pub use sysctl::{ProcSysNetDev, SystemLimits};

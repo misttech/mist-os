@@ -48,7 +48,6 @@ pub mod overlayfs;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;
-pub mod proc;
 pub mod rw_queue;
 pub mod socket;
 pub mod syscalls;

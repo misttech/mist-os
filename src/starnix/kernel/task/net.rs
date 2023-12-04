@@ -3,11 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::proc::ProcSysNetDev,
     task::CurrentTask,
     vfs::{
-        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, proc::ProcSysNetDev,
-        unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle,
-        FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
+        emit_dotdot, fileops_impl_directory, fs_node_impl_dir_readonly, unbounded_seek,
+        DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystemHandle, FsNode,
+        FsNodeHandle, FsNodeOps, FsStr, FsString, SeekTarget, StaticDirectoryBuilder,
     },
 };
 use starnix_lock::Mutex;

@@ -4,6 +4,7 @@
 
 use crate::{
     device::BinderFs,
+    fs::proc::proc_fs,
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::selinux_fs,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter},
@@ -18,7 +19,6 @@ use crate::{
         fs_node_impl_not_dir,
         fuse::new_fuse_fs,
         overlayfs::OverlayFs,
-        proc::proc_fs,
         socket::{SocketAddress, SocketHandle, UnixSocket},
         sysfs::sys_fs,
         tmpfs::TmpFs,

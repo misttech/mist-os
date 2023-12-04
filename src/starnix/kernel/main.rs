@@ -40,6 +40,7 @@ mod device;
 mod diagnostics;
 mod dynamic_thread_spawner;
 mod execution;
+mod fs;
 mod loader;
 mod lock_ordering;
 mod logging;

@@ -17,7 +17,7 @@ pub fn proc_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileS
 }
 
 /// `ProcFs` is a filesystem that exposes runtime information about a `Kernel` instance.
-pub struct ProcFs;
+struct ProcFs;
 impl FileSystemOps for Arc<ProcFs> {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(statfs::default(PROC_SUPER_MAGIC))
