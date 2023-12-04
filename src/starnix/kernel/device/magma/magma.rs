@@ -5,7 +5,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::{
-    device::wayland::vulkan::{BufferCollectionTokens, Loader},
+    device::magma::vulkan::{BufferCollectionTokens, Loader},
     logging::log_warn,
     mm::MemoryAccessorExt,
     task::CurrentTask,

@@ -3,15 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{
-        magma::{
-            file::{
-                BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
-                MagmaDevice, MagmaSemaphore,
-            },
-            magma::create_drm_image,
+    device::magma::{
+        file::{
+            BufferInfo, ConnectionInfo, ConnectionMap, DeviceMap, MagmaBuffer, MagmaConnection,
+            MagmaDevice, MagmaSemaphore,
         },
-        wayland::image_file::{ImageFile, ImageInfo},
+        image_file::{ImageFile, ImageInfo},
+        magma::create_drm_image,
     },
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,

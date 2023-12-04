@@ -14,8 +14,8 @@ use super::{
 };
 use crate::{
     device::{
+        magma::image_file::{ImageFile, ImageInfo},
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
-        wayland::image_file::{ImageFile, ImageInfo},
     },
     fs::fuchsia::RemoteFileObject,
     logging::{impossible_error, log_error, log_warn, set_zx_name},
