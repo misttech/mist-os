@@ -68,6 +68,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "SdioInit failed: %d", status);
   }
 
+  if ((status = LightInit()) != ZX_OK) {
+    zxlogf(ERROR, "LightInit failed: %d", status);
+  }
+
   if ((status = AudioInit()) != ZX_OK) {
     zxlogf(ERROR, "AudioInit failed: %d", status);
   }
@@ -161,10 +165,6 @@ int Astro::Thread() {
 
   if ((status = RawNandInit()) != ZX_OK) {
     zxlogf(ERROR, "RawNandInit failed: %d", status);
-  }
-
-  if ((status = LightInit()) != ZX_OK) {
-    zxlogf(ERROR, "LightInit failed: %d", status);
   }
 
   if ((status = ThermalInit()) != ZX_OK) {

@@ -158,6 +158,11 @@ int Sherlock::Thread() {
     zxlogf(ERROR, "AudioInit() failed");
   }
 
+  if (LightInit() != ZX_OK) {
+    zxlogf(ERROR, "LightInit() failed");
+    return -1;
+  }
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if (GpioInit() != ZX_OK) {
@@ -247,11 +252,6 @@ int Sherlock::Thread() {
 
   if (TouchInit() != ZX_OK) {
     zxlogf(ERROR, "TouchInit() failed");
-    return -1;
-  }
-
-  if (LightInit() != ZX_OK) {
-    zxlogf(ERROR, "LightInit() failed");
     return -1;
   }
 

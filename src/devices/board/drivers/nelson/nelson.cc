@@ -107,6 +107,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "SdioInit failed: %d", status);
   }
 
+  if ((status = LightInit()) != ZX_OK) {
+    zxlogf(ERROR, "LightInit failed: %d", status);
+  }
+
   if ((status = AudioInit()) != ZX_OK) {
     zxlogf(ERROR, "AudioInit failed: %d", status);
   }
@@ -224,10 +228,6 @@ int Nelson::Thread() {
 
   if ((status = VideoInit()) != ZX_OK) {
     zxlogf(ERROR, "VideoInit failed: %d", status);
-  }
-
-  if ((status = LightInit()) != ZX_OK) {
-    zxlogf(ERROR, "LightInit failed: %d", status);
   }
 
   if ((status = ThermalInit()) != ZX_OK) {
