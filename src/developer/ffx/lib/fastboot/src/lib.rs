@@ -10,7 +10,6 @@ pub mod lock;
 pub mod manifest;
 pub mod transport;
 pub mod unlock;
-pub mod usb_discovery;
 
 ////////////////////////////////////////////////////////////////////////////////
 // tests

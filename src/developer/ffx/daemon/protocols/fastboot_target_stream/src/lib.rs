@@ -5,7 +5,6 @@
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use ffx_daemon_target::{is_usb_discovery_disabled, FASTBOOT_CHECK_INTERVAL};
-use ffx_fastboot::usb_discovery::find_serial_numbers;
 use ffx_stream_util::TryStreamUtilExt;
 use fidl::endpoints::ProtocolMarker;
 use fidl_fuchsia_developer_ffx as ffx;
@@ -13,6 +12,7 @@ use fuchsia_async::Task;
 use futures::TryStreamExt;
 use protocols::prelude::*;
 use std::rc::Rc;
+use usb_fastboot_discovery::find_serial_numbers;
 
 struct Inner {
     events_in: async_channel::Receiver<ffx::FastbootTarget>,

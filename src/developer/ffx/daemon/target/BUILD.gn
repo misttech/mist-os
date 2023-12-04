@@ -30,6 +30,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/ssh:lib",
     "//src/developer/ffx/lib/timeout:lib",
+    "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
     "//src/lib/async-utils",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
