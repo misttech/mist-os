@@ -28,7 +28,8 @@ one. These resources each have their own base within the system resource. Valid 
 values for the system resource are **ZX_RSRC_SYSTEM_HYPERVISOR_BASE**,
 **ZX_RSRC_SYSTEM_VMEX_BASE**, **ZX_RSRC_SYSTEM_DEBUG_BASE**,**ZX_RSRC_SYSTEM_INFO_BASE**,
 **ZX_RSRC_SYSTEM_CPU_BASE**, **ZX_RSRC_SYSTEM_POWER_BASE**, **ZX_RSRC_SYSTEM_MEXEC_BASE**,
-**ZX_RSRC_SYSTEM_ENERGY_INFO_BASE**, and **ZX_RSRC_SYSTEM_IOMMU_BASE**.
+**ZX_RSRC_SYSTEM_ENERGY_INFO_BASE**, **ZX_RSRC_SYSTEM_IOMMU_BASE** and
+**ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE**.
 
 New resources may be created with an appropriate parent resource by calling
 [`zx_resource_create()`]. An initial resource of each *kind* is created by the kernel

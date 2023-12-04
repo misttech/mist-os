@@ -455,6 +455,7 @@ multiconst!(zx_rsrc_system_base_t, [
     ZX_RSRC_SYSTEM_MEXEC_BASE       = 6;
     ZX_RSRC_SYSTEM_ENERGY_INFO_BASE = 7;
     ZX_RSRC_SYSTEM_IOMMU_BASE       = 8;
+    ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE = 9;
 ]);
 
 // clock ids
