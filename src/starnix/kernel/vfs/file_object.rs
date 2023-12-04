@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{impossible_error, not_implemented},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessorExt, ProtectionFlags,
@@ -23,6 +22,7 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_lock::Mutex;
+use starnix_logging::{impossible_error, not_implemented, trace_duration};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,

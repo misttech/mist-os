@@ -13,7 +13,6 @@ use zerocopy::{AsBytes, FromBytes, FromZeroes};
 use crate::{
     execution::execute_task,
     lock_ordering::MmDumpable,
-    logging::{log_error, log_trace, not_implemented, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE},
     task::{
         max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach,
@@ -23,6 +22,7 @@ use crate::{
     },
     vfs::{FdNumber, FileHandle, MountNamespaceFile},
 };
+use starnix_logging::{log_error, log_trace, not_implemented, set_zx_name};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,

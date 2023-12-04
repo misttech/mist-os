@@ -9,7 +9,6 @@ use crate::{
         DeviceMode, DeviceOps,
     },
     fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
-    logging::not_implemented,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
     vfs::{
@@ -20,6 +19,7 @@ use crate::{
         FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
+use starnix_logging::not_implemented;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::FsCred,

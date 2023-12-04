@@ -8,7 +8,6 @@ use crate::{
         simple_device_ops, DeviceMode,
     },
     fs::sysfs::BlockDeviceDirectory,
-    logging::log_error,
     task::{CurrentTask, KernelStats},
     vfs::{
         fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
@@ -17,6 +16,7 @@ use crate::{
     },
 };
 use fuchsia_zircon as zx;
+use starnix_logging::log_error;
 use starnix_uapi::{
     auth::FsCred,
     device_type::{DeviceType, ZRAM_MAJOR},

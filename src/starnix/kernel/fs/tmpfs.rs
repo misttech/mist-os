@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::not_implemented,
     mm::PAGE_SIZE,
     task::{CurrentTask, Kernel},
     vfs::{
@@ -14,6 +13,7 @@ use crate::{
     },
 };
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,

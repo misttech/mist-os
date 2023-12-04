@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use super::{GenericMessage, GenericNetlinkFamily};
-use crate::logging::{log_debug, log_error, log_warn};
+use starnix_logging::{log_debug, log_error, log_warn};
 
 use anyhow::{bail, format_err, Context as _, Error};
 use async_trait::async_trait;

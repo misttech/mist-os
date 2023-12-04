@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log_trace,
     task::CurrentTask,
     vfs::{FileSystemHandle, Namespace, NamespaceNode},
 };
 use starnix_lock::RwLock;
+use starnix_logging::log_trace;
 use starnix_uapi::{
     auth::CAP_SYS_CHROOT,
     errno, error,

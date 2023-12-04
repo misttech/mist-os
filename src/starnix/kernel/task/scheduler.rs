@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::logging::{impossible_error, log_debug, log_warn};
 use fidl::HandleBased;
 use fidl_fuchsia_scheduler::ProfileProviderSynchronousProxy;
 use fuchsia_zircon as zx;
+use starnix_logging::{impossible_error, log_debug, log_warn};
 use starnix_uapi::{
     errno, error, errors::Errno, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE,
     SCHED_NORMAL, SCHED_RR,

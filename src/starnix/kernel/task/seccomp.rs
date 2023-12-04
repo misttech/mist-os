@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log_warn,
     mm::MemoryAccessorExt,
     signals::{send_standard_signal, SignalDetail, SignalInfo},
     task::{
@@ -18,6 +17,7 @@ use crate::{
 use bstr::ByteSlice;
 use lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
+use starnix_logging::log_warn;
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};
 use starnix_uapi::{
     __NR_exit, __NR_read, __NR_write, errno, errno_from_code, error,
@@ -385,7 +385,7 @@ impl SeccompState {
         } else {
             "unknown"
         };
-        crate::logging::log_info!(
+        starnix_logging::log_info!(
             "type=SECCOMP: uid={} gid={} pid={} comm={} syscall={} ip={} ARCH={} SYSCALL={}",
             uid,
             gid,

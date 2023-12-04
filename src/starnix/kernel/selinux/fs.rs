@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::not_implemented,
     task::{CurrentTask, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -17,6 +16,7 @@ use crate::{
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;
 use starnix_lock::Mutex;
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,

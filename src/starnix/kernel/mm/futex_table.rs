@@ -16,11 +16,10 @@ use std::{
 };
 
 use crate::{
-    log_error,
-    logging::impossible_error,
     mm::{ProtectionFlags, PAGE_SIZE},
     task::{CurrentTask, Task},
 };
+use starnix_logging::{impossible_error, log_error};
 use starnix_uapi::{
     errno, error, errors::Errno, user_address::UserAddress, FUTEX_BITSET_MATCH_ANY, FUTEX_TID_MASK,
     FUTEX_WAITERS,

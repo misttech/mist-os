@@ -4,7 +4,6 @@
 
 use crate::{
     fs::fuchsia::{TimerFile, TimerFileClock},
-    logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter},
     vfs::{
@@ -25,6 +24,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
+use starnix_logging::{log_trace, not_implemented, not_implemented_log_once};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,

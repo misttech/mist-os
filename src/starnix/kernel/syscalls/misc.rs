@@ -10,10 +10,10 @@ use fuchsia_component::client::connect_to_protocol_sync;
 use lock_sequence::{Locked, Unlocked};
 
 use crate::{
-    logging::{log_error, log_info, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
 };
+use starnix_logging::{log_error, log_info, not_implemented};
 use starnix_syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},

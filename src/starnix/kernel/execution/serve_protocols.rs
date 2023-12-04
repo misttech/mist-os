@@ -4,9 +4,7 @@
 
 use crate::{
     execution::execute_task,
-    fs::devpts::create_main_and_replica,
-    fs::fuchsia::create_fuchsia_pipe,
-    logging::log_error,
+    fs::{devpts::create_main_and_replica, fuchsia::create_fuchsia_pipe},
     task::{CurrentTask, ExitStatus, Kernel},
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
@@ -26,6 +24,7 @@ use fuchsia_async::{
 };
 use fuchsia_zircon as zx;
 use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use starnix_logging::log_error;
 use starnix_uapi::{
     errors::Errno,
     open_flags::OpenFlags,

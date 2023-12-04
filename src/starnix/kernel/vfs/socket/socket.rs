@@ -8,7 +8,6 @@ use super::{
     ZxioBackedSocket,
 };
 use crate::{
-    logging::log_warn,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Task, WaitCanceler, Waiter},
     vfs::{
@@ -29,6 +28,7 @@ use netlink_packet_route::{
     AddressMessage, LinkMessage, RtnlMessage,
 };
 use starnix_lock::Mutex;
+use starnix_logging::log_warn;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,

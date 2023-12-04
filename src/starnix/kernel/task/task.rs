@@ -4,7 +4,6 @@
 
 use crate::{
     lock_ordering::MmDumpable,
-    logging::{self, log_debug, log_warn, set_zx_name},
     mm::{DumpPolicy, MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{SignalInfo, SignalState},
     task::{
@@ -22,6 +21,9 @@ use fuchsia_zircon::{
 use lock_sequence::{LockBefore, Locked};
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_logging::{
+    log_debug, log_warn, set_zx_name, {self},
+};
 use starnix_uapi::{
     auth::{
         Credentials, FsCred, PtraceAccessMode, CAP_KILL, CAP_SYS_PTRACE, PTRACE_MODE_FSCREDS,
@@ -591,7 +593,7 @@ pub struct Task {
     pub seccomp_filter_state: SeccompState,
 
     /// Used to ensure that all logs related to this task carry the same metadata about the task.
-    logging_span: OnceCell<logging::Span>,
+    logging_span: OnceCell<starnix_logging::Span>,
 }
 
 /// The decoded cross-platform parts we care about for page fault exception reports.
@@ -1071,8 +1073,11 @@ impl Task {
             set_zx_name(&self.thread_group.process, name.as_bytes());
         }
 
-        let debug_info =
-            logging::TaskDebugInfo { pid: self.thread_group.leader, tid: self.id, command: name };
+        let debug_info = starnix_logging::TaskDebugInfo {
+            pid: self.thread_group.leader,
+            tid: self.id,
+            command: name,
+        };
         self.update_logging_span(&debug_info);
 
         // Truncate to 16 bytes, including null byte.
@@ -1207,9 +1212,9 @@ impl Task {
         false
     }
 
-    pub fn logging_span(&self) -> logging::Span {
+    pub fn logging_span(&self) -> starnix_logging::Span {
         let logging_span = self.logging_span.get_or_init(|| {
-            logging::Span::new(&logging::TaskDebugInfo {
+            starnix_logging::Span::new(&starnix_logging::TaskDebugInfo {
                 pid: self.thread_group.leader,
                 tid: self.id,
                 command: self.command(),
@@ -1218,8 +1223,9 @@ impl Task {
         logging_span.clone()
     }
 
-    fn update_logging_span(&self, debug_info: &logging::TaskDebugInfo) {
-        let logging_span = self.logging_span.get_or_init(|| logging::Span::new(&debug_info));
+    fn update_logging_span(&self, debug_info: &starnix_logging::TaskDebugInfo) {
+        let logging_span =
+            self.logging_span.get_or_init(|| starnix_logging::Span::new(&debug_info));
         logging_span.update(debug_info);
     }
 }

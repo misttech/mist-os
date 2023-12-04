@@ -14,7 +14,6 @@
 
 use crate::{
     lock_ordering::BpfMapEntries,
-    logging::{log_trace, not_implemented},
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, Kernel},
     vfs::{
@@ -27,6 +26,7 @@ use crate::{
 };
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::OrderedMutex;
+use starnix_logging::{log_trace, not_implemented};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,

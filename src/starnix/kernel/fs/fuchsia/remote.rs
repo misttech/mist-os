@@ -5,7 +5,6 @@
 use crate::{
     device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
     fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async},
-    logging::{impossible_error, log_warn},
     mm::{ProtectionFlags, VMEX_RESOURCE},
     task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter},
     vfs::{
@@ -25,6 +24,7 @@ use fuchsia_zircon as zx;
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_logging::{impossible_error, log_warn, trace_duration};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, errno, error, errors::Errno, file_mode::FileMode,

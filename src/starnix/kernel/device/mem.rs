@@ -4,7 +4,6 @@
 
 use crate::{
     device::{kobject::KObjectDeviceAttribute, simple_device_ops, DeviceMode},
-    logging::{log, log_info},
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
     },
@@ -18,6 +17,7 @@ use crate::{
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
+use starnix_logging::{log, log_info};
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress,

@@ -7,7 +7,6 @@ use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
-    logging::not_implemented,
     mm::MemoryAccessorExt,
     signals::{syscalls::sys_signalfd4, RunState},
     task::{syscalls::do_clone, CurrentTask},
@@ -22,6 +21,7 @@ use crate::{
         DirentSink32, FdNumber,
     },
 };
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     __kernel_time_t, clone_args,
     device_type::DeviceType,

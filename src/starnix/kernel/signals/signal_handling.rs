@@ -10,7 +10,6 @@ use crate::{
             SignalStackFrame, RED_ZONE_SIZE, SIG_STACK_SIZE, SYSCALL_INSTRUCTION_SIZE_BYTES,
         },
     },
-    logging::{log_trace, log_warn},
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{SignalDetail, SignalInfo, SignalState},
     task::{CurrentTask, ExitStatus, StopState, Task, TaskFlags, TaskMutableState},
@@ -18,6 +17,7 @@ use crate::{
 use extended_pstate::ExtendedPstateState;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::RwLockWriteGuard;
+use starnix_logging::{log_trace, log_warn};
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,

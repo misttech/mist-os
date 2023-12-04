@@ -8,7 +8,6 @@ use crate::{
         input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
         kobject::KObjectDeviceAttribute, registry::DeviceOps, DeviceMode,
     },
-    logging::{log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -16,6 +15,7 @@ use crate::{
         fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode,
     },
 };
+use starnix_logging::{log_info, log_warn, not_implemented};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::{DeviceType, INPUT_MAJOR},

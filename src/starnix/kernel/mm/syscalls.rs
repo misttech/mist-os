@@ -8,7 +8,6 @@ use lock_sequence::{Locked, Unlocked};
 
 use crate::{
     execution::notify_debugger_of_module_list,
-    logging::{log_trace, not_implemented, not_implemented_log_once},
     mm::{
         DesiredAddress, FutexKey, FutexTable, MappingName, MappingOptions, MemoryAccessorExt,
         MremapFlags, ProtectionFlags, PAGE_SIZE,
@@ -19,6 +18,7 @@ use crate::{
         FdNumber,
     },
 };
+use starnix_logging::{log_trace, not_implemented, not_implemented_log_once, trace_duration};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,

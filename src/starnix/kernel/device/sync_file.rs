@@ -4,7 +4,6 @@
 
 use crate::{
     fs::fuchsia::RemoteFileObject,
-    logging::{impossible_error, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::{
         CurrentTask, EventHandler, ManyZxHandleSignalHandler, SignalHandler, SignalHandlerInner,
@@ -19,6 +18,7 @@ use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::AsHandleRef;
 use lifecycle::AtomicUsizeCounter;
+use starnix_logging::{impossible_error, log_warn};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     c_char, error,

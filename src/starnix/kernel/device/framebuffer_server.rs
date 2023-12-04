@@ -41,7 +41,7 @@ use std::{
     sync::{mpsc::channel, Arc},
 };
 
-use crate::logging::log_warn;
+use starnix_logging::log_warn;
 use starnix_uapi::{errno, errors::Errno};
 
 /// The offset at which the framebuffer will be placed.

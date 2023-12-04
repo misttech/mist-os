@@ -25,7 +25,7 @@ use std::{
     sync::Arc,
 };
 
-use crate::logging::{log_error, log_info, log_warn};
+use starnix_logging::{log_error, log_info, log_warn};
 use starnix_uapi::{error, errors::Errno};
 
 mod messages;

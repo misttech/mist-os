@@ -4,7 +4,6 @@
 
 use crate::{
     device::{DeviceOps, RemoteBinderConnection},
-    logging::{log_error, log_warn},
     mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags},
     task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter},
     vfs::{
@@ -31,6 +30,9 @@ use futures::{
 };
 use lifecycle::DropWaiter;
 use starnix_lock::{Mutex, MutexGuard};
+use starnix_logging::{
+    log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,

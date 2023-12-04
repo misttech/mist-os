@@ -2,13 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{logging::log_warn, vdso::vdso_loader::MemoryMappedVvar};
+use crate::vdso::vdso_loader::MemoryMappedVvar;
 use fuchsia_runtime::duplicate_utc_clock_handle;
 use fuchsia_zircon::{
     AsHandleRef, ClockTransformation, {self as zx},
 };
 use once_cell::sync::Lazy;
 use starnix_lock::Mutex;
+use starnix_logging::log_warn;
 
 // Many Linux APIs need a running UTC clock to function. Since there can be a delay until the
 // UTC clock in Zircon starts up (fxb/131200), Starnix provides a synthetic utc clock initially,

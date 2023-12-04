@@ -5,7 +5,6 @@
 use crate::{
     lock_ordering::MmDumpable,
     mm::{DumpPolicy, MemoryAccessorExt},
-    not_implemented,
     signals::{
         send_signal_first, send_standard_signal, syscalls::WaitingOptions, SignalDetail,
         SignalInfo, SignalInfoHeader, SI_HEADER_SIZE,
@@ -14,6 +13,7 @@ use crate::{
     vfs::parse_unsigned_file,
 };
 use lock_sequence::{LockBefore, Locked};
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,

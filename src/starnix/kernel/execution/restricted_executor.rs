@@ -7,12 +7,11 @@
 use super::shared::{execute_syscall, process_completed_restricted_exit, TaskInfo};
 use crate::{
     arch::execution::{generate_cfi_directives, restore_cfi_directives},
-    logging::{log_warn, set_zx_name},
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
-        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, TaskFlags, ThreadGroup,
-        ThreadGroupWriteGuard,
+        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, TaskFlags,
+        ThreadGroup, ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -21,6 +20,10 @@ use fuchsia_zircon::{
     AsHandleRef, {self as zx},
 };
 use lock_sequence::{Locked, Unlocked};
+use starnix_logging::{
+    log_warn, set_zx_name, trace_duration, trace_duration_begin, trace_duration_end, trace_instant,
+    CoreDumpInfo, MAX_ARGV_LENGTH,
+};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
     errors::Errno, from_status_like_fdio, ownership::Releasable, pid_t, signals::SIGKILL,
@@ -328,7 +331,10 @@ fn run_task(
                 profile_duration!("RecordCoreDump");
 
                 // Make diagnostics tooling aware of the crash.
-                current_task.kernel().core_dumps.record_core_dump(locked, &current_task.task);
+                current_task
+                    .kernel()
+                    .core_dumps
+                    .record_core_dump(get_core_dump_info(&current_task.task));
 
                 // (Re)-generate CFI directives so that stack unwinders will trace into the Linux state.
                 generate_cfi_directives!(state);
@@ -338,6 +344,36 @@ fn run_task(
             return Ok(exit_status);
         }
     }
+}
+
+fn get_core_dump_info(task: &Task) -> CoreDumpInfo {
+    let process_koid = task
+        .thread_group
+        .process
+        .get_koid()
+        .expect("handles for processes with crashing threads are still valid");
+    let thread_koid = task
+        .thread
+        .read()
+        .as_ref()
+        .expect("coredumps occur in tasks with associated threads")
+        .get_koid()
+        .expect("handles for crashing threads are still valid");
+    let pid = task.thread_group.leader as i64;
+    let mut argv = task
+        .read_argv()
+        .unwrap_or_else(|_| vec![b"<unknown>".to_vec()])
+        .into_iter()
+        .map(|a| String::from_utf8_lossy(&a).to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+
+    let original_len = argv.len();
+    argv.truncate(MAX_ARGV_LENGTH - 3);
+    if argv.len() < original_len {
+        argv.push_str("...");
+    }
+    CoreDumpInfo { process_koid, thread_koid, pid, argv }
 }
 
 pub fn create_zircon_process(

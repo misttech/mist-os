@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_warn, not_implemented},
     mm::{MemoryAccessorExt, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
@@ -13,6 +12,7 @@ use crate::{
     },
 };
 use starnix_lock::{ordered_lock, MutexGuard};
+use starnix_logging::{log_warn, not_implemented};
 use starnix_uapi::{
     error,
     errors::Errno,

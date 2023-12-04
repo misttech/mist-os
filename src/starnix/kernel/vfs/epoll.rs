@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log_warn,
     task::{
         CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, WaitCanceler,
         WaitQueue, Waiter,
@@ -16,6 +15,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use itertools::Itertools;
 use starnix_lock::Mutex;
+use starnix_logging::log_warn;
 use starnix_uapi::{
     epoll_event, errno, error,
     errors::{Errno, EBADF, EINTR, ETIMEDOUT},

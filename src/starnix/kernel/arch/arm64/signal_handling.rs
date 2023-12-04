@@ -6,13 +6,12 @@ use fuchsia_zircon as zx;
 
 use crate::{
     arch::registers::RegisterState,
-    log_debug,
     mm::vmo::round_up_to_increment,
-    not_implemented,
     signals::{SignalInfo, SignalState},
     task::{CurrentTask, Task},
 };
 use extended_pstate::ExtendedPstateState;
+use starnix_logging::{log_debug, not_implemented};
 use starnix_uapi::{
     __NR_restart_syscall, _aarch64_ctx, error,
     errors::{Errno, ErrnoCode, ERESTART_RESTARTBLOCK},

@@ -2,10 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{logging::not_implemented, mm::MemoryAccessorExt, task::CurrentTask};
+use crate::{mm::MemoryAccessorExt, task::CurrentTask};
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     errno, error, errors::Errno, fsverity_descriptor, fsverity_enable_arg,
     fsverity_read_metadata_arg, user_address::UserAddress, FS_VERITY_HASH_ALG_SHA256,
@@ -136,7 +137,6 @@ impl FsVerityState {
 pub mod ioctl {
 
     use crate::{
-        log_warn,
         mm::{MemoryAccessor, MemoryAccessorExt},
         task::CurrentTask,
         vfs::{
@@ -149,6 +149,7 @@ pub mod ioctl {
         },
     };
     use num_traits::FromPrimitive;
+    use starnix_logging::log_warn;
     use starnix_syscalls::{SyscallResult, SUCCESS};
     use starnix_uapi::{
         errno, error,

@@ -72,6 +72,7 @@ rustc_binary("starnix_kernel_bin") {
     ":lifecycle",
     ":perfetto_consumer_proto",
     ":starnix_kernel_config",
+    ":starnix_logging",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -247,7 +248,6 @@ rustc_binary("starnix_kernel_bin") {
     "device/terminal.rs",
     "device/uinput.rs",
     "device/zram.rs",
-    "diagnostics/mod.rs",
     "dynamic_thread_spawner.rs",
     "execution/component_runner.rs",
     "execution/container.rs",
@@ -288,7 +288,6 @@ rustc_binary("starnix_kernel_bin") {
     "fs/tracefs/tracing_directory.rs",
     "loader.rs",
     "lock_ordering.rs",
-    "logging.rs",
     "main.rs",
     "mm/futex_table.rs",
     "mm/memory_manager.rs",
@@ -338,7 +337,6 @@ rustc_binary("starnix_kernel_bin") {
     "testing.rs",
     "time/mod.rs",
     "time/utc.rs",
-    "trace.rs",
     "vdso/mod.rs",
     "vdso/vdso_loader.rs",
     "vfs/anon_node.rs",
@@ -398,9 +396,6 @@ rustc_binary("starnix_kernel_bin") {
   ]
 
   features = []
-  if (starnix_disable_logging) {
-    features = [ "disable_logging" ]
-  }
   if (starnix_enable_tracing) {
     features += [ "tracing" ]
   }
@@ -566,6 +561,41 @@ rustc_library("lifecycle") {
 
 fuchsia_unittest_package("lifecycle-tests") {
   deps = [ ":lifecycle_test" ]
+}
+
+rustc_library("starnix_logging") {
+  name = "starnix_logging"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "logging/lib.rs"
+
+  sources = [
+    "logging/core_dump_list.rs",
+    "logging/lib.rs",
+    "logging/logging.rs",
+    "logging/trace.rs",
+  ]
+
+  deps = [
+    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-lock",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  if (starnix_disable_logging) {
+    features = [ "disable_logging" ]
+  }
+}
+
+fuchsia_unittest_package("starnix_logging-tests") {
+  deps = [ ":starnix_logging_test" ]
 }
 
 fuchsia_package("starnix_kernel_package") {

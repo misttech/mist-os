@@ -5,7 +5,6 @@ use super::DeviceMode;
 
 use crate::{
     device::kobject::KObjectDeviceAttribute,
-    logging::not_implemented,
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
@@ -17,6 +16,7 @@ use crate::{
 use bitflags::bitflags;
 use fuchsia_zircon::{Vmo, VmoChildOptions};
 use starnix_lock::Mutex;
+use starnix_logging::not_implemented;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_old_dev_t,

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log_warn,
     mm::ProtectionFlags,
     task::{CurrentTask, Kernel},
     vfs::{
@@ -21,6 +20,7 @@ use ext4_read_only::{
 };
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
+use starnix_logging::log_warn;
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::FileMode, ino_t, mount_flags::MountFlags,
     off_t, open_flags::OpenFlags, statfs, EXT4_SUPER_MAGIC,

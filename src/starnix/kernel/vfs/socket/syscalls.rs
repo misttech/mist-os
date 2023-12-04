@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_trace, not_implemented},
     mm::{vmo::round_up_to_increment, MemoryAccessor, MemoryAccessorExt},
     task::{CurrentTask, IpTables, Task, WaitCallback, Waiter},
     vfs::{
@@ -18,6 +17,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
+use starnix_logging::{log_trace, not_implemented};
 use starnix_uapi::{
     cmsghdr, errno, error,
     errors::{Errno, EEXIST, EINPROGRESS},

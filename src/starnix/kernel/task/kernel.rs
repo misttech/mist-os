@@ -7,10 +7,8 @@ use crate::{
         framebuffer::Framebuffer, input::InputDevice, loop_device::LoopDeviceRegistry,
         BinderDriver, DeviceMode, DeviceRegistry, Features,
     },
-    diagnostics::CoreDumpList,
     fs::proc::SystemLimits,
     lock_ordering::KernelIpTables,
-    logging::log_error,
     mm::{FutexTable, SharedFutexKey},
     power::PowerManager,
     task::{
@@ -42,6 +40,7 @@ use netlink::{interfaces::InterfacesHandler, Netlink, NETLINK_LOG_TAG};
 use once_cell::sync::OnceCell;
 use selinux::security_server::SecurityServer;
 use starnix_lock::{OrderedRwLock, RwLock};
+use starnix_logging::{log_error, CoreDumpList};
 use starnix_uapi::{
     device_type::DeviceType, errno, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
 };

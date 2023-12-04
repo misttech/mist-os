@@ -10,11 +10,11 @@ use crate::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
     },
-    logging::log_error,
     task::CurrentTask,
     vfs::{FileOps, FsNode, FsNodeOps, FsStr},
 };
 use assert_matches::assert_matches;
+use starnix_logging::log_error;
 use starnix_uapi::{
     device_type::{DeviceType, DYN_MAJOR},
     errno, error,

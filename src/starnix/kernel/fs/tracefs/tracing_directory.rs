@@ -9,6 +9,7 @@ use crate::{
         DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
     },
 };
+use starnix_logging::trace_category_atrace;
 use starnix_uapi::errors::Errno;
 
 use std::{collections::HashMap, sync::Mutex};

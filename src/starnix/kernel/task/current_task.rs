@@ -21,7 +21,6 @@ use crate::{
     execution::{create_zircon_process, TaskInfo},
     loader::{load_executable, resolve_executable, ResolvedElf},
     lock_ordering::MmDumpable,
-    logging::{log_error, log_warn, not_implemented, set_zx_name},
     mm::{MemoryAccessor, MemoryAccessorExt, MemoryManager},
     signals::{send_standard_signal, RunState, SignalActions, SignalInfo},
     task::{
@@ -33,6 +32,7 @@ use crate::{
         SymlinkTarget,
     },
 };
+use starnix_logging::{log_error, log_warn, not_implemented, set_zx_name};
 use starnix_syscalls::{decls::Syscall, SyscallResult};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN},

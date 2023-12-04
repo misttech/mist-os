@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once},
     mm::{vmo::round_up_to_increment, PAGE_SIZE},
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
@@ -17,6 +16,7 @@ use crate::{
 };
 use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred,

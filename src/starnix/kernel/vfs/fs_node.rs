@@ -4,7 +4,6 @@
 
 use crate::{
     device::DeviceMode,
-    logging::log_error,
     mm::PAGE_SIZE,
     signals::{send_standard_signal, SignalInfo},
     task::{CurrentTask, Kernel, WaitQueue, Waiter},
@@ -20,6 +19,7 @@ use bitflags::bitflags;
 use fuchsia_zircon as zx;
 use once_cell::sync::OnceCell;
 use starnix_lock::{Mutex, RwLock, RwLockReadGuard};
+use starnix_logging::log_error;
 use starnix_uapi::{
     __kernel_ulong_t,
     as_any::AsAny,

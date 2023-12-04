@@ -2,11 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    logging::not_implemented,
-    power::{SuspendState, SuspendStats},
-};
+use crate::power::{SuspendState, SuspendStats};
 use starnix_lock::Mutex;
+use starnix_logging::not_implemented;
 use starnix_uapi::{error, errors::Errno};
 use std::{collections::HashSet, sync::Arc};
 

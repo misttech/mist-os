@@ -7,7 +7,6 @@ use crate::{
         pid_directory::pid_directory,
         sysctl::{net_directory, sysctl_directory},
     },
-    logging::{log_error, not_implemented},
     task::{CurrentTask, EventHandler, Kernel, KernelStats, TaskStateCode, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
@@ -21,6 +20,7 @@ use crate::{
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_zircon as zx;
 use once_cell::sync::Lazy;
+use starnix_logging::{log_error, not_implemented};
 use starnix_uapi::{
     auth::FsCred, errno, error, errors::Errno, file_mode::mode, off_t, open_flags::OpenFlags,
     pid_t, time::duration_to_scheduler_clock,

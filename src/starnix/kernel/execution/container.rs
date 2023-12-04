@@ -9,7 +9,6 @@ use crate::{
         serve_component_runner, serve_container_controller, serve_graphical_presenter,
     },
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
-    logging::{log_error, log_info, log_warn},
     task::{set_thread_role, CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
     vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
@@ -31,10 +30,13 @@ use fuchsia_async::DurationExt;
 use fuchsia_component::{client::connect_to_protocol_sync, server::ServiceFs};
 use fuchsia_inspect as inspect;
 use fuchsia_runtime as fruntime;
-use fuchsia_zircon::{self as zx, Task as _};
+use fuchsia_zircon::{
+    Task as _, {self as zx},
+};
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
+use starnix_logging::{log_error, log_info, log_warn, trace_duration};
 use starnix_uapi::{
     auth::Credentials,
     errno,

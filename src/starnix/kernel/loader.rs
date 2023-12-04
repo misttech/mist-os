@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_error, log_warn},
     mm::{
         vmo::round_up_to_system_page_size, DesiredAddress, MappingName, MappingOptions,
         MemoryAccessor, MemoryManager, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE,
@@ -15,6 +14,7 @@ use fuchsia_zircon::{
     HandleBased, {self as zx},
 };
 use process_builder::{elf_load, elf_parse};
+use starnix_logging::{log_error, log_warn};
 use starnix_uapi::{
     errno, error, errors::Errno, from_status_like_fdio, open_flags::OpenFlags,
     time::SCHEDULER_CLOCK_HZ, user_address::UserAddress, AT_BASE, AT_CLKTCK, AT_EGID, AT_ENTRY,

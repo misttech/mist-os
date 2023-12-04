@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log,
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
+use starnix_logging::log;
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 

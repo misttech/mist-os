@@ -4,7 +4,6 @@
 
 use crate::{
     lock_ordering::MmDumpable,
-    logging::{impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name},
     mm::{vmo::round_up_to_system_page_size, FutexTable, PrivateFutexKey, VMEX_RESOURCE},
     signals::{SignalDetail, SignalInfo},
     task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task},
@@ -23,6 +22,10 @@ use lock_sequence::{LockBefore, Locked};
 use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
 use starnix_lock::{OrderedMutex, RwLock};
+use starnix_logging::{
+    impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name,
+    trace_duration,
+};
 use starnix_uapi::{
     errno, error,
     errors::Errno,

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::log_error,
     task::{CurrentTask, EventHandler, Kernel, Waiter},
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
@@ -20,10 +19,14 @@ use perfetto_consumer_proto::perfetto::protos::{
     FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
+use starnix_logging::{log_error, trace_category_atrace, trace_name_perfetto_blob};
 use starnix_uapi::{errno, errors::Errno, AF_UNIX, SOCK_STREAM};
 use std::{
     collections::VecDeque,
-    sync::{mpsc::channel, mpsc::Sender, Arc},
+    sync::{
+        mpsc::{channel, Sender},
+        Arc,
+    },
 };
 
 use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};

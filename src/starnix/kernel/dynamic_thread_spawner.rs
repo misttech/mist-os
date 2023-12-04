@@ -2,13 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{
-    log_error,
-    task::{CurrentTask, Task},
-};
+use crate::task::{CurrentTask, Task};
 use futures::{channel::oneshot, TryFutureExt};
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
+use starnix_logging::log_error;
 use starnix_uapi::{
     errno,
     errors::Errno,

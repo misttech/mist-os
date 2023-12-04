@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_error, log_warn, not_implemented},
     task::CurrentTask,
     vfs::{
         default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_seekable, fs_args,
@@ -17,6 +16,7 @@ use crate::{
 use once_cell::sync::OnceCell;
 use rand::Rng;
 use starnix_lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_logging::{log_error, log_warn, not_implemented};
 use starnix_uapi::{
     auth::FsCred,
     device_type::DeviceType,

@@ -18,7 +18,6 @@ use crate::{
         sync_file::{SyncFence, SyncFile, SyncPoint, Timeline},
     },
     fs::fuchsia::RemoteFileObject,
-    logging::{impossible_error, log_error, log_warn, set_zx_name},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::CurrentTask,
     vfs::{
@@ -149,6 +148,7 @@ use magma::{
     MAGMA_STATUS_OK,
 };
 use starnix_lock::Mutex;
+use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type::DeviceType,

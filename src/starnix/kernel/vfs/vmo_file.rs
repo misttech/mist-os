@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::impossible_error,
     mm::{vmo::round_up_to_system_page_size, ProtectionFlags, PAGE_SIZE, VMEX_RESOURCE},
     task::CurrentTask,
     vfs::{
@@ -16,6 +15,7 @@ use crate::{
 };
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
+use starnix_logging::impossible_error;
 use starnix_uapi::{
     errno, error, errors::Errno, file_mode::mode, open_flags::OpenFlags, seal_flags::SealFlags,
 };

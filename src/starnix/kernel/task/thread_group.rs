@@ -4,7 +4,6 @@
 
 use crate::{
     device::terminal::{ControllingSession, Terminal},
-    logging::{log_error, log_warn, not_implemented},
     mutable_state::{state_accessor, state_implementation},
     selinux::fs::SeLinuxThreadGroupState,
     signals::{
@@ -23,6 +22,7 @@ use fuchsia_zircon as zx;
 use itertools::Itertools;
 use lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_lock::{Mutex, MutexGuard, RwLock};
+use starnix_logging::{log_error, log_warn, not_implemented};
 use starnix_uapi::{
     auth::{Credentials, CAP_SYS_ADMIN, CAP_SYS_RESOURCE},
     errno, error,

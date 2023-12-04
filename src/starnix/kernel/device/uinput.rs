@@ -7,13 +7,13 @@ use crate::{
         input::{add_and_register_input_device, InputFile},
         DeviceOps,
     },
-    logging::{log_info, log_warn},
     mm::MemoryAccessorExt,
     task::CurrentTask,
     vfs::{default_ioctl, fileops_impl_seekless, FileObject, FileOps, FsNode},
 };
 use bit_vec::BitVec;
 use starnix_lock::Mutex;
+use starnix_logging::{log_info, log_warn};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     device_type, error,

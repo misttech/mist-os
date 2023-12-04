@@ -9,12 +9,12 @@ use lock_sequence::{Locked, Unlocked};
 use starnix_sync::{InterruptibleEvent, WakeReason};
 
 use crate::{
-    logging::{log_trace, not_implemented},
     mm::MemoryAccessorExt,
     signals::{RunState, SignalEvent},
     task::{ClockId, CurrentTask, TimerId},
     time::utc::utc_now,
 };
+use starnix_logging::{log_trace, not_implemented};
 use starnix_uapi::{
     errno, error,
     errors::{Errno, EINTR},

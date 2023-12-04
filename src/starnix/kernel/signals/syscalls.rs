@@ -5,7 +5,6 @@
 pub use super::signal_handling::sys_restart_syscall;
 use super::signalfd::SignalFd;
 use crate::{
-    logging::not_implemented,
     mm::{MemoryAccessor, MemoryAccessorExt},
     signals::{
         restore_from_signal_handler, send_signal, SignalDetail, SignalInfo, SignalInfoHeader,
@@ -19,6 +18,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
+use starnix_logging::not_implemented;
 use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     errno, error,

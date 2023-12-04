@@ -5,7 +5,6 @@
 use crate::{
     device::kobject::{KObject, KObjectHandle, KType, UEventFsNode},
     fs::sysfs::SysFsOps,
-    logging::not_implemented,
     task::CurrentTask,
     vfs::{
         buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly,
@@ -14,6 +13,7 @@ use crate::{
         VecDirectory, VecDirectoryEntry,
     },
 };
+use starnix_logging::not_implemented;
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::mode,
     open_flags::OpenFlags,

@@ -17,10 +17,7 @@ extern crate fuchsia_inspect_contrib;
 #[macro_use]
 extern crate macro_rules_attribute;
 
-use crate::{
-    execution::{Container, ContainerServiceConfig},
-    logging::{impossible_error, log_debug, log_error, log_warn, not_implemented},
-};
+use crate::execution::{Container, ContainerServiceConfig};
 use anyhow::Error;
 use fidl::endpoints::ControlHandle;
 use fidl_fuchsia_component_runner as frunner;
@@ -31,19 +28,15 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-
-#[macro_use]
-mod trace;
+use starnix_logging::{impossible_error, log_debug, trace_instant};
 
 mod arch;
 mod device;
-mod diagnostics;
 mod dynamic_thread_spawner;
 mod execution;
 mod fs;
 mod loader;
 mod lock_ordering;
-mod logging;
 mod mm;
 mod mutable_state;
 mod power;

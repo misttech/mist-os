@@ -6,7 +6,6 @@
 
 use crate::{
     device::magma::vulkan::{BufferCollectionTokens, Loader},
-    logging::log_warn,
     mm::MemoryAccessorExt,
     task::CurrentTask,
 };
@@ -36,6 +35,7 @@ use magma::{
     MAGMA_MAX_IMAGE_PLANES, MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INTERNAL_ERROR,
     MAGMA_STATUS_INVALID_ARGS,
 };
+use starnix_logging::log_warn;
 use starnix_uapi::{
     errno,
     errors::Errno,

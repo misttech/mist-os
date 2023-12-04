@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::{
-    logging::{log_warn, not_implemented},
     signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo},
     task::{
         timers::{ClockId, TimerId},
@@ -15,6 +14,7 @@ use fuchsia_async as fasync;
 use fuchsia_zircon as zx;
 use futures::stream::AbortHandle;
 use starnix_lock::Mutex;
+use starnix_logging::{log_warn, not_implemented};
 use starnix_uapi::{itimerspec, ownership::TempRef, time::timespec_from_duration, SI_TIMER};
 use std::sync::{Arc, Weak};
 
