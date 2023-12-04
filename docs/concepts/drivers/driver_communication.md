@@ -92,5 +92,5 @@ the Zircon kernel.
 [driver-manager]: driver_framework.md#driver_manager
 [driver-runtime]: driver_framework.md#driver_runtime
 [node-topology]: drivers_and_nodes.md#node_topology
-[devfs-add-args]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framwork/topology.fidl
+[devfs-add-args]: https://cs.opensource.google/fuchsia/fuchsia/+/main:sdk/fidl/fuchsia.driver.framework/topology.fidl
 [components]: /docs/concepts/components/v2/README.md
