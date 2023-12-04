@@ -60,7 +60,7 @@ use crate::{
             IpAddressState, IpDeviceHandler, Ipv6DeviceHandler,
         },
         path_mtu::PmtuHandler,
-        socket::{BufferIpSocketHandler, DefaultSendOptions, IpSock},
+        socket::{DefaultSendOptions, IpSock, IpSocketHandler},
         AddressStatus, AnyDevice, BufferIpLayerHandler, BufferIpTransportContext,
         BufferTransportIpContext, DeviceIdContext, EitherDeviceId, IpDeviceStateContext, IpExt,
         IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler, SendIpPacketMeta,
@@ -1312,7 +1312,7 @@ pub(crate) trait InnerBufferIcmpContext<
     I: IcmpIpExt + IpExt,
     C: IcmpNonSyncCtx<I, Self::DeviceId>,
     B: BufferMut,
->: InnerIcmpContext<I, C> + BufferIpSocketHandler<I, C, B>
+>: InnerIcmpContext<I, C> + IpSocketHandler<I, C>
 {
 }
 
@@ -1320,7 +1320,7 @@ impl<
         I: IcmpIpExt + IpExt,
         C: IcmpNonSyncCtx<I, SC::DeviceId>,
         B: BufferMut,
-        SC: InnerIcmpContext<I, C> + BufferIpSocketHandler<I, C, B>,
+        SC: InnerIcmpContext<I, C> + IpSocketHandler<I, C>,
     > InnerBufferIcmpContext<I, C, B> for SC
 {
 }
@@ -2430,21 +2430,21 @@ impl<
 /// outbound packet. This allows `get_body_from_src_ip` to properly compute the
 /// ICMP checksum, which relies on both the source and destination IP addresses
 /// of the IP packet it's encapsulated in.
-fn send_icmp_reply<
-    I: crate::ip::IpExt,
-    B: BufferMut,
-    C: IcmpNonSyncCtx<I, SC::DeviceId>,
-    SC: BufferIpSocketHandler<I, C, B> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
-    S: Serializer<Buffer = B>,
-    F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
->(
+fn send_icmp_reply<I, C, SC, S, F>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device: Option<&SC::DeviceId>,
     original_src_ip: SpecifiedAddr<I::Addr>,
     original_dst_ip: SpecifiedAddr<I::Addr>,
     get_body_from_src_ip: F,
-) {
+) where
+    I: crate::ip::IpExt,
+    C: IcmpNonSyncCtx<I, SC::DeviceId>,
+    SC: IpSocketHandler<I, C> + DeviceIdContext<AnyDevice> + CounterContext<IcmpTxCounters<I>>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    F: FnOnce(SpecifiedAddr<I::Addr>) -> S,
+{
     trace!("send_icmp_reply({:?}, {}, {})", device, original_src_ip, original_dst_ip);
     sync_ctx.with_counters(|counters| {
         counters.reply.increment();
@@ -4208,14 +4208,6 @@ mod tests {
         DualStackSendIpPacketMeta<FakeDeviceId>,
         FakeDeviceId,
     >;
-
-    impl<I: Ip, D> CounterContext<IpCounters<I>>
-        for FakeSyncCtx<FakeDualStackIpSocketCtx<D>, DualStackSendIpPacketMeta<D>, D>
-    {
-        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
-            cb(self.get_ref().get_common_counters::<I>())
-        }
-    }
 
     impl<Inner, I: Ip, D> CounterContext<IpCounters<I>>
         for Wrapped<

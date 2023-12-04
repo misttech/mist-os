@@ -1457,6 +1457,16 @@ pub mod testutil {
     }
 
     #[cfg(test)]
+    impl<C, S, Meta, DeviceId> CounterContext<C> for FakeSyncCtx<S, Meta, DeviceId>
+    where
+        S: CounterContext<C>,
+    {
+        fn with_counters<O, F: FnOnce(&C) -> O>(&self, cb: F) -> O {
+            CounterContext::<C>::with_counters(&self.state, cb)
+        }
+    }
+
+    #[cfg(test)]
     impl<S, Meta, DeviceId> FakeSyncCtx<S, Meta, DeviceId> {
         /// Constructs a `FakeSyncCtx` with the given state and default
         /// `FakeTimerCtx`, and `FakeFrameCtx`.

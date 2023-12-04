@@ -83,7 +83,7 @@ use crate::{
         reassembly::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
-        socket::{BufferIpSocketHandler, IpSocketContext, IpSocketHandler, IpSocketNonSyncContext},
+        socket::{IpSocketContext, IpSocketHandler, IpSocketNonSyncContext},
         types::{Destination, NextHop, ResolvedRoute},
     },
     socket::datagram,
@@ -329,11 +329,11 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice
 /// allows any generated link-layer frames to reuse that buffer rather than
 /// needing to always allocate a new one.
 pub(crate) trait BufferTransportIpContext<I: IpExt, C, B: BufferMut>:
-    TransportIpContext<I, C> + BufferIpSocketHandler<I, C, B>
+    TransportIpContext<I, C> + IpSocketHandler<I, C>
 {
 }
 
-impl<I: IpExt, B: BufferMut, C, SC: TransportIpContext<I, C> + BufferIpSocketHandler<I, C, B>>
+impl<I: IpExt, B: BufferMut, C, SC: TransportIpContext<I, C> + IpSocketHandler<I, C>>
     BufferTransportIpContext<I, C, B> for SC
 {
 }

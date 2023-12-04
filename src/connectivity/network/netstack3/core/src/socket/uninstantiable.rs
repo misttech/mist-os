@@ -5,15 +5,12 @@
 use core::{convert::Infallible as Never, marker::PhantomData};
 use explicit::UnreachableExt as _;
 use net_types::SpecifiedAddr;
-use packet::{serialize::Serializer, BufferMut};
+use packet::serialize::Serializer;
 
 use crate::{
     device::{Device, DeviceIdContext, StrongId},
     ip::{
-        socket::{
-            BufferIpSocketHandler, IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler,
-            SendOptions,
-        },
+        socket::{IpSock, IpSockCreationError, IpSockSendError, IpSocketHandler, SendOptions},
         EitherDeviceId, HopLimits, IpExt, TransportIpContext,
     },
     socket::address::SocketIpAddr,
@@ -60,12 +57,8 @@ impl<I: IpExt, C, D: StrongId> IpSocketHandler<I, C> for UninstantiableBufferTra
     ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)> {
         self.uninstantiable_unreachable()
     }
-}
 
-impl<I: IpExt, C, B: BufferMut, D: StrongId> BufferIpSocketHandler<I, C, B>
-    for UninstantiableBufferTransportIpContext<D>
-{
-    fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
+    fn send_ip_packet<S: Serializer, O: SendOptions<I>>(
         &mut self,
         _ctx: &mut C,
         _socket: &IpSock<I, Self::WeakDeviceId, O>,

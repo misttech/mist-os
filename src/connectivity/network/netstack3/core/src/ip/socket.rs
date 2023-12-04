@@ -58,6 +58,132 @@ pub(crate) trait IpSocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         proto: I::Proto,
         options: O,
     ) -> Result<IpSock<I, Self::WeakDeviceId, O>, (IpSockCreationError, O)>;
+
+    /// Sends an IP packet on a socket.
+    ///
+    /// The generated packet has its metadata initialized from `socket`,
+    /// including the source and destination addresses, the Time To Live/Hop
+    /// Limit, and the Protocol/Next Header. The outbound device is also chosen
+    /// based on information stored in the socket.
+    ///
+    /// `mtu` may be used to optionally impose an MTU on the outgoing packet.
+    /// Note that the device's MTU will still be imposed on the packet. That is,
+    /// the smaller of `mtu` and the device's MTU will be imposed on the packet.
+    ///
+    /// If the socket is currently unroutable, an error is returned.
+    fn send_ip_packet<S, O>(
+        &mut self,
+        ctx: &mut C,
+        socket: &IpSock<I, Self::WeakDeviceId, O>,
+        body: S,
+        mtu: Option<u32>,
+    ) -> Result<(), (S, IpSockSendError)>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+        O: SendOptions<I>;
+
+    /// Creates a temporary IP socket and sends a single packet on it.
+    ///
+    /// `local_ip`, `remote_ip`, `proto`, and `builder` are passed directly to
+    /// [`IpSocketHandler::new_ip_socket`]. `get_body_from_src_ip` is given the
+    /// source IP address for the packet - which may have been chosen
+    /// automatically if `local_ip` is `None` - and returns the body to be
+    /// encapsulated. This is provided in case the body's contents depend on the
+    /// chosen source IP address.
+    ///
+    /// If `device` is specified, the available routes are limited to those that
+    /// egress over the device.
+    ///
+    /// `mtu` may be used to optionally impose an MTU on the outgoing packet.
+    /// Note that the device's MTU will still be imposed on the packet. That is,
+    /// the smaller of `mtu` and the device's MTU will be imposed on the packet.
+    ///
+    /// # Errors
+    ///
+    /// If an error is encountered while sending the packet, the body returned
+    /// from `get_body_from_src_ip` will be returned along with the error. If an
+    /// error is encountered while constructing the temporary IP socket,
+    /// `get_body_from_src_ip` will be called on an arbitrary IP address in
+    /// order to obtain a body to return. In the case where a buffer was passed
+    /// by ownership to `get_body_from_src_ip`, this allows the caller to
+    /// recover that buffer. `get_body_from_src_ip` is fallible, and if there's
+    /// an error, it will be returned as well.
+    fn send_oneshot_ip_packet_with_fallible_serializer<S, E, F, O>(
+        &mut self,
+        ctx: &mut C,
+        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
+        proto: I::Proto,
+        options: O,
+        get_body_from_src_ip: F,
+        mtu: Option<u32>,
+    ) -> Result<(), SendOneShotIpPacketError<O, E>>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+        F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
+        O: SendOptions<I>,
+    {
+        // We use a `match` instead of `map_err` because `map_err` would require passing a closure
+        // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
+        match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
+            Err((err, options)) => {
+                Err(SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options })
+            }
+            Ok(tmp) => {
+                let packet = get_body_from_src_ip(*tmp.local_ip())
+                    .map_err(SendOneShotIpPacketError::SerializeError)?;
+                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(_body, err)| match err {
+                    IpSockSendError::Mtu => {
+                        let IpSock { options, definition: _ } = tmp;
+                        SendOneShotIpPacketError::CreateAndSendError {
+                            err: IpSockCreateAndSendError::Mtu,
+                            options,
+                        }
+                    }
+                    IpSockSendError::Unroutable(_) => {
+                        unreachable!("socket which was just created should still be routable")
+                    }
+                })
+            }
+        }
+    }
+
+    /// Sends a one-shot IP packet but with a non-fallible serializer.
+    fn send_oneshot_ip_packet<S, F, O>(
+        &mut self,
+        ctx: &mut C,
+        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
+        local_ip: Option<SocketIpAddr<I::Addr>>,
+        remote_ip: SocketIpAddr<I::Addr>,
+        proto: I::Proto,
+        options: O,
+        get_body_from_src_ip: F,
+        mtu: Option<u32>,
+    ) -> Result<(), (IpSockCreateAndSendError, O)>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+        F: FnOnce(SocketIpAddr<I::Addr>) -> S,
+        O: SendOptions<I>,
+    {
+        self.send_oneshot_ip_packet_with_fallible_serializer(
+            ctx,
+            device,
+            local_ip,
+            remote_ip,
+            proto,
+            options,
+            |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
+            mtu,
+        )
+        .map_err(|err| match err {
+            SendOneShotIpPacketError::CreateAndSendError { err, options } => (err, options),
+            SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
+        })
+    }
 }
 
 /// An error in sending a packet on an IP socket.
@@ -129,131 +255,6 @@ mod socket_ip_ext_test {
         // away changes)
         let _addr = SocketIpAddr::new(I::LOOPBACK_ADDRESS_AS_SOCKET_IP_ADDR.addr())
             .expect("loopback address should be a valid SocketIpAddr");
-    }
-}
-
-/// An extension of [`IpSocketHandler`] adding the ability to send packets on an
-/// IP socket.
-pub(crate) trait BufferIpSocketHandler<I: IpExt, C, B: BufferMut>:
-    IpSocketHandler<I, C>
-{
-    /// Sends an IP packet on a socket.
-    ///
-    /// The generated packet has its metadata initialized from `socket`,
-    /// including the source and destination addresses, the Time To Live/Hop
-    /// Limit, and the Protocol/Next Header. The outbound device is also chosen
-    /// based on information stored in the socket.
-    ///
-    /// `mtu` may be used to optionally impose an MTU on the outgoing packet.
-    /// Note that the device's MTU will still be imposed on the packet. That is,
-    /// the smaller of `mtu` and the device's MTU will be imposed on the packet.
-    ///
-    /// If the socket is currently unroutable, an error is returned.
-    fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
-        &mut self,
-        ctx: &mut C,
-        socket: &IpSock<I, Self::WeakDeviceId, O>,
-        body: S,
-        mtu: Option<u32>,
-    ) -> Result<(), (S, IpSockSendError)>;
-
-    /// Creates a temporary IP socket and sends a single packet on it.
-    ///
-    /// `local_ip`, `remote_ip`, `proto`, and `builder` are passed directly to
-    /// [`IpSocketHandler::new_ip_socket`]. `get_body_from_src_ip` is given the
-    /// source IP address for the packet - which may have been chosen
-    /// automatically if `local_ip` is `None` - and returns the body to be
-    /// encapsulated. This is provided in case the body's contents depend on the
-    /// chosen source IP address.
-    ///
-    /// If `device` is specified, the available routes are limited to those that
-    /// egress over the device.
-    ///
-    /// `mtu` may be used to optionally impose an MTU on the outgoing packet.
-    /// Note that the device's MTU will still be imposed on the packet. That is,
-    /// the smaller of `mtu` and the device's MTU will be imposed on the packet.
-    ///
-    /// # Errors
-    ///
-    /// If an error is encountered while sending the packet, the body returned
-    /// from `get_body_from_src_ip` will be returned along with the error. If an
-    /// error is encountered while constructing the temporary IP socket,
-    /// `get_body_from_src_ip` will be called on an arbitrary IP address in
-    /// order to obtain a body to return. In the case where a buffer was passed
-    /// by ownership to `get_body_from_src_ip`, this allows the caller to
-    /// recover that buffer. `get_body_from_src_ip` is fallible, and if there's
-    /// an error, it will be returned as well.
-    fn send_oneshot_ip_packet_with_fallible_serializer<
-        S: Serializer<Buffer = B>,
-        E,
-        F: FnOnce(SocketIpAddr<I::Addr>) -> Result<S, E>,
-        O: SendOptions<I>,
-    >(
-        &mut self,
-        ctx: &mut C,
-        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: O,
-        get_body_from_src_ip: F,
-        mtu: Option<u32>,
-    ) -> Result<(), SendOneShotIpPacketError<O, E>> {
-        // We use a `match` instead of `map_err` because `map_err` would require passing a closure
-        // which takes ownership of `get_body_from_src_ip`, which we also use in the success case.
-        match self.new_ip_socket(ctx, device, local_ip, remote_ip, proto, options) {
-            Err((err, options)) => {
-                Err(SendOneShotIpPacketError::CreateAndSendError { err: err.into(), options })
-            }
-            Ok(tmp) => {
-                let packet = get_body_from_src_ip(*tmp.local_ip())
-                    .map_err(SendOneShotIpPacketError::SerializeError)?;
-                self.send_ip_packet(ctx, &tmp, packet, mtu).map_err(|(_body, err)| match err {
-                    IpSockSendError::Mtu => {
-                        let IpSock { options, definition: _ } = tmp;
-                        SendOneShotIpPacketError::CreateAndSendError {
-                            err: IpSockCreateAndSendError::Mtu,
-                            options,
-                        }
-                    }
-                    IpSockSendError::Unroutable(_) => {
-                        unreachable!("socket which was just created should still be routable")
-                    }
-                })
-            }
-        }
-    }
-
-    /// Sends a one-shot IP packet but with a non-fallible serializer.
-    fn send_oneshot_ip_packet<
-        S: Serializer<Buffer = B>,
-        F: FnOnce(SocketIpAddr<I::Addr>) -> S,
-        O: SendOptions<I>,
-    >(
-        &mut self,
-        ctx: &mut C,
-        device: Option<EitherDeviceId<&Self::DeviceId, &Self::WeakDeviceId>>,
-        local_ip: Option<SocketIpAddr<I::Addr>>,
-        remote_ip: SocketIpAddr<I::Addr>,
-        proto: I::Proto,
-        options: O,
-        get_body_from_src_ip: F,
-        mtu: Option<u32>,
-    ) -> Result<(), (IpSockCreateAndSendError, O)> {
-        self.send_oneshot_ip_packet_with_fallible_serializer(
-            ctx,
-            device,
-            local_ip,
-            remote_ip,
-            proto,
-            options,
-            |ip| Ok::<_, Infallible>(get_body_from_src_ip(ip)),
-            mtu,
-        )
-        .map_err(|err| match err {
-            SendOneShotIpPacketError::CreateAndSendError { err, options } => (err, options),
-            SendOneShotIpPacketError::SerializeError(infallible) => match infallible {},
-        })
     }
 }
 
@@ -432,7 +433,7 @@ where
 impl<
         I: Ip + IpExt + IpDeviceStateIpExt,
         C: IpSocketNonSyncContext,
-        SC: IpSocketContext<I, C> + InstantiableCtxMarker,
+        SC: IpSocketContext<I, C> + InstantiableCtxMarker + CounterContext<IpCounters<I>>,
     > IpSocketHandler<I, C> for SC
 {
     fn new_ip_socket<O>(
@@ -482,15 +483,35 @@ impl<
             IpSockDefinition { local_ip: src_addr, remote_ip, device: socket_device, proto };
         Ok(IpSock { definition: definition, options })
     }
+
+    fn send_ip_packet<S, O>(
+        &mut self,
+        ctx: &mut C,
+        ip_sock: &IpSock<I, SC::WeakDeviceId, O>,
+        body: S,
+        mtu: Option<u32>,
+    ) -> Result<(), (S, IpSockSendError)>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+        O: SendOptions<I>,
+    {
+        // TODO(joshlf): Call `trace!` with relevant fields from the socket.
+        self.with_counters(|counters| {
+            counters.send_ip_packet.increment();
+        });
+
+        send_ip_packet(self, ctx, ip_sock, body, mtu)
+    }
 }
 
 /// Provides hooks for altering sending behavior of [`IpSock`].
 ///
 /// Must be implemented by the socket option type of an `IpSock` when using it
-/// to call [`BufferIpSocketHandler::send_ip_packet`]. This is implemented as a
-/// trait instead of an inherent impl on a type so that users of sockets that
-/// don't need certain option types, like TCP for anything multicast-related,
-/// can avoid allocating space for those options.
+/// to call [`IpSocketHandler::send_ip_packet`]. This is implemented as a trait
+/// instead of an inherent impl on a type so that users of sockets that don't
+/// need certain option types, like TCP for anything multicast-related, can
+/// avoid allocating space for those options.
 pub trait SendOptions<I: Ip> {
     /// Returns the hop limit to set on a packet going to the given destination.
     ///
@@ -575,29 +596,6 @@ where
         body,
     )
     .map_err(|s| (s, IpSockSendError::Mtu))
-}
-
-impl<
-        I: Ip + IpExt + IpDeviceStateIpExt,
-        B: BufferMut,
-        C: IpSocketNonSyncContext,
-        SC: IpSocketContext<I, C> + CounterContext<IpCounters<I>> + InstantiableCtxMarker,
-    > BufferIpSocketHandler<I, C, B> for SC
-{
-    fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
-        &mut self,
-        ctx: &mut C,
-        ip_sock: &IpSock<I, SC::WeakDeviceId, O>,
-        body: S,
-        mtu: Option<u32>,
-    ) -> Result<(), (S, IpSockSendError)> {
-        // TODO(joshlf): Call `trace!` with relevant fields from the socket.
-        self.with_counters(|counters| {
-            counters.send_ip_packet.increment();
-        });
-
-        send_ip_packet(self, ctx, ip_sock, body, mtu)
-    }
 }
 
 impl<
@@ -987,6 +985,12 @@ pub(crate) mod testutil {
         pub(crate) counters: IpCounters<I>,
     }
 
+    impl<I: IpDeviceStateIpExt, D> CounterContext<IpCounters<I>> for FakeIpSocketCtx<I, D> {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(&self.counters)
+        }
+    }
+
     impl<I: IpDeviceStateIpExt, D> InstantiableCtxMarker for FakeIpSocketCtx<I, D> {}
 
     impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
@@ -1302,7 +1306,7 @@ pub(crate) mod testutil {
             I: IpExt + IpDeviceStateIpExt,
             C: InstantContext + TracingContext,
             D: FakeStrongDeviceId,
-            State: TransportIpContext<I, C, DeviceId = D>,
+            State: TransportIpContext<I, C, DeviceId = D> + CounterContext<IpCounters<I>>,
             Meta,
         > TransportIpContext<I, C> for FakeSyncCtx<State, Meta, D>
     where
@@ -1504,6 +1508,12 @@ pub(crate) mod testutil {
                 |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv4_counters,
                 |IpInvariant(sync_ctx)| &sync_ctx.rx_icmpv6_counters,
             )
+        }
+    }
+
+    impl<I: IpDeviceStateIpExt, D> CounterContext<IpCounters<I>> for FakeDualStackIpSocketCtx<D> {
+        fn with_counters<O, F: FnOnce(&IpCounters<I>) -> O>(&self, cb: F) -> O {
+            cb(self.get_common_counters::<I>())
         }
     }
 
@@ -2081,7 +2091,7 @@ mod tests {
         from_addr_type: AddressType,
         to_addr_type: AddressType,
     ) where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
             + DeviceIdContext<AnyDevice, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         set_logger_for_test();
@@ -2176,7 +2186,7 @@ mod tests {
 
         // Send an echo packet on the socket and validate that the packet is
         // delivered locally.
-        BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2195,7 +2205,7 @@ mod tests {
     #[ip_test]
     fn test_send<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>,
         FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
@@ -2264,7 +2274,7 @@ mod tests {
 
         // Send a packet on the socket and make sure that the right contents
         // are sent.
-        BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2285,7 +2295,7 @@ mod tests {
         // packet.
         let small_body = [0; 1];
         let small_body_serializer = (&small_body).into_serializer();
-        let res = BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        let res = IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2297,7 +2307,7 @@ mod tests {
 
         // Send a packet on the socket while imposing an MTU which will not
         // allow a packet to be sent.
-        let res = BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        let res = IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2309,7 +2319,7 @@ mod tests {
         assert_eq!(non_sync_ctx.frames_sent().len(), packet_count);
         // Try sending a packet which will be larger than the device's MTU,
         // and make sure it fails.
-        let res = BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        let res = IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2325,7 +2335,7 @@ mod tests {
             subnet,
         )
         .unwrap();
-        let res = BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+        let res = IpSocketHandler::<I, _>::send_ip_packet(
             &mut Locked::new(sync_ctx),
             &mut non_sync_ctx,
             &sock,
@@ -2338,7 +2348,7 @@ mod tests {
     #[ip_test]
     fn test_send_hop_limits<I: Ip + IpSocketIpExt + IpLayerIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>,
     {
@@ -2405,7 +2415,7 @@ mod tests {
             )
             .unwrap();
 
-            BufferIpSocketHandler::<I, _, _>::send_ip_packet(
+            IpSocketHandler::<I, _>::send_ip_packet(
                 &mut Locked::new(sync_ctx),
                 &mut non_sync_ctx,
                 &sock,
@@ -2471,7 +2481,7 @@ mod tests {
     #[test_case(false; "dont remove device")]
     fn get_mms_device_removed<I: Ip + IpSocketIpExt + IpLayerIpExt>(remove_device: bool)
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpSocketHandler<I, FakeNonSyncCtx, packet::EmptyBuf>
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpSocketHandler<I, FakeNonSyncCtx>
             + IpDeviceContext<I, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>
             + IpStateContext<I, FakeNonSyncCtx>
             + DeviceIpSocketHandler<I, FakeNonSyncCtx>,

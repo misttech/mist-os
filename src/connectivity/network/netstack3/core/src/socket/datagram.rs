@@ -36,8 +36,8 @@ use crate::{
     ip::{
         device::state::IpDeviceStateIpExt,
         socket::{
-            BufferIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError,
-            IpSockSendError, IpSocketHandler, SendOneShotIpPacketError, SendOptions,
+            IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
+            IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
         BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
         TransportIpContext,
@@ -4015,7 +4015,7 @@ pub(crate) fn send_conn<
             Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)) => {
                 let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
                     .map_err(SendError::SerializeError)?;
-                dual_stack.with_other_transport_context_buf(|sync_ctx| {
+                dual_stack.with_other_transport_context_buf::<_, B, _>(|sync_ctx| {
                     sync_ctx
                         .send_ip_packet(ctx, &socket, packet, None)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
@@ -4313,7 +4313,7 @@ pub(crate) fn send_to<
                 })
             }
             Operation::SendToOtherStack((params, sync_ctx)) => {
-                DualStackDatagramBoundStateContext::with_other_transport_context_buf(
+                DualStackDatagramBoundStateContext::with_other_transport_context_buf::<_, B, _>(
                     sync_ctx,
                     |sync_ctx| send_oneshot::<_, S, _, _, _, _>(sync_ctx, ctx, params, body),
                 )
@@ -4336,7 +4336,7 @@ struct SendOneshotParameters<'a, I: IpExt, S: DatagramSocketSpec, D: WeakId, O: 
 fn send_oneshot<
     I: IpExt,
     S: DatagramSocketSpec,
-    SC: BufferIpSocketHandler<I, C, B>,
+    SC: IpSocketHandler<I, C>,
     C,
     B: BufferMut,
     O: SendOptions<I>,

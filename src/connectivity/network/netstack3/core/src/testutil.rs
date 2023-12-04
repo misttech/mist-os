@@ -1486,7 +1486,7 @@ mod tests {
         context::testutil::{FakeNetwork, FakeNetworkLinks},
         device::testutil::receive_frame,
         ip::{
-            socket::{BufferIpSocketHandler, DefaultSendOptions},
+            socket::{DefaultSendOptions, IpSocketHandler},
             BufferIpLayerHandler,
         },
         socket::address::SocketIpAddr,
@@ -1511,7 +1511,7 @@ mod tests {
         // Alice sends Bob a ping.
 
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
-            BufferIpSocketHandler::<Ipv4, _, _>::send_oneshot_ip_packet(
+            IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
                 &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 None, // device
@@ -1682,7 +1682,7 @@ mod tests {
 
         // Alice sends Bob a ping.
         net.with_context("alice", |Ctx { sync_ctx, non_sync_ctx }| {
-            BufferIpSocketHandler::<Ipv4, _, _>::send_oneshot_ip_packet(
+            IpSocketHandler::<Ipv4, _>::send_oneshot_ip_packet(
                 &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 None, // device

@@ -25,10 +25,7 @@ use crate::{
     device::{self, DeviceIdContext as _},
     error::NotFoundError,
     ip::{
-        socket::{
-            BufferIpSocketHandler as _, DefaultSendOptions, DeviceIpSocketHandler as _,
-            IpSocketHandler as _, MmsError,
-        },
+        socket::{DefaultSendOptions, DeviceIpSocketHandler as _, IpSocketHandler as _, MmsError},
         BufferIpTransportContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
         TransportReceiveError,
     },

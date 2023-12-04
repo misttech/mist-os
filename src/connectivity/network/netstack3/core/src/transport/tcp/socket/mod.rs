@@ -54,8 +54,8 @@ use crate::{
     ip::{
         icmp::IcmpErrorCode,
         socket::{
-            BufferIpSocketHandler, DefaultSendOptions, DeviceIpSocketHandler, IpSock,
-            IpSockCreationError, IpSocketHandler as _, Mms,
+            DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError,
+            IpSocketHandler, Mms,
         },
         BufferTransportIpContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
     },
@@ -236,7 +236,7 @@ pub(crate) trait DemuxSyncContext<I: IpExt, D: device::WeakId, BT: TcpBindingsTy
 
 /// Sync context for TCP.
 pub(crate) trait SyncContext<I: IpLayerIpExt, C: TcpBindingsTypes>:
-    DemuxSyncContext<I, Self::WeakDeviceId, C> + BufferIpSocketHandler<I, C, EmptyBuf>
+    DemuxSyncContext<I, Self::WeakDeviceId, C> + IpSocketHandler<I, C>
 {
     type IpTransportAndDemuxCtx<'a>: BufferTransportIpContext<
             I,
