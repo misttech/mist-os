@@ -14,20 +14,13 @@ use {
     crate::plugin_output::filter_digest_by_process,
     crate::write_csv_output::write_csv_output,
     crate::write_human_readable_output::write_human_readable_output,
-    anyhow::Context,
     anyhow::Result,
     async_trait::async_trait,
     digest::{processed, raw},
     ffx_profile_memory_args::MemoryCommand,
     ffx_writer::ToolIO,
-    fho::{FfxMain, FfxTool, MachineWriter},
-    fidl::endpoints::DiscoverableProtocolMarker,
-    fidl::Socket,
-    fidl_fuchsia_developer_remotecontrol as rc,
-    fidl_fuchsia_io::OpenFlags,
-    fidl_fuchsia_memory::MonitorProxy,
+    fho::{moniker, FfxMain, FfxTool, MachineWriter},
     fidl_fuchsia_memory_inspection::CollectorProxy,
-    fidl_fuchsia_sys2 as fsys,
     futures::AsyncReadExt,
     plugin_output::ProfileMemoryOutput,
     std::io::Write,
@@ -38,7 +31,8 @@ use {
 pub struct MemoryTool {
     #[command]
     cmd: MemoryCommand,
-    remote_control: rc::RemoteControlProxy,
+    #[with(moniker("/core/memory_monitor"))]
+    collector_proxy: CollectorProxy,
 }
 
 fho::embedded_plugin!(MemoryTool);
@@ -46,103 +40,25 @@ fho::embedded_plugin!(MemoryTool);
 #[async_trait(?Send)]
 impl FfxMain for MemoryTool {
     type Writer = MachineWriter<ProfileMemoryOutput>;
-    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        plugin_entrypoint(self.remote_control, self.cmd, writer).await?;
+        plugin_entrypoint(&self.collector_proxy, self.cmd, writer).await?;
         Ok(())
     }
-}
-
-/// Abstracts a JSON collector.
-pub trait JsonCollector {
-    fn collect_json_stats(&self, tx: Socket) -> Result<()>;
-}
-
-// Implements a JSON collector with CollectorProxy.
-struct JsonCollectorImpl {
-    collector_proxy: CollectorProxy,
-}
-
-impl JsonCollector for JsonCollectorImpl {
-    fn collect_json_stats(&self, tx: Socket) -> Result<()> {
-        self.collector_proxy.collect_json_stats(tx)?;
-        Ok(())
-    }
-}
-
-// Implements a JSON collector with MonitorProxy.
-// Deprecated. Exists to maintain backwards compatibility.
-struct DeprecatedJsonCollectorImpl {
-    monitor_proxy: MonitorProxy,
-}
-
-impl JsonCollector for DeprecatedJsonCollectorImpl {
-    fn collect_json_stats(&self, tx: Socket) -> Result<()> {
-        self.monitor_proxy.write_json_capture_and_buckets(tx)?;
-        Ok(())
-    }
-}
-
-/// Connect to a protocol on a remote device using the remote control proxy.
-async fn remotecontrol_connect<S: DiscoverableProtocolMarker>(
-    remote_control: &rc::RemoteControlProxy,
-    moniker: &str,
-) -> Result<S::Proxy> {
-    let (proxy, server_end) = fidl::endpoints::create_proxy::<S>()
-        .with_context(|| format!("failed to create proxy to {}", S::PROTOCOL_NAME))?;
-    remote_control
-        .open_capability(
-            moniker,
-            fsys::OpenDirType::ExposedDir,
-            S::PROTOCOL_NAME,
-            server_end.into_channel(),
-            OpenFlags::empty(),
-        )
-        .await?
-        .map_err(|e| {
-            anyhow::anyhow!("failed to connect to {} at {}: {:?}", S::PROTOCOL_NAME, moniker, e)
-        })?;
-    Ok(proxy)
 }
 
 /// Prints a memory digest to stdout.
 pub async fn plugin_entrypoint(
-    remote_control: rc::RemoteControlProxy,
+    collector: &CollectorProxy,
     cmd: MemoryCommand,
     mut writer: MachineWriter<ProfileMemoryOutput>,
 ) -> Result<()> {
-    let collector: Box<dyn JsonCollector> = {
-        // Attempt to connect to memory monitor's fuchsia.memory.inspection.Collector.
-        let proxy = remotecontrol_connect::<fidl_fuchsia_memory_inspection::CollectorMarker>(
-            &remote_control,
-            "/core/memory_monitor",
-        )
-        .await;
-
-        if let Ok(proxy) = proxy {
-            Box::new(JsonCollectorImpl { collector_proxy: proxy })
-        } else {
-            // Failed to connect to `fuchsia.memory.inspection.Collector`.
-            // This is probably because the target is running an older version of the
-            // `memory_monitor` component.
-            // Fallback to connecting to the previous FIDL protocol, `fuchsia.memory.Monitor`.
-            // TODO(fxb/122950) Stop connecting to`fuchsia.memory.Monitor`.
-            let deprecated_proxy = remotecontrol_connect::<fidl_fuchsia_memory::MonitorMarker>(
-                &remote_control,
-                "/core/memory_monitor",
-            )
-            .await;
-            let monitor_proxy = deprecated_proxy.expect("Failed to connect to fuchsia.memory.inspection.Collector and fuchsia.memory.Monitor.");
-            Box::new(DeprecatedJsonCollectorImpl { monitor_proxy })
-        }
-    };
-
     // Either call `print_output` once, or call `print_output` repeatedly every `interval` seconds
     // until the user presses ctrl-C.
     match cmd.interval {
-        None => print_output(&*collector, &cmd, &mut writer).await?,
+        None => print_output(collector, &cmd, &mut writer).await?,
         Some(interval) => loop {
-            print_output(&*collector, &cmd, &mut writer).await?;
+            print_output(collector, &cmd, &mut writer).await?;
             fuchsia_async::Timer::new(Duration::from_secs_f64(interval)).await;
         },
     }
@@ -150,7 +66,7 @@ pub async fn plugin_entrypoint(
 }
 
 pub async fn print_output(
-    collector: &dyn JsonCollector,
+    collector: &CollectorProxy,
     cmd: &MemoryCommand,
     writer: &mut MachineWriter<ProfileMemoryOutput>,
 ) -> Result<()> {
@@ -180,8 +96,8 @@ pub async fn print_output(
     }
 }
 
-/// Returns a buffer containing the data that `JsonCollector` wrote.
-async fn get_raw_data(collector: &dyn JsonCollector) -> Result<Vec<u8>> {
+/// Returns a buffer containing the data that `CollectorProxy` wrote.
+async fn get_raw_data(collector: &CollectorProxy) -> Result<Vec<u8>> {
     // Create a socket.
     let (rx, tx) = fidl::Socket::create_stream();
 
@@ -196,8 +112,8 @@ async fn get_raw_data(collector: &dyn JsonCollector) -> Result<Vec<u8>> {
     Ok(buffer)
 }
 
-/// Returns the `MemoryMonitorOutput` obtained via the `MonitorProxyInterface`. Performs basic schema validation.
-async fn get_output(collector: &dyn JsonCollector) -> anyhow::Result<raw::MemoryMonitorOutput> {
+/// Returns the `MemoryMonitorOutput` obtained via the `CollectorProxy`. Performs basic schema validation.
+async fn get_output(collector: &CollectorProxy) -> anyhow::Result<raw::MemoryMonitorOutput> {
     let buffer = get_raw_data(collector).await?;
     Ok(serde_json::from_slice(&buffer)?)
 }
@@ -247,23 +163,25 @@ mod tests {
 
     }
 
-    struct TestJsonCollectorImpl {}
-
-    impl JsonCollector for TestJsonCollectorImpl {
-        fn collect_json_stats(&self, socket: Socket) -> Result<()> {
-            let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
-            fuchsia_async::Task::local(async move {
-                s.write_all(&DATA_WRITTEN_BY_MEMORY_MONITOR).await.unwrap();
-            })
-            .detach();
-            Ok(())
-        }
+    fn create_fake_collector_proxy() -> CollectorProxy {
+        fho::testing::fake_proxy(move |req| match req {
+            fidl_fuchsia_memory_inspection::CollectorRequest::CollectJsonStats {
+                socket, ..
+            } => {
+                let mut s = fidl::AsyncSocket::from_socket(socket).unwrap();
+                fuchsia_async::Task::local(async move {
+                    s.write_all(&DATA_WRITTEN_BY_MEMORY_MONITOR).await.unwrap();
+                })
+                .detach();
+            }
+            _ => panic!("Expected CollectorRequest/CollectJsonStats; got {:?}", req),
+        })
     }
 
     /// Tests that `get_raw_data` properly reads data from the memory monitor service.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_raw_data_test() {
-        let collector = TestJsonCollectorImpl {};
+        let collector = create_fake_collector_proxy();
         let raw_data = get_raw_data(&collector).await.expect("failed to get raw data");
         assert_eq!(raw_data, *DATA_WRITTEN_BY_MEMORY_MONITOR);
     }
@@ -271,7 +189,7 @@ mod tests {
     /// Tests that `get_output` properly reads and parses data from the memory monitor service.
     #[fuchsia_async::run_singlethreaded(test)]
     async fn get_output_test() {
-        let collector = TestJsonCollectorImpl {};
+        let collector = create_fake_collector_proxy();
         let output = get_output(&collector).await.expect("failed to get output");
         assert_eq!(output, *EXPECTED_OUTPUT);
     }
