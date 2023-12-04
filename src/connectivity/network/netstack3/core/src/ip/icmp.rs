@@ -889,47 +889,6 @@ pub(crate) trait StateContext<I: IcmpIpExt + IpExt, C: IcmpNonSyncCtx<I, Self::D
     ) -> O;
 }
 
-// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
-// for the blanket impl [1] so that we don't need to mention the datagram traits
-// in our BufferSocketHandler trait. We should simplify this by adding datagram
-// trait bounds.
-// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1073;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
-/// A [`StateContext`] whose implementors will automatically implement
-/// [`BufferDatagramStateContext`].
-pub(crate) trait BufferStateContext<
-    I: IcmpIpExt + IpExt,
-    C: IcmpNonSyncCtx<I, Self::DeviceId>,
-    B: BufferMut,
->: StateContext<I, C> where
-    for<'a> Self: StateContext<I, C, SocketStateCtx<'a> = Self::BufferSocketStateCtx<'a>>,
-{
-    type BufferSocketStateCtx<'a>: BufferBoundStateContext<
-            I,
-            C,
-            B,
-            DeviceId = Self::DeviceId,
-            WeakDeviceId = Self::WeakDeviceId,
-        > + IcmpStateContext;
-}
-
-// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
-// for the blanket impl [1] so that we don't need to mention the datagram traits
-// in our BufferSocketHandler trait. We should simplify this by adding datagram
-// trait bounds.
-// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1042;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
-/// A [`InnerIcmpContext`] whose implementors will automatically implement
-/// [`BufferDatagramBoundStateContext`].
-pub(crate) trait BufferBoundStateContext<
-    I: IpExt,
-    C: IcmpNonSyncCtx<I, Self::DeviceId>,
-    B: BufferMut,
-> where
-    for<'a> Self: InnerIcmpContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
-{
-    type BufferIpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
-        + IcmpStateContext;
-}
-
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
 pub(crate) enum Icmp {}
 
@@ -3537,15 +3496,9 @@ pub(crate) trait SocketHandler<I: datagram::IpExt, C>: DeviceIdContext<AnyDevice
         id: &SocketId<I>,
         hop_limit: Option<NonZeroU8>,
     );
-}
 
-/// A handler trait for ICMP sockets that also allows sending/receiving on the
-/// sockets.
-pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
-    SocketHandler<I, C>
-{
     /// Send an ICMP echo reply on the socket.
-    fn send(
+    fn send<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         conn: &SocketId<I>,
@@ -3553,7 +3506,7 @@ pub(crate) trait BufferSocketHandler<I: datagram::IpExt, C, B: BufferMut>:
     ) -> Result<(), datagram::SendError<packet_formats::error::ParseError>>;
 
     /// Send an ICMP echo reply to a remote address without connecting.
-    fn send_to(
+    fn send_to<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         id: &SocketId<I>,
@@ -3722,16 +3675,8 @@ impl<
             SocketHopLimits::set_multicast(hop_limit),
         )
     }
-}
 
-impl<
-        I: datagram::IpExt,
-        B: BufferMut,
-        C: IcmpNonSyncCtx<I, SC::DeviceId>,
-        SC: BufferStateContext<I, C, B> + IcmpStateContext,
-    > BufferSocketHandler<I, C, B> for SC
-{
-    fn send(
+    fn send<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         id: &SocketId<I>,
@@ -3740,7 +3685,7 @@ impl<
         datagram::send_conn::<_, _, _, Icmp, _>(self, ctx, id.clone(), body)
     }
 
-    fn send_to(
+    fn send_to<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         id: &SocketId<I>,
@@ -3831,7 +3776,7 @@ pub fn send<I: Ip, B: BufferMut, C: NonSyncContext>(
         IpInvariant((sync_ctx, ctx, body)),
         id,
     )| {
-        BufferSocketHandler::<I, C, _>::send(&mut Locked::new(sync_ctx), ctx, id, body)
+        SocketHandler::<I, C>::send(&mut Locked::new(sync_ctx), ctx, id, body)
     })
 }
 
@@ -3852,7 +3797,7 @@ pub fn send_to<I: Ip, B: BufferMut, C: NonSyncContext>(
         I,
         (IpInvariant((sync_ctx, ctx, body)), (remote_ip, id)),
         |(IpInvariant((sync_ctx, ctx, body)), (remote_ip, id))| {
-            IpInvariant(BufferSocketHandler::<I, C, _>::send_to(
+            IpInvariant(SocketHandler::<I, C>::send_to(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 id,
@@ -4361,18 +4306,6 @@ mod tests {
         ) -> O {
             cb(&mut self.inner)
         }
-    }
-
-    impl<I: datagram::IpExt + IpDeviceStateIpExt, B: BufferMut>
-        BufferStateContext<I, FakeIcmpNonSyncCtx<I>, B> for FakeIcmpSyncCtx<I>
-    {
-        type BufferSocketStateCtx<'a> = FakeIcmpInnerSyncCtx<I>;
-    }
-
-    impl<I: datagram::IpExt + IpDeviceStateIpExt, B: BufferMut>
-        BufferBoundStateContext<I, FakeIcmpNonSyncCtx<I>, B> for FakeIcmpInnerSyncCtx<I>
-    {
-        type BufferIpSocketsCtx<'a> = FakeBufferSyncCtx;
     }
 
     impl<I: IcmpIpExt, D> IcmpBindingsContext<I, D> for FakeIcmpNonSyncCtx<I> {
@@ -6245,7 +6178,7 @@ mod tests {
             .unwrap()
             .into_inner();
         assert_matches!(
-            BufferSocketHandler::<I, _, _>::send(sync_ctx, non_sync_ctx, &conn, buf,),
+            SocketHandler::<I, _>::send(sync_ctx, non_sync_ctx, &conn, buf,),
             Err(datagram::SendError::SerializeError(
                 packet_formats::error::ParseError::NotExpected
             ))

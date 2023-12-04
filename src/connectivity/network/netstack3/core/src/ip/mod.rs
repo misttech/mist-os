@@ -3228,36 +3228,6 @@ impl<
     }
 }
 
-impl<
-        I: datagram::IpExt,
-        B: BufferMut,
-        C: icmp::IcmpNonSyncCtx<I, Self::DeviceId>
-            + icmp::IcmpNonSyncCtx<I::OtherVersion, Self::DeviceId>
-            + crate::NonSyncContext,
-        L,
-    > icmp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
-where
-    Self: icmp::StateContext<I, C> + icmp::IcmpStateContext,
-    for<'a> Self::SocketStateCtx<'a>: icmp::BufferBoundStateContext<I, C, B>,
-{
-    type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
-}
-
-impl<
-        I: datagram::IpExt,
-        B: BufferMut,
-        C: icmp::IcmpNonSyncCtx<I, Self::DeviceId>
-            + icmp::IcmpNonSyncCtx<I::OtherVersion, Self::DeviceId>
-            + crate::NonSyncContext,
-        L,
-    > icmp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
-where
-    Self: icmp::InnerIcmpContext<I, C>,
-    for<'a> Self::IpSocketsCtx<'a>: TransportIpContext<I, C>,
-{
-    type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
-}
-
 /// Resolve the route to a given destination.
 ///
 /// Returns `Some` [`ResolvedRoute`] with details for reaching the destination,
