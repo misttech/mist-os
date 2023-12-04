@@ -33,6 +33,8 @@ source_set("test_device_helper") {
 }
 
 source_set("magma_map_cpu") {
+  testonly = true
+
   public_configs = [ "../../..:src_config" ]
 
   sources = [

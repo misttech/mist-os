@@ -5,6 +5,8 @@
 import("//build/components.gni")
 
 group("loop_fixture") {
+  testonly = true
+
   public_deps = [ ":gtest" ]
 }
 
@@ -12,6 +14,8 @@ group("loop_fixture") {
 # //sdk/lib/testing/loop_fixture (for RealLoop) or
 # //src/lib/testing/loop_fixture (for TestLoop or RealLoopFixture)
 source_set("gtest") {
+  testonly = true
+
   sources = [
     "real_loop_fixture.h",
     "test_loop.cc",
@@ -26,7 +30,7 @@ source_set("gtest") {
     "//sdk/lib/fit",
     "//sdk/lib/stdcompat",
     "//src/lib/fxl",
-    "//third_party/googletest:gtest_no_testonly",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

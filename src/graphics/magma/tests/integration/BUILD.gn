@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/components/fuchsia_test_component.gni")
-import("//build/packages/sdk_fuchsia_package.gni")
 import("//src/graphics/lib/magma/gnbuild/magma.gni")
 
 group("integration") {
@@ -56,6 +55,8 @@ fuchsia_structured_config_cpp_elf_lib("conformance-config") {
 }
 
 executable("magma_conformance_tests") {
+  testonly = true
+
   sources = [
     "main.cc",
     "test_magma.cc",
@@ -73,7 +74,7 @@ executable("magma_conformance_tests") {
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//src/lib/testing/loop_fixture",
-    "//third_party/googletest:gtest_no_testonly",
+    "//third_party/googletest:gtest",
     "//zircon/system/ulib/trace",
   ]
 
@@ -217,12 +218,6 @@ fuchsia_structured_config_values("vsi_config") {
   }
 }
 
-fuchsia_component("magma_conformance_tests_child_component") {
-  component_name = "magma_conformance_tests"
-  manifest = "meta/magma_conformance_tests_child.cml"
-  deps = [ ":magma_conformance_tests" ]
-}
-
 fuchsia_test_component("magma-conformance-tests-component") {
   cm_label = ":conformance-manifest"
   deps = [ ":magma_conformance_tests" ]
@@ -241,19 +236,6 @@ fuchsia_test_package("magma-conformance-tests") {
     }
   }
   validate_structured_config = false
-}
-
-fuchsia_package("magma_conformance_tests_for_sdk") {
-  deps = [ ":magma_conformance_tests_child_component" ]
-  validate_structured_config = false
-}
-
-sdk_fuchsia_package("magma_conformance_tests_sdk") {
-  distribution_name = "magma_conformance_tests"
-  category = "partner"
-  package_label = ":magma_conformance_tests_for_sdk"
-  expected_files_exact = [ "meta/magma_conformance_tests.cm" ]
-  api_level_added = 16
 }
 
 fuchsia_test_package("magma-conformance-tests-vsi") {
