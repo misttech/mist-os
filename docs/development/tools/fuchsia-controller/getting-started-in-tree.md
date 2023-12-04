@@ -81,6 +81,7 @@ python_binary("your_binary") {
     deps = [
         "//src/developer/ffx:host",
         "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
+        "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
     ]
 }
 ```
@@ -104,7 +105,13 @@ dependency in your `BUILD.gn` for the `fidlc` target to create these FIDL
 bindings:
 
 ```gn
-"//src/developer/ffx/fidl:fuchsia.developer.ffx_compile_fidlc($fidl_toolchain)"
+"//src/developer/ffx/fidl:fuchsia.developer.ffx($fidl_toolchain)"
+```
+
+This also requires including an import of the `$fidl_toolchain` variable:
+
+```gn
+import("//build/fidl/toolchain.gni")
 ```
 
 If you're writing a test, you need to include the host test data (which will
