@@ -28,7 +28,7 @@ executable("vk_timer_query_bin") {
 }
 
 fuchsia_test_component("vk_timer_query_cmp") {
-  component_name = "vk_timer_query"
+  component_name = "vk_timer_query_test"
   deps = [
     ":vk_timer_query_bin",
     "//src/lib/vulkan/validation_layers",
@@ -39,7 +39,7 @@ fuchsia_test_component("vk_timer_query_cmp") {
 }
 
 fuchsia_test_package("vk-timer-query-pkg") {
-  package_name = "vk_timer_query"
+  package_name = "vk_timer_query_test"
   test_components = [ ":vk_timer_query_cmp" ]
   test_specs = {
     environments = magma_libvulkan_arm_hardware_envs

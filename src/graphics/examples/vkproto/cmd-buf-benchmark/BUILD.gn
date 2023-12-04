@@ -22,7 +22,7 @@ packaged_shared_library("libvulkan") {
 
 fuchsia_test_component("cmd-buf-benchmark-component") {
   testonly = true
-  component_name = "cmd-buf-benchmark"
+  component_name = "cmd-buf-benchmark-test"
   manifest = "meta/cmd-buf-benchmark.cml"
   deps = [
     ":bin",
@@ -111,7 +111,7 @@ group("cmd-buf-benchmark-glfw") {
   deps = [ ":bin($host_toolchain)" ]
 }
 
-fuchsia_test_package("cmd-buf-benchmark") {
+fuchsia_test_package("cmd-buf-benchmark-test") {
   test_components = [ ":cmd-buf-benchmark-component" ]
   test_specs = {
     environments = vulkan_envs

@@ -22,7 +22,7 @@ executable("vkpriority_bin") {
 
 fuchsia_test_component("vkpriority_cmp") {
   testonly = true
-  component_name = "vkpriority"
+  component_name = "vkpriority_test"
   deps = [
     ":vkpriority_bin",
     "//src/lib/vulkan/validation_layers",
@@ -33,7 +33,7 @@ fuchsia_test_component("vkpriority_cmp") {
 }
 
 fuchsia_test_package("vkpriority-pkg") {
-  package_name = "vkpriority"
+  package_name = "vkpriority_test"
   test_components = [ ":vkpriority_cmp" ]
 
   # Test could flake due to bad luck, so only enable for manual runs.

@@ -36,7 +36,7 @@ resource("shaders") {
 
 fuchsia_test_component("vkloop_cmp") {
   manifest = "meta/vkloop.cml"
-  component_name = "vkloop"
+  component_name = "vkloop_test"
   deps = [
     ":shaders",
     ":vkloop_bin",
@@ -46,7 +46,7 @@ fuchsia_test_component("vkloop_cmp") {
 }
 
 fuchsia_test_package("vkloop-pkg") {
-  package_name = "vkloop"
+  package_name = "vkloop_test"
   test_components = [ ":vkloop_cmp" ]
   test_specs = {
     environments = magma_libvulkan_hardware_envs

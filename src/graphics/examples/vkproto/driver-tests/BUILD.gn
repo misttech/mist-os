@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//src/graphics/examples/vkproto/common/common.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
-fuchsia_test_component("vkproto_driver_tests") {
+fuchsia_test_component("vkproto_driver_test") {
   manifest = "meta/vkproto_driver_tests.cml"
   deps = [
     ":bin",
@@ -52,9 +52,9 @@ executable("bin") {
   ]
 }
 
-fuchsia_test_package("vkproto-driver-tests") {
-  package_name = "vkproto-driver-tests"
-  test_components = [ ":vkproto_driver_tests" ]
+fuchsia_test_package("vkproto-driver-test") {
+  package_name = "vkproto-driver-test"
+  test_components = [ ":vkproto_driver_test" ]
   test_specs = {
     environments = vulkan_envs
   }
@@ -62,5 +62,5 @@ fuchsia_test_package("vkproto-driver-tests") {
 
 group("driver-tests") {
   testonly = true
-  deps = [ ":vkproto-driver-tests" ]
+  deps = [ ":vkproto-driver-test" ]
 }
