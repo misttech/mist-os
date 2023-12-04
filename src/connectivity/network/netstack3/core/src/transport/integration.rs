@@ -12,7 +12,6 @@ use packet::BufferMut;
 
 use crate::{
     device::WeakDeviceId,
-    ip::TransportIpContext,
     socket::datagram::{MaybeDualStack, UninstantiableContext},
     transport::{
         tcp::{
@@ -21,7 +20,7 @@ use crate::{
                 isn::IsnGenerator, TcpSocketId, TcpSocketSet, TcpSocketState, WeakTcpSocketId,
             },
         },
-        udp::{self, UdpBindingsContext},
+        udp::{self},
     },
     NonSyncContext, SyncCtx,
 };
@@ -351,36 +350,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
 impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::UdpBoundMap<Ipv4>>>
     udp::NonDualStackBoundStateContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-}
-
-impl<
-        I: udp::IpExt,
-        B: BufferMut,
-        C: UdpBindingsContext<I, Self::DeviceId>
-            + UdpBindingsContext<I::OtherVersion, Self::DeviceId>
-            + crate::NonSyncContext,
-        L,
-    > udp::BufferStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
-where
-    Self: udp::StateContext<I, C>,
-    for<'a> Self::SocketStateCtx<'a>: udp::BufferBoundStateContext<I, C, B>,
-{
-    type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
-}
-
-impl<
-        I: udp::IpExt,
-        B: BufferMut,
-        C: UdpBindingsContext<I, Self::DeviceId>
-            + UdpBindingsContext<I::OtherVersion, Self::DeviceId>
-            + crate::NonSyncContext,
-        L,
-    > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
-where
-    Self: udp::BoundStateContext<I, C>,
-    for<'a> Self::IpSocketsCtx<'a>: TransportIpContext<I, C>,
-{
-    type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
 }
 
 impl<I: crate::ip::IpExt, C: NonSyncContext> RwLockFor<crate::lock_ordering::TcpAllSocketsSet<I>>

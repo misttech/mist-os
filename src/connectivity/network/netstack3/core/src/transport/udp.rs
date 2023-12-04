@@ -1233,51 +1233,6 @@ pub(crate) trait NonDualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<
 {
 }
 
-// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
-// for the blanket impl [1] so that we don't need to mention the datagram traits
-// in our BufferSocketHandler trait. We should simplify this by adding datagram
-// trait bounds.
-// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1073;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
-/// An execution context for the UDP protocol when a buffer is provided which
-/// also provides access to state.
-pub(crate) trait BufferStateContext<
-    I: IpExt,
-    C: StateNonSyncContext<I, Self::DeviceId>,
-    B: BufferMut,
->: StateContext<I, C> where
-    for<'a> Self: StateContext<I, C, SocketStateCtx<'a> = Self::BufferSocketStateCtx<'a>>,
-{
-    type BufferSocketStateCtx<'a>: BufferBoundStateContext<
-        I,
-        C,
-        B,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-}
-
-// TODO(https://fxbug.dev/133966): This trait is used to express the requirement
-// for the blanket impl [1] so that we don't need to mention the datagram traits
-// in our BufferSocketHandler trait. We should simplify this by adding datagram
-// trait bounds.
-// [1]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/connectivity/network/netstack3/core/src/socket/datagram.rs;l=1042;drc=9c47dd3a602a603b1a803cf3abc7e708e8e17455
-/// An execution context for the UDP protocol when a buffer is provided which
-/// also provides access to state.
-pub(crate) trait BufferBoundStateContext<
-    I: IpExt,
-    C: StateNonSyncContext<I, Self::DeviceId>,
-    B: BufferMut,
-> where
-    for<'a> Self: BoundStateContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
-{
-    type BufferIpSocketsCtx<'a>: TransportIpContext<
-        I,
-        C,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-}
-
 /// An implementation of [`IpTransportContext`] for UDP.
 pub(crate) enum UdpIpTransportContext {}
 
@@ -1312,9 +1267,7 @@ fn receive_ip_packet<
     I: IpExt,
     B: BufferMut,
     C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-    SC: BufferStateContext<I, C, B>
-        + BufferStateContext<I::OtherVersion, C, B>
-        + CounterContext<UdpCounters<I>>,
+    SC: StateContext<I, C> + StateContext<I::OtherVersion, C> + CounterContext<UdpCounters<I>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1428,7 +1381,7 @@ fn receive_ip_packet<
 /// Tries to deliver the given UDP packet to the given UDP socket.
 fn try_deliver<
     I: IpExt,
-    SC: BufferStateContext<I, C, B>,
+    SC: StateContext<I, C>,
     C: StateNonSyncContext<I, SC::DeviceId>,
     B: BufferMut,
 >(
@@ -1475,7 +1428,7 @@ fn try_dual_stack_deliver<
     I: IpExt,
     B: BufferMut,
     C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-    SC: BufferStateContext<I, C, B> + BufferStateContext<I::OtherVersion, C, B>,
+    SC: StateContext<I, C> + StateContext<I::OtherVersion, C>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1549,8 +1502,8 @@ impl<
         I: IpExt,
         B: BufferMut,
         C: StateNonSyncContext<I, SC::DeviceId> + StateNonSyncContext<I::OtherVersion, SC::DeviceId>,
-        SC: BufferStateContext<I, C, B>
-            + BufferStateContext<I::OtherVersion, C, B>
+        SC: StateContext<I, C>
+            + StateContext<I::OtherVersion, C>
             + NonTestCtxMarker
             + CounterContext<UdpCounters<I>>,
     > BufferIpTransportContext<I, C, SC, B> for UdpIpTransportContext
@@ -1709,10 +1662,29 @@ pub(crate) trait SocketHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
         addr: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
         port: Option<NonZeroU16>,
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>>;
+
+    fn send<B: BufferMut>(
+        &mut self,
+        ctx: &mut C,
+        conn: SocketId<I>,
+        body: B,
+    ) -> Result<(), Either<SendError, ExpectedConnError>>;
+
+    fn send_to<B: BufferMut>(
+        &mut self,
+        ctx: &mut C,
+        id: SocketId<I>,
+        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
+        remote_port: UdpRemotePort,
+        body: B,
+    ) -> Result<(), Either<LocalAddressError, SendToError>>;
 }
 
-impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>>
-    SocketHandler<I, C> for SC
+impl<
+        I: IpExt,
+        C: StateNonSyncContext<I, Self::DeviceId>,
+        SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
+    > SocketHandler<I, C> for SC
 {
     fn create_udp(&mut self) -> SocketId<I> {
         datagram::create(self)
@@ -1911,49 +1883,8 @@ impl<I: IpExt, C: StateNonSyncContext<I, Self::DeviceId>, SC: StateContext<I, C>
     ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
         datagram::listen(self, ctx, id, addr, port)
     }
-}
 
-/// Error when sending a packet on a socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
-#[generic_over_ip()]
-pub enum SendError {
-    /// The socket is not writeable.
-    NotWriteable,
-    /// The packet couldn't be sent.
-    IpSock(IpSockSendError),
-    /// Disallow sending packets with a remote port of 0. See
-    /// [`UdpRemotePort::Unset`] for the rationale.
-    RemotePortUnset,
-}
-
-pub(crate) trait BufferSocketHandler<I: IpExt, C, B: BufferMut>:
-    SocketHandler<I, C>
-{
-    fn send(
-        &mut self,
-        ctx: &mut C,
-        conn: SocketId<I>,
-        body: B,
-    ) -> Result<(), Either<SendError, ExpectedConnError>>;
-
-    fn send_to(
-        &mut self,
-        ctx: &mut C,
-        id: SocketId<I>,
-        remote_ip: Option<SocketZonedIpAddr<I::Addr, Self::DeviceId>>,
-        remote_port: UdpRemotePort,
-        body: B,
-    ) -> Result<(), Either<LocalAddressError, SendToError>>;
-}
-
-impl<
-        I: IpExt,
-        B: BufferMut,
-        C: StateNonSyncContext<I, SC::DeviceId>,
-        SC: BufferStateContext<I, C, B> + CounterContext<UdpCounters<I>>,
-    > BufferSocketHandler<I, C, B> for SC
-{
-    fn send(
+    fn send<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
@@ -1977,7 +1908,7 @@ impl<
         })
     }
 
-    fn send_to(
+    fn send_to<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         id: SocketId<I>,
@@ -2017,6 +1948,19 @@ impl<
     }
 }
 
+/// Error when sending a packet on a socket.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[generic_over_ip()]
+pub enum SendError {
+    /// The socket is not writeable.
+    NotWriteable,
+    /// The packet couldn't be sent.
+    IpSock(IpSockSendError),
+    /// Disallow sending packets with a remote port of 0. See
+    /// [`UdpRemotePort::Unset`] for the rationale.
+    RemotePortUnset,
+}
+
 /// Sends a UDP packet on an existing socket.
 ///
 /// # Errors
@@ -2039,10 +1983,10 @@ pub fn send_udp<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, body)), id.clone()),
         |(IpInvariant((sync_ctx, ctx, body)), id)| {
-            BufferSocketHandler::<Ipv4, _, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
+            SocketHandler::<Ipv4, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, body)), id)| {
-            BufferSocketHandler::<Ipv6, _, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
+            SocketHandler::<Ipv6, _>::send(sync_ctx, ctx, id, body).map_err(IpInvariant)
         },
     )
     .map_err(|IpInvariant(e)| e)
@@ -2082,26 +2026,12 @@ pub fn send_udp_to<I: Ip, B: BufferMut, C: crate::NonSyncContext>(
     I::map_ip::<_, Result<_, _>>(
         (IpInvariant((&mut sync_ctx, ctx, remote_port, body)), id, remote_ip),
         |(IpInvariant((sync_ctx, ctx, remote_port, body)), id, remote_ip)| {
-            BufferSocketHandler::<Ipv4, _, _>::send_to(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
+            SocketHandler::<Ipv4, _>::send_to(sync_ctx, ctx, id, remote_ip, remote_port, body)
+                .map_err(IpInvariant)
         },
         |(IpInvariant((sync_ctx, ctx, remote_port, body)), id, remote_ip)| {
-            BufferSocketHandler::<Ipv6, _, _>::send_to(
-                sync_ctx,
-                ctx,
-                id,
-                remote_ip,
-                remote_port,
-                body,
-            )
-            .map_err(IpInvariant)
+            SocketHandler::<Ipv6, _>::send_to(sync_ctx, ctx, id, remote_ip, remote_port, body)
+                .map_err(IpInvariant)
         },
     )
     .map_err(|IpInvariant(e)| e)
@@ -3214,23 +3144,6 @@ mod tests {
         }
     }
 
-    impl<
-            I: TestIpExt,
-            D: FakeStrongDeviceId,
-            B: BufferMut,
-            Outer: AsRef<SocketsState<I, FakeWeakDeviceId<D>>>
-                + AsMut<SocketsState<I, FakeWeakDeviceId<D>>>,
-        > BufferStateContext<I, FakeUdpNonSyncCtx, B> for Wrapped<Outer, FakeUdpInnerSyncCtx<D>>
-    {
-        type BufferSocketStateCtx<'a> = Self::SocketStateCtx<'a>;
-    }
-
-    impl<I: TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
-        BufferBoundStateContext<I, FakeUdpNonSyncCtx, B> for FakeUdpInnerSyncCtx<D>
-    {
-        type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
-    }
-
     /// Ip packet delivery for the [`FakeUdpSyncCtx`].
     impl<I: IpExt + IpDeviceStateIpExt + TestIpExt, D: FakeStrongDeviceId, B: BufferMut>
         BufferIpTransportContext<I, FakeUdpNonSyncCtx, FakeUdpSyncCtx<D>, B>
@@ -3526,7 +3439,7 @@ mod tests {
         );
 
         // Send a packet providing a local ip:
-        BufferSocketHandler::send_to(
+        SocketHandler::send_to(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -3536,7 +3449,7 @@ mod tests {
         )
         .expect("send_to suceeded");
         // And send a packet that doesn't:
-        BufferSocketHandler::send_to(
+        SocketHandler::send_to(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -3641,13 +3554,8 @@ mod tests {
         assert_eq!(non_sync_ctx.state().socket_data(), HashMap::from([(socket, vec![&body[..]])]));
 
         // Now try to send something over this new connection.
-        BufferSocketHandler::send(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            socket,
-            Buf::new(body.to_vec(), ..),
-        )
-        .expect("send_udp_conn returned an error");
+        SocketHandler::send(&mut sync_ctx, &mut non_sync_ctx, socket, Buf::new(body.to_vec(), ..))
+            .expect("send_udp_conn returned an error");
 
         let (meta, frame_body) = assert_matches!(sync_ctx.inner.inner.frames(), [frame] => frame);
         // Check first frame.
@@ -4109,7 +4017,7 @@ mod tests {
 
         let body = [1, 2, 3, 4, 5];
         // Try to send something with send_to
-        BufferSocketHandler::send_to(
+        SocketHandler::send_to(
             &mut sync_ctx,
             &mut non_sync_ctx,
             socket,
@@ -4169,13 +4077,9 @@ mod tests {
         frames.set_should_error_for_frame(|_frame_meta| true);
 
         // Now try to send something over this new connection:
-        let send_err = BufferSocketHandler::send(
-            &mut sync_ctx,
-            &mut non_sync_ctx,
-            socket,
-            Buf::new(Vec::new(), ..),
-        )
-        .unwrap_err();
+        let send_err =
+            SocketHandler::send(&mut sync_ctx, &mut non_sync_ctx, socket, Buf::new(Vec::new(), ..))
+                .unwrap_err();
         assert_eq!(send_err, Either::Left(SendError::IpSock(IpSockSendError::Mtu)));
     }
 
@@ -4209,7 +4113,7 @@ mod tests {
             set_device_removed::<I>(&mut sync_ctx, device_removed);
 
             assert_eq!(
-                BufferSocketHandler::send(
+                SocketHandler::send(
                     &mut sync_ctx,
                     &mut non_sync_ctx,
                     socket,
@@ -4231,14 +4135,14 @@ mod tests {
         #[derive(Debug)]
         struct NotWriteableError;
 
-        fn send<I: Ip + TestIpExt, SC: BufferSocketHandler<I, FakeUdpNonSyncCtx, Buf<Vec<u8>>>>(
+        fn send<I: Ip + TestIpExt, SC: SocketHandler<I, FakeUdpNonSyncCtx>>(
             remote_ip: Option<SocketZonedIpAddr<I::Addr, SC::DeviceId>>,
             sync_ctx: &mut SC,
             non_sync_ctx: &mut FakeUdpNonSyncCtx,
             id: SocketId<I>,
         ) -> Result<(), NotWriteableError> {
             match remote_ip {
-                Some(remote_ip) => BufferSocketHandler::send_to(
+                Some(remote_ip) => SocketHandler::send_to(
                     sync_ctx,
                     non_sync_ctx,
                     id,
@@ -4249,7 +4153,7 @@ mod tests {
                 .map_err(
                     |e| assert_matches!(e, Either::Right(SendToError::NotWriteable) => NotWriteableError)
                 ),
-                None => BufferSocketHandler::send(
+                None => SocketHandler::send(
                     sync_ctx,
                     non_sync_ctx,
                     id,
@@ -4939,7 +4843,7 @@ mod tests {
         // Send a packet from each socket.
         let body = [1, 2, 3, 4, 5];
         for socket in bound_on_devices {
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 sync_ctx,
                 &mut non_sync_ctx,
                 socket,
@@ -5302,7 +5206,7 @@ mod tests {
         fn listen_unbound<
             I: Ip + TestIpExt,
             C: StateNonSyncContext<I, SC::DeviceId>,
-            SC: StateContext<I, C>,
+            SC: StateContext<I, C> + CounterContext<UdpCounters<I>>,
         >(
             sync_ctx: &mut SC,
             non_sync_ctx: &mut C,
@@ -6580,7 +6484,7 @@ mod tests {
                 REMOTE_PORT.into(),
             )
             .expect("connect should succeed");
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
@@ -6597,7 +6501,7 @@ mod tests {
                 Some(LOCAL_PORT),
             )
             .expect("listen should succeed");
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
@@ -6665,7 +6569,7 @@ mod tests {
                 REMOTE_PORT.into(),
             )
             .expect("connect should succeed");
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
@@ -6674,7 +6578,7 @@ mod tests {
                 Buf::new(Vec::new(), ..),
             )
         } else {
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 socket,
@@ -6875,7 +6779,7 @@ mod tests {
             .expect("listen failed");
 
         let mut send_and_get_ttl = |remote_ip| {
-            BufferSocketHandler::send_to(
+            SocketHandler::send_to(
                 &mut sync_ctx,
                 &mut non_sync_ctx,
                 listener,
