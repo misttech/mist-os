@@ -133,7 +133,7 @@ fuchsia_component("f2fs-short") {
   ]
 }
 
-# This test package is designed to run on `core.qemu-x64-stress`.
+# This test package is designed to run on `core.x64-stress`.
 # These bots have a time limit of 23 hours. There are 6 tests
 # in this package, each running for exactly 22 hours.
 fuchsia_test_package("storage-stress-tests") {

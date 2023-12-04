@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 # A collection of all stress tests available in-tree. The tests in this group will be built
-# and run on the core.qemu-x64-stress builder.
+# and run on the core.x64-stress builder.
 group("stress-tests") {
   testonly = true
   public_deps = [

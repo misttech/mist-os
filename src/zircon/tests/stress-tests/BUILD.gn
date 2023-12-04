@@ -10,7 +10,7 @@ fuchsia_test_component("vm-stress-test") {
   test_type = "system"
 }
 
-# This test will run for 22 hours on the core.qemu-x64-stress bot.
+# This test will run for 22 hours on the core.x64-stress bot.
 fuchsia_test_package("kernel-stress-tests") {
   test_components = [ ":vm-stress-test" ]
   test_specs = {

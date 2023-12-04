@@ -11,8 +11,8 @@ Stress tests reveal errors in these interactions by generating large workloads f
 concurrently. If a workload produces an unexpected error, developers can root-cause the issue,
 fix it and write a test that covers that specific interaction.
 
-Our infrastructure also has a dedicated builder `core.qemu-x64-stress` for running stress tests.
-This builder will run each stress test for a maximum of 22 hours.
+Our infrastructure also has a dedicated builder `core.x64-stress` for running stress tests.  This
+builder will run each stress test for a maximum of 22 hours.
 
 Note: Stress tests are currently restricted to the `QEMU` device type, since they run for long
 periods of time.

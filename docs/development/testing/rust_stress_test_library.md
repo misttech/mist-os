@@ -242,8 +242,8 @@ fuchsia_test_package("filesystem-stress-tests") {
 }
 ```
 
-A dedicated `core.qemu-x64-stress` builder identifies these tests and runs each test component in
-the package for a maximum of 22 hours.
+A dedicated `core.x64-stress` builder identifies these tests and runs each test component in the
+package for a maximum of 22 hours.
 
 Note: On infra bots, a stress test is required to show "signs of life" which is usually some form of
 output to show that the test is still running and has not hung.
