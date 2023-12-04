@@ -48,9 +48,9 @@ use net_types::{
 use packet::{Buf, BufferMut, ParseMetadata, Serializer};
 use packet_formats::{
     error::IpParseError,
-    ip::{IpPacket, IpProto, Ipv4Proto, Ipv6Proto},
-    ipv4::{Ipv4FragmentType, Ipv4Packet, Ipv4PacketBuilder},
-    ipv6::{Ipv6Packet, Ipv6PacketBuilder},
+    ip::{IpPacket, IpPacketBuilder as _, IpProto, Ipv4Proto, Ipv6Proto},
+    ipv4::{Ipv4FragmentType, Ipv4Packet},
+    ipv6::Ipv6Packet,
 };
 use thiserror::Error;
 use tracing::{debug, trace};
@@ -83,7 +83,7 @@ use crate::{
         reassembly::{
             FragmentCacheKey, FragmentHandler, FragmentProcessingState, IpPacketFragmentCache,
         },
-        socket::{BufferIpSocketHandler, IpSocketContext, IpSocketHandler},
+        socket::{BufferIpSocketHandler, IpSocketContext, IpSocketHandler, IpSocketNonSyncContext},
         types::{Destination, NextHop, ResolvedRoute},
     },
     socket::datagram,
@@ -500,16 +500,34 @@ pub(crate) enum Ipv6PresentAddressStatus {
 pub(crate) trait IpLayerIpExt: IpExt {
     type AddressStatus;
     type State<I: Instant, StrongDeviceId: StrongId>: AsRef<IpStateInner<Self, I, StrongDeviceId>>;
+    type PacketIdState;
+    type PacketId;
+    fn next_packet_id_from_state(state: &Self::PacketIdState) -> Self::PacketId;
 }
 
 impl IpLayerIpExt for Ipv4 {
     type AddressStatus = Ipv4PresentAddressStatus;
     type State<I: Instant, StrongDeviceId: StrongId> = Ipv4State<I, StrongDeviceId>;
+    type PacketIdState = AtomicU16;
+    type PacketId = u16;
+    fn next_packet_id_from_state(next_packet_id: &Self::PacketIdState) -> Self::PacketId {
+        // Relaxed ordering as we only need atomicity without synchronization. See
+        // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
+        // for more details.
+        //
+        // TODO(https://fxbug.dev/87588): Generate IPv4 IDs unpredictably
+        next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
+    }
 }
 
 impl IpLayerIpExt for Ipv6 {
     type AddressStatus = Ipv6PresentAddressStatus;
     type State<I: Instant, StrongDeviceId: StrongId> = Ipv6State<I, StrongDeviceId>;
+    type PacketIdState = ();
+    type PacketId = ();
+    fn next_packet_id_from_state((): &Self::PacketIdState) -> Self::PacketId {
+        ()
+    }
 }
 
 /// The state context provided to the IP layer.
@@ -537,14 +555,13 @@ pub(crate) trait IpStateContext<I: IpLayerIpExt, C>: DeviceIdContext<AnyDevice> 
     ) -> O;
 }
 
-pub(crate) trait Ipv4StateContext<C> {
-    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O;
-}
-
 /// Provices access to an IP device's state for the IP layer.
 pub(crate) trait IpDeviceStateContext<I: IpLayerIpExt, C>:
     DeviceIdContext<AnyDevice>
 {
+    /// Calls the callback with the next packet ID.
+    fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
+
     /// Returns the best local address for communicating with the remote.
     fn get_local_addr_for_remote(
         &mut self,
@@ -849,11 +866,14 @@ fn resolve_route_to_destination<
 
 impl<
         I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
-        C: IpDeviceNonSyncContext<I, SC::DeviceId> + IpLayerNonSyncContext<I, SC::DeviceId>,
+        C: IpDeviceNonSyncContext<I, SC::DeviceId>
+            + IpLayerNonSyncContext<I, SC::DeviceId>
+            + IpSocketNonSyncContext,
         SC: IpLayerContext<I, C>
             + device::IpDeviceConfigurationContext<I, C>
             + IpDeviceStateContext<I, C>
-            + NonTestCtxMarker,
+            + NonTestCtxMarker
+            + IpDeviceSendContext<I, C>,
     > IpSocketContext<I, C> for SC
 {
     fn lookup_route(
@@ -865,13 +885,22 @@ impl<
     ) -> Result<ResolvedRoute<I, SC::DeviceId>, ResolveRouteError> {
         resolve_route_to_destination(self, device, local_ip, Some(addr))
     }
-}
 
-impl<NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    Ipv4StateContext<NonSyncCtx> for Locked<&SyncCtx<NonSyncCtx>, L>
-{
-    fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
+    fn send_ip_packet<S>(
+        &mut self,
+        ctx: &mut C,
+        meta: SendIpPacketMeta<
+            I,
+            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
+            SpecifiedAddr<I::Addr>,
+        >,
+        body: S,
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
+        send_ip_packet_from_device(self, ctx, meta.into(), body)
     }
 }
 
@@ -1180,15 +1209,10 @@ impl<I: Instant, StrongDeviceId: StrongId> AsRef<IpStateInner<Ipv4, I, StrongDev
     }
 }
 
-fn gen_ipv4_packet_id<C, SC: Ipv4StateContext<C>>(sync_ctx: &mut SC) -> u16 {
-    // Relaxed ordering as we only need atomicity without synchronization. See
-    // https://en.cppreference.com/w/cpp/atomic/memory_order#Relaxed_ordering
-    // for more details.
-    //
-    // TODO(https://fxbug.dev/87588): Generate IPv4 IDs unpredictably
-    sync_ctx.with_next_packet_id(|next_packet_id| {
-        next_packet_id.fetch_add(1, atomic::Ordering::Relaxed)
-    })
+fn gen_ip_packet_id<I: IpLayerIpExt, C, SC: IpDeviceStateContext<I, C>>(
+    sync_ctx: &mut SC,
+) -> I::PacketId {
+    sync_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
 }
 
 pub(crate) struct Ipv6State<Instant: crate::Instant, StrongDeviceId: StrongId> {
@@ -2854,10 +2878,7 @@ pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
 impl<
         B: BufferMut,
         C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<Ipv4, C>
-            + IpDeviceSendContext<Ipv4, C>
-            + Ipv4StateContext<C>
-            + NonTestCtxMarker,
+        SC: IpDeviceStateContext<Ipv4, C> + IpDeviceSendContext<Ipv4, C> + NonTestCtxMarker,
     > BufferIpLayerHandler<Ipv4, C, B> for SC
 {
     fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
@@ -2866,7 +2887,7 @@ impl<
         meta: SendIpPacketMeta<Ipv4, &SC::DeviceId, Option<SpecifiedAddr<Ipv4Addr>>>,
         body: S,
     ) -> Result<(), S> {
-        send_ipv4_packet_from_device(self, ctx, meta, body)
+        send_ip_packet_from_device(self, ctx, meta, body)
     }
 }
 
@@ -2882,94 +2903,59 @@ impl<
         meta: SendIpPacketMeta<Ipv6, &SC::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
         body: S,
     ) -> Result<(), S> {
-        send_ipv6_packet_from_device(self, ctx, meta, body)
+        send_ip_packet_from_device(self, ctx, meta, body)
     }
 }
 
-/// Sends an IPv4 packet with the specified metadata.
+/// Sends an Ip packet with the specified metadata.
 ///
 /// # Panics
 ///
 /// Panics if either the source or destination address is the loopback address
 /// and the device is a non-loopback device.
-pub(crate) fn send_ipv4_packet_from_device<C, SC, S>(
+pub(crate) fn send_ip_packet_from_device<I, C, SC, S>(
     sync_ctx: &mut SC,
     ctx: &mut C,
-    SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
-        Ipv4,
+    meta: SendIpPacketMeta<
+        I,
         &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
-        Option<SpecifiedAddr<Ipv4Addr>>,
+        Option<SpecifiedAddr<I::Addr>>,
     >,
     body: S,
 ) -> Result<(), S>
 where
-    C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    SC: IpDeviceStateContext<Ipv4, C> + IpDeviceSendContext<Ipv4, C> + Ipv4StateContext<C>,
+    I: IpLayerIpExt,
+    C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+    SC: IpDeviceStateContext<I, C> + IpDeviceSendContext<I, C>,
     S: Serializer,
     S::Buffer: BufferMut,
 {
-    let src_ip = src_ip.map_or(Ipv4::UNSPECIFIED_ADDRESS, |a| a.get());
-    let builder = {
-        assert!(
-            (!Ipv4::LOOPBACK_SUBNET.contains(&src_ip) && !Ipv4::LOOPBACK_SUBNET.contains(&dst_ip))
-                || device.is_loopback()
-        );
-        let mut builder = Ipv4PacketBuilder::new(
-            src_ip,
-            dst_ip,
-            ttl.unwrap_or_else(|| sync_ctx.get_hop_limit(device)).get(),
-            proto,
-        );
-        builder.id(gen_ipv4_packet_id(sync_ctx));
-        builder
-    };
-    let body = body.encapsulate(builder);
+    let SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu } = meta;
+    let next_packet_id = gen_ip_packet_id(sync_ctx);
+    let ttl = ttl.unwrap_or_else(|| sync_ctx.get_hop_limit(device)).get();
+    let src_ip = src_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.get());
+    assert!(
+        (!I::LOOPBACK_SUBNET.contains(&src_ip) && !I::LOOPBACK_SUBNET.contains(&dst_ip))
+            || device.is_loopback()
+    );
+    let mut builder = I::PacketBuilder::new(src_ip, dst_ip.get(), ttl, proto);
 
-    if let Some(mtu) = mtu {
-        let body = body.with_size_limit(mtu as usize);
-        sync_ctx
-            .send_ip_frame(ctx, device, next_hop, body)
-            .map_err(|ser| ser.into_inner().into_inner())
-    } else {
-        sync_ctx.send_ip_frame(ctx, device, next_hop, body).map_err(|ser| ser.into_inner())
+    #[derive(GenericOverIp)]
+    #[generic_over_ip(I, Ip)]
+    struct Wrap<'a, I: IpLayerIpExt> {
+        builder: &'a mut I::PacketBuilder,
+        next_packet_id: I::PacketId,
     }
-}
 
-/// Sends an IPv6 packet with the specified metadata.
-///
-/// # Panics
-///
-/// Panics if either the source or destination address is the loopback address
-/// and the device is a non-loopback device.
-pub(crate) fn send_ipv6_packet_from_device<C, SC, S>(
-    sync_ctx: &mut SC,
-    ctx: &mut C,
-    SendIpPacketMeta { device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<
-        Ipv6,
-        &SC::DeviceId,
-        Option<SpecifiedAddr<Ipv6Addr>>,
-    >,
-    body: S,
-) -> Result<(), S>
-where
-    C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
-    SC: IpDeviceSendContext<Ipv6, C> + IpDeviceStateContext<Ipv6, C>,
-    S: Serializer,
-    S::Buffer: BufferMut,
-{
-    let src_ip = src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get());
-    let builder = {
-        assert!(
-            (!Ipv6::LOOPBACK_SUBNET.contains(&src_ip) && !Ipv6::LOOPBACK_SUBNET.contains(&dst_ip))
-                || device.is_loopback()
-        );
-        Ipv6PacketBuilder::new(
-            src_ip,
-            dst_ip,
-            ttl.unwrap_or_else(|| sync_ctx.get_hop_limit(device)).get(),
-            proto,
-        )
-    };
+    I::map_ip::<_, ()>(
+        Wrap { builder: &mut builder, next_packet_id },
+        |Wrap { builder, next_packet_id }| {
+            builder.id(next_packet_id);
+        },
+        |Wrap { builder: _, next_packet_id: () }| {
+            // IPv6 doesn't have packet IDs.
+        },
+    );
 
     let body = body.encapsulate(builder);
 

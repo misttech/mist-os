@@ -3456,8 +3456,7 @@ mod tests {
             icmp::{IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode},
             socket::{
                 testutil::{FakeDeviceConfig, FakeIpSocketCtx},
-                BufferIpSocketContext, IpSocketContext, IpSocketNonSyncContext, MmsError,
-                SendOptions,
+                IpSocketContext, IpSocketNonSyncContext, MmsError, SendOptions,
             },
             types::ResolvedRoute,
             BufferIpTransportContext as _, HopLimits, IpCounters, IpTransportContext,
@@ -3732,22 +3731,17 @@ mod tests {
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.inner.get_mut().lookup_route(ctx, device, local_ip, addr)
         }
-    }
 
-    /// Delegate implementation to inner context.
-    impl<I, D, B, C> BufferIpSocketContext<I, C, B> for TcpSyncCtx<I, D, C>
-    where
-        I: TcpTestIpExt,
-        D: FakeStrongDeviceId,
-        B: BufferMut,
-        C: TcpBindingsTypes + IpSocketNonSyncContext,
-    {
-        fn send_ip_packet<SS: Serializer<Buffer = B>>(
+        fn send_ip_packet<SS>(
             &mut self,
             ctx: &mut C,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
-        ) -> Result<(), SS> {
+        ) -> Result<(), SS>
+        where
+            SS: Serializer,
+            SS::Buffer: BufferMut,
+        {
             let meta = SendIpPacketMeta {
                 device: device.clone(),
                 src_ip,

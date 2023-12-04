@@ -371,7 +371,7 @@ mod tests {
 
             assert_empty(non_sync_ctx.frames_sent().iter());
 
-            crate::ip::send_ipv6_packet_from_device(
+            crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
                 &mut Locked::new(&*sync_ctx),
                 non_sync_ctx,
                 SendIpPacketMeta {
@@ -1182,7 +1182,7 @@ mod tests {
                 icmpv6_packet_buf,
             );
             assert_eq!(get_ipv6_hop_limit(&mut Locked::new(sync_ctx), device_id).get(), hop_limit);
-            crate::ip::send_ipv6_packet_from_device(
+            crate::ip::send_ip_packet_from_device::<Ipv6, _, _, _>(
                 &mut Locked::new(sync_ctx),
                 ctx,
                 SendIpPacketMeta {

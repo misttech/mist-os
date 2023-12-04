@@ -6,22 +6,16 @@
 
 use lock_order::{relation::LockBefore, Locked};
 use net_types::{
-    ip::{Ip, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
-    MulticastAddr, SpecifiedAddr,
+    ip::{Ip, Ipv4, Ipv6},
+    MulticastAddr,
 };
-use packet::{BufferMut, Serializer};
 
 use crate::{
-    context::NonTestCtxMarker,
     ip::{
-        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext, IpDeviceSendContext},
+        device::{self, IpDeviceIpExt, IpDeviceNonSyncContext},
         path_mtu::{PmtuCache, PmtuStateContext},
         reassembly::FragmentStateContext,
-        send_ipv4_packet_from_device, send_ipv6_packet_from_device,
-        socket::{BufferIpSocketContext, IpSocketContext, IpSocketNonSyncContext},
-        AnyDevice, DeviceIdContext, IpDeviceStateContext, IpLayerNonSyncContext,
-        IpPacketFragmentCache, IpStateContext, Ipv4StateContext, MulticastMembershipHandler,
-        SendIpPacketMeta,
+        IpPacketFragmentCache, MulticastMembershipHandler,
     },
     NonSyncContext, SyncCtx,
 };
@@ -56,56 +50,6 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpStatePmtuCache<Ipv
     fn with_state_mut<O, F: FnOnce(&mut PmtuCache<Ipv6, C::Instant>) -> O>(&mut self, cb: F) -> O {
         let mut cache = self.lock::<crate::lock_ordering::IpStatePmtuCache<Ipv6>>();
         cb(&mut cache)
-    }
-}
-
-impl<
-        B: BufferMut,
-        C: IpSocketNonSyncContext
-            + IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<Ipv4, C>
-            + IpDeviceSendContext<Ipv4, C>
-            + Ipv4StateContext<C>
-            + IpSocketContext<Ipv4, C>
-            + NonTestCtxMarker,
-    > BufferIpSocketContext<Ipv4, C, B> for SC
-{
-    fn send_ip_packet<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut C,
-        meta: SendIpPacketMeta<
-            Ipv4,
-            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
-            SpecifiedAddr<Ipv4Addr>,
-        >,
-        body: S,
-    ) -> Result<(), S> {
-        send_ipv4_packet_from_device(self, ctx, meta.into(), body)
-    }
-}
-
-impl<
-        B: BufferMut,
-        C: IpSocketNonSyncContext
-            + IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<Ipv6, C>
-            + IpDeviceSendContext<Ipv6, C>
-            + IpStateContext<Ipv6, C>
-            + IpSocketContext<Ipv6, C>
-            + NonTestCtxMarker,
-    > BufferIpSocketContext<Ipv6, C, B> for SC
-{
-    fn send_ip_packet<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut C,
-        meta: SendIpPacketMeta<
-            Ipv6,
-            &<SC as DeviceIdContext<AnyDevice>>::DeviceId,
-            SpecifiedAddr<Ipv6Addr>,
-        >,
-        body: S,
-    ) -> Result<(), S> {
-        send_ipv6_packet_from_device(self, ctx, meta.into(), body)
     }
 }
 

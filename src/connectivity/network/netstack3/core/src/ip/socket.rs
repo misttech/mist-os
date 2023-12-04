@@ -4,7 +4,6 @@
 
 //! IPv4 and IPv6 sockets.
 
-use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::convert::Infallible;
 use core::num::{NonZeroU32, NonZeroU8};
@@ -13,7 +12,7 @@ use net_types::{
     ip::{Ip, Ipv6Addr, Mtu},
     SpecifiedAddr, UnicastAddr,
 };
-use packet::{Buf, BufferMut, SerializeError, Serializer};
+use packet::{BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::{
@@ -404,7 +403,7 @@ impl<C: InstantContext + TracingContext> IpSocketNonSyncContext for C {}
 pub(crate) trait IpSocketContext<I, C: IpSocketNonSyncContext>:
     DeviceIdContext<AnyDevice>
 where
-    I: IpDeviceStateIpExt,
+    I: IpDeviceStateIpExt + IpExt,
 {
     /// Returns a route for a socket.
     ///
@@ -417,24 +416,17 @@ where
         src_ip: Option<SpecifiedAddr<I::Addr>>,
         dst_ip: SpecifiedAddr<I::Addr>,
     ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError>;
-}
 
-/// The context required in order to implement [`BufferIpSocketHandler`].
-///
-/// Blanket impls of `BufferIpSocketHandler` are provided in terms of
-/// `BufferIpSocketContext`.
-pub(crate) trait BufferIpSocketContext<I, C: IpSocketNonSyncContext, B: BufferMut>:
-    IpSocketContext<I, C>
-where
-    I: IpDeviceStateIpExt + packet_formats::ip::IpExt,
-{
     /// Send an IP packet to the next-hop node.
-    fn send_ip_packet<S: Serializer<Buffer = B>>(
+    fn send_ip_packet<S>(
         &mut self,
         ctx: &mut C,
         meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 impl<
@@ -524,22 +516,21 @@ impl<I: Ip, S: SendOptions<I>> SendOptions<I> for &'_ S {
     }
 }
 
-fn send_ip_packet<
-    I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
-    B: BufferMut,
-    S: Serializer<Buffer = B>,
-    C: IpSocketNonSyncContext,
-    SC: BufferIpSocketContext<I, C, B>
-        + BufferIpSocketContext<I, C, Buf<Vec<u8>>>
-        + IpSocketContext<I, C>,
-    O: SendOptions<I>,
->(
+fn send_ip_packet<I, S, C, SC, O>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     socket: &IpSock<I, SC::WeakDeviceId, O>,
     body: S,
     mtu: Option<u32>,
-) -> Result<(), (S, IpSockSendError)> {
+) -> Result<(), (S, IpSockSendError)>
+where
+    I: IpExt + IpDeviceStateIpExt + packet_formats::ip::IpExt,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    C: IpSocketNonSyncContext,
+    SC: IpSocketContext<I, C>,
+    O: SendOptions<I>,
+{
     trace_duration!(ctx, "ip::send_packet");
 
     let IpSock { definition: IpSockDefinition { remote_ip, local_ip, device, proto }, options } =
@@ -569,7 +560,7 @@ fn send_ip_packet<
         NextHop::Gateway(gateway) => gateway,
     };
 
-    BufferIpSocketContext::send_ip_packet(
+    IpSocketContext::send_ip_packet(
         sync_ctx,
         ctx,
         SendIpPacketMeta {
@@ -590,11 +581,7 @@ impl<
         I: Ip + IpExt + IpDeviceStateIpExt,
         B: BufferMut,
         C: IpSocketNonSyncContext,
-        SC: BufferIpSocketContext<I, C, B>
-            + BufferIpSocketContext<I, C, Buf<Vec<u8>>>
-            + IpSocketContext<I, C>
-            + CounterContext<IpCounters<I>>
-            + InstantiableCtxMarker,
+        SC: IpSocketContext<I, C> + CounterContext<IpCounters<I>> + InstantiableCtxMarker,
     > BufferIpSocketHandler<I, C, B> for SC
 {
     fn send_ip_packet<S: Serializer<Buffer = B>, O: SendOptions<I>>(
@@ -1120,7 +1107,7 @@ pub(crate) mod testutil {
     }
 
     impl<
-            I: IpDeviceStateIpExt,
+            I: IpDeviceStateIpExt + IpExt,
             C: InstantContext + TracingContext,
             DeviceId: FakeStrongDeviceId,
         > IpSocketContext<I, C> for FakeIpSocketCtx<I, DeviceId>
@@ -1135,10 +1122,19 @@ pub(crate) mod testutil {
             let FakeIpSocketCtx { device_state, table, ip_forwarding_ctx, counters: _ } = self;
             lookup_route(table, ip_forwarding_ctx, device_state, device, local_ip, addr)
         }
+
+        fn send_ip_packet<S>(
+            &mut self,
+            _ctx: &mut C,
+            _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            _body: S,
+        ) -> Result<(), S> {
+            panic!("FakeIpSocketCtx can't send packets, wrap it in a FakeSyncCtx instead");
+        }
     }
 
     impl<
-            I: IpDeviceStateIpExt,
+            I: IpDeviceStateIpExt + IpExt,
             S: AsRef<FakeIpSocketCtx<I, DeviceId>>
                 + AsMut<FakeIpSocketCtx<I, DeviceId>>
                 + AsRef<FakeIpDeviceIdCtx<DeviceId>>,
@@ -1149,6 +1145,11 @@ pub(crate) mod testutil {
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<S, Meta, DeviceId>
+    where
+        FakeSyncCtx<S, Meta, DeviceId>: SendFrameContext<
+            FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
+        >,
     {
         fn lookup_route(
             &mut self,
@@ -1159,31 +1160,17 @@ pub(crate) mod testutil {
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.get_mut().as_mut().lookup_route(ctx, device, local_ip, addr)
         }
-    }
 
-    impl<
-            I: IpDeviceStateIpExt + packet_formats::ip::IpExt,
-            B: BufferMut,
-            S,
-            Id,
-            Meta,
-            Event: Debug,
-            DeviceId,
-            NonSyncCtxState,
-        > BufferIpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>, B>
-        for FakeSyncCtx<S, Meta, DeviceId>
-    where
-        FakeSyncCtx<S, Meta, DeviceId>: SendFrameContext<
-                FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
-                SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
-            > + IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>,
-    {
-        fn send_ip_packet<SS: Serializer<Buffer = B>>(
+        fn send_ip_packet<SS>(
             &mut self,
             ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
             SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
             body: SS,
-        ) -> Result<(), SS> {
+        ) -> Result<(), SS>
+        where
+            SS: Serializer,
+            SS::Buffer: BufferMut,
+        {
             let meta = SendIpPacketMeta {
                 device: device.clone(),
                 src_ip,
@@ -1556,8 +1543,11 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, DeviceId: FakeStrongDeviceId, C: IpSocketNonSyncContext>
-        IpSocketContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
+    impl<
+            I: IpDeviceStateIpExt + IpExt,
+            DeviceId: FakeStrongDeviceId,
+            C: IpSocketNonSyncContext,
+        > IpSocketContext<I, C> for FakeDualStackIpSocketCtx<DeviceId>
     {
         fn lookup_route(
             &mut self,
@@ -1587,10 +1577,20 @@ pub(crate) mod testutil {
                 addr,
             )
         }
+
+        /// Send an IP packet to the next-hop node.
+        fn send_ip_packet<S>(
+            &mut self,
+            _ctx: &mut C,
+            _meta: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            _body: S,
+        ) -> Result<(), S> {
+            panic!("FakeDualStackIpSocketCtx can't send packets, wrap it in a FakeSyncCtx instead");
+        }
     }
 
     impl<
-            I: IpDeviceStateIpExt,
+            I: IpDeviceStateIpExt + IpExt,
             Id,
             Meta,
             Event: Debug,
@@ -1598,6 +1598,11 @@ pub(crate) mod testutil {
             NonSyncCtxState,
         > IpSocketContext<I, FakeNonSyncCtx<Id, Event, NonSyncCtxState>>
         for FakeSyncCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>
+    where
+        FakeSyncCtx<FakeDualStackIpSocketCtx<DeviceId>, Meta, DeviceId>: SendFrameContext<
+            FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            SendIpPacketMeta<I, Self::DeviceId, SpecifiedAddr<I::Addr>>,
+        >,
     {
         fn lookup_route(
             &mut self,
@@ -1607,6 +1612,28 @@ pub(crate) mod testutil {
             addr: SpecifiedAddr<I::Addr>,
         ) -> Result<ResolvedRoute<I, Self::DeviceId>, ResolveRouteError> {
             self.get_mut().lookup_route(ctx, device, local_ip, addr)
+        }
+
+        fn send_ip_packet<SS>(
+            &mut self,
+            ctx: &mut FakeNonSyncCtx<Id, Event, NonSyncCtxState>,
+            SendIpPacketMeta {  device, src_ip, dst_ip, next_hop, proto, ttl, mtu }: SendIpPacketMeta<I, &Self::DeviceId, SpecifiedAddr<I::Addr>>,
+            body: SS,
+        ) -> Result<(), SS>
+        where
+            SS: Serializer,
+            SS::Buffer: BufferMut,
+        {
+            let meta = SendIpPacketMeta {
+                device: device.clone(),
+                src_ip,
+                dst_ip,
+                next_hop,
+                proto,
+                ttl,
+                mtu,
+            };
+            self.send_frame(ctx, meta, body)
         }
     }
 
@@ -1728,6 +1755,8 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+
     use assert_matches::assert_matches;
     use const_unwrap::const_unwrap_option;
     use ip_test_macro::ip_test;
@@ -2172,7 +2201,7 @@ mod tests {
         FakeNonSyncCtx: EventContext<IpLayerEvent<DeviceId<FakeNonSyncCtx>, I>>,
     {
         // Test various edge cases of the
-        // `BufferIpSocketContext::send_ip_packet` method.
+        // IpSocketContext::send_ip_packet` method.
 
         let cfg = I::FAKE_CONFIG;
         let proto = I::ICMP_IP_PROTO;
@@ -2196,7 +2225,7 @@ mod tests {
         )
         .unwrap();
 
-        let curr_id = crate::ip::gen_ipv4_packet_id(&mut Locked::new(sync_ctx));
+        let curr_id = crate::ip::gen_ip_packet_id::<Ipv4, _, _>(&mut Locked::new(sync_ctx));
 
         let check_frame =
             move |frame: &[u8], packet_count| match [local_ip.get(), remote_ip.get()].into() {

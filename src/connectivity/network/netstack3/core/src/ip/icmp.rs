@@ -5270,24 +5270,6 @@ mod tests {
     impl_pmtu_handler!(FakeIcmpInnerSyncCtx<Ipv4>, FakeIcmpNonSyncCtx<Ipv4>, Ipv4);
     impl_pmtu_handler!(FakeIcmpInnerSyncCtx<Ipv6>, FakeIcmpNonSyncCtx<Ipv6>, Ipv6);
 
-    impl<I: datagram::IpExt + IpDeviceStateIpExt, B: BufferMut>
-        crate::ip::socket::BufferIpSocketContext<I, FakeIcmpNonSyncCtx<I>, B>
-        for FakeIcmpInnerSyncCtx<I>
-    {
-        fn send_ip_packet<S: Serializer<Buffer = B>>(
-            &mut self,
-            ctx: &mut FakeIcmpNonSyncCtx<I>,
-            meta: SendIpPacketMeta<I, &FakeDeviceId, SpecifiedAddr<I::Addr>>,
-            body: S,
-        ) -> Result<(), S> {
-            crate::ip::socket::BufferIpSocketContext::<_, _, _>::send_ip_packet(
-                &mut self.inner,
-                ctx,
-                meta,
-                body,
-            )
-        }
-    }
     impl<I: datagram::IpExt + IpDeviceStateIpExt>
         crate::ip::IpSocketContext<I, FakeIcmpNonSyncCtx<I>> for FakeIcmpInnerSyncCtx<I>
     {
@@ -5300,6 +5282,24 @@ mod tests {
         ) -> Result<crate::ip::ResolvedRoute<I, FakeDeviceId>, crate::ip::ResolveRouteError>
         {
             self.inner.lookup_route(ctx, device, local_ip, addr)
+        }
+
+        fn send_ip_packet<S>(
+            &mut self,
+            ctx: &mut FakeIcmpNonSyncCtx<I>,
+            meta: SendIpPacketMeta<I, &FakeDeviceId, SpecifiedAddr<I::Addr>>,
+            body: S,
+        ) -> Result<(), S>
+        where
+            S: Serializer,
+            S::Buffer: BufferMut,
+        {
+            crate::ip::socket::IpSocketContext::<_, _>::send_ip_packet(
+                &mut self.inner,
+                ctx,
+                meta,
+                body,
+            )
         }
     }
 
@@ -5314,6 +5314,10 @@ mod tests {
     }
 
     impl IpDeviceStateContext<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+        fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
+            cb(&())
+        }
+
         fn get_local_addr_for_remote(
             &mut self,
             _device_id: &Self::DeviceId,
