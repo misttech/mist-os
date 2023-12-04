@@ -4,6 +4,7 @@
 
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
+import("//build/sdk/sdk_host_tool.gni")
 
 group("fuchsia-sdk-run") {
   deps = [
@@ -42,6 +43,12 @@ host_test_data("sdk_exported") {
   sources = [ get_label_info("//sdk:core($default_toolchain)", "root_out_dir") +
               "/sdk/exported/core" ]
   deps = [ "//sdk:core($default_toolchain)" ]
+}
+
+sdk_host_tool("fuchsia-sdk-run_sdk") {
+  category = "partner"
+  output_name = "fuchsia-sdk-run"
+  deps = [ ":fuchsia-sdk-run-bin" ]
 }
 
 group("tests") {
