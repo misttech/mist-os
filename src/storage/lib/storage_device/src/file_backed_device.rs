@@ -12,7 +12,7 @@ use {
     async_trait::async_trait,
     // Provides read_exact_at and write_all_at.
     // TODO(jfsulliv): Do we need to support non-UNIX systems?
-    std::os::unix::fs::FileExt,
+    std::{ops::Range, os::unix::fs::FileExt},
 };
 
 // TODO(csuter): Consider using an async file interface.
@@ -86,6 +86,24 @@ impl Device for FileBackedDevice {
         Ok(())
     }
 
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+        assert_eq!(range.start % self.block_size() as u64, 0);
+        assert_eq!(range.end % self.block_size() as u64, 0);
+        // Blast over the range to simulate it being used for something else.
+        // This will help catch incorrect usage of trim, and since FileBackedDevice is not used in a
+        // production context, there should be no performance issues.
+        // Note that we could punch a hole in the file instead using platform-dependent operations
+        // (e.g. FALLOC_FL_PUNCH_HOLE on Linux) to speed this up if needed.
+        const BUF: [u8; 8192] = [0xab; 8192];
+        let mut offset = range.start;
+        while offset < range.end {
+            let len = std::cmp::min(BUF.len(), range.end as usize - offset as usize);
+            self.file.write_at(&BUF[..len], offset)?;
+            offset += len as u64;
+        }
+        Ok(())
+    }
+
     async fn close(&self) -> Result<(), Error> {
         // This isn't actually async, but that probably doesn't matter for host usage.
         self.file.sync_all()?;
@@ -98,6 +116,12 @@ impl Device for FileBackedDevice {
 
     fn is_read_only(&self) -> bool {
         false
+    }
+
+    fn supports_trim(&self) -> bool {
+        // We "support" trim insofar as Device::trim() can be called.  The actual implementation is,
+        // of course, simulated.
+        true
     }
 }
 

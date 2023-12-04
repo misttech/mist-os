@@ -10,9 +10,12 @@ use {
     },
     anyhow::{ensure, Error},
     async_trait::async_trait,
-    std::sync::{
-        atomic::{AtomicBool, Ordering},
-        Mutex,
+    std::{
+        ops::Range,
+        sync::{
+            atomic::{AtomicBool, Ordering},
+            Mutex,
+        },
     },
 };
 
@@ -127,6 +130,17 @@ impl Device for FakeDevice {
         Ok(())
     }
 
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+        ensure!(!self.closed.load(Ordering::Relaxed));
+        ensure!(!self.read_only.load(Ordering::Relaxed));
+        assert_eq!(range.start % self.block_size() as u64, 0);
+        assert_eq!(range.end % self.block_size() as u64, 0);
+        // Blast over the range to simulate it being used for something else.
+        let mut data = self.data.lock().unwrap();
+        data[range.start as usize..range.end as usize].fill(0xab);
+        Ok(())
+    }
+
     async fn close(&self) -> Result<(), Error> {
         self.closed.store(true, Ordering::Relaxed);
         Ok(())
@@ -143,6 +157,10 @@ impl Device for FakeDevice {
 
     fn is_read_only(&self) -> bool {
         self.read_only.load(Ordering::Relaxed)
+    }
+
+    fn supports_trim(&self) -> bool {
+        true
     }
 
     fn snapshot(&self) -> Result<DeviceHolder, Error> {

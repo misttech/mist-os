@@ -6,9 +6,10 @@ use {
     crate::{BlockClient, BufferSlice, MutableBufferSlice, VmoId},
     anyhow::{anyhow, ensure, Error},
     async_trait::async_trait,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_hardware_block as block, fuchsia_zircon as zx,
     std::{
         collections::BTreeMap,
+        ops::Range,
         sync::{
             atomic::{self, AtomicU32},
             Mutex,
@@ -129,6 +130,16 @@ impl BlockClient for FakeBlockClient {
         }
     }
 
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+        ensure!(range.start % self.block_size as u64 == 0, "bad alignment");
+        ensure!(range.end % self.block_size as u64 == 0, "bad alignment");
+        // Blast over the range to simulate it being reused.
+        let inner = &mut *self.inner.lock().unwrap();
+        ensure!(range.end as usize <= inner.data.len(), "bad range");
+        inner.data[range.start as usize..range.end as usize].fill(0xab);
+        Ok(())
+    }
+
     async fn flush(&self) -> Result<(), Error> {
         self.flush_count.fetch_add(1, atomic::Ordering::Relaxed);
         Ok(())
@@ -144,6 +155,10 @@ impl BlockClient for FakeBlockClient {
 
     fn block_count(&self) -> u64 {
         self.inner.lock().unwrap().data.len() as u64 / self.block_size as u64
+    }
+
+    fn block_flags(&self) -> block::Flag {
+        block::Flag::TRIM_SUPPORT
     }
 
     fn is_connected(&self) -> bool {

@@ -11,7 +11,8 @@ use {
     anyhow::{bail, ensure, Error},
     async_trait::async_trait,
     fuchsia_zircon::Status,
-    remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, VmoId},
+    remote_block_device::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId},
+    std::ops::Range,
 };
 
 /// BlockDevice is an implementation of Device backed by a real block device behind a FIFO.
@@ -91,6 +92,15 @@ impl Device for BlockDevice {
             .await
     }
 
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+        if self.read_only {
+            bail!(Status::ACCESS_DENIED);
+        }
+        assert_eq!(range.start % self.block_size() as u64, 0);
+        assert_eq!(range.end % self.block_size() as u64, 0);
+        self.remote.trim(range).await
+    }
+
     async fn close(&self) -> Result<(), Error> {
         // We can leak the VMO id because we are closing the device.
         self.vmoid.take().into_id();
@@ -103,6 +113,10 @@ impl Device for BlockDevice {
 
     fn is_read_only(&self) -> bool {
         self.read_only
+    }
+
+    fn supports_trim(&self) -> bool {
+        self.remote.block_flags().contains(BlockFlags::TRIM_SUPPORT)
     }
 }
 

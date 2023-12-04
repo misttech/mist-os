@@ -17,7 +17,7 @@ use {
         convert::TryInto,
         future::Future,
         hash::{Hash, Hasher},
-        ops::DerefMut,
+        ops::{DerefMut, Range},
         pin::Pin,
         sync::{
             atomic::{AtomicU16, Ordering},
@@ -28,6 +28,8 @@ use {
 };
 
 pub use cache::Cache;
+
+pub use block::Flag as BlockFlags;
 
 pub mod fifo;
 pub use fifo::*;
@@ -274,6 +276,12 @@ pub trait BlockClient: Send + Sync {
         device_offset: u64,
     ) -> Result<(), Error>;
 
+    /// Trims the given range on the block device.
+    async fn trim(&self, _device_range: Range<u64>) -> Result<(), Error> {
+        // TODO(b/293964968): Implement for OOT clients and remove default implementation.
+        Ok(())
+    }
+
     /// Sends a flush request to the underlying block device.
     async fn flush(&self) -> Result<(), Error>;
 
@@ -286,6 +294,12 @@ pub trait BlockClient: Send + Sync {
     /// Returns the size, in blocks, of the device.
     fn block_count(&self) -> u64;
 
+    /// Returns the block flags reported by the device.
+    fn block_flags(&self) -> BlockFlags {
+        // TODO(b/293964968): Implement for OOT clients and remove default implementation.
+        BlockFlags::default()
+    }
+
     /// Returns true if the remote fifo is still connected.
     fn is_connected(&self) -> bool;
 }
@@ -293,6 +307,7 @@ pub trait BlockClient: Send + Sync {
 struct Common {
     block_size: u32,
     block_count: u64,
+    block_flags: BlockFlags,
     fifo_state: FifoStateRef,
     temp_vmo: futures::lock::Mutex<zx::Vmo>,
     temp_vmo_id: VmoId,
@@ -354,6 +369,7 @@ impl Common {
         Self {
             block_size: info.block_size,
             block_count: info.block_count,
+            block_flags: info.flags,
             fifo_state,
             temp_vmo: futures::lock::Mutex::new(temp_vmo),
             temp_vmo_id,
@@ -477,6 +493,23 @@ impl Common {
         Ok(())
     }
 
+    async fn trim(&self, device_range: Range<u64>) -> Result<(), Error> {
+        let length = self.to_blocks(device_range.end - device_range.start)? as u32;
+        let dev_offset = self.to_blocks(device_range.start)?;
+        self.send(BlockFifoRequest {
+            command: BlockFifoCommand {
+                opcode: BlockOpcode::Trim.into_primitive(),
+                flags: 0,
+                ..Default::default()
+            },
+            vmoid: block_driver::BLOCK_VMOID_INVALID,
+            length,
+            dev_offset,
+            ..Default::default()
+        })
+        .await
+    }
+
     async fn flush(&self) -> Result<(), Error> {
         self.send(BlockFifoRequest {
             command: BlockFifoCommand {
@@ -496,6 +529,10 @@ impl Common {
 
     fn block_count(&self) -> u64 {
         self.block_count
+    }
+
+    fn block_flags(&self) -> BlockFlags {
+        self.block_flags
     }
 
     fn is_connected(&self) -> bool {
@@ -562,6 +599,10 @@ impl BlockClient for RemoteBlockClient {
         self.common.write_at(buffer_slice, device_offset).await
     }
 
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+        self.common.trim(range).await
+    }
+
     async fn flush(&self) -> Result<(), Error> {
         self.common.flush().await
     }
@@ -577,6 +618,10 @@ impl BlockClient for RemoteBlockClient {
 
     fn block_count(&self) -> u64 {
         self.common.block_count()
+    }
+
+    fn block_flags(&self) -> BlockFlags {
+        self.common.block_flags()
     }
 
     fn is_connected(&self) -> bool {

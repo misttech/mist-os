@@ -10,7 +10,7 @@ use {
     std::{
         future::Future,
         mem::ManuallyDrop,
-        ops::Deref,
+        ops::{Deref, Range},
         sync::{Arc, OnceLock},
     },
 };
@@ -51,6 +51,9 @@ pub trait Device: Send + Sync {
     /// Writes the contents of |buffer| to the device at |offset|.
     async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error>;
 
+    /// Trims the given device |range|.
+    async fn trim(&self, range: Range<u64>) -> Result<(), Error>;
+
     /// Closes the block device. It is an error to continue using the device after this, but close
     /// itself is idempotent.
     async fn close(&self) -> Result<(), Error>;
@@ -64,6 +67,9 @@ pub trait Device: Send + Sync {
     }
     /// Returns whether the device is read-only.
     fn is_read_only(&self) -> bool;
+
+    /// Returns whether the device supports trim.
+    fn supports_trim(&self) -> bool;
 
     /// Returns a snapshot of the device.
     fn snapshot(&self) -> Result<DeviceHolder, Error> {

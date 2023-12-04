@@ -24,6 +24,7 @@ use {
             volume::{root_volume, VOLUMES_DIRECTORY},
             ObjectStore,
         },
+        range::RangeExt,
         serialized_types::Version,
     },
     anyhow::{bail, Context, Error},
@@ -54,6 +55,12 @@ const_assert!(9223372036854771712 == MAX_FILE_SIZE);
 
 // The maximum number of transactions that can be in-flight at any time.
 const MAX_IN_FLIGHT_TRANSACTIONS: u64 = 4;
+
+// Start trimming 5 minutes after boot.  The idea here is to wait until the initial flurry of
+// activity during boot is finished.  This is a rough heuristic and may need to change later if
+// performance is affected.
+// TODO(b/293964968): We probably also want to reschedule trimming, e.g. every day.
+const TRIM_AFTER_BOOT_TIMER: std::time::Duration = std::time::Duration::from_secs(5 * 60);
 
 /// Holds information on an Fxfs Filesystem
 pub struct Info {
@@ -86,6 +93,10 @@ pub struct Options {
     /// If true, don't do an initial reap of the graveyard at mount time.  This is useful for
     /// testing.
     pub skip_initial_reap: bool,
+
+    /// How long after the filesystem is mounted to wait until we perform a batch trim.  If set to
+    /// None, trimming is not performed (which can be useful for testing).
+    pub trim_delay: Option<std::time::Duration>,
 }
 
 impl Default for Options {
@@ -96,6 +107,7 @@ impl Default for Options {
             pre_commit_hook: None,
             post_commit_hook: None,
             skip_initial_reap: false,
+            trim_delay: Some(TRIM_AFTER_BOOT_TIMER),
         }
     }
 }
@@ -345,13 +357,15 @@ impl FxFilesystemBuilder {
             commit_mutex: futures::lock::Mutex::new(()),
             lock_manager: LockManager::new(),
             flush_task: Mutex::new(None),
+            trim_task: Mutex::new(None),
             closed: AtomicBool::new(true),
+            shutdown_event: Event::new(),
             trace: self.trace,
             graveyard: Graveyard::new(objects.clone()),
             completed_transactions: metrics::detail().create_uint("completed_transactions", 0),
             options: filesystem_options,
             in_flight_transactions: AtomicU64::new(0),
-            event: Event::new(),
+            transaction_limit_event: Event::new(),
         });
 
         if let Some(fsck_after_every_transaction) = fsck_after_every_transaction {
@@ -406,6 +420,10 @@ impl FxFilesystemBuilder {
                 }
                 // Now start the async reaper.
                 filesystem.graveyard.clone().reap_async();
+
+                if let Some(delay) = &filesystem.options.trim_delay {
+                    filesystem.start_trim_task(delay.clone());
+                }
             }
         }
 
@@ -421,7 +439,10 @@ pub struct FxFilesystem {
     commit_mutex: futures::lock::Mutex<()>,
     lock_manager: LockManager,
     flush_task: Mutex<Option<fasync::Task<()>>>,
+    trim_task: Mutex<Option<fasync::Task<()>>>,
     closed: AtomicBool,
+    // An event that is signalled when the filesystem starts to shut down.
+    shutdown_event: Event,
     trace: bool,
     graveyard: Arc<Graveyard>,
     completed_transactions: UintProperty,
@@ -432,7 +453,7 @@ pub struct FxFilesystem {
 
     // An event that is used to wake up tasks that are blocked due to the in-flight transaction
     // limit.
-    event: Event,
+    transaction_limit_event: Event,
 
     // NOTE: This *must* go last so that when users take the device from a closed filesystem, the
     // filesystem has dropped all other members first (Rust drops members in declaration order).
@@ -455,7 +476,12 @@ impl FxFilesystem {
 
     pub async fn close(&self) -> Result<(), Error> {
         assert_eq!(self.closed.swap(true, Ordering::SeqCst), false);
+        self.shutdown_event.notify(usize::MAX);
         debug_assert_not_too_long!(self.graveyard.wait_for_reap());
+        let trim_task = self.trim_task.lock().unwrap().take();
+        if let Some(task) = trim_task {
+            debug_assert_not_too_long!(task);
+        }
         self.journal.stop_compactions().await;
         let sync_status =
             self.journal.sync(SyncOptions { flush_device: true, ..Default::default() }).await;
@@ -617,6 +643,57 @@ impl FxFilesystem {
         }
     }
 
+    // Returns the number of bytes trimmed.
+    async fn do_trim(&self) -> Result<usize, Error> {
+        const MAX_EXTENTS_PER_BATCH: usize = 8;
+        const MAX_EXTENT_SIZE: usize = 256 * 1024;
+        let mut offset = 0;
+        let mut bytes_trimmed = 0;
+        loop {
+            if self.closed.load(Ordering::Relaxed) {
+                return Ok(bytes_trimmed);
+            }
+            let allocator = self.allocator();
+            let free_extents = allocator
+                .collect_free_extents(offset, MAX_EXTENT_SIZE, MAX_EXTENTS_PER_BATCH)
+                .await?;
+            for device_range in free_extents.extents() {
+                self.device.trim(device_range.clone()).await?;
+                bytes_trimmed += device_range.length()? as usize;
+            }
+            if let Some(device_range) = free_extents.extents().last() {
+                offset = device_range.end;
+            } else {
+                break;
+            }
+        }
+        Ok(bytes_trimmed)
+    }
+
+    fn start_trim_task(self: &Arc<Self>, delay: std::time::Duration) {
+        if !self.device.supports_trim() {
+            info!("Device does not support trim; not scheduling trimming");
+            return;
+        }
+        let this = self.clone();
+        let shutdown_listener = self.shutdown_event.listen();
+        *self.trim_task.lock().unwrap() = Some(fasync::Task::spawn(async move {
+            futures::select!(
+                () = fasync::Timer::new(delay).fuse() => {},
+                () = shutdown_listener.fuse() => return,
+            );
+            let start_time = std::time::Instant::now();
+            info!("Starting trim...");
+            let res = this.do_trim().await;
+            let duration = std::time::Instant::now() - start_time;
+            match res {
+                Ok(bytes_trimmed) => info!("Trimmed {bytes_trimmed} bytes in {duration:?}"),
+                Err(e) => error!(?e, "Failed to trim"),
+            }
+            *this.trim_task.lock().unwrap() = None;
+        }));
+    }
+
     pub(crate) async fn reservation_for_transaction<'a>(
         self: &Arc<Self>,
         options: transaction::Options<'a>,
@@ -683,7 +760,7 @@ impl FxFilesystem {
                 return false;
             };
             while !inc() {
-                let listener = self.event.listen();
+                let listener = self.transaction_limit_event.listen();
                 if inc() {
                     break;
                 }
@@ -696,7 +773,7 @@ impl FxFilesystem {
         let old = self.in_flight_transactions.fetch_sub(1, Ordering::Relaxed);
         assert!(old != 0);
         if old <= MAX_IN_FLIGHT_TRANSACTIONS {
-            self.event.notify(usize::MAX);
+            self.transaction_limit_event.notify(usize::MAX);
         }
     }
 }

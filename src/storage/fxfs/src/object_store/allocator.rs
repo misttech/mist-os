@@ -608,6 +608,46 @@ impl Inner {
     }
 }
 
+/// A container for a set of extents which are known to be free.  Returned by `collect_free_extents`
+/// (e.g. to trim the extents).  The extents will not be allocated while this object exists.
+/// TODO(b/293964968): We might want to let the allocator block until these are released if there's
+/// no other free space, so that trimming doesn't prevent normal usage.
+pub struct FreeExtents<'a>(&'a SimpleAllocator, Vec<Range<u64>>);
+
+fn allocator_item(device_range: Range<u64>, owner_object_id: u64) -> AllocatorItem {
+    AllocatorItem::new(
+        AllocatorKey { device_range },
+        AllocatorValue::Abs { count: 1, owner_object_id },
+    )
+}
+
+impl<'a> FreeExtents<'a> {
+    pub fn extents(&self) -> &Vec<Range<u64>> {
+        &self.1
+    }
+
+    async fn add_extent(&mut self, device_range: Range<u64>) {
+        // The mutation will never be used in a transaction, so we can use a fake object ID.
+        let owner_object_id = INVALID_OBJECT_ID;
+        self.0
+            .reserved_allocations
+            .insert(allocator_item(device_range.clone(), owner_object_id))
+            .await
+            .expect("Reserved an in-use range.");
+        self.1.push(device_range);
+    }
+}
+
+impl<'a> Drop for FreeExtents<'a> {
+    fn drop(&mut self) {
+        let mut inner = self.0.inner.lock().unwrap();
+        let owner_object_id = INVALID_OBJECT_ID;
+        for device_range in &self.1 {
+            inner.dropped_allocations.push(allocator_item(device_range.clone(), owner_object_id));
+        }
+    }
+}
+
 impl SimpleAllocator {
     pub fn new(filesystem: Arc<FxFilesystem>, object_id: u64) -> SimpleAllocator {
         let max_extent_size_bytes = max_extent_size_for_block_size(filesystem.block_size());
@@ -769,6 +809,65 @@ impl SimpleAllocator {
 
         assert_eq!(std::mem::replace(&mut self.inner.lock().unwrap().opened, true), false);
         Ok(())
+    }
+
+    /// Collects up to `extents_per_batch` free extents of size up to `max_extent_size` from
+    /// `offset`.  The extents will be reserved.
+    pub async fn collect_free_extents(
+        &self,
+        offset: u64,
+        max_extent_size: usize,
+        extents_per_batch: usize,
+    ) -> Result<FreeExtents<'_>, Error> {
+        let _guard = self.allocation_mutex.lock().await;
+
+        let mut free_extents = vec![];
+        {
+            let layer_set = self.layer_set();
+            let mut merger = layer_set.merger();
+            let mut iter = self
+                .filter(
+                    merger
+                        .seek(Bound::Included(&AllocatorKey { device_range: offset..offset + 1 }))
+                        .await?,
+                )
+                .await?;
+            let mut last_offset = offset;
+            loop {
+                let next_extent = match iter.get() {
+                    None => self.device_size..self.device_size,
+                    Some(ItemRef { key: AllocatorKey { device_range, .. }, .. }) => {
+                        ensure!(
+                            device_range.is_aligned(self.block_size)
+                                && device_range.end <= self.device_size,
+                            FxfsError::Inconsistent
+                        );
+                        device_range.clone()
+                    }
+                };
+                let free_range = last_offset..next_extent.start;
+                if free_range.start < free_range.end {
+                    // Split the range up as needed.
+                    let mut range_offset = free_range.start;
+                    while free_extents.len() < extents_per_batch && range_offset < free_range.end {
+                        let sub_range = range_offset
+                            ..std::cmp::min(free_range.end, range_offset + max_extent_size as u64);
+                        range_offset = sub_range.end;
+                        free_extents.push(sub_range);
+                    }
+                }
+                last_offset = next_extent.end;
+                if free_extents.len() == extents_per_batch || last_offset == self.device_size {
+                    break;
+                }
+                iter.advance().await?;
+            }
+        }
+        let mut result = FreeExtents(self, vec![]);
+        for extent in free_extents {
+            result.add_extent(extent).await;
+        }
+        Ok(result)
     }
 
     /// Returns all objects that exist in the parent store that pertain to this allocator.
@@ -1729,9 +1828,7 @@ mod tests {
                     merge::merge, Allocator, AllocatorKey, AllocatorValue, CoalescingIterator,
                     SimpleAllocator,
                 },
-                // testing::fake_filesystem::FakeFilesystem,
                 transaction::{lock_keys, Options},
-                ObjectStore,
             },
             range::RangeExt,
         },
@@ -1909,18 +2006,17 @@ mod tests {
         assert_eq!(found, expected_allocations.iter().map(|r| r.length().unwrap()).sum::<u64>());
     }
 
-    async fn test_fs() -> (OpenFxFilesystem, Arc<SimpleAllocator>, Arc<ObjectStore>) {
+    async fn test_fs() -> (OpenFxFilesystem, Arc<SimpleAllocator>) {
         let device = DeviceHolder::new(FakeDevice::new(4096, 4096));
         let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
         let allocator = fs.allocator();
-        let store = fs.object_manager().root_store();
-        (fs, allocator, store)
+        (fs, allocator)
     }
 
     #[fuchsia::test]
     async fn test_allocations() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = collect_allocations(&allocator).await;
@@ -1959,7 +2055,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_allocate_more_than_max_size() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         let mut transaction =
             fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
         let mut device_ranges = collect_allocations(&allocator).await;
@@ -1981,7 +2077,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_deallocations() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         let initial_allocations = collect_allocations(&allocator).await;
 
         let mut transaction =
@@ -2007,7 +2103,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_mark_allocated() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         let mut device_ranges = collect_allocations(&allocator).await;
         let range = {
             let mut transaction = fs
@@ -2064,7 +2160,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_mark_for_deletion() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
 
         // Allocate some stuff.
         let initial_allocated_bytes = allocator.get_allocated_bytes();
@@ -2135,7 +2231,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_allocate_free_reallocate() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
 
         // Allocate some stuff.
         let mut device_ranges = Vec::new();
@@ -2197,7 +2293,7 @@ mod tests {
 
         let mut device_ranges = Vec::new();
         let device = {
-            let (fs, allocator, _) = test_fs().await;
+            let (fs, allocator) = test_fs().await;
             let mut transaction = fs
                 .clone()
                 .new_transaction(lock_keys![], Options::default())
@@ -2261,7 +2357,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_dropped_transaction() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         let allocated_range = {
             let mut transaction = fs
                 .clone()
@@ -2292,7 +2388,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_allocated_bytes() {
         const STORE_OBJECT_ID: u64 = 99;
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
 
         let initial_allocated_bytes = allocator.get_allocated_bytes();
 
@@ -2354,7 +2450,7 @@ mod tests {
         const LIMIT: u64 = 12345;
         const OWNER_ID: u64 = 12;
 
-        let (fs, allocator, _) = test_fs().await;
+        let (fs, allocator) = test_fs().await;
         {
             let mut transaction = fs
                 .clone()
@@ -2377,5 +2473,110 @@ mod tests {
                 .expect("Failed to find limit");
             assert_eq!(LIMIT, bytes);
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_collect_free_extents() {
+        const STORE_OBJECT_ID: u64 = 99;
+
+        // Allocate a large chunk, then free a few bits of it, so we have free chunks interleaved
+        // with allocated chunks.
+        let allocated_range;
+        let expected_free_ranges;
+        let device = {
+            let (fs, allocator) = test_fs().await;
+            let bs = fs.block_size();
+            let mut transaction = fs
+                .clone()
+                .new_transaction(lock_keys![], Options::default())
+                .await
+                .expect("new failed");
+            allocated_range = allocator
+                .allocate(&mut transaction, STORE_OBJECT_ID, 32 * bs)
+                .await
+                .expect("allocate failed");
+            transaction.commit().await.expect("commit failed");
+
+            let mut transaction = fs
+                .clone()
+                .new_transaction(lock_keys![], Options::default())
+                .await
+                .expect("new failed");
+            let base = allocated_range.start;
+            expected_free_ranges = vec![
+                base..(base + (bs * 1)),
+                (base + (bs * 2))..(base + (bs * 3)),
+                // Note that the next three ranges are adjacent and will be treated as one free
+                // range once applied.  We separate them here to exercise the handling of "large"
+                // free ranges.
+                (base + (bs * 4))..(base + (bs * 8)),
+                (base + (bs * 8))..(base + (bs * 12)),
+                (base + (bs * 12))..(base + (bs * 13)),
+                (base + (bs * 29))..(base + (bs * 30)),
+            ];
+            for range in &expected_free_ranges {
+                allocator
+                    .deallocate(&mut transaction, STORE_OBJECT_ID, range.clone())
+                    .await
+                    .expect("deallocate failed");
+            }
+            transaction.commit().await.expect("commit failed");
+
+            allocator.flush().await.expect("flush failed");
+
+            fs.close().await.expect("close failed");
+            fs.take_device().await
+        };
+
+        device.reopen(false);
+        let fs = FxFilesystemBuilder::new().open(device).await.expect("open failed");
+        let allocator = fs.allocator();
+
+        // These values were picked so that each of them would be the reason why
+        // collect_free_extents finished, and so we would return after partially processing one of
+        // the free extents.
+        let max_extent_size = fs.block_size() as usize * 4;
+        const EXTENTS_PER_BATCH: usize = 2;
+        let mut free_ranges = vec![];
+        let mut offset = allocated_range.start;
+        while offset < allocated_range.end {
+            let free = allocator
+                .collect_free_extents(offset, max_extent_size, EXTENTS_PER_BATCH)
+                .await
+                .expect("collect_free_extents failed");
+            free_ranges.extend(
+                free.extents().iter().filter(|range| range.end <= allocated_range.end).cloned(),
+            );
+            offset = free.extents().last().expect("Unexpectedly hit the end of free extents").end;
+        }
+        assert_eq!(free_ranges, expected_free_ranges);
+    }
+
+    #[fuchsia::test]
+    async fn test_reserved_free_extents_released_on_drop() {
+        const STORE_OBJECT_ID: u64 = 99;
+        let (fs, allocator) = test_fs().await;
+
+        let mut transaction =
+            fs.clone().new_transaction(lock_keys![], Options::default()).await.expect("new failed");
+        {
+            // Tie up all of the free extents on the device, and make sure allocations fail.
+            let max_extent_size = fs.device().size() as usize;
+            const EXTENTS_PER_BATCH: usize = usize::MAX;
+            let _free_extents = allocator
+                .collect_free_extents(0, max_extent_size, EXTENTS_PER_BATCH)
+                .await
+                .expect("collect_free_extents failed");
+            allocator
+                .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+                .await
+                .expect_err("allocate should fail");
+        }
+        // Once the free extents are released, we should be able to allocate again.
+        allocator
+            .allocate(&mut transaction, STORE_OBJECT_ID, fs.block_size())
+            .await
+            .expect("allocate failed");
+        transaction.commit().await.expect("commit failed");
     }
 }
