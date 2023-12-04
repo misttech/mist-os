@@ -12,6 +12,8 @@ pub struct DiagnosticsConfig {
     #[serde(default)]
     pub archivist: Option<ArchivistConfig>,
     #[serde(default)]
+    pub archivist_pipelines: Vec<ArchivistPipeline>,
+    #[serde(default)]
     pub additional_serial_log_components: Vec<String>,
     #[serde(default)]
     pub sampler: SamplerConfig,
@@ -23,6 +25,14 @@ pub struct DiagnosticsConfig {
 pub enum ArchivistConfig {
     Default,
     LowMem,
+}
+
+/// A single archivist pipeline config.
+#[derive(Debug, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ArchivistPipeline {
+    pub name: String,
+    pub files: Vec<Utf8PathBuf>,
 }
 
 /// Diagnostics configuration options for the sampler configuration area.
@@ -75,6 +85,7 @@ mod tests {
             config.diagnostics,
             DiagnosticsConfig {
                 archivist: None,
+                archivist_pipelines: Vec::new(),
                 additional_serial_log_components: Vec::new(),
                 sampler: SamplerConfig::default()
             }
@@ -97,6 +108,7 @@ mod tests {
             config.diagnostics,
             DiagnosticsConfig {
                 archivist: None,
+                archivist_pipelines: Vec::new(),
                 additional_serial_log_components: Vec::new(),
                 sampler: SamplerConfig::default()
             }
@@ -123,6 +135,7 @@ mod tests {
             config.diagnostics,
             DiagnosticsConfig {
                 archivist: None,
+                archivist_pipelines: Vec::new(),
                 additional_serial_log_components: vec!["/foo".to_string()],
                 sampler: SamplerConfig::default(),
             }

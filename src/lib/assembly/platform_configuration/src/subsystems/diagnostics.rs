@@ -5,7 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::{anyhow, Context};
 use assembly_config_schema::platform_config::diagnostics_config::{
-    ArchivistConfig, DiagnosticsConfig,
+    ArchivistConfig, ArchivistPipeline, DiagnosticsConfig,
 };
 use assembly_config_schema::FileEntry;
 use std::collections::BTreeSet;
@@ -30,8 +30,12 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
         diagnostics_config: &DiagnosticsConfig,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        let DiagnosticsConfig { archivist, additional_serial_log_components, sampler } =
-            diagnostics_config;
+        let DiagnosticsConfig {
+            archivist,
+            archivist_pipelines,
+            additional_serial_log_components,
+            sampler,
+        } = diagnostics_config;
         // LINT.IfChange
         let mut bind_services = BTreeSet::from([
             "fuchsia.component.KcounterBinder",
@@ -87,6 +91,17 @@ impl DefineSubsystemConfiguration<DiagnosticsConfig> for DiagnosticsSubsystem {
             // LINT.ThenChange(/src/diagnostics/archivist/configs.gni)
             .field("allow_serial_logs", allow_serial_logs)?
             .field("deny_serial_log_tags", deny_serial_log_tags)?;
+
+        for pipeline in archivist_pipelines {
+            let ArchivistPipeline { name, files } = pipeline;
+            for file in files {
+                let file_name = file
+                    .file_name()
+                    .ok_or(anyhow!("Failed to get filename for archivist pipeline: {}", &file))?;
+                let path = format!("config/archivist/{}/{}", name, file_name);
+                builder.bootfs().file(FileEntry { source: file.clone(), destination: path })?;
+            }
+        }
 
         let exception_handler_available =
             !matches!(context.feature_set_level, FeatureSupportLevel::Bootstrap);
