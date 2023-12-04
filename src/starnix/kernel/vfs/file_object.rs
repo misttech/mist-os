@@ -16,8 +16,8 @@ use crate::{
             FsVerityState, {self},
         },
         DirentSink, FallocMode, FdEvents, FdTableId, FileReleaser, FileSystemHandle,
-        FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, InotifyMask,
-        NamespaceNode, RecordLockCommand, RecordLockOwner,
+        FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle, NamespaceNode,
+        RecordLockCommand, RecordLockOwner,
     },
 };
 use fidl::HandleBased;
@@ -28,7 +28,9 @@ use starnix_uapi::{
     as_any::AsAny,
     errno, error,
     errors::{Errno, EAGAIN, ETIMEDOUT},
-    fsxattr, off_t,
+    fsxattr,
+    inotify_mask::InotifyMask,
+    off_t,
     open_flags::OpenFlags,
     ownership::Releasable,
     pid_t,

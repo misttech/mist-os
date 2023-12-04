@@ -8,6 +8,7 @@ pub mod auth;
 pub mod device_type;
 pub mod errors;
 pub mod file_mode;
+pub mod inotify_mask;
 pub mod kcmp;
 pub mod math;
 pub mod mount_flags;

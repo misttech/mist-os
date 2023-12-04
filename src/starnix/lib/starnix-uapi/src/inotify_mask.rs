@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_uapi::uapi;
+use crate::uapi;
+use bitflags::bitflags;
 
-bitflags::bitflags! {
+bitflags! {
     pub struct InotifyMask: u32 {
         // Events
         const ACCESS = uapi::IN_ACCESS;

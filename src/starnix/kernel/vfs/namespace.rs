@@ -21,8 +21,8 @@ use crate::{
         socket::{SocketAddress, SocketHandle, UnixSocket},
         DirEntry, DirEntryHandle, DynamicFile, DynamicFileBuf, DynamicFileSource, FdEvents,
         FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
-        FsNodeOps, FsStr, FsString, InotifyMask, PathBuilder, RenameFlags, SimpleFileNode,
-        SymlinkTarget, UnlinkKind,
+        FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget,
+        UnlinkKind,
     },
 };
 use fidl_fuchsia_io as fio;
@@ -34,6 +34,7 @@ use starnix_uapi::{
     errno, error,
     errors::Errno,
     file_mode::{Access, FileMode},
+    inotify_mask::InotifyMask,
     mount_flags::MountFlags,
     open_flags::OpenFlags,
     ownership::WeakRef,

@@ -366,7 +366,6 @@ rustc_binary("starnix_kernel_bin") {
     "vfs/fsverity.rs",
     "vfs/fuse.rs",
     "vfs/inotify.rs",
-    "vfs/inotify_mask.rs",
     "vfs/mod.rs",
     "vfs/namespace.rs",
     "vfs/path.rs",

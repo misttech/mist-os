@@ -9,7 +9,7 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_nonseekable, fs_args, inotify, Anon, BytesFile, BytesFileOps,
         DirEntryHandle, FdEvents, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr,
-        FsString, InotifyMask, WdNumber,
+        FsString, WdNumber,
     },
 };
 use starnix_lock::Mutex;
@@ -21,6 +21,7 @@ use starnix_uapi::{
     errors::Errno,
     file_mode::FileMode,
     inotify_event,
+    inotify_mask::InotifyMask,
     open_flags::OpenFlags,
     user_address::{UserAddress, UserRef},
     FIONREAD,
@@ -580,9 +581,9 @@ mod tests {
     use super::{InotifyEvent, InotifyEventQueue, InotifyFileObject, DATA_SIZE};
     use crate::{
         testing::create_kernel_and_task,
-        vfs::{buffers::VecOutputBuffer, InotifyMask, OutputBuffer, WdNumber},
+        vfs::{buffers::VecOutputBuffer, OutputBuffer, WdNumber},
     };
-    use starnix_uapi::{arc_key::WeakKey, file_mode::FileMode};
+    use starnix_uapi::{arc_key::WeakKey, file_mode::FileMode, inotify_mask::InotifyMask};
 
     #[::fuchsia::test]
     fn inotify_event() {

@@ -5,8 +5,8 @@
 use crate::{
     task::CurrentTask,
     vfs::{
-        FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, InotifyMask,
-        MountInfo, NamespaceNode, UnlinkKind,
+        FileHandle, FileObject, FsNodeHandle, FsNodeLinkBehavior, FsStr, FsString, MountInfo,
+        NamespaceNode, UnlinkKind,
     },
 };
 use bitflags::bitflags;
@@ -16,6 +16,7 @@ use starnix_uapi::{
     errno, error,
     errors::{Errno, ENOENT},
     file_mode::{Access, FileMode},
+    inotify_mask::InotifyMask,
     open_flags::OpenFlags,
     NAME_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE, RENAME_WHITEOUT,
 };

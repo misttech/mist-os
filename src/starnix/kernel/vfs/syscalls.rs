@@ -16,10 +16,10 @@ use crate::{
         pidfd::new_pidfd,
         pipe::{new_pipe, PipeFileObject},
         splice, DirentSink64, EpollFileObject, FallocMode, FdEvents, FdFlags, FdNumber,
-        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, InotifyMask,
-        LookupContext, NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags,
-        SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType,
-        UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
+        FileAsyncOwner, FileHandle, FileSystemOptions, FlockOperation, FsStr, LookupContext,
+        NamespaceNode, PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget,
+        StatxFlags, SymlinkMode, SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind,
+        ValueOrSize, WdNumber, WhatToMount, XattrOp,
     },
 };
 use fuchsia_zircon as zx;
@@ -34,6 +34,7 @@ use starnix_uapi::{
     errors::{Errno, ErrnoResultExt, EINTR, ENAMETOOLONG, ETIMEDOUT},
     f_owner_ex,
     file_mode::{Access, FileMode},
+    inotify_mask::InotifyMask,
     itimerspec,
     mount_flags::MountFlags,
     off_t,
