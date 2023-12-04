@@ -28,7 +28,6 @@ mod xattr;
 
 pub mod bpf;
 pub mod buffers;
-pub mod cgroup;
 pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;
