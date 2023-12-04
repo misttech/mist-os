@@ -10,6 +10,7 @@ use zerocopy::AsBytes;
 
 use crate::{
     device::{init_common_devices, Features},
+    fs::tmpfs::TmpFs,
     mm::{
         syscalls::{do_mmap, sys_mremap},
         MemoryAccessor, MemoryAccessorExt, MemoryManager, PAGE_SIZE,
@@ -19,7 +20,6 @@ use crate::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_nonseekable, fs_node_impl_not_dir,
         fuchsia::RemoteFs,
-        tmpfs::TmpFs,
         Anon, FdNumber, FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions,
         FsContext, FsNode, FsNodeOps,
     },

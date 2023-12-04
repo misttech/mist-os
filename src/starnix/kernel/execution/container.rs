@@ -8,13 +8,11 @@ use crate::{
         create_filesystem_from_spec, create_remotefs_filesystem, execute_task, expose_root,
         serve_component_runner, serve_container_controller, serve_graphical_presenter,
     },
+    fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
     logging::{log_error, log_info, log_warn},
     task::{set_thread_role, CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
-    vfs::{
-        layeredfs::LayeredFs, tmpfs::TmpFs, FileSystemOptions, FsContext, LookupContext,
-        WhatToMount,
-    },
+    vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;

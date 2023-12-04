@@ -4,7 +4,6 @@
 
 mod anon_node;
 mod dir_entry;
-mod directory_file;
 mod dirent_sink;
 mod dynamic_file;
 mod epoll;
@@ -33,8 +32,7 @@ mod zxio;
 pub mod bpf;
 pub mod buffers;
 pub mod cgroup;
-pub mod devpts;
-pub mod devtmpfs;
+pub mod directory_file;
 pub mod eventfd;
 pub mod ext4;
 pub mod file_server;
@@ -43,8 +41,6 @@ pub mod fuchsia;
 pub mod fuse;
 pub mod inotify;
 pub mod kobject;
-pub mod layeredfs;
-pub mod overlayfs;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;
@@ -52,7 +48,6 @@ pub mod rw_queue;
 pub mod socket;
 pub mod syscalls;
 pub mod sysfs;
-pub mod tmpfs;
 pub mod tracefs;
 
 pub use anon_node::*;

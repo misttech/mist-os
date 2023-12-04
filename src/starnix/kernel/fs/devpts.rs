@@ -7,12 +7,12 @@ use crate::{
         terminal::{TTYState, Terminal},
         DeviceMode, DeviceOps,
     },
+    fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
     logging::not_implemented,
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_child},
         fileops_impl_nonseekable, fs_node_impl_dir_readonly,
         kobject::KObjectDeviceAttribute,
         CacheMode, DirEntryHandle, DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps,
@@ -619,10 +619,10 @@ fn shared_ioctl(
 mod tests {
     use super::*;
     use crate::{
+        fs::tmpfs::TmpFs,
         testing::*,
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
-            tmpfs::TmpFs,
             MountInfo, NamespaceNode,
         },
     };
@@ -765,7 +765,7 @@ mod tests {
     async fn test_open_tty() {
         let (_kernel, task) = create_kernel_and_task();
         let fs = dev_pts_fs(&task, Default::default());
-        let devfs = crate::vfs::devtmpfs::dev_tmp_fs(&task);
+        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&task);
 
         let ptmx = open_ptmx_and_unlock(&task, fs).expect("ptmx");
         set_controlling_terminal(&task, &ptmx, false).expect("set_controlling_terminal");

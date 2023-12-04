@@ -4,11 +4,11 @@
 
 use crate::{
     execution::execute_task,
+    fs::devpts::create_main_and_replica,
     logging::log_error,
     task::{CurrentTask, ExitStatus, Kernel},
     vfs::{
         buffers::{VecInputBuffer, VecOutputBuffer},
-        devpts::create_main_and_replica,
         file_server::serve_file_at,
         fuchsia::create_fuchsia_pipe,
         socket::VsockSocket,

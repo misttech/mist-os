@@ -170,8 +170,9 @@ impl FsContext {
 #[cfg(test)]
 mod test {
     use crate::{
+        fs::tmpfs::TmpFs,
         testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs},
-        vfs::{tmpfs::TmpFs, FsContext},
+        vfs::FsContext,
     };
     use starnix_uapi::{file_mode::FileMode, open_flags::OpenFlags};
 

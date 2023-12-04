@@ -672,7 +672,7 @@ impl directory::entry::DirectoryEntry for StarnixNodeConnection {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testing::*, vfs::tmpfs::TmpFs};
+    use crate::{fs::tmpfs::TmpFs, testing::*};
     use fuchsia_async as fasync;
     use std::collections::HashSet;
     use syncio::{zxio_node_attr_has_t, Zxio};

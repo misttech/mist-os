@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
+    fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
     logging::log_error,
     task::CurrentTask,
     vfs::{
-        devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         kobject::{
             KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
         },

@@ -10,11 +10,11 @@ use std::{
 };
 
 use crate::{
+    fs::devpts::{get_device_type_for_pts, DEVPTS_COUNT},
     mutable_state::{state_accessor, state_implementation},
     task::{CurrentTask, EventHandler, ProcessGroup, Session, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        devpts::{get_device_type_for_pts, DEVPTS_COUNT},
         FdEvents,
     },
 };

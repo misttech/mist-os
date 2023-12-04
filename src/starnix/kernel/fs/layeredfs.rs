@@ -155,7 +155,7 @@ impl FileOps for LayeredFsRootNodeOps {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{testing::*, vfs::tmpfs::TmpFs};
+    use crate::{fs::tmpfs::TmpFs, testing::*};
 
     fn get_root_entry_names(current_task: &CurrentTask, fs: &FileSystem) -> Vec<Vec<u8>> {
         struct DirentNameCapturer {

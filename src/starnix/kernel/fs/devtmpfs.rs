@@ -4,10 +4,9 @@
 
 use crate::{
     device::DeviceMode,
+    fs::tmpfs::TmpFs,
     task::CurrentTask,
-    vfs::{
-        kobject::DeviceMetadata, tmpfs::TmpFs, DirEntryHandle, FileSystemHandle, FsStr, MountInfo,
-    },
+    vfs::{kobject::DeviceMetadata, DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
 };
 use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 

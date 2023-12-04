@@ -1425,10 +1425,10 @@ impl fmt::Debug for FileObject {
 #[cfg(test)]
 mod tests {
     use crate::{
+        fs::tmpfs::TmpFs,
         testing::*,
         vfs::{
             buffers::{VecInputBuffer, VecOutputBuffer},
-            tmpfs::TmpFs,
             MountInfo,
         },
     };
