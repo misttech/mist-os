@@ -6,9 +6,14 @@
 
 #include "lib/boot-shim/testing/devicetree-test-fixture.h"
 
+#include <cstddef>
+
+#include <zxtest/zxtest.h>
+
 namespace boot_shim::testing {
 
 std::optional<LoadedDtb> SyntheticDevicetreeTest::empty_dtb_ = std::nullopt;
+std::optional<LoadedDtb> SyntheticDevicetreeTest::arm_gic2_no_msi_ = std::nullopt;
 
 std::optional<LoadedDtb> ArmDevicetreeTest::crosvm_arm_ = std::nullopt;
 std::optional<LoadedDtb> ArmDevicetreeTest::qemu_arm_gic3_ = std::nullopt;
@@ -68,6 +73,36 @@ void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
         break;
     }
   }
+}
+
+void CheckMmioRanges(cpp20::span<const boot_shim::DevicetreeMmioRange> actual,
+                     cpp20::span<const boot_shim::DevicetreeMmioRange> expected) {
+  size_t matched_count = 0;
+
+  for (size_t i = 0; i < expected.size(); ++i) {
+    const auto& expected_range = expected[i];
+
+    bool matched = false;
+    for (size_t j = 0; j < actual.size(); ++j) {
+      const auto& actual_range = actual[j];
+
+      if (actual_range.address != expected_range.address) {
+        continue;
+      }
+
+      if (actual_range.size != expected_range.size) {
+        continue;
+      }
+
+      matched = true;
+      matched_count++;
+    }
+    EXPECT_TRUE(matched, "Expected range %zu [0x%zx, 0x%zx] had no match.", i,
+                static_cast<size_t>(expected_range.address),
+                static_cast<size_t>(expected_range.end()));
+  }
+
+  EXPECT_EQ(matched_count, actual.size(), "There were more actual_ranges than expected ranges.");
 }
 
 }  // namespace boot_shim::testing

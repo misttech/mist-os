@@ -31,6 +31,24 @@ namespace boot_shim {
 // On failure |nullptr| is returned.
 using DevicetreeBootShimAllocator = fit::inline_function<void*(size_t, size_t)>;
 
+struct DevicetreeMmioRange {
+  static DevicetreeMmioRange From(const devicetree::RegPropertyElement& reg) {
+    return {.address = reg.address().value_or(0),
+            .size = static_cast<size_t>(reg.size().value_or(0))};
+  }
+
+  constexpr bool empty() const { return size == 0; }
+  constexpr uint64_t end() const { return address + size; }
+
+  uint64_t address = 0;
+  size_t size = 0;
+};
+
+// Provides an observer for MMIO Ranges. Devicetree Items that will provide configuration for
+// kernel drivers, that will be interacted through MMIO must notify through this observer.
+//
+using DevicetreeBootShimMmioObserver = fit::inline_function<void(const DevicetreeMmioRange&)>;
+
 // A DevicetreeBootShim represents a collection of items, which look into the devicetree itself
 // to gather information to produce ZBI items.
 //
@@ -66,8 +84,18 @@ class DevicetreeBootShim : public BootShim<Items...> {
     ZX_ASSERT(allocator_);
     return allocator_;
   }
+  const DevicetreeBootShimMmioObserver& mmio_observer() const {
+    ZX_ASSERT(mmio_observer_);
+    return mmio_observer_;
+  }
 
   void set_allocator(DevicetreeBootShimAllocator&& allocator) { allocator_ = std::move(allocator); }
+
+  // Optional: Set a callback for MMIO Ranges of interest for each |Item|
+  // of the shim.
+  void set_mmio_observer(DevicetreeBootShimMmioObserver&& observer) {
+    mmio_observer_ = std::move(observer);
+  }
 
  private:
   DECLARE_HAS_MEMBER_FN_WITH_SIGNATURE(HasInit, Init, void (C::*)(const DevicetreeBootShim& shim));
@@ -77,6 +105,7 @@ class DevicetreeBootShim : public BootShim<Items...> {
                                               std::true_type, std::false_type>;
   devicetree::Devicetree dt_;
   DevicetreeBootShimAllocator allocator_ = nullptr;
+  DevicetreeBootShimMmioObserver mmio_observer_ = [](const DevicetreeMmioRange&) {};
 };
 
 }  // namespace boot_shim

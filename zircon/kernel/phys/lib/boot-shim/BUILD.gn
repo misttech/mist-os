@@ -113,6 +113,7 @@ if (!is_kernel) {
       "test-helper.cc",
     ]
     public_deps = [
+      ":boot-shim",
       "//sdk/lib/stdcompat",
       "//sdk/lib/zbi-format",
       "//zircon/kernel/lib/devicetree/testing",

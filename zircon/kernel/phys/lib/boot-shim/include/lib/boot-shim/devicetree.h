@@ -204,6 +204,13 @@ class ArmDevicetreeGicItem
 
   static constexpr auto kGicV3CompatibleDevices = cpp20::to_array<std::string_view>({"arm,gic-v3"});
 
+  // Boot Shim Item API.
+  template <typename Shim>
+  void Init(const Shim& shim) {
+    DevicetreeItemBase::Init(shim);
+    mmio_observer_ = &shim.mmio_observer();
+  }
+
   // Matcher API.
   devicetree::ScanState OnNode(const devicetree::NodePath& path,
                                const devicetree::PropertyDecoder& decoder);
@@ -230,6 +237,7 @@ class ArmDevicetreeGicItem
   constexpr bool IsGicChildNode() const { return gic_ != nullptr; }
 
   const devicetree::Node* gic_ = nullptr;
+  const DevicetreeBootShimMmioObserver* mmio_observer_ = nullptr;
   bool matched_ = false;
 };
 

@@ -4,6 +4,7 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/devicetree/testing/loaded-dtb.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
@@ -25,14 +26,20 @@ class SyntheticDevicetreeTest {
     auto loaded_dtb = LoadDtb("empty.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     empty_dtb_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("arm_gic2_no_msi.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    arm_gic2_no_msi_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() { empty_dtb_ = std::nullopt; }
 
   auto empty_fdt() { return empty_dtb_->fdt(); }
+  auto arm_gic2_no_msi() { return arm_gic2_no_msi_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> empty_dtb_;
+  static std::optional<LoadedDtb> arm_gic2_no_msi_;
 };
 
 // Devicetree Test fixture that provides members to existing ARM dtbs.
@@ -137,6 +144,9 @@ class TestMixin : public zxtest::Test, public Base... {
 
 void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
                       cpp20::span<const zbi_topology_node_t> expected_nodes);
+
+void CheckMmioRanges(cpp20::span<const boot_shim::DevicetreeMmioRange> actual,
+                     cpp20::span<const boot_shim::DevicetreeMmioRange> expected);
 
 }  // namespace boot_shim::testing
 

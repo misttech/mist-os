@@ -7,6 +7,7 @@
 #include <lib/boot-shim/devicetree-boot-shim.h>
 #include <lib/boot-shim/devicetree.h>
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
+#include <lib/stdcompat/array.h>
 #include <lib/zbitl/image.h>
 
 namespace {
@@ -18,35 +19,53 @@ class ArmDevicetreeGicItemTest
     : public boot_shim::testing::TestMixin<boot_shim::testing::ArmDevicetreeTest,
                                            boot_shim::testing::SyntheticDevicetreeTest> {
  public:
-  static void SetUpTestSuite() {
-    Mixin::SetUpTestSuite();
-    auto loaded_dtb = LoadDtb("arm_gic2_no_msi.dtb");
-    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
-    gic2_no_msi_ = std::move(loaded_dtb).value();
+  using Mixin::SetUpTestSuite;
+  using Mixin::TearDownTestSuite;
+
+  auto get_mmio_observer() {
+    return [this](const boot_shim::DevicetreeMmioRange& r) { ranges_.push_back(r); };
   }
 
-  static void TearDownTestSuite() {
-    gic2_no_msi_ = std::nullopt;
-    Mixin::TearDownTestSuite();
-  }
-
-  devicetree::Devicetree arm_gic2_no_msi() { return gic2_no_msi_->fdt(); }
+  cpp20::span<const boot_shim::DevicetreeMmioRange> mmio_ranges() const { return ranges_; }
 
  private:
-  static std::optional<LoadedDtb> gic2_no_msi_;
+  std::vector<boot_shim::DevicetreeMmioRange> ranges_;
 };
 
-std::optional<LoadedDtb> ArmDevicetreeGicItemTest::gic2_no_msi_ = std::nullopt;
-
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8010000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8030000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8040000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8020000,
+          .size = 0x1000,
+      },
+  });
+
   std::array<std::byte, 256> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic2();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
 
-  EXPECT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -71,14 +90,35 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV2WithMsi) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8010000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8030000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x8040000,
+          .size = 0x10000,
+      },
+  });
+
   std::array<std::byte, 256> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = arm_gic2_no_msi();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
 
-  shim.Init();
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -104,14 +144,27 @@ TEST_F(ArmDevicetreeGicItemTest, GicV2NoMsi) {
 
 // We dont support GicV3 with MSI yet, not reflected in the driver configuration.
 TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x8000000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x80a0000,
+          .size = 0xf60000,
+      },
+  });
+
   std::array<std::byte, 256> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = qemu_arm_gic3();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
 
-  EXPECT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
@@ -135,14 +188,26 @@ TEST_F(ArmDevicetreeGicItemTest, ParseQemuGicV3) {
 }
 
 TEST_F(ArmDevicetreeGicItemTest, ParseCrosvm) {
+  constexpr auto kExpectedMmio = cpp20::to_array<boot_shim::DevicetreeMmioRange>({
+      {
+          .address = 0x3fff0000,
+          .size = 0x10000,
+      },
+      {
+          .address = 0x3ffd0000,
+          .size = 0x20000,
+      },
+  });
   std::array<std::byte, 256> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
   ASSERT_TRUE(image.clear().is_ok());
 
   auto fdt = crosvm_arm();
   boot_shim::DevicetreeBootShim<boot_shim::ArmDevicetreeGicItem> shim("test", fdt);
+  shim.set_mmio_observer(get_mmio_observer());
 
-  EXPECT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.Init());
+  boot_shim::testing::CheckMmioRanges(mmio_ranges(), kExpectedMmio);
   EXPECT_TRUE(shim.AppendItems(image).is_ok());
 
   // Look for a gic 2 driver.
