@@ -248,15 +248,13 @@ function fx-config-read {
 }
 
 function _query_product_bundle_path {
-  local -r manifest_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
-  local -r paths="$(fx-command-run jq --raw-output '.[] | .path' ${manifest_path})"
-  # Currently product_bundles.json should always contain one and only one
-  # product bundle.
-  if [[ ${#paths[@]} -gt 1 ]]; then
-    fx-error "Expecting exactly 1 product bundle in ${manifest_path}, found ${#paths[@]}"
-    exit 1
-  fi
-  printf %s "${paths[0]}"
+  local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
+  local product=$(fx-command-run jq .build_info_product ${args_json_path})
+  local board=$(fx-command-run jq .build_info_board ${args_json_path})
+  local product_name="\"${product//\"}.${board//\"}\""
+  local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+  local product_bundle_path=$(fx-command-run jq ".[] | select(.name==${product_name}) | .path" ${product_bundles_path} | tr -d '"')
+  echo $product_bundle_path
 }
 
 function fx-change-build-dir {
