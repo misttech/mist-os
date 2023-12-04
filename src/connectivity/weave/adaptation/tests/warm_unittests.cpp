@@ -125,10 +125,12 @@ class FakeAddressStateProvider
   FakeAddressStateProvider(
       const fuchsia::net::Subnet& address, std::shared_ptr<std::vector<OwnedAddress>> addresses,
       std::shared_ptr<TestNotifier> on_hangup_notifier, async_dispatcher_t* dispatcher,
-      fidl::InterfaceRequest<fuchsia::net::interfaces::admin::AddressStateProvider> request) {
+      fidl::InterfaceRequest<fuchsia::net::interfaces::admin::AddressStateProvider> request,
+      std::optional<zx_status_t> add_fails_with_err) {
     address.Clone(&address_);
     addresses_ = addresses;
     on_hangup_notifier_ = on_hangup_notifier;
+    add_fails_with_err_ = add_fails_with_err;
 
     binding_.Bind(std::move(request), dispatcher);
     binding_.set_error_handler([this](zx_status_t error) { OnHangUp(error); });
@@ -143,7 +145,12 @@ class FakeAddressStateProvider
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
 
   void WatchAddressAssignmentState(WatchAddressAssignmentStateCallback callback) override {
-    callback(fuchsia::net::interfaces::AddressAssignmentState::ASSIGNED);
+    if (add_fails_with_err_.has_value()) {
+      binding_.Close(add_fails_with_err_.value());
+      OnHangUp(add_fails_with_err_.value());
+    } else {
+      callback(fuchsia::net::interfaces::AddressAssignmentState::ASSIGNED);
+    }
   }
 
   // Callback to remove the address when the client hangs up.
@@ -166,6 +173,10 @@ class FakeAddressStateProvider
     on_hangup_notifier_->Notify();
   }
 
+  // When `nullopt`, adding the address will succeed. Otherwise, adding the
+  // address will fail and the underlying channel will be closed with the
+  // provided error.
+  std::optional<zx_status_t> add_fails_with_err_;
   fuchsia::net::Subnet address_;
   std::shared_ptr<std::vector<OwnedAddress>> addresses_;
   std::shared_ptr<TestNotifier> on_hangup_notifier_;
@@ -178,12 +189,14 @@ class FakeControl : public fuchsia::net::interfaces::admin::testing::Control_Tes
  public:
   FakeControl() = delete;
   FakeControl(std::shared_ptr<std::vector<OwnedAddress>> addresses, async_dispatcher_t* dispatcher,
-              fidl::InterfaceRequest<fuchsia::net::interfaces::admin::Control> request) {
+              fidl::InterfaceRequest<fuchsia::net::interfaces::admin::Control> request,
+              std::optional<zx_status_t> add_addresses_fail_with_err) {
     addresses_ = addresses;
     // Hang on to the dispatcher for later; which will allow us to spawn
     // `FakeAddressStateProvider` handlers when serving `AddAddress`.
     dispatcher_ = dispatcher;
     binding_.Bind(std::move(request), dispatcher);
+    add_addresses_fail_with_err_ = add_addresses_fail_with_err;
   }
 
   ~FakeControl() {
@@ -206,7 +219,8 @@ class FakeControl : public fuchsia::net::interfaces::admin::testing::Control_Tes
 
     std::shared_ptr<TestNotifier> on_hangup_notifier = std::make_shared<TestNotifier>();
     std::unique_ptr<FakeAddressStateProvider> fake_asp = std::make_unique<FakeAddressStateProvider>(
-        address, addresses_, on_hangup_notifier, dispatcher_, std::move(server_end));
+        address, addresses_, on_hangup_notifier, dispatcher_, std::move(server_end),
+        add_addresses_fail_with_err_);
 
     // Verify that the address does not already exist.
     auto it = std::find_if(addresses_->begin(), addresses_->end(), [&](const OwnedAddress& addr) {
@@ -224,6 +238,7 @@ class FakeControl : public fuchsia::net::interfaces::admin::testing::Control_Tes
 
   fidl::Binding<fuchsia::net::interfaces::admin::Control> binding_{this};
   std::shared_ptr<std::vector<OwnedAddress>> addresses_;
+  std::optional<zx_status_t> add_addresses_fail_with_err_;
   async_dispatcher_t* dispatcher_;
 };
 
@@ -320,8 +335,8 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
     if (it == interfaces_.end()) {
       server_end.Close(ZX_ERR_NOT_FOUND);
     } else {
-      it->fake_control =
-          std::make_unique<FakeControl>(it->ipv6addrs, dispatcher_, std::move(server_end));
+      it->fake_control = std::make_unique<FakeControl>(
+          it->ipv6addrs, dispatcher_, std::move(server_end), add_addresses_fail_with_err_);
     }
   }
 
@@ -406,6 +421,11 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
     return *this;
   }
 
+  // Inject the given failure when adding addresses.
+  void InjectAddAddressFailures(zx_status_t error) {
+    add_addresses_fail_with_err_ = std::make_optional(error);
+  }
+
   // Access the current interfaces.
   const std::vector<OwnedInterface>& interfaces() const { return interfaces_; }
 
@@ -473,6 +493,7 @@ class FakeNetstack : public fuchsia::net::root::testing::Interfaces_TestBase,
   std::vector<uint64_t> ip_forwarded_interfaces_;
   bool forwarding_success_ = true;
   uint32_t last_id_assigned = 0;
+  std::optional<zx_status_t> add_addresses_fail_with_err_;
 };
 
 class WarmTest : public testing::WeaveTestFixture<> {
@@ -607,6 +628,26 @@ TEST_F(WarmTest, AddRemoveAddressWiFi) {
   // Confirm that it worked.
   EXPECT_TRUE(on_hangup_notifier->WaitWithTimeout(std::chrono::seconds(1)));
   EXPECT_EQ(wlan.ipv6addrs->size(), 0u);
+}
+
+// Verify Weavestack gracefully handles a Netstack disconnection while waiting
+// for an address to become assigned.
+TEST_F(WarmTest, AddAddressPeerClosed) {
+  constexpr char kSubnetIp[] = "2001:0DB8:0042::";
+  constexpr uint8_t kPrefixLength = 48;
+  Inet::IPAddress addr;
+
+  // Sanity check - no addresses assigned.
+  OwnedInterface& wlan = GetWiFiInterface();
+  EXPECT_EQ(wlan.ipv6addrs->size(), 0u);
+
+  // Configure the Netstack to fail to add addresses.
+  fake_net_stack().InjectAddAddressFailures(ZX_ERR_PEER_CLOSED);
+
+  // Attempt to add the address.
+  ASSERT_TRUE(Inet::IPAddress::FromString(kSubnetIp, addr));
+  auto result = AddRemoveHostAddress(kInterfaceTypeWiFi, addr, kPrefixLength, /*add*/ true);
+  EXPECT_EQ(result, kPlatformResultFailure);
 }
 
 TEST_F(WarmTest, AddRemoveSameAddress) {
