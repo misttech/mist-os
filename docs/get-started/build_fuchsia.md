@@ -26,13 +26,14 @@ environment on your machine.
 
 ### Hardware requirements {#hardware-requirements}
 
-You can build Fuchsia only on a machine with one of the following
-host architectures:
+You can build Fuchsia on a host machine with one of the following
+architectures:
 
 - x86-64 Linux (Debian-based distributions only)
 - x86-64 macOS
+- ARM64 macOS
 
-Note: Windows and ARM64 are not supported.
+Note: Windows is not supported.
 
 ## 2. Set your build configuration {#set-your-build-configuration}
 
