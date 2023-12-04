@@ -8,6 +8,7 @@ import("//build/components/fuchsia_unittest_component.gni")
 import("//build/components/fuchsia_unittest_package.gni")
 import("//build/test.gni")
 import("//build/testing/environments.gni")
+import("//build/testing/perf/test.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 
 test("loopback_socket_benchmarks") {
@@ -74,6 +75,24 @@ fuchsia_test_package("loopback-socket-benchmarks-with-tracing-pkg-netstack3") {
   }
 }
 
+benchmark_test_configs = [
+  {
+    package = ":loopback-socket-benchmarks-tests"
+    tests = [
+      {
+        name = "loopback_socket_benchmarks_with_netstack3"
+        component = "loopback-socket-benchmarks-with-netstack3"
+        expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.netstack3.txt"
+      },
+      {
+        name = "loopback_socket_benchmarks_with_fake_netstack"
+        component = "loopback-socket-benchmarks-with-fake-netstack"
+        expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.fake_netstack.txt"
+      },
+    ]
+  },
+]
+
 # The Go runtime on Fuchsia does not support RISC-V.
 if (target_cpu != "riscv64") {
   fuchsia_unittest_component("loopback-socket-benchmarks") {
@@ -98,6 +117,24 @@ if (target_cpu != "riscv64") {
       ":loopback-socket-benchmarks-with-fast-udp",
     ]
   }
+
+  benchmark_test_configs += [
+    {
+      package = ":loopback-socket-benchmarks-tests-netstack2"
+      tests = [
+        {
+          name = "loopback_socket_benchmarks_test"
+          component = "loopback-socket-benchmarks"
+          expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.txt"
+        },
+        {
+          name = "loopback_socket_benchmarks_with_fast_udp"
+          component = "loopback-socket-benchmarks-with-fast-udp"
+          expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.network.socket.loopback.fastudp.txt"
+        },
+      ]
+    },
+  ]
 
   fuchsia_unittest_component("loopback-socket-benchmarks-with-tracing") {
     manifest = "meta/loopback-socket-benchmarks-with-tracing.cml"
@@ -134,10 +171,13 @@ if (target_cpu != "riscv64") {
   }
 
   ns2_test_targets = [
-    ":loopback-socket-benchmarks-tests-netstack2",
     ":loopback-socket-benchmarks-with-tracing-pkg-netstack2",
+    ":loopback-socket-benchmarks-tests-netstack2",
   ]
+  ns2_benchmark_targets =
+      [ ":loopback-socket-benchmarks-with-tracing-pkg-netstack2" ]
 } else {
+  ns2_benchmark_targets = []
   ns2_test_targets = []
 }
 
@@ -225,6 +265,26 @@ all_test_targets = [
                      ":loopback-socket-benchmarks-tests",
                      ":loopback-socket-benchmarks-with-tracing-pkg-netstack3",
                    ] + ns2_test_targets + starnix_benchmarks
+all_benchmark_targets =
+    [ ":loopback-socket-benchmarks-with-tracing-pkg-netstack3" ] +
+    ns2_benchmark_targets + starnix_benchmarks
+
+foreach(test_config, benchmark_test_configs) {
+  foreach(test, test_config.tests) {
+    fuchsia_component_perf_test(test.name) {
+      package = test_config.package
+      component_name = test.component
+      expected_metric_names_filepath = test.expected_metric_names_filepath
+      test_component_args = [
+        "-p",
+        "--quiet",
+      ]
+      results_path_test_arg = "--out"
+    }
+
+    all_benchmark_targets += [ ":${test.name}" ]
+  }
+}
 
 group("tests") {
   testonly = true
@@ -236,5 +296,5 @@ group("tests") {
 
 group("benchmarks") {
   testonly = true
-  deps = all_test_targets
+  deps = all_benchmark_targets
 }

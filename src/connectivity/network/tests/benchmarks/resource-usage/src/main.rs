@@ -29,11 +29,15 @@ struct Args {
     /// whether to run in perftest mode instead of unit test mode
     #[argh(switch, short = 'p')]
     perftest: bool,
+
+    /// path to which the fuchsiaperf.json results will be written to.
+    #[argh(positional, default = "String::from(\"/custom_artifacts/results.fuchsiaperf.json\")")]
+    output_path: String,
 }
 
 #[fuchsia::main]
 async fn main() {
-    let Args { netstack3, perftest } = argh::from_env();
+    let Args { netstack3, perftest, output_path } = argh::from_env();
 
     const BENCHMARK_NAME: &str = "fuchsia.netstack.resource_usage";
     let num_runs = if perftest {
@@ -60,8 +64,7 @@ async fn main() {
     .collect::<Vec<_>>();
 
     let metrics_json = serde_json::to_string_pretty(&metrics).expect("serialize metrics as JSON");
-    std::fs::write(format!("/custom_artifacts/results.fuchsiaperf.json"), metrics_json)
-        .expect("write metrics as custom artifact");
+    std::fs::write(output_path, metrics_json).expect("write metrics as custom artifact");
 }
 
 #[async_trait(?Send)]

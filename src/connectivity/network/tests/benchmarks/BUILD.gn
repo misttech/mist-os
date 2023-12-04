@@ -5,7 +5,7 @@
 group("benchmarks") {
   testonly = true
   deps = [
-    "resource-usage:tests",
+    "resource-usage:benchmarks",
     "socket-loopback:benchmarks",
     "socket-tun:benchmarks",
     "udp-serde:benchmarks",
