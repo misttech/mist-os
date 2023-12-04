@@ -766,10 +766,6 @@
                 "SyncFileRangeTest.BadArgs",
                 "SyncFileRangeTest.CannotSyncFileRangeOnUnopenedFd",
 
-                // syslog_test
-                "Syslog.Size",
-                "Syslog.ReadAll",
-
                 // sysret_test
                 "SysretTest.JustDetach",
                 "SysretTest.BadRip",

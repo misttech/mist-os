@@ -32,6 +32,7 @@ rustc_library("starnix-uapi") {
     "src/seal_flags.rs",
     "src/signals.rs",
     "src/stats.rs",
+    "src/syslog.rs",
     "src/time.rs",
     "src/uapi.rs",
     "src/union.rs",

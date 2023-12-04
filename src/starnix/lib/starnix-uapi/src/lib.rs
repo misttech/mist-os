@@ -20,6 +20,7 @@ pub mod resource_limits;
 pub mod seal_flags;
 pub mod signals;
 pub mod stats;
+pub mod syslog;
 pub mod time;
 pub mod uapi;
 pub mod union;

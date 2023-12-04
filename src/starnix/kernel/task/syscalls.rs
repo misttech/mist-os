@@ -27,8 +27,8 @@ use starnix_syscalls::SyscallResult;
 use starnix_uapi::{
     __user_cap_data_struct, __user_cap_header_struct,
     auth::{
-        Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYS_ADMIN,
-        CAP_SYS_NICE, CAP_SYS_PTRACE,
+        Capabilities, Credentials, SecureBits, CAP_SETGID, CAP_SETPCAP, CAP_SETUID, CAP_SYSLOG,
+        CAP_SYS_ADMIN, CAP_SYS_NICE, CAP_SYS_PTRACE,
     },
     c_int, clone_args, errno, error,
     errors::Errno,
@@ -41,6 +41,7 @@ use starnix_uapi::{
     resource_limits::Resource,
     rlimit, rusage, sched_param,
     signals::{Signal, UncheckedSignal},
+    syslog::SyslogAction,
     time::timeval_from_duration,
     uid_t,
     user_address::{UserAddress, UserCString, UserRef},
@@ -1624,6 +1625,55 @@ pub fn sys_kcmp(
         }
         _ => error!(EINVAL),
     }
+}
+
+pub fn sys_syslog(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    action_type: i32,
+    address: UserAddress,
+    length: i32,
+) -> Result<i32, Errno> {
+    let action = SyslogAction::try_from(action_type)?;
+    match action {
+        SyslogAction::Read => {
+            syslog_check_credentials(&current_task)?;
+            if address.is_null() || length < 0 {
+                return error!(EINVAL);
+            }
+            not_implemented!("syslog: read");
+            Ok(0)
+        }
+        SyslogAction::ReadAll => {
+            if address.is_null() || length < 0 {
+                return error!(EINVAL);
+            }
+            not_implemented!("syslog: read_all");
+            Ok(0)
+        }
+        SyslogAction::SizeUnread => {
+            syslog_check_credentials(&current_task)?;
+            not_implemented!("syslog: size_unread");
+            Ok(0)
+        }
+        SyslogAction::SizeBuffer => {
+            not_implemented!("syslog: size_buffer");
+            Ok(0)
+        }
+        _ => {
+            // Other actions aren't necessary yet.
+            not_implemented!(?action, "syslog: unsupported action");
+            Ok(0)
+        }
+    }
+}
+
+fn syslog_check_credentials(current_task: &CurrentTask) -> Result<(), Errno> {
+    let credentials = current_task.creds();
+    if credentials.has_capability(CAP_SYSLOG) || credentials.has_capability(CAP_SYS_ADMIN) {
+        return Ok(());
+    }
+    error!(EPERM)
 }
 
 #[cfg(test)]
