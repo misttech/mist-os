@@ -492,8 +492,12 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         key_id: u64,
     ) -> Result<(), Error> {
         let store = self.store();
-        store.device.read(device_offset, buffer.reborrow()).await?;
-        if let Some(keys) = self.get_keys().await? {
+        let ((), keys) = futures::future::try_join(
+            store.device.read(device_offset, buffer.reborrow()),
+            self.get_keys(),
+        )
+        .await?;
+        if let Some(keys) = keys {
             keys.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
         }
         Ok(())
