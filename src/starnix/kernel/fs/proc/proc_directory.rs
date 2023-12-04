@@ -413,21 +413,34 @@ impl MeminfoFile {
 }
 impl DynamicFileSource for MeminfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let memstats =
-            self.kernel_stats.get().get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
-                log_error!("FIDL error getting memory stats: {e}");
+        let stats = self.kernel_stats.get();
+        let memory_stats = stats.get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
+            log_error!("FIDL error getting memory stats: {e}");
+            errno!(EIO)
+        })?;
+        let compression_stats =
+            stats.get_memory_stats_compression(zx::Time::INFINITE).map_err(|e| {
+                log_error!("FIDL error getting memory compression stats: {e}");
                 errno!(EIO)
             })?;
 
-        let mem_total = memstats.total_bytes.unwrap_or_default() / 1024;
-        let mem_free = memstats.free_bytes.unwrap_or_default() / 1024;
-        let mem_available = (memstats.free_bytes.unwrap_or_default()
-            + memstats.vmo_discardable_unlocked_bytes.unwrap_or_default())
+        let mem_total = memory_stats.total_bytes.unwrap_or_default() / 1024;
+        let mem_free = memory_stats.free_bytes.unwrap_or_default() / 1024;
+        let mem_available = (memory_stats.free_bytes.unwrap_or_default()
+            + memory_stats.vmo_discardable_unlocked_bytes.unwrap_or_default())
             / 1024;
+
+        let swap_used = compression_stats.uncompressed_storage_bytes.unwrap_or_default() / 1024;
+        // Fuchsia doesn't have a limit on the size of its swap file, so we just pretend that
+        // we're willing to grow the swap by half the amount of free memory.
+        let swap_free = mem_free / 2;
+        let swap_total = swap_used + swap_free;
 
         writeln!(sink, "MemTotal:       {:8} kB", mem_total)?;
         writeln!(sink, "MemFree:        {:8} kB", mem_free)?;
         writeln!(sink, "MemAvailable:   {:8} kB", mem_available)?;
+        writeln!(sink, "SwapTotal:      {:8} kB", swap_total)?;
+        writeln!(sink, "SwapFree:       {:8} kB", swap_free)?;
         Ok(())
     }
 }
