@@ -2,7 +2,7 @@
   "name": "start",
   "description": "Start the Fuchsia emulator.",
   "examples": [
-    "ffx emu start\nffx emu start workstation_eng.qemu-x64 --name my-emulator --engine femu"
+    "ffx emu start"
   ],
   "flags": [
     {
