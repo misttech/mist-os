@@ -43,8 +43,8 @@ use crate::{
     ip::{
         icmp::IcmpIpExt,
         socket::{IpSockCreateAndSendError, IpSockCreationError, IpSockSendError},
-        BufferIpTransportContext, BufferTransportIpContext, IpTransportContext,
-        MulticastMembershipHandler, TransportIpContext, TransportReceiveError,
+        BufferIpTransportContext, IpTransportContext, MulticastMembershipHandler,
+        TransportIpContext, TransportReceiveError,
     },
     socket::{
         address::{
@@ -1182,10 +1182,9 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, 
     // TODO(https://fxbug.dev/135142): This associated type can be removed in
     // favor of `Self::IpSocketsCtx` once the `BufferTransportIpContext` and
     // `TransportIpContext` traits are merged.
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: BufferTransportIpContext<
+    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: TransportIpContext<
         I::OtherVersion,
         C,
-        B,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
@@ -1271,10 +1270,9 @@ pub(crate) trait BufferBoundStateContext<
 > where
     for<'a> Self: BoundStateContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
 {
-    type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
+    type BufferIpSocketsCtx<'a>: TransportIpContext<
         I,
         C,
-        B,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;

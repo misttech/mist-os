@@ -38,7 +38,6 @@ use net_types::{
     ip::{GenericOverIp, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
     AddrAndZone, NonMappedAddr, SpecifiedAddr, ZonedAddr,
 };
-use packet::EmptyBuf;
 use packet_formats::ip::IpProto;
 use rand::RngCore;
 use smallvec::{smallvec, SmallVec};
@@ -57,7 +56,7 @@ use crate::{
             DefaultSendOptions, DeviceIpSocketHandler, IpSock, IpSockCreationError,
             IpSocketHandler, Mms,
         },
-        BufferTransportIpContext, EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext as _,
+        EitherDeviceId, IpExt, IpLayerIpExt, TransportIpContext,
     },
     socket::{
         address::{
@@ -238,13 +237,8 @@ pub(crate) trait DemuxSyncContext<I: IpExt, D: device::WeakId, BT: TcpBindingsTy
 pub(crate) trait SyncContext<I: IpLayerIpExt, C: TcpBindingsTypes>:
     DemuxSyncContext<I, Self::WeakDeviceId, C> + IpSocketHandler<I, C>
 {
-    type IpTransportAndDemuxCtx<'a>: BufferTransportIpContext<
-            I,
-            C,
-            EmptyBuf,
-            DeviceId = Self::DeviceId,
-            WeakDeviceId = Self::WeakDeviceId,
-        > + DeviceIpSocketHandler<I, C>
+    type IpTransportAndDemuxCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + DeviceIpSocketHandler<I, C>
         + DemuxSyncContext<I, Self::WeakDeviceId, C>;
 
     /// Calls the function with mutable access to the set with all TCP sockets.
@@ -2512,7 +2506,7 @@ fn do_send_inner<I, SC, C>(
 ) where
     I: IpExt,
     C: NonSyncContext<I, SC::WeakDeviceId>,
-    SC: BufferTransportIpContext<I, C, EmptyBuf>,
+    SC: TransportIpContext<I, C>,
 {
     while let Some(seg) = conn.state.poll_send(u32::MAX, ctx.now(), &conn.socket_options) {
         let ser = tcp_serialize_segment(seg, addr.ip.clone());

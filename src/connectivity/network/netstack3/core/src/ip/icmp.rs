@@ -23,7 +23,7 @@ use net_types::{
     LinkLocalAddress, LinkLocalUnicastAddr, MulticastAddress, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{
-    BufferMut, EmptyBuf, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, Serializer,
+    BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, Serializer,
     TruncateDirection, TruncatingSerializer,
 };
 use packet_formats::{
@@ -61,10 +61,10 @@ use crate::{
         },
         path_mtu::PmtuHandler,
         socket::{DefaultSendOptions, IpSock, IpSocketHandler},
-        AddressStatus, AnyDevice, BufferIpLayerHandler, BufferIpTransportContext,
-        BufferTransportIpContext, DeviceIdContext, EitherDeviceId, IpDeviceStateContext, IpExt,
-        IpTransportContext, Ipv6PresentAddressStatus, MulticastMembershipHandler, SendIpPacketMeta,
-        TransportIpContext, TransportReceiveError, IPV6_DEFAULT_SUBNET,
+        AddressStatus, AnyDevice, BufferIpTransportContext, DeviceIdContext, EitherDeviceId,
+        IpDeviceStateContext, IpExt, IpLayerHandler, IpTransportContext, Ipv6PresentAddressStatus,
+        MulticastMembershipHandler, SendIpPacketMeta, TransportIpContext, TransportReceiveError,
+        IPV6_DEFAULT_SUBNET,
     },
     socket::{
         self,
@@ -926,13 +926,8 @@ pub(crate) trait BufferBoundStateContext<
 > where
     for<'a> Self: InnerIcmpContext<I, C, IpSocketsCtx<'a> = Self::BufferIpSocketsCtx<'a>>,
 {
-    type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
-            I,
-            C,
-            B,
-            DeviceId = Self::DeviceId,
-            WeakDeviceId = Self::WeakDeviceId,
-        > + IcmpStateContext;
+    type BufferIpSocketsCtx<'a>: TransportIpContext<I, C, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
+        + IcmpStateContext;
 }
 
 /// Uninstantiatable type for implementing [`DatagramSocketSpec`].
@@ -1696,12 +1691,7 @@ impl<
     }
 }
 
-pub(crate) fn send_ndp_packet<
-    C,
-    SC: BufferIpLayerHandler<Ipv6, C, EmptyBuf>,
-    S: Serializer<Buffer = EmptyBuf>,
-    M: IcmpMessage<Ipv6>,
->(
+pub(crate) fn send_ndp_packet<C, SC, S, M>(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
@@ -1710,9 +1700,15 @@ pub(crate) fn send_ndp_packet<
     body: S,
     code: M::Code,
     message: M,
-) -> Result<(), S> {
+) -> Result<(), S>
+where
+    SC: IpLayerHandler<Ipv6, C>,
+    S: Serializer,
+    S::Buffer: BufferMut,
+    M: IcmpMessage<Ipv6>,
+{
     // TODO(https://fxbug.dev/95359): Send through ICMPv6 send path.
-    BufferIpLayerHandler::<Ipv6, _, _>::send_ip_packet_from_device(
+    IpLayerHandler::<Ipv6, _>::send_ip_packet_from_device(
         sync_ctx,
         ctx,
         SendIpPacketMeta {
@@ -1738,7 +1734,7 @@ fn send_neighbor_advertisement<
     C,
     SC: Ipv6DeviceHandler<C>
         + IpDeviceHandler<Ipv6, C>
-        + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
+        + IpLayerHandler<Ipv6, C>
         + CounterContext<NdpCounters>,
 >(
     sync_ctx: &mut SC,
@@ -1798,7 +1794,7 @@ fn receive_ndp_packet<
         + IpDeviceHandler<Ipv6, C>
         + IpDeviceStateContext<Ipv6, C>
         + NudIpHandler<Ipv6, C>
-        + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
+        + IpLayerHandler<Ipv6, C>
         + CounterContext<NdpCounters>,
 >(
     sync_ctx: &mut SC,
@@ -2222,7 +2218,7 @@ impl<
             + IpDeviceStateContext<Ipv6, C>
             + PmtuHandler<Ipv6, C>
             + NudIpHandler<Ipv6, C>
-            + BufferIpLayerHandler<Ipv6, C, EmptyBuf>
+            + IpLayerHandler<Ipv6, C>
             + CounterContext<IcmpRxCounters<Ipv6>>
             + CounterContext<IcmpTxCounters<Ipv6>>
             + CounterContext<NdpCounters>,
@@ -5338,10 +5334,8 @@ mod tests {
         }
     }
 
-    impl<B: BufferMut> BufferIpLayerHandler<Ipv6, FakeIcmpNonSyncCtx<Ipv6>, B>
-        for FakeIcmpInnerSyncCtx<Ipv6>
-    {
-        fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
+    impl IpLayerHandler<Ipv6, FakeIcmpNonSyncCtx<Ipv6>> for FakeIcmpInnerSyncCtx<Ipv6> {
+        fn send_ip_packet_from_device<S>(
             &mut self,
             _ctx: &mut FakeIcmpNonSyncCtx<Ipv6>,
             _meta: SendIpPacketMeta<Ipv6, &Self::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,

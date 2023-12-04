@@ -12,7 +12,7 @@ use packet::BufferMut;
 
 use crate::{
     device::WeakDeviceId,
-    ip::BufferTransportIpContext,
+    ip::TransportIpContext,
     socket::datagram::{MaybeDualStack, UninstantiableContext},
     transport::{
         tcp::{
@@ -378,7 +378,7 @@ impl<
     > udp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: udp::BoundStateContext<I, C>,
-    for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+    for<'a> Self::IpSocketsCtx<'a>: TransportIpContext<I, C>,
 {
     type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
 }

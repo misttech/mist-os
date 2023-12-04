@@ -320,24 +320,6 @@ pub(crate) trait MulticastMembershipHandler<I: Ip, C>: DeviceIdContext<AnyDevice
     );
 }
 
-/// The execution context provided by the IP layer to transport layer protocols
-/// when a buffer is provided.
-///
-/// `BufferTransportIpContext` is like [`TransportIpContext`], except that it
-/// also requires that the context be capable of receiving frames in buffers of
-/// type `B`. This is used when a buffer of type `B` is provided to IP, and
-/// allows any generated link-layer frames to reuse that buffer rather than
-/// needing to always allocate a new one.
-pub(crate) trait BufferTransportIpContext<I: IpExt, C, B: BufferMut>:
-    TransportIpContext<I, C> + IpSocketHandler<I, C>
-{
-}
-
-impl<I: IpExt, B: BufferMut, C, SC: TransportIpContext<I, C> + IpSocketHandler<I, C>>
-    BufferTransportIpContext<I, C, B> for SC
-{
-}
-
 // TODO(joshlf): With all 256 protocol numbers (minus reserved ones) given their
 // own associated type in both traits, running `cargo check` on a 2018 MacBook
 // Pro takes over a minute. Eventually - and before we formally publish this as
@@ -2864,45 +2846,34 @@ impl<I: packet_formats::ip::IpExt, D> From<SendIpPacketMeta<I, D, SpecifiedAddr<
     }
 }
 
-pub(crate) trait BufferIpLayerHandler<I: IpExt, C, B: BufferMut>:
-    DeviceIdContext<AnyDevice>
-{
-    fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
+pub(crate) trait IpLayerHandler<I: IpExt, C>: DeviceIdContext<AnyDevice> {
+    fn send_ip_packet_from_device<S>(
         &mut self,
         ctx: &mut C,
         meta: SendIpPacketMeta<I, &Self::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S>;
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut;
 }
 
 impl<
-        B: BufferMut,
-        C: IpLayerNonSyncContext<Ipv4, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<Ipv4, C> + IpDeviceSendContext<Ipv4, C> + NonTestCtxMarker,
-    > BufferIpLayerHandler<Ipv4, C, B> for SC
+        I: IpLayerIpExt,
+        C: IpLayerNonSyncContext<I, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
+        SC: IpDeviceStateContext<I, C> + IpDeviceSendContext<I, C> + NonTestCtxMarker,
+    > IpLayerHandler<I, C> for SC
 {
-    fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
+    fn send_ip_packet_from_device<S>(
         &mut self,
         ctx: &mut C,
-        meta: SendIpPacketMeta<Ipv4, &SC::DeviceId, Option<SpecifiedAddr<Ipv4Addr>>>,
+        meta: SendIpPacketMeta<I, &SC::DeviceId, Option<SpecifiedAddr<I::Addr>>>,
         body: S,
-    ) -> Result<(), S> {
-        send_ip_packet_from_device(self, ctx, meta, body)
-    }
-}
-
-impl<
-        B: BufferMut,
-        C: IpLayerNonSyncContext<Ipv6, <SC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        SC: IpDeviceStateContext<Ipv6, C> + IpDeviceSendContext<Ipv6, C> + NonTestCtxMarker,
-    > BufferIpLayerHandler<Ipv6, C, B> for SC
-{
-    fn send_ip_packet_from_device<S: Serializer<Buffer = B>>(
-        &mut self,
-        ctx: &mut C,
-        meta: SendIpPacketMeta<Ipv6, &SC::DeviceId, Option<SpecifiedAddr<Ipv6Addr>>>,
-        body: S,
-    ) -> Result<(), S> {
+    ) -> Result<(), S>
+    where
+        S: Serializer,
+        S::Buffer: BufferMut,
+    {
         send_ip_packet_from_device(self, ctx, meta, body)
     }
 }
@@ -3282,7 +3253,7 @@ impl<
     > icmp::BufferBoundStateContext<I, C, B> for Locked<&SyncCtx<C>, L>
 where
     Self: icmp::InnerIcmpContext<I, C>,
-    for<'a> Self::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+    for<'a> Self::IpSocketsCtx<'a>: TransportIpContext<I, C>,
 {
     type BufferIpSocketsCtx<'a> = Self::IpSocketsCtx<'a>;
 }

@@ -1487,7 +1487,7 @@ mod tests {
         device::testutil::receive_frame,
         ip::{
             socket::{DefaultSendOptions, IpSocketHandler},
-            BufferIpLayerHandler,
+            IpLayerHandler,
         },
         socket::address::SocketIpAddr,
         TimerIdInner,
@@ -1781,12 +1781,8 @@ mod tests {
         device: &DeviceId<FakeNonSyncCtx>,
     ) where
         A::Version: TestIpExt,
-        Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
-            A::Version,
-            FakeNonSyncCtx,
-            Buf<Vec<u8>>,
-            DeviceId = DeviceId<FakeNonSyncCtx>,
-        >,
+        Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>:
+            IpLayerHandler<A::Version, FakeNonSyncCtx, DeviceId = DeviceId<FakeNonSyncCtx>>,
     {
         let meta = SendIpPacketMeta {
             device,
@@ -1797,7 +1793,7 @@ mod tests {
             ttl: None,
             mtu: None,
         };
-        BufferIpLayerHandler::<A::Version, _, _>::send_ip_packet_from_device(
+        IpLayerHandler::<A::Version, _>::send_ip_packet_from_device(
             &mut Locked::new(sync_ctx),
             ctx,
             meta,
@@ -1809,10 +1805,9 @@ mod tests {
     #[ip_test]
     fn test_send_to_many<I: Ip + TestIpExt>()
     where
-        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: BufferIpLayerHandler<
+        for<'a> Locked<&'a FakeSyncCtx, crate::lock_ordering::Unlocked>: IpLayerHandler<
             I,
             FakeNonSyncCtx,
-            Buf<Vec<u8>>,
             DeviceId = DeviceId<FakeNonSyncCtx>,
             WeakDeviceId = WeakDeviceId<FakeNonSyncCtx>,
         >,

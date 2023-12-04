@@ -39,8 +39,7 @@ use crate::{
             IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
             IpSocketHandler, SendOneShotIpPacketError, SendOptions,
         },
-        BufferTransportIpContext, EitherDeviceId, HopLimits, MulticastMembershipHandler,
-        TransportIpContext,
+        EitherDeviceId, HopLimits, MulticastMembershipHandler, TransportIpContext,
     },
     socket::{
         self,
@@ -727,10 +726,9 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
     // TODO(https://fxbug.dev/135142): This associated type can be removed in
     // favor of `Self::IpSocketsCtx` once the `BufferTransportIpContext` and
     // `TransportIpContext` traits are merged.
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: BufferTransportIpContext<
+    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: TransportIpContext<
         I::OtherVersion,
         C,
-        B,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
@@ -1139,10 +1137,9 @@ pub(crate) trait BufferDatagramStateContext<I: IpExt, C, S: DatagramSocketSpec, 
 pub(crate) trait BufferDatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut>:
     DatagramBoundStateContext<I, C, S>
 {
-    type BufferIpSocketsCtx<'a>: BufferTransportIpContext<
+    type BufferIpSocketsCtx<'a>: TransportIpContext<
         I,
         C,
-        B,
         DeviceId = Self::DeviceId,
         WeakDeviceId = Self::WeakDeviceId,
     >;
@@ -1223,7 +1220,7 @@ where
 impl<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut, SC: DatagramBoundStateContext<I, C, S>>
     BufferDatagramBoundStateContext<I, C, S, B> for SC
 where
-    for<'a> SC::IpSocketsCtx<'a>: BufferTransportIpContext<I, C, B>,
+    for<'a> SC::IpSocketsCtx<'a>: TransportIpContext<I, C>,
 {
     type BufferIpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
 
