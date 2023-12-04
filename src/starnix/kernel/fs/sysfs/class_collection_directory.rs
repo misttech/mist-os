@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::kobject::{KObject, KObjectHandle},
     fs::sysfs::SysFsOps,
     task::CurrentTask,
     vfs::{
-        fs_node_impl_dir_readonly,
-        kobject::{KObject, KObjectHandle},
-        DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        VecDirectory, VecDirectoryEntry,
+        fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
     },
 };
 use starnix_uapi::{auth::FsCred, error, errors::Errno, file_mode::mode, open_flags::OpenFlags};

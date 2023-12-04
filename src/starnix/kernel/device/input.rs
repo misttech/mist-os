@@ -6,16 +6,14 @@ use crate::{
     device::{
         framebuffer::Framebuffer,
         input_event_conversion::parse_fidl_keyboard_event_to_linux_input_event,
-        registry::DeviceOps, DeviceMode,
+        kobject::KObjectDeviceAttribute, registry::DeviceOps, DeviceMode,
     },
     logging::{log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable,
-        kobject::KObjectDeviceAttribute,
-        FdEvents, FileObject, FileOps, FsNode,
+        fileops_impl_nonseekable, FdEvents, FileObject, FileOps, FsNode,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};

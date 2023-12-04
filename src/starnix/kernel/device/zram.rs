@@ -3,13 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{simple_device_ops, DeviceMode},
+    device::{
+        kobject::{KObject, KObjectDeviceAttribute},
+        simple_device_ops, DeviceMode,
+    },
     fs::sysfs::BlockDeviceDirectory,
     logging::log_error,
     task::{CurrentTask, KernelStats},
     vfs::{
         fileops_impl_dataless, fileops_impl_seekless, fs_node_impl_dir_readonly,
-        kobject::{KObject, KObjectDeviceAttribute},
         DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileOps, FsNode,
         FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
     },

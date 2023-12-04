@@ -18,6 +18,7 @@ pub use registry::*;
 
 pub mod framebuffer;
 pub mod input;
+pub mod kobject;
 pub mod loop_device;
 pub mod magma;
 pub mod mem;

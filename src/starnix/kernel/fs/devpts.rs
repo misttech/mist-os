@@ -4,6 +4,7 @@
 
 use crate::{
     device::{
+        kobject::KObjectDeviceAttribute,
         terminal::{TTYState, Terminal},
         DeviceMode, DeviceOps,
     },
@@ -13,11 +14,10 @@ use crate::{
     task::{CurrentTask, EventHandler, WaitCanceler, Waiter},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_dir_readonly,
-        kobject::KObjectDeviceAttribute,
-        CacheMode, DirEntryHandle, DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps,
-        FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-        FsNodeInfo, FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
+        fileops_impl_nonseekable, fs_node_impl_dir_readonly, CacheMode, DirEntryHandle,
+        DirectoryEntryType, FdEvents, FileHandle, FileObject, FileOps, FileSystem,
+        FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
+        FsNodeOps, FsStr, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};

@@ -4,11 +4,12 @@
 
 use crate::{
     device::{
-        create_unknown_device, loop_device::create_loop_control_device, mem::DevRandom,
-        simple_device_ops, uinput::create_uinput_device, DeviceMode,
+        create_unknown_device, kobject::KObjectDeviceAttribute,
+        loop_device::create_loop_control_device, mem::DevRandom, simple_device_ops,
+        uinput::create_uinput_device, DeviceMode,
     },
     task::CurrentTask,
-    vfs::{fuse::DevFuse, kobject::KObjectDeviceAttribute},
+    vfs::fuse::DevFuse,
 };
 use starnix_uapi::device_type::DeviceType;
 

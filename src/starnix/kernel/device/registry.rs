@@ -3,18 +3,16 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::kobject::{
+        KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
+    },
     fs::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
         sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
     },
     logging::log_error,
     task::CurrentTask,
-    vfs::{
-        kobject::{
-            KObject, KObjectDeviceAttribute, KObjectHandle, KType, UEventAction, UEventContext,
-        },
-        FileOps, FsNode, FsNodeOps, FsStr,
-    },
+    vfs::{FileOps, FsNode, FsNodeOps, FsStr},
 };
 use assert_matches::assert_matches;
 use starnix_uapi::{

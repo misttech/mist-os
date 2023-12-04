@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{simple_device_ops, DeviceMode},
+    device::{kobject::KObjectDeviceAttribute, simple_device_ops, DeviceMode},
     logging::{log, log_info},
     mm::{
         create_anonymous_mapping_vmo, DesiredAddress, MappingName, MappingOptions, ProtectionFlags,
@@ -11,9 +11,8 @@ use crate::{
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, InputBufferExt as _, OutputBuffer},
-        fileops_impl_seekless,
-        kobject::KObjectDeviceAttribute,
-        Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef, FsNodeInfo, NamespaceNode,
+        fileops_impl_seekless, Anon, FileHandle, FileObject, FileOps, FileWriteGuardRef,
+        FsNodeInfo, NamespaceNode,
     },
 };
 use fuchsia_zircon::{

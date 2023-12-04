@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::kobject::{KObject, KObjectHandle},
     fs::{sysfs::SysFsOps, tmpfs::TmpfsDirectory},
     task::CurrentTask,
     vfs::{
-        fs_node_impl_dir_readonly,
-        kobject::{KObject, KObjectHandle},
-        BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-        VecDirectory, VecDirectoryEntry,
+        fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
+        FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
     },
 };
 use fuchsia_zircon as zx;

@@ -3,16 +3,15 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::kobject::{KObject, KObjectHandle, KType, UEventFsNode},
     fs::sysfs::SysFsOps,
     logging::not_implemented,
     task::CurrentTask,
     vfs::{
-        buffers::InputBuffer,
-        fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir,
-        kobject::{KObject, KObjectHandle, KType, UEventFsNode},
-        BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject,
-        FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory,
-        VecDirectoryEntry,
+        buffers::InputBuffer, fileops_impl_delegate_read_and_seek, fs_node_impl_dir_readonly,
+        fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
+        DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+        VecDirectory, VecDirectoryEntry,
     },
 };
 use starnix_uapi::{

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::{magma::MagmaFile, DeviceMode},
+    device::{kobject::KObjectDeviceAttribute, magma::MagmaFile, DeviceMode},
     task::CurrentTask,
-    vfs::{kobject::KObjectDeviceAttribute, FileOps, FsNode},
+    vfs::{FileOps, FsNode},
 };
 use starnix_uapi::{device_type::DeviceType, errors::Errno, open_flags::OpenFlags};
 

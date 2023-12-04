@@ -22,7 +22,10 @@ use std::{marker::PhantomData, num::NonZeroU32, sync::Arc};
 use zerocopy::{AsBytes, FromBytes};
 
 use crate::{
-    device::{DeviceListener, DeviceListenerKey},
+    device::{
+        kobject::{KObjectHandle, KType, UEventAction, UEventContext},
+        DeviceListener, DeviceListenerKey,
+    },
     logging::{log_error, log_info, log_warn, not_implemented},
     mm::MemoryAccessorExt,
     task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, WaitQueue, Waiter},
@@ -31,7 +34,6 @@ use crate::{
             AncillaryData, InputBuffer, Message, MessageQueue, MessageReadInfo, OutputBuffer,
             UnixControlData, VecInputBuffer,
         },
-        kobject::{KObjectHandle, KType, UEventAction, UEventContext},
         socket::{
             GenericMessage, GenericNetlinkClientHandle, Socket, SocketAddress, SocketHandle,
             SocketMessageFlags, SocketOps, SocketPeer, SocketShutdownFlags, SocketType,

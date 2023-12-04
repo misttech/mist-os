@@ -6,15 +6,13 @@ use super::framebuffer_server::{
     init_viewport_scene, present_view, spawn_view_provider, FramebufferServer,
 };
 use crate::{
-    device::{features::AspectRatio, DeviceMode, DeviceOps},
+    device::{features::AspectRatio, kobject::KObjectDeviceAttribute, DeviceMode, DeviceOps},
     logging::{impossible_error, log_info, log_warn},
     mm::{MemoryAccessorExt, ProtectionFlags},
     task::{CurrentTask, Kernel},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_seekable,
-        kobject::KObjectDeviceAttribute,
-        FileObject, FileOps, FsNode, VmoFileObject,
+        fileops_impl_seekable, FileObject, FileOps, FsNode, VmoFileObject,
     },
 };
 use fidl_fuchsia_io as fio;

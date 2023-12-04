@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use crate::{
-    device::DeviceMode,
+    device::{kobject::DeviceMetadata, DeviceMode},
     fs::tmpfs::TmpFs,
     task::CurrentTask,
-    vfs::{kobject::DeviceMetadata, DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
+    vfs::{DirEntryHandle, FileSystemHandle, FsStr, MountInfo},
 };
 use starnix_uapi::{auth::FsCred, device_type::DeviceType, errors::Errno, file_mode::mode};
 

@@ -4,13 +4,13 @@
 use super::DeviceMode;
 
 use crate::{
+    device::kobject::KObjectDeviceAttribute,
     logging::not_implemented,
     mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE},
     task::CurrentTask,
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         default_ioctl, fileops_impl_dataless, fileops_impl_seekable, fileops_impl_seekless,
-        kobject::KObjectDeviceAttribute,
         FdNumber, FileHandle, FileObject, FileOps, FsNode,
     },
 };

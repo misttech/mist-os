@@ -3,13 +3,12 @@
 // found in the LICENSE file.
 
 use crate::{
+    device::kobject::{KObjectHandle, KType},
     fs::sysfs::{sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, SysFsDirectory},
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
-        cgroup::CgroupDirectoryNode,
-        kobject::{KObjectHandle, KType},
-        CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
+        cgroup::CgroupDirectoryNode, CacheConfig, CacheMode, FileSystem, FileSystemHandle,
+        FileSystemOps, FileSystemOptions, FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
     },
 };
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
