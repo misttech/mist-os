@@ -4,6 +4,7 @@ bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.platform
 cc_prebuilt_library://pkg/async-default
 cc_prebuilt_library://pkg/async-loop-default
+cc_prebuilt_library://pkg/backend_fuchsia_globals
 cc_prebuilt_library://pkg/driver_runtime_shared_lib
 cc_prebuilt_library://pkg/fdio
 cc_prebuilt_library://pkg/heapdump_instrumentation
