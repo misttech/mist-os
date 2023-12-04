@@ -6,6 +6,7 @@ import("//build/test.gni")
 
 test("fidl-metadata-unittest") {
   deps = [
+    "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
     "//sdk/fidl/fuchsia.hardware.registers:fuchsia.hardware.registers_cpp",
     "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
@@ -15,6 +16,7 @@ test("fidl-metadata-unittest") {
   ]
 
   sources = [
+    "adc-test.cc",
     "i2c-test.cc",
     "registers-test.cc",
     "spi-test.cc",

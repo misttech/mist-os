@@ -5,7 +5,10 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.hardware.adcimpl") {
-  sources = [ "adc-impl.fidl" ]
+  sources = [
+    "adc-impl.fidl",
+    "metadata.fidl",
+  ]
   contains_drivers = true
   public_deps = [ "//zircon/vdso/zx" ]
 }
