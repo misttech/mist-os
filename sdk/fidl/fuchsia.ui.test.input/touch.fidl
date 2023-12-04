@@ -4,6 +4,7 @@
 
 library fuchsia.ui.test.input;
 
+using fuchsia.input.report;
 using fuchsia.math;
 using fuchsia.ui.pointer;
 using zx;
@@ -76,6 +77,16 @@ closed protocol TouchScreen {
 
         /// Number of move events in the pinch.
         3: move_event_count uint32;
+    }) -> ();
+
+    /// Simulate a touch event by a touch input report.
+    ///
+    /// TouchInputReport includes a list of contacts that are currently contacting the
+    /// touch surface. The report can represent multiply touch events by comparing with
+    /// previous reports received.
+    @available(added=17)
+    strict SimulateTouchEvent(struct {
+        report fuchsia.input.report.TouchInputReport;
     }) -> ();
 };
 

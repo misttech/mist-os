@@ -320,6 +320,17 @@ fn handle_touchscreen_request_stream(
                 Ok(TouchScreenRequest::SimulateMultiFingerGesture { payload: _, responder: _ }) => {
                     todo!();
                 }
+                Ok(TouchScreenRequest::SimulateTouchEvent { report, responder }) => {
+                    let input_report = InputReport {
+                        event_time: Some(fasync::Time::now().into_nanos()),
+                        touch: Some(report),
+                        ..Default::default()
+                    };
+                    touchscreen_device
+                        .send_input_report(input_report)
+                        .expect("failed to send empty input report");
+                    responder.send().expect("Failed to send SimulateTouchEvent response");
+                }
                 Err(e) => {
                     error!("Error on touchscreen channel: {}", e);
                     return;
