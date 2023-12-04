@@ -160,12 +160,12 @@ template("sdk_fuchsia_package") {
 
     _tool_deps = []
     _ffx_package_bin = "${host_out_dir}/ffx-package_unversioned"
-    _far_tool_bin = "${host_out_dir}/far"
+    _far_tool_bin = "$root_build_dir/host-tools/far"
 
     if (use_prebuilt_host_tools_from_build_dir == "") {
       _tool_deps += [
         "//src/developer/ffx/plugins/package:ffx_package_tool($host_toolchain)",
-        "//src/sys/pkg/bin/far:bin($host_toolchain)",
+        "//src/sys/pkg/bin/far:host($host_toolchain)",
       ]
     } else {
       _host_tool_dir =

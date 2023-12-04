@@ -57,7 +57,7 @@ template("_subbuild") {
       "--fuchsia-dir",
       rebase_path("//", root_build_dir),
       "--prebuilt-host-tools-dir",
-      rebase_path("$root_build_dir/sdk/idk_build_tools", _build_dir),
+      rebase_path(root_build_dir, _build_dir),
       "--compress-debuginfo",
       compress_debuginfo,
     ]
