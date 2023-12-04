@@ -26,7 +26,7 @@ impl SmcResource {
         mut stream: fkernel::SmcResourceRequestStream,
     ) -> Result<(), Error> {
         if self.resource.info()?.kind != zx::sys::ZX_RSRC_KIND_SMC {
-            return Err(format_err!("invalid handle kind, expected IOPORT"));
+            return Err(format_err!("invalid handle kind, expected SMC"));
         }
         while let Some(fkernel::SmcResourceRequest::Get { responder }) = stream.try_next().await? {
             responder.send(self.resource.duplicate_handle(zx::Rights::SAME_RIGHTS)?)?;

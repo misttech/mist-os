@@ -22,6 +22,7 @@ use {
             fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
             hypervisor_resource::HypervisorResource,
             info_resource::InfoResource,
+            iommu_resource::IommuResource,
             irq_resource::IrqResource,
             items::Items,
             kernel_stats::KernelStats,
@@ -787,6 +788,28 @@ impl BuiltinEnvironment {
         if let Some(info_resource) = info_resource {
             builtin_dict_builder.add_protocol_if_enabled::<fkernel::InfoResourceMarker>(
                 move |stream| info_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the IommuResource service.
+        let iommu_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_IOMMU_BASE,
+                        1,
+                        b"iommu",
+                    )
+                    .ok()
+            })
+            .map(IommuResource::new)
+            .and_then(Result::ok);
+        if let Some(iommu_resource) = iommu_resource {
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::IommuResourceMarker>(
+                move |stream| iommu_resource.clone().serve(stream).boxed(),
             );
         }
 

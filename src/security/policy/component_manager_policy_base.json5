@@ -76,6 +76,17 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
+                source_name: "fuchsia.kernel.IommuResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/boot-drivers:**",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
                 source_name: "fuchsia.kernel.IoportResource",
                 capability: "protocol",
                 target_monikers: [
