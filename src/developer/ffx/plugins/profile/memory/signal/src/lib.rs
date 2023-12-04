@@ -10,7 +10,7 @@ use {
     errors::ffx_error,
     ffx_profile_memory_signal_args::SignalCommand,
     fho::{moniker, FfxMain, FfxTool, SimpleWriter},
-    fidl_fuchsia_memory::DebuggerProxy,
+    fidl_fuchsia_memory_debug::MemoryPressureProxy,
 };
 
 #[derive(FfxTool)]
@@ -18,7 +18,7 @@ pub struct MemorySignalTool {
     #[command]
     cmd: SignalCommand,
     #[with(moniker("/core/memory_monitor"))]
-    debugger_proxy: DebuggerProxy,
+    debugger_proxy: MemoryPressureProxy,
 }
 
 fho::embedded_plugin!(MemorySignalTool);
@@ -26,11 +26,13 @@ fho::embedded_plugin!(MemorySignalTool);
 #[async_trait(?Send)]
 impl FfxMain for MemorySignalTool {
     type Writer = SimpleWriter;
-    /// Forwards the specified memory pressure level to the fuchsia.memory.Debugger FIDL interface.
+
+    /// Forwards the specified memory pressure level to the fuchsia.memory.debug.MemoryPressure FIDL
+    /// interface.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         self.debugger_proxy
-            .signal_memory_pressure(self.cmd.level)
-            .map_err(|err| ffx_error!("Failed to call Debugger/SignalMemroyPressure: {err}"))?;
+            .signal(self.cmd.level)
+            .map_err(|err| ffx_error!("Failed to call MemoryPressure/Signal: {err}"))?;
         Ok(())
     }
 }
