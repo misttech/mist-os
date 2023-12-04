@@ -604,6 +604,8 @@ impl PagedObjectHandle {
         let keys = lock_keys![LockKey::truncate(store.store_object_id(), self.handle.object_id())];
         let _truncate_guard = fs.lock_manager().write_lock(keys).await;
 
+        self.handle.owner().pager().page_in_barrier().await;
+
         let pending_shrink = self.inner.lock().unwrap().pending_shrink;
         if let PendingShrink::ShrinkTo(size) = pending_shrink {
             let needs_trim = self.shrink_file(size).await.context("Failed to shrink file")?;
@@ -1110,27 +1112,34 @@ mod tests {
         super::*,
         crate::fuchsia::{
             directory::FxDirectory,
+            pager::{default_page_in, PagerBacked},
             testing::{close_dir_checked, close_file_checked, open_file_checked, TestFixture},
             volume::FxVolumeAndRoot,
         },
         anyhow::{bail, Context},
+        assert_matches::assert_matches,
+        async_trait::async_trait,
         fidl::endpoints::{create_proxy, ServerEnd},
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon as zx,
-        futures::join,
+        futures::{
+            channel::mpsc::{unbounded, UnboundedSender},
+            join, StreamExt,
+        },
         fxfs::{
             filesystem::{FxFilesystemBuilder, OpenFxFilesystem},
-            object_store::volume::root_volume,
+            object_store::{volume::root_volume, Directory},
         },
         std::{
+            collections::HashSet,
             sync::{
                 atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering},
-                Arc, Weak,
+                Arc, Condvar, Weak,
             },
             time::Duration,
         },
-        storage_device::{fake_device::FakeDevice, DeviceHolder},
+        storage_device::{buffer, fake_device::FakeDevice, DeviceHolder},
         test_util::{assert_geq, assert_lt},
         vfs::path::Path,
     };
@@ -2198,6 +2207,185 @@ mod tests {
         assert_eq!(synced_ctime, synced_mtime);
 
         close_file_checked(file).await;
+        fixture.close().await;
+    }
+
+    #[fuchsia::test(threads = 8)]
+    async fn test_race() {
+        struct File {
+            notifications: UnboundedSender<Op>,
+            handle: PagedObjectHandle,
+            unblocked_requests: Mutex<HashSet<u64>>,
+            cvar: Condvar,
+        }
+
+        impl File {
+            fn unblock(&self, request: u64) {
+                self.unblocked_requests.lock().unwrap().insert(request);
+                self.cvar.notify_all();
+            }
+        }
+
+        #[async_trait]
+        impl PagerBacked for File {
+            fn pager(&self) -> &crate::pager::Pager {
+                self.handle.owner().pager()
+            }
+
+            fn pager_packet_receiver_registration(&self) -> &PagerPacketReceiverRegistration {
+                &self.handle.pager_packet_receiver_registration()
+            }
+
+            fn vmo(&self) -> &zx::Vmo {
+                self.handle.vmo()
+            }
+
+            fn page_in(self: Arc<Self>, range: Range<u64>) {
+                default_page_in(self.clone(), range);
+            }
+
+            fn mark_dirty(self: Arc<Self>, range: Range<u64>) {
+                self.handle.owner().clone().spawn(async move {
+                    self.handle.mark_dirty(range).await;
+                });
+            }
+
+            fn on_zero_children(self: Arc<Self>) {}
+
+            fn read_alignment(&self) -> u64 {
+                self.handle.block_size()
+            }
+
+            fn byte_size(&self) -> u64 {
+                self.handle.uncached_size()
+            }
+
+            async fn aligned_read(
+                &self,
+                range: Range<u64>,
+            ) -> Result<(buffer::Buffer<'_>, usize), Error> {
+                let buffer = self.handle.read_uncached(range).await?;
+                static COUNTER: AtomicU64 = AtomicU64::new(0);
+                let counter = COUNTER.fetch_add(1, Ordering::Relaxed);
+                if let Ok(()) = self.notifications.unbounded_send(Op::AfterAlignedRead(counter)) {
+                    let mut unblocked_requests = self.unblocked_requests.lock().unwrap();
+                    while !unblocked_requests.remove(&counter) {
+                        unblocked_requests = self.cvar.wait(unblocked_requests).unwrap();
+                    }
+                }
+                let buffer_len = buffer.len();
+                Ok((buffer, buffer_len))
+            }
+        }
+
+        #[derive(Debug)]
+        enum Op {
+            AfterAlignedRead(u64),
+        }
+
+        let fixture = TestFixture::new().await;
+
+        let vol = fixture.volume().volume().clone();
+        let fs = fixture.fs().clone();
+
+        // Run the test in a separate executor to avoid issues caused by stalling page_in requests
+        // (see `page_in` above).
+        std::thread::spawn(move || {
+            fasync::LocalExecutor::new().run_singlethreaded(async move {
+                let root_object_id = vol.store().root_directory_object_id();
+                let root_dir = Directory::open(&vol, root_object_id).await.expect("open failed");
+
+                let file;
+                let mut transaction = fs
+                    .new_transaction(
+                        lock_keys![LockKey::object(
+                            vol.store().store_object_id(),
+                            root_dir.object_id()
+                        )],
+                        Options::default(),
+                    )
+                    .await
+                    .unwrap();
+                file = root_dir
+                    .create_child_file(&mut transaction, "foo", None)
+                    .await
+                    .expect("create_child_file failed");
+                {
+                    let mut buf = file.allocate_buffer(100).await;
+                    buf.as_mut_slice().fill(1);
+                    file.txn_write(&mut transaction, 0, buf.as_ref())
+                        .await
+                        .expect("txn_write failed");
+                }
+                transaction.commit().await.unwrap();
+                let (notifications, mut receiver) = unbounded();
+
+                let file = Arc::new(File {
+                    notifications,
+                    handle: PagedObjectHandle::new(file),
+                    unblocked_requests: Mutex::new(HashSet::new()),
+                    cvar: Condvar::new(),
+                });
+
+                file.handle.owner().pager().register_file(&file);
+
+                // Trigger a pager request.
+                let cloned_file = file.clone();
+                let thread1 = std::thread::spawn(move || {
+                    cloned_file.vmo().read_to_vec(0, 10).unwrap();
+                });
+
+                // Wait for it.
+                let request1 = assert_matches!(
+                    receiver.next().await.unwrap(),
+                    Op::AfterAlignedRead(request1) => request1
+                );
+
+                // Truncate and then grow the file.
+                file.handle.truncate(0).await.expect("truncate failed");
+                file.handle.truncate(100).await.expect("truncate failed");
+
+                // Unblock the first page request after a delay.  The flush should wait for the
+                // request to finish.  If it doesn't, then the page request might finish later and
+                // provide the wrong pages.
+                let cloned_file = file.clone();
+                let thread2 = std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    cloned_file.unblock(request1);
+                });
+
+                file.handle.flush().await.expect("flush failed");
+
+                // We don't care what the original VMO read request returned, but reading now should
+                // return the new content, i.e. zeroes.  The original page-in request would/will
+                // return non-zero content.
+                let file_cloned = file.clone();
+                let thread3 = std::thread::spawn(move || {
+                    assert_eq!(&file_cloned.vmo().read_to_vec(0, 10).unwrap(), &[0; 10]);
+                });
+
+                // Wait for the second page request to arrive.
+                let request2 = assert_matches!(
+                    receiver.next().await.unwrap(),
+                    Op::AfterAlignedRead(request2) => request2
+                );
+
+                // If the flush didn't wait for the request to finish (it's a bug if it doesn't) we
+                // want the first page request to complete before the second one, and the only way
+                // we can do that now is to wait.
+                fasync::Timer::new(std::time::Duration::from_millis(100)).await;
+
+                // Unblock the second page request.
+                file.unblock(request2);
+
+                thread1.join().unwrap();
+                thread2.join().unwrap();
+                thread3.join().unwrap();
+            })
+        })
+        .join()
+        .unwrap();
+
         fixture.close().await;
     }
 }

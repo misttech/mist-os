@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use {
-    crate::fuchsia::errors::map_to_status,
+    crate::fuchsia::{
+        epochs::{Epochs, RefGuard},
+        errors::map_to_status,
+    },
     anyhow::Error,
-    async_lock::{Semaphore, SemaphoreGuard},
     async_trait::async_trait,
     bitflags::bitflags,
     fuchsia_async as fasync,
@@ -141,7 +143,13 @@ pub struct Pager {
     pager: zx::Pager,
     scope: ExecutionScope,
     executor: fasync::EHandle,
-    read_sem: Semaphore,
+
+    // Whenever a file is flushed, we must make sure existing page requests for a file are completed
+    // to eliminate the possibility of supplying stale data for a file.  We solve this by using a
+    // barrier when we flush to wait for outstanding page requests to finish.  Technically, we only
+    // need to wait for page requests for the specific file being flushed, but we should see if we
+    // need to for performance reasons first.
+    epochs: Arc<Epochs>,
 }
 
 // FileHolder is used to retain either a strong or a weak reference to a file.  If there are any
@@ -170,12 +178,11 @@ impl From<Weak<dyn PagerBacked>> for FileHolder {
 impl Pager {
     /// Creates a new pager.
     pub fn new(scope: ExecutionScope) -> Result<Self, Error> {
-        const MAX_CONCURRENT_READS: usize = 8;
         Ok(Pager {
             pager: zx::Pager::create(zx::PagerOptions::empty())?,
             scope,
             executor: fasync::EHandle::local(),
-            read_sem: Semaphore::new(MAX_CONCURRENT_READS),
+            epochs: Epochs::new(),
         })
     }
 
@@ -364,8 +371,8 @@ impl Pager {
         Ok(PagerVmoStats { was_vmo_modified: vmo_stats.modified == ZX_PAGER_VMO_STATS_MODIFIED })
     }
 
-    async fn acquire_read_permit(&self) -> SemaphoreGuard<'_> {
-        self.read_sem.acquire().await
+    pub async fn page_in_barrier(&self) {
+        self.epochs.barrier().await;
     }
 }
 
@@ -412,6 +419,11 @@ pub trait PagerBacked: Sync + Send + 'static {
 /// A generic page_in implementation that supplies pages using block-aligned reads.
 pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     fxfs_trace::duration!("start-page-in");
+
+    let pager = this.pager();
+
+    let ref_guard = pager.epochs.add_ref();
+
     const ZERO_VMO_SIZE: u64 = 1_048_576;
     static ZERO_VMO: Lazy<zx::Vmo> = Lazy::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
@@ -435,7 +447,7 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
     let mut offset = std::cmp::max(range.start, aligned_size);
     while offset < range.end {
         let end = std::cmp::min(range.end, offset + ZERO_VMO_SIZE);
-        this.pager().supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
+        pager.supply_pages(this.vmo(), offset..end, &ZERO_VMO, 0);
         offset = end;
     }
 
@@ -447,16 +459,12 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, mut range: Range<u64>) {
         range.start += read_size;
 
         let this = this.clone();
-        this.clone().pager().spawn(page_in_chunk(this, read_range));
+        this.clone().pager().spawn(page_in_chunk(this, read_range, ref_guard.clone()));
     }
 }
 
 #[fxfs_trace::trace]
-async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: Range<u64>) {
-    // TODO(fxbug.dev/299206422): Cap concurrency and prevent parallelism until we have a
-    // solution for buffer allocation failing.
-    let _guard = this.pager().acquire_read_permit().await;
-
+async fn page_in_chunk<P: PagerBacked>(this: Arc<P>, read_range: Range<u64>, _ref_guard: RefGuard) {
     let (buffer, buffer_len) = match this.aligned_read(read_range.clone()).await {
         Ok(v) => v,
         Err(error) => {
