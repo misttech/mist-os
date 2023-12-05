@@ -9,7 +9,7 @@ use crate::{
 };
 use fidl::AsHandleRef as _;
 use fuchsia_zircon as zx;
-use lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
+use starnix_lifecycle::{AtomicU64Counter, AtomicUsizeCounter};
 use starnix_lock::Mutex;
 use starnix_sync::{EventWaitGuard, InterruptibleEvent, NotifyKind, PortEvent, PortWaitResult};
 use starnix_uapi::{

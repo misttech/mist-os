@@ -28,7 +28,7 @@ use futures::{
     task::Poll,
     Future, Stream, StreamExt, TryStreamExt,
 };
-use lifecycle::DropWaiter;
+use starnix_lifecycle::DropWaiter;
 use starnix_lock::{Mutex, MutexGuard};
 use starnix_logging::{
     log_error, log_warn, trace_duration, trace_flow_begin, trace_flow_end, trace_flow_step,

@@ -69,7 +69,7 @@ pub use wd_number::*;
 pub use xattr::*;
 
 use crate::task::CurrentTask;
-use lifecycle::{ObjectReleaser, ReleaserAction};
+use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
 use std::{cell::RefCell, ops::DerefMut, sync::Arc};
 

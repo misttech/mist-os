@@ -502,7 +502,7 @@ mod tests {
     use fuchsia_zircon::{
         HandleBased, {self as zx},
     };
-    use lifecycle::AtomicUsizeCounter;
+    use starnix_lifecycle::AtomicUsizeCounter;
     use syncio::Zxio;
 
     #[::fuchsia::test]

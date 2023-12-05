@@ -20,7 +20,7 @@ use crate::{
 };
 use fuchsia_zircon as zx;
 use itertools::Itertools;
-use lifecycle::{AtomicU64Counter, DropNotifier};
+use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_logging::{log_error, log_warn, not_implemented};
 use starnix_uapi::{

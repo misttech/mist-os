@@ -28,7 +28,7 @@ use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
 use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
-use lifecycle::AtomicU64Counter;
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
 use starnix_logging::{log_error, log_trace, log_warn, not_implemented, trace_duration};
 use starnix_sync::InterruptibleEvent;

@@ -34,7 +34,7 @@ use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
 use futures::{StreamExt, TryStreamExt};
-use lifecycle::AtomicU64Counter;
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use std::{
     ops::DerefMut,

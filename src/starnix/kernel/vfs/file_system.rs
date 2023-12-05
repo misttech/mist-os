@@ -9,11 +9,11 @@ use crate::{
         WeakFsNodeHandle, XattrOp,
     },
 };
-use lifecycle::AtomicU64Counter;
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use starnix_uapi::{
     arc_key::ArcKey, as_any::AsAny, device_type::DeviceType, error, errors::Errno, ino_t,

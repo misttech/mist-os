@@ -69,9 +69,9 @@ rustc_binary("starnix_kernel_bin") {
 
   source_root = "main.rs"
   deps = [
-    ":lifecycle",
     ":perfetto_consumer_proto",
     ":starnix_kernel_config",
+    ":starnix_lifecycle",
     ":starnix_logging",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
@@ -534,8 +534,8 @@ fuchsia_structured_config_values("kernel_config") {
   values_source = "//src/starnix/kernel/meta/config.json5"
 }
 
-rustc_library("lifecycle") {
-  name = "lifecycle"
+rustc_library("starnix_lifecycle") {
+  name = "starnix_lifecycle"
   edition = "2021"
   version = "0.1.0"
   with_unit_tests = true
@@ -559,8 +559,8 @@ rustc_library("lifecycle") {
   test_deps = [ "//src/lib/fuchsia" ]
 }
 
-fuchsia_unittest_package("lifecycle-tests") {
-  deps = [ ":lifecycle_test" ]
+fuchsia_unittest_package("starnix_lifecycle-tests") {
+  deps = [ ":starnix_lifecycle_test" ]
 }
 
 rustc_library("starnix_logging") {

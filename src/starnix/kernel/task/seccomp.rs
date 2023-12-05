@@ -15,7 +15,7 @@ use crate::{
     },
 };
 use bstr::ByteSlice;
-use lifecycle::AtomicU64Counter;
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use starnix_logging::log_warn;
 use starnix_syscalls::{decls::Syscall, SyscallArg, SyscallResult};

@@ -29,7 +29,6 @@ use crate::{
 use fidl_fuchsia_logger;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
-use lifecycle::AtomicU64Counter;
 use magma::{
     magma_buffer_clean_cache, magma_buffer_get_cache_policy, magma_buffer_get_info,
     magma_buffer_id_t, magma_buffer_info_t, magma_buffer_set_cache_policy, magma_buffer_set_name,
@@ -147,6 +146,7 @@ use magma::{
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
     MAGMA_STATUS_OK,
 };
+use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use starnix_logging::{impossible_error, log_error, log_warn, set_zx_name};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
