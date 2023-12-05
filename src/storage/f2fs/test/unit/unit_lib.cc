@@ -309,6 +309,15 @@ std::string FileTester::GetRandomName(unsigned int len) {
   return str;
 }
 
+void FileTester::AppendToInline(File *file, const void *data, size_t len) {
+  size_t offset = file->GetSize();
+  size_t ret = 0;
+  if (file->TestFlag(InodeInfoFlag::kInlineData) && offset + len < file->MaxInlineData()) {
+    ASSERT_EQ(file->WriteInline(data, len, offset, &ret), ZX_OK);
+    ASSERT_EQ(ret, len);
+  }
+}
+
 void FileTester::AppendToFile(File *file, const void *data, size_t len) {
   size_t end = 0;
   size_t ret = 0;

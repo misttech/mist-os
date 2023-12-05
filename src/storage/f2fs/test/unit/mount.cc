@@ -36,7 +36,6 @@ void MountTestVerifyOptions(F2fs *fs, MountOptions &options) {
       case MountOption::kNoAcl:
       case MountOption::kDisableRollForward:
       case MountOption::kInlineXattr:
-      case MountOption::kInlineData:
       case MountOption::kInlineDentry:
       case MountOption::kForceLfs:
         ASSERT_EQ(*value_or != 0, superblock_info.TestOpt(option));

@@ -13,9 +13,7 @@ namespace {
 
 class MultiThreads : public F2fsFakeDevTestFixture {
  public:
-  MultiThreads()
-      : F2fsFakeDevTestFixture(TestOptions{.block_count = 2097152,
-                                           .mount_options = {{MountOption::kInlineData, 0}}}) {}
+  MultiThreads() : F2fsFakeDevTestFixture(TestOptions{.block_count = 2097152}) {}
 };
 
 TEST_F(MultiThreads, Truncate) {

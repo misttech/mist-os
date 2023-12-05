@@ -182,7 +182,6 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   NodeInfo ni;
 
   if (vnode.RecoverInlineData(page) == ZX_OK) {
-    // Restored from inline data.
     return;
   }
 

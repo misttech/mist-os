@@ -19,7 +19,6 @@ enum class MountOption {
   kNoAcl,
   kDisableExtIdentify,
   kInlineXattr,
-  kInlineData,
   kInlineDentry,
   kForceLfs,
   kReadOnly,
@@ -54,12 +53,11 @@ class MountOptions {
   // "noacl", 1
   // "disable_ext_identify", 0
   // "inline_xattr", 0
-  // "inline_data", 0
   // "inline_dentry", 1
   // "mode", ModeType::kModeAdaptive (0)
   // "readonly", 0
   // "active_logs", 6
-  std::array<size_t, kMaxOptionCount> opt_ = {1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 6};
+  std::array<size_t, kMaxOptionCount> opt_ = {1, 0, 1, 1, 1, 1, 0, 0, 1, 0, 0, 6};
 };
 
 zx::result<> StartComponent(fidl::ServerEnd<fuchsia_io::Directory> root,

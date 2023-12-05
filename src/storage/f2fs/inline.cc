@@ -351,20 +351,6 @@ zx_status_t Dir::ReadInlineDir(fs::VdirCookie *cookie, void *dirents, size_t len
   return ZX_OK;
 }
 
-zx_status_t File::ReadInline(void *data, size_t len, size_t off, size_t *out_actual) {
-  LockedPage inline_page;
-  if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &inline_page); ret != ZX_OK) {
-    return ret;
-  }
-
-  size_t cur_len = std::min(len, GetSize() - off);
-  inline_page->Read(data, InlineDataOffset() + off, cur_len);
-
-  *out_actual = cur_len;
-
-  return ZX_OK;
-}
-
 zx_status_t File::ConvertInlineData() {
   if (!TestFlag(InodeInfoFlag::kInlineData)) {
     return ZX_OK;

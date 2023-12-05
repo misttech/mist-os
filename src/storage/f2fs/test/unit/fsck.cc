@@ -325,7 +325,6 @@ TEST(FsckTest, OrphanNodes) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -379,7 +378,6 @@ TEST(FsckTest, InvalidNatEntry) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -463,7 +461,6 @@ TEST(FsckTest, InvalidSsaEntry) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options;
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -843,8 +840,6 @@ TEST(FsckTest, WrongDataExistFlag) {
     std::unique_ptr<F2fs> fs;
     async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
     MountOptions options{};
-    // Enable inline data option
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
     FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
     fbl::RefPtr<VnodeF2fs> root;
@@ -855,11 +850,13 @@ TEST(FsckTest, WrongDataExistFlag) {
     fbl::RefPtr<fs::Vnode> child;
     ASSERT_EQ(root_dir->Create(file_name, S_IFREG, &child), ZX_OK);
 
-    // Write string and verify
+    // Write string in inode and verify
     fbl::RefPtr<VnodeF2fs> child_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(child));
     File *child_file_ptr = static_cast<File *>(child_file.get());
+    child_file_ptr->SetFlag(InodeInfoFlag::kInlineData);
+
     const std::string_view data_string = "hello";
-    FileTester::AppendToFile(child_file_ptr, data_string.data(), data_string.size());
+    FileTester::AppendToInline(child_file_ptr, data_string.data(), data_string.size());
     ASSERT_EQ(child_file_ptr->GetSize(), data_string.size());
 
     char r_buf[data_string.size()];
@@ -867,6 +864,13 @@ TEST(FsckTest, WrongDataExistFlag) {
     ASSERT_EQ(child_file_ptr->Read(r_buf, data_string.size(), 0, &out), ZX_OK);
     ASSERT_EQ(out, data_string.size());
     ASSERT_EQ(memcmp(r_buf, data_string.data(), data_string.size()), 0);
+    // read() migrated inline data to a file block.
+    FileTester::CheckNonInlineFile(child_file_ptr);
+
+    // fill inline data again.
+    child_file_ptr->Truncate(0);
+    child_file_ptr->SetFlag(InodeInfoFlag::kInlineData);
+    FileTester::AppendToInline(child_file_ptr, data_string.data(), data_string.size());
 
     // Save the inode number for fsck to retrieve it
     ino = child_file->GetKey();

@@ -124,6 +124,7 @@ class FileTester {
 
   static std::string GetRandomName(unsigned int len);
 
+  static void AppendToInline(File *file, const void *data, size_t len);
   static void AppendToFile(File *file, const void *data, size_t len);
   static void ReadFromFile(File *file, void *data, size_t len, size_t off);
 };

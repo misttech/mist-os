@@ -234,64 +234,6 @@ TEST_F(InlineCompatibilityTest, InlineDataLinuxToFuchsia) {
   }
 }
 
-TEST_F(InlineCompatibilityTest, InlineDataFuchsiaToLinux) {
-  // Inline data on Linux F2FS is available from v3.13
-  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 13);
-
-  const std::string inline_file_name = "inline";
-
-  const uint32_t data_length = GetEnclosedGuest().GetFuchsiaOperator().MaxInlineDataLength() / 2;
-
-  uint32_t w_buf[kPageSize / sizeof(uint32_t)];
-  for (uint32_t i = 0; i < kPageSize / sizeof(uint32_t); ++i) {
-    w_buf[i] = CpuToLe(i);
-  }
-
-  // Create and write inline file on Fuchsia
-  {
-    GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
-    MountOptions options;
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
-    GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
-
-    auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
-
-    auto test_file =
-        GetEnclosedGuest().GetFuchsiaOperator().Open(inline_file_name, O_RDWR | O_CREAT, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    ASSERT_EQ(test_file->Write(w_buf, data_length), data_length);
-
-    VnodeF2fs *raw_vn_ptr = static_cast<FuchsiaTestFile *>(test_file.get())->GetRawVnodePtr();
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
-  }
-
-  // Verify on Linux
-  {
-    GetEnclosedGuest().GetLinuxOperator().Fsck();
-    GetEnclosedGuest().GetLinuxOperator().Mount();
-
-    auto umount = fit::defer([&] { GetEnclosedGuest().GetLinuxOperator().Umount(); });
-
-    auto test_file = GetEnclosedGuest().GetLinuxOperator().Open(
-        std::string(kLinuxPathPrefix) + inline_file_name, O_RDWR, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    const uint32_t count = data_length / sizeof(uint32_t);
-    for (uint32_t i = 0; i < count; ++i) {
-      std::string result;
-      GetEnclosedGuest().GetLinuxOperator().ExecuteWithAssert(
-          {"od -An -j", std::to_string(i * sizeof(uint32_t)), "-N",
-           std::to_string(sizeof(uint32_t)), "-td4",
-           GetEnclosedGuest().GetLinuxOperator().ConvertPath(std::string(kLinuxPathPrefix) +
-                                                             inline_file_name),
-           "| tr -d ' \\n'"},
-          &result);
-      ASSERT_EQ(result, std::to_string(CpuToLe(i)));
-    }
-  }
-}
-
 TEST_F(InlineCompatibilityTest, DataExistFlagLinuxToFuchsia) {
   // |DataExist| flag on Linux F2FS is available from v3.18
   GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 18);
@@ -378,71 +320,6 @@ TEST_F(InlineCompatibilityTest, DataExistFlagLinuxToFuchsia) {
     ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
     ASSERT_FALSE(raw_vn_ptr->TestFlag(InodeInfoFlag::kDataExist));
   }
-}
-
-TEST_F(InlineCompatibilityTest, DataExistFlagFuchsiaToLinux) {
-  // |DataExist| flag on Linux F2FS is available from v3.18
-  GetEnclosedGuest().GetLinuxOperator().CheckLinuxVersion(3, 18);
-
-  const std::string filenames[4] = {"alpha", "bravo", "charlie", "delta"};
-  const std::string test_string = "hello";
-
-  // Create and write inline files on Fuchsia
-  {
-    GetEnclosedGuest().GetFuchsiaOperator().Mkfs();
-    MountOptions options;
-    ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
-    GetEnclosedGuest().GetFuchsiaOperator().Mount(options);
-
-    auto umount = fit::defer([&] { GetEnclosedGuest().GetFuchsiaOperator().Umount(); });
-
-    // Create file, then check if kDataExist is unset
-    auto test_file =
-        GetEnclosedGuest().GetFuchsiaOperator().Open(filenames[0], O_RDWR | O_CREAT, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    VnodeF2fs *raw_vn_ptr = static_cast<FuchsiaTestFile *>(test_file.get())->GetRawVnodePtr();
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
-    ASSERT_FALSE(raw_vn_ptr->TestFlag(InodeInfoFlag::kDataExist));
-
-    // Write some data, then check if kDataExist is set
-    test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filenames[1], O_RDWR | O_CREAT, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    ASSERT_EQ(test_file->Write(test_string.data(), test_string.size()),
-              static_cast<ssize_t>(test_string.size()));
-
-    raw_vn_ptr = static_cast<FuchsiaTestFile *>(test_file.get())->GetRawVnodePtr();
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kDataExist));
-
-    // Truncate to non-zero size, then check if kDataExist is set
-    test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filenames[2], O_RDWR | O_CREAT, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    ASSERT_EQ(test_file->Write(test_string.data(), test_string.size()),
-              static_cast<ssize_t>(test_string.size()));
-    ASSERT_EQ(test_file->Ftruncate(test_string.size() / 2), 0);
-
-    raw_vn_ptr = static_cast<FuchsiaTestFile *>(test_file.get())->GetRawVnodePtr();
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kDataExist));
-
-    // Truncate to zero size, then check if kDataExist is unset
-    test_file = GetEnclosedGuest().GetFuchsiaOperator().Open(filenames[3], O_RDWR | O_CREAT, 0644);
-    ASSERT_TRUE(test_file->IsValid());
-
-    ASSERT_EQ(test_file->Write(test_string.data(), test_string.size()),
-              static_cast<ssize_t>(test_string.size()));
-    ASSERT_EQ(test_file->Ftruncate(0), 0);
-
-    raw_vn_ptr = static_cast<FuchsiaTestFile *>(test_file.get())->GetRawVnodePtr();
-    ASSERT_TRUE(raw_vn_ptr->TestFlag(InodeInfoFlag::kInlineData));
-    ASSERT_FALSE(raw_vn_ptr->TestFlag(InodeInfoFlag::kDataExist));
-  }
-
-  // Check if all files pass fsck on Linux
-  { GetEnclosedGuest().GetLinuxOperator().Fsck(); }
 }
 
 }  // namespace

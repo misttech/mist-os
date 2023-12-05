@@ -147,8 +147,6 @@ TEST(FsyncRecoveryTest, FsyncInode) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -214,8 +212,6 @@ TEST(FsyncRecoveryTest, FsyncDnode) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -281,8 +277,6 @@ TEST(FsyncRecoveryTest, FsyncIndirectDnode) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -478,8 +472,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryIndirectDnode) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -551,8 +543,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryMultipleFiles) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -663,8 +653,6 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Enable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 1), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 
@@ -685,6 +673,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   fbl::RefPtr<VnodeF2fs> inline_vnode =
       fbl::RefPtr<VnodeF2fs>::Downcast(std::move(inline_raw_vnode));
   File *inline_file_ptr = static_cast<File *>(inline_vnode.get());
+  inline_vnode->SetFlag(InodeInfoFlag::kInlineData);
   FileTester::CheckInlineFile(inline_vnode.get());
 
   fs->SyncFs();
@@ -699,7 +688,7 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
     w_buf[i] = static_cast<char>(rand());
   }
 
-  FileTester::AppendToFile(inline_file_ptr, w_buf, target_size);
+  FileTester::AppendToInline(inline_file_ptr, w_buf, target_size);
   FileTester::CheckInlineFile(inline_vnode.get());
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
 
@@ -725,12 +714,18 @@ TEST(FsyncRecoveryTest, FsyncRecoveryInlineData) {
   // Check recovery inline data
   FileTester::ReadFromFile(inline_file_ptr, r_buf, target_size, 0);
   ASSERT_EQ(memcmp(r_buf, w_buf, target_size), 0);
+  // As fuchsia f2fs doesn't use inlinedata, |inline_vnode| should move inline data to data block
+  // during read()
+  FileTester::CheckNonInlineFile(inline_vnode.get());
 
   // 2. remove inline_data, and then recover data blocks
   // Write one more byte, then it should be converted to noinline
-  target_size = inline_file_ptr->MaxInlineData();
-
+  inline_vnode->Truncate(0);
+  inline_vnode->SetFlag(InodeInfoFlag::kInlineData);
   FileTester::CheckInlineFile(inline_vnode.get());
+  FileTester::AppendToInline(inline_file_ptr, w_buf, target_size);
+
+  target_size = inline_file_ptr->MaxInlineData();
   FileTester::AppendToFile(inline_file_ptr, &(w_buf[target_size - 1]), 1);
   FileTester::CheckNonInlineFile(inline_vnode.get());
   ASSERT_EQ(inline_file_ptr->GetSize(), target_size);
@@ -779,8 +774,6 @@ TEST(FsyncRecoveryTest, RecoveryWithoutFsync) {
   MountOptions options{};
   // Enable roll-forward recovery
   ASSERT_EQ(options.SetValue(MountOption::kDisableRollForward, 0), ZX_OK);
-  // Disable inline data option
-  ASSERT_EQ(options.SetValue(MountOption::kInlineData, 0), ZX_OK);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
 

@@ -39,10 +39,6 @@ zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
   vnode->SetGeneration(superblock_info_.GetNextGeneration());
   superblock_info_.IncNextGeneration();
 
-  if (superblock_info_.TestOpt(MountOption::kInlineData) && !vnode->IsDir()) {
-    vnode->SetFlag(InodeInfoFlag::kInlineData);
-  }
-
   if (superblock_info_.TestOpt(MountOption::kInlineDentry) && vnode->IsDir()) {
     vnode->SetFlag(InodeInfoFlag::kInlineDentry);
     vnode->SetInlineXattrAddrs(kInlineXattrAddrs);

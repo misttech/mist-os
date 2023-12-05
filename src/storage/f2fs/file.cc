@@ -307,7 +307,7 @@ zx_status_t File::Read(void *data, size_t length, size_t offset, size_t *out_act
 
   size_t num_bytes = std::min(length, GetSize() - offset);
   if (TestFlag(InodeInfoFlag::kInlineData)) {
-    return ReadInline(data, num_bytes, offset, out_actual);
+    ConvertInlineData();
   }
 
   const pgoff_t vmo_node_start = safemath::CheckDiv<pgoff_t>(offset, kVmoNodeSize).ValueOrDie();
@@ -343,9 +343,6 @@ zx_status_t File::DoWrite(const void *data, size_t len, size_t offset, size_t *o
   }
 
   if (TestFlag(InodeInfoFlag::kInlineData)) {
-    if (offset + len < MaxInlineData()) {
-      return WriteInline(data, len, offset, out_actual);
-    }
     ConvertInlineData();
   }
 

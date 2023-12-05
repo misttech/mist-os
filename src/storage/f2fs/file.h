@@ -6,6 +6,8 @@
 #define SRC_STORAGE_F2FS_FILE_H_
 
 namespace f2fs {
+
+class FileTester;
 class File : public VnodeF2fs, public fbl::Recyclable<File> {
  public:
   explicit File(F2fs* fs, ino_t ino, umode_t mode);
@@ -43,6 +45,7 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
   bool SupportsClientSideStreams() final;
 
  private:
+  friend FileTester;
   zx_status_t ReadInline(void* data, size_t len, size_t off, size_t* out_actual);
   zx_status_t WriteInline(const void* data, size_t len, size_t offset, size_t* out_actual);
   zx_status_t TruncateInline(size_t len, bool is_recover);

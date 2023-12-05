@@ -431,7 +431,6 @@ uint32_t FuchsiaOperator::MaxInlineDentrySlots() {
 uint32_t FuchsiaOperator::MaxInlineDataLength() {
   Mkfs();
   MountOptions options;
-  options.SetValue(MountOption::kInlineData, 1);
   Mount(options);
 
   auto umount = fit::defer([&] { Umount(); });
