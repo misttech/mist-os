@@ -241,6 +241,9 @@ struct DisplayTiming {
   //
   // Also known as "Htotal".
   //
+  // If `IsValid()` is true, the value is guaranteed to be >= 0 and
+  // <= kMaxTimingValue.
+  //
   // TODO(fxbug.dev/136948): The current display limits may not support some
   // timings allowed by the VESA DisplayID standard.
   constexpr int horizontal_total_px() const { return horizontal_active_px + horizontal_blank_px(); }
@@ -248,6 +251,9 @@ struct DisplayTiming {
   // Number of all lines on the display.
   //
   // Also known as "Vtotal".
+  //
+  // If `IsValid()` is true, the value is guaranteed to be >= 0 and
+  // <= kMaxTimingValue.
   //
   // TODO(fxbug.dev/136948): The current display limits may not support some
   // timings allowed by the VESA DisplayID standard.
@@ -292,6 +298,12 @@ constexpr bool DisplayTiming::IsValid() const {
   if (pixel_repetition < 0 || pixel_repetition > 1) {
     return false;
   }
+  if (horizontal_total_px() < 0 || horizontal_total_px() > kMaxTimingValue) {
+    return false;
+  }
+  if (vertical_total_lines() < 0 || vertical_total_lines() > kMaxTimingValue) {
+    return false;
+  }
   return true;
 }
 
@@ -325,6 +337,12 @@ constexpr void DisplayTiming::DebugAssertIsValid() const {
 
   ZX_DEBUG_ASSERT(pixel_repetition >= 0);
   ZX_DEBUG_ASSERT(pixel_repetition <= 1);
+
+  ZX_DEBUG_ASSERT(horizontal_total_px() >= 0);
+  ZX_DEBUG_ASSERT(horizontal_total_px() <= kMaxTimingValue);
+
+  ZX_DEBUG_ASSERT(vertical_total_lines() >= 0);
+  ZX_DEBUG_ASSERT(vertical_total_lines() <= kMaxTimingValue);
 }
 
 constexpr inline bool operator==(const DisplayTiming& lhs, const DisplayTiming& rhs) {

@@ -875,6 +875,54 @@ TEST(DisplayTimingIsValid, InvalidPixelRepetition) {
   EXPECT_FALSE(kParam2.IsValid());
 }
 
+TEST(DisplayTimingIsValid, InvalidHorizontalTotal) {
+  // All the atomic fields (horizontal_active_px, horizontal_front_porch_px,
+  // horizontal_sync_width_px and horizontal_back_porch_px) don't exceed their
+  // maximum allowed limits, but the horizontal total pixels (0x3bbb8) exceeds
+  // the maximum limit.
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0xee'ee,
+      .horizontal_front_porch_px = 0xee'ee,
+      .horizontal_sync_width_px = 0xee'ee,
+      .horizontal_back_porch_px = 0xee'ee,
+      .vertical_active_lines = 0x0b'0b,
+      .vertical_front_porch_lines = 0x03'03,
+      .vertical_sync_width_lines = 0x04'04,
+      .vertical_back_porch_lines = 0x05'05,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = true,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+}
+
+TEST(DisplayTimingIsValid, InvalidVerticalTotal) {
+  // All the atomic fields (vertical_active_lines, vertical_front_porch_lines,
+  // vertical_sync_width_lines and vertical_back_porch_lines) don't exceed their
+  // maximum allowed limits, but the vertical total lines (0x3bbb8) exceeds
+  // the maximum limit.
+  constexpr DisplayTiming kParam = {
+      .horizontal_active_px = 0x0f'0f,
+      .horizontal_front_porch_px = 0x0a'0a,
+      .horizontal_sync_width_px = 0x01'01,
+      .horizontal_back_porch_px = 0x02'02,
+      .vertical_active_lines = 0xee'ee,
+      .vertical_front_porch_lines = 0xee'ee,
+      .vertical_sync_width_lines = 0xee'ee,
+      .vertical_back_porch_lines = 0xee'ee,
+      .pixel_clock_frequency_khz = 0x1f'1f'1f'1f,
+      .fields_per_frame = FieldsPerFrame::kProgressive,
+      .hsync_polarity = SyncPolarity::kPositive,
+      .vsync_polarity = SyncPolarity::kPositive,
+      .vblank_alternates = false,
+      .pixel_repetition = 0,
+  };
+  EXPECT_FALSE(kParam.IsValid());
+}
+
 }  // namespace
 
 }  // namespace display
