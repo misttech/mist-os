@@ -70,6 +70,11 @@ still zero and marking it clean (hence evictable).
 were previously signaled with **ZX_PAGER_OP_WRITEBACK_BEGIN** can be marked clean. Refer to the
 sample code below for suggested usage.
 
+The kernel is free to evict any pages or zero ranges that have been marked clean, after which the
+userspace pager will be expected to supply them again if needed. This also means that the pager
+should be careful to not have any stale supplies in flight, and should only supply with the new
+content it has just written back.
+
 Sample code (modulo error handling) to discover and clean any dirty pages might look something like
 this.
 
@@ -121,7 +126,8 @@ this.
 **ZX_ERR_NOT_SUPPORTED**  *op* is not supported on the specified range in *pager_vmo*.
 
 **ZX_ERR_NOT_FOUND** *op* is **ZX_PAGER_OP_DIRTY** and the range denoted by *offset* and
-*length* contains unsupplied regions.
+*length* contains unsupplied regions, or regions that were previously populated but have since been
+evicted by the kernel.
 
 **ZX_ERR_BAD_STATE** *op* is **ZX_PAGER_OP_DIRTY** or **ZX_PAGER_OP_FAIL** and *pager_vmo* has been
 detached from the *pager*.
