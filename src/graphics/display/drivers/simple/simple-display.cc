@@ -357,6 +357,7 @@ zx_status_t SimpleDisplay::DisplayControllerImplSetBufferCollectionConstraints(
   buffer_constraints.ram_domain_supported(true);
   buffer_constraints.cpu_domain_supported(true);
   buffer_constraints.heap_permitted(std::array{fuchsia_sysmem2::wire::HeapType::kFramebuffer});
+  constraints.buffer_memory_constraints(buffer_constraints.Build());
   auto image_constraints = fuchsia_sysmem2::wire::ImageFormatConstraints::Builder(arena);
   image_constraints.pixel_format(format_);
   image_constraints.pixel_format_modifier(kFormatModifier);
