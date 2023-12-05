@@ -123,6 +123,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "AudioInit failed: %d", status);
   }
 
+  if (OtRadioInit() != ZX_OK) {
+    zxlogf(ERROR, "OtRadioInit failed");
+  }
+
   if ((status = BluetoothInit()) != ZX_OK) {
     zxlogf(ERROR, "BluetoothInit failed: %d", status);
   }
@@ -256,10 +260,6 @@ int Nelson::Thread() {
 
   if (ThermistorInit() != ZX_OK) {
     zxlogf(ERROR, "ThermistorInit failed");
-  }
-
-  if (OtRadioInit() != ZX_OK) {
-    zxlogf(ERROR, "OtRadioInit failed");
   }
 
   root_ = inspector_.GetRoot().CreateChild("nelson_board_driver");

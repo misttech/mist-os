@@ -58,6 +58,13 @@ const std::vector<fdf::NodeProperty> kSpiProperties = std::vector{
                       bind_fuchsia_nordic_platform::BIND_PLATFORM_DEV_DID_THREAD),
 };
 
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
     {GPIO_TH_SOC_INT, bind_fuchsia_gpio::FUNCTION_OT_RADIO_INTERRUPT},
     {GPIO_SOC_TH_RST_L, bind_fuchsia_gpio::FUNCTION_OT_RADIO_RESET},
@@ -69,12 +76,13 @@ const std::map<uint32_t, std::string> kGpioPinFunctionMap = {
 namespace nelson {
 
 zx_status_t Nelson::OtRadioInit() {
-  gpio_impl_.SetAltFunction(GPIO_TH_SOC_INT, 0);
-  gpio_impl_.ConfigIn(GPIO_TH_SOC_INT, GPIO_NO_PULL);
-  gpio_impl_.SetAltFunction(GPIO_SOC_TH_RST_L, 0);  // Reset
-  gpio_impl_.ConfigOut(GPIO_SOC_TH_RST_L, 1);
-  gpio_impl_.SetAltFunction(GPIO_SOC_TH_BOOT_MODE_L, 0);  // Boot mode
-  gpio_impl_.ConfigOut(GPIO_SOC_TH_BOOT_MODE_L, 1);
+  gpio_init_steps_.push_back({GPIO_TH_SOC_INT, GpioSetAltFunction(0)});
+  gpio_init_steps_.push_back(
+      {GPIO_TH_SOC_INT, GpioConfigIn(fuchsia_hardware_gpio::GpioFlags::kNoPull)});
+  gpio_init_steps_.push_back({GPIO_SOC_TH_RST_L, GpioSetAltFunction(0)});  // Reset
+  gpio_init_steps_.push_back({GPIO_SOC_TH_RST_L, GpioConfigOut(1)});
+  gpio_init_steps_.push_back({GPIO_SOC_TH_BOOT_MODE_L, GpioSetAltFunction(0)});  // Boot mode
+  gpio_init_steps_.push_back({GPIO_SOC_TH_BOOT_MODE_L, GpioConfigOut(1)});
 
   fpbus::Node dev;
   dev.name() = "nrf52811-radio";
@@ -83,7 +91,10 @@ zx_status_t Nelson::OtRadioInit() {
   dev.did() = bind_fuchsia_platform::BIND_PLATFORM_DEV_DID_OT_RADIO;
   dev.metadata() = kNrf52811RadioMetadata;
 
-  std::vector<fdf::ParentSpec> parents = {fdf::ParentSpec{{kSpiRules, kSpiProperties}}};
+  std::vector<fdf::ParentSpec> parents = {
+      fdf::ParentSpec{{kSpiRules, kSpiProperties}},
+      fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}},
+  };
   parents.reserve(parents.size() + kGpioPinFunctionMap.size());
 
   for (auto& [gpio_pin, function] : kGpioPinFunctionMap) {
