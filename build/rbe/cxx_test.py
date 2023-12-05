@@ -462,6 +462,25 @@ class CxxActionTests(unittest.TestCase):
         self.assertEqual(c.linker_depfile, depfile)
         self.assertEqual(list(c.linker_output_files()), [output, depfile])
 
+    def test_linker_pdb_output(self):
+        source = Path("hello.o")
+        output = Path("hello.efi")
+        pdb = Path("hello.pdb")
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "--target=x86_x64-windows-msvc",
+                    f"-Wl,/debug:full",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.pdb, pdb)
+        self.assertEqual(list(c.linker_output_files()), [output, pdb])
+
     def test_linker_retain_symbols_file(self):
         source = Path("hello.o")
         output = Path("hello")

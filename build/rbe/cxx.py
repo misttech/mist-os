@@ -762,6 +762,14 @@ class CxxAction(object):
         if self.crash_diagnostics_dir:
             yield self.crash_diagnostics_dir
 
+    @property
+    def pdb(self) -> Optional[Path]:
+        if "windows" in self.target:
+            if any("/debug" in f for f in self.linker_driver_flags):
+                if self.output_file:
+                    return self.output_file.with_suffix(".pdb")
+        return None
+
     def linker_output_files(self) -> Iterable[Path]:
         if self.output_file:
             yield self.output_file
@@ -769,6 +777,8 @@ class CxxAction(object):
             yield self.linker_depfile
         if self.linker_mapfile:
             yield self.linker_mapfile
+        if self.pdb:
+            yield self.pdb
 
     def _preprocess_only_command(self) -> Iterable[str]:
         # replace the output with a preprocessor output
