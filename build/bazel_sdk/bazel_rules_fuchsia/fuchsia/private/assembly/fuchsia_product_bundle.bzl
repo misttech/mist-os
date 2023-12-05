@@ -4,6 +4,7 @@
 """Rule for creating product bundle for flashing Fuchsia images to target devices."""
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs")
+load("//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl", "fuchsia_product_bundle_tasks")
 load(
     ":providers.bzl",
     "FuchsiaAssemblyConfigInfo",
@@ -13,6 +14,50 @@ load(
     "FuchsiaScrutinyConfigInfo",
     "FuchsiaVirtualDeviceInfo",
 )
+
+def fuchsia_product_bundle(
+        *,
+        name,
+        board_name = None,
+        partitions_config = None,
+        product_image = None,
+        product_name = None,
+        **kwargs):
+    """ Build a fuchsia product bundle.
+
+    This rule produces a fuchsia product bundle which can be used to flash or OTA a device.
+
+    This macro will expand out into several fuchsia tasks that can be run by a
+    bazel invocation. Given a product bundle definition, the following targets will be
+    created.
+
+    ```
+    fuchsia_product_bundle(
+        name = "product_bundle",
+        board_name = "<your_board>",
+        partitions_config = ":your_partitions_config",
+        product_image = ":your_image",
+        product_name = "<your_product_name>",
+    )
+    ```
+    - product_bundle.flash: Calling run on this target will flash the device this created product_bundle.
+    - product_bundle.ota: <TBA>.
+    - product_bundle.emu: <TBA>.
+    """
+
+    _build_fuchsia_product_bundle(
+        name = name,
+        board_name = board_name,
+        partitions_config = partitions_config,
+        product_image = product_image,
+        product_name = product_name,
+        **kwargs
+    )
+
+    fuchsia_product_bundle_tasks(
+        name = "%s_tasks" % name,
+        product_bundle = name,
+    )
 
 def _scrutiny_validation(
         ctx,
@@ -440,7 +485,7 @@ def _extract_structured_config(ctx, ffx_tool, pb_out_dir, is_recovery):
     )
     return [structured_config, depfile]
 
-def _fuchsia_product_bundle_impl(ctx):
+def _build_fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
     partitions_configuration = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config
     system_a_out = ctx.attr.product_image[FuchsiaProductImageInfo].images_out
@@ -551,9 +596,9 @@ def _fuchsia_product_bundle_impl(ctx):
         is_remote = False,
     )]
 
-fuchsia_product_bundle = rule(
+_build_fuchsia_product_bundle = rule(
     doc = """Creates pb for flashing Fuchsia images to target devices.""",
-    implementation = _fuchsia_product_bundle_impl,
+    implementation = _build_fuchsia_product_bundle_impl,
     toolchains = ["@fuchsia_sdk//fuchsia:toolchain"],
     attrs = {
         "board_name": attr.string(

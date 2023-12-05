@@ -46,6 +46,7 @@ debug_symbols
 delete
 delete_repo
 fetch
+flash
 help
 make_default
 publish

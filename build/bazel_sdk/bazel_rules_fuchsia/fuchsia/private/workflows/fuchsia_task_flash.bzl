@@ -4,8 +4,8 @@
 
 """Flash device using product bundle as a task workflow."""
 
-load(":providers.bzl", "FuchsiaProductBundleInfo")
 load(":fuchsia_task_ffx.bzl", "ffx_task_rule")
+load(":providers.bzl", "FuchsiaProductBundleInfo")
 
 def _fuchsia_task_flash_impl(ctx, _make_ffx_task):
     return _make_ffx_task(
