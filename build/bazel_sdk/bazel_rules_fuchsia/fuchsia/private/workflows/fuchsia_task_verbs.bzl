@@ -41,6 +41,7 @@ def _make_verbs(*verbs):
     )
 
 _verbs = _make_verbs(*"""
+check_now
 create
 debug_symbols
 delete
@@ -49,10 +50,13 @@ fetch
 flash
 help
 make_default
+ota
 publish
 reboot
 remove
+repo_add
 start
+set_channel
 stop
 wait
 """.strip().split("\n"))
