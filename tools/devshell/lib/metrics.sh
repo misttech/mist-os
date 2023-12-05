@@ -222,6 +222,25 @@ function __is_in_regex {
   return 1
 }
 
+function _read-other-tools-analytics-uuid {
+  local base_dir
+  case "${HOST_OS}" in
+    linux)
+      base_dir="${XDG_DATA_HOME}"
+      if [[ -z "${base_dir}" ]]; then
+        base_dir="${HOME}/.local/share"
+      fi
+      ;;
+    mac)
+      base_dir="${HOME}/Library/Application Support"
+      ;;
+  esac
+  base_dir="${base_dir}/Fuchsia/metrics"
+  if [[ "$(cat "${base_dir}/analytics-status" 2>/dev/null)" == 1 ]]; then
+    echo "$(cat "${base_dir}/uuid" 2>/dev/null)"
+  fi
+}
+
 function metrics-read-config {
   METRICS_UUID=""
   METRICS_ENABLED=0
@@ -234,6 +253,7 @@ function metrics-read-config {
     METRICS_ENABLED=0
     return 1
   fi
+  OTHER_TOOLS_ANALYTICS_UUID="$(_read-other-tools-analytics-uuid)"
   return 0
 }
 
@@ -551,7 +571,8 @@ function _send-analytics-batch {
   \"shell\":{\"value\":\"$(_app_name)\"},\
   \"shell_version\":{\"value\":\"$(_app_version)\"},\
   \"kernel_release\":{\"value\":\"$(uname -rs)\"},\
-  \"ninja_persistent\":{\"value\":\"$(_get_ninja_persistent_mode)\"}\
+  \"ninja_persistent\":{\"value\":\"$(_get_ninja_persistent_mode)\"},\
+  \"other_uuid\":{\"value\":\"${OTHER_TOOLS_ANALYTICS_UUID}\"}\
   }"
   local events_json=$(fx-command-run jq -n -c '$ARGS.positional' \
     --jsonargs "${events[@]}")

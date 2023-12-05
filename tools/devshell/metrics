@@ -51,6 +51,7 @@ the session and user workflow in order to improve the user experience:
    - Time taken to complete
    - Exit status
    - Whether ninja persistent mode is enabled
+   - Analytics UUID associated with other Fuchsia tools, such as ffx, zxdb, etc.
 
 2. For "fx set":
    - The target name (product.board, e.g. core.x64)
