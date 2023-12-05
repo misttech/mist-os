@@ -9,15 +9,23 @@
 #include <lib/ddk/io-buffer.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/component/cpp/composite_node_spec.h>
+#include <lib/driver/component/cpp/node_add_args.h>
 #include <unistd.h>
 #include <zircon/hw/gpt.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <ddk/metadata/nand.h>
 #include <soc/aml-common/aml-guid.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
 #include "astro.h"
+
+namespace fdf {
+using namespace fuchsia_driver_framework;
+}  // namespace fdf
 
 namespace astro {
 namespace fpbus = fuchsia_hardware_platform_bus;
@@ -110,43 +118,35 @@ static const fpbus::Node raw_nand_dev = []() {
   return dev;
 }();
 
+static const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+static const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+static const std::vector<fdf::ParentSpec> kRawNandParents = std::vector{
+    fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+};
+
+static const auto kCompositeNodeSpec =
+    fdf::CompositeNodeSpec{{.name = "raw_nand", .parents = kRawNandParents}};
+
 zx_status_t Astro::RawNandInit() {
-  zx_status_t status;
-
   // Set alternate functions to enable raw_nand.
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(8), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(8), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(9), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(10), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(11), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(12), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(14), GpioSetAltFunction(2)});
+  gpio_init_steps_.push_back({S905D2_GPIOBOOT(15), GpioSetAltFunction(2)});
 
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(9), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(10), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(11), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(12), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(14), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
-  status = gpio_impl_.SetAltFunction(S905D2_GPIOBOOT(15), 2);
-  if (status != ZX_OK) {
-    return status;
-  }
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('RAWN');
-  auto result = pbus_.buffer(arena)->NodeAdd(fidl::ToWire(fidl_arena, raw_nand_dev));
+  fdf::WireUnownedResult result = pbus_.buffer(arena)->AddCompositeNodeSpec(
+      fidl::ToWire(fidl_arena, raw_nand_dev), fidl::ToWire(fidl_arena, kCompositeNodeSpec));
   if (!result.ok()) {
     zxlogf(ERROR, "%s: NodeAdd RawNand(raw_nand_dev) request failed: %s", __func__,
            result.FormatDescription().data());

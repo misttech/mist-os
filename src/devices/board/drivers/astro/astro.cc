@@ -68,6 +68,10 @@ int Astro::Thread() {
     zxlogf(ERROR, "CpuInit failed: %d", status);
   }
 
+  if ((status = RawNandInit()) != ZX_OK) {
+    zxlogf(ERROR, "RawNandInit failed: %d", status);
+  }
+
   if ((status = SdioInit()) != ZX_OK) {
     zxlogf(ERROR, "SdioInit failed: %d", status);
   }
@@ -161,10 +165,6 @@ int Astro::Thread() {
 
   if ((status = VideoInit()) != ZX_OK) {
     zxlogf(ERROR, "VideoInit failed: %d", status);
-  }
-
-  if ((status = RawNandInit()) != ZX_OK) {
-    zxlogf(ERROR, "RawNandInit failed: %d", status);
   }
 
   if ((status = ThermalInit()) != ZX_OK) {

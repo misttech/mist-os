@@ -31,6 +31,7 @@ driver_bind_rules("aml-rawnand-bind") {
   tests = "bind-tests.json"
   deps = [
     "//src/devices/bind/fuchsia.amlogic.platform",
+    "//src/devices/bind/fuchsia.gpio",
     "//src/devices/bind/fuchsia.platform",
   ]
 }
