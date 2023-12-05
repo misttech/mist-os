@@ -319,15 +319,36 @@ class LlcppControlClientFromHlcpp {
   fidl::SyncClient<fuchsia_net_interfaces_admin::Control> llcpp_client_;
 };
 
-// A Handler for
-// `fuchsia.net.interfaces.admin/AddressStateProvider.OnAddressRemoved` events
-// that simply records the `AddressRemovalReason`.
+// A Handler for `fuchsia.net.interfaces.admin/AddressStateProvider` events.
+//
+// The `fuchsia.net.interfaces.admin/AddressStateProvider.OnAddressRemoved`
+// event is stored.
 //
 // The `fuchsia.net.interfaces.admin/AddressStateProvider.OnAddressAdded` event
 // is ignored by this handler.
-class OnAddressRemovedHandler
+class AddressStateProviderEventHandler
     : public fidl::SyncEventHandler<fuchsia_net_interfaces_admin::AddressStateProvider> {
  public:
+  // Handles events until `OnAddressRemoved` is observed.
+  //
+  // If the returned `fidl::Status` is ok, `removal_reason` is guaranteed to be
+  // populated with a value.
+  fidl::Status WaitForAddressRemoval(
+      fidl::UnownedClientEnd<::fuchsia_net_interfaces_admin::AddressStateProvider> client_end) {
+    // `OnAddressAdded` and `OnAddressRemoved` are both one-time only events, so
+    // at most two events will be observed.
+    fidl::Status status = HandleOneEvent(client_end);
+    if (!status.ok()) {
+      return status;
+    }
+    if (removal_reason.has_value()) {
+      // We've already observed removal; no need to wait for a second event.
+      return status;
+    }
+    // The first event was `OnAddressAdded`; wait for a second event.
+    return HandleOneEvent(client_end);
+  }
+
   void OnAddressAdded() override {}
 
   void OnAddressRemoved(
@@ -336,7 +357,7 @@ class OnAddressRemovedHandler
     removal_reason = event.error();
   }
 
-  fuchsia_net_interfaces_admin::AddressRemovalReason removal_reason;
+  std::optional<fuchsia_net_interfaces_admin::AddressRemovalReason> removal_reason;
 };
 
 // Adds the given address to the given interface.
@@ -397,13 +418,13 @@ PlatformResult AddAddressInternal(
       }
       // Peer Closed errors will be accompanied by an `OnAddressRemoved` event.
       // That provides additional context as to why the error was observed.
-      OnAddressRemovedHandler handler;
-      fidl::Status status = handler.HandleOneEvent(asp_client.client_end());
+      AddressStateProviderEventHandler handler;
+      fidl::Status status = handler.WaitForAddressRemoval(asp_client.client_end());
       if (!status.ok()) {
         FX_LOGS(ERROR) << "Failure while handling |OnAddressRemoved|: " << status.status_string();
         return kPlatformResultFailure;
       }
-      if (handler.removal_reason ==
+      if (handler.removal_reason.value() ==
           fuchsia_net_interfaces_admin::AddressRemovalReason::kAlreadyAssigned) {
         FX_LOGS(WARNING) << "Address " << AddressToStringInfallible(address)
                          << " was already assigned to interface " << interface_id;
@@ -411,7 +432,7 @@ PlatformResult AddAddressInternal(
       } else {
         FX_LOGS(ERROR) << "Failed to add address " << AddressToStringInfallible(address)
                        << " to Interface " << interface_id << " : "
-                       << AddressRemovalReasonToString(handler.removal_reason);
+                       << AddressRemovalReasonToString(handler.removal_reason.value());
         return kPlatformResultFailure;
       }
     }

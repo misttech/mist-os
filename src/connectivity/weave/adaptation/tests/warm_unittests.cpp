@@ -140,12 +140,21 @@ class FakeAddressStateProvider
     binding_.events().OnAddressRemoved(reason);
   }
 
+  void SendOnAddressAdded() { binding_.events().OnAddressAdded(); }
+
  private:
   // Default implementation for any API method not explicitly overridden.
   void NotImplemented_(const std::string& name) override { FAIL() << "Not implemented: " << name; }
 
   void WatchAddressAssignmentState(WatchAddressAssignmentStateCallback callback) override {
     if (add_fails_with_err_.has_value()) {
+      // Send the OnAddressAdded event prior the `OnAddressRemoved`, so that the
+      // `AddressStateProviderEventHandler` has to handle two events before
+      // knowing the removal reason. This is a regression test for
+      // fxbug.dev/136245.
+      SendOnAddressAdded();
+      SendOnAddressRemoved(
+          fuchsia::net::interfaces::admin::AddressRemovalReason::INTERFACE_REMOVED);
       binding_.Close(add_fails_with_err_.value());
       OnHangUp(add_fails_with_err_.value());
     } else {
