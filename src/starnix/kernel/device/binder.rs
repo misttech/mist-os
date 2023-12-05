@@ -30,7 +30,9 @@ use fidl_fuchsia_starnix_binder as fbinder;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::{Mutex, MutexGuard, RwLock};
-use starnix_logging::{log_error, log_trace, log_warn, not_implemented, trace_duration};
+use starnix_logging::{
+    log_error, log_trace, log_warn, not_implemented, trace_category_starnix, trace_duration,
+};
 use starnix_sync::InterruptibleEvent;
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{

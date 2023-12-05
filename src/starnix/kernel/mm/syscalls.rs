@@ -18,7 +18,9 @@ use crate::{
         FdNumber,
     },
 };
-use starnix_logging::{log_trace, not_implemented, not_implemented_log_once, trace_duration};
+use starnix_logging::{
+    log_trace, not_implemented, not_implemented_log_once, trace_category_starnix_mm, trace_duration,
+};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,

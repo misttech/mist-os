@@ -24,7 +24,7 @@ use range_map::RangeMap;
 use starnix_lock::{OrderedMutex, RwLock};
 use starnix_logging::{
     impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name,
-    trace_duration,
+    trace_category_starnix_mm, trace_duration,
 };
 use starnix_uapi::{
     errno, error,

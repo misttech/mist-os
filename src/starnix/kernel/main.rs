@@ -28,7 +28,9 @@ use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_runtime as fruntime;
 use futures::{StreamExt, TryStreamExt};
-use starnix_logging::{impossible_error, log_debug, trace_instant};
+use starnix_logging::{
+    impossible_error, log_debug, trace_category_starnix, trace_instant, trace_name_start_kernel,
+};
 
 mod arch;
 mod device;

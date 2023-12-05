@@ -21,8 +21,8 @@ use fuchsia_zircon::{
 };
 use lock_sequence::{Locked, Unlocked};
 use starnix_logging::{
-    log_warn, set_zx_name, trace_duration, trace_duration_begin, trace_duration_end, trace_instant,
-    CoreDumpInfo, MAX_ARGV_LENGTH,
+    firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
+    firehose_trace_instant, log_warn, set_zx_name, CoreDumpInfo, MAX_ARGV_LENGTH,
 };
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
@@ -92,14 +92,14 @@ impl RestrictedState {
     }
 
     pub fn write_state(&mut self, state: &zx::sys::zx_restricted_state_t) {
-        trace_duration!(trace_category_starnix!(), trace_name_write_restricted_state!());
+        firehose_trace_duration!(trace_category_starnix!(), trace_name_write_restricted_state!());
         debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
         self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()]
             .copy_from_slice(Self::restricted_state_as_bytes(state));
     }
 
     pub fn read_state(&self, state: &mut zx::sys::zx_restricted_state_t) {
-        trace_duration!(trace_category_starnix!(), trace_name_read_restricted_state!());
+        firehose_trace_duration!(trace_category_starnix!(), trace_name_read_restricted_state!());
         debug_assert!(self.state_size >= std::mem::size_of::<zx::sys::zx_restricted_state_t>());
         Self::restricted_state_as_bytes_mut(state).copy_from_slice(
             &self.bound_state[0..std::mem::size_of::<zx::sys::zx_restricted_state_t>()],
@@ -190,7 +190,7 @@ fn run_task(
     let span = current_task.logging_span();
     let _span_guard = span.enter();
 
-    trace_duration!(trace_category_starnix!(), trace_name_run_task!());
+    firehose_trace_duration!(trace_category_starnix!(), trace_name_run_task!());
 
     // This is the pointer that is passed to `restricted_enter`.
     let restricted_return_ptr = restricted_return as *const ();
@@ -261,7 +261,10 @@ fn run_task(
         match reason_code {
             zx::sys::ZX_RESTRICTED_REASON_SYSCALL => {
                 profile_duration!("ExecuteSyscall");
-                trace_duration_begin!(trace_category_starnix!(), trace_name_execute_syscall!());
+                firehose_trace_duration_begin!(
+                    trace_category_starnix!(),
+                    trace_name_execute_syscall!()
+                );
 
                 // Store the new register state in the current task before dispatching the system call.
                 current_task.thread_state.registers =
@@ -282,14 +285,14 @@ fn run_task(
                 // Restore the CFI directives before continuing.
                 restore_cfi_directives!();
 
-                trace_duration_end!(
+                firehose_trace_duration_end!(
                     trace_category_starnix!(),
                     trace_name_execute_syscall!(),
                     trace_arg_name!() => syscall_decl.name
                 );
             }
             zx::sys::ZX_RESTRICTED_REASON_EXCEPTION => {
-                trace_duration!(trace_category_starnix!(), trace_name_handle_exception!());
+                firehose_trace_duration!(trace_category_starnix!(), trace_name_handle_exception!());
                 profile_duration!("HandleException");
                 let restricted_exception = restricted_state.read_exception();
 
@@ -301,7 +304,7 @@ fn run_task(
                 process_completed_exception(current_task, exception_result);
             }
             zx::sys::ZX_RESTRICTED_REASON_KICK => {
-                trace_instant!(
+                firehose_trace_instant!(
                     trace_category_starnix!(),
                     trace_name_restricted_kick!(),
                     fuchsia_trace::Scope::Thread
@@ -323,7 +326,7 @@ fn run_task(
             }
         }
 
-        trace_duration!(trace_category_starnix!(), trace_name_check_task_exit!());
+        firehose_trace_duration!(trace_category_starnix!(), trace_name_check_task_exit!());
         profile_duration!("CheckTaskExit");
         if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {

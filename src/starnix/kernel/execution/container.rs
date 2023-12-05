@@ -36,7 +36,10 @@ use fuchsia_zircon::{
 use futures::{channel::oneshot, FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_kernel_config::Config;
-use starnix_logging::{log_error, log_info, log_warn, trace_duration};
+use starnix_logging::{
+    log_error, log_info, log_warn, trace_category_starnix, trace_duration,
+    trace_name_create_container,
+};
 use starnix_uapi::{
     auth::Credentials,
     errno,

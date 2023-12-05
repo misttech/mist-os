@@ -8,9 +8,6 @@ fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
 // The trace category used for memory manager related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix_mm, "starnix:mm");
 
-// The trace category used to enable task runtime args on trace durations.
-fuchsia_trace::string_name_macro!(trace_category_starnix_task_runtime, "starnix:task_runtime");
-
 // The name used to track the duration in Starnix while executing a task.
 fuchsia_trace::string_name_macro!(trace_name_run_task, "RunTask");
 
@@ -19,12 +16,6 @@ fuchsia_trace::string_name_macro!(trace_category_atrace, "starnix:atrace");
 
 // The name used to identify blob records from the container's Perfetto daemon.
 fuchsia_trace::string_name_macro!(trace_name_perfetto_blob, "starnix_perfetto");
-
-// The name used to track the duration in Starnix while executing a syscall.
-fuchsia_trace::string_name_macro!(trace_name_normal_mode, "NormalMode");
-
-// The name used to track the duration in user space between syscalls.
-fuchsia_trace::string_name_macro!(trace_name_restricted_mode, "RestrictedMode");
 
 // The name used to track the duration of a syscall.
 fuchsia_trace::string_name_macro!(trace_name_execute_syscall, "ExecuteSyscall");
@@ -51,24 +42,21 @@ fuchsia_trace::string_name_macro!(trace_name_check_task_exit, "CheckTaskExit");
 // The argument used to track the name of a syscall.
 fuchsia_trace::string_name_macro!(trace_arg_name, "name");
 
-// The argument used to track the CPU time of a thread at various points during a syscall.
-fuchsia_trace::string_name_macro!(trace_arg_cpu_time, "cpu_time");
-
-// The argument used to track the queue time of a thread at various points during a syscall.
-fuchsia_trace::string_name_macro!(trace_arg_queue_time, "queue_time");
-
-// The argument used to track the page fault time of a thread at various points during a syscall.
-fuchsia_trace::string_name_macro!(trace_arg_page_fault_time, "page_fault_time");
-
-// The argument used to track the lock contention time of a thread at various points during a
-// syscall.
-fuchsia_trace::string_name_macro!(trace_arg_lock_contention_time, "lock_contention_time");
-
 #[macro_export]
 macro_rules! ignore_unused_variables_if_disable_tracing {
     ($($val:expr),*) => {
         $(
             #[cfg(not(feature = "tracing"))]
+            { let _ = &$val; }
+        )*
+    };
+}
+
+#[macro_export]
+macro_rules! ignore_unused_variables_if_disable_firehose {
+    ($($val:expr),*) => {
+        $(
+            #[cfg(not(feature = "tracing_firehose"))]
             { let _ = &$val; }
         )*
     };
@@ -82,6 +70,16 @@ macro_rules! trace_instant {
 
         $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
     };
+}
+
+#[macro_export]
+macro_rules! firehose_trace_instant {
+    ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
+        #[cfg(feature = "tracing_firehose")]
+        $crate::trace_instant($category, $name, $scope $(, $key => $val)*);
+
+        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+    }
 }
 
 // The `trace_duration` macro defines a `_scope` instead of executing a statement because the
@@ -99,6 +97,16 @@ macro_rules! trace_duration {
 }
 
 #[macro_export]
+macro_rules! firehose_trace_duration {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+        #[cfg(feature = "tracing_firehose")]
+        $crate::trace_duration!($category, $name $(, $key => $val)*);
+
+        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+    }
+}
+
+#[macro_export]
 macro_rules! trace_duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
         #[cfg(feature = "tracing")]
@@ -109,6 +117,16 @@ macro_rules! trace_duration_begin {
 }
 
 #[macro_export]
+macro_rules! firehose_trace_duration_begin {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+        #[cfg(feature = "tracing_firehose")]
+        $crate::trace_duration_begin!($category, $name $(, $key => $val)*);
+
+        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+    }
+}
+
+#[macro_export]
 macro_rules! trace_duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
         #[cfg(feature = "tracing")]
@@ -116,6 +134,16 @@ macro_rules! trace_duration_end {
 
         $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
     };
+}
+
+#[macro_export]
+macro_rules! firehose_trace_duration_end {
+    ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
+        #[cfg(feature = "tracing_firehose")]
+        $crate::trace_duration_end!($category, $name $(, $key => $val)*);
+
+        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+    }
 }
 
 #[macro_export]

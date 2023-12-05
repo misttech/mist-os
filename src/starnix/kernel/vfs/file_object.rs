@@ -22,7 +22,9 @@ use crate::{
 use fidl::HandleBased;
 use fuchsia_zircon as zx;
 use starnix_lock::Mutex;
-use starnix_logging::{impossible_error, not_implemented, trace_duration};
+use starnix_logging::{
+    impossible_error, not_implemented, trace_category_starnix_mm, trace_duration,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     as_any::AsAny,

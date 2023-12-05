@@ -14,7 +14,10 @@ declare_args() {
   starnix_disable_logging = false
 
   # Whether or not tracing is enabled globally.
-  starnix_enable_tracing = false
+  starnix_enable_tracing = true
+
+  # Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
+  starnix_enable_tracing_firehose = false
 
   # Compiles-in trace and debug logging in release builds. By default, these
   # logs are compiled-out for performance reasons. For more information, see
@@ -398,6 +401,9 @@ rustc_binary("starnix_kernel_bin") {
   features = []
   if (starnix_enable_tracing) {
     features += [ "tracing" ]
+  }
+  if (starnix_enable_tracing_firehose) {
+    features += [ "tracing_firehose" ]
   }
   if (starnix_enable_trace_and_debug_logs_in_release) {
     features += [ "trace_and_debug_logs_in_release" ]
