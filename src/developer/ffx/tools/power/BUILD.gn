@@ -11,6 +11,8 @@ ffx_plugin("ffx_power_plugin") {
   plugin_deps = [ "debugcmd:ffx_power_debugcmd" ]
 
   args_sources = [ "src/args.rs" ]
+
+  sdk_category = "internal"
 }
 
 ffx_tool("ffx_power") {

@@ -88,6 +88,11 @@ import("plugins.gni")
 #     A list of conditional compilation flags to enable. This can be used to set features for crates
 #     built in-tree which are also published to crates.io. This would be passed to rustc as
 #     '--cfg feature=XXX'
+#
+#   sdk_category (optional)
+#     Publication level of the plugin in SDKs. Defaults to partner if not
+#     specified.
+#     See //build/sdk/sdk_atom.gni.
 template("ffx_plugin") {
   output_name = target_name
 
@@ -101,6 +106,11 @@ template("ffx_plugin") {
   }
 
   if (is_host) {
+    sdk_category = "partner"
+    if (defined(invoker.sdk_category)) {
+      sdk_category = invoker.sdk_category
+    }
+
     args_deps = []
     if (defined(invoker.args_deps)) {
       args_deps += invoker.args_deps
@@ -154,14 +164,18 @@ template("ffx_plugin") {
                                  "original_target_name",
                                ])
 
-        # make sure no fidl libraries not in the SDK are used.
-        assert_no_deps = [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+        # make sure no fidl libraries not in the SDK are used if it's public
+        # TODO(b/314822328): improve this logic to cascade properly
+        if (sdk_category != "internal") {
+          assert_no_deps = [
+            "//sdk:marker-cts",
+            "//sdk:marker-excluded",
+            "//sdk:marker-experimental",
+            "//sdk:marker-internal",
+            "//sdk:marker-unknown",
+          ]
+        }
+        deps += [ "//sdk:marker-$sdk_category" ]
       }
 
       args_deps += [ ":" + sub_cmd ]
@@ -317,14 +331,18 @@ template("ffx_plugin") {
                                ])
         original_target_name = _original_target_name
 
-        # make sure no fidl libraries not in the SDK are used.
-        assert_no_deps = [
-          "//sdk:marker-cts",
-          "//sdk:marker-excluded",
-          "//sdk:marker-experimental",
-          "//sdk:marker-internal",
-          "//sdk:marker-unknown",
-        ]
+        # make sure no fidl libraries not in the SDK are used if it's public
+        # TODO(b/314822328): improve this logic to cascade properly
+        if (sdk_category != "internal") {
+          assert_no_deps = [
+            "//sdk:marker-cts",
+            "//sdk:marker-excluded",
+            "//sdk:marker-experimental",
+            "//sdk:marker-internal",
+            "//sdk:marker-unknown",
+          ]
+        }
+        deps += [ "//sdk:marker-$sdk_category" ]
       }
       suite_deps += [ ":" + execution_lib ]
 
@@ -340,7 +358,7 @@ template("ffx_plugin") {
       with_unit_tests = false
       disable_rustdoc = true
       sources = [ "$target_gen_dir/plugins.rs" ]
-      deps = suite_deps
+      deps = suite_deps + [ "//sdk:marker-$sdk_category" ]
 
       forward_variables_from(invoker,
                              "*",

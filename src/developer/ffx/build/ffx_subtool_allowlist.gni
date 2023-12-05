@@ -57,9 +57,6 @@ ffx_subtool_fidl_allowlist = [
   # used by ffx daemon
   "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite",
 
-  # used by ffx power debugcmd
-  "//sdk/fidl/fuchsia.power.manager.debug:fuchsia.power.manager.debug",
-
   # used by ffx process
   "//sdk/fidl/fuchsia.process.explorer:fuchsia.process.explorer",
 

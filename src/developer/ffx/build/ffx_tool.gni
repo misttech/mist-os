@@ -84,8 +84,12 @@ template("ffx_tool") {
     assert_no_deps += invoker.assert_no_deps
   }
 
+  # TODO(b/314822328): improve this logic to cascade properly
   if (defined(invoker.sdk_category) && invoker.sdk_category != "internal") {
     assert_no_deps += [
+      "//sdk:marker-cts",
+      "//sdk:marker-excluded",
+      "//sdk:marker-experimental",
       "//sdk:marker-internal",
       "//sdk:marker-unknown",
     ]

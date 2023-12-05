@@ -20,4 +20,6 @@ ffx_plugin("ffx_power_debugcmd") {
   test_deps = [ "//src/lib/fuchsia-async" ]
 
   args_sources = [ "src/args.rs" ]
+
+  sdk_category = "internal"
 }
