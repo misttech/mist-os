@@ -30,8 +30,8 @@ source_set("common_srcs") {
   sources = [
     "device.cc",
     "device.h",
-    "gpu.cc",
-    "gpu.h",
+    "gpu-device-driver.cc",
+    "gpu-device-driver.h",
     "virtio-abi.cc",
     "virtio-abi.h",
   ]
@@ -82,7 +82,7 @@ test("virtio-gpu-test") {
     }
   }
   sources = [
-    "gpu_test.cc",
+    "gpu-device-driver-test.cc",
     "virtio-abi-test.cc",
   ]
   deps = [
@@ -104,7 +104,7 @@ fuchsia_unittest_package("virtio-gpu-test-package") {
 
   # TODO(fxbug.dev/134883): Remove this block when below error is resolved.
   # There's expected error logs that happen in the integration test where
-  # GetBtiAndBackend fails in GpuDriver::Device::Create due to testing
+  # GetBtiAndBackend fails in GpuDeviceDriver::Device::Create due to testing
   # without a fake GPU backend in place.
   test_specs = {
     log_settings = {

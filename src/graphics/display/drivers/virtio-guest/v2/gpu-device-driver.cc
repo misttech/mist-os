@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
@@ -42,13 +42,13 @@ zx_status_t ResponseTypeToZxStatus(virtio_abi::ControlType type) {
 
 // DDK level ops
 
-GpuDriver::GpuDriver(fdf::DriverStartArgs start_args,
-                     fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+GpuDeviceDriver::GpuDeviceDriver(fdf::DriverStartArgs start_args,
+                                 fdf::UnownedSynchronizedDispatcher driver_dispatcher)
     : DriverBase("virtio-gpu", std::move(start_args), std::move(driver_dispatcher)) {}
 
-GpuDriver::~GpuDriver() {}
+GpuDeviceDriver::~GpuDeviceDriver() {}
 
-zx_status_t GpuDriver::get_display_info() {
+zx_status_t GpuDeviceDriver::get_display_info() {
   const virtio_abi::GetDisplayInfoCommand command = {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
@@ -101,8 +101,9 @@ std::optional<virtio_abi::ResourceFormat> To2DResourceFormat(
 
 }  // namespace
 
-zx_status_t GpuDriver::allocate_2d_resource(uint32_t* resource_id, uint32_t width, uint32_t height,
-                                            fuchsia_images2::wire::PixelFormat pixel_format) {
+zx_status_t GpuDeviceDriver::allocate_2d_resource(uint32_t* resource_id, uint32_t width,
+                                                  uint32_t height,
+                                                  fuchsia_images2::wire::PixelFormat pixel_format) {
   ZX_ASSERT(resource_id);
 
   FDF_LOG(TRACE, "Allocate2DResource");
@@ -127,7 +128,7 @@ zx_status_t GpuDriver::allocate_2d_resource(uint32_t* resource_id, uint32_t widt
   return ResponseTypeToZxStatus(response->header.type);
 }
 
-zx_status_t GpuDriver::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
+zx_status_t GpuDeviceDriver::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
   ZX_ASSERT(ptr);
 
   FDF_LOG(TRACE,
@@ -149,8 +150,8 @@ zx_status_t GpuDriver::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size
   return ResponseTypeToZxStatus(response->header.type);
 }
 
-zx_status_t GpuDriver::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
-                                   uint32_t height) {
+zx_status_t GpuDeviceDriver::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
+                                         uint32_t height) {
   FDF_LOG(TRACE,
           "SetScanout - scanout ID %" PRIu32 ", resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
           scanout_id, resource_id, width, height);
@@ -173,7 +174,7 @@ zx_status_t GpuDriver::set_scanout(uint32_t scanout_id, uint32_t resource_id, ui
   return ResponseTypeToZxStatus(response->header.type);
 }
 
-zx_status_t GpuDriver::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t GpuDeviceDriver::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
   FDF_LOG(TRACE, "FlushResource - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32, resource_id,
           width, height);
 
@@ -188,7 +189,8 @@ zx_status_t GpuDriver::flush_resource(uint32_t resource_id, uint32_t width, uint
   return ResponseTypeToZxStatus(response->header.type);
 }
 
-zx_status_t GpuDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t width, uint32_t height) {
+zx_status_t GpuDeviceDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
+                                                 uint32_t height) {
   FDF_LOG(TRACE, "Transfer2DResourceToHost - resource ID %" PRIu32 ", size %" PRIu32 "x%" PRIu32,
           resource_id, width, height);
 
@@ -210,7 +212,7 @@ zx_status_t GpuDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
   return ResponseTypeToZxStatus(response->header.type);
 }
 
-zx_status_t GpuDriver::Stage2Init() {
+zx_status_t GpuDeviceDriver::Stage2Init() {
   FDF_LOG(TRACE, "Stage2Init()");
 
   // Get the display info and see if we find a valid pmode
@@ -235,8 +237,8 @@ zx_status_t GpuDriver::Stage2Init() {
   return ZX_OK;
 }
 
-void GpuDriver::Start(fdf::StartCompleter completer) {
-  FDF_LOG(TRACE, "GpuDriver::Start");
+void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
+  FDF_LOG(TRACE, "GpuDeviceDriver::Start");
 
   {
     auto sysmem_result = incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV1>();
@@ -292,17 +294,17 @@ void GpuDriver::Start(fdf::StartCompleter completer) {
   });
 }
 
-void GpuDriver::Stop() {
+void GpuDeviceDriver::Stop() {
   if (device_) {
     device_->Release();
   }
 }
 
-void GpuDriver::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
+void GpuDeviceDriver::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
 }  // namespace virtio_display
 
-FUCHSIA_DRIVER_EXPORT(virtio_display::GpuDriver);
+FUCHSIA_DRIVER_EXPORT(virtio_display::GpuDeviceDriver);
 
 // TODO(b/282968393): remove when libdriver dep removed from bus/lib/virtio
 zx_driver_rec_t __zircon_driver_rec__ = {};

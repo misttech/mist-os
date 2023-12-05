@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem/cpp/wire_test_base.h>
@@ -165,8 +165,9 @@ class MockAllocator : public fidl::testing::WireTestBase<fuchsia_sysmem::Allocat
   mutable fbl::Mutex lock_;
   std::unordered_map<display::DriverBufferCollectionId, BufferCollection> active_buffer_collections_
       __TA_GUARDED(lock_);
-  std::vector<fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>>
-      inactive_buffer_collection_tokens_ __TA_GUARDED(lock_);
+  std::vector<
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>> inactive_buffer_collection_tokens_
+      __TA_GUARDED(lock_);
 
   display::DriverBufferCollectionId next_buffer_collection_id_ =
       display::DriverBufferCollectionId(0);
@@ -321,7 +322,7 @@ class VirtioGpuTest : public ::testing::Test {
 
     // Start driver
     zx::result start_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDriver>::Start,
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::Start,
                          std::move(start_args->start_args)));
 
     // TODO(fxbug.dev/134883): This should be ZX_OK once all the mocks are in place.
@@ -329,8 +330,8 @@ class VirtioGpuTest : public ::testing::Test {
   }
 
   void TearDown() override {
-    zx::result stop_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDriver>::PrepareStop));
+    zx::result stop_result = runtime_.RunToCompletion(driver_.SyncCall(
+        &fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>::PrepareStop));
     EXPECT_EQ(ZX_OK, stop_result.status_value());
   }
 
@@ -349,7 +350,7 @@ class VirtioGpuTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
                                                                               std::in_place};
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio_display::GpuDriver>>
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio_display::GpuDeviceDriver>>
       driver_{driver_dispatcher_->async_dispatcher(), std::in_place};
   async_patterns::TestDispatcherBound<FakePciParent> fake_pci_parent_{env_dispatcher(),
                                                                       std::in_place};

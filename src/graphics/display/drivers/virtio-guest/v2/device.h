@@ -7,12 +7,12 @@
 
 #include <lib/fit/defer.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
 namespace virtio_display {
 
 template <typename RequestType, typename ResponseType>
-void GpuDriver::Device::send_command_response(const RequestType* cmd, ResponseType** res) {
+void GpuDeviceDriver::Device::send_command_response(const RequestType* cmd, ResponseType** res) {
   size_t cmd_len = sizeof(RequestType);
   size_t res_len = sizeof(ResponseType);
   FDF_LOG(INFO,

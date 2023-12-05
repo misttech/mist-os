@@ -5,17 +5,17 @@
 #include <lib/fit/defer.h>
 #include <lib/virtio/driver_utils.h>
 
-#include "gpu.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
 
 namespace virtio_display {
 
-GpuDriver::Device::Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
+GpuDeviceDriver::Device::Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
 }
 
-GpuDriver::Device::~Device() {
+GpuDeviceDriver::Device::~Device() {
   if (request_virt_addr_) {
     zx::vmar::root_self()->unmap(request_virt_addr_, GetRequestSize(request_vmo_));
   }
@@ -24,7 +24,7 @@ GpuDriver::Device::~Device() {
   sem_destroy(&response_sem_);
 }
 
-fit::result<zx_status_t, std::unique_ptr<GpuDriver::Device>> GpuDriver::Device::Create(
+fit::result<zx_status_t, std::unique_ptr<GpuDeviceDriver::Device>> GpuDeviceDriver::Device::Create(
     fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end) {
   zx::bti bti;
   std::unique_ptr<virtio::Backend> backend;
@@ -47,7 +47,7 @@ fit::result<zx_status_t, std::unique_ptr<GpuDriver::Device>> GpuDriver::Device::
   return zx::ok(std::move(device));
 }
 
-zx_status_t GpuDriver::Device::Init() {
+zx_status_t GpuDeviceDriver::Device::Init() {
   DeviceReset();
 
   virtio_abi::GpuDeviceConfig config;
@@ -116,13 +116,13 @@ zx_status_t GpuDriver::Device::Init() {
 }
 
 // static
-uint64_t GpuDriver::Device::GetRequestSize(zx::vmo& vmo) {
+uint64_t GpuDeviceDriver::Device::GetRequestSize(zx::vmo& vmo) {
   uint64_t size = 0;
   ZX_ASSERT(ZX_OK == vmo.get_size(&size));
   return size;
 }
 
-void GpuDriver::Device::IrqRingUpdate() {
+void GpuDeviceDriver::Device::IrqRingUpdate() {
   FDF_LOG(TRACE, "IrqRingUpdate()");
 
   // Parse our descriptor chain, add back to the free queue
@@ -155,6 +155,6 @@ void GpuDriver::Device::IrqRingUpdate() {
   vring_.IrqRingUpdate(free_chain);
 }
 
-void GpuDriver::Device::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
+void GpuDeviceDriver::Device::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
 
 }  // namespace virtio_display

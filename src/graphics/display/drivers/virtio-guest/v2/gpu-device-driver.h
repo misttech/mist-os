@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_DRIVER_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_DRIVER_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -24,10 +24,12 @@ namespace virtio_display {
 
 class Ring;
 
-class GpuDriver : public fdf::DriverBase {
+// Driver instance that binds to the VIRTIO GPU device.
+class GpuDeviceDriver : public fdf::DriverBase {
  public:
-  GpuDriver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
-  ~GpuDriver() override;
+  GpuDeviceDriver(fdf::DriverStartArgs start_args,
+                  fdf::UnownedSynchronizedDispatcher driver_dispatcher);
+  ~GpuDeviceDriver() override;
 
   class Device : public virtio::Device {
    public:
@@ -95,4 +97,4 @@ class GpuDriver : public fdf::DriverBase {
 
 }  // namespace virtio_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_DEVICE_DRIVER_H_
