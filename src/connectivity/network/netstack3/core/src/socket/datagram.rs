@@ -1077,175 +1077,6 @@ where
 pub(crate) trait DatagramStateNonSyncContext<I: Ip, S>: RngContext {}
 impl<C: RngContext, I: Ip, S> DatagramStateNonSyncContext<I, S> for C {}
 
-pub(crate) trait BufferDatagramStateContext<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut>:
-    DatagramStateContext<I, C, S>
-{
-    type BufferSocketStateCtx<'a>: BufferDatagramBoundStateContext<
-        I,
-        C,
-        S,
-        B,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-
-    /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_sockets_state_buf<
-        O,
-        F: FnOnce(&mut Self::BufferSocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId, S>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with a mutable reference to the datagram sockets.
-    fn with_sockets_state_mut_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferSocketStateCtx<'_>,
-            &mut SocketsState<I, Self::WeakDeviceId, S>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-}
-
-pub(crate) trait BufferDatagramBoundStateContext<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut>:
-    DatagramBoundStateContext<I, C, S>
-{
-    type BufferIpSocketsCtx<'a>: TransportIpContext<
-        I,
-        C,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-
-    /// Calls the function with an immutable reference to the datagram sockets.
-    fn with_bound_sockets_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
-            &BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with a mutable reference to the datagram sockets.
-    fn with_bound_sockets_mut_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-            &mut Self::LocalIdAllocator,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O;
-
-    /// Calls the function with only the inner context.
-    fn with_transport_context_buf<O, F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O;
-}
-
-impl<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut, SC: DatagramStateContext<I, C, S>>
-    BufferDatagramStateContext<I, C, S, B> for SC
-where
-    for<'a> SC::SocketsStateCtx<'a>: BufferDatagramBoundStateContext<I, C, S, B>,
-{
-    type BufferSocketStateCtx<'a> = SC::SocketsStateCtx<'a>;
-
-    fn with_sockets_state_buf<
-        O,
-        F: FnOnce(&mut Self::BufferSocketStateCtx<'_>, &SocketsState<I, Self::WeakDeviceId, S>) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        Self::with_sockets_state(self, cb)
-    }
-
-    fn with_sockets_state_mut_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferSocketStateCtx<'_>,
-            &mut SocketsState<I, Self::WeakDeviceId, S>,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        Self::with_sockets_state_mut(self, cb)
-    }
-}
-
-impl<I: IpExt, C, S: DatagramSocketSpec, B: BufferMut, SC: DatagramBoundStateContext<I, C, S>>
-    BufferDatagramBoundStateContext<I, C, S, B> for SC
-where
-    for<'a> SC::IpSocketsCtx<'a>: TransportIpContext<I, C>,
-{
-    type BufferIpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
-
-    fn with_bound_sockets_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
-            &BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        Self::with_bound_sockets(self, cb)
-    }
-
-    fn with_bound_sockets_mut_buf<
-        O,
-        F: FnOnce(
-            &mut Self::BufferIpSocketsCtx<'_>,
-            &mut BoundSockets<
-                I,
-                Self::WeakDeviceId,
-                S::AddrSpec,
-                S::SocketMapSpec<I, Self::WeakDeviceId>,
-            >,
-            &mut Self::LocalIdAllocator,
-        ) -> O,
-    >(
-        &mut self,
-        cb: F,
-    ) -> O {
-        Self::with_bound_sockets_mut(self, cb)
-    }
-
-    fn with_transport_context_buf<O, F: FnOnce(&mut Self::BufferIpSocketsCtx<'_>) -> O>(
-        &mut self,
-        cb: F,
-    ) -> O {
-        Self::with_transport_context(self, cb)
-    }
-}
-
 /// Types and behavior for datagram socket demultiplexing map.
 ///
 /// `I: Ip` describes the type of packets that can be received by sockets in
@@ -3892,7 +3723,7 @@ pub enum SendError<SE> {
 pub(crate) fn send_conn<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
-    SC: BufferDatagramStateContext<I, C, S, B>,
+    SC: DatagramStateContext<I, C, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
 >(
@@ -3901,7 +3732,7 @@ pub(crate) fn send_conn<
     id: S::SocketId<I>,
     body: B,
 ) -> Result<(), SendError<S::SerializeError>> {
-    sync_ctx.with_sockets_state_buf(|sync_ctx, state| {
+    sync_ctx.with_sockets_state(|sync_ctx, state| {
         let state = match state.get(id.get_key_index()).expect("invalid socket ID") {
             SocketState::Unbound(_) => return Err(SendError::NotConnected),
             SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
@@ -3928,16 +3759,15 @@ pub(crate) fn send_conn<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            B: BufferMut,
             C: DatagramStateNonSyncContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
-            SC: BufferDatagramBoundStateContext<I, C, S, B>,
+            SC: DatagramBoundStateContext<I, C, S>,
         > {
             SendToThisStack((SendParams<'a, I, I, S, D>, &'a mut SC)),
             SendToOtherStack((SendParams<'a, I::OtherVersion, I, S, D>, &'a mut DualStackSC)),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
-            _Phantom((Never, PhantomData<(B, C)>)),
+            _Phantom((Never, PhantomData<C>)),
         }
 
         let (shutdown, operation) = match sync_ctx.dual_stack_context() {
@@ -3980,7 +3810,7 @@ pub(crate) fn send_conn<
             Operation::SendToThisStack((SendParams { socket, ip }, sync_ctx)) => {
                 let packet =
                     S::make_packet::<I, _>(body, &ip).map_err(SendError::SerializeError)?;
-                sync_ctx.with_transport_context_buf(|sync_ctx| {
+                sync_ctx.with_transport_context(|sync_ctx| {
                     sync_ctx
                         .send_ip_packet(ctx, &socket, packet, None)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
@@ -4023,7 +3853,7 @@ pub enum SendToError<SE> {
 pub(crate) fn send_to<
     I: IpExt,
     C: DatagramStateNonSyncContext<I, S>,
-    SC: BufferDatagramStateContext<I, C, S, B>,
+    SC: DatagramStateContext<I, C, S>,
     S: DatagramSocketSpec,
     B: BufferMut,
 >(
@@ -4034,7 +3864,7 @@ pub(crate) fn send_to<
     remote_identifier: <S::AddrSpec as SocketMapAddrSpec>::RemoteIdentifier,
     body: B,
 ) -> Result<(), Either<LocalAddressError, SendToError<S::SerializeError>>> {
-    sync_ctx.with_sockets_state_mut_buf(|sync_ctx, state| {
+    sync_ctx.with_sockets_state_mut(|sync_ctx, state| {
         match listen_inner(sync_ctx, ctx, state, id.clone(), None, None) {
             Ok(()) | Err(Either::Left(ExpectedUnboundError)) => (),
             Err(Either::Right(e)) => return Err(Either::Left(e)),
@@ -4051,10 +3881,9 @@ pub(crate) fn send_to<
             I: DualStackIpExt,
             S: DatagramSocketSpec,
             D: WeakId,
-            B: BufferMut,
             C: DatagramStateNonSyncContext<I, S>,
             DualStackSC: DualStackDatagramBoundStateContext<I, C, S>,
-            SC: BufferDatagramBoundStateContext<I, C, S, B>,
+            SC: DatagramBoundStateContext<I, C, S>,
         > {
             SendToThisStack((SendOneshotParameters<'a, I, S, D, IpOptions<I, D, S>>, &'a mut SC)),
             SendToOtherStack(
@@ -4065,7 +3894,7 @@ pub(crate) fn send_to<
             ),
             // Allow `Operation` to be generic over `B` and `C` so that they can
             // be used in trait bounds for `DualStackSC` and `SC`.
-            _Phantom((Never, PhantomData<(B, C)>)),
+            _Phantom((Never, PhantomData<C>)),
         }
 
         let (operation, shutdown) = match (
@@ -4282,7 +4111,7 @@ pub(crate) fn send_to<
 
         match operation {
             Operation::SendToThisStack((params, sync_ctx)) => {
-                BufferDatagramBoundStateContext::with_transport_context_buf(sync_ctx, |sync_ctx| {
+                DatagramBoundStateContext::with_transport_context(sync_ctx, |sync_ctx| {
                     send_oneshot::<_, S, _, _, _, _>(sync_ctx, ctx, params, body)
                 })
             }
