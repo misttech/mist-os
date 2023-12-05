@@ -50,6 +50,14 @@ class CollectedLicense:
         )
 
 
+_readme_fallback_note = """Note:
+   This error might be a red-herring if the README.fuchsia file is
+   used because of a faulty 'applicable_licenses' GN setup. You would
+   see other errors above/below, such as `THIRD_PARTY_RESOURCE_WITHOUT_LICENSE`
+   or `THIRD_PARTY_TARGET_WITHOUT_APPLICABLE_LICENSES` errors. When
+   these errors happen, we fallback to reading the README.fuchsia file."""
+
+
 class CollectorErrorKind(enum.Enum):
     """The type of a CollectionError"""
 
@@ -87,13 +95,17 @@ Notes:
 """,
             CollectorErrorKind.LICENSE_FILE_IN_README_NOT_FOUND: """
 The `License File: ...` specified in the README.fuchsia file does not exist.
-""",
+
+"""
+            + _readme_fallback_note,
             CollectorErrorKind.NO_LICENSE_FILE_IN_README: """
 The README.fuchsia file of the target is missing a `License File: ...` value.
-""",
+"""
+            + _readme_fallback_note,
             CollectorErrorKind.NO_PACKAGE_NAME_IN_README: """
 The README.fuchsia file of the target is missing a `Name: [package name]` value.
-""",
+"""
+            + _readme_fallback_note,
             CollectorErrorKind.THIRD_PARTY_GOLIB_WITHOUT_LICENSES: """
 No license found in the golib source folder. We look for files named
 LICENSE*, COPYRIGHT* and NOTICE*.
