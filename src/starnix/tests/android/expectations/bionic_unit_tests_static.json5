@@ -40,7 +40,7 @@
                 "ifaddrs.getifaddrs_interfaces",
 
                 // These tests fail on arm64, and skipped on other arches but counted as failed by expectation matcher.
-                "MemtagNoteTest.*",
+                "MemtagNoteTest.*", // Marked passing in arm64 expectations.
                 "MemtagStackTest.*",
                 "MemtagGlobalsTest.*",
                 "__cxa_demangle.DISABLED_cxa_demangle_fuzz_167977068",
