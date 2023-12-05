@@ -36,8 +36,9 @@ impl CapabilitySourceFactory {
 /// The dicts a component holds once it has been resolved.
 #[derive(Default)]
 pub struct ComponentSandbox {
-    pub dict_from_parent: Dict,
-    pub program_dict: Dict,
+    pub component_input_dict: Dict,
+    pub program_input_dict: Dict,
+    pub program_output_dict: Dict,
     /// Initial dicts for children and collections
     pub child_dicts: HashMap<Name, Dict>,
     pub collection_dicts: HashMap<Name, Dict>,
@@ -45,8 +46,8 @@ pub struct ComponentSandbox {
 }
 
 impl ComponentSandbox {
-    fn new(dict_from_parent: Dict) -> Self {
-        Self { dict_from_parent, ..Self::default() }
+    fn new(component_input_dict: Dict) -> Self {
+        Self { component_input_dict, ..Self::default() }
     }
 }
 
@@ -54,9 +55,9 @@ impl ComponentSandbox {
 /// various dicts the component needs based on the contents of its manifest.
 pub async fn build_component_sandbox(
     decl: &cm_rust::ComponentDecl,
-    dict_from_parent: Dict,
+    component_input_dict: Dict,
 ) -> ComponentSandbox {
-    let mut output = ComponentSandbox::new(dict_from_parent);
+    let mut output = ComponentSandbox::new(component_input_dict);
 
     for child in &decl.children {
         let child_name = Name::new(&child.name).unwrap();
@@ -76,7 +77,7 @@ pub async fn build_component_sandbox(
                 _ => continue,
             }
             output
-                .program_dict
+                .program_output_dict
                 .get_or_insert_protocol_mut(capability.name())
                 .insert_receiver(Receiver::new());
         }
@@ -92,10 +93,10 @@ pub async fn build_component_sandbox(
         let source_name = use_.source_name();
         match use_.source() {
             cm_rust::UseSource::Parent => {
-                if let Some(cap_dict) = output.dict_from_parent.get_protocol(source_name) {
+                if let Some(cap_dict) = output.component_input_dict.get_protocol(source_name) {
                     if let Some(parent_router) = cap_dict.get_router() {
                         output
-                            .program_dict
+                            .program_input_dict
                             .get_or_insert_protocol_mut(source_name)
                             .insert_router(parent_router.clone());
                     }
@@ -104,16 +105,20 @@ pub async fn build_component_sandbox(
                 }
             }
             cm_rust::UseSource::Self_ => {
-                if let Some(mut cap_dict) = output.program_dict.get_protocol_mut(source_name) {
+                if let Some(mut cap_dict) = output.program_output_dict.get_protocol_mut(source_name)
+                {
                     if let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) {
-                        cap_dict.insert_router(new_terminating_router(receiver));
+                        output
+                            .program_input_dict
+                            .get_or_insert_protocol_mut(source_name)
+                            .insert_router(new_terminating_router(receiver));
                     }
                 }
             }
             cm_rust::UseSource::Framework => {
                 let receiver = Receiver::new();
                 output
-                    .program_dict
+                    .program_input_dict
                     .get_or_insert_protocol_mut(source_name)
                     .insert_router(new_terminating_router(receiver.clone()));
                 let source_name = source_name.clone();
@@ -128,7 +133,7 @@ pub async fn build_component_sandbox(
             cm_rust::UseSource::Capability(_) => {
                 let receiver = Receiver::new();
                 output
-                    .program_dict
+                    .program_input_dict
                     .get_or_insert_protocol_mut(source_name)
                     .insert_router(new_terminating_router(receiver.clone()));
                 let use_ = use_.clone();
@@ -165,8 +170,8 @@ pub async fn build_component_sandbox(
             }
         };
         extend_dict_with_offer(
-            &output.dict_from_parent,
-            &output.program_dict,
+            &output.component_input_dict,
+            &output.program_output_dict,
             offer,
             target_dict,
             &mut output.sources_and_receivers,
@@ -179,16 +184,16 @@ pub async fn build_component_sandbox(
 /// Extends the given dict based on offer declarations. All offer declarations in `offers` are
 /// assumed to target `target_dict`.
 pub fn extend_dict_with_offers(
-    dict_from_parent: &Dict,
-    program_dict: &Dict,
+    component_input_dict: &Dict,
+    program_output_dict: &Dict,
     dynamic_offers: &Vec<cm_rust::OfferDecl>,
     target_dict: &mut Dict,
 ) -> Vec<(CapabilitySourceFactory, Receiver<Message>)> {
     let mut sources_and_receivers = vec![];
     for offer in dynamic_offers {
         extend_dict_with_offer(
-            dict_from_parent,
-            program_dict,
+            component_input_dict,
+            program_output_dict,
             offer,
             target_dict,
             &mut sources_and_receivers,
@@ -198,8 +203,8 @@ pub fn extend_dict_with_offers(
 }
 
 fn extend_dict_with_offer(
-    dict_from_parent: &Dict,
-    program_dict: &Dict,
+    component_input_dict: &Dict,
+    program_output_dict: &Dict,
     offer: &cm_rust::OfferDecl,
     target_dict: &mut Dict,
     sources_and_receivers: &mut Vec<(CapabilitySourceFactory, Receiver<Message>)>,
@@ -223,7 +228,7 @@ fn extend_dict_with_offer(
     }
     match offer.source() {
         cm_rust::OfferSource::Parent => {
-            if let Some(source_cap_dict) = dict_from_parent.get_protocol(source_name) {
+            if let Some(source_cap_dict) = component_input_dict.get_protocol(source_name) {
                 if let Some(parent_router) = source_cap_dict.get_router() {
                     target_dict
                         .get_or_insert_protocol_mut(target_name)
@@ -232,7 +237,7 @@ fn extend_dict_with_offer(
             }
         }
         cm_rust::OfferSource::Self_ => {
-            if let Some(receiver) = program_dict
+            if let Some(receiver) = program_output_dict
                 .get_protocol(source_name)
                 .and_then(|c| c.get_receiver().map(|r| r.clone()))
             {

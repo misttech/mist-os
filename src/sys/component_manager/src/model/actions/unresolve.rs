@@ -73,7 +73,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), Unresolv
         let mut state = component.lock_state().await;
         match state.deref_mut() {
             InstanceState::Resolved(resolved_state) => {
-                let dict = resolved_state.dict_from_parent.try_clone().unwrap();
+                let dict = resolved_state.component_input_dict.try_clone().unwrap();
                 state.set(InstanceState::Unresolved(UnresolvedInstanceState::new(dict)));
                 true
             }

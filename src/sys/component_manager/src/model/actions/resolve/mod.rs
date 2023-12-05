@@ -98,7 +98,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
         if first_resolve {
             {
                 let mut state = component.lock_state().await;
-                let dict_from_parent = match state.deref_mut() {
+                let component_input_dict = match state.deref_mut() {
                     InstanceState::Resolved(_) => {
                         panic!("Component was marked Resolved during Resolve action?");
                     }
@@ -111,11 +111,11 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                         });
                     }
                     InstanceState::Unresolved(unresolved_state) => {
-                        unresolved_state.dict_from_parent.try_clone().unwrap()
+                        unresolved_state.component_input_dict.try_clone().unwrap()
                     }
                 };
                 let component_sandbox =
-                    build_component_sandbox(&component_info.decl, dict_from_parent).await;
+                    build_component_sandbox(&component_info.decl, component_input_dict).await;
                 state.set(InstanceState::Resolved(
                     ResolvedInstanceState::new(
                         component,

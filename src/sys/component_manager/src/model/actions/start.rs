@@ -434,7 +434,7 @@ async fn make_execution_runtime(
         .expect("component must be resolved in order to start");
 
     let dict_dispatcher = DictDispatcher::new(
-        resolved_state.program_dict.try_clone().unwrap(),
+        resolved_state.program_output_dict.try_clone().unwrap(),
         decl.capabilities.clone(),
         outgoing_dir.clone(),
         WeakComponentInstance::new(&component),

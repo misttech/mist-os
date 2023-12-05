@@ -297,7 +297,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                 if let Ok(state) = target.lock_resolved_state().await {
                     // The capability dict can be missing if we used a capability from our
                     // parent but the parent did not offer this capability.
-                    if let Some(cap_dict) = state.program_dict.get_protocol(name) {
+                    if let Some(cap_dict) = state.program_input_dict.get_protocol(name) {
                         // The capability dict can be present but missing a sender if we're both
                         // using from parent _and_ declaring a capability, but our parent didn't
                         // offer the capability to us. In this case this capability dict will

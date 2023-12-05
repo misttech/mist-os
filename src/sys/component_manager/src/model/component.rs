@@ -738,7 +738,7 @@ impl ComponentInstance {
             // dict so a new start action can be kicked off on the next capability access.
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.wait_on_program_dict(&self);
+                resolved_state.wait_on_program_output_dict(&self);
             }
         }
         if let ExtendedInstance::Component(parent) =
@@ -947,7 +947,7 @@ impl ComponentInstance {
         {
             let mut state = self.lock_state().await;
             if let InstanceState::Resolved(resolved_state) = state.deref_mut() {
-                resolved_state.stop_waiting_on_program_dict();
+                resolved_state.stop_waiting_on_program_output_dict();
             }
         }
 
@@ -1239,12 +1239,12 @@ impl fmt::Debug for InstanceState {
 
 pub struct UnresolvedInstanceState {
     /// The dict containing all capabilities that the parent wished to provide to us.
-    pub dict_from_parent: Dict,
+    pub component_input_dict: Dict,
 }
 
 impl UnresolvedInstanceState {
-    pub fn new(dict_from_parent: Dict) -> Self {
-        Self { dict_from_parent }
+    pub fn new(component_input_dict: Dict) -> Self {
+        Self { component_input_dict }
     }
 }
 
@@ -1320,10 +1320,13 @@ pub struct ResolvedInstanceState {
     pub anonymized_services: HashMap<AnonymizedServiceRoute, Arc<AnonymizedAggregateServiceDir>>,
 
     /// The dict containing all capabilities that the parent wished to provide to us.
-    pub dict_from_parent: Dict,
+    pub component_input_dict: Dict,
 
-    /// The dict containing all capabilities that we use or declare.
-    pub program_dict: Dict,
+    /// The dict containing all capabilities that we use.
+    pub program_input_dict: Dict,
+
+    /// The dict containing all capabilities that we declare.
+    pub program_output_dict: Dict,
 
     /// Dicts containing the capabilities we want to provide to each collection. Each new
     /// dynamic child gets a clone of one of these dicts (which is potentially extended by
@@ -1366,22 +1369,23 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
-            dict_from_parent: component_sandbox.dict_from_parent,
-            program_dict: component_sandbox.program_dict.try_clone().unwrap(),
+            component_input_dict: component_sandbox.component_input_dict,
+            program_input_dict: component_sandbox.program_input_dict.try_clone().unwrap(),
+            program_output_dict: component_sandbox.program_output_dict.try_clone().unwrap(),
             collection_dicts: component_sandbox.collection_dicts,
             dict_waiter: None,
         };
         state.add_static_children(component, component_sandbox.child_dicts).await?;
-        state.wait_on_program_dict(component);
+        state.wait_on_program_output_dict(component);
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
     }
 
     // Waits for any receiver in our program dict to become readable.
-    pub fn wait_on_program_dict(&mut self, component: &Arc<ComponentInstance>) {
+    pub fn wait_on_program_output_dict(&mut self, component: &Arc<ComponentInstance>) {
         let weak_component = WeakComponentInstance::new(component);
         self.dict_waiter = Some(DictWaiter::new(
-            self.program_dict.try_clone().unwrap(),
+            self.program_output_dict.try_clone().unwrap(),
             move |name, target_moniker| {
                 let name = name.clone();
                 async move {
@@ -1470,7 +1474,7 @@ impl ResolvedInstanceState {
     }
 
     // Causes this component to stop watching the receivers in our program dict.
-    pub fn stop_waiting_on_program_dict(&mut self) {
+    pub fn stop_waiting_on_program_output_dict(&mut self) {
         self.dict_waiter = None;
     }
 
@@ -1690,8 +1694,8 @@ impl ResolvedInstanceState {
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
         let sources_and_receivers = extend_dict_with_offers(
-            &self.dict_from_parent,
-            &self.program_dict,
+            &self.component_input_dict,
+            &self.program_output_dict,
             &dynamic_offers,
             &mut child_dict,
         );
