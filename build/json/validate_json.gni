@@ -57,6 +57,11 @@ template("validate_json") {
                              "visibility",
                            ])
 
+    # The fact that the underlying binary is chosen by the `use_valico` variable
+    # makes supporting the "previously built tools" strategy complicated. Don't
+    # bother - it's fine to rebuild this tool multiple times in subbuilds.
+    allow_prebuilt_tool_use = false
+
     if (use_valico) {
       tool = "//build/tools/json_validator:json_validator_valico"
     } else {
