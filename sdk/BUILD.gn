@@ -818,6 +818,7 @@ sdk_molecule("driver_atoms") {
     "//sdk/lib/inspect/component/cpp:inspect_component_cpp_sdk",
     "//src/devices/bin/driver_runtime:driver_runtime_sdk",
     "//src/devices/lib/mmio:mmio_sdk",
+    "//src/lib/ddk:ddk_metadata_sdk",
     "//src/lib/fidl/cpp:cpp_sdk",
     "//zircon/system/ulib/hwreg:hwreg_sdk_sdk",
   ]
