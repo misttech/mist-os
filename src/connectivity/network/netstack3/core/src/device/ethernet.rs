@@ -853,7 +853,7 @@ pub(super) fn receive_frame<
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv6>>
-        + ArpPacketHandler<B, EthernetLinkDevice, C>
+        + ArpPacketHandler<EthernetLinkDevice, C>
         + DeviceSocketHandler<EthernetLinkDevice, C>,
 >(
     sync_ctx: &mut SC,

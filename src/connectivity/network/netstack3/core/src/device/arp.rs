@@ -293,10 +293,8 @@ impl<D: ArpDevice, C: ArpNonSyncCtx<D, SC::DeviceId>, SC: ArpSenderContext<D, C>
     }
 }
 
-pub(crate) trait ArpPacketHandler<B: BufferMut, D: ArpDevice, C>:
-    DeviceIdContext<D>
-{
-    fn handle_packet(
+pub(crate) trait ArpPacketHandler<D: ArpDevice, C>: DeviceIdContext<D> {
+    fn handle_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device_id: Self::DeviceId,
@@ -306,17 +304,16 @@ pub(crate) trait ArpPacketHandler<B: BufferMut, D: ArpDevice, C>:
 }
 
 impl<
-        B: BufferMut,
         D: ArpDevice,
         C: ArpNonSyncCtx<D, SC::DeviceId>,
         SC: ArpContext<D, C>
             + SendFrameContext<C, ArpFrameMetadata<D, Self::DeviceId>>
             + NudHandler<Ipv4, D, C>
             + CounterContext<ArpCounters>,
-    > ArpPacketHandler<B, D, C> for SC
+    > ArpPacketHandler<D, C> for SC
 {
     /// Handles an inbound ARP packet.
-    fn handle_packet(
+    fn handle_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device_id: Self::DeviceId,
