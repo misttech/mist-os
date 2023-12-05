@@ -331,6 +331,7 @@ host_tool://tools/x64/zbi
 host_tool://tools/x64/zxdb
 loadable_module://pkg/vulkan_layers
 package://packages/heapdump-collector
+package://packages/magma_conformance_tests
 package://packages/realm_builder_server
 sysroot://pkg/sysroot
 version_history://version_history.json
