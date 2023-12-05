@@ -563,6 +563,20 @@ class CxxAction(object):
         return self._attributes.libdirs
 
     @property
+    def clang_linker_executable(self) -> str:  # basename only
+        use_ld = self.use_ld or "lld"
+        if "windows" in self.target:
+            # Targeting Windows uses lld-link.
+            if use_ld != "lld":
+                raise ValueError(
+                    f"Unexpected linker selected for Windows.  Expected: lld, but got: {use_ld}"
+                )
+            return use_ld + "-link"
+        else:
+            # For ld.bfd, ld.gold, ld.lld
+            return "ld." + use_ld
+
+    @property
     def linker_inputs(self) -> Sequence[Path]:
         return self._linker_inputs
 

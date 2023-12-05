@@ -112,6 +112,10 @@ class CxxLinkRemoteAction(object):
         return self.cxx_action.use_ld or "lld"  # default
 
     @property
+    def linker_executable(self) -> str:
+        return self.cxx_action.clang_linker_executable
+
+    @property
     def unwindlib(self) -> str:
         return self.cxx_action.unwindlib or "libunwind"  # default
 
@@ -246,7 +250,7 @@ class CxxLinkRemoteAction(object):
                 working_dir_abs=self.working_dir, search_paths=search_paths
             )
 
-            lld = self.host_compiler.parent / ("ld." + self.use_ld)
+            lld = self.host_compiler.parent / self.linker_executable
 
             def linker_script_expander(paths: Sequence[Path]) -> Iterable[Path]:
                 if lld.exists():
@@ -286,7 +290,7 @@ class CxxLinkRemoteAction(object):
         # TODO(b/307418630): remove the following workaround when fixed.
         remote_inputs.extend(self.cxx_action.linker_response_files)
 
-        remote_ld = self.remote_compiler.parent / ("ld." + self.use_ld)
+        remote_ld = self.remote_compiler.parent / self.linker_executable
         if remote_ld.exists():
             remote_inputs.append(remote_ld)
 

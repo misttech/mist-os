@@ -317,6 +317,27 @@ class CxxActionTests(unittest.TestCase):
         )
         self.assertEqual(c.use_ld, linker)
         self.assertEqual(c.linker_inputs, [source])
+        self.assertEqual(c.clang_linker_executable, "ld.lld")
+
+    def test_fuse_ld_windows(self):
+        source = Path("hello.o")
+        output = Path("hello")
+        linker = "lld"
+        c = cxx.CxxAction(
+            _strs(
+                [
+                    "clang++",
+                    "--target=x64_64-windows-msvc",
+                    f"-fuse-ld={linker}",
+                    source,
+                    "-o",
+                    output,
+                ]
+            )
+        )
+        self.assertEqual(c.use_ld, linker)
+        self.assertEqual(c.linker_inputs, [source])
+        self.assertEqual(c.clang_linker_executable, "lld-link")
 
     def test_asan(self):
         source = Path("hello.o")
