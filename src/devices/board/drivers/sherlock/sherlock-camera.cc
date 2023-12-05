@@ -4,8 +4,6 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
-#include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
@@ -247,8 +245,8 @@ static const fpbus::Node sensor_dev_sherlock = []() {
 // design and layout details.
 zx_status_t Sherlock::CameraInit() {
   // Set GPIO alternate functions.
-  gpio_impl_.SetAltFunction(T931_GPIOAO(10), kClk24MAltFunc);
-  gpio_impl_.SetDriveStrength(T931_GPIOAO(10), kClkGpioDriveStrengthUa, nullptr);
+  gpio_init_steps_.push_back({T931_GPIOAO(10), GpioSetAltFunction(kClk24MAltFunc)});
+  gpio_init_steps_.push_back({T931_GPIOAO(10), GpioSetDriveStrength(kClkGpioDriveStrengthUa)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CAME');
@@ -358,6 +356,18 @@ zx_status_t Sherlock::CameraInit() {
           },
   }};
 
+  auto imx227_sensor_gpio_init_spec = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP,
+                                      bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+          },
+  }};
+
   auto composite_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "imx227_sensor",
       .parents = {{
@@ -367,6 +377,7 @@ zx_status_t Sherlock::CameraInit() {
           imx227_sensor_gpio_vana_spec,
           imx227_sensor_gpio_vdig_spec,
           imx227_sensor_clock_sensor_spec,
+          imx227_sensor_gpio_init_spec,
       }},
   }};
 

@@ -45,3 +45,7 @@ node "clock-sensor" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.clock.FUNCTION == fuchsia.clock.FUNCTION.CAMERA_SENSOR;
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
