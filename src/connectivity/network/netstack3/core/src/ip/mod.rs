@@ -937,12 +937,15 @@ where
     }
 }
 
-/// The transport context provided to the IP layer requiring a buffer type.
-pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
+/// The IP context providing dispatch to the available transport protocols.
+///
+/// This trait acts like a demux on the transport protocol for ingress IP
+/// packets.
+pub(crate) trait IpTransportDispatchContext<I: IpLayerIpExt, C>:
     DeviceIdContext<AnyDevice>
 {
     /// Dispatches a received incoming IP packet to the appropriate protocol.
-    fn dispatch_receive_ip_packet(
+    fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
@@ -953,13 +956,15 @@ pub(crate) trait BufferTransportContext<I: IpLayerIpExt, C, B: BufferMut>:
     ) -> Result<(), (B, TransportReceiveError)>;
 }
 
-/// The execution context for the IP layer requiring buffer.
-pub(crate) trait BufferIpLayerContext<
+/// A marker trait for all the contexts required for IP ingress.
+///
+/// This is a shorthand for all the traits required to operate on an ingress IP
+/// frame.
+pub(crate) trait IpLayerIngressContext<
     I: IpLayerIpExt + IcmpHandlerIpExt,
     C: IpLayerNonSyncContext<I, Self::DeviceId>,
-    B: BufferMut,
 >:
-    BufferTransportContext<I, C, B>
+    IpTransportDispatchContext<I, C>
     + IpDeviceStateContext<I, C>
     + IpDeviceSendContext<I, C>
     + IcmpErrorHandler<I, C>
@@ -971,24 +976,20 @@ pub(crate) trait BufferIpLayerContext<
 impl<
         I: IpLayerIpExt + IcmpHandlerIpExt,
         C: IpLayerNonSyncContext<I, SC::DeviceId>,
-        B: BufferMut,
-        SC: BufferTransportContext<I, C, B>
+        SC: IpTransportDispatchContext<I, C>
             + IpDeviceStateContext<I, C>
             + IpDeviceSendContext<I, C>
             + IcmpErrorHandler<I, C>
             + IpLayerContext<I, C>
             + FragmentHandler<I, C>,
-    > BufferIpLayerContext<I, C, B> for SC
+    > IpLayerIngressContext<I, C> for SC
 {
 }
 
-impl<
-        C: NonSyncContext,
-        B: BufferMut,
-        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>,
-    > BufferTransportContext<Ipv4, C, B> for Locked<&SyncCtx<C>, L>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv4>>>
+    IpTransportDispatchContext<Ipv4, C> for Locked<&SyncCtx<C>, L>
 {
-    fn dispatch_receive_ip_packet(
+    fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
@@ -1030,13 +1031,10 @@ impl<
     }
 }
 
-impl<
-        C: NonSyncContext,
-        B: BufferMut,
-        L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>,
-    > BufferTransportContext<Ipv6, C, B> for Locked<&SyncCtx<C>, L>
+impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IcmpSocketsTable<Ipv6>>>
+    IpTransportDispatchContext<Ipv6, C> for Locked<&SyncCtx<C>, L>
 {
-    fn dispatch_receive_ip_packet(
+    fn dispatch_receive_ip_packet<B: BufferMut>(
         &mut self,
         ctx: &mut C,
         device: &Self::DeviceId,
@@ -1596,7 +1594,7 @@ pub(crate) fn handle_timer<NonSyncCtx: NonSyncContext>(
 fn dispatch_receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv4, C, B> + CounterContext<IpCounters<Ipv4>>,
+    SC: IpLayerIngressContext<Ipv4, C> + CounterContext<IpCounters<Ipv4>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1683,7 +1681,7 @@ fn dispatch_receive_ipv4_packet<
 fn dispatch_receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv6, C, B> + CounterContext<IpCounters<Ipv6>>,
+    SC: IpLayerIngressContext<Ipv6, C> + CounterContext<IpCounters<Ipv6>>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
@@ -1940,8 +1938,7 @@ pub(crate) fn receive_ip_packet<B: BufferMut, NonSyncCtx: NonSyncContext, I: Ip>
 pub(crate) fn receive_ipv4_packet<
     C: IpLayerNonSyncContext<Ipv4, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv4, C, B>
-        + BufferIpLayerContext<Ipv4, C, Buf<Vec<u8>>>
+    SC: IpLayerIngressContext<Ipv4, C>
         + CounterContext<IpCounters<Ipv4>>
         + CounterContext<Ipv4Counters>,
 >(
@@ -2191,8 +2188,7 @@ pub(crate) fn receive_ipv4_packet<
 pub(crate) fn receive_ipv6_packet<
     C: IpLayerNonSyncContext<Ipv6, SC::DeviceId>,
     B: BufferMut,
-    SC: BufferIpLayerContext<Ipv6, C, B>
-        + BufferIpLayerContext<Ipv6, C, Buf<Vec<u8>>>
+    SC: IpLayerIngressContext<Ipv6, C>
         + CounterContext<IpCounters<Ipv6>>
         + CounterContext<Ipv6Counters>,
 >(
