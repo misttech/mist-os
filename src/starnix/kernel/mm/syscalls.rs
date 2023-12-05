@@ -485,6 +485,28 @@ pub fn sys_set_robust_list(
     Ok(())
 }
 
+pub fn sys_mlock(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _addr: UserAddress,
+    _length: usize,
+) -> Result<(), Errno> {
+    // TODO(https://fxbug.dev/297591218): Implement mlock.
+    not_implemented!("mlock not implemented");
+    Ok(())
+}
+
+pub fn sys_munlock(
+    _locked: &mut Locked<'_, Unlocked>,
+    _current_task: &CurrentTask,
+    _addr: UserAddress,
+    _length: usize,
+) -> Result<(), Errno> {
+    // TODO(https://fxbug.dev/297591218): Implement munlock.
+    not_implemented!("munlock not implemented");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

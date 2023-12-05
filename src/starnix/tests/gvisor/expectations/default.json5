@@ -317,7 +317,6 @@
                 "MlockTest.RlimitMemlockZero",
                 "MunlockTest.Basic",
                 "MlockTest.RlimitMemlockInsufficient",
-                "MunlockTest.NotLocked",
                 "MlockallTest.Future",
                 "MunlockallTest.Basic",
                 "Mlock2Test.NoFlags",

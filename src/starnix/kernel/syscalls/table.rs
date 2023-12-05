@@ -47,9 +47,9 @@ pub fn dispatch_syscall(
 ) -> Result<SyscallResult, Errno> {
     use crate::{
         mm::syscalls::{
-            sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mmap,
-            sys_mprotect, sys_mremap, sys_msync, sys_munmap, sys_process_vm_readv,
-            sys_process_vm_writev, sys_set_robust_list,
+            sys_brk, sys_futex, sys_get_robust_list, sys_madvise, sys_membarrier, sys_mlock,
+            sys_mmap, sys_mprotect, sys_mremap, sys_msync, sys_munlock, sys_munmap,
+            sys_process_vm_readv, sys_process_vm_writev, sys_set_robust_list,
         },
         signals::syscalls::{
             sys_kill, sys_pidfd_send_signal, sys_restart_syscall, sys_rt_sigaction,
@@ -296,11 +296,13 @@ pub fn dispatch_syscall(
         mkdirat[3],
         #[cfg(target_arch = "x86_64")] mknod[3],
         mknodat[4],
+        mlock[2],
         mmap[6],
         mount[5],
         mprotect[3],
         mremap[5],
         msync[3],
+        munlock[2],
         munmap[2],
         nanosleep[2],
         newfstatat[4],
