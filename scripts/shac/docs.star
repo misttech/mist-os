@@ -29,15 +29,22 @@ def _doc_checker(ctx):
             msg += "\n\n" + finding["help_suggestion"]
         msg += "\n\nRun `fx doc-checker --local-links-only` to reproduce."
         filepath = abspath[len(ctx.scm.root) + 1:]
-        if filepath in affected_files:
+        level = {
+            "Info": "notice",
+            "Warning": "warning",
+            "Error": "error",
+        }[finding["level"]]
+
+        # Normally we should only propagate findings if the referenced file is
+        # affected to avoid spamming users with non-blocking warnings about
+        # files they didn't touch. But errors may occur in unaffected files
+        # (e.g. deleting a file may make links in unaffected files invalid) so
+        # we should always propagate errors.
+        if filepath in affected_files or level == "error":
             ctx.emit.finding(
-                level = {
-                    "Info": "notice",
-                    "Warning": "warning",
-                    "Error": "error",
-                }[finding["level"]],
                 filepath = filepath,
                 line = finding["doc_line"]["line_num"],
+                level = level,
                 message = msg,
             )
 
