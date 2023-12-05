@@ -15,6 +15,7 @@
 #include <lib/syslog/cpp/log_level.h>
 #include <lib/syslog/cpp/logging_backend.h>
 #include <lib/syslog/cpp/logging_backend_fuchsia_globals.h>
+#include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/process.h>
 
@@ -24,7 +25,6 @@
 #include <sstream>
 
 #include "lib/syslog/cpp/macros.h"
-#include "sdk/lib/syslog/structured_backend/cpp/fuchsia_syslog.h"
 
 namespace syslog_backend {
 

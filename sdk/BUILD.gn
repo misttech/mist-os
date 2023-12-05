@@ -550,7 +550,6 @@ sdk_molecule("platform_libs") {
   deps = [
     ":version_history",
     "//sdk/lib/driver/compat/cpp:cpp_sdk",
-    "//sdk/lib/syslog/cpp:backend_fuchsia_lib_sdk",
     "//src/developer/debug/ipc:ipc_sdk",
     "//src/developer/debug/shared:shared_sdk",
     "//src/devices/block/lib/sdmmc:sdmmc_sdk",
