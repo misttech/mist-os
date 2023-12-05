@@ -161,6 +161,9 @@ template("clang_toolchain") {
         } else if (cxx_rbe_exec_strategy == "racing") {
           compiler_prefix_list += [ "--exec_strategy=racing" ]
         }
+        if (!cxx_rbe_download_obj_files) {
+          compiler_prefix_list += [ "--download_outputs=false" ]
+        }
         _cxx_concurrent_jobs = concurrent_jobs.remote
       }
       if (restat_cc) {

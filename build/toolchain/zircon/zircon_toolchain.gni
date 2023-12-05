@@ -264,6 +264,9 @@ template("zircon_toolchain") {
       } else if (cxx_rbe_exec_strategy == "racing") {
         compiler_prefix_list += [ "--exec_strategy=racing" ]
       }
+      if (!cxx_rbe_download_obj_files) {
+        compiler_prefix_list += [ "--download_outputs=false" ]
+      }
       _cxx_concurrent_jobs = concurrent_jobs.remote
     }
     if (restat_cc) {
@@ -582,30 +585,30 @@ template("zircon_toolchain") {
         mapfile = "${outfile}.map"
         outputs += [ mapfile ]
         switches += " -Wl,-Map,$mapfile"
+      }
 
-        # remote linking option
-        if (_link_rbe_enable) {
-          _linker_prefix_list = [
-            rebase_path(python_exe_src, root_build_dir),
-            "-S",
-            rebase_path(cxx_link_remote_wrapper, root_build_dir),
-          ]
-          if (link_rbe_check == "determinism") {
-            _linker_prefix_list += [
-              "--local",
-              "--check-determinism",
-            ]
-          } else if (link_rbe_check == "consistency") {
-            _linker_prefix_list += [ "--compare" ]
-          } else if (link_rbe_check == "none") {
-            _link_concurrent_jobs = concurrent_jobs.remote
-          }
+      # remote linking option
+      if (_link_rbe_enable) {
+        _linker_prefix_list = [
+          rebase_path(python_exe_src, root_build_dir),
+          "-S",
+          rebase_path(cxx_link_remote_wrapper, root_build_dir),
+        ]
+        if (link_rbe_check == "determinism") {
           _linker_prefix_list += [
-            "--preserve_unchanged_output_mtime",
-            "--",
+            "--local",
+            "--check-determinism",
           ]
-          linker_prefix = string_join(" ", _linker_prefix_list)
+        } else if (link_rbe_check == "consistency") {
+          _linker_prefix_list += [ "--compare" ]
+        } else if (link_rbe_check == "none") {
+          _link_concurrent_jobs = concurrent_jobs.remote
         }
+        _linker_prefix_list += [
+          "--preserve_unchanged_output_mtime",
+          "--",
+        ]
+        linker_prefix = string_join(" ", _linker_prefix_list)
       }
     }
     forward_variables_from(_link_concurrent_jobs, "*")

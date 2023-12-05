@@ -180,6 +180,13 @@ declare_args() {
   # from infra builds, and later inspection.
   comparison_diagnostics_dir = "$root_build_dir/comparison-reports"
 
+  # Controls whether or not to download intermediate .o files.
+  # When downloading is disabled, the build produces stubs
+  # that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+  # TODO(b/284994230): This option is only available to developers,
+  # and not restricted environments that lack direct network access.
+  cxx_rbe_download_obj_files = true
+
   ############################
   ### Linking RBE controls ###
   ############################
@@ -265,6 +272,10 @@ assert(
     cxx_rbe_check == "none" || cxx_rbe_check == "consistency" ||
         cxx_rbe_check == "determinism",
     "cxx_rbe_check must be one of {none,consistency,determinism}, but got: ${cxx_rbe_check}.")
+
+assert(
+    cxx_rbe_download_obj_files || !cxx_rbe_minimalist_wrapper,
+    "Skipping downloading .o files is only available with the non-minimalist cxx_remote_wrapper.py wrapper.")
 
 assert(
     link_rbe_check == "none" || link_rbe_check == "consistency" ||
