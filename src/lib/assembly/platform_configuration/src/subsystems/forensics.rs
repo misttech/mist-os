@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use crate::util;
 use assembly_config_schema::platform_config::forensics_config::ForensicsConfig;
+use assembly_config_schema::FileEntry;
 
 pub(crate) struct ForensicsSubsystem;
 impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
@@ -37,6 +38,12 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
             FeatureSupportLevel::Minimal | FeatureSupportLevel::Utility
         ) {
             util::add_build_type_config_data("cobalt", context, builder)?;
+            if let Some(api_key) = &config.cobalt.api_key {
+                builder.package("cobalt").config_data(FileEntry {
+                    source: api_key.clone(),
+                    destination: "api_key.hex".into(),
+                })?;
+            }
         }
 
         Ok(())
