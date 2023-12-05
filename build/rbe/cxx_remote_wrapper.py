@@ -143,6 +143,10 @@ class CxxRemoteAction(object):
         return self.cxx_action.compiler.type
 
     @property
+    def primary_output(self) -> Optional[Path]:
+        return self.cxx_action.output_file
+
+    @property
     def depfile(self) -> Optional[Path]:
         return self.cxx_action.depfile
 
@@ -237,8 +241,10 @@ class CxxRemoteAction(object):
         )
 
     def _remote_output_files(self) -> Sequence[Path]:
+        depfile_list = [self.depfile] if self.depfile else []
         return (
             list(self.cxx_action.output_files())
+            + depfile_list
             + self.command_line_output_files
         )
 
@@ -315,9 +321,14 @@ class CxxRemoteAction(object):
         self.vprintlist("remote output dirs", remote_output_dirs)
         self.vprintlist("rewrapper options", remote_options)
 
-        downloads = []
-        if self.depfile:  # always fetch the depfile
-            downloads.append(self.depfile)
+        # Interpret --download_outputs=false as a request to avoid
+        # downloading only the primary compiler output, usually the .o file.
+        # In other words, always download *all* other outputs,
+        # including the depfile.
+        # The depfile *must* be downloaded because it is consumed by ninja.
+        downloads = [
+            f for f in remote_output_files if f != self.primary_output
+        ] + remote_output_dirs
 
         self._remote_action = remote_action.remote_action_from_args(
             main_args=self._main_args,

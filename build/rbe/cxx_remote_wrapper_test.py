@@ -374,7 +374,7 @@ class CxxRemoteActionTests(unittest.TestCase):
         )
         self.assertEqual(
             c.remote_action.output_files_relative_to_project_root,
-            [fake_builddir / output],
+            [fake_builddir / output, fake_builddir / depfile],
         )
         self.assertEqual(set(c.remote_action.always_download), set([depfile]))
 
