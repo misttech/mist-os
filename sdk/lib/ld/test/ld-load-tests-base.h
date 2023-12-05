@@ -26,7 +26,6 @@ class LdLoadTestsBase {
   static constexpr bool kHasPassiveAbi = true;
   static constexpr bool kHasRelro = true;
   static constexpr bool kHasTls = true;
-  static constexpr bool kIsStartupDynamicLinker = true;
 
   void InitLog(fbl::unique_fd& log_fd);
 

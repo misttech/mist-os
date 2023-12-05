@@ -307,10 +307,6 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
-  if constexpr (!TestFixture::kIsStartupDynamicLinker) {
-    GTEST_SKIP() << "test is specific to the startup dynamic linker";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
@@ -325,10 +321,6 @@ startup dynamic linking failed with 1 errors and 0 warnings
 }
 
 TYPED_TEST(LdLoadFailureTests, MissingDependency) {
-  if constexpr (!TestFixture::kIsStartupDynamicLinker) {
-    GTEST_SKIP() << "test is specific to the startup dynamic linker";
-  }
-
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
   ASSERT_NO_FATAL_FAILURE(this->Needed({std::pair{"libmissing-dep-dep.so", false}}));
