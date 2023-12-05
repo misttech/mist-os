@@ -9,7 +9,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu.h"
 
-namespace virtio {
+namespace virtio_display {
 
 template <typename RequestType, typename ResponseType>
 void GpuDriver::Device::send_command_response(const RequestType* cmd, ResponseType** res) {
@@ -54,6 +54,6 @@ void GpuDriver::Device::send_command_response(const RequestType* cmd, ResponseTy
   sem_wait(&response_sem_);
 }
 
-}  // namespace virtio
+}  // namespace virtio_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_DEVICE_H_

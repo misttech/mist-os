@@ -20,7 +20,7 @@
 
 #include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 
-namespace virtio {
+namespace virtio_display {
 
 class Ring;
 
@@ -31,7 +31,7 @@ class GpuDriver : public fdf::DriverBase {
 
   class Device : public virtio::Device {
    public:
-    Device(zx::bti bti, std::unique_ptr<Backend> backend);
+    Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend);
     ~Device();
 
     static fit::result<zx_status_t, std::unique_ptr<Device>> Create(
@@ -50,7 +50,7 @@ class GpuDriver : public fdf::DriverBase {
    private:
     sem_t request_sem_ = {};
     sem_t response_sem_ = {};
-    Ring vring_ = {this};
+    virtio::Ring vring_ = {this};
     zx::vmo request_vmo_;
     zx::pmt request_pmt_;
     zx_paddr_t request_phys_addr_ = {};
@@ -93,6 +93,6 @@ class GpuDriver : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_sysmem::Allocator> sysmem_;
 };
 
-}  // namespace virtio
+}  // namespace virtio_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V2_GPU_H_

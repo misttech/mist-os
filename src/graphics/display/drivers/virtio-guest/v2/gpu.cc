@@ -25,7 +25,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
-namespace virtio {
+namespace virtio_display {
 
 namespace {
 
@@ -300,9 +300,9 @@ void GpuDriver::Stop() {
 
 void GpuDriver::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
-}  // namespace virtio
+}  // namespace virtio_display
 
-FUCHSIA_DRIVER_EXPORT(virtio::GpuDriver);
+FUCHSIA_DRIVER_EXPORT(virtio_display::GpuDriver);
 
 // TODO(b/282968393): remove when libdriver dep removed from bus/lib/virtio
 zx_driver_rec_t __zircon_driver_rec__ = {};

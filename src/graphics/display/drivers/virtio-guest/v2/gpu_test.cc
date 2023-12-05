@@ -321,7 +321,7 @@ class VirtioGpuTest : public ::testing::Test {
 
     // Start driver
     zx::result start_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio::GpuDriver>::Start,
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDriver>::Start,
                          std::move(start_args->start_args)));
 
     // TODO(fxbug.dev/134883): This should be ZX_OK once all the mocks are in place.
@@ -330,7 +330,7 @@ class VirtioGpuTest : public ::testing::Test {
 
   void TearDown() override {
     zx::result stop_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio::GpuDriver>::PrepareStop));
+        driver_.SyncCall(&fdf_testing::DriverUnderTest<virtio_display::GpuDriver>::PrepareStop));
     EXPECT_EQ(ZX_OK, stop_result.status_value());
   }
 
@@ -349,8 +349,8 @@ class VirtioGpuTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<TestEnvironmentLocal> test_environment_{env_dispatcher(),
                                                                               std::in_place};
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio::GpuDriver>> driver_{
-      driver_dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<virtio_display::GpuDriver>>
+      driver_{driver_dispatcher_->async_dispatcher(), std::in_place};
   async_patterns::TestDispatcherBound<FakePciParent> fake_pci_parent_{env_dispatcher(),
                                                                       std::in_place};
   async_patterns::TestDispatcherBound<FakeSysmem> sysmem_server_{env_dispatcher(), std::in_place};

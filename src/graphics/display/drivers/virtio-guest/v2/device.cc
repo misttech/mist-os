@@ -7,9 +7,9 @@
 
 #include "gpu.h"
 
-namespace virtio {
+namespace virtio_display {
 
-GpuDriver::Device::Device(zx::bti bti, std::unique_ptr<Backend> backend)
+GpuDriver::Device::Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
@@ -29,7 +29,7 @@ fit::result<zx_status_t, std::unique_ptr<GpuDriver::Device>> GpuDriver::Device::
   zx::bti bti;
   std::unique_ptr<virtio::Backend> backend;
   {
-    auto result = GetBtiAndBackend(ddk::Pci(std::move(client_end)));
+    auto result = virtio::GetBtiAndBackend(ddk::Pci(std::move(client_end)));
     if (!result.is_ok()) {
       FDF_LOG(ERROR, "GetBtiAndBackend failed");
       return result.take_error();
@@ -157,4 +157,4 @@ void GpuDriver::Device::IrqRingUpdate() {
 
 void GpuDriver::Device::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
 
-}  // namespace virtio
+}  // namespace virtio_display
