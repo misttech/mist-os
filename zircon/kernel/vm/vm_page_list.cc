@@ -1361,6 +1361,43 @@ void VmPageSpliceList::FreeAllPages() {
   }
 }
 
+VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
+  if (IsDone()) {
+    DEBUG_ASSERT_MSG(false, "peeked at empty splice list");
+    return VmPageOrMarkerRef(nullptr);
+  }
+  if (!list_is_empty(&raw_pages_)) {
+    return VmPageOrMarkerRef(nullptr);
+  }
+
+  const uint64_t cur_offset = offset_ + pos_;
+  const auto cur_node_idx = offset_to_node_index(cur_offset, 0);
+  const auto cur_node_offset = offset_to_node_offset(cur_offset, 0);
+
+  VmPageOrMarker* res = nullptr;
+  if (offset_to_node_index(offset_, 0) != 0 &&
+      offset_to_node_offset(offset_, 0) == cur_node_offset) {
+    // If the original offset means that pages were placed in head_
+    // and the current offset points to the same node, look there.
+    res = &head_.Lookup(cur_node_idx);
+  } else if (cur_node_offset != offset_to_node_offset(offset_ + length_, 0)) {
+    // If the current offset isn't pointing to the tail node,
+    // look in the middle tree.
+    auto middle_node = middle_.find(cur_node_offset);
+    if (middle_node.IsValid()) {
+      res = &middle_node->Lookup(cur_node_idx);
+    }
+  } else {
+    // If none of the other cases, we're in the tail_.
+    res = &tail_.Lookup(cur_node_idx);
+  }
+  // We only want to return non-null if the head of the splice list is a reference.
+  if (res != nullptr && !res->IsReference()) {
+    res = nullptr;
+  }
+  return VmPageOrMarkerRef(res);
+}
+
 VmPageOrMarker VmPageSpliceList::Pop() {
   if (IsDone()) {
     DEBUG_ASSERT_MSG(false, "Popped from empty splice list");

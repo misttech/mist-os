@@ -741,8 +741,15 @@ class VmPageSpliceList final {
   // Pops the next page off of the splice.
   VmPageOrMarker Pop();
 
+  // Peeks at the head of the splice list and returns a non-null VmPageOrMarkerRef pointing to it
+  // if and only if it is a reference.
+  VmPageOrMarkerRef PeekReference();
+
   // Returns true after the whole collection has been processed by Pop.
   bool IsDone() const { return pos_ >= length_; }
+
+  // Returns the current position in the list.
+  uint64_t Position() const { return pos_; }
 
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(VmPageSpliceList);
 

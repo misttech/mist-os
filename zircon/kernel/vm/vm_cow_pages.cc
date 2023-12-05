@@ -4955,8 +4955,25 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   uint64_t new_pages_start = offset;
   uint64_t new_pages_len = 0;
   zx_status_t status = ZX_OK;
+  [[maybe_unused]] uint64_t initial_list_position = pages->Position();
   while (!pages->IsDone()) {
+    // With a PageSource only Pages are supported, so convert any refs to real pages.
+    // We do this without popping a page from the splice list as `MakePageFromReference` may return
+    // ZX_ERR_SHOULD_WAIT. This could lead the caller to wait on the page request and call
+    // `SupplyPagesLocked` again, at which point it would expect the operation to continue at the
+    // exact same page.
+    VmPageOrMarkerRef src_page_ref = pages->PeekReference();
+    // The src_page_ref can be null if the head of the page list is not a reference or if the page
+    // list is empty.
+    if (src_page_ref) {
+      DEBUG_ASSERT(src_page_ref->IsReference());
+      status = MakePageFromReference(src_page_ref, page_request);
+      if (status != ZX_OK) {
+        break;
+      }
+    }
     VmPageOrMarker src_page = pages->Pop();
+    DEBUG_ASSERT(!src_page.IsReference());
 
     // The pager API does not allow the source VMO of supply pages to have a page source, so we can
     // assume that any empty pages are zeroes and insert explicit markers here. We need to insert
@@ -4964,15 +4981,6 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     if (src_page.IsEmpty()) {
       src_page = VmPageOrMarker::Marker();
     }
-
-    // With a PageSource only Pages are supported, so convert any refs to real pages.
-    if (src_page.IsReference()) {
-      status = MakePageFromReference(VmPageOrMarkerRef(&src_page), page_request);
-      if (status != ZX_OK) {
-        break;
-      }
-    }
-    DEBUG_ASSERT(!src_page.IsReference());
 
     // A newly supplied page starts off as Clean.
     if (src_page.IsPage() && is_source_preserving_page_content()) {
@@ -5079,6 +5087,8 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   *supplied_len = offset - start;
+  // Assert we have only popped as many pages from the splice list as we have supplied.
+  DEBUG_ASSERT((pages->Position() - initial_list_position) == *supplied_len);
   return status;
 }
 
