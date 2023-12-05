@@ -31,3 +31,7 @@ node "reset" {
     fuchsia.amlogic.platform.BIND_REGISTER_ID.SPICC1_RESET
   }
 }
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}

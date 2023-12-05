@@ -142,6 +142,10 @@ int Sherlock::Thread() {
     zxlogf(ERROR, "I2cInit() failed");
   }
 
+  if (SpiInit() != ZX_OK) {
+    zxlogf(ERROR, "SpiInit() failed");
+  }
+
   if (ThermalInit() != ZX_OK) {
     zxlogf(ERROR, "ThermalInit() failed");
   }
@@ -191,10 +195,6 @@ int Sherlock::Thread() {
 
   if (CpuInit() != ZX_OK) {
     zxlogf(ERROR, "CpuInit() failed\n");
-  }
-
-  if (SpiInit() != ZX_OK) {
-    zxlogf(ERROR, "SpiInit() failed");
   }
 
   if (CanvasInit() != ZX_OK) {

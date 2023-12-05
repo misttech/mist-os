@@ -98,14 +98,23 @@ const std::vector kResetRegisterProperties = {
                       bind_fuchsia_amlogic_platform::BIND_REGISTER_ID_SPICC0_RESET),
 };
 
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 zx_status_t Sherlock::SpiInit() {
   // setup pinmux for the SPI bus
   // SPI_A
-  gpio_impl_.SetAltFunction(T931_GPIOC(0), 5);         // MOSI
-  gpio_impl_.SetAltFunction(T931_GPIOC(1), 5);         // MISO
-  gpio_impl_.ConfigOut(GPIO_SPICC0_SS0, 1);            // SS0
-  gpio_impl_.ConfigIn(T931_GPIOC(3), GPIO_PULL_DOWN);  // SCLK
-  gpio_impl_.SetAltFunction(T931_GPIOC(3), 5);         // SCLK
+  gpio_init_steps_.push_back({T931_GPIOC(0), GpioSetAltFunction(5)});  // MOSI
+  gpio_init_steps_.push_back({T931_GPIOC(1), GpioSetAltFunction(5)});  // MISO
+  gpio_init_steps_.push_back({GPIO_SPICC0_SS0, GpioConfigOut(1)});     // SS0
+  gpio_init_steps_.push_back(
+      {T931_GPIOC(3), GpioConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown)});  // SCLK
+  gpio_init_steps_.push_back({T931_GPIOC(3), GpioSetAltFunction(5)});               // SCLK
 
   std::vector<fpbus::Metadata> spi_metadata;
   spi_metadata.emplace_back([&]() {
@@ -166,6 +175,7 @@ zx_status_t Sherlock::SpiInit() {
   auto parents = std::vector<fdf::ParentSpec>{
       {kGpioSpiRules, kGpioSpiProperties},
       {kResetRegisterRules, kResetRegisterProperties},
+      {kGpioInitRules, kGpioInitProperties},
   };
 
   fidl::Arena<> fidl_arena;

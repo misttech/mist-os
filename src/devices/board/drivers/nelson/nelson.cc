@@ -99,6 +99,10 @@ int Nelson::Thread() {
     zxlogf(ERROR, "I2cInit failed: %d", status);
   }
 
+  if ((status = SpiInit()) != ZX_OK) {
+    zxlogf(ERROR, "SpiInit failed: %d", status);
+  }
+
   if ((status = EmmcInit()) != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed: %d", status);
   }
@@ -188,10 +192,6 @@ int Nelson::Thread() {
 
   if ((status = CpuInit()) != ZX_OK) {
     zxlogf(ERROR, "CpuInit failed: %d", status);
-  }
-
-  if ((status = SpiInit()) != ZX_OK) {
-    zxlogf(ERROR, "SpiInit failed: %d", status);
   }
 
   if ((status = SelinaInit()) != ZX_OK) {

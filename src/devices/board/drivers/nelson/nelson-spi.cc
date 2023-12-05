@@ -73,9 +73,17 @@ fdf::wire::CompositeNodeSpec MakeSpiCompositeNodeSpec(fidl::AnyArena& fidl_arena
       fdf::MakeProperty(bind_fuchsia::REGISTER_ID, register_id),
   };
 
+  const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+  const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+  };
+
   const std::vector<fdf::ParentSpec> parents = {
       {kGpioSpiRules, kGpioSpiProperties},
       {kResetRegisterRules, kResetRegisterProperties},
+      {kGpioInitRules, kGpioInitProperties},
   };
 
   return fidl::ToWire(fidl_arena, fdf::CompositeNodeSpec{{.name = name, .parents = parents}});
@@ -157,19 +165,20 @@ zx_status_t Nelson::Spi0Init() {
   spi_0_dev.mmio() = spi_0_mmios;
   spi_0_dev.irq() = spi_0_irqs;
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_A_MOSI, 5);  // MOSI
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_A_MOSI, 2500, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_MOSI, GpioSetAltFunction(5)});  // MOSI
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_MOSI, GpioSetDriveStrength(2500)});
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_A_MISO, 5);  // MISO
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_A_MISO, 2500, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_MISO, GpioSetAltFunction(5)});  // MISO
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_MISO, GpioSetDriveStrength(2500)});
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_A_SS0, 0);
-  gpio_impl_.ConfigOut(GPIO_SOC_SPI_A_SS0, 1);  // SS0
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_SS0, GpioSetAltFunction(0)});
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_SS0, GpioConfigOut(1)});  // SS0
 
   // SCLK must be pulled down to prevent SPI bit errors.
-  gpio_impl_.ConfigIn(GPIO_SOC_SPI_A_SCLK, GPIO_PULL_DOWN);
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_A_SCLK, 5);  // SCLK
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_A_SCLK, 2500, nullptr);
+  gpio_init_steps_.push_back(
+      {GPIO_SOC_SPI_A_SCLK, GpioConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown)});
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_SCLK, GpioSetAltFunction(5)});  // SCLK
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_A_SCLK, GpioSetDriveStrength(2500)});
 
   std::vector<fpbus::Metadata> spi_0_metadata;
   spi_0_metadata.emplace_back([]() {
@@ -278,16 +287,16 @@ zx_status_t Nelson::Spi1Init() {
   spi_1_dev.bti() = spi_1_btis;
 
   // setup pinmux for SPICC1 bus arbiter.
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_B_MOSI, 3);  // MOSI
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_B_MOSI, 2500, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_MOSI, GpioSetAltFunction(3)});  // MOSI
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_MOSI, GpioSetDriveStrength(2500)});
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_B_MISO, 3);  // MISO
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_B_MISO, 2500, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_MISO, GpioSetAltFunction(3)});  // MISO
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_MISO, GpioSetDriveStrength(2500)});
 
-  gpio_impl_.ConfigOut(GPIO_SOC_SPI_B_SS0, 1);  // SS0
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_SS0, GpioConfigOut(1)});  // SS0
 
-  gpio_impl_.SetAltFunction(GPIO_SOC_SPI_B_SCLK, 3);  // SCLK
-  gpio_impl_.SetDriveStrength(GPIO_SOC_SPI_B_SCLK, 2500, nullptr);
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_SCLK, GpioSetAltFunction(3)});  // SCLK
+  gpio_init_steps_.push_back({GPIO_SOC_SPI_B_SCLK, GpioSetDriveStrength(2500)});
 
   std::vector<fpbus::Metadata> spi_1_metadata;
   spi_1_metadata.emplace_back([]() {
