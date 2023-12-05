@@ -1,5 +1,6 @@
 bind_library://bind/fuchsia
 bind_library://bind/fuchsia.arm.platform
+bind_library://bind/fuchsia.devicetree
 bind_library://bind/fuchsia.nxp.platform
 bind_library://bind/fuchsia.platform
 cc_prebuilt_library://pkg/async-default
