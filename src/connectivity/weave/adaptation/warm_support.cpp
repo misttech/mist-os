@@ -203,6 +203,8 @@ std::string_view StackErrorToString(fuchsia::net::stack::Error error) {
       return "already exists";
     case fuchsia::net::stack::Error::IO:
       return "i/o";
+    default:
+      return "malformed stack error";
   }
 }
 
@@ -219,6 +221,8 @@ std::string_view AddressRemovalReasonToString(
       return "interface removed";
     case fuchsia_net_interfaces_admin::AddressRemovalReason::kUserRemoved:
       return "user removed";
+    default:
+      return "malformed address removal reason";
   }
 }
 
@@ -231,6 +235,8 @@ std::string_view AddressAssignmentStateToString(
       return "assigned";
     case fuchsia_net_interfaces::AddressAssignmentState::kUnavailable:
       return "unavailable";
+    default:
+      return "malformed address assignment state";
   }
 }
 
