@@ -74,6 +74,27 @@ impl Route for RouteRequest {
     }
 }
 
+// Helper function to log and return an error if the capability is void.
+fn check_source_for_void(
+    source: &CapabilitySource,
+    moniker: &moniker::Moniker,
+) -> Result<(), RouteAndOpenCapabilityError> {
+    if let CapabilitySource::Void { ref capability, .. } = source {
+        debug!(
+            "Optional {} `{}` was not available for target component `{}`\n{}",
+            capability.type_name(),
+            capability.source_name(),
+            &moniker,
+            ROUTE_ERROR_HELP
+        );
+        return Err(RouteAndOpenCapabilityError::OpenError {
+            source: source.clone(),
+            err: crate::model::error::OpenError::SourceInstanceNotFound,
+        });
+    };
+    Ok(())
+}
+
 /// Routes a capability from `target` to its source. Opens the capability if routing succeeds.
 ///
 /// If the capability is not allowed to be routed to the `target`, per the
@@ -89,6 +110,7 @@ pub(super) async fn route_and_open_capability(
             let storage_source = r.route(target).await.map_err(|e| {
                 RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
             })?;
+            check_source_for_void(&storage_source.source, &target.moniker)?;
 
             let backing_dir_info = storage::route_backing_directory(storage_source.source.clone())
                 .await
@@ -118,6 +140,7 @@ pub(super) async fn route_and_open_capability(
             let route_source = r.route(target).await.map_err(|e| {
                 RouteAndOpenCapabilityError::RoutingError { request: route_request, err: e }
             })?;
+            check_source_for_void(&route_source.source, &target.moniker)?;
 
             // clone the source as additional context in case of an error
             let capability_source = route_source.source.clone();
@@ -213,29 +236,6 @@ pub async fn report_routing_failure(
     target
         .with_logger_as_default(|| {
             match err {
-                ModelError::RouteAndOpenCapabilityError {
-                    err:
-                        RouteAndOpenCapabilityError::RoutingError {
-                            err:
-                                RoutingError::AvailabilityRoutingError(
-                                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                                ),
-                            ..
-                        },
-                } => {
-                    // If the route failed because the capability is
-                    // intentionally not provided, then this failure is expected
-                    // and the warn level is unwarranted, so use the debug level
-                    // in this case.
-                    debug!(
-                        "Optional {} `{}` was not available for target component `{}`: {}\n{}",
-                        cap.type_name(),
-                        cap.source_id(),
-                        &target.moniker,
-                        &err_str,
-                        ROUTE_ERROR_HELP
-                    );
-                }
                 ModelError::RouteAndOpenCapabilityError {
                     err:
                         RouteAndOpenCapabilityError::RoutingError {

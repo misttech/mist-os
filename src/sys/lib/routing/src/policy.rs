@@ -108,6 +108,12 @@ impl GlobalPolicyChecker {
                 source: CapabilityAllowlistSource::Framework,
                 capability: capability.type_name(),
             },
+            CapabilitySource::Void { capability, component } => CapabilityAllowlistKey {
+                source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),
+                source_name: capability.source_name().clone(),
+                source: CapabilityAllowlistSource::Void,
+                capability: capability.type_name(),
+            },
             CapabilitySource::Capability { source_capability, component } => {
                 CapabilityAllowlistKey {
                     source_moniker: ExtendedMoniker::ComponentInstance(component.moniker.clone()),

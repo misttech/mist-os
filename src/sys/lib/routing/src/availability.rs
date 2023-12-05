@@ -24,42 +24,26 @@ impl AvailabilityState {
         &mut self,
         offer: &dyn OfferDeclCommon,
     ) -> Result<(), AvailabilityRoutingError> {
-        let next_availability = offer.availability();
-        if offer.source() == &OfferSource::Void {
-            match self.advance(next_availability) {
-                // Nb: Although an error is returned here, this specific error is ignored during validation
-                // because it's acceptable for routing to fail due to an optional capability ending in an offer
-                // from `void`.
-                Ok(()) => Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget),
-                Err(AvailabilityRoutingError::TargetHasStrongerAvailability) => {
-                    Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget)
-                }
-                Err(e) => Err(e),
-            }
-        } else {
-            self.advance(next_availability)
+        let result = self.advance(offer.availability());
+        if offer.source() == &OfferSource::Void
+            && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        {
+            return Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget);
         }
+        result
     }
 
     pub fn advance_with_expose(
         &mut self,
         expose: &dyn ExposeDeclCommon,
     ) -> Result<(), AvailabilityRoutingError> {
-        let next_availability = expose.availability();
-        if expose.source() == &ExposeSource::Void {
-            match self.advance(next_availability) {
-                // Nb: Although an error is returned here, this specific error is ignored during validation
-                // because it's acceptable for routing to fail due to an optional capability ending in an expose
-                // from `void`.
-                Ok(()) => Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget),
-                Err(AvailabilityRoutingError::TargetHasStrongerAvailability) => {
-                    Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget)
-                }
-                Err(e) => Err(e),
-            }
-        } else {
-            self.advance(next_availability)
+        let result = self.advance(expose.availability());
+        if expose.source() == &ExposeSource::Void
+            && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        {
+            return Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget);
         }
+        result
     }
 
     pub fn advance(
@@ -174,11 +158,7 @@ mod tests {
         new_offer(Availability::Transitional),
         Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
     )]
-    #[test_case(
-        Availability::Optional,
-        new_void_offer(),
-        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
-    )]
+    #[test_case(Availability::Optional, new_void_offer(), Ok(()))]
     #[test_case(
         Availability::Required,
         new_offer(Availability::Optional),
@@ -200,11 +180,7 @@ mod tests {
     #[test_case(Availability::Transitional, new_offer(Availability::Required), Ok(()))]
     #[test_case(Availability::Transitional, new_offer(Availability::SameAsTarget), Ok(()))]
     #[test_case(Availability::Transitional, new_offer(Availability::Transitional), Ok(()))]
-    #[test_case(
-        Availability::Transitional,
-        new_void_offer(),
-        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
-    )]
+    #[test_case(Availability::Transitional, new_void_offer(), Ok(()))]
     fn offer_tests(
         availability: Availability,
         offer: OfferDecl,
@@ -248,7 +224,7 @@ mod tests {
     #[test_case(
         Availability::Optional,
         new_void_expose(),
-        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
+        Ok(())
     )]
     #[test_case(
         Availability::Required,
@@ -274,7 +250,7 @@ mod tests {
     #[test_case(
         Availability::Transitional,
         new_void_expose(),
-        Err(AvailabilityRoutingError::RouteFromVoidToOptionalTarget)
+        Ok(())
     )]
     fn expose_tests(
         availability: Availability,

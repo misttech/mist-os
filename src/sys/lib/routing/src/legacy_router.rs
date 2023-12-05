@@ -985,7 +985,13 @@ impl Offer {
     {
         let res = match offer.source() {
             OfferSource::Void => {
-                panic!("an error should have been emitted by the availability walker before we reach this point");
+                OfferSegment::Done(OfferResult::Source(CapabilitySource::<C>::Void {
+                    capability: InternalCapability::new(
+                        (&offer).into(),
+                        offer.source_name().clone(),
+                    ),
+                    component: target.as_weak(),
+                }))
             }
             OfferSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();
@@ -1394,7 +1400,13 @@ impl Expose {
     {
         let res = match expose.source() {
             ExposeSource::Void => {
-                panic!("an error should have been emitted by the availability walker before we reach this point");
+                ExposeSegment::Done(ExposeResult::Source(CapabilitySource::<C>::Void {
+                    capability: InternalCapability::new(
+                        (&expose).into(),
+                        expose.source_name().clone(),
+                    ),
+                    component: target.as_weak(),
+                }))
             }
             ExposeSource::Self_ => {
                 let target_capabilities = target.lock_resolved_state().await?.capabilities();

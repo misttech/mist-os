@@ -344,6 +344,7 @@ pub enum CapabilityAllowlistSource {
     Framework,
     Capability,
     Environment,
+    Void,
 }
 
 /// The enforcement and validation policy to apply to component target ABI revisions.

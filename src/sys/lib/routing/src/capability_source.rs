@@ -120,6 +120,11 @@ pub enum CapabilitySource<C: ComponentInstanceInterface> {
         capability: ComponentCapability,
         component: WeakComponentInstanceInterface<C>,
     },
+    // This capability originates from "void". This is only a valid origination for optional capabilities.
+    Void {
+        capability: InternalCapability,
+        component: WeakComponentInstanceInterface<C>,
+    },
 }
 
 impl<C: ComponentInstanceInterface> CapabilitySource<C> {
@@ -135,6 +140,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::AnonymizedAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::FilteredAggregate { capability, .. } => capability.can_be_in_namespace(),
             Self::Environment { capability, .. } => capability.can_be_in_namespace(),
+            Self::Void { capability, .. } => capability.can_be_in_namespace(),
         }
     }
 
@@ -148,6 +154,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::AnonymizedAggregate { capability, .. } => Some(capability.source_name()),
             Self::FilteredAggregate { capability, .. } => Some(capability.source_name()),
             Self::Environment { capability, .. } => capability.source_name(),
+            Self::Void { capability, .. } => Some(capability.source_name()),
         }
     }
 
@@ -161,6 +168,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             Self::AnonymizedAggregate { capability, .. } => capability.type_name(),
             Self::FilteredAggregate { capability, .. } => capability.type_name(),
             Self::Environment { capability, .. } => capability.type_name(),
+            Self::Void { capability, .. } => capability.type_name(),
         }
     }
 
@@ -171,6 +179,7 @@ impl<C: ComponentInstanceInterface> CapabilitySource<C> {
             | Self::Capability { component, .. }
             | Self::AnonymizedAggregate { component, .. }
             | Self::FilteredAggregate { component, .. }
+            | Self::Void { component, .. }
             | Self::Environment { component, .. } => {
                 WeakExtendedInstanceInterface::Component(component.clone())
             }
@@ -204,6 +213,7 @@ impl<C: ComponentInstanceInterface> fmt::Display for CapabilitySource<C> {
                     )
                 }
                 Self::Environment { capability, .. } => capability.to_string(),
+                Self::Void { capability, .. } => capability.to_string(),
             }
         )
     }
@@ -328,6 +338,20 @@ pub enum InternalCapability {
 }
 
 impl InternalCapability {
+    pub fn new(type_name: CapabilityTypeName, name: Name) -> Self {
+        match type_name {
+            CapabilityTypeName::Directory => InternalCapability::Directory(name),
+            CapabilityTypeName::EventStream => InternalCapability::Directory(name),
+            CapabilityTypeName::Protocol => InternalCapability::Protocol(name),
+            CapabilityTypeName::Resolver => InternalCapability::Resolver(name),
+            CapabilityTypeName::Runner => InternalCapability::Runner(name),
+            CapabilityTypeName::Service => InternalCapability::Service(name),
+            CapabilityTypeName::Storage => InternalCapability::Storage(name),
+            CapabilityTypeName::Dictionary => InternalCapability::Dictionary(name),
+            CapabilityTypeName::Config => InternalCapability::Config(name),
+        }
+    }
+
     /// Returns whether the given InternalCapability can be available in a component's namespace.
     pub fn can_be_in_namespace(&self) -> bool {
         matches!(

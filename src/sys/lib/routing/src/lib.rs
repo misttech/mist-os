@@ -1061,6 +1061,7 @@ where
             capability: ComponentCapability::Storage(storage_decl),
             component,
         } => (storage_decl, component),
+        CapabilitySource::Void { .. } => return Ok(()),
         _ => unreachable!("unexpected storage source"),
     };
 

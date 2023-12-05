@@ -518,9 +518,6 @@ pub enum AvailabilityRoutingError {
     #[error("Offer uses void source, but target requires the capability")]
     OfferFromVoidToRequiredTarget,
 
-    #[error("Offer or expose uses void source, so the route cannot be completed")]
-    RouteFromVoidToOptionalTarget,
-
     #[error("Expose uses void source, but target requires the capability")]
     ExposeFromVoidToRequiredTarget,
 

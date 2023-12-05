@@ -19,8 +19,8 @@ use {
     crate::runner::RemoteRunner,
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
-        component_instance::ComponentInstanceInterface, error::AvailabilityRoutingError,
-        error::RoutingError, policy::GlobalPolicyChecker,
+        component_instance::ComponentInstanceInterface, error::RoutingError,
+        policy::GlobalPolicyChecker,
     },
     async_trait::async_trait,
     cm_logger::scoped::ScopedLogger,
@@ -36,7 +36,6 @@ use {
     futures::channel::oneshot,
     moniker::Moniker,
     sandbox::Capability,
-    std::string::ToString,
     std::sync::Arc,
     tracing::warn,
 };
@@ -298,27 +297,20 @@ async fn make_structured_config(
             continue;
         };
 
-        let route_result = routing::route_capability(
+        let source = routing::route_capability(
             RouteRequest::UseConfig(use_config.clone()),
             component,
             &mut routing::mapper::NoopRouteMapper,
         )
-        .await;
-        // If the config capability is optional and routed from void, we ignore it.
-        if matches!(
-            route_result,
-            Err(RoutingError::AvailabilityRoutingError(
-                AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-            ))
-        ) {
-            continue;
-        }
-        let source = route_result.map_err(|err| StartActionError::StructuredConfigError {
+        .await
+        .map_err(|err| StartActionError::StructuredConfigError {
             moniker: component.moniker.clone(),
             err: err.into(),
         })?;
 
         let cap = match source.source {
+            routing::capability_source::CapabilitySource::Void { .. } => continue,
+
             routing::capability_source::CapabilitySource::Capability {
                 source_capability, ..
             } => source_capability,

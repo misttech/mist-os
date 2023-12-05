@@ -279,13 +279,12 @@ impl<'a> OpenRequest<'a> {
 
                 Ok(Some(Box::new(provider)))
             }
+            // These capabilities do not have a default provider.
             CapabilitySource::Framework { .. }
+            | CapabilitySource::Void { .. }
             | CapabilitySource::Capability { .. }
             | CapabilitySource::Builtin { .. }
-            | CapabilitySource::Environment { .. } => {
-                // There is no default provider for a framework, builtin or environment capability
-                Ok(None)
-            }
+            | CapabilitySource::Environment { .. } => Ok(None),
         }
     }
 }

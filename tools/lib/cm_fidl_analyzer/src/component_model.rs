@@ -31,7 +31,7 @@ use {
         environment::{
             component_has_relative_url, find_first_absolute_ancestor_url, RunnerRegistry,
         },
-        error::{AvailabilityRoutingError, ComponentInstanceError, RoutingError},
+        error::{ComponentInstanceError, RoutingError},
         legacy_router::RouteBundle,
         mapper::{RouteMapper, RouteSegment},
         policy::GlobalPolicyChecker,
@@ -648,36 +648,41 @@ impl ComponentModelForAnalyzer {
         };
 
         let (route_result, route) = Self::route_capability_sync(route_request, target);
-        match route_result {
-            Ok(source) => match self.check_use_source(&source) {
-                Ok(()) => {
-                    results.push(VerifyRouteResult {
-                        using_node: target.moniker().clone(),
-                        capability: Some(capability.clone()),
-                        error: None,
-                        route,
-                    });
-                }
-                Err(err) => {
-                    results.push(VerifyRouteResult {
-                        using_node: target.moniker().clone(),
-                        capability: Some(capability.clone()),
-                        error: Some(err),
-                        route,
-                    });
-                }
-            },
-            // Ignore any route that failed due to a void offer to a target with an
-            // optional dependency on the capability.
-            Err(RoutingError::AvailabilityRoutingError(
-                AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-            )) => return vec![],
-            Err(err) => results.push(VerifyRouteResult {
-                using_node: target.moniker().clone(),
-                capability: Some(capability.clone()),
-                error: Some(err.into()),
-                route,
-            }),
+        let source = match route_result {
+            Ok(source) => source,
+            Err(err) => {
+                results.push(VerifyRouteResult {
+                    using_node: target.moniker().clone(),
+                    capability: Some(capability.clone()),
+                    error: Some(err.into()),
+                    route,
+                });
+                return results;
+            }
+        };
+
+        // Ignore any valid routes to void.
+        if let CapabilitySource::Void { .. } = source.source {
+            return vec![];
+        }
+
+        match self.check_use_source(&source) {
+            Ok(()) => {
+                results.push(VerifyRouteResult {
+                    using_node: target.moniker().clone(),
+                    capability: Some(capability.clone()),
+                    error: None,
+                    route,
+                });
+            }
+            Err(err) => {
+                results.push(VerifyRouteResult {
+                    using_node: target.moniker().clone(),
+                    capability: Some(capability.clone()),
+                    error: Some(err),
+                    route,
+                });
+            }
         };
 
         results
@@ -766,13 +771,11 @@ impl ComponentModelForAnalyzer {
                     target,
                 );
 
-                // Ignore any route that failed due to a void offer to a target with an
-                // optional dependency on the capability.
-                if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                )) = result
-                {
-                    return vec![];
+                // Ignore any valid routes to void.
+                if let Ok(ref source) = result {
+                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                        return vec![];
+                    }
                 }
 
                 (result.map_err(|e| AnalyzerModelError::from(e)), vec![route], capability)
@@ -784,13 +787,11 @@ impl ComponentModelForAnalyzer {
                     target,
                 );
 
-                // Ignore any route that failed due to a void offer to a target with an
-                // optional dependency on the capability.
-                if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                )) = result
-                {
-                    return vec![];
+                // Ignore any valid routes to void.
+                if let Ok(ref source) = result {
+                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                        return vec![];
+                    }
                 }
 
                 (result.map_err(|e| e.into()), vec![route], capability)
@@ -802,13 +803,11 @@ impl ComponentModelForAnalyzer {
                     target,
                 );
 
-                // Ignore any route that failed due to a void offer to a target with an
-                // optional dependency on the capability.
-                if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                )) = result
-                {
-                    return vec![];
+                // Ignore any valid routes to void.
+                if let Ok(ref source) = result {
+                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                        return vec![];
+                    }
                 }
 
                 (result.map_err(|e| e.into()), vec![route], capability)
@@ -818,13 +817,11 @@ impl ComponentModelForAnalyzer {
                 let (result, storage_route, dir_route) =
                     Self::route_storage_and_backing_directory_sync(use_storage_decl, target);
 
-                // Ignore any route that failed due to a void offer to a target with an
-                // optional dependency on the capability.
-                if let Err(RoutingError::AvailabilityRoutingError(
-                    AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                )) = result
-                {
-                    return vec![];
+                // Ignore any valid routes to void.
+                if let Ok(ref source) = result {
+                    if matches!(source.source, CapabilitySource::Void { .. }) {
+                        return vec![];
+                    }
                 }
 
                 let result = result.map_err(|e| e.into());
@@ -907,17 +904,6 @@ impl ComponentModelForAnalyzer {
                 let (result, route) = Self::route_capability_sync(request, target);
                 let error =
                     result.map_err(|e| e.into()).and_then(|s| self.check_use_source(&s)).err();
-
-                // Ignore any route that failed due to a void expose to a target with an
-                // optional dependency on the capability.
-                let error = match error {
-                    Some(AnalyzerModelError::RoutingError(
-                        RoutingError::AvailabilityRoutingError(
-                            AvailabilityRoutingError::RouteFromVoidToOptionalTarget,
-                        ),
-                    )) => None,
-                    _ => error,
-                };
 
                 Some(VerifyRouteResult {
                     using_node: target.moniker().clone(),
@@ -1067,6 +1053,7 @@ impl ComponentModelForAnalyzer {
             }
             CapabilitySource::Builtin { .. } => Ok(()),
             CapabilitySource::Framework { .. } => Ok(()),
+            CapabilitySource::Void { .. } => Ok(()),
             _ => unimplemented![],
         }
     }
@@ -1178,16 +1165,13 @@ impl ComponentModelForAnalyzer {
             let result =
                 route_capability(RouteRequest::UseStorage(use_decl), target, &mut storage_mapper)
                     .await?;
-            let (storage_decl, storage_component) = match result {
-                RouteSource {
-                    source:
-                        CapabilitySource::Component {
-                            capability: ComponentCapability::Storage(storage_decl),
-                            component,
-                            ..
-                        },
-                    relative_path: _,
+            let (storage_decl, storage_component) = match result.source {
+                CapabilitySource::Component {
+                    capability: ComponentCapability::Storage(storage_decl),
+                    component,
+                    ..
                 } => (storage_decl, component.upgrade()?),
+                CapabilitySource::Void { .. } => return Ok(result),
                 _ => unreachable!("unexpected storage source"),
             };
             route_capability(
