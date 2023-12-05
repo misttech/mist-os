@@ -18,7 +18,7 @@ static zx_status_t virtio_gpu_bind(void* ctx, zx_device_t* bus_device) {
     zxlogf(INFO, "driver.virtio-gpu.disabled=1, not binding to the GPU");
     return ZX_ERR_NOT_FOUND;
   }
-  return virtio::CreateAndBind<virtio::GpuDevice>(ctx, bus_device);
+  return virtio::CreateAndBind<virtio_display::GpuDevice>(ctx, bus_device);
 }
 
 static const zx_driver_ops_t gpu_block_driver_ops = []() {

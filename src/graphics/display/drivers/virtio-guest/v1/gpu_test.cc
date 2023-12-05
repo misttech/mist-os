@@ -167,8 +167,8 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
     zx::bti bti;
     fake_bti_create(bti.reset_and_get_address());
-    device_ = std::make_unique<virtio::GpuDevice>(nullptr, std::move(bti),
-                                                  std::make_unique<FakeGpuBackend>());
+    device_ = std::make_unique<virtio_display::GpuDevice>(nullptr, std::move(bti),
+                                                          std::make_unique<FakeGpuBackend>());
 
     zx::result<fidl::Endpoints<fuchsia_sysmem::Allocator>> sysmem_endpoints =
         fidl::CreateEndpoints<fuchsia_sysmem::Allocator>();
@@ -196,7 +196,7 @@ class VirtioGpuTest : public testing::Test, public loop_fixture::RealLoop {
 
  protected:
   std::unique_ptr<MockAllocator> fake_sysmem_;
-  std::unique_ptr<virtio::GpuDevice> device_;
+  std::unique_ptr<virtio_display::GpuDevice> device_;
 };
 
 TEST_F(VirtioGpuTest, ImportVmo) {
@@ -222,7 +222,7 @@ TEST_F(VirtioGpuTest, ImportVmo) {
   RunLoopUntilIdle();
 
   PerformBlockingWork([&] {
-    zx::result<virtio::GpuDevice::BufferInfo> buffer_info_result =
+    zx::result<virtio_display::GpuDevice::BufferInfo> buffer_info_result =
         device_->GetAllocatedBufferInfoForImage(kBufferCollectionId, /*index=*/0, &kDefaultImage);
     ASSERT_OK(buffer_info_result.status_value());
 

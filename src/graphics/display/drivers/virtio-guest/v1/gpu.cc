@@ -32,7 +32,7 @@
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
-namespace virtio {
+namespace virtio_display {
 
 namespace {
 
@@ -414,7 +414,7 @@ zx_status_t GpuDevice::DisplayControllerImplSetDisplayPower(uint64_t display_id,
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<Backend> backend)
+GpuDevice::GpuDevice(zx_device_t* bus_device, zx::bti bti, std::unique_ptr<virtio::Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)), DeviceType(bus_device) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
@@ -840,4 +840,4 @@ void GpuDevice::IrqRingUpdate() {
 
 void GpuDevice::IrqConfigChange() { zxlogf(TRACE, "IrqConfigChange()"); }
 
-}  // namespace virtio
+}  // namespace virtio_display

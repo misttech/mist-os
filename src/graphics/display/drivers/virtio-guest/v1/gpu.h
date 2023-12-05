@@ -23,18 +23,18 @@
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 
-namespace virtio {
+namespace virtio_display {
 
 class Ring;
 
 class GpuDevice;
 using DeviceType = ddk::Device<GpuDevice, ddk::GetProtocolable, ddk::Initializable>;
-class GpuDevice : public Device,
+class GpuDevice : public virtio::Device,
                   public DeviceType,
                   public ddk::DisplayControllerImplProtocol<GpuDevice, ddk::base_protocol> {
  public:
   // Constructor called by virtio::CreateAndBind().
-  GpuDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<Backend> backend);
+  GpuDevice(zx_device_t* device, zx::bti bti, std::unique_ptr<virtio::Backend> backend);
   ~GpuDevice() override;
 
   zx_status_t Init() override;
@@ -146,7 +146,7 @@ class GpuDevice : public Device,
   std::thread start_thread_ = {};
 
   // the main virtio ring
-  Ring vring_ = {this};
+  virtio::Ring vring_ = {this};
 
   // gpu op
   io_buffer_t gpu_req_ = {};
@@ -187,6 +187,6 @@ class GpuDevice : public Device,
   };
 };
 
-}  // namespace virtio
+}  // namespace virtio_display
 
 #endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_VIRTIO_GUEST_V1_GPU_H_
