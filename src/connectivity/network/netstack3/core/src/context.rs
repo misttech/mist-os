@@ -99,18 +99,6 @@ pub(crate) trait NonTestCtxMarker {}
 
 impl<NonSyncCtx: NonSyncContext, L> NonTestCtxMarker for Locked<&SyncCtx<NonSyncCtx>, L> {}
 
-/// A marker trait indicating that the implementor is not the
-/// [`crate::socket::uninstantiable::UninstantiableBufferTransportIpContext`].
-///
-/// See [this issue] for details on why this is needed.
-///
-/// [this issue]: https://github.com/rust-lang/rust/issues/97811
-// TODO(https://fxbug.dev/135142): Remove this trait when the buffer trait
-// abstraction is removed.
-pub(crate) trait InstantiableCtxMarker {}
-
-impl<NonSyncCtx: NonSyncContext, L> InstantiableCtxMarker for Locked<&SyncCtx<NonSyncCtx>, L> {}
-
 /// Trait defining the `Instant` type provided by bindings' [`InstantContext`]
 /// implementation.
 ///
@@ -1401,9 +1389,6 @@ pub mod testutil {
     }
 
     #[cfg(test)]
-    impl<Outer, Inner> InstantiableCtxMarker for Wrapped<Outer, Inner> {}
-
-    #[cfg(test)]
     pub(crate) type WrappedFakeSyncCtx<Outer, S, Meta, DeviceId> =
         Wrapped<Outer, FakeSyncCtx<S, Meta, DeviceId>>;
 
@@ -1438,9 +1423,6 @@ pub mod testutil {
         pub(crate) frames: FakeFrameCtx<Meta>,
         _devices_marker: PhantomData<DeviceId>,
     }
-
-    #[cfg(test)]
-    impl<S, Meta, DeviceId> InstantiableCtxMarker for FakeSyncCtx<S, Meta, DeviceId> {}
 
     #[cfg(test)]
     impl<S, Meta, DeviceId> AsRef<FakeSyncCtx<S, Meta, DeviceId>> for FakeSyncCtx<S, Meta, DeviceId> {

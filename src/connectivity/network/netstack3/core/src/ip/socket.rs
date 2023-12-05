@@ -16,9 +16,7 @@ use packet::{BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::{
-    context::{
-        CounterContext, InstantContext, InstantiableCtxMarker, NonTestCtxMarker, TracingContext,
-    },
+    context::{CounterContext, InstantContext, NonTestCtxMarker, TracingContext},
     ip::{
         device::state::IpDeviceStateIpExt,
         types::{NextHop, ResolvedRoute},
@@ -433,7 +431,7 @@ where
 impl<
         I: Ip + IpExt + IpDeviceStateIpExt,
         C: IpSocketNonSyncContext,
-        SC: IpSocketContext<I, C> + InstantiableCtxMarker + CounterContext<IpCounters<I>>,
+        SC: IpSocketContext<I, C> + CounterContext<IpCounters<I>>,
     > IpSocketHandler<I, C> for SC
 {
     fn new_ip_socket<O>(
@@ -991,8 +989,6 @@ pub(crate) mod testutil {
         }
     }
 
-    impl<I: IpDeviceStateIpExt, D> InstantiableCtxMarker for FakeIpSocketCtx<I, D> {}
-
     impl<I: IpDeviceStateIpExt, D> AsRef<FakeIpDeviceIdCtx<D>> for FakeIpSocketCtx<I, D> {
         fn as_ref(&self) -> &FakeIpDeviceIdCtx<D> {
             let FakeIpSocketCtx { device_state: _, table: _, ip_forwarding_ctx, counters: _ } =
@@ -1355,8 +1351,6 @@ pub(crate) mod testutil {
         pub(crate) rx_icmpv6_counters: IcmpRxCounters<Ipv6>,
         pub(crate) ndp_counters: NdpCounters,
     }
-
-    impl<D> InstantiableCtxMarker for FakeDualStackIpSocketCtx<D> {}
 
     impl<D: FakeStrongDeviceId> FakeDualStackIpSocketCtx<D> {
         pub(crate) fn new<A: Into<SpecifiedAddr<IpAddr>>>(

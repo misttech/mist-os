@@ -47,7 +47,6 @@ use crate::{
             AddrIsMappedError, AddrVecIter, ConnAddr, ConnIpAddr, DualStackConnIpAddr,
             DualStackListenerIpAddr, ListenerIpAddr, SocketIpAddr, SocketZonedIpAddr,
         },
-        uninstantiable::UninstantiableBufferTransportIpContext,
         AddrVec, BoundSocketMap, ExistsError, InsertError, ListenerAddr, Shutdown,
         SocketMapAddrSpec, SocketMapConflictPolicy, SocketMapStateSpec,
     },
@@ -721,18 +720,6 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         // Allow creating IP sockets for the other IP version.
         + TransportIpContext<I::OtherVersion, C>;
 
-    /// The synchronized context passed to the callbacks of methods requiring
-    /// [`BufferTransportIpContext`] for `I::OtherVersion`.
-    // TODO(https://fxbug.dev/135142): This associated type can be removed in
-    // favor of `Self::IpSocketsCtx` once the `BufferTransportIpContext` and
-    // `TransportIpContext` traits are merged.
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: TransportIpContext<
-        I::OtherVersion,
-        C,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-
     /// Returns if the socket state indicates dual-stack operation is enabled.
     fn dual_stack_enabled(&self, state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool;
 
@@ -848,12 +835,8 @@ pub(crate) trait DualStackDatagramBoundStateContext<I: IpExt, C, S: DatagramSock
         cb: F,
     ) -> O;
 
-    /// Calls the provided callback with access to the `OtherBufferIpSocketsCtx`.
-    fn with_other_transport_context_buf<
-        O,
-        B: BufferMut,
-        F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-    >(
+    /// Calls the provided callback with access to the `IpSocketsCtx`.
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -1011,8 +994,6 @@ where
     for<'a> P::IpSocketsCtx<'a>: TransportIpContext<I::OtherVersion, C>,
 {
     type IpSocketsCtx<'a> = P::IpSocketsCtx<'a>;
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut> =
-        UninstantiableBufferTransportIpContext<Self::DeviceId>;
 
     fn dual_stack_enabled(&self, _state: &impl AsRef<IpOptions<I, Self::WeakDeviceId, S>>) -> bool {
         self.uninstantiable_unreachable()
@@ -1085,11 +1066,7 @@ where
         self.uninstantiable_unreachable()
     }
 
-    fn with_other_transport_context_buf<
-        O,
-        B: BufferMut,
-        F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-    >(
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         _cb: F,
     ) -> O {
@@ -4012,7 +3989,7 @@ pub(crate) fn send_conn<
             Operation::SendToOtherStack((SendParams { socket, ip }, dual_stack)) => {
                 let packet = S::make_packet::<I::OtherVersion, _>(body, &ip)
                     .map_err(SendError::SerializeError)?;
-                dual_stack.with_other_transport_context_buf::<_, B, _>(|sync_ctx| {
+                dual_stack.with_transport_context::<_, _>(|sync_ctx| {
                     sync_ctx
                         .send_ip_packet(ctx, &socket, packet, None)
                         .map_err(|(_serializer, send_error)| SendError::IpSock(send_error))
@@ -4310,7 +4287,7 @@ pub(crate) fn send_to<
                 })
             }
             Operation::SendToOtherStack((params, sync_ctx)) => {
-                DualStackDatagramBoundStateContext::with_other_transport_context_buf::<_, B, _>(
+                DualStackDatagramBoundStateContext::with_transport_context::<_, _>(
                     sync_ctx,
                     |sync_ctx| send_oneshot::<_, S, _, _, _, _>(sync_ctx, ctx, params, body),
                 )
@@ -5620,7 +5597,6 @@ mod test {
         for Wrapped<FakeBoundSockets<D>, FakeInnerSyncCtx<D>>
     {
         type IpSocketsCtx<'a> = FakeInnerSyncCtx<D>;
-        type OtherBufferIpSocketsCtx<'a, B: BufferMut> = FakeInnerSyncCtx<D>;
         fn dual_stack_enabled(
             &self,
             _state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, FakeStateSpec>>,
@@ -5699,11 +5675,7 @@ mod test {
             cb(inner, outer.as_mut())
         }
 
-        fn with_other_transport_context_buf<
-            O,
-            B: BufferMut,
-            F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-        >(
+        fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
             &mut self,
             cb: F,
         ) -> O {

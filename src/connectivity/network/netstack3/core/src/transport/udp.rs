@@ -1176,18 +1176,6 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, 
         // Allow creating IP sockets for the other IP version.
         + TransportIpContext<I::OtherVersion, C>;
 
-    /// The synchronized context passed to the callbacks of methods requiring
-    /// [`BufferTransportIpContext`] for `I::OtherVersion`.
-    // TODO(https://fxbug.dev/135142): This associated type can be removed in
-    // favor of `Self::IpSocketsCtx` once the `BufferTransportIpContext` and
-    // `TransportIpContext` traits are merged.
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut>: TransportIpContext<
-        I::OtherVersion,
-        C,
-        DeviceId = Self::DeviceId,
-        WeakDeviceId = Self::WeakDeviceId,
-    >;
-
     /// Calls the provided callback with mutable access to both the
     /// demultiplexing maps.
     fn with_both_bound_sockets_mut<
@@ -1215,12 +1203,8 @@ pub(crate) trait DualStackBoundStateContext<I: IpExt, C: StateNonSyncContext<I, 
         cb: F,
     ) -> O;
 
-    /// Calls the provided callback with access to the `OtherBufferIpSocketsCtx`.
-    fn with_other_transport_context_buf<
-        O,
-        B: BufferMut,
-        F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-    >(
+    /// Calls the provided callback with access to the `IpSocketsCtx`.
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O;
@@ -2130,7 +2114,6 @@ impl<
     > DualStackDatagramBoundStateContext<Ipv6, C, Udp> for SC
 {
     type IpSocketsCtx<'a> = SC::IpSocketsCtx<'a>;
-    type OtherBufferIpSocketsCtx<'a, B: BufferMut> = SC::OtherBufferIpSocketsCtx<'a, B>;
     fn dual_stack_enabled(
         &self,
         state: &impl AsRef<IpOptions<Ipv6, Self::WeakDeviceId, Udp>>,
@@ -2192,15 +2175,11 @@ impl<
         )
     }
 
-    fn with_other_transport_context_buf<
-        O,
-        B: BufferMut,
-        F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-    >(
+    fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
         &mut self,
         cb: F,
     ) -> O {
-        self.with_other_transport_context_buf(|sync_ctx| cb(sync_ctx))
+        self.with_transport_context(|sync_ctx| cb(sync_ctx))
     }
 }
 
@@ -3092,7 +3071,6 @@ mod tests {
         for FakeUdpInnerSyncCtx<D>
     {
         type IpSocketsCtx<'a> = FakeBufferSyncCtx<D>;
-        type OtherBufferIpSocketsCtx<'a, B: BufferMut> = FakeBufferSyncCtx<D>;
 
         fn with_both_bound_sockets_mut<
             O,
@@ -3122,11 +3100,7 @@ mod tests {
             )
         }
 
-        fn with_other_transport_context_buf<
-            O,
-            B: BufferMut,
-            F: FnOnce(&mut Self::OtherBufferIpSocketsCtx<'_, B>) -> O,
-        >(
+        fn with_transport_context<O, F: FnOnce(&mut Self::IpSocketsCtx<'_>) -> O>(
             &mut self,
             cb: F,
         ) -> O {
