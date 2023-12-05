@@ -245,17 +245,9 @@ static const fpbus::Node thermal_dev = []() {
 zx_status_t Nelson::ThermalInit() {
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.
-  zx_status_t status = gpio_impl_.ConfigOut(S905D3_PWM_D_PIN, 0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, status);
-    return status;
-  }
+  gpio_init_steps_.push_back({S905D3_PWM_D_PIN, GpioConfigOut(0)});
 
-  status = gpio_impl_.SetAltFunction(S905D3_PWM_D_PIN, S905D3_PWM_D_FN);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: SetAltFunction failed: %d", __func__, status);
-    return status;
-  }
+  gpio_init_steps_.push_back({S905D3_PWM_D_PIN, GpioSetAltFunction(S905D3_PWM_D_FN)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('THER');

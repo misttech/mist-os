@@ -142,6 +142,10 @@ int Sherlock::Thread() {
     zxlogf(ERROR, "I2cInit() failed");
   }
 
+  if (ThermalInit() != ZX_OK) {
+    zxlogf(ERROR, "ThermalInit() failed");
+  }
+
   if (EmmcInit() != ZX_OK) {
     zxlogf(ERROR, "EmmcInit() failed");
   }
@@ -199,10 +203,6 @@ int Sherlock::Thread() {
 
   if (PwmInit() != ZX_OK) {
     zxlogf(ERROR, "PwmInit() failed");
-  }
-
-  if (ThermalInit() != ZX_OK) {
-    zxlogf(ERROR, "ThermalInit() failed");
   }
 
   if (DsiInit() != ZX_OK) {

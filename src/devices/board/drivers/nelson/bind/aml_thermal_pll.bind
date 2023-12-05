@@ -10,6 +10,7 @@ using fuchsia.pwm;
 using fuchsia.amlogic.platform.s905d3;
 using fuchsia.clock;
 using fuchsia.amlogic.platform.meson;
+using fuchsia.gpio;
 
 primary node "pdev" {
   fuchsia.BIND_PROTOCOL == fuchsia.platform.BIND_PROTOCOL.DEVICE;
@@ -32,4 +33,8 @@ node "clock-1" {
 node "clock-2" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.clock.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CLOCK_ID == fuchsia.amlogic.platform.meson.SM1_CLK_ID.CLK_SYS_CPU_CLK_DIV16;
+}
+
+node "gpio-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

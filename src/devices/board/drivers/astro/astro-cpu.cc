@@ -15,6 +15,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/google/platform/cpp/bind.h>
+#include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/power/cpp/bind.h>
 #include <soc/aml-common/aml-cpu-metadata.h>
 #include <soc/aml-meson/g12a-clk.h>
@@ -88,6 +89,13 @@ const std::vector<fdf::NodeProperty> kPowerProperties = std::vector{
                       bind_fuchsia_power::POWER_DOMAIN_ARM_CORE_BIG),
 };
 
+const std::vector<fdf::BindRule> kGpioInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
+};
+
 // Contains all the clock parent nodes for the composite. Maps the clock id to the clock function.
 const std::map<uint32_t, std::string> kClockFunctionMap = {
     {g12a_clk::CLK_SYS_PLL_DIV16, bind_fuchsia_clock::FUNCTION_SYS_PLL_DIV16},
@@ -111,27 +119,19 @@ static const fpbus::Node cpu_dev = []() {
 namespace astro {
 
 zx_status_t Astro::CpuInit() {
-  zx_status_t result;
-  result = gpio_impl_.ConfigOut(S905D2_PWM_D_PIN, 0);
-  if (result != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, result);
-    return result;
-  }
+  gpio_init_steps_.push_back({S905D2_PWM_D_PIN, GpioConfigOut(0)});
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.
-  result = gpio_impl_.SetAltFunction(S905D2_PWM_D_PIN, S905D2_PWM_D_FN);
-  if (result != ZX_OK) {
-    zxlogf(ERROR, "%s: SetAltFunction failed: %d", __func__, result);
-    return result;
-  }
+  gpio_init_steps_.push_back({S905D2_PWM_D_PIN, GpioSetAltFunction(S905D2_PWM_D_FN)});
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('CPU_');
 
   std::vector<fdf::ParentSpec> parents;
-  parents.reserve(kClockFunctionMap.size() + 1);
+  parents.reserve(kClockFunctionMap.size() + 2);
   parents.push_back(fdf::ParentSpec{{kPowerRules, kPowerProperties}});
+  parents.push_back(fdf::ParentSpec{{kGpioInitRules, kGpioInitProperties}});
 
   for (auto& [clock_id, function] : kClockFunctionMap) {
     auto rules = std::vector{

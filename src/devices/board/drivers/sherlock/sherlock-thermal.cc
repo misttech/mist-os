@@ -278,23 +278,15 @@ const fpbus::Node thermal_dev_ddr = []() {
 zx_status_t Sherlock::ThermalInit() {
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A53 cluster (Small)
-  gpio_impl_.SetAltFunction(T931_GPIOE(1), kPwmDFn);
+  gpio_init_steps_.push_back({T931_GPIOE(1), GpioSetAltFunction(kPwmDFn)});
 
-  zx_status_t status = gpio_impl_.ConfigOut(T931_GPIOE(1), 0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, status);
-    return status;
-  }
+  gpio_init_steps_.push_back({T931_GPIOE(1), GpioConfigOut(0)});
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A73 cluster (Big)
-  gpio_impl_.SetAltFunction(T931_GPIOE(2), kPwmDFn);
+  gpio_init_steps_.push_back({T931_GPIOE(2), GpioSetAltFunction(kPwmDFn)});
 
-  status = gpio_impl_.ConfigOut(T931_GPIOE(2), 0);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: ConfigOut failed: %d", __func__, status);
-    return status;
-  }
+  gpio_init_steps_.push_back({T931_GPIOE(2), GpioConfigOut(0)});
 
   // The PLL sensor is controlled by a legacy thermal device, which performs DVFS.
   fidl::Arena<> fidl_arena;
@@ -330,7 +322,7 @@ zx_status_t Sherlock::ThermalInit() {
     return result->error_value();
   }
 
-  return status;
+  return ZX_OK;
 }
 
 }  // namespace sherlock
