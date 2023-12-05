@@ -15,108 +15,105 @@ group("tests") {
   }
 }
 
-group("kernel") {
-  testonly = true
-
+if (is_fuchsia) {
   # qemu_boot_shim must be interpreted in the default toolchain.
   if (current_toolchain == default_toolchain) {
-    deps = qemu_boot_shim.deps
-    metadata = {
-      test_runtime_deps = [ qemu_boot_shim.path ]
+    group("test_data_kernel") {
+      testonly = true
+
+      deps = qemu_boot_shim.deps
+      metadata = {
+        test_runtime_deps = [ qemu_boot_shim.path ]
+      }
     }
-  } else {
-    deps = [ ":kernel($default_toolchain)" ]
   }
 }
 
 # Currently, we only support working with QEMU or FEMU on Linux.
 if (is_linux) {
-  # The infrastructure does not provide a way for host tests to access
-  # qemu, so we need to archive our own copy of qemu from the source
-  # tree.
-  action("archive-qemu") {
-    testonly = true
-    visibility = [ ":*" ]
+  if (current_toolchain == toolchain_variant.base) {
+    # The infrastructure does not provide a way for host tests to access
+    # qemu, so we need to archive our own copy of qemu from the source
+    # tree.
+    action("archive-qemu") {
+      testonly = true
+      visibility = [ ":*" ]
 
-    archive_path = "$root_out_dir/test_data/emulator/qemu.tar.gz"
-    outputs = [ archive_path ]
+      archive_path = "$root_out_dir/test_data/emulator/qemu.tar.gz"
+      outputs = [ archive_path ]
 
-    depfile = "${archive_path}.d"
+      depfile = "${archive_path}.d"
 
-    script = "archive.py"
+      script = "archive.py"
 
-    args = [
-      "--src",
-      rebase_path("//prebuilt/third_party/qemu/${host_platform}",
-                  root_build_dir),
-      "--dst",
-      rebase_path(archive_path, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-    ]
-  }
+      args = [
+        "--src",
+        rebase_path("//prebuilt/third_party/qemu/${host_platform}",
+                    root_build_dir),
+        "--dst",
+        rebase_path(archive_path, root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+    }
 
-  action("archive-femu") {
-    testonly = true
-    visibility = [ ":*" ]
+    action("archive-femu") {
+      testonly = true
+      visibility = [ ":*" ]
 
-    archive_path = "$root_out_dir/test_data/emulator/femu.tar.gz"
-    outputs = [ archive_path ]
+      archive_path = "$root_out_dir/test_data/emulator/femu.tar.gz"
+      outputs = [ archive_path ]
 
-    depfile = "${archive_path}.d"
+      depfile = "${archive_path}.d"
 
-    script = "archive.py"
+      script = "archive.py"
 
-    args = [
-      "--src",
-      rebase_path(
-          "//prebuilt/third_party/android/aemu/release/${host_platform}",
-          root_build_dir),
-      "--dst",
-      rebase_path(archive_path, root_build_dir),
-      "--depfile",
-      rebase_path(depfile, root_build_dir),
-    ]
-  }
+      args = [
+        "--src",
+        rebase_path(
+            "//prebuilt/third_party/android/aemu/release/${host_platform}",
+            root_build_dir),
+        "--dst",
+        rebase_path(archive_path, root_build_dir),
+        "--depfile",
+        rebase_path(depfile, root_build_dir),
+      ]
+    }
 
-  generated_file("buildinfo.ini") {
-    testonly = true
-    contents = [
-      # The path to images.json relative to the test data directory. This must be relative
-      # the test data directory specifically, rather than the build directory because the
-      # build directory is not guaranteed to exist at runtime, especially on CI.
-      "image_manifest_path=" + rebase_path("$root_build_dir/images.json",
-                                           "$root_out_dir/test_data/emulator"),
-      "target_cpu=$target_cpu",
-    ]
-    outputs = [ "$root_out_dir/test_data/emulator/buildinfo.ini" ]
-  }
+    generated_file("buildinfo.ini") {
+      testonly = true
+      contents = [
+        # The path to images.json relative to the test data directory. This must be relative
+        # the test data directory specifically, rather than the build directory because the
+        # build directory is not guaranteed to exist at runtime, especially on CI.
+        "image_manifest_path=" +
+            rebase_path("$root_build_dir/images.json",
+                        "$root_out_dir/test_data/emulator"),
+        "target_cpu=$target_cpu",
+      ]
+      outputs = [ "$root_out_dir/test_data/emulator/buildinfo.ini" ]
+    }
 
-  host_test_data("test_data") {
-    sources = get_target_outputs(":buildinfo.ini") +
-              get_target_outputs(":archive-qemu") +
-              get_target_outputs(":archive-femu") +
-              [
-                # Any files referenced by :buildinfo.ini should be listed here.
-                "$root_build_dir/images.json",
-              ]
+    host_test_data("test_data") {
+      sources =
+          get_target_outputs(":buildinfo.ini") +
+          get_target_outputs(":archive-qemu") +
+          get_target_outputs(":archive-femu") +
+          [
+            # Any files referenced by :buildinfo.ini should be listed here.
+            "$root_build_dir/images.json",
+          ]
 
-    deps = [
-      ":archive-femu",
-      ":archive-qemu",
-      ":buildinfo.ini",
-      ":kernel",
-    ]
+      deps = [
+        ":archive-femu",
+        ":archive-qemu",
+        ":buildinfo.ini",
+      ]
+    }
   }
 
   go_library("emulator") {
     testonly = true
-    non_go_deps = [
-      ":archive-femu",
-      ":archive-qemu",
-      ":kernel",
-      ":test_data",
-    ]
     sources = [
       "emulator.go",
       "emulator_test.go",
@@ -125,6 +122,13 @@ if (is_linux) {
       "//tools/qemu",
       "//tools/virtual_device",
       "//tools/virtual_device:proto",
+    ]
+
+    # The emulator itself should only be included via the base toolchain, not
+    # any toolchain variant (such as sanitizers)
+    data_deps = [
+      ":test_data(${toolchain_variant.base})",
+      ":test_data_kernel($default_toolchain)",
     ]
   }
 

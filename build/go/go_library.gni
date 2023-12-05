@@ -104,6 +104,8 @@ template("go_library") {
       }
     }
 
+    forward_variables_from(invoker, [ "data_deps" ])
+
     if (defined(invoker.non_go_deps)) {
       deps += invoker.non_go_deps
     }

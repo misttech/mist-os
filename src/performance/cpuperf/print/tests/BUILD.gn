@@ -12,28 +12,30 @@ group("tests") {
 }
 
 if (is_host) {
-  host_test_data("raw_printer_test_data") {
-    sources = [
-      "raw-expected-output.txt",
-      "raw-test.0.0.cpuperf",
-      "raw-test.0.1.cpuperf",
-      "raw-test.0.2.cpuperf",
-      "raw-test.0.3.cpuperf",
-      "raw-test.cpsession",
-    ]
-    outputs = [ "$root_out_dir/test_data/cpuperf/{{source_file_part}}" ]
-  }
+  if (current_toolchain == toolchain_variant.base) {
+    host_test_data("raw_printer_test_data") {
+      sources = [
+        "raw-expected-output.txt",
+        "raw-test.0.0.cpuperf",
+        "raw-test.0.1.cpuperf",
+        "raw-test.0.2.cpuperf",
+        "raw-test.0.3.cpuperf",
+        "raw-test.cpsession",
+      ]
+      outputs = [ "$root_out_dir/test_data/cpuperf/{{source_file_part}}" ]
+    }
 
-  host_test_data("cpuperf_print") {
-    sources = [ "$root_out_dir/cpuperf_print" ]
-    deps = [ "//src/performance/cpuperf/print:cpuperf_print" ]
+    host_test_data("cpuperf_print") {
+      sources = [ "$root_out_dir/cpuperf_print" ]
+      deps = [ "//src/performance/cpuperf/print:cpuperf_print" ]
+    }
   }
 
   go_library("raw_printer_test_lib") {
     testonly = true
-    non_go_deps = [
-      ":cpuperf_print",
-      ":raw_printer_test_data",
+    data_deps = [
+      ":cpuperf_print(${toolchain_variant.base})",
+      ":raw_printer_test_data(${toolchain_variant.base})",
     ]
     sources = [
       "raw-expected-output.txt",
