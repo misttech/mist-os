@@ -21,10 +21,10 @@ function parent_dir {
 function fuchsia_host_tag {
   local host_os host_arch
   case "${OSTYPE}" in
-    linux-*)
+    linux*)
       host_os=linux
       ;;
-    darwin-*)
+    darwin*)
       host_os=mac
       ;;
     *)

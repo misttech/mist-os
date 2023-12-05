@@ -36,6 +36,7 @@ go_library("build") {
     "blob.go",
     "boot_tests.go",
     "checkout_artifacts.go",
+    "client.go",
     "clippy.go",
     "images.go",
     "licenses.go",

@@ -9,12 +9,10 @@ import (
 
 	"golang.org/x/exp/maps"
 	"golang.org/x/exp/slices"
-
-	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 )
 
 const (
-	imageManifestName = "images.json"
+	imageManifestName = "images"
 )
 
 // Modules is a convenience interface for accessing the various build API
@@ -53,29 +51,34 @@ type Modules struct {
 func NewModules(buildDir string) (*Modules, error) {
 	m := &Modules{buildDir: buildDir}
 
+	buildApiClient, err := NewBuildAPIClient(buildDir)
+	if err != nil {
+		return nil, err
+	}
+
 	manifests := map[string]interface{}{
 		// keep-sorted start ignore_prefixes="
-		"api.json":                         &m.apis,
-		"archives.json":                    &m.archives,
-		"args.json":                        &m.args,
-		"assembly_input_archives.json":     &m.assemblyInputArchives,
-		"assembly_manifests.json":          &m.assemblyManifests,
-		"binaries.json":                    &m.binaries,
-		"checkout_artifacts.json":          &m.checkoutArtifacts,
-		"clippy_target_mapping.json":       &m.clippyTargets,
-		"generated_sources.json":           &m.generatedSources,
-		imageManifestName:                  &m.images,
-		"licenses.json":                    &m.licenses,
-		"package-repositories.json":        &m.packageRepositories,
-		"platforms.json":                   &m.platforms,
-		"prebuilt_binaries.json":           &m.prebuiltBinarySets,
-		"product_bundles.json":             &m.productBundles,
-		"product_size_checker_output.json": &m.productSizeCheckerOutput,
-		"sdk_archives.json":                &m.sdkArchives,
-		"test_durations.json":              &m.testDurations,
-		"test_list_location.json":          &m.testListLocation,
-		"tests.json":                       &m.testSpecs,
-		"tool_paths.json":                  &m.tools,
+		"api":                         &m.apis,
+		"archives":                    &m.archives,
+		"args":                        &m.args,
+		"assembly_input_archives":     &m.assemblyInputArchives,
+		"assembly_manifests":          &m.assemblyManifests,
+		"binaries":                    &m.binaries,
+		"checkout_artifacts":          &m.checkoutArtifacts,
+		"clippy_target_mapping":       &m.clippyTargets,
+		"generated_sources":           &m.generatedSources,
+		imageManifestName:             &m.images,
+		"licenses":                    &m.licenses,
+		"package-repositories":        &m.packageRepositories,
+		"platforms":                   &m.platforms,
+		"prebuilt_binaries":           &m.prebuiltBinarySets,
+		"product_bundles":             &m.productBundles,
+		"product_size_checker_output": &m.productSizeCheckerOutput,
+		"sdk_archives":                &m.sdkArchives,
+		"test_durations":              &m.testDurations,
+		"test_list_location":          &m.testListLocation,
+		"tests":                       &m.testSpecs,
+		"tool_paths":                  &m.tools,
 		// keep-sorted end
 	}
 	// Ensure we read the manifests in order, so that if multiple manifests are
@@ -83,8 +86,7 @@ func NewModules(buildDir string) (*Modules, error) {
 	manifestNames := maps.Keys(manifests)
 	slices.Sort(manifestNames)
 	for _, manifest := range manifestNames {
-		path := filepath.Join(buildDir, manifest)
-		if err := jsonutil.ReadFromFile(path, manifests[manifest]); err != nil {
+		if err := buildApiClient.GetJSON(manifest, manifests[manifest]); err != nil {
 			return nil, err
 		}
 	}
@@ -98,7 +100,7 @@ func (m Modules) BuildDir() string {
 
 // ImageManifest returns the path to the images manifest.
 func (m Modules) ImageManifest() string {
-	return filepath.Join(m.BuildDir(), imageManifestName)
+	return filepath.Join(m.BuildDir(), imageManifestName+".json")
 }
 
 // APIs returns the build API module of available build API modules.
