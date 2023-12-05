@@ -183,7 +183,10 @@ impl<
     }
 }
 
-pub(crate) struct SyncCtxWithDeviceId<'a, SC: DeviceIdContext<EthernetLinkDevice>> {
+pub(crate) struct SyncCtxWithDeviceId<
+    'a,
+    SC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>,
+> {
     pub(crate) sync_ctx: &'a mut SC,
     pub(crate) device_id: &'a SC::DeviceId,
 }
@@ -341,7 +344,8 @@ where
     S::Buffer: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        + CounterContext<DeviceCounters>,
 {
     /// The minimum body length for the Ethernet frame.
     ///
@@ -372,8 +376,12 @@ where
     S::Buffer: BufferMut,
     C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
     SC: EthernetIpLinkDeviceDynamicStateContext<C>
-        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+        + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+        + CounterContext<DeviceCounters>,
 {
+    sync_ctx.with_counters(|counters| {
+        counters.ethernet.common.send_total_frames.increment();
+    });
     match TransmitQueueHandler::<EthernetLinkDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
@@ -381,12 +389,29 @@ where
         (),
         frame,
     ) {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.send_frame.increment();
+            });
+            Ok(())
+        }
         Err(TransmitQueueFrameError::NoQueue(e)) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.send_no_queue.increment();
+            });
             tracing::error!("device {device_id:?} not ready to send frame: {e:?}");
             Ok(())
         }
-        Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
+        Err(TransmitQueueFrameError::QueueFull(s)) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.send_queue_full.increment();
+            });
+            Err(s)
+        }
+        Err(TransmitQueueFrameError::SerializeError(s)) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.send_serialize_error.increment();
+            });
             Err(s)
         }
     }
@@ -822,7 +847,7 @@ where
     A::Version: EthernetIpExt,
 {
     sync_ctx.with_counters(|counters| {
-        counters.ethernet_send_ip_frame.increment();
+        counters.ethernet.send_ip_frame.increment();
     });
 
     trace!("ethernet::send_ip_frame: local_addr = {:?}; device = {:?}", local_addr, device_id);
@@ -854,13 +879,17 @@ pub(super) fn receive_frame<
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv4>>
         + RecvFrameContext<C, RecvIpFrameMeta<SC::DeviceId, Ipv6>>
         + ArpPacketHandler<EthernetLinkDevice, C>
-        + DeviceSocketHandler<EthernetLinkDevice, C>,
+        + DeviceSocketHandler<EthernetLinkDevice, C>
+        + CounterContext<DeviceCounters>,
 >(
     sync_ctx: &mut SC,
     ctx: &mut C,
     device_id: &SC::DeviceId,
     mut buffer: B,
 ) {
+    sync_ctx.with_counters(|counters| {
+        counters.ethernet.common.recv_frame.increment();
+    });
     trace!("ethernet::receive_frame: device_id = {:?}", device_id);
     // NOTE(joshlf): We do not currently validate that the Ethernet frame
     // satisfies the minimum length requirement. We expect that if this
@@ -875,6 +904,9 @@ pub(super) fn receive_frame<
     {
         frame
     } else {
+        sync_ctx.with_counters(|counters| {
+            counters.ethernet.common.recv_parse_error.increment();
+        });
         trace!("ethernet::receive_frame: failed to parse ethernet frame");
         // TODO(joshlf): Do something else?
         return;
@@ -888,6 +920,9 @@ pub(super) fn receive_frame<
 
     let frame_dst = match frame_dest {
         None => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.recv_other_dest.increment();
+            });
             trace!(
                 "ethernet::receive_frame: destination mac {:?} not for device {:?}",
                 dst,
@@ -916,6 +951,9 @@ pub(super) fn receive_frame<
             };
             match types {
                 (ArpHardwareType::Ethernet, ArpNetworkType::Ipv4) => {
+                    sync_ctx.with_counters(|counters| {
+                        counters.ethernet.recv_arp_delivered.increment();
+                    });
                     ArpPacketHandler::handle_packet(
                         sync_ctx,
                         ctx,
@@ -926,17 +964,31 @@ pub(super) fn receive_frame<
                 }
             }
         }
-        Some(EtherType::Ipv4) => sync_ctx.receive_frame(
-            ctx,
-            RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), frame_dst),
-            buffer,
-        ),
-        Some(EtherType::Ipv6) => sync_ctx.receive_frame(
-            ctx,
-            RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), frame_dst),
-            buffer,
-        ),
-        Some(EtherType::Other(_)) | None => {} // TODO(joshlf)
+        Some(EtherType::Ipv4) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.recv_ip_delivered.increment();
+            });
+            sync_ctx.receive_frame(
+                ctx,
+                RecvIpFrameMeta::<_, Ipv4>::new(device_id.clone(), frame_dst),
+                buffer,
+            )
+        }
+        Some(EtherType::Ipv6) => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.recv_ip_delivered.increment();
+            });
+            sync_ctx.receive_frame(
+                ctx,
+                RecvIpFrameMeta::<_, Ipv6>::new(device_id.clone(), frame_dst),
+                buffer,
+            )
+        }
+        Some(EtherType::Other(_)) | None => {
+            sync_ctx.with_counters(|counters| {
+                counters.ethernet.common.recv_unsupported_ethertype.increment();
+            });
+        } // TODO(joshlf)
     }
 }
 
@@ -1118,7 +1170,8 @@ pub(super) fn insert_static_ndp_table_entry<
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId> + SocketNonSyncContext<SC::DeviceId>,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+            + CounterContext<DeviceCounters>,
     > SendFrameContext<C, ArpFrameMetadata<EthernetLinkDevice, SC::DeviceId>> for SC
 {
     fn send_frame<S>(
@@ -1216,7 +1269,10 @@ impl<C: NonSyncContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
 }
 
 impl<C: NonSyncContext, L> ArpConfigContext for Locked<&SyncCtx<C>, L> {}
-impl<SC: DeviceIdContext<EthernetLinkDevice>> ArpConfigContext for SyncCtxWithDeviceId<'_, SC> {}
+impl<SC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>> ArpConfigContext
+    for SyncCtxWithDeviceId<'_, SC>
+{
+}
 
 impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets>>
     ArpSenderContext<EthernetLinkDevice, C> for SyncCtxWithDeviceId<'a, Locked<&'a SyncCtx<C>, L>>
@@ -1238,7 +1294,8 @@ impl<'a, C: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDeviceSockets
 impl<
         C: EthernetIpLinkDeviceNonSyncContext<SC::DeviceId>,
         SC: EthernetIpLinkDeviceDynamicStateContext<C>
-            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>,
+            + TransmitQueueHandler<EthernetLinkDevice, C, Meta = ()>
+            + CounterContext<DeviceCounters>,
     > SendFrameContext<C, DeviceSocketMetadata<SC::DeviceId>> for SC
 {
     fn send_frame<S>(
@@ -1454,6 +1511,12 @@ mod tests {
     impl CounterContext<DeviceCounters> for FakeCtx {
         fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
             cb(&self.as_ref().state.counters)
+        }
+    }
+
+    impl CounterContext<DeviceCounters> for FakeInnerCtx {
+        fn with_counters<O, F: FnOnce(&DeviceCounters) -> O>(&self, cb: F) -> O {
+            cb(&self.state.counters)
         }
     }
 

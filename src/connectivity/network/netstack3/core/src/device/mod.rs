@@ -417,9 +417,57 @@ impl<C: DeviceLayerTypes> DeviceLayerState<C> {
 
 /// Device layer counters.
 #[derive(Default)]
-pub(crate) struct DeviceCounters {
+pub struct DeviceCounters {
+    /// Device layer counters for Ethernet devices.
+    pub ethernet: EthernetDeviceCounters,
+    /// Device layer counters for Loopback devices.
+    pub loopback: LoopbackDeviceCounters,
+}
+
+/// Device layer counters for Ethernet devices.
+#[derive(Default)]
+pub struct EthernetDeviceCounters {
+    /// Common device layer counters.
+    pub common: CommonDeviceCounters,
     /// Count of ip packets sent inside an ethernet frame.
-    pub(crate) ethernet_send_ip_frame: Counter,
+    pub(crate) send_ip_frame: Counter,
+    /// Count of ethernet frames that failed to send because there was no Tx queue.
+    pub send_no_queue: Counter,
+    /// Count of incoming ethernet frames dropped because the destination address was for another device.
+    pub recv_other_dest: Counter,
+    /// Count of incoming ethernet frames deliverd to the ARP layer.
+    pub recv_arp_delivered: Counter,
+}
+
+/// Device layer counters for Loopback devices.
+#[derive(Default)]
+pub struct LoopbackDeviceCounters {
+    /// Common device layer counters.
+    pub common: CommonDeviceCounters,
+    /// Count of incoming loopback frames dropped due to an empty ethertype.
+    pub recv_no_ethertype: Counter,
+}
+
+/// Device layer counters that are common to both Ethernet and Loopback devices.
+#[derive(Default)]
+pub struct CommonDeviceCounters {
+    /// Count of outgoing frames which enter the device layer (but may or may
+    /// not have been dropped prior to reaching the wire).
+    pub send_total_frames: Counter,
+    /// Count of frames sent.
+    pub send_frame: Counter,
+    /// Count of frames that failed to send because of a full Tx queue.
+    pub send_queue_full: Counter,
+    /// Count of frames that failed to send because of a serialization error.
+    pub send_serialize_error: Counter,
+    /// Count of frames received.
+    pub recv_frame: Counter,
+    /// Count of incoming frames dropped due to a parsing error.
+    pub recv_parse_error: Counter,
+    /// Count of incoming frames deliverd to the IP layer.
+    pub recv_ip_delivered: Counter,
+    /// Count of incoming frames dropped due to an unsupported ethertype.
+    pub recv_unsupported_ethertype: Counter,
 }
 
 impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::DeviceCounters> for SyncCtx<C> {
@@ -854,6 +902,7 @@ pub fn receive_frame<B: BufferMut, NonSyncCtx: NonSyncContext>(
     buffer: B,
 ) {
     trace_duration!(ctx, "device::receive_frame");
+    sync_ctx.state.device_counters().ethernet.common.recv_frame.increment();
     self::ethernet::receive_frame(&mut Locked::new(sync_ctx), ctx, device, buffer)
 }
 

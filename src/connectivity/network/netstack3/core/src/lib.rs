@@ -278,6 +278,8 @@ pub struct StackCounters<'a> {
     pub icmpv6_tx: &'a IcmpTxCounters<Ipv6>,
     /// NDP counters.
     pub ndp: &'a NdpCounters,
+    /// Device layer counters.
+    pub devices: &'a DeviceCounters,
 }
 
 /// Visitor for stack counters.
@@ -301,6 +303,7 @@ pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx
         icmpv6_rx: sync_ctx.state.icmp_rx_counters::<Ipv6>(),
         icmpv6_tx: sync_ctx.state.icmp_tx_counters::<Ipv6>(),
         ndp: sync_ctx.state.ndp_counters(),
+        devices: sync_ctx.state.device_counters(),
     };
     visitor.visit_counters(counters);
 }

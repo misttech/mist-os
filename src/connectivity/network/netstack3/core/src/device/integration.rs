@@ -21,12 +21,12 @@ use packet::{BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
 
 use crate::{
-    context::SendFrameContext,
+    context::{CounterContext, SendFrameContext},
     device::{
         ethernet::{self, EthernetLinkDevice, SyncCtxWithDeviceId},
         loopback::{self, LoopbackDevice, LoopbackDeviceId},
-        socket, AnyDevice, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerState,
-        DeviceLayerTypes, Devices, DevicesIter, EthernetDeviceId,
+        socket, AnyDevice, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher,
+        DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter, EthernetDeviceId,
         EthernetIpLinkDeviceDynamicStateContext, EthernetWeakDeviceId, IpLinkDeviceState,
         Ipv6DeviceLinkLayerAddr, OriginTracker, RecvFrameContext, RecvIpFrameMeta,
         TransmitQueueHandler, WeakDeviceId,
@@ -783,8 +783,8 @@ impl<NonSyncCtx: NonSyncContext, L> DeviceIdContext<EthernetLinkDevice>
     }
 }
 
-impl<'a, SC: DeviceIdContext<EthernetLinkDevice>> DeviceIdContext<EthernetLinkDevice>
-    for SyncCtxWithDeviceId<'a, SC>
+impl<'a, SC: DeviceIdContext<EthernetLinkDevice> + CounterContext<DeviceCounters>>
+    DeviceIdContext<EthernetLinkDevice> for SyncCtxWithDeviceId<'a, SC>
 {
     type DeviceId = SC::DeviceId;
     type WeakDeviceId = SC::WeakDeviceId;

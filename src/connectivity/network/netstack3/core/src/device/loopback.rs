@@ -19,7 +19,7 @@ use packet_formats::ethernet::{
 use tracing::trace;
 
 use crate::{
-    context::SendFrameContext,
+    context::{CounterContext, SendFrameContext},
     device::{
         self,
         id::{BaseDeviceId, BasePrimaryDeviceId, BaseWeakDeviceId},
@@ -41,7 +41,7 @@ use crate::{
             ParseSentFrameError, ReceivedFrame, SentFrame,
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
-        Device, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
+        Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
         DeviceSendFrameError, FrameDestination, Mtu,
     },
     ip::types::RawMetric,
@@ -275,6 +275,9 @@ where
     S::Buffer: BufferMut,
     NonSyncCtx: NonSyncContext,
 {
+    sync_ctx.with_counters(|counters: &DeviceCounters| {
+        counters.loopback.common.send_total_frames.increment();
+    });
     match TransmitQueueHandler::<LoopbackDevice, _>::queue_tx_frame(
         sync_ctx,
         ctx,
@@ -282,11 +285,25 @@ where
         (),
         frame,
     ) {
-        Ok(()) => Ok(()),
+        Ok(()) => {
+            sync_ctx.with_counters(|counters: &DeviceCounters| {
+                counters.loopback.common.send_frame.increment();
+            });
+            Ok(())
+        }
         Err(TransmitQueueFrameError::NoQueue(_)) => {
             unreachable!("loopback never fails to send a frame")
         }
-        Err(TransmitQueueFrameError::QueueFull(s) | TransmitQueueFrameError::SerializeError(s)) => {
+        Err(TransmitQueueFrameError::QueueFull(s)) => {
+            sync_ctx.with_counters(|counters: &DeviceCounters| {
+                counters.loopback.common.send_queue_full.increment();
+            });
+            Err(s)
+        }
+        Err(TransmitQueueFrameError::SerializeError(s)) => {
+            sync_ctx.with_counters(|counters: &DeviceCounters| {
+                counters.loopback.common.send_serialize_error.increment();
+            });
             Err(s)
         }
     }
@@ -353,9 +370,15 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
         (): Self::Meta,
         mut buf: Buf<Vec<u8>>,
     ) {
+        self.with_counters(|counters: &DeviceCounters| {
+            counters.loopback.common.recv_frame.increment();
+        });
         let (frame, whole_body) =
             match buf.parse_with_view::<_, EthernetFrame<_>>(EthernetFrameLengthCheck::NoCheck) {
                 Err(e) => {
+                    self.with_counters(|counters: &DeviceCounters| {
+                        counters.loopback.common.recv_parse_error.increment();
+                    });
                     trace!("dropping invalid ethernet frame over loopback: {:?}", e);
                     return;
                 }
@@ -376,27 +399,43 @@ impl<C: NonSyncContext> ReceiveDequeFrameContext<LoopbackDevice, C>
         let ethertype = match ethertype {
             Some(e) => e,
             None => {
+                self.with_counters(|counters: &DeviceCounters| {
+                    counters.loopback.recv_no_ethertype.increment();
+                });
                 trace!("dropping ethernet frame without ethertype");
                 return;
             }
         };
 
         match ethertype {
-            EtherType::Ipv4 => crate::ip::receive_ipv4_packet(
-                self,
-                ctx,
-                &device_id.clone().into(),
-                frame_dest,
-                buf,
-            ),
-            EtherType::Ipv6 => crate::ip::receive_ipv6_packet(
-                self,
-                ctx,
-                &device_id.clone().into(),
-                frame_dest,
-                buf,
-            ),
+            EtherType::Ipv4 => {
+                self.with_counters(|counters: &DeviceCounters| {
+                    counters.loopback.common.recv_ip_delivered.increment();
+                });
+                crate::ip::receive_ipv4_packet(
+                    self,
+                    ctx,
+                    &device_id.clone().into(),
+                    frame_dest,
+                    buf,
+                )
+            }
+            EtherType::Ipv6 => {
+                self.with_counters(|counters: &DeviceCounters| {
+                    counters.loopback.common.recv_ip_delivered.increment();
+                });
+                crate::ip::receive_ipv6_packet(
+                    self,
+                    ctx,
+                    &device_id.clone().into(),
+                    frame_dest,
+                    buf,
+                )
+            }
             ethertype @ EtherType::Arp | ethertype @ EtherType::Other(_) => {
+                self.with_counters(|counters: &DeviceCounters| {
+                    counters.loopback.common.recv_unsupported_ethertype.increment();
+                });
                 trace!("not handling loopback frame of type {:?}", ethertype)
             }
         }
