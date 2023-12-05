@@ -15,7 +15,7 @@ use crate::{
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
         fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps, FsNode, FsNodeOps, FsStr,
-        FsString,
+        FsString, PathBuilder,
     },
 };
 use starnix_uapi::{device_type::DeviceType, error, errors::Errno, open_flags::OpenFlags};
@@ -33,6 +33,9 @@ pub enum KType {
     ///
     /// Contains all information of a device node.
     Device(DeviceMetadata),
+    #[cfg(test)]
+    /// A type used for testing.
+    Test,
 }
 
 #[derive(Clone, Debug)]
@@ -182,14 +185,27 @@ impl KObject {
     /// Get the full path from the root.
     pub fn path(self: &KObjectHandle) -> FsString {
         let mut current = Some(self.clone());
-        let mut path: Vec<String> = vec![];
+        let mut path = PathBuilder::new();
         while let Some(n) = current {
-            path.push(String::from_utf8(n.name()).unwrap());
+            path.prepend_element(&n.name());
             current = n.parent();
         }
 
-        path.reverse();
-        path.join("/").into()
+        // Dedup root directory slash.
+        path.build()[1..].to_vec()
+    }
+
+    /// Get the relative path to the root.
+    pub fn path_to_root(self: &KObjectHandle) -> FsString {
+        let mut parent = self.parent();
+        let mut path = PathBuilder::new();
+        while let Some(n) = parent {
+            path.prepend_element(b"..");
+            parent = n.parent();
+        }
+
+        // Get the relative path.
+        path.build()[1..].to_vec()
     }
 
     /// Checks if there is any child holding the `name`.
@@ -408,34 +424,34 @@ mod tests {
         assert!(root.parent().is_none());
 
         assert!(!root.has_child(b"virtual"));
-        root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
+        root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
         assert!(root.has_child(b"virtual"));
     }
 
     #[::fuchsia::test]
     fn kobject_path() {
         let root = KObject::new_root();
-        let bus = root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
-        let device =
-            bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new).get_or_create_child(
-                b"null",
-                KType::Device(DeviceMetadata::new(
-                    &bus,
-                    b"null",
-                    DeviceType::NULL,
-                    DeviceMode::Char,
-                )),
-                DeviceDirectory::new,
-            );
+        let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
+        let device = bus
+            .get_or_create_child(b"mem", KType::Test, SysFsDirectory::new)
+            .get_or_create_child(b"null", KType::Test, DeviceDirectory::new);
         assert_eq!(device.path(), b"/virtual/mem/null".to_vec());
+    }
+
+    #[::fuchsia::test]
+    fn kobject_path_to_root() {
+        let root = KObject::new_root();
+        let bus = root.get_or_create_child(b"bus", KType::Test, SysFsDirectory::new);
+        let device = bus.get_or_create_child(b"device", KType::Test, SysFsDirectory::new);
+        assert_eq!(device.path_to_root(), b"../..".to_vec());
     }
 
     #[::fuchsia::test]
     fn kobject_get_children_names() {
         let root = KObject::new_root();
-        root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
-        root.get_or_create_child(b"cpu", KType::Bus, SysFsDirectory::new);
-        root.get_or_create_child(b"power", KType::Bus, SysFsDirectory::new);
+        root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
+        root.get_or_create_child(b"cpu", KType::Test, SysFsDirectory::new);
+        root.get_or_create_child(b"power", KType::Test, SysFsDirectory::new);
 
         let names = root.get_children_names();
         assert!(names.iter().any(|name| *name == b"virtual".to_vec()));
@@ -447,8 +463,8 @@ mod tests {
     #[::fuchsia::test]
     fn kobject_remove() {
         let root = KObject::new_root();
-        let bus = root.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new);
-        let class = bus.get_or_create_child(b"mem", KType::Class, SysFsDirectory::new);
+        let bus = root.get_or_create_child(b"virtual", KType::Test, SysFsDirectory::new);
+        let class = bus.get_or_create_child(b"mem", KType::Test, SysFsDirectory::new);
         assert!(bus.has_child(b"mem"));
         class.remove();
         assert!(!bus.has_child(b"mem"));
