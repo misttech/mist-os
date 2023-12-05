@@ -8,3 +8,4 @@ mod trace;
 
 pub use core_dump_list::*;
 pub use logging::*;
+pub use trace::*;

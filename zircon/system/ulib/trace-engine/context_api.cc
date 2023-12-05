@@ -9,9 +9,9 @@
 #include <string.h>
 #include <zircon/compiler.h>
 #include <zircon/syscalls.h>
+#include <zircon/threads.h>
 
 #include <algorithm>
-#include <atomic>
 #include <memory>
 
 #include "context_impl.h"
@@ -25,9 +25,10 @@ constexpr uint64_t kArtificialKoidFlag = 1ul << 63;
 
 zx_koid_t MakeArtificialKoid(trace_vthread_id_t id) { return id | kArtificialKoidFlag; }
 
-// The cached koid of this process.
+// The cached koid of this process, stored as a thread-local to support jobs with multiple processes
+// using a shared address space for globals.
 // Initialized on first use.
-std::atomic<uint64_t> g_process_koid{ZX_KOID_INVALID};
+thread_local zx_koid_t tls_process_koid{ZX_KOID_INVALID};
 
 // This thread's koid.
 // Initialized on first use.
@@ -41,12 +42,21 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 zx_koid_t GetCurrentProcessKoid() {
-  zx_koid_t koid = g_process_koid.load(std::memory_order_relaxed);
-  if (unlikely(koid == ZX_KOID_INVALID)) {
-    koid = GetKoid(zx_process_self());
-    g_process_koid.store(koid, std::memory_order_relaxed);  // idempotent
+  if (unlikely(tls_process_koid == ZX_KOID_INVALID)) {
+#ifndef STATIC_LIBRARY
+    // zx_process_self() doesn't work correctly in jobs where multiple processes share
+    // the portion of their address space for global variables. This symbol can be overridden to use
+    // thrd_get_zx_process() to return the correct value in that context.
+    // See https://fxbug.dev/133807 for background.
+    tls_process_koid = GetKoid(thrd_get_zx_process());
+#else
+    // When this library is included in the Vulkan ICD it needs to link against prebuilt libc's
+    // from prior API levels which don't have thrd_get_zx_process().
+    // TODO(https://fxbug.dev/133807) remove this branch once thrd_get_zx_process is everywhere
+    tls_process_koid = GetKoid(zx_process_self());
+#endif
   }
-  return koid;
+  return tls_process_koid;
 }
 
 zx_koid_t GetCurrentThreadKoid() {
@@ -1090,7 +1100,7 @@ EXPORT_NO_DDK void trace_context_snapshot_buffer_header_internal(
   memcpy(header, ctx->buffer_header(), sizeof(*header));
 }
 
-EXPORT_NO_DDK trace_buffering_mode_t
-trace_context_get_buffering_mode(const trace_context_t* context) {
+EXPORT_NO_DDK trace_buffering_mode_t trace_context_get_buffering_mode(
+    const trace_context_t* context) {
   return context->buffering_mode();
 }

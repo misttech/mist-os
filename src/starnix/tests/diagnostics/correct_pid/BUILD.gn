@@ -21,9 +21,13 @@ rustc_binary("starnix_pid_test_bin") {
   sources = [ "src/main.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_rust",
     "//src/lib/diagnostics/reader/rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
+    "//src/performance/lib/fxt/rust",
     "//src/starnix/tests/diagnostics/lib/parse_starnix_inspect",
     "//src/sys/lib/component-events",
     "//third_party/rust_crates:futures",
@@ -69,5 +73,6 @@ fuchsia_test_package("starnix_pid_diagnostics_test") {
   subpackages = [
     "//src/starnix/kernel:starnix_kernel_package",
     "//src/starnix/containers/debian:debian_package",
+    "//src/performance/trace_manager:package_hermetic",
   ]
 }

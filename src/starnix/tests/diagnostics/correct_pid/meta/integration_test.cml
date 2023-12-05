@@ -12,6 +12,10 @@
     },
     children: [
         {
+            name: "trace_manager",
+            url: "trace_manager_hermetic#meta/trace_manager.cm",
+        },
+        {
             name: "kernel",
             url: "starnix_kernel#meta/starnix_kernel.cm",
         },
@@ -29,6 +33,10 @@
     use: [
         { protocol: "fuchsia.diagnostics.ArchiveAccessor" },
         {
+            protocol: "fuchsia.tracing.controller.Controller",
+            from: "#trace_manager",
+        },
+        {
             protocol: [ "fuchsia.component.Binder" ],
             from: "#kmsg_hello_world",
         },
@@ -44,6 +52,11 @@
         {
             protocol: [ "fuchsia.kernel.VmexResource" ],
             from: "parent",
+            to: "#kernel",
+        },
+        {
+            protocol: "fuchsia.tracing.provider.Registry",
+            from: "#trace_manager",
             to: "#kernel",
         },
     ],

@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+pub use fuchsia_trace::Scope as TraceScope;
+
 // The trace category used for starnix-related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
 

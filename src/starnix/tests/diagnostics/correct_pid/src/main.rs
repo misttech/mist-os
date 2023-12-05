@@ -7,14 +7,54 @@ use component_events::{
     matcher::EventMatcher,
 };
 use diagnostics_reader::{ArchiveReader, Inspect, Logs};
+use fidl::Socket;
 use fidl_fuchsia_component::BinderMarker;
+use fidl_fuchsia_tracing_controller::{
+    ControllerMarker as TracingControllerMarker, StartOptions, TerminateOptions, TraceConfig,
+};
+use fuchsia_async::{Socket as AsyncSocket, Task};
 use fuchsia_component::client::connect_to_protocol;
-use futures::StreamExt;
+use futures::{AsyncReadExt, StreamExt};
 use parse_starnix_inspect::CoredumpReport;
+use std::io::Write;
 use tracing::info;
 
 #[fuchsia::main]
 async fn main() {
+    info!("initializing tracing...");
+    let tracing_controller = connect_to_protocol::<TracingControllerMarker>().unwrap();
+    let (tracing_socket, tracing_socket_write) = Socket::create_stream();
+    let mut tracing_socket = AsyncSocket::from_socket(tracing_socket).unwrap();
+    tracing_controller
+        .initialize_tracing(
+            &TraceConfig {
+                categories: Some(vec!["starnix".to_string()]),
+                // Since oneshot mode is used, set the buffer size as large
+                // as possible so that trace events don't get dropped.
+                buffer_size_megabytes_hint: Some(64),
+                ..Default::default()
+            },
+            tracing_socket_write,
+        )
+        .unwrap();
+
+    // Start reading from the trace socket before we launch the component to reduce the risk of
+    // missing records.
+    let collect_trace = Task::spawn(async move {
+        info!("draining trace record socket...");
+        let mut buf = Vec::new();
+        tracing_socket.read_to_end(&mut buf).await.unwrap();
+        info!("trace record socket drained.");
+        buf
+    });
+
+    info!("starting tracing...");
+    tracing_controller
+        .start_tracing(&StartOptions::default())
+        .await
+        .expect("starting tracing FIDL")
+        .expect("start tracing");
+
     info!("running hello_world...");
     let mut event_stream = EventStream::open().await.unwrap();
 
@@ -31,6 +71,24 @@ async fn main() {
         // Our Linux program requests a SIGABRT so there's a coredump report in inspect.
         ExitStatus::Crash(11),
     );
+
+    info!("terminating trace...");
+    tracing_controller
+        .terminate_tracing(&TerminateOptions { write_results: Some(true), ..Default::default() })
+        .await
+        .unwrap();
+
+    info!("waiting for socket collection to complete...");
+    let trace = collect_trace.await;
+
+    let fxt_path = format!("/custom_artifacts/trace.fxt");
+    info!("creating {fxt_path} and writing trace records...");
+    let mut fxt_file = std::fs::File::create(fxt_path).unwrap();
+    fxt_file.write_all(&trace[..]).unwrap();
+
+    info!("parsing trace session...");
+    let (records, warnings) = fxt::parse_full_session(&trace).unwrap();
+    assert!(warnings.is_empty(), "should not encounter any trace parsing warnings");
 
     let kernel_inspect = ArchiveReader::new()
         .select_all_for_moniker("kernel")
@@ -50,6 +108,22 @@ async fn main() {
 
     let hello_world_pid = coredumps[0].process_koid;
     let hello_world_tid = coredumps[0].thread_koid;
+
+    let hello_world_trace_events = records
+        .iter()
+        .filter_map(|r| match r {
+            fxt::TraceRecord::Event(e)
+                if e.process.0 == hello_world_pid && e.thread.0 == hello_world_tid =>
+            {
+                Some(e)
+            }
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(!hello_world_trace_events.is_empty(), "must see trace events with expected pid/tid");
+    for event in hello_world_trace_events {
+        assert_eq!(event.category, "starnix", "starnix trace events should have starnix category");
+    }
 
     let mut logs = ArchiveReader::new().snapshot_then_subscribe::<Logs>().unwrap();
     let hello_world_msg = loop {

@@ -22,7 +22,8 @@ use fuchsia_zircon::{
 use lock_sequence::{Locked, Unlocked};
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_warn, set_zx_name, CoreDumpInfo, MAX_ARGV_LENGTH,
+    firehose_trace_instant, log_warn, set_zx_name, trace_category_starnix, trace_instant,
+    CoreDumpInfo, TraceScope, MAX_ARGV_LENGTH,
 };
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
@@ -331,9 +332,9 @@ fn run_task(
         if let Some(exit_status) = process_completed_restricted_exit(current_task, &error_context)?
         {
             if current_task.flags().contains(TaskFlags::DUMP_ON_EXIT) {
-                profile_duration!("RecordCoreDump");
-
                 // Make diagnostics tooling aware of the crash.
+                profile_duration!("RecordCoreDump");
+                trace_instant!(trace_category_starnix!(), "RecordCoreDump", TraceScope::Process);
                 current_task
                     .kernel()
                     .core_dumps
