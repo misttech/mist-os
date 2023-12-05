@@ -172,29 +172,38 @@ void ControlServer::GetCurrentlyPermittedFormats(
     return;
   }
 
+  if (currently_permitted_formats_completer_) {
+    ADR_WARN_OBJECT() << "previous `GetCurrentlyPermittedFormats` request has not yet completed";
+    completer.Reply(fit::error(
+        fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kAlreadyPending));
+    return;
+  }
+
   currently_permitted_formats_completer_ = completer.ToAsync();
-  device_->GetCurrentlyPermittedFormats(
-      [this](std::vector<fuchsia_audio_device::PcmFormatSet> formats) {
-        // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
-        if (!currently_permitted_formats_completer_) {
-          return;
-        }
+  device_->GetCurrentlyPermittedFormats([this](std::vector<fuchsia_audio_device::PcmFormatSet>
+                                                   formats) {
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
+    if (!currently_permitted_formats_completer_) {
+      ADR_WARN_OBJECT()
+          << "currently_permitted_formats_completer_ gone by the time the GetCurrentlyPermittedFormats callback ran";
+      return;
+    }
 
-        auto completer = std::move(currently_permitted_formats_completer_);
-        currently_permitted_formats_completer_.reset();
-        if (device_has_error_) {
-          ADR_WARN_OBJECT() << "GetCurrentlyPermittedFormats callback: device has an error";
-          completer->Reply(fit::error(
-              fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kDeviceError));
-          return;
-        }
+    auto completer = std::move(currently_permitted_formats_completer_);
+    currently_permitted_formats_completer_.reset();
+    if (device_has_error_) {
+      ADR_WARN_OBJECT() << "GetCurrentlyPermittedFormats callback: device has an error";
+      completer->Reply(
+          fit::error(fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsError::kDeviceError));
+      return;
+    }
 
-        FX_CHECK(!formats.empty());
-        completer->Reply(
-            fit::success(fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsResponse{{
-                .permitted_formats = std::move(formats),
-            }}));
-      });
+    FX_CHECK(!formats.empty());
+    completer->Reply(
+        fit::success(fuchsia_audio_device::ControlGetCurrentlyPermittedFormatsResponse{{
+            .permitted_formats = std::move(formats),
+        }}));
+  });
 }
 
 void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
@@ -205,6 +214,13 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
   if (device_has_error_) {
     ADR_WARN_OBJECT() << "device has an error";
     completer.Reply(fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kDeviceError));
+    return;
+  }
+
+  if (create_ring_buffer_completer_) {
+    ADR_WARN_OBJECT() << "previous `CreateRingBuffer` request has not yet completed";
+    completer.Reply(
+        fit::error(fuchsia_audio_device::ControlCreateRingBufferError::kAlreadyPending));
     return;
   }
 
@@ -256,6 +272,8 @@ void ControlServer::CreateRingBuffer(CreateRingBufferRequest& request,
       [this](Device::RingBufferInfo info) {
         // If we have no async completer, maybe we're shutting down. Just exit.
         if (!create_ring_buffer_completer_) {
+          ADR_WARN_OBJECT()
+              << "create_ring_buffer_completer_ gone by the time the CreateRingBuffer callback ran";
           if (auto ring_buffer_server = GetRingBufferServer(); ring_buffer_server) {
             ring_buffer_server_.reset();
           }

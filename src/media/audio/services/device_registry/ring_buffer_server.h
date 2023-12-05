@@ -61,7 +61,7 @@ class RingBufferServer
   bool started_ = false;
 
   std::optional<WatchDelayInfoCompleter::Async> delay_info_completer_;
-  std::optional<fuchsia_audio_device::DelayInfo> delay_info_update_;
+  std::optional<fuchsia_audio_device::DelayInfo> new_delay_info_to_notify_;
 
   bool device_dropped_ring_buffer_ = false;
 };

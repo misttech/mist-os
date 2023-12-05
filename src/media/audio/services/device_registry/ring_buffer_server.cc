@@ -91,8 +91,8 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
 
   if (active_channels_completer_) {
     ADR_WARN_OBJECT() << "previous `SetActiveChannels` request has not yet completed";
-    active_channels_completer_->Close(ZX_ERR_BAD_STATE);
-    active_channels_completer_.reset();
+    completer.Reply(
+        fit::error(fuchsia_audio_device::RingBufferSetActiveChannelsError::kAlreadyPending));
     return;
   }
 
@@ -125,6 +125,7 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   active_channels_completer_ = completer.ToAsync();
   device_->SetActiveChannels(*request.channel_bitmask(), [this](zx::result<zx::time> result) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
     if (!active_channels_completer_) {
       ADR_WARN_OBJECT()
           << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
@@ -156,8 +157,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
 
   if (start_completer_) {
     ADR_WARN_OBJECT() << "previous `Start` request has not yet completed";
-    start_completer_->Close(ZX_ERR_BAD_STATE);
-    start_completer_.reset();
+    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStartError::kAlreadyPending));
     return;
   }
 
@@ -170,6 +170,7 @@ void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& comple
   start_completer_ = completer.ToAsync();
   device_->StartRingBuffer([this](zx::result<zx::time> result) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StartRingBuffer response";
+    // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
     if (!start_completer_) {
       ADR_WARN_OBJECT() << "start_completer_ gone by the time the StartRingBuffer callback ran";
       return;
@@ -200,8 +201,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
 
   if (stop_completer_) {
     ADR_WARN_OBJECT() << "previous `Stop` request has not yet completed";
-    stop_completer_->Close(ZX_ERR_BAD_STATE);
-    stop_completer_.reset();
+    completer.Reply(fit::error(fuchsia_audio_device::RingBufferStopError::kAlreadyPending));
     return;
   }
 
@@ -215,6 +215,7 @@ void RingBufferServer::Stop(StopRequest& request, StopCompleter::Sync& completer
   device_->StopRingBuffer([this](zx_status_t status) {
     ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/StopRingBuffer response";
     if (!stop_completer_) {
+      // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
       ADR_WARN_OBJECT() << "stop_completer_ gone by the time the StopRingBuffer callback ran";
       return;
     }
@@ -248,12 +249,11 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
     return;
   }
 
-  if (delay_info_update_) {
+  if (new_delay_info_to_notify_) {
     completer.Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
-        .delay_info = *delay_info_update_,
+        .delay_info = *new_delay_info_to_notify_,
     }}));
-
-    delay_info_update_.reset();
+    new_delay_info_to_notify_.reset();
     return;
   }
 
@@ -264,10 +264,10 @@ void RingBufferServer::DelayInfoChanged(const fuchsia_audio_device::DelayInfo& d
   ADR_LOG_OBJECT(kLogRingBufferFidlResponses || kLogNotifyMethods);
 
   if (!delay_info_completer_) {
-    delay_info_update_ = delay_info;
+    new_delay_info_to_notify_ = delay_info;
     return;
   }
-  FX_CHECK(!delay_info_update_);
+  FX_CHECK(!new_delay_info_to_notify_);
 
   delay_info_completer_->Reply(fit::success(fuchsia_audio_device::RingBufferWatchDelayInfoResponse{{
       .delay_info = delay_info,

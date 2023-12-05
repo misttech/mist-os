@@ -58,10 +58,10 @@ class ObserverServer
 
   explicit ObserverServer(std::shared_ptr<const Device> device);
 
-  std::optional<fuchsia_audio_device::GainState> updated_gain_state_;
+  std::optional<fuchsia_audio_device::GainState> new_gain_state_to_notify_;
   std::optional<WatchGainStateCompleter::Async> watch_gain_state_completer_;
 
-  std::optional<fuchsia_audio_device::ObserverWatchPlugStateResponse> plug_state_update_;
+  std::optional<fuchsia_audio_device::ObserverWatchPlugStateResponse> new_plug_state_to_notify_;
   std::optional<WatchPlugStateCompleter::Async> watch_plug_state_completer_;
 
   bool has_error_ = false;

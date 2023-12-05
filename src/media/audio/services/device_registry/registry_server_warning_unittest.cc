@@ -18,7 +18,7 @@ namespace {
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
 
 // A subsequent call to WatchDevicesAdded before the previous one completes should fail.
-TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhileAlreadyWatching) {
+TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhilePending) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 
@@ -48,7 +48,7 @@ TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhileAlreadyWatching) {
 }
 
 // A subsequent call to WatchDeviceRemoved before the previous one completes should fail.
-TEST_F(RegistryServerWarningTest, WatchDeviceRemovedWhileAlreadyWatching) {
+TEST_F(RegistryServerWarningTest, WatchDeviceRemovedWhilePending) {
   auto registry = CreateTestRegistryServer();
   EXPECT_EQ(RegistryServer::count(), 1u);
 

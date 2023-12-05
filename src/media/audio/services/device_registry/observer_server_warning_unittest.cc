@@ -52,7 +52,7 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
 };
 
 // A subsequent call to WatchGainState before the previous one completes should fail.
-TEST_F(ObserverServerWarningTest, WatchGainStateWhileAlreadyWatching) {
+TEST_F(ObserverServerWarningTest, WatchGainStateWhilePending) {
   auto fake_driver = CreateAndEnableDriverWithDefaults();
   ASSERT_EQ(adr_service_->devices().size(), 1u);
   ASSERT_EQ(adr_service_->unhealthy_devices().size(), 0u);
