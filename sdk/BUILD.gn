@@ -646,6 +646,7 @@ copy("idk_build_tools") {
   sources = [
     "$host_out_dir/bindc",
     "$host_out_dir/cmc",
+    "$host_out_dir/configc",
     "$host_out_dir/far",
     "$host_out_dir/ffx-package_unversioned",
     "$host_out_dir/fidl-format",
@@ -673,6 +674,7 @@ copy("idk_build_tools") {
     "//src/sys/pkg/bin/package-tool($host_toolchain)",
     "//tools/bindc:bin($host_toolchain)",
     "//tools/cmc:cmc($host_toolchain)",
+    "//tools/configc:configc($host_toolchain)",
     "//tools/fidl/fidl_api_diff($host_toolchain)",
     "//tools/fidl/fidl_api_summarize($host_toolchain)",
     "//tools/fidl/fidlc:fidl-format($host_toolchain)",
