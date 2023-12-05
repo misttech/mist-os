@@ -10,7 +10,7 @@
 
 namespace mod {
 
-constexpr uint64_t ERR_SCRATCH_LEN = 1024;
+constexpr uint64_t ERR_SCRATCH_LEN = 4096;
 
 // Definition of the module-wide state.
 using FuchsiaControllerState = struct {
