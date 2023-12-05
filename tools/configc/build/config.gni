@@ -333,6 +333,7 @@ template("validate_packaged_config") {
                              "metadata",
                              "testonly",
                              "visibility",
+                             "applicable_licenses",
                            ])
     binary_label = "//tools/configc:validate_config_wrapper"
 

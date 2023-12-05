@@ -320,14 +320,18 @@ template("fuchsia_package") {
     }
 
     _package_build_target = "${target_name}.pkg"
-    _validate_structured_config = false
+    _validate_structured_config = true
     if (defined(invoker.validate_structured_config)) {
       _validate_structured_config = invoker.validate_structured_config
     }
     if (_validate_structured_config) {
       _validate_config_target = "${target_name}.validate_config"
       validate_packaged_config(_validate_config_target) {
-        forward_variables_from(invoker, [ "testonly" ])
+        forward_variables_from(invoker,
+                               [
+                                 "applicable_licenses",
+                                 "testonly",
+                               ])
         package_manifest = _files.package_manifest
         deps = [ ":$_package_build_target" ]
       }
@@ -421,6 +425,9 @@ template("fuchsia_package") {
       # package.
       if (defined(visibility)) {
         visibility += [ ":${_package_target_name}" ]
+        if (_validate_structured_config) {
+          visibility += [ ":${_validate_config_target}" ]
+        }
       } else {
         not_needed([ "_package_target_name" ])
       }

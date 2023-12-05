@@ -19,5 +19,6 @@ fuchsia_component("to_configure") {
 # NOTE: this should not be included in build graphs except when product assembly is configured
 # to provide it with configuration values.
 fuchsia_package("configured_by_assembly") {
+  validate_structured_config = false
   deps = [ ":to_configure" ]
 }

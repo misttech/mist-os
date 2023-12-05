@@ -23,6 +23,7 @@ fuchsia_package("malformed_for_validation_fail") {
     ":fail_bad_runner",
     ":fail_missing_program",
   ]
+  validate_structured_config = false
   visibility = [ ":*" ]
 }
 

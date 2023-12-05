@@ -176,6 +176,7 @@ fuchsia_structured_config_rust_lib("brightness_manager_config") {
 
 fuchsia_package("brightness_manager_pkg") {
   package_name = "brightness_manager"
+  validate_structured_config = false
   deps = [ ":brightness_manager_component" ]
 }
 

@@ -101,6 +101,7 @@ fuchsia_component("component") {
 
 fuchsia_package("package") {
   package_name = "driver-index"
+  validate_structured_config = false
   deps = [ ":component" ]
 }
 

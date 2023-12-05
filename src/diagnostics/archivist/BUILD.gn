@@ -226,6 +226,7 @@ group("archivist-for-embedding-bundle") {
 
 fuchsia_package("package") {
   package_name = "archivist"
+  validate_structured_config = false
   deps = [ ":component" ]
 }
 

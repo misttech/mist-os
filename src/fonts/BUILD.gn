@@ -156,6 +156,7 @@ fuchsia_structured_config_rust_lib("config") {
 
 fuchsia_package("pkg") {
   package_name = "fonts"
+  validate_structured_config = false
   deps = [ ":font_provider_cm" ]
 }
 

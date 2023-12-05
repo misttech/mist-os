@@ -96,6 +96,7 @@ group("scene_manager_component_for_test") {
 }
 
 icu_fuchsia_package("scene_manager") {
+  validate_structured_config = false
   icu_deps = [ ":scene_manager_component" ]
 }
 

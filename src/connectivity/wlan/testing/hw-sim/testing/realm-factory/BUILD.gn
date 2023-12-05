@@ -54,6 +54,7 @@ fuchsia_component("realm-factory-component") {
 }
 
 fuchsia_package("realm-factory") {
+  validate_structured_config = false
   package_name = "wlan-hw-sim-realm-factory"
   testonly = true
   deps = [

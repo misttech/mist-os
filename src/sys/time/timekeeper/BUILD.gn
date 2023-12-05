@@ -121,6 +121,7 @@ fuchsia_component("service") {
 # This package requires structured config from elsewhere.
 fuchsia_package("timekeeper-without-config") {
   package_name = "timekeeper"
+  validate_structured_config = false
   deps = [ ":service" ]
 }
 

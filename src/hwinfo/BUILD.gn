@@ -59,6 +59,7 @@ fuchsia_structured_config_rust_lib("hwinfo_structured_config") {
 }
 
 fuchsia_package("hwinfo") {
+  validate_structured_config = false
   deps = [ ":hwinfo_component" ]
 }
 

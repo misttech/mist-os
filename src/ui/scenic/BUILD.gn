@@ -294,6 +294,7 @@ fuchsia_structured_config_values("scenic_config") {
 
 fuchsia_package("scenic_pkg") {
   package_name = "scenic"
+  validate_structured_config = false
   deps = [ ":component_v2" ]
 }
 

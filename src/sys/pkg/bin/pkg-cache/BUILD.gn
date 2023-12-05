@@ -200,6 +200,7 @@ group("production-component-and-config-fxblob") {
 }
 
 fuchsia_package("pkg-cache") {
+  validate_structured_config = false
   deps = [ ":component" ]
 }
 

@@ -33,6 +33,7 @@ fuchsia_component("server.component") {
 
 fuchsia_package("server.package") {
   package_name = "font-server"
+  validate_structured_config = false
   deps = [ ":server.component" ]
 }
 
@@ -70,6 +71,7 @@ fuchsia_component("provider.component") {
 
 fuchsia_package("provider.package") {
   package_name = "fonts"
+  validate_structured_config = false
   deps = [ ":provider.component" ]
 }
 

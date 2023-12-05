@@ -79,6 +79,7 @@ fuchsia_component("component") {
 
 fuchsia_package("pkg") {
   package_name = "svchost"
+  validate_structured_config = false
   deps = [ ":component" ]
 }
 

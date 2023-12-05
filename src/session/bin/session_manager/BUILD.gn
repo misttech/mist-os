@@ -113,6 +113,7 @@ fuchsia_component("session_manager_comp") {
 }
 
 fuchsia_package("session_manager") {
+  validate_structured_config = false
   deps = [ ":session_manager_comp" ]
 }
 
