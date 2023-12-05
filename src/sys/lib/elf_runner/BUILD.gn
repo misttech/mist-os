@@ -56,6 +56,7 @@ rustc_library("elf_runner") {
 
   sources = [
     "src/component.rs",
+    "src/component_set.rs",
     "src/config.rs",
     "src/crash_handler.rs",
     "src/crash_info.rs",

@@ -118,7 +118,7 @@ impl ColocatedProgram {
 
 #[async_trait]
 impl Controllable for ColocatedProgram {
-    async fn kill(mut self) {
+    async fn kill(&mut self) {
         warn!("Timed out stopping ColocatedProgram");
         self.stop().await
     }

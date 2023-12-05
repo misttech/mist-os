@@ -11,6 +11,7 @@ use {
     fuchsia_zircon::{self as zx, HandleBased, Status},
     futures::{
         future::{self, BoxFuture, Either},
+        lock::Mutex,
         prelude::*,
         Future,
     },
@@ -19,6 +20,7 @@ use {
     namespace::{Namespace, Path},
     std::convert::{TryFrom, TryInto},
     std::path::PathBuf,
+    std::sync::Arc,
     thiserror::Error,
     tracing::*,
 };
@@ -32,7 +34,7 @@ lazy_static! {
 pub trait Controllable {
     /// Should kill self and do cleanup.
     /// Should not return error or panic, should log error instead.
-    async fn kill(mut self);
+    async fn kill(&mut self);
 
     /// Stop the component. Once the component is stopped, the
     /// ComponentControllerControlHandle should be closed. If the component is
@@ -43,6 +45,26 @@ pub trait Controllable {
     /// Perform any teardown tasks before closing the controller channel.
     fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
         async {}.boxed()
+    }
+}
+
+#[async_trait]
+impl<T> Controllable for Arc<Mutex<T>>
+where
+    T: Controllable + Send + Sync + 'static,
+{
+    async fn kill(&mut self) {
+        self.lock().await.kill().await
+    }
+
+    fn stop<'a>(&mut self) -> BoxFuture<'a, ()> {
+        let self_clone = self.clone();
+        async move { self_clone.lock().await.stop().await }.boxed()
+    }
+
+    fn teardown<'a>(&mut self) -> BoxFuture<'a, ()> {
+        let self_clone = self.clone();
+        async move { self_clone.lock().await.teardown().await }.boxed()
     }
 }
 
@@ -162,7 +184,7 @@ impl<C: Controllable> Controller<C> {
 
     /// Kill the job and shutdown control handle supplied to this function.
     async fn kill(&mut self) {
-        if let Some(controllable) = self.controllable.take() {
+        if let Some(mut controllable) = self.controllable.take() {
             controllable.kill().await;
         }
     }
@@ -455,7 +477,7 @@ mod tests {
         K: FnOnce() + std::marker::Send,
         J: FnOnce() + std::marker::Send,
     {
-        async fn kill(mut self) {
+        async fn kill(&mut self) {
             let func = self.onkill.take().unwrap();
             func();
         }
