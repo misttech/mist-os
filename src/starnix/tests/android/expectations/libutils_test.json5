@@ -10,17 +10,14 @@
             ],
         },
         {
-            type: "expect_failure",
-            matchers: [
-                "SingletonTest.*",
-            ],
-        },
-        {
             type: "skip",
             matchers: [
                 // Flaky tests.
                 "LooperTest.*",
                 "SystemClock.SystemClock",
+
+                // TODO(https://fxbug.dev/314995593) Remove after new binaries roll.
+                "SingletonTest.*",
             ],
         },
     ],
