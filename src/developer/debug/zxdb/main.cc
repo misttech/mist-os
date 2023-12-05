@@ -119,6 +119,10 @@ int ConsoleMain(int argc, const char* argv[]) {
     return 0;
   }
 
+  Curl::GlobalInit();
+  auto deferred_cleanup_curl = fit::defer(Curl::GlobalCleanup);
+  auto deferred_cleanup_analytics = fit::defer(Analytics::CleanUp);
+
   if (EarlyProcessAnalyticsOptions<Analytics>(options.analytics, options.analytics_show)) {
     return 0;
   }
@@ -155,10 +159,6 @@ int ConsoleMain(int argc, const char* argv[]) {
     return 1;
   }
 #endif
-
-  Curl::GlobalInit();
-  auto deferred_cleanup_curl = fit::defer(Curl::GlobalCleanup);
-  auto deferred_cleanup_analytics = fit::defer(Analytics::CleanUp);
 
   std::vector<std::string> actions;
   Err err = SetupActions(options, &actions);
