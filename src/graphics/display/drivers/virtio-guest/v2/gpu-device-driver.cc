@@ -21,7 +21,7 @@
 #include <optional>
 #include <utility>
 
-#include "src/graphics/display/drivers/virtio-guest/v2/device.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -277,7 +277,7 @@ void GpuDeviceDriver::Start(fdf::StartCompleter completer) {
 
   {
     // Create and initialize device
-    auto result = Device::Create(std::move(pci_client_end.value()));
+    auto result = GpuDevice::Create(std::move(pci_client_end.value()));
     if (result.is_error()) {
       completer(result.take_error());
       return;

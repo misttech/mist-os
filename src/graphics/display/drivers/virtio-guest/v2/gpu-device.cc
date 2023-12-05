@@ -2,20 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
+
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
+#include <lib/virtio/backends/backend.h>
 #include <lib/virtio/driver_utils.h>
 
-#include "src/graphics/display/drivers/virtio-guest/v2/gpu-device-driver.h"
+#include <memory>
+#include <utility>
+
+#include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 
 namespace virtio_display {
 
-GpuDeviceDriver::Device::Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
+GpuDevice::GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend)
     : virtio::Device(std::move(bti), std::move(backend)) {
   sem_init(&request_sem_, 0, 1);
   sem_init(&response_sem_, 0, 0);
 }
 
-GpuDeviceDriver::Device::~Device() {
+GpuDevice::~GpuDevice() {
   if (request_virt_addr_) {
     zx::vmar::root_self()->unmap(request_virt_addr_, GetRequestSize(request_vmo_));
   }
@@ -24,7 +31,8 @@ GpuDeviceDriver::Device::~Device() {
   sem_destroy(&response_sem_);
 }
 
-fit::result<zx_status_t, std::unique_ptr<GpuDeviceDriver::Device>> GpuDeviceDriver::Device::Create(
+// static
+fit::result<zx_status_t, std::unique_ptr<GpuDevice>> GpuDevice::Create(
     fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end) {
   zx::bti bti;
   std::unique_ptr<virtio::Backend> backend;
@@ -38,7 +46,7 @@ fit::result<zx_status_t, std::unique_ptr<GpuDeviceDriver::Device>> GpuDeviceDriv
     backend = std::move(result.value().second);
   }
 
-  auto device = std::make_unique<Device>(std::move(bti), std::move(backend));
+  auto device = std::make_unique<GpuDevice>(std::move(bti), std::move(backend));
   if (zx_status_t status = device->Init(); status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to initialize device");
     return zx::error(status);
@@ -47,7 +55,7 @@ fit::result<zx_status_t, std::unique_ptr<GpuDeviceDriver::Device>> GpuDeviceDriv
   return zx::ok(std::move(device));
 }
 
-zx_status_t GpuDeviceDriver::Device::Init() {
+zx_status_t GpuDevice::Init() {
   DeviceReset();
 
   virtio_abi::GpuDeviceConfig config;
@@ -116,13 +124,13 @@ zx_status_t GpuDeviceDriver::Device::Init() {
 }
 
 // static
-uint64_t GpuDeviceDriver::Device::GetRequestSize(zx::vmo& vmo) {
+uint64_t GpuDevice::GetRequestSize(zx::vmo& vmo) {
   uint64_t size = 0;
   ZX_ASSERT(ZX_OK == vmo.get_size(&size));
   return size;
 }
 
-void GpuDeviceDriver::Device::IrqRingUpdate() {
+void GpuDevice::IrqRingUpdate() {
   FDF_LOG(TRACE, "IrqRingUpdate()");
 
   // Parse our descriptor chain, add back to the free queue
@@ -155,6 +163,6 @@ void GpuDeviceDriver::Device::IrqRingUpdate() {
   vring_.IrqRingUpdate(free_chain);
 }
 
-void GpuDeviceDriver::Device::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
+void GpuDevice::IrqConfigChange() { FDF_LOG(TRACE, "IrqConfigChange()"); }
 
 }  // namespace virtio_display

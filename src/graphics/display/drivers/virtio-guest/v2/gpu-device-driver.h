@@ -22,43 +22,16 @@
 
 namespace virtio_display {
 
-class Ring;
+class GpuDevice;
 
 // Driver instance that binds to the VIRTIO GPU device.
+//
+// This class is responsible for interfacing with the Fuchsia Driver Framework.
 class GpuDeviceDriver : public fdf::DriverBase {
  public:
   GpuDeviceDriver(fdf::DriverStartArgs start_args,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~GpuDeviceDriver() override;
-
-  class Device : public virtio::Device {
-   public:
-    Device(zx::bti bti, std::unique_ptr<virtio::Backend> backend);
-    ~Device();
-
-    static fit::result<zx_status_t, std::unique_ptr<Device>> Create(
-        fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end);
-
-    zx_status_t Init() override;
-    void IrqRingUpdate() override;
-    void IrqConfigChange() override;
-    const char* tag() const override { return "virtio-gpu"; }
-
-    static uint64_t GetRequestSize(zx::vmo& vmo);
-
-    template <typename RequestType, typename ResponseType>
-    void send_command_response(const RequestType* cmd, ResponseType** res);
-
-   private:
-    sem_t request_sem_ = {};
-    sem_t response_sem_ = {};
-    virtio::Ring vring_ = {this};
-    zx::vmo request_vmo_;
-    zx::pmt request_pmt_;
-    zx_paddr_t request_phys_addr_ = {};
-    zx_vaddr_t request_virt_addr_ = {};
-    std::optional<uint32_t> capset_count_;
-  };
 
   // Asynchronous start.
   void Start(fdf::StartCompleter completer) override;
@@ -80,7 +53,7 @@ class GpuDeviceDriver : public fdf::DriverBase {
 
   zx_status_t Stage2Init();
 
-  std::unique_ptr<Device> device_;
+  std::unique_ptr<GpuDevice> device_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
 
   // A saved copy of the display
