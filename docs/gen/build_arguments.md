@@ -1289,6 +1289,18 @@ One of:
 
 From //build/toolchain/rbe.gni:176
 
+### cxx_rbe_download_obj_files
+
+Controls whether or not to download intermediate .o files.
+When downloading is disabled, the build produces stubs
+that be used to retrieve remote artifacts later using build/rbe/dlwrap.py.
+TODO(b/284994230): This option is only available to developers,
+and not restricted environments that lack direct network access.
+
+**Current value (from the default):** `true`
+
+From //build/toolchain/rbe.gni:188
+
 ### cxx_rbe_enable
 
 Set to true to enable distributed compilation of C++ using RBE.
@@ -4279,7 +4291,7 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:228
+From //build/toolchain/rbe.gni:235
 
 ### link_rbe_enable
 
@@ -4293,7 +4305,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:190
+From //build/toolchain/rbe.gni:197
 
 **Current value for `target_cpu = "x64"`:** `false`
 
@@ -4301,7 +4313,7 @@ From //out/not-default/args.gn:10
 
 **Overridden from the default:** `false`
 
-From //build/toolchain/rbe.gni:190
+From //build/toolchain/rbe.gni:197
 
 ### link_rbe_exec_strategy
 
@@ -4324,7 +4336,7 @@ One of:
 
 **Current value (from the default):** `"remote"`
 
-From //build/toolchain/rbe.gni:208
+From //build/toolchain/rbe.gni:215
 
 ### llvm_prefix
 
