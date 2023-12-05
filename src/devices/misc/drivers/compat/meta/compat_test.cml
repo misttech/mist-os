@@ -15,6 +15,7 @@
             protocol: [
                 "fuchsia.boot.RootResource",
                 "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",

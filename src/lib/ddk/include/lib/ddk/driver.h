@@ -399,6 +399,8 @@ zx_handle_t get_power_resource(zx_device_t* dev);
 
 zx_handle_t get_ioport_resource(zx_device_t* dev);
 
+zx_handle_t get_iommu_resource(zx_device_t* dev);
+
 zx_handle_t get_irq_resource(zx_device_t* dev);
 
 zx_handle_t get_smc_resource(zx_device_t* dev);

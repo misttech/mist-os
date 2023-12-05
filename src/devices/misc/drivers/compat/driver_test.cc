@@ -148,6 +148,33 @@ class TestPowerResource : public fidl::testing::WireTestBase<fkernel::PowerResou
   zx::event fake_resource_;
 };
 
+class TestIommuResource : public fidl::testing::WireTestBase<fkernel::IommuResource> {
+ public:
+  TestIommuResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
+
+  fidl::ProtocolHandler<fkernel::IommuResource> GetHandler() {
+    return bindings_.CreateHandler(this, async_get_default_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+ private:
+  void Get(GetCompleter::Sync& completer) override {
+    zx::event duplicate;
+    ASSERT_EQ(ZX_OK, fake_resource_.duplicate(ZX_RIGHT_SAME_RIGHTS, &duplicate));
+    completer.Reply(zx::resource(duplicate.release()));
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    printf("Not implemented: IommuResource::%s\n", name.data());
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+  fidl::ServerBindingGroup<fkernel::IommuResource> bindings_;
+
+  // An event is similar enough that we can pretend it's the iommu resource, in that we can
+  // send it over a FIDL channel.
+  zx::event fake_resource_;
+};
+
 class TestIoportResource : public fidl::testing::WireTestBase<fkernel::IoportResource> {
  public:
   TestIoportResource() { EXPECT_EQ(ZX_OK, zx::event::create(0, &fake_resource_)); }
@@ -522,6 +549,11 @@ class IncomingNamespace {
         return result.take_error();
       }
 
+      result = outgoing.AddUnmanagedProtocol<fkernel::IommuResource>(iommu_resource_.GetHandler());
+      if (result.is_error()) {
+        return result.take_error();
+      }
+
       result =
           outgoing.AddUnmanagedProtocol<fkernel::IoportResource>(ioport_resource_.GetHandler());
       if (result.is_error()) {
@@ -609,6 +641,7 @@ class IncomingNamespace {
   TestRootResource root_resource_;
   TestMmioResource mmio_resource_;
   TestPowerResource power_resource_;
+  TestIommuResource iommu_resource_;
   TestIoportResource ioport_resource_;
   TestIrqResource irq_resource_;
   TestSmcResource smc_resource_;
