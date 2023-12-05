@@ -58,6 +58,11 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                         Self::Dictionary(d) => write!(f, "{}", d),
                     });
                 }
+                if self.variants.contains("OwnDictionary") {
+                    tokens.append_all(quote! {
+                        Self::OwnDictionary(d) => write!(f, "self/{}", d),
+                    });
+                }
                 if self.variants.contains("All") {
                     tokens.append_all(quote! {
                         Self::All => write!(f, "all"),
@@ -94,6 +99,20 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                         return Err(ParseError::TooLong);
                     }
                 });
+                if self.variants.contains("OwnDictionary") {
+                    tokens.append_all(quote! {
+                        if let Some(value) = value.strip_prefix("self/") {
+                            let num_splits = value.chars().filter(|c| *c == '/').count();
+                            return if num_splits == 0 {
+                                value.parse::<Name>()
+                                    .map(Self::OwnDictionary)
+                                    .map_err(|_| ParseError::InvalidValue)
+                            } else {
+                                Err(ParseError::InvalidValue)
+                            };
+                        }
+                    });
+                }
                 if self.variants.contains("Dictionary") {
                     tokens.append_all(quote! {
                         if value.contains("/") {
@@ -210,6 +229,11 @@ pub fn impl_derive_ref(ast: syn::DeriveInput) -> Result<TokenStream2, syn::Error
                         #name::Dictionary(ref d) => Self::Dictionary(d),
                     });
                 }
+                if self.variants.contains("OwnDictionary") {
+                    tokens.append_all(quote! {
+                        #name::OwnDictionary(ref d) => Self::OwnDictionary(d),
+                    });
+                }
                 if self.variants.contains("All") {
                     tokens.append_all(quote! {
                         #name::All => panic!("should not convert All to AnyRef"),
@@ -312,6 +336,7 @@ fn parse_reference_attributes(ast: &syn::DeriveInput) -> Result<ReferenceAttribu
         "Self_",
         "Void",
         "Dictionary",
+        "OwnDictionary",
         "All",
     };
     for ty in variants.iter() {

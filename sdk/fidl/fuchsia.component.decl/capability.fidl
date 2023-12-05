@@ -174,14 +174,14 @@ type Dictionary = table {
     /// Must be unique among built-in capabilities.
     1: name name;
 
-    /// (Required) Source of the contents used to initialize the dictionary.
-    /// Must be `void`, `parent`, `self`, or `child`.
+    /// (Optional) Source of the contents used to initialize the dictionary.
+    /// Must be `parent`, `self`, or `child`.
     2: source Ref;
 
     /// (Optional) Path in a dictionary provided by `ref` which contains the contents
     /// that will be used to initialize the dictionary.
     ///
-    /// This must be set iff `source` is not `void`.
+    /// This must be set iff `source` is set.
     3: source_dictionary dictionary_path;
 };
 

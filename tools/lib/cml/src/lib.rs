@@ -529,7 +529,7 @@ pub struct OneOrManyExposeFromRefs;
 /// Generates deserializer for `OneOrMany<OfferToRef>`.
 #[derive(OneOrMany, Debug, Clone)]
 #[one_or_many(
-    expected = "one or an array of \"#<child-name>\", \"#<collection-name>\", or a dictionary path, with unique elements",
+    expected = "one or an array of \"#<child-name>\", \"#<collection-name>\", or \"self/<dictionary>\", with unique elements",
     inner_type = "OfferToRef",
     min_length = 1,
     unique_items = true
@@ -622,6 +622,9 @@ pub enum AnyRef<'a> {
     Void,
     /// A reference to a dictionary. Parsed as a dictionary path.
     Dictionary(&'a DictionaryRef),
+    /// A reference to a dictionary defined by this component. Parsed as
+    /// `self/<dictionary>`.
+    OwnDictionary(&'a Name),
 }
 
 /// Format an `AnyRef` as a string.
@@ -635,6 +638,7 @@ impl fmt::Display for AnyRef<'_> {
             Self::Self_ => write!(f, "self"),
             Self::Void => write!(f, "void"),
             Self::Dictionary(d) => write!(f, "{}", d),
+            Self::OwnDictionary(name) => write!(f, "self/{}", name),
         }
     }
 }
@@ -732,13 +736,16 @@ impl OfferFromRef {
 
 /// A reference in an `offer to`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"#<child-name>\" or \"#<collection-name>\"")]
+#[reference(expected = "\"#<child-name>\", \"#<collection-name>\", or \"self/<dictionary>\"")]
 pub enum OfferToRef {
     /// A reference to a child or collection.
     Named(Name),
 
     /// Syntax sugar that results in the offer decl applying to all children and collections
     All,
+
+    /// A reference to a dictionary defined by this component, the form "self/<dictionary>".
+    OwnDictionary(Name),
 }
 
 /// A reference in an `offer to`.
@@ -765,18 +772,14 @@ pub enum EnvironmentRef {
 
 /// A reference in a `storage from`.
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Reference)]
-#[reference(expected = "\"parent\", \"self\", \"#<child-name>\", \"void\", or a dictionary path")]
+#[reference(expected = "\"parent\", \"self\", or \"#<child-name>\"")]
 pub enum CapabilityFromRef {
-    /// (storage) A reference to a child.
+    /// A reference to a child.
     Named(Name),
-    /// (storage) A reference to the parent.
+    /// A reference to the parent.
     Parent,
-    /// (storage) A reference to this component.
+    /// A reference to this component.
     Self_,
-    /// (dictionary) Create empty from scratch.
-    Void,
-    /// (dictionary) Initialize with the contents of another dictionary.
-    Dictionary(DictionaryRef),
 }
 
 /// A reference to a (possibly nested) dictionary.
@@ -785,6 +788,12 @@ pub struct DictionaryRef {
     /// Path to the dictionary relative to `root_dictionary`.
     pub path: RelativePath,
     pub root: RootDictionaryRef,
+}
+
+impl<'a> From<&'a DictionaryRef> for AnyRef<'a> {
+    fn from(r: &'a DictionaryRef) -> Self {
+        Self::Dictionary(r)
+    }
 }
 
 impl FromStr for DictionaryRef {
@@ -1924,12 +1933,14 @@ impl Document {
         }
     }
 
-    pub fn all_dictionaries_with_sources<'a>(&'a self) -> HashMap<&'a Name, &'a CapabilityFromRef> {
+    pub fn all_dictionaries_with_sources<'a>(
+        &'a self,
+    ) -> HashMap<&'a Name, Option<&'a DictionaryRef>> {
         if let Some(capabilities) = self.capabilities.as_ref() {
             capabilities
                 .iter()
-                .filter_map(|c| match (c.dictionary.as_ref(), c.from.as_ref()) {
-                    (Some(s), Some(f)) => Some((s, f)),
+                .filter_map(|c| match (c.dictionary.as_ref(), c.extends.as_ref()) {
+                    (Some(s), e) => Some((s, e)),
                     _ => None,
                 })
                 .collect()
@@ -2414,16 +2425,17 @@ pub struct Capability {
     /// - `self`: This component.
     /// - `#<child-name>`: A [reference](#references) to a child component
     ///     instance.
-    ///
-    /// (`dictionary` only) The contents to initialize a dictionary with. One of:
-    /// - `void`: Create the dictionary empty.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from: Option<CapabilityFromRef>,
+
+    /// (`dictionary` only, optional) The contents to initialize a dictionary with. One of:
     /// - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     /// - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     /// - `self/<relative_path>`: A path to a dictionary defined by this component.
     /// `<relative_path>` may be either a name, identifying a dictionary capability), or
     /// a path with multiple parts, identifying a nested dictionary.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub from: Option<CapabilityFromRef>,
+    pub extends: Option<DictionaryRef>,
 
     /// (`storage` only) The [name](#name) of the directory capability backing the storage. The
     /// capability must be available from the component referenced in `from`.

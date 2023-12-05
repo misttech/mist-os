@@ -1524,6 +1524,9 @@ fn translate_target_ref(
             Ok(fdecl::Ref::Collection(fdecl::CollectionRef { name: name.clone().into() }))
         }
         AnyRef::Named(name) if all_capabilities.contains(name) => {
+            Ok(fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() }))
+        }
+        AnyRef::OwnDictionary(name) if all_capabilities.contains(name) => {
             if !options.features.unwrap_or(&FeatureSet::empty()).has(&Feature::Dictionaries) {
                 return Err(Error::validate("dictionaries are not enabled"));
             }
@@ -1814,11 +1817,16 @@ pub fn translate_capabilities(
                 }));
             }
         } else if let Some(n) = &capability.dictionary {
-            let (source, source_dictionary) =
-                any_ref_to_decl(options, capability.from.as_ref().unwrap().into(), None, None)?;
+            let (source, source_dictionary) = match capability.extends.as_ref() {
+                Some(extends) => {
+                    let (s, d) = any_ref_to_decl(options, extends.into(), None, None)?;
+                    (Some(s), d)
+                }
+                None => (None, None),
+            };
             out_capabilities.push(fdecl::Capability::Dictionary(fdecl::Dictionary {
                 name: Some(n.clone().into()),
-                source: Some(source),
+                source,
                 source_dictionary,
                 ..Default::default()
             }));
@@ -1905,6 +1913,9 @@ pub fn any_ref_to_decl(
                 return Err(Error::validate("dictionaries are not enabled"));
             }
             return Ok(dictionary_ref_to_source(&d));
+        }
+        AnyRef::OwnDictionary(name) => {
+            fdecl::Ref::Capability(fdecl::CapabilityRef { name: name.clone().into() })
         }
     };
     Ok((ref_, None))
@@ -4235,17 +4246,17 @@ mod tests {
                     {
                         "protocol": "A",
                         "from": "parent/dict/1",
-                        "to": "#dict",
+                        "to": "self/dict",
                     },
                     {
                         "directory": "B",
                         "from": "#child",
-                        "to": "#dict",
+                        "to": "self/dict",
                     },
                     {
                         "service": "B",
                         "from": "parent/dict/2",
-                        "to": "#dict",
+                        "to": "self/dict",
                         "as": "C",
                     },
                 ],
@@ -4258,7 +4269,7 @@ mod tests {
                 "capabilities": [
                     {
                         "dictionary": "dict",
-                        "from": "parent/dict/3",
+                        "extends": "parent/dict/3",
                     },
                 ],
             }),
@@ -4491,15 +4502,14 @@ mod tests {
                     },
                     {
                         "dictionary": "dict1",
-                        "from": "void",
                     },
                     {
                         "dictionary": "dict2",
-                        "from": "parent/in/a",
+                        "extends": "parent/in/a",
                     },
                     {
                         "dictionary": "dict3",
-                        "from": "#minfs/b",
+                        "extends": "#minfs/b",
                     },
                 ],
                 "children": [
@@ -4590,7 +4600,6 @@ mod tests {
                     fdecl::Capability::Dictionary (
                         fdecl::Dictionary {
                             name: Some("dict1".into()),
-                            source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                             ..Default::default()
                         }
                     ),

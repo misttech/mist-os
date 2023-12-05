@@ -1339,11 +1339,6 @@ impl<'a> ValidationContext<'a> {
             self.all_dictionaries.insert(name, dictionary.source.as_ref());
         }
         match dictionary.source.as_ref() {
-            Some(fdecl::Ref::VoidType(_)) => {
-                if dictionary.source_dictionary.is_some() {
-                    self.errors.push(Error::extraneous_field(decl, "source_dictionary"));
-                }
-            }
             Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Parent(_)) => {
                 check_relative_path(
                     dictionary.source_dictionary.as_ref(),
@@ -1365,7 +1360,9 @@ impl<'a> ValidationContext<'a> {
                 self.errors.push(Error::invalid_field(decl, "source"));
             }
             None => {
-                self.errors.push(Error::missing_field(decl, "source"));
+                if dictionary.source_dictionary.is_some() {
+                    self.errors.push(Error::extraneous_field(decl, "source_dictionary"));
+                }
             }
         };
     }
@@ -3904,7 +3901,7 @@ mod tests {
                 Error::dependency_cycle("{{self -> capability data -> child child -> self}}".to_string()),
             ])),
         },
-        test_validate_strong_cycle_with_dictionary_from_void => {
+        test_validate_strong_cycle_with_dictionary => {
             input = fdecl::Component {
                 offers: Some(vec![
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
@@ -3963,7 +3960,6 @@ mod tests {
                 capabilities: Some(vec![
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict".into()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                 ]),
@@ -3973,7 +3969,7 @@ mod tests {
                 Error::dependency_cycle("{{child a -> child b -> capability dict -> child a}}".to_string()),
             ])),
         },
-        test_validate_strong_cycle_with_dictionary_from_dictionary => {
+        test_validate_strong_cycle_with_dictionary_that_extends => {
             input = fdecl::Component {
                 offers: Some(vec![
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
@@ -5576,7 +5572,6 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("source_dict".to_string()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                 ]);
@@ -8359,7 +8354,6 @@ mod tests {
                 Error::missing_field(DeclType::Resolver, "name"),
                 Error::missing_field(DeclType::Resolver, "source_path"),
                 Error::missing_field(DeclType::Dictionary, "name"),
-                Error::missing_field(DeclType::Dictionary, "source"),
             ])),
         },
         test_validate_capabilities_invalid_identifiers => {
@@ -8404,7 +8398,6 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("^bad".to_string()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                 ]);
@@ -8499,7 +8492,6 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("a".repeat(101)),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                 ]);
@@ -8596,12 +8588,10 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dictionary".to_string()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dictionary".to_string()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
                         ..Default::default()
                     }),
                 ]);

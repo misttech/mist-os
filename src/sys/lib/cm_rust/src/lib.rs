@@ -989,7 +989,7 @@ pub struct EventStreamDecl {
 #[fidl_decl(fidl_table = "fdecl::Dictionary")]
 pub struct DictionaryDecl {
     pub name: Name,
-    pub source: DictionarySource,
+    pub source: Option<DictionarySource>,
     pub source_dictionary: Option<PathBuf>,
 }
 
@@ -2243,7 +2243,6 @@ impl NativeIntoFidl<fdecl::Ref> for StorageDirectorySource {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DictionarySource {
-    Void,
     Parent,
     Self_,
     Child(ChildRef),
@@ -2252,7 +2251,6 @@ pub enum DictionarySource {
 impl FidlIntoNative<DictionarySource> for fdecl::Ref {
     fn fidl_into_native(self) -> DictionarySource {
         match self {
-            Self::VoidType(_) => DictionarySource::Void,
             Self::Parent(_) => DictionarySource::Parent,
             Self::Self_(_) => DictionarySource::Self_,
             Self::Child(c) => DictionarySource::Child(c.fidl_into_native()),
@@ -2264,7 +2262,6 @@ impl FidlIntoNative<DictionarySource> for fdecl::Ref {
 impl NativeIntoFidl<fdecl::Ref> for DictionarySource {
     fn native_into_fidl(self) -> fdecl::Ref {
         match self {
-            Self::Void => fdecl::Ref::VoidType(fdecl::VoidRef {}),
             Self::Parent => fdecl::Ref::Parent(fdecl::ParentRef {}),
             Self::Self_ => fdecl::Ref::Self_(fdecl::SelfRef {}),
             Self::Child(c) => fdecl::Ref::Child(c.native_into_fidl()),
@@ -2872,7 +2869,7 @@ mod tests {
                     }),
                     fdecl::Capability::Dictionary(fdecl::Dictionary {
                         name: Some("dict2".to_string()),
-                        source: Some(fdecl::Ref::VoidType(fdecl::VoidRef {})),
+                        source: None,
                         source_dictionary: None,
                         ..Default::default()
                     }),
@@ -3261,12 +3258,12 @@ mod tests {
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict1".parse().unwrap(),
-                            source: DictionarySource::Parent,
+                            source: Some(DictionarySource::Parent),
                             source_dictionary: Some("in/other".parse().unwrap()),
                         }),
                         CapabilityDecl::Dictionary(DictionaryDecl {
                             name: "dict2".parse().unwrap(),
-                            source: DictionarySource::Void,
+                            source: None,
                             source_dictionary: None,
                         }),
                     ],
@@ -3447,7 +3444,6 @@ mod tests {
                     collection: None,
                 }),
                 fdecl::Ref::Parent(fdecl::ParentRef {}),
-                fdecl::Ref::VoidType(fdecl::VoidRef {}),
             ],
             input_type = fdecl::Ref,
             result = vec![
@@ -3457,7 +3453,6 @@ mod tests {
                     collection: None,
                 }),
                 DictionarySource::Parent,
-                DictionarySource::Void,
             ],
             result_type = DictionarySource,
         },

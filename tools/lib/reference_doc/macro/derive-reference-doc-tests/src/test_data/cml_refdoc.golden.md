@@ -454,9 +454,7 @@ One and only one of the capability type keys (`protocol`, `directory`, `service`
     - `self`: This component.
     - `#<child-name>`: A [reference](#references) to a child component
         instance.
-
-    (`dictionary` only) The contents to initialize a dictionary with. One of:
-    - `void`: Create the dictionary empty.
+- `extends`: (_optional `string`_) (`dictionary` only, optional) The contents to initialize a dictionary with. One of:
     - `parent/<relative_path>`: A path to a dictionary offered by `parent`.
     - `#<child-name>/<relative_path>`: A path to a dictionary exposed by `#<child-name>`.
     - `self/<relative_path>`: A path to a dictionary defined by this component.
