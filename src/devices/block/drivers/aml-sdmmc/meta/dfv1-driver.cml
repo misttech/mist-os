@@ -10,7 +10,6 @@
     program: {
         runner: "driver",
         bind: "meta/bind/aml-sdmmc.bindbc",
-        colocate: "true",
         compat: "driver/aml-sdmmc-dfv1.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
