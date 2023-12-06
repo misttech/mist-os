@@ -1,3 +1,5 @@
 lijiaming@google.com
 chaselatta@google.com
 chandarren@google.com
+
+per-file bazel_rules_fuchsia/fuchsia/private/fuchsia_archivist_pipeline_test.bzl = file:/src/diagnostics/OWNERS
