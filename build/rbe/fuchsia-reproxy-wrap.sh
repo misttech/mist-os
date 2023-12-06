@@ -117,7 +117,10 @@ then
   # Locate the reproxy logs and temporary dirs on the same device as
   # the build output, so that moves can be done atomically,
   # and this avoids cross-device linking problems.
-  build_subdir="$(cat "$build_dir_file")"
+  build_dir_file_contents="$(cat "$build_dir_file")"
+  # In some cases, .fx-build-dir might contain an absolute path.
+  # We want only the relative-path.
+  build_subdir="$(relpath "$project_root" "$build_dir_file_contents")"
 fi
 # assume build_subdir path has depth=2
 IFS=/ read -r -a build_subdir_arr <<< "$build_subdir"
