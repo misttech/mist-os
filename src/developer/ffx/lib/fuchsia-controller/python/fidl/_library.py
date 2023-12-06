@@ -29,6 +29,7 @@ from typing import (
 )
 
 from fidl_codec import add_ir_path
+from fuchsia_controller_py import Context
 
 from ._client import EventHandlerBase
 from ._client import FidlClient
@@ -245,35 +246,24 @@ class IR(dict):
         )
 
 
-def fidl_ir_prefix_path() -> str:
-    """Returns the prefix to the FIDL IR.
-
-    If FUCHSIA_DIR is not set in the environment, or .fx-build-dir does not exist, this returns an
-    empty string.
-    """
-    fuchsia_dir = os.environ.get("FUCHSIA_DIR")
-    if fuchsia_dir:
-        try:
-            with open(os.path.join(fuchsia_dir, ".fx-build-dir"), "r") as f:
-                build_dir = f.readlines()[0].strip()
-                return os.path.join(fuchsia_dir, build_dir)
-        except FileNotFoundError:
-            return ""
-    return ""
-
-
 def get_fidl_ir_map() -> Mapping[str, str]:
     """Returns a singleton mapping of library names to FIDL files."""
     global MAP_INIT
     if MAP_INIT:
         return LIB_MAP
+    ctx = Context()
     # TODO(b/308723467): Handle multiple paths.
-    default_ir_path = "fidling/gen/ir_root"
-    if FIDL_IR_PATH_ENV in os.environ:
-        default_ir_path = os.environ[FIDL_IR_PATH_ENV]
+    default_ir_path = ctx.config_get_string("fidl.ir.path")
+    if not default_ir_path:
+        if FIDL_IR_PATH_ENV in os.environ:
+            default_ir_path = os.environ[FIDL_IR_PATH_ENV]
+        else:
+            # TODO(b/311250297): Remove last resort backstop for unconfigured
+            # in-tree build config
+            default_ir_path = "fidling/gen/ir_root"
     if not os.path.isdir(default_ir_path):
         raise RuntimeError(
-            f"Unable to find IR path root dir at {default_ir_path}"
+            f"Unable to find IR path root dir at '{default_ir_path}'"
         )
     for _, dirs, _ in os.walk(default_ir_path):
         for d in dirs:
