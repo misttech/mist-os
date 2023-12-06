@@ -15,6 +15,7 @@
 
 #include <cstring>
 
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/usb/phy/cpp/bind.h>
@@ -137,6 +138,14 @@ const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
     fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
+const std::vector<fdf::BindRule> kClockInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+
+const std::vector<fdf::NodeProperty> kClockInitProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+
 const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {
     fuchsia_driver_framework::ParentSpec{{
         .bind_rules = kResetRegisterRules,
@@ -145,6 +154,10 @@ const std::vector<fuchsia_driver_framework::ParentSpec> kUsbPhyDevParents = {
     fuchsia_driver_framework::ParentSpec{{
         .bind_rules = kGpioInitRules,
         .properties = kGpioInitProperties,
+    }},
+    fuchsia_driver_framework::ParentSpec{{
+        .bind_rules = kClockInitRules,
+        .properties = kClockInitProperties,
     }},
 };
 
@@ -331,35 +344,19 @@ zx_status_t AddXhciComposite(fdf::WireSyncClient<fpbus::PlatformBus>& pbus,
 }
 
 zx_status_t Vim3::UsbInit() {
+  using fuchsia_hardware_clockimpl::wire::InitCall;
+
   // Turn on clocks.
-  auto status = clk_impl_.Enable(g12b_clk::G12B_CLK_USB);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to enable G12B_CLK_USB");
-    return status;
-  }
-  status = clk_impl_.Enable(g12b_clk::G12B_CLK_USB1_TO_DDR);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to enable G12B_CLK_USB1_TO_DDR");
-    return status;
-  }
+  clock_init_steps_.push_back({g12b_clk::G12B_CLK_USB, InitCall::WithEnable({})});
 
-  status = clk_impl_.Disable(g12b_clk::CLK_PCIE_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Disable(CLK_PCIE_PLL) failed: %d", status);
-    return status;
-  }
+  clock_init_steps_.push_back({g12b_clk::G12B_CLK_USB1_TO_DDR, InitCall::WithEnable({})});
 
-  status = clk_impl_.SetRate(g12b_clk::CLK_PCIE_PLL, 100000000);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetRate(CLK_PCIE_PLL) failed: %d", status);
-    return status;
-  }
+  clock_init_steps_.push_back({g12b_clk::CLK_PCIE_PLL, InitCall::WithDisable({})});
 
-  status = clk_impl_.Enable(g12b_clk::CLK_PCIE_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to enable CLK_PCIE_PLL");
-    return status;
-  }
+  clock_init_steps_.push_back(
+      {g12b_clk::CLK_PCIE_PLL, InitCall::WithRateHz(init_arena_, 100'000'000)});
+
+  clock_init_steps_.push_back({g12b_clk::CLK_PCIE_PLL, InitCall::WithEnable({})});
 
   // Power on USB.
   gpio_init_steps_.push_back({VIM3_USB_PWR, GpioConfigOut(1)});
@@ -384,7 +381,7 @@ zx_status_t Vim3::UsbInit() {
 
   // Create DWC2 Device
   std::unique_ptr<usb::UsbPeripheralConfig> peripheral_config;
-  status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
+  auto status = usb::UsbPeripheralConfig::CreateFromBootArgs(parent_, &peripheral_config);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to get usb config from boot args - %d", status);
     return status;

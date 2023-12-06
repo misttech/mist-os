@@ -5,6 +5,7 @@
 composite vim3_usb_phy;
 
 using fuchsia.amlogic.platform;
+using fuchsia.clock;
 using fuchsia.gpio;
 using fuchsia.khadas.platform;
 using fuchsia.platform;
@@ -25,4 +26,8 @@ node "register-reset" {
 
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
+}
+
+node "clock-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.clock.BIND_INIT_STEP.CLOCK;
 }
