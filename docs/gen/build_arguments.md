@@ -7515,7 +7515,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"16.99991231.0.1"`
+**Current value (from the default):** `"17.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7874,7 +7874,7 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:33
+From //src/starnix/kernel/BUILD.gn:36
 
 ### starnix_enable_trace_and_debug_logs_in_release
 
@@ -7884,15 +7884,23 @@ https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:22
+From //src/starnix/kernel/BUILD.gn:25
 
 ### starnix_enable_tracing
 
 Whether or not tracing is enabled globally.
 
-**Current value (from the default):** `false`
+**Current value (from the default):** `true`
 
 From //src/starnix/kernel/BUILD.gn:17
+
+### starnix_enable_tracing_firehose
+
+Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/BUILD.gn:20
 
 ### starnix_syscall_stats
 
@@ -7900,7 +7908,7 @@ Whether or not syscall status inspect is enabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:25
+From //src/starnix/kernel/BUILD.gn:28
 
 ### starnix_unified_aspace
 
@@ -7910,7 +7918,7 @@ support is available.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/BUILD.gn:30
+From //src/starnix/kernel/BUILD.gn:33
 
 ### target_cpu
 
