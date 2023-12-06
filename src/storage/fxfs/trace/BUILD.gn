@@ -19,6 +19,9 @@ rustc_library("trace") {
   if (is_fuchsia) {
     deps += [ "//src/lib/trace/rust:trace" ]
     features = [ "tracing" ]
+    sources += [ "src/fuchsia.rs" ]
+  } else {
+    sources += [ "src/portable.rs" ]
   }
 }
 
