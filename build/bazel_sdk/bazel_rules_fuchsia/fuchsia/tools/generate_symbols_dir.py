@@ -31,7 +31,7 @@ def main():
     )
     parser.add_argument("output_dir", help="Output directory path.")
     parser.add_argument(
-        "input_file", nargs="+", help="Input ids.txt file paths."
+        "input_file", nargs="*", help="Input ids.txt file paths."
     )
 
     args = parser.parse_args()

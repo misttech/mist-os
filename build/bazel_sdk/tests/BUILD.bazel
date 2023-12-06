@@ -6,12 +6,20 @@ test_suite(
     name = "tests",
     tags = ["all"],
     tests = [
+        ":archivist_tests",
         ":assembly_tests",
         ":cpp_variants_tests",
         ":licenses_tests",
         "//fuchsia/api_levels:tests",
         "//fuchsia/drivers:tests",
         "//fuchsia/packaging:tests",
+    ],
+)
+
+test_suite(
+    name = "archivist_tests",
+    tests = [
+        "//fuchsia/archivist:archivist_pipeline_test_test",
     ],
 )
 

@@ -62,6 +62,11 @@ load(
     _fuchsia_driver_tool = "fuchsia_driver_tool",
 )
 load(
+    "//fuchsia/private:fuchsia_archivist_pipeline_test.bzl",
+    _fuchsia_archivist_pipeline_test = "fuchsia_archivist_pipeline_test",
+    _fuchsia_archivist_pipeline_test_manifest = "fuchsia_archivist_pipeline_test_manifest",
+)
+load(
     "//fuchsia/private:fuchsia_package.bzl",
     _fuchsia_package = "fuchsia_package",
     _fuchsia_test_package = "fuchsia_test_package",
@@ -133,6 +138,8 @@ fuchsia_fidl_bind_library = _fuchsia_fidl_bind_library
 fuchsia_bind_cc_library = _fuchsia_bind_cc_library
 fuchsia_fidl_hlcpp_library = _fuchsia_fidl_hlcpp_library
 fuchsia_fidl_llcpp_library = _fuchsia_fidl_llcpp_library
+fuchsia_archivist_pipeline_test_manifest = _fuchsia_archivist_pipeline_test_manifest
+fuchsia_archivist_pipeline_test = _fuchsia_archivist_pipeline_test
 fuchsia_package = _fuchsia_package
 fuchsia_test_package = _fuchsia_test_package
 fuchsia_unittest_package = _fuchsia_unittest_package

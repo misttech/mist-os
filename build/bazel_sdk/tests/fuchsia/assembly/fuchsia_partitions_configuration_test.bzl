@@ -4,7 +4,7 @@
 
 # buildifier: disable=module-docstring
 load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaAssemblyConfigInfo")
-load(":test_utils.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
+load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
 
 def _fuchsia_partitions_configuration_test_impl(ctx):
     partitions_config_file = ctx.attr.partitions_config[FuchsiaAssemblyConfigInfo].config

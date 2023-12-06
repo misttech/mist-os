@@ -3,31 +3,30 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@fuchsia_sdk//fuchsia/private/assembly:providers.bzl", "FuchsiaVirtualDeviceInfo")
 load("//test_utils:json_validator.bzl", "CREATE_VALIDATION_SCRIPT_ATTRS", "create_validation_script")
 
-def _fuchsia_virtual_device_test_impl(ctx):
-    virtual_device_file = ctx.attr.virtual_device[FuchsiaVirtualDeviceInfo].config
+def _fuchsia_archivist_pipeline_test_test_impl(ctx):
+    generated_cml_file = ctx.file.archivist_pipeline_test
     golden_file = ctx.file.golden_file
-    script, runfiles = create_validation_script(ctx, virtual_device_file, golden_file)
+    script, runfiles = create_validation_script(ctx, generated_cml_file, golden_file)
     return [
         DefaultInfo(
             executable = script,
             runfiles = runfiles,
             files = depset(
-                direct = ctx.files.virtual_device,
+                direct = ctx.files.archivist_pipeline_test,
             ),
         ),
     ]
 
-fuchsia_virtual_device_test = rule(
-    doc = """Validate the generated virtual device config file.""",
+fuchsia_archivist_pipeline_test_test = rule(
+    doc = """Validate the generated archivist pipeline test cml file.""",
     test = True,
-    implementation = _fuchsia_virtual_device_test_impl,
+    implementation = _fuchsia_archivist_pipeline_test_test_impl,
     attrs = {
-        "virtual_device": attr.label(
-            doc = "Built virtual device config.",
-            providers = [FuchsiaVirtualDeviceInfo],
+        "archivist_pipeline_test": attr.label(
+            doc = "Built archivist pipeline test cml.",
+            allow_single_file = True,
             mandatory = True,
         ),
         "golden_file": attr.label(
