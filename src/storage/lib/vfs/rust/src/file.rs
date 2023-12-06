@@ -163,6 +163,11 @@ pub trait File: Node {
         Err(Status::NOT_SUPPORTED)
     }
 
+    /// Set the merkle tree and the descriptor for this file and mark the file as fsverity-enabled.
+    async fn enable_verity(&self, _options: fio::VerificationOptions) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
+    }
+
     /// Sync this file's contents to the storage medium (probably disk).
     /// This does not necessarily guarantee that the file will be completely written to disk once
     /// the call returns. It merely guarantees that any changes to the file have been propagated

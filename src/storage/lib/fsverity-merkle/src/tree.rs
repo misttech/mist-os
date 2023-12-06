@@ -28,9 +28,9 @@ use std::io;
 ///
 /// A `MerkleTree` has an associated H: Hasher type. Each Hasher type has its own hash algorithm
 /// (e.g. Sha256, Sha512) that it uses to compute hashes. A `MerkleTree` is additionally
-/// parameterized across `block size`, `salt`, and `salt size`, whose values are
-/// determined by the FsverityMetadata struct stored in fxfs. When computing a hash, if
-/// `salt_size` > 0, the block of data (or hashes) is prepended by the `salt`.
+/// parameterized across `block size` and `salt`, where the `block size` is determined by the
+/// filesystem and the `salt` by the FsverityMetadata struct stored in fxfs. When computing a hash,
+/// if `salt`.len() > 0, the block of data (or hashes) is prepended by the `salt`.
 ///
 /// For level 0, the length of the block is `block size`, except for the last block, which may be
 /// less than `block size`. All other levels use a block length of `block size`.
@@ -63,7 +63,7 @@ impl<H: Hasher> MerkleTree<H> {
     /// # use fsverity_merkle::MerkleTree;
     /// fsverity_merkle::{MerkleTree, Sha256Struct},
     /// let data_to_hash = [0xffu8; 8192];
-    /// let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+    /// let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
     /// let tree = MerkleTree::from_reader(&data_to_hash[..], hasher).unwrap();
     /// assert_eq!(
     ///     tree.root().bytes(),
@@ -111,7 +111,7 @@ mod tests {
 
     #[test]
     fn test_single_full_hash_block_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let hashes_per_block = hasher.block_size() / hasher.hash_size();
         let mut leafs = Vec::new();
         let mut expected_leafs = Vec::new();
@@ -133,7 +133,7 @@ mod tests {
 
     #[test]
     fn test_single_full_hash_block_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let hashes_per_block = hasher.block_size() / hasher.hash_size();
         let mut leafs = Vec::new();
         let mut expected_leafs = Vec::new();
@@ -157,7 +157,7 @@ mod tests {
     fn test_from_reader_empty_sha256() {
         let data_to_hash = [0x00u8; 0];
         let tree =
-            MerkleTree::from_reader(&data_to_hash[..], Sha256Struct::new([0xFF; 32], 8, 4096))
+            MerkleTree::from_reader(&data_to_hash[..], Sha256Struct::new(vec![0xFF; 8], 4096))
                 .unwrap();
         let expected: [u8; 32] =
             FromHex::from_hex("0000000000000000000000000000000000000000000000000000000000000000")
@@ -169,7 +169,7 @@ mod tests {
     fn test_from_reader_empty_sha512() {
         let data_to_hash = [0x00u8; 0];
         let tree =
-            MerkleTree::from_reader(&data_to_hash[..], Sha512Struct::new([0xFF; 32], 8, 4096))
+            MerkleTree::from_reader(&data_to_hash[..], Sha512Struct::new(vec![0xFF; 8], 4096))
                 .unwrap();
         let expected: [u8; 64] = FromHex::from_hex("00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000").unwrap();
         assert_eq!(tree.root().bytes(), expected);
@@ -179,7 +179,7 @@ mod tests {
     fn test_from_reader_oneblock_sha256() {
         let data_to_hash = [0xffu8; 8192];
         let tree =
-            MerkleTree::from_reader(&data_to_hash[..], Sha256Struct::new([0xFF; 32], 8, 4096))
+            MerkleTree::from_reader(&data_to_hash[..], Sha256Struct::new(vec![0xFF; 8], 4096))
                 .unwrap();
         let expected: [u8; 32] =
             FromHex::from_hex("e9c09b505561b9509f93b5c7990ed41427f708480c56306453d505e94076d600")
@@ -191,7 +191,7 @@ mod tests {
     fn test_from_reader_oneblock_sha512() {
         let data_to_hash = [0xffu8; 8192];
         let tree =
-            MerkleTree::from_reader(&data_to_hash[..], Sha512Struct::new([0xFF; 32], 8, 4096))
+            MerkleTree::from_reader(&data_to_hash[..], Sha512Struct::new(vec![0xFF; 8], 4096))
                 .unwrap();
         let expected: [u8; 64] = FromHex::from_hex("22750472f522bf68a1fe2a66ee1ac57759b322c634d931097b3751e3cd9fe9dd2d8f551631922bf8f675e4b5e3a38e6db11c7df0e5053e80ffbac2c2d7a0105b").unwrap();
         assert_eq!(tree.root().bytes(), expected);
@@ -202,7 +202,7 @@ mod tests {
         let size = 2_109_440usize;
         let mut the_bytes = Vec::with_capacity(size);
         the_bytes.extend(std::iter::repeat(0xff).take(size));
-        let tree = MerkleTree::from_reader(&the_bytes[..], Sha256Struct::new([0xFF; 32], 8, 8192))
+        let tree = MerkleTree::from_reader(&the_bytes[..], Sha256Struct::new(vec![0xFF; 8], 8192))
             .unwrap();
         let expected: [u8; 32] =
             FromHex::from_hex("fc21b1fbf53a4175470a7328085b5a03b2c87771cda6f1a4dbd1d1d5ce8babd5")
@@ -215,7 +215,7 @@ mod tests {
         let size = 2_109_440usize;
         let mut the_bytes = Vec::with_capacity(size);
         the_bytes.extend(std::iter::repeat(0xff).take(size));
-        let tree = MerkleTree::from_reader(&the_bytes[..], Sha512Struct::new([0xFF; 32], 8, 8192))
+        let tree = MerkleTree::from_reader(&the_bytes[..], Sha512Struct::new(vec![0xFF; 8], 8192))
             .unwrap();
         let expected: [u8; 64] = FromHex::from_hex("e0b048b63e814157443f42ccef9093482cee056f6afea5b9e26b772effa5077a8bac34ee8f7a877bf219e0f45a999154b0600a319c4bd7d0c9b59f8d17ce0f75").unwrap();
         assert_eq!(tree.root().bytes(), expected);

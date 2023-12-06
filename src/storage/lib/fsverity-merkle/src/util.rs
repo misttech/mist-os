@@ -5,40 +5,38 @@
 use crate::{SHA256_SALT_PADDING, SHA512_SALT_PADDING};
 use mundane::hash::{Digest, Hasher, Sha256, Sha256Digest, Sha512, Sha512Digest};
 
-/// `Sha256Struct` impls the HasherTrait with type Sha256. The `salt`, `salt_size`, and
-/// `block_size` are set according to the FsverityMetadata struct stored in fxfs.
+/// `Sha256Struct` impls the HasherTrait with type Sha256. The `salt` is set according to the
+/// FsverityMetadata struct stored in fxfs and `block_size` is that of the filesystem.
 /// TODO(b/309127106): Refactor Sha256Struct and Sha512Struct to use an enum + common struct.
 #[derive(Clone)]
 pub struct Sha256Struct {
-    salt: [u8; 32],
-    salt_size: u8,
+    salt: Vec<u8>,
     block_size: usize,
 }
 
 impl Sha256Struct {
-    pub fn new(salt: [u8; 32], salt_size: u8, block_size: usize) -> Self {
-        Sha256Struct { salt, salt_size, block_size }
+    pub fn new(salt: Vec<u8>, block_size: usize) -> Self {
+        Sha256Struct { salt, block_size }
     }
 }
 
-/// `Sha512Struct` impls the HasherTrait with type Sha512. The `salt`, `salt_size`, and
-/// `block_size` are set according to the FsverityMetadata struct stored in fxfs.
+/// `Sha512Struct` impls the HasherTrait with type Sha512. The `salt` is set according to the
+/// FsverityMetadata struct stored in fxfs and `block_size` is that of the filesystem.
 /// TODO(b/309127106): Refactor Sha256Struct and Sha512Struct to use an enum + common struct.
 #[derive(Clone)]
 pub struct Sha512Struct {
-    salt: [u8; 32],
-    salt_size: u8,
+    salt: Vec<u8>,
     block_size: usize,
 }
 
 impl Sha512Struct {
-    pub fn new(salt: [u8; 32], salt_size: u8, block_size: usize) -> Self {
-        Sha512Struct { salt, salt_size, block_size }
+    pub fn new(salt: Vec<u8>, block_size: usize) -> Self {
+        Sha512Struct { salt, block_size }
     }
 }
 
 pub trait HasherTrait<H: Hasher> {
-    /// Returns the block size for this Hasher.
+    /// Returns the block size of the filesystem.
     fn block_size(&self) -> usize;
 
     /// Returns the size of MerkleTree digest for this Hasher.
@@ -64,8 +62,8 @@ impl HasherTrait<Sha256> for Sha256Struct {
     ///
     /// For `Sha256Struct`, a MerkleTree Digest is a SHA-256 hash of a block of data. The block
     /// will be zero filled if its len is less than self.block_size, except for when the first data
-    /// block is completely empty. If self.salt_size > 0, we prepend the block with self.salt which
-    /// itself is zero filled up to SHA256_SALT_PADDING.
+    /// block is completely empty. If self.salt.len() > 0, we prepend the block with self.salt
+    /// which itself is zero filled up to SHA256_SALT_PADDING.
     ///
     /// # Panics
     ///
@@ -77,14 +75,14 @@ impl HasherTrait<Sha256> for Sha256Struct {
         }
         assert!(block.len() <= self.block_size);
         let mut hasher = Sha256::default();
+        let salt_size = self.salt.len() as u8;
 
-        if self.salt_size > 0 {
-            hasher.update(&self.salt[..self.salt_size as usize]);
-            if self.salt_size % SHA256_SALT_PADDING != 0 {
+        if salt_size > 0 {
+            hasher.update(&self.salt);
+            if salt_size % SHA256_SALT_PADDING != 0 {
                 hasher.update(&vec![
                     0;
-                    (SHA256_SALT_PADDING - self.salt_size % SHA256_SALT_PADDING)
-                        as usize
+                    (SHA256_SALT_PADDING - salt_size % SHA256_SALT_PADDING) as usize
                 ])
             }
         }
@@ -113,13 +111,13 @@ impl HasherTrait<Sha256> for Sha256Struct {
         assert!(hashes.len() <= (self.block_size / <Sha256 as Hasher>::Digest::DIGEST_LEN));
 
         let mut hasher = Sha256::default();
-        if self.salt_size > 0 {
-            hasher.update(&self.salt[..self.salt_size as usize]);
-            if self.salt_size % SHA256_SALT_PADDING != 0 {
+        let salt_size = self.salt.len() as u8;
+        if salt_size > 0 {
+            hasher.update(&self.salt);
+            if salt_size % SHA256_SALT_PADDING != 0 {
                 hasher.update(&vec![
                     0;
-                    (SHA256_SALT_PADDING - self.salt_size % SHA256_SALT_PADDING)
-                        as usize
+                    (SHA256_SALT_PADDING - salt_size % SHA256_SALT_PADDING) as usize
                 ])
             }
         }
@@ -148,8 +146,8 @@ impl HasherTrait<Sha512> for Sha512Struct {
     ///
     /// For `Sha512Struct`, a MerkleTree Digest is a SHA-512 hash of a block of data. The block
     /// will be zero filled if its len is less than self.block_size, except for when the first data
-    /// block is completely empty. If self.salt_size > 0, we prepend the block with self.salt which
-    /// itself is zero filled up to SHA512_SALT_PADDING.
+    /// block is completely empty. If self.salt.len() > 0, we prepend the block with self.salt
+    /// which itself is zero filled up to SHA512_SALT_PADDING.
     ///
     /// # Panics
     ///
@@ -162,14 +160,13 @@ impl HasherTrait<Sha512> for Sha512Struct {
 
         assert!(block.len() <= self.block_size);
         let mut hasher = Sha512::default();
-
-        if !block.is_empty() && self.salt_size > 0 {
-            hasher.update(&self.salt[..self.salt_size as usize]);
-            if self.salt_size % SHA512_SALT_PADDING != 0 {
+        let salt_size = self.salt.len() as u8;
+        if !block.is_empty() && salt_size > 0 {
+            hasher.update(&self.salt);
+            if salt_size % SHA512_SALT_PADDING != 0 {
                 hasher.update(&vec![
                     0;
-                    (SHA512_SALT_PADDING - self.salt_size % SHA512_SALT_PADDING)
-                        as usize
+                    (SHA512_SALT_PADDING - salt_size % SHA512_SALT_PADDING) as usize
                 ])
             }
         }
@@ -198,13 +195,13 @@ impl HasherTrait<Sha512> for Sha512Struct {
         assert!(hashes.len() <= (self.block_size / <Sha512 as Hasher>::Digest::DIGEST_LEN));
 
         let mut hasher = Sha512::default();
-        if self.salt_size > 0 {
-            hasher.update(&self.salt[..self.salt_size as usize]);
-            if self.salt_size % SHA512_SALT_PADDING != 0 {
+        let salt_size = self.salt.len() as u8;
+        if salt_size > 0 {
+            hasher.update(&self.salt);
+            if salt_size % SHA512_SALT_PADDING != 0 {
                 hasher.update(&vec![
                     0;
-                    (SHA512_SALT_PADDING - self.salt_size % SHA512_SALT_PADDING)
-                        as usize
+                    (SHA512_SALT_PADDING - salt_size % SHA512_SALT_PADDING) as usize
                 ])
             }
         }
@@ -227,7 +224,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_empty_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let block = [];
         let hash = hasher.hash_block(&block[..]).bytes();
         assert_eq!(hash, [0; 32]);
@@ -235,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_empty_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let block = [];
         let hash = hasher.hash_block(&block[..]).bytes();
         assert_eq!(hash, [0; 64]);
@@ -243,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_partial_block_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let block = vec![0xFF; hasher.block_size()];
         let mut block2: Vec<u8> = vec![0xFF; hasher.block_size() / 2];
         block2.append(&mut vec![0; hasher.block_size() / 2]);
@@ -254,7 +251,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_partial_block_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let block = vec![0xFF; hasher.block_size()];
         let mut block2: Vec<u8> = vec![0xFF; hasher.block_size() / 2];
         block2.append(&mut vec![0; hasher.block_size() / 2]);
@@ -265,7 +262,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_single_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let block = vec![0xFF; hasher.block_size()];
         let hash = hasher.hash_block(&block[..]).bytes();
         // Root hash of file size 4096 = block_size
@@ -277,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_hash_block_single_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let block = vec![0xFF; hasher.block_size()];
         let hash = hasher.hash_block(&block[..]).bytes();
         // Root hash of file size 4096 = block_size
@@ -287,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_hash_hashes_full_block_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let mut leafs = Vec::new();
         {
             let block = vec![0xFF; hasher.block_size()];
@@ -305,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_hash_hashes_full_block_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let mut leafs = Vec::new();
         {
             let block = vec![0xFF; hasher.block_size()];
@@ -321,7 +318,7 @@ mod tests {
 
     #[test]
     fn test_hash_hashes_zero_pad_same_length_sha256() {
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let data_hash = hasher.hash_block(&vec![0xFF; hasher.block_size()]).bytes();
         let zero_hash = Sha256Digest::from_bytes([0; 32]);
         let hash_of_single_hash = hasher.hash_hashes(&[Sha256Digest::from_bytes(data_hash)]);
@@ -332,7 +329,7 @@ mod tests {
 
     #[test]
     fn test_hash_hashes_zero_pad_same_length_sha512() {
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let data_hash = hasher.hash_block(&vec![0xFF; hasher.block_size()]).bytes();
         let zero_hash = Sha512Digest::from_bytes([0; 64]);
         let hash_of_single_hash = hasher.hash_hashes(&[Sha512Digest::from_bytes(data_hash)]);

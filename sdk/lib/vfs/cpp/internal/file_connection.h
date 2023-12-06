@@ -86,6 +86,9 @@ class FileConnection final : public Connection, public fuchsia::io::File {
                 AllocateCallback callback) override {
     callback(fuchsia::io::File_Allocate_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
   }
+  void EnableVerity(fuchsia::io::VerificationOptions, EnableVerityCallback callback) override {
+    callback(fuchsia::io::File_EnableVerity_Result::WithErr(ZX_ERR_NOT_SUPPORTED));
+  }
 #endif
 
  protected:

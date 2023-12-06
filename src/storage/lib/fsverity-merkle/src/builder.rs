@@ -14,7 +14,7 @@ use {
 /// ```
 /// # use fsverity_merkle::*;
 /// let data = vec![0xff; 8192];
-/// let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+/// let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
 /// let mut builder = MerkleTreeBuilder::new(hasher);
 /// for i in 0..8 {
 ///     builder.write(&data[..]);
@@ -156,7 +156,7 @@ mod tests {
     #[test_case(vec![0xFF; 2105344], "b4050a226383d94c09c004d59a81b08bed17726b79cf9bd0994931f13213652d"; "test_large")]
     #[test_case(vec![0xFF; 2109440], "1a07efa041afdf78b86df2c580ec6f8446eb6e802321252996563c14334a5342"; "test_unaligned")]
     fn sha256_tests_no_salt(input: Vec<u8>, output: &str) {
-        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new([0; 32], 0, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new(vec![], 4096));
         tree.write(input.as_slice());
         let actual = tree.finish().root().bytes();
         let expected: [u8; 32] = FromHex::from_hex(output).unwrap();
@@ -172,7 +172,7 @@ mod tests {
     #[test_case(vec![0xFF; 2105344], "b433c8b632c79ca9fc2c04913541aa38970ae9da04a43269f67770221e79fe37"; "test_large")]
     #[test_case(vec![0xFF; 2109440], "fbd261c306f522aba5ac0c70229870594d236634f5afe68fe9656ea04eb4a4fe"; "test_unaligned")]
     fn sha256_tests_with_salt(input: Vec<u8>, output: &str) {
-        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new([0xFF; 32], 8, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
         tree.write(input.as_slice());
         let actual = tree.finish().root().bytes();
         let expected: [u8; 32] = FromHex::from_hex(output).unwrap();
@@ -188,7 +188,7 @@ mod tests {
     #[test_case(vec![0xFF; 2105344], "51977ac06edd17d32761e27d384f6c437ead6922f0a3fbabc3390d8f6e929bc1d9ff9e4ee34fb060484e8eff272f9cc36fa1cf26361c3258b5d8b87d8144b497"; "test_large")]
     #[test_case(vec![0xFF; 2109440], "f6e821f7cdd1306031080ff99c4c2d7270c6d6bbaa07f4e3040a5d20a1178af1e4f6377f898166d5835ec22b2fcca6d364711cf0c20862d40f3580b6b6276683"; "test_unaligned")]
     fn sha512_tests_no_salt(input: Vec<u8>, output: &str) {
-        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new([0; 32], 0, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new(vec![], 4096));
         tree.write(input.as_slice());
         let actual = tree.finish().root().bytes();
         let expected: [u8; 64] = FromHex::from_hex(output).unwrap();
@@ -204,7 +204,7 @@ mod tests {
     #[test_case(vec![0xFF; 2105344], "a92ddf722dfcf679a64b6364de7f823850f8f856e0ba2c53d66f75cf72d5572bf1d525b3c185e5c39818e2d29997d259f81363daab80a902f86291a71514f891"; "test_large")]
     #[test_case(vec![0xFF; 2109440], "b6913e8c1d3bb84b467e24667aedad0491ad86f548e849741969688b2526919a380946bebf481ec1ee1bdda86631e10c4a82e7329afdd84db2ac43994a524785"; "test_unaligned")]
     fn sha512_tests_with_salt(input: Vec<u8>, output: &str) {
-        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new([0xFF; 32], 8, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new(vec![0xFF; 8], 4096));
         tree.write(input.as_slice());
         let actual = tree.finish().root().bytes();
         let expected: [u8; 64] = FromHex::from_hex(output).unwrap();
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn test_unaligned_single_block_sha256() {
         let data = vec![0xFF; 8192];
-        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new([0xFF; 32], 8, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
         let (first, second) = &data[..].split_at(1024);
         tree.write(first);
         tree.write(second);
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_unaligned_single_block_sha512() {
         let data = vec![0xFF; 8192];
-        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new([0xFF; 32], 8, 4096));
+        let mut tree = MerkleTreeBuilder::new(Sha512Struct::new(vec![0xFF; 8], 4096));
         let (first, second) = &data[..].split_at(1024);
         tree.write(first);
         tree.write(second);
@@ -245,7 +245,7 @@ mod tests {
                 .unwrap();
 
         for chunk_size in &[1, 100, 1024, 8193] {
-            let mut tree = MerkleTreeBuilder::new(Sha256Struct::new([0xFF; 32], 8, 4096));
+            let mut tree = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
             for block in data.as_slice().chunks(*chunk_size) {
                 tree.write(block);
             }
@@ -261,7 +261,7 @@ mod tests {
         let expected: [u8; 64] = FromHex::from_hex("4f6a2e16dabf6347b9ae88d5c298befcff0cc71abe1905fa6aefcee14fa5acb89ecbf949daef002d11a9dbb51f211f0eb3e2f7f5e2911b0af2e9fb68c7799a94").unwrap();
 
         for chunk_size in &[1, 100, 1024, 8193] {
-            let mut tree = MerkleTreeBuilder::new(Sha512Struct::new([0xFF; 32], 8, 4096));
+            let mut tree = MerkleTreeBuilder::new(Sha512Struct::new(vec![0xFF; 8], 4096));
             for block in data.as_slice().chunks(*chunk_size) {
                 tree.write(block);
             }

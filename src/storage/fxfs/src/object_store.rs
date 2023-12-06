@@ -96,7 +96,7 @@ pub use object_record::{
     AttributeKey, EncryptionKeys, ExtendedAttributeValue, FsverityMetadata, ObjectAttributes,
     ObjectAttributesV5, ObjectKey, ObjectKeyData, ObjectKeyDataV5, ObjectKeyV25, ObjectKeyV5,
     ObjectKind, ObjectValue, ObjectValueV25, ObjectValueV29, ObjectValueV30, ObjectValueV31,
-    ObjectValueV5, ProjectProperty,
+    ObjectValueV5, ProjectProperty, RootDigest,
 };
 pub use transaction::Mutation;
 
@@ -2128,7 +2128,7 @@ mod tests {
                 object_record::{AttributeKey, ObjectKey, ObjectValue},
                 transaction::{lock_keys, Options},
                 volume::root_volume,
-                FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore,
+                FsverityMetadata, HandleOptions, LockKey, Mutation, ObjectStore, RootDigest,
             },
             serialized_types::VersionedLatest,
         },
@@ -2266,15 +2266,7 @@ mod tests {
                 ),
                 ObjectValue::verified_attribute(
                     0,
-                    FsverityMetadata {
-                        version: 1,
-                        hash_algorithm: 1,
-                        log_blocksize: 8,
-                        salt_size: 0,
-                        data_size: 0,
-                        root_hash: vec![0; 64],
-                        salt: [0; 32],
-                    },
+                    FsverityMetadata { root_digest: RootDigest::Sha256([0; 32]), salt: vec![] },
                 ),
             ),
         );

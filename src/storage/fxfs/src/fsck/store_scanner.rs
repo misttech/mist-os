@@ -860,6 +860,7 @@ fn validate_attributes(
         if attributes.iter().find(|(attr_id, _)| *attr_id == DEFAULT_DATA_ATTRIBUTE_ID).is_none() {
             fsck.error(FsckError::MissingDataAttribute(store_id, object_id))?;
         }
+        // TODO(b/315016213): Add a check for the expected size of the merkle tree.
         let merkle_attribute =
             attributes.iter().find(|(attr_id, _)| *attr_id == FSVERITY_MERKLE_ATTRIBUTE_ID);
 

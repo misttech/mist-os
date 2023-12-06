@@ -14,9 +14,6 @@ mod util;
 pub use crate::util::{HasherTrait, Sha256Struct, Sha512Struct};
 use mundane::hash::Hasher;
 
-pub const FS_VERITY_HASH_ALG_SHA256: u8 = 1;
-pub const FS_VERITY_HASH_ALG_SHA512: u8 = 2;
-
 pub const SHA256_SALT_PADDING: u8 = 64;
 pub const SHA512_SALT_PADDING: u8 = 128;
 
@@ -35,7 +32,7 @@ mod tests {
     #[test]
     fn test_from_slice_sha256() {
         let file = vec![0xFF; 2105344];
-        let hasher = Sha256Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha256Struct::new(vec![0xFF; 8], 4096);
         let mut builder = MerkleTreeBuilder::new(hasher.clone());
         builder.write(&file[..]);
         let expected = builder.finish();
@@ -46,7 +43,7 @@ mod tests {
     #[test]
     fn test_from_slice_sha512() {
         let file = vec![0xFF; 2105344];
-        let hasher = Sha512Struct::new([0xFF; 32], 8, 4096);
+        let hasher = Sha512Struct::new(vec![0xFF; 8], 4096);
         let mut builder = MerkleTreeBuilder::new(hasher.clone());
         builder.write(&file[..]);
         let expected = builder.finish();

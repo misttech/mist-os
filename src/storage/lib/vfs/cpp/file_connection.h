@@ -95,6 +95,12 @@ class FileConnection : public Connection, public fidl::WireServer<fuchsia_io::Fi
   }
 #endif
 
+#if __Fuchsia_API_level__ >= FUCHSIA_HEAD
+  void EnableVerity(EnableVerityRequestView request, EnableVerityCompleter::Sync& completer) final {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+#endif
+
   //
   // |fuchsia.io/AdvisoryLocking| operations.
   //

@@ -370,6 +370,11 @@ impl File for FxFile {
         Ok(())
     }
 
+    async fn enable_verity(&self, options: fio::VerificationOptions) -> Result<(), Status> {
+        self.flush().await.map_err(map_to_status)?;
+        self.handle.uncached_handle().enable_verity(options).await.map_err(map_to_status)
+    }
+
     // Returns a VMO handle that supports paging.
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
         // We do not support executable VMO handles.

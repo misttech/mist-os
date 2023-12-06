@@ -523,18 +523,20 @@ pub struct ChildValue {
     pub object_descriptor: ObjectDescriptor,
 }
 
+#[derive(
+    Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint,
+)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum RootDigest {
+    Sha256([u8; 32]),
+    Sha512(Vec<u8>),
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-/// TODO(b/308870667): Potentially revise FsverityMetadata with stricter types and storage
-/// optimizations.
 pub struct FsverityMetadata {
-    pub version: u8,
-    pub hash_algorithm: u8,
-    pub log_blocksize: u8,
-    pub salt_size: u8,
-    pub data_size: u64,
-    pub root_hash: Vec<u8>,
-    pub salt: [u8; 32],
+    pub root_digest: RootDigest,
+    pub salt: Vec<u8>,
 }
 
 /// ObjectValue is the value of an item in the object store.

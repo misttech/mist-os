@@ -585,6 +585,11 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
                     self.handle_remove_extended_attribute(name).await.map_err(|s| s.into_raw());
                 responder.send(res)?;
             }
+            fio::FileRequest::EnableVerity { options, responder } => {
+                fuchsia_trace::duration!("storage", "File::EnableVerity");
+                let res = self.handle_enable_verity(options).await.map_err(|s| s.into_raw());
+                responder.send(res)?;
+            }
             fio::FileRequest::Read { count, responder } => {
                 fuchsia_trace::duration!("storage", "File::Read", "bytes" => count);
                 let result = self.handle_read(count).await;
@@ -772,6 +777,16 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler>
         }
 
         self.file.update_attributes(attributes).await
+    }
+
+    async fn handle_enable_verity(
+        &mut self,
+        options: fio::VerificationOptions,
+    ) -> Result<(), zx::Status> {
+        if !self.options.rights.intersects(fio::Operations::UPDATE_ATTRIBUTES) {
+            return Err(zx::Status::BAD_HANDLE);
+        }
+        self.file.enable_verity(options).await
     }
 
     async fn handle_truncate(&mut self, length: u64) -> Result<(), zx::Status> {

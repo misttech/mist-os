@@ -704,6 +704,10 @@ func (*fileState) Allocate(fidl.Context, uint64, uint64, io.AllocateMode) (io.Fi
 	return io.FileAllocateResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
+func (*fileState) EnableVerity(fidl.Context, io.VerificationOptions) (io.FileEnableVerityResult, error) {
+	return io.FileEnableVerityResultWithErr(int32(zx.ErrNotSupported)), nil
+}
+
 func (fState *fileState) Read(_ fidl.Context, count uint64) (io.ReadableReadResult, error) {
 	if l := fState.size; l < count {
 		count = l
