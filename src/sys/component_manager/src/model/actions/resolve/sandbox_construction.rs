@@ -84,68 +84,60 @@ pub async fn build_component_sandbox(
     }
 
     for use_ in &decl.uses {
-        // We only support protocol capabilities right now
-        match &use_ {
-            cm_rust::UseDecl::Protocol(_) => (),
-            _ => continue,
-        }
+        let cm_rust::UseDecl::Protocol(cm_rust::UseProtocolDecl { target_path, .. }) = use_ else {
+            // We only support protocol capabilities right now
+            continue;
+        };
 
         let source_name = use_.source_name();
-        match use_.source() {
+        let router = match use_.source() {
             cm_rust::UseSource::Parent => {
-                if let Some(cap_dict) = output.component_input_dict.get_protocol(source_name) {
-                    if let Some(parent_router) = cap_dict.get_router() {
-                        output
-                            .program_input_dict
-                            .get_or_insert_protocol_mut(source_name)
-                            .insert_router(parent_router.clone());
-                    }
-                } else {
+                let Some(cap_dict) = output.component_input_dict.get_protocol(source_name) else {
                     debug!("unable to use from parent, parent dict does not have {}", source_name);
-                }
+                    continue;
+                };
+                let Some(parent_router) = cap_dict.get_router() else {
+                    continue;
+                };
+                parent_router.clone()
             }
             cm_rust::UseSource::Self_ => {
-                if let Some(cap_dict) = output.program_output_dict.get_protocol_mut(source_name) {
-                    if let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) {
-                        output
-                            .program_input_dict
-                            .get_or_insert_protocol_mut(source_name)
-                            .insert_router(new_terminating_router(receiver));
-                    }
-                }
+                let Some(cap_dict) = output.program_output_dict.get_protocol_mut(source_name)
+                else {
+                    continue;
+                };
+                let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) else { continue };
+                new_terminating_router(receiver)
             }
             cm_rust::UseSource::Framework => {
                 let receiver = Receiver::new();
-                output
-                    .program_input_dict
-                    .get_or_insert_protocol_mut(source_name)
-                    .insert_router(new_terminating_router(receiver.clone()));
                 let source_name = source_name.clone();
+                let receiver_clone = receiver.clone();
                 output.sources_and_receivers.push((
                     CapabilitySourceFactory::new(move |component| CapabilitySource::Framework {
                         capability: InternalCapability::Protocol(source_name.clone()),
                         component,
                     }),
-                    receiver,
+                    receiver_clone,
                 ));
+                new_terminating_router(receiver)
             }
             cm_rust::UseSource::Capability(_) => {
                 let receiver = Receiver::new();
-                output
-                    .program_input_dict
-                    .get_or_insert_protocol_mut(source_name)
-                    .insert_router(new_terminating_router(receiver.clone()));
                 let use_ = use_.clone();
+                let receiver_clone = receiver.clone();
                 output.sources_and_receivers.push((
                     CapabilitySourceFactory::new(move |component| CapabilitySource::Capability {
                         source_capability: ComponentCapability::Use(use_.clone()),
                         component,
                     }),
-                    receiver,
+                    receiver_clone,
                 ));
+                new_terminating_router(receiver)
             }
-            _ => (), // unsupported
-        }
+            _ => continue, // unsupported
+        };
+        output.program_input_dict.insert_router(target_path.split(), router);
     }
 
     for offer in &decl.offers {
@@ -227,26 +219,27 @@ fn extend_dict_with_offer(
     }
     match offer.source() {
         cm_rust::OfferSource::Parent => {
-            if let Some(source_cap_dict) = component_input_dict.get_protocol(source_name) {
-                if let Some(parent_router) = source_cap_dict.get_router() {
-                    target_dict
-                        .get_or_insert_protocol_mut(target_name)
-                        .insert_router(parent_router.clone().availability(*offer.availability()));
-                }
-            }
+            let Some(source_cap_dict) = component_input_dict.get_protocol(source_name) else {
+                return;
+            };
+            let Some(parent_router) = source_cap_dict.get_router() else { return };
+            target_dict
+                .get_or_insert_protocol_mut(target_name)
+                .insert_router(parent_router.clone().availability(*offer.availability()));
         }
         cm_rust::OfferSource::Self_ => {
-            if let Some(receiver) = program_output_dict
+            let Some(receiver) = program_output_dict
                 .get_protocol(source_name)
                 .and_then(|c| c.get_receiver().map(|r| r.clone()))
-            {
-                insert_receiver_into_target_dict(
-                    receiver,
-                    target_dict,
-                    target_name,
-                    *offer.availability(),
-                );
-            }
+            else {
+                return;
+            };
+            insert_receiver_into_target_dict(
+                receiver,
+                target_dict,
+                target_name,
+                *offer.availability(),
+            );
         }
         cm_rust::OfferSource::Framework => {
             let receiver = Receiver::new();

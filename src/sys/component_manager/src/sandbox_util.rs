@@ -89,6 +89,10 @@ impl TryFrom<AnyCapability> for Message {
 
 #[async_trait]
 pub trait DictExt {
+    fn get_sub_dict(&self, path: Vec<String>) -> Option<Dict>;
+    fn get_or_insert_sub_dict(&self, path: Vec<String>) -> Dict;
+    fn get_router(&self, path: Vec<String>) -> Option<Router>;
+    fn insert_router(&self, path: Vec<String>, router: Router);
     fn get_protocol(&self, name: &Name) -> Option<CapabilityDict>;
     fn get_protocol_mut(&self, name: &Name) -> Option<CapabilityDictMut>;
     fn get_or_insert_protocol_mut(&self, name: &Name) -> CapabilityDictMut;
@@ -98,6 +102,46 @@ pub trait DictExt {
 
 #[async_trait]
 impl DictExt for Dict {
+    fn get_sub_dict(&self, mut path: Vec<String>) -> Option<Dict> {
+        if path.is_empty() {
+            return Some(self.clone());
+        }
+
+        let next_name = path.remove(0);
+        self.lock_entries()
+            .get(&next_name)
+            .and_then(|value| value.clone().try_into().ok())
+            .and_then(move |dict: Dict| dict.get_sub_dict(path))
+    }
+
+    fn get_or_insert_sub_dict(&self, mut path: Vec<String>) -> Dict {
+        if path.is_empty() {
+            return self.clone();
+        }
+        let next_name = path.remove(0);
+        let sub_dict: Dict = self
+            .lock_entries()
+            .entry(next_name)
+            .or_insert(Box::new(Dict::new()))
+            .clone()
+            .try_into()
+            .unwrap();
+        sub_dict.get_or_insert_sub_dict(path)
+    }
+
+    fn get_router(&self, mut path: Vec<String>) -> Option<Router> {
+        let last_name = path.pop().expect("unexpected empty path in use declaration");
+        self.get_sub_dict(path)
+            .and_then(|dict| dict.lock_entries().get(&last_name).cloned())
+            .and_then(|value| value.try_into().ok())
+    }
+
+    fn insert_router(&self, mut path: Vec<String>, router: Router) {
+        let last_name = path.pop().expect("unexpected empty path in use declaration");
+        let sub_dict = self.get_or_insert_sub_dict(path);
+        sub_dict.lock_entries().insert(last_name, Box::new(router));
+    }
+
     fn get_protocol(&self, name: &Name) -> Option<CapabilityDict> {
         self.lock_entries()
             .get(&name.as_str().to_string())
@@ -353,5 +397,122 @@ impl LaunchTaskOnReceive {
             );
             service.open(ExecutionScope::new(), flags, Path::dot(), server_end);
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use {super::*, fidl_fuchsia_io as fio};
+
+    #[fuchsia::test]
+    async fn get_sub_dict() {
+        let test_dict = Dict::new();
+        assert_eq!(
+            Some(vec![]),
+            test_dict.get_sub_dict(vec![]).map(|d| d.lock_entries().keys().cloned().collect())
+        );
+
+        test_dict.lock_entries().insert("foo".to_string(), Box::new(Dict::new()));
+
+        assert_eq!(
+            Some(vec!["foo".to_string()]),
+            test_dict.get_sub_dict(vec![]).map(|d| d.lock_entries().keys().cloned().collect())
+        );
+
+        test_dict
+            .get_sub_dict(vec!["foo".to_string()])
+            .unwrap()
+            .lock_entries()
+            .insert("bar".to_string(), Box::new(Dict::new()));
+        test_dict
+            .get_sub_dict(vec!["foo".to_string()])
+            .unwrap()
+            .lock_entries()
+            .insert("baz".to_string(), Box::new(Dict::new()));
+
+        assert_eq!(
+            Some(vec!["bar".to_string(), "baz".to_string()]),
+            test_dict.get_sub_dict(vec!["foo".to_string()]).map(|d| d
+                .lock_entries()
+                .keys()
+                .cloned()
+                .collect())
+        );
+        assert_eq!(
+            Some(vec![]),
+            test_dict.get_sub_dict(vec!["foo".to_string(), "bar".to_string()]).map(|d| d
+                .lock_entries()
+                .keys()
+                .cloned()
+                .collect())
+        );
+    }
+
+    #[fuchsia::test]
+    async fn get_or_insert_sub_dict() {
+        let test_dict = Dict::new();
+        assert!(test_dict
+            .get_or_insert_sub_dict(vec![])
+            .lock_entries()
+            .keys()
+            .cloned()
+            .collect::<Vec<String>>()
+            .is_empty());
+
+        test_dict.get_or_insert_sub_dict(vec!["foo".to_string(), "bar".to_string()]);
+        test_dict.get_or_insert_sub_dict(vec!["foo".to_string(), "baz".to_string()]);
+
+        assert_eq!(
+            Some(vec!["foo".to_string()]),
+            test_dict.get_sub_dict(vec![]).map(|d| d.lock_entries().keys().cloned().collect())
+        );
+        assert_eq!(
+            Some(vec!["bar".to_string(), "baz".to_string()]),
+            test_dict.get_sub_dict(vec!["foo".to_string()]).map(|d| d
+                .lock_entries()
+                .keys()
+                .cloned()
+                .collect())
+        );
+    }
+
+    #[fuchsia::test]
+    async fn get_and_insert_router() {
+        let receiver = Receiver::new();
+        let test_dict = Dict::new();
+        test_dict.insert_router(
+            vec!["svc".to_string(), "fuchsia.example.Router".to_string()],
+            new_terminating_router(receiver.clone()),
+        );
+
+        assert_eq!(
+            Some(vec!["svc".to_string()]),
+            test_dict.get_sub_dict(vec![]).map(|d| d.lock_entries().keys().cloned().collect())
+        );
+        assert_eq!(
+            Some(vec!["fuchsia.example.Router".to_string()]),
+            test_dict.get_sub_dict(vec!["svc".to_string()]).map(|d| d
+                .lock_entries()
+                .keys()
+                .cloned()
+                .collect())
+        );
+
+        let router = test_dict
+            .get_router(vec!["svc".to_string(), "fuchsia.example.Router".to_string()])
+            .expect("router we inserted is missing");
+
+        let (cap_receiver, completer) = Completer::new();
+        router.route(
+            Request {
+                rights: Some(fio::OpenFlags::empty()),
+                relative_path: sandbox::Path::new(""),
+                target_moniker: vec![].try_into().unwrap(),
+                availability: cm_rust::Availability::Required,
+            },
+            completer,
+        );
+
+        let _ = cap_receiver.await.expect("route should not have failed");
     }
 }
