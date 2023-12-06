@@ -11,9 +11,12 @@ use anyhow::Error;
 use async_trait::async_trait;
 use ffx_writer::Format;
 use ffx_writer::MachineWriter;
+use fidl_fuchsia_diagnostics::LogSettingsMarker;
 use fidl_fuchsia_diagnostics::StreamParameters;
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
+use fidl_fuchsia_sys2::RealmQueryMarker;
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_component::client::connect_to_protocol_at_path;
 use fuchsia_zircon as zx;
 use log_command as log_utils;
 use log_command::log_formatter;
@@ -47,6 +50,10 @@ impl Symbolize for Symbolizer {
 async fn main() -> Result<(), Error> {
     let (sender, receiver) = fuchsia_zircon::Socket::create_stream();
     let proxy = connect_to_protocol::<ArchiveAccessorMarker>().unwrap();
+    let realm_proxy =
+        connect_to_protocol_at_path::<RealmQueryMarker>("/svc/fuchsia.sys2.RealmQuery.root")
+            .unwrap();
+    let log_settings = connect_to_protocol::<LogSettingsMarker>().unwrap();
     let cmd: LogCommand = argh::from_env();
     let stream_mode = if matches!(cmd.sub_command, Some(LogSubCommand::Dump(..))) {
         fidl_fuchsia_diagnostics::StreamMode::Snapshot
@@ -82,6 +89,7 @@ async fn main() -> Result<(), Error> {
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
+    cmd.maybe_set_interest(&log_settings, &realm_proxy, cmd.json).await?;
     formatter.set_boot_timestamp(boot_ts.into_nanos());
     let _ = read_logs_from_socket(
         fuchsia_async::Socket::from_socket(receiver).unwrap(),
