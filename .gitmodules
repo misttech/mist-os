@@ -383,11 +383,6 @@
 	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto/
 	name = third_party/perfetto
 	ignore = all
-[submodule "third_party/pigweed/src"]
-	path = third_party/pigweed/src
-	url = https://pigweed.googlesource.com/pigweed/pigweed
-	name = third_party/pigweed
-	ignore = all
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://fuchsia.googlesource.com/third_party/protobuf
@@ -617,4 +612,9 @@
 	path = third_party/gfxstream/src
 	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/hardware/google/gfxstream
 	name = third_party/android/platform/hardware/google/gfxstream
+	ignore = all
+[submodule "third_party/pigweed/src"]
+	path = third_party/pigweed/src
+	url = https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed
+	name = third_party/pigweed
 	ignore = all
