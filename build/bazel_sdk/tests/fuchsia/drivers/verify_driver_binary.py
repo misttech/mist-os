@@ -111,7 +111,6 @@ def verify_exported_symbols(symbols):
 def verify_needed_libs(args):
     # Running readelf --needed-libs returns a response that looks like
     # NeededLibraries [
-    #  libasync-default.so
     #  libc.so
     #  libfdio.so
     #  libsvc.so
@@ -128,7 +127,6 @@ def verify_needed_libs(args):
     ]
 
     expected_libs = [
-        "libasync-default.so",
         "libc.so",
         "libfdio.so",
         "libsvc.so",

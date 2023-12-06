@@ -29,6 +29,4 @@ sdk_shared_library("svc") {
   libcxx_linkage = "static"
 
   public_configs = [ "//sdk/config" ]
-
-  runtime_deps = [ "//zircon/system/ulib/async-default:async-default_sdk" ]
 }
