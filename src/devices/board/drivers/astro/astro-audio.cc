@@ -148,27 +148,15 @@ const std::vector<fdf::ParentSpec> kParentSpecInit = std::vector{
 };
 
 zx_status_t Astro::AudioInit() {
-  zx_status_t status;
+  using fuchsia_hardware_clockimpl::wire::InitCall;
+
   fdf::Arena arena('AUDI');
   uint8_t tdm_instance_id = 1;
 
-  status = clk_impl_.Disable(g12a_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Disable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
-
-  status = clk_impl_.SetRate(g12a_clk::CLK_HIFI_PLL, 768000000);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: SetRate(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
-
-  status = clk_impl_.Enable(g12a_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Enable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
+  clock_init_steps_.push_back({g12a_clk::CLK_HIFI_PLL, InitCall::WithDisable({})});
+  clock_init_steps_.push_back(
+      {g12a_clk::CLK_HIFI_PLL, InitCall::WithRateHz(init_arena_, 768'000'000)});
+  clock_init_steps_.push_back({g12a_clk::CLK_HIFI_PLL, InitCall::WithEnable({})});
 
   auto sleep = [&arena = init_arena_](zx::duration delay) {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());

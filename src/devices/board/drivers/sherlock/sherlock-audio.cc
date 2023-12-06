@@ -81,6 +81,8 @@ zx_status_t AddTas5720Device(fdf::WireSyncClient<fuchsia_hardware_platform_bus::
 }
 
 zx_status_t Sherlock::AudioInit() {
+  using fuchsia_hardware_clockimpl::wire::InitCall;
+
   uint8_t tdm_instance_id = 1;
   static const std::vector<fpbus::Mmio> audio_mmios{
       {{
@@ -203,23 +205,10 @@ zx_status_t Sherlock::AudioInit() {
     }});
   }
 
-  zx_status_t status = clk_impl_.Disable(g12b_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Disable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
-
-  status = clk_impl_.SetRate(g12b_clk::CLK_HIFI_PLL, T931_HIFI_PLL_RATE);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: SetRate(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
-
-  status = clk_impl_.Enable(g12b_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: Enable(CLK_HIFI_PLL) failed, st = %d", __func__, status);
-    return status;
-  }
+  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithDisable({})});
+  clock_init_steps_.push_back(
+      {g12b_clk::CLK_HIFI_PLL, InitCall::WithRateHz(init_arena_, T931_HIFI_PLL_RATE)});
+  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithEnable({})});
 
   // TDM pin configuration.
   gpio_init_steps_.push_back({T931_GPIOZ(7), GpioSetAltFunction(T931_GPIOZ_7_TDMC_SCLK_FN)});
@@ -255,8 +244,8 @@ zx_status_t Sherlock::AudioInit() {
     gpio_init_steps_.push_back({T931_GPIOH(7), GpioConfigOut(1)});  // SOC_AUDIO_EN.
 
     constexpr uint32_t woofer_instance_count = 1;
-    status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,
-                              audio_tas5720_woofer_fragments, &woofer_instance_count);
+    zx_status_t status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,
+                                          audio_tas5720_woofer_fragments, &woofer_instance_count);
     if (status != ZX_OK) {
       zxlogf(ERROR, "Failed to add woofer composite device: %s", zx_status_get_string(status));
       return status;

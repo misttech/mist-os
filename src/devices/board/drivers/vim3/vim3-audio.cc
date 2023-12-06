@@ -36,6 +36,8 @@ namespace vim3 {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t Vim3::AudioInit() {
+  using fuchsia_hardware_clockimpl::wire::InitCall;
+
   uint8_t tdm_instance_id = 1;
   fidl::Arena<> fidl_arena;
   fdf::Arena fdf_arena('AUDI');
@@ -46,23 +48,10 @@ zx_status_t Vim3::AudioInit() {
       }},
   };
 
-  zx_status_t status = clk_impl_.Disable(g12b_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Disable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = clk_impl_.SetRate(g12b_clk::CLK_HIFI_PLL, 768'000'000);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetRate(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = clk_impl_.Enable(g12b_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Enable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
+  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithDisable({})});
+  clock_init_steps_.push_back(
+      {g12b_clk::CLK_HIFI_PLL, InitCall::WithRateHz(init_arena_, 768'000'000)});
+  clock_init_steps_.push_back({g12b_clk::CLK_HIFI_PLL, InitCall::WithEnable({})});
 
   // PCM pin assignments.
   constexpr uint64_t kStrengthUa = 3000;

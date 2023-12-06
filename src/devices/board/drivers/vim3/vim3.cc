@@ -108,6 +108,11 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  if ((status = AudioInit()) != ZX_OK) {
+    zxlogf(ERROR, "AudioInit() failed: %d", status);
+    init_txn_->Reply(ZX_ERR_INTERNAL);
+    return status;
+  }
   if ((status = BluetoothInit()) != ZX_OK) {
     zxlogf(ERROR, "BluetoothInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
@@ -117,11 +122,6 @@ int Vim3::Thread() {
   // their init steps.
   if ((status = ClkInit()) != ZX_OK) {
     zxlogf(ERROR, "ClkInit() failed: %d", status);
-    init_txn_->Reply(ZX_ERR_INTERNAL);
-    return status;
-  }
-  if ((status = AudioInit()) != ZX_OK) {
-    zxlogf(ERROR, "AudioInit() failed: %d", status);
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }

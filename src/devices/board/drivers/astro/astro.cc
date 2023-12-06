@@ -56,10 +56,6 @@ int Astro::Thread() {
     return status;
   }
 
-  if ((status = ClkInit()) != ZX_OK) {
-    zxlogf(ERROR, "ClkInit failed: %d", status);
-  }
-
   if ((status = I2cInit()) != ZX_OK) {
     zxlogf(ERROR, "I2cInit failed: %d", status);
   }
@@ -86,6 +82,12 @@ int Astro::Thread() {
 
   if ((status = BluetoothInit()) != ZX_OK) {
     zxlogf(ERROR, "BluetoothInit failed: %d", status);
+  }
+
+  // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
+  // their init steps.
+  if ((status = ClkInit()) != ZX_OK) {
+    zxlogf(ERROR, "ClkInit failed: %d", status);
   }
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add

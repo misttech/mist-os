@@ -133,11 +133,6 @@ int Sherlock::Thread() {
     return -1;
   }
 
-  if (ClkInit() != ZX_OK) {
-    zxlogf(ERROR, "ClkInit() failed");
-    return -1;
-  }
-
   if (I2cInit() != ZX_OK) {
     zxlogf(ERROR, "I2cInit() failed");
   }
@@ -172,6 +167,13 @@ int Sherlock::Thread() {
 
   if (LightInit() != ZX_OK) {
     zxlogf(ERROR, "LightInit() failed");
+    return -1;
+  }
+
+  // ClkInit() must be called after other subsystems that bind to clock have had a chance to add
+  // their init steps.
+  if (ClkInit() != ZX_OK) {
+    zxlogf(ERROR, "ClkInit() failed");
     return -1;
   }
 

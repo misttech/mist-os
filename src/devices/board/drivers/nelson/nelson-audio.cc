@@ -119,25 +119,12 @@ const std::vector<fdf::NodeProperty> kFaultGpioProps = std::vector{
 };
 
 zx_status_t Nelson::AudioInit() {
-  zx_status_t status;
+  using fuchsia_hardware_clockimpl::wire::InitCall;
 
-  status = clk_impl_.Disable(sm1_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Disable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = clk_impl_.SetRate(sm1_clk::CLK_HIFI_PLL, 768000000);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "SetRate(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
-
-  status = clk_impl_.Enable(sm1_clk::CLK_HIFI_PLL);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Enable(CLK_HIFI_PLL) failed: %s", zx_status_get_string(status));
-    return status;
-  }
+  clock_init_steps_.push_back({sm1_clk::CLK_HIFI_PLL, InitCall::WithDisable({})});
+  clock_init_steps_.push_back(
+      {sm1_clk::CLK_HIFI_PLL, InitCall::WithRateHz(init_arena_, 768'000'000)});
+  clock_init_steps_.push_back({sm1_clk::CLK_HIFI_PLL, InitCall::WithEnable({})});
 
   static const std::vector<fpbus::Mmio> audio_mmios{
       {{
