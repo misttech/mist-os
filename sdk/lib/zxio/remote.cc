@@ -10,7 +10,6 @@
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/channel.h>
-#include <lib/zxio/cpp/vector.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
 #include <lib/zxio/posix_mode.h>
@@ -20,7 +19,8 @@
 #include <zircon/fidl.h>
 #include <zircon/syscalls.h>
 
-#include "private.h"
+#include "sdk/lib/zxio/private.h"
+#include "sdk/lib/zxio/vector.h"
 
 namespace fdevice = fuchsia_device;
 namespace fio = fuchsia_io;

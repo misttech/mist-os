@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/zxio/cpp/vector.h>
 #include <lib/zxio/null.h>
 #include <lib/zxio/ops.h>
 #include <zircon/syscalls/log.h>
@@ -10,7 +9,8 @@
 #include <array>
 #include <mutex>
 
-#include "private.h"
+#include "sdk/lib/zxio/private.h"
+#include "sdk/lib/zxio/vector.h"
 
 namespace {
 

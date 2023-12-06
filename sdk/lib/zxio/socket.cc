@@ -10,7 +10,6 @@
 #include <lib/fit/result.h>
 #include <lib/zx/socket.h>
 #include <lib/zxio/cpp/transitional.h>
-#include <lib/zxio/cpp/vector.h>
 #include <lib/zxio/null.h>
 #include <netinet/icmp6.h>
 #include <netinet/if_ether.h>
@@ -25,9 +24,10 @@
 
 #include <safemath/safe_conversions.h>
 
-#include "dgram_cache.h"
-#include "private.h"
-#include "socket_address.h"
+#include "sdk/lib/zxio/dgram_cache.h"
+#include "sdk/lib/zxio/private.h"
+#include "sdk/lib/zxio/socket_address.h"
+#include "sdk/lib/zxio/vector.h"
 #include "src/connectivity/network/netstack/udp_serde/udp_serde.h"
 
 namespace fio = fuchsia_io;
