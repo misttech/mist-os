@@ -38,18 +38,25 @@ closed protocol Watcher {
     /// atomically will always be followed by [`Event.end_of_update`],
     /// demarcating the end of the atomic update.
     ///
-    /// Note that each event is scoped to a controller; the [`ControllerId`] is
-    /// provided along with the event to allow the client to disambiguate.
+    /// Note that each non-sentinel event is scoped to a controller; the
+    /// [`ControllerId`] is provided along with the event to allow the client to
+    /// disambiguate.
     strict Watch() -> (struct {
-        events vector<@generated_name("Event") struct {
-            controller ControllerId;
-            kind @generated_name("EventKind") flexible union {
-                1: existing Resource;
-                2: added Resource;
-                3: removed ResourceId;
-                4: idle Empty;
-                5: end_of_update Empty;
+        events vector<@generated_name("Event") flexible union {
+            1: existing @generated_name("ExistingResource") struct {
+                controller ControllerId;
+                resource Resource;
             };
+            2: added @generated_name("AddedResource") struct {
+                controller ControllerId;
+                resource Resource;
+            };
+            3: removed @generated_name("RemovedResource") struct {
+                controller ControllerId;
+                resource ResourceId;
+            };
+            4: idle Empty;
+            5: end_of_update Empty;
         }>:MAX_BATCH_SIZE;
     });
 };

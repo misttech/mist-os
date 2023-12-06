@@ -114,7 +114,7 @@ closed protocol NamespaceController {
 
     /// Apply all pending changes. The set of changes will either be applied in
     /// its entirety or, in case of an error, not applied at all.
-    strict Commit(resource table {
+    strict Commit(@generated_name("CommitOptions") resource table {
         /// Whether additions or removals should be idempotent.
         ///
         /// For example, an update to add a resource when the resource already
