@@ -11,7 +11,7 @@
         runner: 'driver',
         bind: 'meta/bind/pci_bind.bindbc',
         compat: 'driver/bus-pci.so',
-        colocate: 'true',
+        colocate: 'false',
     },
     capabilities: [
         { service: 'fuchsia.hardware.pci.Service' },
@@ -23,6 +23,7 @@
                 "fuchsia.kernel.IoportResource",
             ],
         },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [
         {

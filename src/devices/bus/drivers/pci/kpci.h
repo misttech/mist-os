@@ -4,7 +4,6 @@
 
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/sysmem/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -12,6 +11,7 @@
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/device-protocol/pci.h>
+#include <lib/device-protocol/pdev-fidl.h>
 
 #include <ddktl/device.h>
 
@@ -21,7 +21,7 @@ struct kpci_device {
   zx_device_t* zxdev;
   // only set for non-proxy devices
   pciroot_protocol_t pciroot;
-  pdev_protocol_t pdev;
+  ddk::PDevFidl pdev;
   // kernel pci handle, only set for shadow devices
   zx_handle_t handle;
   // nth device index
