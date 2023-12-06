@@ -60,14 +60,8 @@ inline uint8_t GetBitsU8(uint8_t x, uint8_t mask, uint8_t loc) {
 namespace sdmmc {
 
 zx_status_t SdioControllerDevice::Create(SdmmcRootDevice* parent,
-                                         std::unique_ptr<SdmmcDevice> sdmmc, bool use_fidl,
+                                         std::unique_ptr<SdmmcDevice> sdmmc,
                                          std::unique_ptr<SdioControllerDevice>* out_dev) {
-  zx_status_t status = sdmmc->Init(use_fidl);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to initialize SdmmcDevice: %s", zx_status_get_string(status));
-    return status;
-  }
-
   fbl::AllocChecker ac;
   out_dev->reset(new (&ac) SdioControllerDevice(parent, std::move(sdmmc)));
   if (!ac.check()) {

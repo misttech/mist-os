@@ -73,10 +73,14 @@ template <class DeviceType>
 zx::result<std::unique_ptr<SdmmcDevice>> SdmmcRootDevice::MaybeAddDevice(
     const std::string& name, std::unique_ptr<SdmmcDevice> sdmmc,
     const fuchsia_hardware_sdmmc::wire::SdmmcMetadata& metadata) {
+  if (zx_status_t st = sdmmc->Init(metadata.use_fidl()) != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to initialize SdmmcDevice: %s", zx_status_get_string(st));
+    return zx::error(st);
+  }
+
   std::unique_ptr<DeviceType> device;
-  if (zx_status_t st =
-          DeviceType::Create(this, std::move(sdmmc), metadata.use_fidl(), &device) != ZX_OK) {
-    FDF_LOG(ERROR, "Failed to create %s device, retcode = %d", name.c_str(), st);
+  if (zx_status_t st = DeviceType::Create(this, std::move(sdmmc), &device) != ZX_OK) {
+    FDF_LOG(ERROR, "Failed to create %s device: %s", name.c_str(), zx_status_get_string(st));
     return zx::error(st);
   }
 

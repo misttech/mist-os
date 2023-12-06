@@ -121,7 +121,7 @@ class SdmmcBlockDevice {
   }
 
   static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
-                            bool use_fidl, std::unique_ptr<SdmmcBlockDevice>* out_dev);
+                            std::unique_ptr<SdmmcBlockDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdmmcBlockDevice fails to probe (i.e., no eligible device
   // present).
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }

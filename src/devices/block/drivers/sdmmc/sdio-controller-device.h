@@ -51,7 +51,7 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   ~SdioControllerDevice() { StopSdioIrqThread(); }
 
   static zx_status_t Create(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc,
-                            bool use_fidl, std::unique_ptr<SdioControllerDevice>* out_dev);
+                            std::unique_ptr<SdioControllerDevice>* out_dev);
   // Returns the SdmmcDevice. Used if this SdioControllerDevice fails to probe (i.e., no eligible
   // device present).
   std::unique_ptr<SdmmcDevice> TakeSdmmcDevice() { return std::move(sdmmc_); }
