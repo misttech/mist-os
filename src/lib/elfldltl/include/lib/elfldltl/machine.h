@@ -232,6 +232,8 @@ struct TlsTraits;
 
 template <class Elf>
 struct TlsTraits<Elf, ElfMachine::kNone> {
+  using GotAddr = typename Elf::Addr;
+
   // Each module in the initial exec set that has a PT_TLS segment gets
   // assigned an offset from the thread pointer where its PT_TLS block will
   // appear in each thread's static TLS area.  If the main executable has a
@@ -264,6 +266,7 @@ struct TlsTraits<Elf, ElfMachine::kNone> {
 // AArch64 puts TLS above TP after a two-word reserved area.
 template <class Elf>
 struct TlsTraits<Elf, ElfMachine::kAarch64> {
+  using GotAddr = typename Elf::Addr;
   using size_type = typename Elf::size_type;
 
   static constexpr size_type kTlsLocalExecOffset = 2 * sizeof(size_type);
@@ -277,6 +280,7 @@ struct TlsTraits<Elf, ElfMachine::kRiscv> : public TlsTraits<Elf, ElfMachine::kN
 // X86 puts TLS below TP.
 template <class Elf>
 struct TlsTraits<Elf, ElfMachine::kX86_64> {
+  using GotAddr = Elf64<ElfData::k2Lsb>::Addr;
   static constexpr typename Elf::size_type kTlsLocalExecOffset = 0;
   static constexpr bool kTlsNegative = true;
 };

@@ -1,0 +1,120 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#include <lib/arch/asm.h>
+#include <lib/ld/tlsdesc.h>
+
+#if defined(__aarch64__)
+
+// Return -$tp so that adding $tp yields zero, i.e. nullptr.
+.function _ld_tlsdesc_runtime_undefined_weak, global
+  .tlsdesc.cfi
+
+  mrs x0, TPIDR_EL0
+  neg x0, x0
+
+  ret
+
+.end_function
+
+// Return addend-$tp so that adding $tp looks like nullptr+addend.
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+  .tlsdesc.cfi
+
+  // Only x0 and x30 can be clobbered, so another register must be saved.
+  stp x1, xzr, [sp, #-16]!
+  .cfi_adjust_cfa_offset 16
+  .cfi_offset x1, -16
+
+  // On entry x0 contains the argument: the address of the GOT slot pair.
+  // Fetch the addend.
+  ldr tlsdesc.r0, [x0, #tlsdesc.value_offset]
+
+  // On exit x0 contains the return value: offset from $tp (TPIDR_EL0).
+  .cfi_undefined x0
+
+  // Fetch the thread pointer.
+  mrs x1, TPIDR_EL0
+
+  // Subtract the thread pointer from the addend.
+  sub tlsdesc.r0, tlsdesc.r0, tlsdesc.r1
+
+  ldr x1, [sp], #16
+  .cfi_same_value x1
+  .cfi_adjust_cfa_offset -16
+  ret
+
+.end_function
+
+#elif defined(__riscv)
+
+// Return -$tp so that adding $tp yields zero, i.e. nullptr.
+.function _ld_tlsdesc_runtime_undefined_weak, global, align=4
+  .tlsdesc.cfi
+
+  tlsdesc.sub a0, zero, tp
+
+  // On exit a0 contains the return value: offset from tp.
+  .cfi_undefined a0
+
+  // The caller's return address is in t0, with ra preserved.
+  jr t0
+
+.end_function
+
+// Return addend-$tp so that adding $tp looks like nullptr+addend.
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+  .tlsdesc.cfi
+
+  // On entry a0 contains the argument: the address of the GOT slot range.
+  tlsdesc.load a0, tlsdesc.value_offset(a0)
+
+  tlsdesc.sub a0, a0, tp
+
+  // On exit a0 contains the return value: offset from tp.
+  .cfi_undefined a0
+
+  // The caller's return address is in t0, with ra preserved.
+  jr t0
+
+.end_function
+
+#elif defined(__x86_64__)
+
+// Return -$tp so that adding $tp yields zero, i.e. nullptr.
+.function _ld_tlsdesc_runtime_undefined_weak, global
+  .tlsdesc.cfi
+
+  // On entry %rax contains the argument: the address of the GOT slot pair.
+  // On exit %rax contains the return value: offset from $tp (%fs.base).
+  xor %eax, %eax
+  .cfi_undefined %rax
+  sub %fs:0, %tlsdesc_ax
+
+  ret
+
+.end_function
+
+// Return addend-$tp so that adding $tp looks like nullptr+addend.
+.function _ld_tlsdesc_runtime_undefined_weak_addend, global
+  .tlsdesc.cfi
+
+  // On entry %rax contains the argument: the address of the GOT slot pair.
+  // On exit %rax contains the return value: offset from $tp (%fs.base).
+  //
+  // Note that on x86-64 ILP32, GOT entries are still 8 bytes, to facilitate
+  // use of the indirect addressing modes.
+  mov 8(%rax), %tlsdesc_ax
+  .cfi_undefined %rax
+  sub %fs:0, %tlsdesc_ax
+
+  ret
+
+.end_function
+
+#else
+
+// Not all machines have TLSDESC support specified in the psABI.
+
+#endif

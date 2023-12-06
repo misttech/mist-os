@@ -450,6 +450,23 @@ struct Elf : private Layout<Class, Data> {
     Addr offset;     // R_*_DTPOFF* et al relocations set this.
   };
 
+  // When the compiler generates a TLSDESC callback, the linker generates a
+  // single corresponding dynamic relocation entry that applies to a pair of
+  // adjacent GOT slots.  In DT_REL format, the addend is stored in the second
+  // slot.  The first slot holds a function pointer installed by the dynamic
+  // linker.  The compiler generates code to call this function pointer using a
+  // bespoke calling convention specified in each psABI; it takes a single
+  // argument of this address in the GOT.  The second slot is filled by the
+  // dynamic linker with whatever value is of use to the function it installs
+  // such that it returns the thread pointer offset of the per-thread address
+  // of the relocation's symbol plus addend.  (For static TLS, that offset will
+  // be the same in every thread.  For dynamic TLS, it will be the difference
+  // of unrelated pointers that recovers an uncorrelated per-thread address.)
+  struct TlsDescGot {
+    Addr function;
+    Addr value;
+  };
+
   // These are declared in svr4-abi.h rather than there.  These are not
   // formally parts of the ELF format, but rather de facto standard ABI types
   // from the original SVR4 implementation that introduced ELF that have been

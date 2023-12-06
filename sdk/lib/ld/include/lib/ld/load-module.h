@@ -235,16 +235,6 @@ class LoadModule {
 
   constexpr size_t static_tls_bias() const { return static_tls_bias_; }
 
-  // TODO(fxbug.dev/128502): tls methods
-  constexpr size_t tls_desc_hook(const Sym& sym) const {
-    ZX_PANIC("Should never be called");
-    return 0;
-  }
-  constexpr size_t tls_desc_value(const Sym& sym) const {
-    ZX_PANIC("Should never be called");
-    return 0;
-  }
-
  private:
   using ModuleStorage =
       std::conditional_t<InlineModule == LoadModuleInline::kYes, std::optional<Module>, Module*>;

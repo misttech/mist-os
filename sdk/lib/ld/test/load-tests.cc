@@ -306,6 +306,32 @@ TYPED_TEST(LdLoadTests, TlsGlobalDynamicAccess) {
   EXPECT_EQ(return_value, kReturnValue);
 }
 
+TYPED_TEST(LdLoadTests, TlsDescAccess) {
+  if constexpr (!TestFixture::kHasTls) {
+    GTEST_SKIP() << "test requires TLS support";
+  }
+
+  constexpr int64_t kReturnValue = 17;
+  constexpr int64_t kSkipReturnValue = 77;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libtls-desc-dep.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("tls-desc"));
+
+  const int64_t return_value = this->Run();
+
+  // Check the log before the return value so we've handled it in case we skip.
+  this->ExpectLog("");
+
+  if (return_value == kSkipReturnValue) {
+    GTEST_SKIP() << "tls-desc module compiled without TLSDESC";
+  }
+
+  EXPECT_EQ(return_value, kReturnValue);
+}
+
 TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
   ASSERT_NO_FATAL_FAILURE(this->Init());
 

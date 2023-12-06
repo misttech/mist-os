@@ -161,9 +161,10 @@ inline constexpr LinkerZeroInitialized kLinkerZeroInitialized{};
 // also be used to enumerate the symbol table or the hash tables.  It holds
 // non-owning pointers into target data normally found in the RODATA segment.
 //
-template <class Elf, class AbiTraits = LocalAbiTraits>
+template <class ElfLayout, class AbiTraits = LocalAbiTraits>
 class SymbolInfo {
  public:
+  using Elf = ElfLayout;
   using Word = typename Elf::Word;
   using Addr = typename Elf::Addr;
   using size_type = typename Elf::size_type;

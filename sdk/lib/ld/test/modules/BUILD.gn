@@ -27,6 +27,7 @@ in_process_executables = [
   ":tls-exec-shlib",
   ":tls-ie",
   ":tls-gd",
+  ":tls-desc",
 ]
 
 # Everything in this list does not have can_be_in_process = true.
@@ -48,6 +49,7 @@ shlibs = [
   ":indirect-deps-c",
   ":tls-dep",
   ":tls-ie-dep",
+  ":tls-desc-dep",
 ]
 
 modules = []
@@ -480,6 +482,18 @@ test_shared_library("tls-dep") {
   remove_configs = [ "//build/config/lto" ]
 }
 
+# This is the same as tls-dep but using TLSDESC, with no __tls_get_addr.
+test_shared_library("tls-desc-dep") {
+  public = [ "tls-dep.h" ]
+  sources = [ "tls-dep.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [ "//zircon/system/public" ]
+
+  # TODO(fxbug.dev/135809): LTO insists on using IE accesses here. Remove this
+  # when the LLVM bug gets fixed and the fixed toolchain rolled into Fuchsia.
+  remove_configs = [ "//build/config/lto" ]
+}
+
 test_executable("tls-exec-shlib") {
   can_be_in_process = true
   sources = [ "tls-exec-shlib.cc" ]
@@ -533,11 +547,15 @@ test_executable("tls-gd") {
   ]
 }
 
-ifs_shared_library("missing-sym-dep-a") {
-  # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
-  #testonly = true
-  abi = "missing-sym-dep-a.ifs"
-  data_deps = [ ":ld-dep-a" ]
+# This is the same as tls-gd, but using TLSDESC.
+test_executable("tls-desc") {
+  can_be_in_process = true
+  sources = [ "tls-gd.cc" ]
+  configs = [ "//build/config:tlsdesc" ]
+  deps = [
+    ":tls-desc-dep",
+    "../..",
+  ]
 }
 
 test_executable("missing-sym") {
@@ -545,15 +563,22 @@ test_executable("missing-sym") {
   deps = [ ":missing-sym-dep-a" ]
 }
 
-ifs_shared_library("missing-dep-dep") {
+ifs_shared_library("missing-sym-dep-a") {
   # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
   #testonly = true
-  abi = "missing-dep-dep.ifs"
+  abi = "missing-sym-dep-a.ifs"
+  data_deps = [ ":ld-dep-a" ]
 }
 
 test_executable("missing-dep") {
   sources = [ "missing-dep.cc" ]
   deps = [ ":missing-dep-dep" ]
+}
+
+ifs_shared_library("missing-dep-dep") {
+  # TODO(fxbug.dev/135799): setting testonly seems to tickle a GN bug
+  #testonly = true
+  abi = "missing-dep-dep.ifs"
 }
 
 test_executable("relro") {

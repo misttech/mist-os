@@ -34,9 +34,10 @@ namespace elfldltl {
 // in-place addend.  VisitRelative passes either an Elf::Rela with separate
 // address and addend, or an Elf::size_type address using an in-place addend.
 
-template <class Elf>
+template <class ElfLayout>
 class RelocationInfo {
  public:
+  using Elf = ElfLayout;
   using size_type = typename Elf::size_type;
   using Addr = typename Elf::Addr;
   using Rel = typename Elf::Rel;

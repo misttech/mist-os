@@ -109,6 +109,10 @@ class SignedField final : public UnsignedField<T, kSwap> {
 
   using Base::Base;
 
+  constexpr SignedField(const SignedField&) = default;
+
+  constexpr SignedField& operator=(const SignedField&) = default;
+
   constexpr SignedField& operator=(value_type x) {
     Base::operator=(cpp20::bit_cast<T>(x));
     return *this;

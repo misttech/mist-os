@@ -152,8 +152,13 @@ class ElfldltlLoaderTests : public elfldltl::testing::LoadTests<Traits> {
     // These will never actually be called.
     constexpr size_type tls_module_id() const { return 0; }
     constexpr size_type static_tls_bias() const { return 0; }
-    constexpr size_type tls_desc_hook() const { return 0; }
-    constexpr size_type tls_desc_value() const { return 0; }
+
+    template <class Diagnostics>
+    constexpr std::optional<typename Elf::TlsDescGot> tls_desc(Diagnostics& diag) const {
+      return std::nullopt;
+    }
+
+    constexpr typename Elf::TlsDescGot tls_desc_undefined_weak() const { return {}; }
 
     const Sym* symbol_ = nullptr;
     size_type bias_ = 0;

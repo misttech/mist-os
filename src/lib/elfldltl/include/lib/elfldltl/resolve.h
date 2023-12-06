@@ -5,7 +5,6 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RESOLVE_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_RESOLVE_H_
 
-#include <memory>
 #include <type_traits>
 #include <utility>
 
@@ -38,18 +37,22 @@ namespace elfldltl {
 //  * size_type static_tls_bias() const
 //    Returns the static TLS layout bias for the defining module.
 //
-//  * size_type tls_desc_hook(const Sym&), tls_desc_value(const Sym&) const
-//    Returns the two values for the TLSDESC resolution.
+//  * std::optional<TlsDescGot> tls_desc(Diagnostics&, const Sym&, Addr addend)
+//  * std::optional<TlsDescGot> tls_desc(Diagnostics&)
+//    See elfldltl::RelocateSymbolic API comments about the two overloads.
+//    This implements that method but for some particular defined symbol in
+//    `.symbols_info().symtab()`.
 //
-template <class Module>
+template <class Module, typename TlsDescResolver>
 struct ResolverDefinition {
-  using Sym = typename std::decay_t<decltype(std::declval<Module>().symbol_info())>::Sym;
+  using Elf = typename std::decay_t<decltype(std::declval<Module>().symbol_info())>::Elf;
+  using Addr = typename Elf::Addr;
+  using Sym = typename Elf::Sym;
+  using TlsDescGot = typename Elf::TlsDescGot;
 
-  // TODO(fxbug.dev/120388): preferably, this would just be a constexpr static variable
-  // but clang can't compile that.
-  static constexpr ResolverDefinition UndefinedWeak() {
+  static constexpr ResolverDefinition UndefinedWeak(TlsDescResolver* tlsdesc_resolver = nullptr) {
     static_assert(ResolverDefinition{}.undefined_weak());
-    return {};
+    return {.tlsdesc_resolver_ = tlsdesc_resolver};
   }
 
   // This should be called before any other method to check if this Definition is valid.
@@ -60,11 +63,34 @@ struct ResolverDefinition {
 
   constexpr auto tls_module_id() const { return module_->tls_module_id(); }
   constexpr auto static_tls_bias() const { return module_->static_tls_bias(); }
-  constexpr auto tls_desc_hook() const { return module_->tls_desc_hook(*symbol_); }
-  constexpr auto tls_desc_value() const { return module_->tls_desc_value(*symbol_); }
+
+  template <
+      class Diagnostics, typename T = TlsDescResolver,
+      typename = std::enable_if_t<std::is_invocable_v<T, Diagnostics&, const ResolverDefinition&>>>
+  constexpr auto tls_desc(Diagnostics& diag) const {
+    return (*tlsdesc_resolver_)(diag, *this);
+  }
+
+  template <class Diagnostics, typename T = TlsDescResolver,
+            typename = std::enable_if_t<
+                std::is_invocable_v<T, Diagnostics&, const ResolverDefinition&, Addr>>>
+  constexpr auto tls_desc(Diagnostics& diag, Addr addend) const {
+    return (*tlsdesc_resolver_)(diag, *this, addend);
+  }
+
+  template <typename T = TlsDescResolver, typename = std::enable_if_t<std::is_invocable_v<T>>>
+  constexpr TlsDescGot tls_desc_undefined_weak() const {
+    return (*tlsdesc_resolver_)();
+  }
+
+  template <typename T = TlsDescResolver, typename = std::enable_if_t<std::is_invocable_v<T, Addr>>>
+  constexpr TlsDescGot tls_desc_undefined_weak(Addr addend) const {
+    return (*tlsdesc_resolver_)(addend);
+  }
 
   const Sym* symbol_ = nullptr;
   const Module* module_ = nullptr;
+  TlsDescResolver* tlsdesc_resolver_ = nullptr;
 };
 
 enum class ResolverPolicy : bool {
@@ -83,17 +109,25 @@ enum class ResolverPolicy : bool {
 // symbol_info() contains the symbol given by RelocateSymbolic.  The `modules`
 // argument is a list of modules from where symbolic definitions can be
 // resolved, this list is in order of precedence.  The ModuleList type is a
-// forward iterable range or container. diag is a diagnostics object for
-// reporting errors.  All references passed to MakeSymbolResolver should
-// outlive the returned object.
-template <class Module, class ModuleList, class Diagnostics>
+// forward iterable range or container.  diag is a diagnostics object for
+// reporting errors.  The TlsDescResolver is a callable object that's called as
+// `std::optional<TlsDescGot>(Diagnostics&, const Definition&, Addr addend)` or
+// `std::optional<TlsDescGot>(Diagnostics&, const Definition&)` for a TLSDESDC
+// relocation resolved to a defined symbol; and as `TlsDescGot()` or
+// `TlsDescGot(Addr addend)` for one resolved as an undefined weak reference.
+//
+// All references passed to elfldltl::MakeSymbolResolver should outlive the
+// returned object, which in turn must outlive its return values (Definition
+// objects).  The tlsdesc_resolver reference is saved in Definition objects so
+// it can be called from the RelocateSymbolic callbacks.
+template <class Module, class ModuleList, class Diagnostics, typename TlsDescResolver>
 constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& modules,
-                                  Diagnostics& diag,
+                                  Diagnostics& diag, TlsDescResolver& tlsdesc_resolver,
                                   ResolverPolicy policy = ResolverPolicy::kStrictLinkOrder) {
-  using Definition = ResolverDefinition<Module>;
+  using Definition = ResolverDefinition<Module, TlsDescResolver>;
 
-  return [&ref_module, &modules, &diag, policy](const auto& ref,
-                                                RelocateTls tls_type) -> std::optional<Definition> {
+  return [&ref_module, &modules, &diag, &tlsdesc_resolver, policy](
+             const auto& ref, RelocateTls tls_type) -> std::optional<Definition> {
     if (ref.runtime_local()) {
       // The symbol just resolves to itself in the referring module.  Usually
       // this would have been replaced with an R_*_RELATIVE reloc (and then
@@ -106,7 +140,8 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
     SymbolName name{ref_module.symbol_info(), ref};
 
     // Return the chosen Definition after some checking.
-    auto use = [&ref_module, tls_type, &diag, &name](Definition def) -> std::optional<Definition> {
+    auto use = [&ref_module, tls_type, &diag, &tlsdesc_resolver,
+                &name](Definition def) -> std::optional<Definition> {
       switch (tls_type) {
         case RelocateTls::kNone:
           if (def.symbol_->type() == ElfSymType::kTls) [[unlikely]] {
@@ -140,6 +175,9 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
           }
           break;
       }
+      if (tls_type == RelocateTls::kDesc) {
+        def.tlsdesc_resolver_ = &tlsdesc_resolver;
+      }
       return def;
     };
 
@@ -148,7 +186,7 @@ constexpr auto MakeSymbolResolver(const Module& ref_module, const ModuleList& mo
       return std::nullopt;
     }
 
-    Definition weak_def = Definition::UndefinedWeak();
+    Definition weak_def = Definition::UndefinedWeak(&tlsdesc_resolver);
     for (const auto& module : modules) {
       if (const auto* sym = name.Lookup(module.symbol_info())) {
         const Definition module_def{sym, &module};

@@ -79,8 +79,10 @@ inline SymbolInfo<typename Self::Elf> LinkStaticPieWithVdso(
     // These will never actually be called.
     constexpr size_type tls_module_id() const { return 0; }
     constexpr size_type static_tls_bias() const { return 0; }
-    constexpr size_type tls_desc_hook() const { return 0; }
-    constexpr size_type tls_desc_value() const { return 0; }
+    constexpr std::optional<typename Elf::TlsDescGot> tls_desc(DiagnosticsType& diagnostics) const {
+      return std::nullopt;
+    }
+    constexpr typename Elf::TlsDescGot tls_desc_undefined_weak() const { return {}; }
 
     const Sym& symbol_;
     size_type bias_;

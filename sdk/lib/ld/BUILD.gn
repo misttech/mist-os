@@ -18,9 +18,13 @@ library_headers("headers") {
     "lib/ld/load.h",
     "lib/ld/memory.h",
     "lib/ld/remote-load-module.h",
+    "lib/ld/tlsdesc.h",
   ]
 
-  public_deps = [ ":abi-headers" ]
+  public_deps = [
+    ":abi-headers",
+    "//zircon/kernel/lib/arch",
+  ]
 }
 
 # This is the linkable target for using the passive ABI.
@@ -220,6 +224,7 @@ shared_library("ld-startup") {
     ":bootstrap",
     ":diagnostics",
     ":standalone",
+    ":tlsdesc",
     "//src/lib/elfldltl",
     "//zircon/system/ulib/fbl",
   ]
@@ -324,6 +329,17 @@ source_set("linux-syscalls") {
   visibility = [ ":*" ]
   sources = [ "linux-syscalls.cc" ]
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
+}
+
+source_set("tlsdesc") {
+  public_deps = [
+    ":headers",
+    "//zircon/kernel/lib/arch",
+  ]
+  sources = [
+    "tlsdesc-runtime-static.S",
+    "tlsdesc-runtime-undefined-weak.S",
+  ]
 }
 
 user_basic_redirect("ld-startup.basic") {

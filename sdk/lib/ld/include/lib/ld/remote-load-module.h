@@ -36,6 +36,7 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
   using typename RemoteLoadModuleBase::size_type;
   using typename RemoteLoadModuleBase::Soname;
   using Ehdr = typename Elf::Ehdr;
+  using TlsDescGot = typename Elf::TlsDescGot;
   using List = fbl::DoublyLinkedList<std::unique_ptr<RemoteLoadModule>>;
   using LoadInfo =
       elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container,
@@ -240,7 +241,11 @@ struct RemoteLoadModule : public RemoteLoadModuleBase,
     if (!elfldltl::RelocateRelative(diag, mutable_memory, reloc_info(), load_bias())) {
       return false;
     }
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag);
+    auto tlsdesc_resolver = [&diag](auto&&... args) {
+      diag.FormatError("TODO(fxbug.dev/128502): remote TLSDESC not implemented yet");
+      return TlsDescGot{};
+    };
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tlsdesc_resolver);
     return elfldltl::RelocateSymbolic(mutable_memory, diag, reloc_info(), symbol_info(),
                                       load_bias(), resolver);
   }

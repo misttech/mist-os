@@ -16,6 +16,8 @@
 #include <lib/elfldltl/static-vector.h>
 #include <lib/ld/load-module.h>
 #include <lib/ld/load.h>
+#include <lib/ld/tls.h>
+#include <lib/ld/tlsdesc.h>
 
 #include <algorithm>
 
@@ -39,11 +41,12 @@ static_assert(kMaxPhdrs > kMaxSegments);
 
 // The startup dynamic linker always uses the default ELF layout.
 using Elf = elfldltl::Elf<>;
-using Addr = typename Elf::Addr;
-using Ehdr = typename Elf::Ehdr;
-using Phdr = typename Elf::Phdr;
-using Sym = typename Elf::Sym;
-using Dyn = typename Elf::Dyn;
+using Addr = Elf::Addr;
+using Ehdr = Elf::Ehdr;
+using Phdr = Elf::Phdr;
+using Sym = Elf::Sym;
+using Dyn = Elf::Dyn;
+using TlsDescGot = Elf::TlsDescGot;
 
 // StartupLoadModule::Load returns this.
 struct StartupLoadResult {
@@ -59,13 +62,50 @@ struct StartupLoadResult {
   std::optional<size_t> stack_size;  // Requested initial stack size.
 };
 
+class TlsDescResolver {
+ public:
+  // Handle an undefined weak TLSDESC reference.  There are special runtime
+  // resolvers for this case: one for zero addend, and one for nonzero addend.
+  TlsDescGot operator()(Addr addend) const {
+    if (addend == 0) {
+      return {.function = kRuntimeUndefinedWeak};
+    }
+    return {.function = kRuntimeUndefinedWeakAddend, .value = addend};
+  }
+
+  // Handle a TLSDESC reference to a defined symbol.  The runtime resolver just
+  // loads the static TLS offset from the value slot.  When the relocation is
+  // applied the addend will be added to the value computed here from the
+  // symbol's value and module's PT_TLS offset.
+  template <class Definition>
+  std::optional<TlsDescGot> operator()(Diagnostics& diag, const Definition& defn) const {
+    assert(!defn.undefined_weak());
+    return TlsDescGot{
+        .function = kRuntimeStatic,
+        .value = defn.symbol().value + defn.static_tls_bias(),
+    };
+  }
+
+ private:
+  static inline const Addr kRuntimeStatic{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_static),
+  };
+  static inline const Addr kRuntimeUndefinedWeak{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak),
+  };
+  static inline const Addr kRuntimeUndefinedWeakAddend{
+      reinterpret_cast<uintptr_t>(_ld_tlsdesc_runtime_undefined_weak_addend),
+  };
+};
+
+inline constexpr TlsDescResolver kTlsDescResolver{};
+
 // StartupLoadModule is the LoadModule type used in the startup dynamic linker.
 // Its LoadInfo uses fixed storage bounded by kMaxSegments.  The Module is
 // allocated separately using the initial-exec allocator.
 
-using StartupLoadModuleBase =
-    LoadModule<elfldltl::Elf<>, elfldltl::StaticVector<kMaxSegments>::Container,
-               LoadModuleInline::kNo, LoadModuleRelocInfo::kYes>;
+using StartupLoadModuleBase = LoadModule<Elf, elfldltl::StaticVector<kMaxSegments>::Container,
+                                         LoadModuleInline::kNo, LoadModuleRelocInfo::kYes>;
 
 template <class Loader>
 struct StartupLoadModule : public StartupLoadModuleBase,
@@ -190,7 +230,7 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   void Relocate(Diagnostics& diag, const List& modules) {
     ModuleDiagnostics module_diag{diag, this->name().str()};
     elfldltl::RelocateRelative(diag, memory(), reloc_info(), load_bias());
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kTlsDescResolver);
     elfldltl::RelocateSymbolic(memory(), diag, reloc_info(), symbol_info(), load_bias(), resolver);
   }
 
@@ -282,16 +322,17 @@ struct StartupLoadModule : public StartupLoadModuleBase,
     this_link_map.prev = &ins_link_map;
   }
 
-  // If `soname` is found in `preloaded_modules` it will be removed from that list and pushed into
-  // `modules`, making the symbols from those modules visibile to the program.
+  // If `soname` is found in `preloaded_modules` it will be removed from that
+  // list and pushed into `modules`, making the symbols from those modules
+  // visible to the program.
   static bool FindModule(List& modules, List& preloaded_modules, const elfldltl::Soname<>& soname) {
     if (std::find(modules.begin(), modules.end(), soname) != modules.end()) {
       return true;
     }
     if (auto found = std::find(preloaded_modules.begin(), preloaded_modules.end(), soname);
         found != preloaded_modules.end()) {
-      // TODO(fxbug.dev/130483): Mark this preloaded_module as having it's symbols visible to the
-      // program.
+      // TODO(fxbug.dev/130483): Mark this preloaded_module as having it's symbols visible to
+      // the program.
       modules.push_back(preloaded_modules.erase(found));
       return true;
     }
@@ -371,14 +412,16 @@ struct StartupLoadModule : public StartupLoadModuleBase,
   }
 
   static void PopulateAbiLoadedModules(List& modules, List preloaded_modules) {
-    // We want to add the remaining modules to the list. Their symbols aren't visible for symbolic
-    // resolution, but the program can still use their functions even with no relocations resolving
-    // to their symbols. Therefore, we need to add these modules to the global module list so they
-    // can still be seen by dl_iterate_phdr for unwinding purposes. For example, TLSDESC
-    // implementation code lives in the dynamic linker and will be called as part of the TLS
-    // implementation without ever having a DT_NEEDED on ld.so. On systems other than Fuchsia it may
-    // also be possible to get code from the vDSO without an explicit DT_NEEDED, which is common on
-    // Linux.
+    // We want to add the remaining modules to the list. Their symbols aren't
+    // visible for symbolic resolution, but the program can still use their
+    // functions even with no relocations resolving to their
+    // symbols. Therefore, we need to add these modules to the global module
+    // list so they can still be seen by dl_iterate_phdr for unwinding
+    // purposes.  For example, TLSDESC implementation code lives in the dynamic
+    // linker and will be called as part of the TLS implementation without ever
+    // having a DT_NEEDED on ld.so. On systems other than Fuchsia it may also
+    // be possible to get code from the vDSO without an explicit DT_NEEDED,
+    // which is common on Linux.
     auto curr = std::prev(modules.end());
     modules.splice(modules.end(), preloaded_modules);
     for (auto next = std::next(curr), end = modules.end(); next != end; curr = next, next++) {

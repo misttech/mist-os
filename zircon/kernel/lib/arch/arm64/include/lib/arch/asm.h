@@ -28,6 +28,18 @@ shadow_call_sp .req x18
   brk #23
 .endm
 
+.macro .cfi.all_integer op
+  .irp reg,x0,x1,x2,x3,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17,x18,x19,x20,x21,x22,x23,x24,x25,x26,x27,x28,x29,x30,sp
+    \op \reg
+  .endr
+.endm
+
+.macro .cfi.all_vectorfp op
+  .irp reg,q0,q1,q2,q3,q4,q5,q6,q7,q8,q9,q10,q11,q12,q13,q14,q15,q16,q17,q18,q19,q20,q21,q22,q23,q24,q25,q26,q27,q28,q29,q30,q31
+    \op \reg
+  .endr
+.endm
+
 // Standard prologue sequence for FP setup, with CFI.
 .macro .prologue.fp frame_extra_size=0
   stp x29, x30, [sp, #-(16 + \frame_extra_size)]!
