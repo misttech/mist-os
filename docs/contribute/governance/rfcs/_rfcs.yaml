@@ -3057,7 +3057,7 @@
   area: ['Kernel', 'Toolchain']
   issue: ['']
   gerrit_change_id: ['940906']
-  status: 'Pending'
+  status: 'Accepted'
   reviewers: ['mcgrathr@google.com', 'travisg@google.com']
-  submitted: ''
-  reviewed: ''
+  submitted: '2023-11-02'
+  reviewed: '2023-11-17'
