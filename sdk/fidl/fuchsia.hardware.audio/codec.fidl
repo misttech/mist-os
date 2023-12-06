@@ -165,25 +165,29 @@ closed protocol Codec {
     });
 
     /// Stops the codec operation.
-    /// `Stop` returns when configuring the codec to stop is completed but it does not wait for
-    /// the hardware to actually stop playback/capture, i.e. `turn_off_delay` impact is not
-    /// taken into account to return from `Stop`.
-    /// The `stop_time` value (in the CLOCK_MONOTONIC timeline) indicates when when configuring
-    /// the codec to stop is completed.
-    /// If the driver can't successfully configure the codec to stop it will close the codec
-    /// protocol channel, in this case the client may obtain a new codec protocol channel and retry.
+    /// `Stop` returns when configuring the codec to stop is completed. This method does not wait
+    /// for the hardware to actually stop playback/capture (i.e. `turn_off_delay` impact is not
+    /// taken into account), nor is any such delay reflected in the returned `stop_time`.
+    /// `stop_time` indicates when the driver finished configuring the codec to stop, as measured
+    /// in the CLOCK_MONOTONIC timeline.
+    /// If the driver cannot successfully configure the codec to stop, it will close the codec
+    /// protocol channel, in which case the client may obtain a new codec protocol channel and retry.
     strict Stop() -> (struct {
+        @available(deprecated=HEAD)
         start_time zx.Time;
+
+        @available(added=HEAD)
+        stop_time zx.Time;
     });
 
     /// Start/Re-start the codec operation.
-    /// `Start` returns when configuring the codec to start is completed but it does not wait for
-    /// the hardware to actually start playback/capture, i.e. `turn_on_delay` impact is not
-    /// taken into account to return from `Start`.
-    /// The `start_time` value (in the CLOCK_MONOTONIC timeline) indicates when when configuring
-    /// the codec to start is completed.
-    /// If the driver can't successfully start the codec it will close the codec protocol channel,
-    /// in this case the client may obtain a new codec protocol channel and retry.
+    /// `Start` returns when configuring the codec to start is completed. This method does not wait
+    /// for the hardware to actually start playback/capture (i.e. `turn_on_delay` impact is not taken
+    /// into account), nor is any such delay reflected in the returned `start_time`.
+    /// `start_time` indicates when the driver finished configuring the codec to start, as measured
+    /// in the CLOCK_MONOTONIC timeline.
+    /// If the driver can't successfully start the codec, it will close the codec protocol channel,
+    /// in which case the client may obtain a new codec protocol channel and retry.
     strict Start() -> (struct {
         start_time zx.Time;
     });
@@ -193,8 +197,8 @@ closed protocol Codec {
         supports_bridged_mode bool;
     });
 
-    /// Sets a codec's bridged mode.  Only required if the codec supports bridged mode as specified
-    /// by IsBridgeable's reply.
+    /// Sets a codec's bridged mode. This method is required, but it only needs to take action if
+    /// the codec supports bridged mode as specified by its reply to `IsBridgeable`.
     strict SetBridgedMode(struct {
         enable_bridged_mode bool;
     });

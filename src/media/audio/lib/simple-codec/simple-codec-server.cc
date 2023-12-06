@@ -164,7 +164,7 @@ void SimpleCodecServerInternal<T>::Stop(Codec::StopCallback callback,
     static_cast<T*>(this)->state_.Set("stopped");
   }
   int64_t stop_time = zx::clock::get_monotonic().get();
-  callback(stop_time);
+  callback(stop_time, stop_time);
 }
 
 template <class T>
