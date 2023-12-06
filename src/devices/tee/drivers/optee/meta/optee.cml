@@ -20,6 +20,7 @@
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
         { service: "fuchsia.hardware.rpmb.Service" },
+        { service: "fuchsia.hardware.platform.device.Service" },
     ],
     expose: [
         {

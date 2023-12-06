@@ -464,7 +464,7 @@ zx_status_t OpteeController::InitThreadPools() {
 zx_status_t OpteeController::Bind() {
   zx_status_t status = ZX_ERR_INTERNAL;
 
-  pdev_ = ddk::PDev::FromFragment(parent());
+  pdev_ = ddk::PDevFidl::FromFragment(parent());
   if (!pdev_.is_valid()) {
     LOG(ERROR, "unable to get pdev protocol");
     return ZX_ERR_NO_RESOURCES;
