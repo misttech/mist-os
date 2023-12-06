@@ -16,35 +16,53 @@
 
 namespace {
 
+using ::testing::AllOf;
+using ::testing::Eq;
+using ::testing::InSequence;
+using ::testing::Optional;
+using ::testing::Property;
+using ::testing::Return;
+using ::testing::SizeIs;
+using ::testing::StrictMock;
+
 NATIVE_FORMAT_TYPED_TEST_SUITE(ElfldltlLoadInfoMutableMemoryTests);
 
 // This provides the underlying Memory object that the GetMutableMemory
 // function returns.  The Memory object is a potentially-owning object that is
 // returned by value.  But gmock classes can't be moved, so the Memory API
 // object is a copyable proxy object that calls the mocked methods.
-class MockStore {
+class MockMemory {
  public:
   MOCK_METHOD(bool, Store, (size_t size, uintptr_t ptr, uintmax_t value));
   MOCK_METHOD(bool, StoreAdd, (size_t size, uintptr_t ptr, uintmax_t value));
+  MOCK_METHOD(std::optional<cpp20::span<const std::byte>>, ReadArray,
+              (size_t size, uintptr_t ptr, std::optional<size_t> count));
 
   class Memory;
 };
 
-using StrictMockStoreMemory = ::testing::StrictMock<MockStore>;
+using StrictMockMemory = StrictMock<MockMemory>;
 
 template <typename T, bool Ok>
-void ExpectStore(StrictMockStoreMemory& mock, uintptr_t ptr, uintmax_t value) {
-  EXPECT_CALL(mock, Store(sizeof(T), ptr, value)).WillOnce(::testing::Return(Ok));
+void ExpectStore(StrictMockMemory& mock, uintptr_t ptr, uintmax_t value) {
+  EXPECT_CALL(mock, Store(sizeof(T), ptr, value)).WillOnce(Return(Ok));
 }
 
 template <typename T, bool Ok>
-void ExpectStoreAdd(StrictMockStoreMemory& mock, uintptr_t ptr, uintmax_t value) {
-  EXPECT_CALL(mock, StoreAdd(sizeof(T), ptr, value)).WillOnce(::testing::Return(Ok));
+void ExpectStoreAdd(StrictMockMemory& mock, uintptr_t ptr, uintmax_t value) {
+  EXPECT_CALL(mock, StoreAdd(sizeof(T), ptr, value)).WillOnce(Return(Ok));
 }
 
-class MockStore::Memory {
+template <typename T>
+void ExpectReadArray(StrictMockMemory& mock, uintptr_t ptr, std::optional<size_t> count,
+                     std::optional<cpp20::span<const T>> result) {
+  EXPECT_CALL(mock, ReadArray(sizeof(T), ptr, count))
+      .WillOnce(Return(result ? std::make_optional(cpp20::as_bytes(*result)) : std::nullopt));
+}
+
+class MockMemory::Memory {
  public:
-  explicit Memory(StrictMockStoreMemory& mock) : mock_(mock) {}
+  explicit Memory(StrictMockMemory& mock) : mock_(mock) {}
 
   template <typename T, typename U>
   bool Store(uintptr_t ptr, U value) {
@@ -56,33 +74,44 @@ class MockStore::Memory {
     return mock_.StoreAdd(sizeof(T), ptr, value);
   }
 
+  template <typename T>
+  std::optional<cpp20::span<const T>> ReadArray(uintptr_t ptr,
+                                                std::optional<size_t> count = std::nullopt) {
+    if (auto bytes = mock_.ReadArray(sizeof(T), ptr, count)) {
+      return cpp20::span{
+          reinterpret_cast<const T*>(bytes->data()),
+          bytes->size() / sizeof(T),
+      };
+    }
+    return std::nullopt;
+  }
+
  private:
-  StrictMockStoreMemory& mock_;
+  StrictMockMemory& mock_;
 };
 
 // This holds the expectations set with ExpectGet(...) below.  MockGet (below)
 // produces the GetMutableMemory callable object that uses it.
 class MockGetMutableMemory {
  public:
-  using Result = fit::result<bool, MockStore::Memory>;
+  using Result = fit::result<bool, MockMemory::Memory>;
 
   MOCK_METHOD(Result, Get, (uintptr_t vaddr, size_t filesz));
 };
 
-using StrictMockGetMutableMemory = ::testing::StrictMock<MockGetMutableMemory>;
+using StrictMockGetMutableMemory = StrictMock<MockGetMutableMemory>;
 
 void ExpectGet(StrictMockGetMutableMemory& mock_get, uintptr_t vaddr, size_t filesz,
-               StrictMockStoreMemory& mock_store) {
+               StrictMockMemory& mock_memory) {
   EXPECT_CALL(mock_get, Get(vaddr, filesz))
-      .WillOnce(
-          ::testing::Return(MockGetMutableMemory::Result{fit::ok(MockStore::Memory{mock_store})}));
+      .WillOnce(Return(MockGetMutableMemory::Result{fit::ok(MockMemory::Memory{mock_memory})}));
 }
 
 void ExpectGet(StrictMockGetMutableMemory& mock_get, uintptr_t vaddr, size_t filesz,
                bool keep_going, int repeat = 1) {
   EXPECT_CALL(mock_get, Get(vaddr, filesz))
       .Times(repeat)
-      .WillRepeatedly(::testing::Return(MockGetMutableMemory::Result{fit::error{keep_going}}));
+      .WillRepeatedly(Return(MockGetMutableMemory::Result{fit::error{keep_going}}));
 }
 
 // This provides the GetMutableMemory callable signature and turns it into
@@ -123,7 +152,7 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, NoGet) {
 
   auto load_info = MakeLoadInfo<Elf>();
 
-  ::testing::InSequence seq;
+  InSequence seq;
 
   StrictMockGetMutableMemory mock_get;
   auto get_mutable_memory = MockGet(mock_get);
@@ -176,7 +205,7 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, GetFail) {
 
   auto load_info = MakeLoadInfo<Elf>();
 
-  ::testing::InSequence seq;
+  InSequence seq;
 
   StrictMockGetMutableMemory mock_get;
   auto get_mutable_memory = MockGet(mock_get);
@@ -202,6 +231,12 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, GetFail) {
   ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, false, 2);
   EXPECT_FALSE(memory.template Store<size_type>(kDataStart, 0xabcd));
   EXPECT_FALSE(memory.template StoreAdd<size_type>(kDataStart, 0xedf0));
+
+  // The ReadArray methods have to return std::nullopt for any failure
+  // regardless of the Diagnostics object's Boolean return value.
+  ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, true, 2);
+  EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle, 1), std::nullopt);
+  EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle), std::nullopt);
 }
 
 // Test cases where the a Memory object is returned and used.
@@ -211,7 +246,7 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, Store) {
 
   auto load_info = MakeLoadInfo<Elf>();
 
-  ::testing::InSequence seq;
+  InSequence seq;
 
   StrictMockGetMutableMemory mock_get;
   auto get_mutable_memory = MockGet(mock_get);
@@ -221,22 +256,59 @@ TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, Store) {
   elfldltl::LoadInfoMutableMemory memory{diag, load_info, get_mutable_memory};
   ASSERT_TRUE(memory.Init());
 
-  StrictMockStoreMemory mock_store;
+  StrictMockMemory mock_memory;
 
   // The Boolean value from the underlying Memory method call should propagate
   // back to the caller of Store / StoreAdd.
 
-  ExpectGet(mock_get, kRelroStart, elfldltl::testing::kPageSize, mock_store);
-  ExpectStore<size_type, true>(mock_store, kRelroStart, 0x1234);
-  ExpectStoreAdd<size_type, true>(mock_store, kRelroMiddle, 0x5678);
+  ExpectGet(mock_get, kRelroStart, elfldltl::testing::kPageSize, mock_memory);
+  ExpectStore<size_type, true>(mock_memory, kRelroStart, 0x1234);
+  ExpectStoreAdd<size_type, true>(mock_memory, kRelroMiddle, 0x5678);
   EXPECT_TRUE(memory.template Store<size_type>(kRelroStart, 0x1234));
   EXPECT_TRUE(memory.template StoreAdd<size_type>(kRelroMiddle, 0x5678));
 
-  ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, mock_store);
-  ExpectStore<size_type, false>(mock_store, kDataStart, 0xabcd);
-  ExpectStoreAdd<size_type, false>(mock_store, kDataMiddle, 0xedf0);
+  ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, mock_memory);
+  ExpectStore<size_type, false>(mock_memory, kDataStart, 0xabcd);
+  ExpectStoreAdd<size_type, false>(mock_memory, kDataMiddle, 0xedf0);
   EXPECT_FALSE(memory.template Store<size_type>(kDataStart, 0xabcd));
   EXPECT_FALSE(memory.template StoreAdd<size_type>(kDataMiddle, 0xedf0));
+}
+
+// Test the ReadArray methods.
+TYPED_TEST(ElfldltlLoadInfoMutableMemoryTests, ReadArray) {
+  using Elf = typename TestFixture::Elf;
+  using size_type = typename Elf::size_type;
+
+  auto load_info = MakeLoadInfo<Elf>();
+
+  InSequence seq;
+
+  StrictMockGetMutableMemory mock_get;
+  auto get_mutable_memory = MockGet(mock_get);
+
+  auto diag = elfldltl::testing::ExpectOkDiagnostics();
+
+  elfldltl::LoadInfoMutableMemory memory{diag, load_info, get_mutable_memory};
+  ASSERT_TRUE(memory.Init());
+
+  StrictMockMemory mock_memory;
+
+  static constexpr size_type kData[] = {0x1234, 0x5678};
+  constexpr cpp20::span<const size_type> kDataSpan{kData};
+
+  ExpectGet(mock_get, kDataStart, elfldltl::testing::kPageSize, mock_memory);
+  ExpectReadArray<size_type>(mock_memory, kDataStart, 1, kDataSpan.first(1));
+  ExpectReadArray<size_type>(mock_memory, kDataStart, std::nullopt, kDataSpan);
+  ExpectReadArray<size_type>(mock_memory, kDataMiddle, 1, std::nullopt);
+  ExpectReadArray<size_type>(mock_memory, kDataMiddle, std::nullopt, std::nullopt);
+  EXPECT_THAT(memory.template ReadArray<size_type>(kDataStart, 1),
+              Optional(AllOf(SizeIs(1),
+                             Property(&cpp20::span<const size_type>::data, Eq(kDataSpan.data())))));
+  EXPECT_THAT(memory.template ReadArray<size_type>(kDataStart),
+              Optional(AllOf(SizeIs(2),
+                             Property(&cpp20::span<const size_type>::data, Eq(kDataSpan.data())))));
+  EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle, 1), std::nullopt);
+  EXPECT_EQ(memory.template ReadArray<size_type>(kDataMiddle), std::nullopt);
 }
 
 }  // namespace

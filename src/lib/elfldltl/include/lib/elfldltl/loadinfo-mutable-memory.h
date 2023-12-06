@@ -6,6 +6,7 @@
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_LOADINFO_MUTABLE_MEMORY_H_
 
 #include <lib/fit/result.h>
+#include <lib/stdcompat/span.h>
 
 #include <optional>
 #include <vector>
@@ -97,6 +98,36 @@ class LoadInfoMutableMemory {
     return OnMemory<T>(ptr, store);
   }
 
+  // The ReadArray methods are provided here as well, and not only for Memory
+  // API completeness.  The primary expected use of the adapter is for applying
+  // relocations.  Some (DT_REL) relocation cases need to fetch the in-place
+  // addend and examine its value, rather than just using StoreAdd.  These
+  // "read-only" methods have the same copy-on-first-reference behavior as the
+  // mutation methods, since in the expected use a ReadArray call will always
+  // be followed shortly by a Store call anyway.
+
+  template <typename T>
+  std::optional<cpp20::span<const T>> ReadArray(size_type address, size_type count) {
+    std::optional<cpp20::span<const T>> result;
+    auto read = [address, count, &result](auto& memory) -> bool {
+      result = memory.template ReadArray<T>(address, count);
+      return true;
+    };
+    OnMemory<T>(address, read, count);
+    return result;
+  }
+
+  template <typename T>
+  std::optional<cpp20::span<const T>> ReadArray(size_type address) {
+    std::optional<cpp20::span<const T>> result;
+    auto read = [address, &result](auto& memory) -> bool {
+      result = memory.template ReadArray<T>(address);
+      return true;
+    };
+    OnMemory<T>(address, read);
+    return result;
+  }
+
  private:
   using LoadSegment = typename LoadInfo::Segment;
   using MutableMemory = std::decay_t<  //
@@ -164,8 +195,8 @@ class LoadInfoMutableMemory {
   }
 
   template <typename T, typename Op>
-  bool OnMemory(size_type ptr, Op&& op) {
-    auto result = GetMutableSegment(ptr, sizeof(T));
+  bool OnMemory(size_type ptr, Op&& op, size_type count = 1) {
+    auto result = GetMutableSegment(ptr, sizeof(T) * count);
     if (result.is_error()) {
       return result.error_value();
     }
