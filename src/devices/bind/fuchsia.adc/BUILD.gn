@@ -2,11 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("tests") {
-  testonly = true
+import("//build/bind/bind.gni")
 
-  deps = [
-    "adc:tests",
-    "aml-saradc:tests",
-  ]
+bind_library("fuchsia.adc") {
+  sdk_category = "partner"
+  source = "fuchsia.adc.bind"
 }

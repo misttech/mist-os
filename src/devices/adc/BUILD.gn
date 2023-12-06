@@ -3,7 +3,10 @@
 # found in the LICENSE file.
 
 group("drivers") {
-  deps = [ "drivers/aml-saradc" ]
+  deps = [
+    "drivers/adc",
+    "drivers/aml-saradc",
+  ]
 }
 
 group("tests") {
