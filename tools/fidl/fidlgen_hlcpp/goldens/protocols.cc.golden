@@ -7,7 +7,6 @@
 
 #include "lib/fidl/cpp/internal/implementation.h"
 
-
 //
 // Domain objects definitions
 //
@@ -2287,6 +2286,7 @@ zx_status_t MethodWithUnionUnionMethodResponse::Clone(MethodWithUnionUnionMethod
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
   
@@ -2738,6 +2738,7 @@ zx_status_t WithAndWithoutRequestResponse_SyncProxy::WithRequestWithResponse(::s
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   
@@ -3105,6 +3106,7 @@ zx_status_t WithErrorSyntax_SyncProxy::HandleInResult(::test::protocols::WithErr
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -3458,6 +3460,7 @@ zx_status_t ChannelProtocol_SyncProxy::MutateSocket(::zx::socket a, ::zx::socket
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -3681,6 +3684,7 @@ zx_status_t Transitional_SyncProxy::OneWay(int64_t x) {
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   
@@ -3811,6 +3815,7 @@ zx_status_t DiscoverableProtocol_SyncProxy::Method() {
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
 
@@ -3918,6 +3923,7 @@ AnotherDiscoverableProtocol_SyncProxy::AnotherDiscoverableProtocol_SyncProxy(::z
 AnotherDiscoverableProtocol_SyncProxy::~AnotherDiscoverableProtocol_SyncProxy() = default;
 
 #endif  // __Fuchsia__
+
 
 #ifdef __Fuchsia__
 
@@ -4141,6 +4147,7 @@ zx_status_t HandleRightsProtocol_SyncProxy::ResponseMethod(::zx::socket h, ::zx:
 }
 
 #endif  // __Fuchsia__
+
 
 #ifdef __Fuchsia__
 
@@ -4450,6 +4457,7 @@ zx_status_t WithProtocolEnds_SyncProxy::StructContainingEnds(::test::protocols::
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -4580,6 +4588,7 @@ zx_status_t ManyParameters_SyncProxy::Fifteen(bool p1, bool p2, bool p3, bool p4
 }
 
 #endif  // __Fuchsia__
+
 
 #ifdef __Fuchsia__
 
@@ -4755,8 +4764,6 @@ zx_status_t MethodWithUnion_SyncProxy::UnionMethod(::test::protocols::TheUnion u
 
 #endif  // __Fuchsia__
 
-
 }  // namespace protocols
 }  // namespace test
-
 

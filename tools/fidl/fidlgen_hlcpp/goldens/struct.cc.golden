@@ -80,6 +80,5 @@ zx_status_t BasicStruct::Clone(BasicStruct* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace struct_
 }  // namespace test

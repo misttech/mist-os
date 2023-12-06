@@ -614,6 +614,5 @@ void EmptyResourceUnion::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace handlesintypes
 }  // namespace test

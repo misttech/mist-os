@@ -61,6 +61,5 @@ const char* DOLLAR_BRACE = "${";
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace escaping
 }  // namespace test

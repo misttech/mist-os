@@ -94,6 +94,5 @@ zx_status_t ExampleOfUseOfAliases::Clone(ExampleOfUseOfAliases* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace aliases
 }  // namespace test

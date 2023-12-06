@@ -43,6 +43,5 @@ zx_status_t Foo::Clone(Foo* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace structdefaultvalueenumlibraryreference
 }  // namespace test

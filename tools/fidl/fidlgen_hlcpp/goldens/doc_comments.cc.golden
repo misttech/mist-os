@@ -493,6 +493,7 @@ zx_status_t Table::Clone(Table* result) const {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 Interface::~Interface() = default;

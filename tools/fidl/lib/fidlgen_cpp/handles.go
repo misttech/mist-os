@@ -16,8 +16,12 @@ type HandleInformation struct {
 }
 
 func (c *compiler) fieldHandleInformation(val *fidlgen.Type) *HandleInformation {
-	if val.ElementType != nil {
-		return c.fieldHandleInformation(val.ElementType)
+	return FieldHandleInformation(val, c.decls)
+}
+
+func FieldHandleInformation(val *fidlgen.Type, decls fidlgen.DeclInfoMap) *HandleInformation {
+	for val.ElementType != nil {
+		val = val.ElementType
 	}
 	if val.Kind == fidlgen.RequestType {
 		return &HandleInformation{
@@ -26,7 +30,7 @@ func (c *compiler) fieldHandleInformation(val *fidlgen.Type) *HandleInformation 
 		}
 	}
 	if val.Kind == fidlgen.IdentifierType {
-		declInfo, ok := c.decls[val.Identifier]
+		declInfo, ok := decls[val.Identifier]
 		if !ok {
 			panic(fmt.Sprintf("unknown identifier: %v", val.Identifier))
 		}

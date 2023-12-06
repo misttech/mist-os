@@ -1478,6 +1478,7 @@ void MainProtocol_OnImportWithError_Result::EnsureStorageInitialized(::fidl_xuni
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

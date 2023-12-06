@@ -18,6 +18,5 @@ const char* USERNAME = "\"squeenze\"";
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace consts
 }  // namespace test

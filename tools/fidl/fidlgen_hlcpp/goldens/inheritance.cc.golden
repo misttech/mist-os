@@ -70,6 +70,7 @@ zx_status_t SuperFooResponse::Clone(SuperFooResponse* _result) const {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

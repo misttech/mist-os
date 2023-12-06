@@ -11,9 +11,9 @@ import (
 
 func main() {
 	flags := cpp.NewCmdlineFlags("llcpp", nil)
-	fidl := flags.ParseAndLoadIR()
+	root := cpp.Compile(flags.ParseAndLoadIR())
 	generator := codegen.NewGenerator(flags)
-	generator.GenerateFiles(fidl, []string{
+	generator.GenerateFiles(root, []string{
 		"WireHeader", "UnifiedHeader", "WireTestBase", "TestBase", "Markers",
 		"CommonTypesHeader", "CommonTypesSource",
 		"WireTypesHeader", "WireTypesSource",

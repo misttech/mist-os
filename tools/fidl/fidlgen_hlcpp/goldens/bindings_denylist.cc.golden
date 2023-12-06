@@ -1345,6 +1345,7 @@ zx_status_t OnlyAppearsInImportingLibrary::Clone(OnlyAppearsInImportingLibrary* 
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 OnlyLibfuzzerAndDeps::~OnlyLibfuzzerAndDeps() = default;

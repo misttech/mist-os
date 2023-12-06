@@ -271,6 +271,7 @@ void ExampleUseOfErrorSyntax_CallWhichMayFail_Result::EnsureStorageInitialized(:
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

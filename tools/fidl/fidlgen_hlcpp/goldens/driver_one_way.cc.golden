@@ -70,6 +70,5 @@ zx_status_t OneWaySendRequest::Clone(OneWaySendRequest* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace driveroneway
 }  // namespace test

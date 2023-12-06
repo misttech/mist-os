@@ -347,6 +347,7 @@ zx_status_t Handles::Clone(Handles* _result) const {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 SomeProtocol::~SomeProtocol() = default;

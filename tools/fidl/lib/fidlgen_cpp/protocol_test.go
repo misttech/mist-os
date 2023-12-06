@@ -31,7 +31,7 @@ var exampleProtocol = func() func(t *testing.T) *Protocol {
 	var p *Protocol
 	return func(t *testing.T) *Protocol {
 		once.Do(func() {
-			root := compile(fidlgentest.EndToEndTest{T: t}.Single(`
+			root := Compile(fidlgentest.EndToEndTest{T: t}.Single(`
 library example;
 
 closed protocol P {
@@ -153,7 +153,7 @@ func TestNaturalArgumentRenderingSendPath(t *testing.T) {
 	}
 	for _, ex := range cases {
 		t.Run(ex.desc, func(t *testing.T) {
-			root := compile(fidlgentest.EndToEndTest{T: t}.WithExperiment("unknown_interactions").Single("library example; " + ex.fidl))
+			root := Compile(fidlgentest.EndToEndTest{T: t}.WithExperiment("unknown_interactions").Single("library example; " + ex.fidl))
 			var protocols []*Protocol
 			for _, decl := range root.Decls {
 				if p, ok := decl.(*Protocol); ok {
@@ -353,7 +353,7 @@ func TestWireBindingsAllocation(t *testing.T) {
 	}
 	for _, ex := range cases {
 		t.Run(ex.desc, func(t *testing.T) {
-			root := compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
+			root := Compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
 			var protocols []*Protocol
 			for _, decl := range root.Decls {
 				if p, ok := decl.(*Protocol); ok {
@@ -454,7 +454,7 @@ func TestRequestAndResponseResourceness(t *testing.T) {
 	}
 	for _, ex := range cases {
 		t.Run(ex.desc, func(t *testing.T) {
-			root := compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
+			root := Compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
 			var protocols []*Protocol
 			for _, decl := range root.Decls {
 				if p, ok := decl.(*Protocol); ok {
@@ -483,7 +483,7 @@ library fuchsia.foobar;
 // Regular protocol
 closed protocol P {};
 `
-	root := compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
+	root := Compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
 
 	messaging := root.Decls[0].(*Protocol).HlMessaging
 	assertEqual(t, messaging.ProtocolMarker.String(), "::fuchsia::foobar::P")
@@ -506,7 +506,7 @@ library fuchsia.foobar;
 // Regular protocol
 closed protocol P {};
 `
-	root := compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
+	root := Compile(fidlgentest.EndToEndTest{T: t}.Single(fidl))
 
 	messaging := root.Decls[0].(*Protocol).wireTypeNames
 	setTransport("Driver")

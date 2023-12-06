@@ -68,6 +68,7 @@ def _codegen_impl(context):
         headers.append(context.actions.declare_file(dir + "/fidl.h"))
         headers.append(context.actions.declare_file(dir + "/fidl_test_base.h"))
         sources.append(context.actions.declare_file(dir + "/fidl.cc"))
+        sources.append(context.actions.declare_file(dir + "/tables.c"))
 
     outputs = [root] + headers + sources
     context.actions.run(

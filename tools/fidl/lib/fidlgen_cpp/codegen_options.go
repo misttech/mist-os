@@ -65,7 +65,7 @@ func NewCmdlineFlags(name string, validExperiments []string) *CmdlineFlags {
 	return &flags
 }
 
-func (c *CmdlineFlags) ParseAndLoadIR() *Root {
+func (c *CmdlineFlags) ParseAndLoadIR() fidlgen.Root {
 	flag.Parse()
 	if !flag.Parsed() {
 		flag.PrintDefaults()
@@ -105,7 +105,7 @@ func (c *CmdlineFlags) ParseAndLoadIR() *Root {
 		log.Fatal("Missing required flag: --root")
 	}
 
-	return compileFor(ir, c.name)
+	return ir.ForBindings(c.name)
 }
 
 func (c *CmdlineFlags) ExperimentEnabled(experiment string) bool {

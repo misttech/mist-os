@@ -28,6 +28,5 @@ constexpr const ::test::bits::EmptyBits EmptyBits::kMask = ::test::bits::EmptyBi
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace bits
 }  // namespace test

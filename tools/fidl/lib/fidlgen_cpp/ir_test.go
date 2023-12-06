@@ -12,7 +12,7 @@ import (
 )
 
 func TestCompileTypeNames(t *testing.T) {
-	root := compile(fidlgentest.EndToEndTest{T: t}.Single(`
+	root := Compile(fidlgentest.EndToEndTest{T: t}.Single(`
 library foo.bar;
 
 type U = union {
@@ -150,7 +150,7 @@ func TestAnonymousLayoutAliases(t *testing.T) {
 	}
 	for _, ex := range cases {
 		t.Run(ex.desc, func(t *testing.T) {
-			root := compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
+			root := Compile(fidlgentest.EndToEndTest{T: t}.Single("library example; " + ex.fidl))
 
 			layoutToChildren := make(map[namingContextKey][]ScopedLayout)
 			for _, decl := range root.Decls {

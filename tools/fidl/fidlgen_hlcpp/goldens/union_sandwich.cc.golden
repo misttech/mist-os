@@ -791,6 +791,5 @@ zx_status_t SandwichUnionSize36Alignment4::Clone(SandwichUnionSize36Alignment4* 
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace unionsandwich
 }  // namespace test

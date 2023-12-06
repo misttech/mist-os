@@ -14,9 +14,6 @@ import (
 //go:embed *.tmpl
 var templates embed.FS
 
-func NewGenerator(flags *cpp.CmdlineFlags) *cpp.Generator {
-	return cpp.NewGenerator(flags, templates, template.FuncMap{
-		"IncludeDomainObjects": func() bool {
-			return true
-		}})
+func NewGenerator(flags *cpp.CmdlineFlags, extraFuncs template.FuncMap) *cpp.Generator {
+	return cpp.NewGenerator(flags, templates, extraFuncs)
 }

@@ -7,7 +7,6 @@
 
 #include "lib/fidl/cpp/internal/implementation.h"
 
-
 //
 // Domain objects definitions
 //
@@ -2574,6 +2573,7 @@ void MainProtocol_OnAnonWithError_Result::EnsureStorageInitialized(::fidl_xunion
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -3710,6 +3710,7 @@ zx_status_t MainProtocol_SyncProxy::TwoWayAnonWithError(::test::protocollayouts:
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -4235,8 +4236,6 @@ zx_status_t OpenProtocol_SyncProxy::FlexibleOneWayNamedPayload(int32_t value) {
 
 #endif  // __Fuchsia__
 
-
 }  // namespace protocollayouts
 }  // namespace test
-
 

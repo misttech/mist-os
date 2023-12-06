@@ -43,6 +43,5 @@ zx_status_t ByteAndBytes::Clone(ByteAndBytes* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace byteandbytes
 }  // namespace test

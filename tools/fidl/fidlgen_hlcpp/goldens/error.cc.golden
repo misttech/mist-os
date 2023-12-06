@@ -271,6 +271,7 @@ void Example_foo_Result::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

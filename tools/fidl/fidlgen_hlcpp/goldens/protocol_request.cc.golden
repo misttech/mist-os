@@ -152,6 +152,7 @@ zx_status_t ParentTakeChildRequestRequest::Clone(ParentTakeChildRequestRequest* 
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 Child::~Child() = default;

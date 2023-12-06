@@ -30,6 +30,5 @@ constexpr const ::test::enum_::MyFlexibleEnumWithCustomUnknown MyFlexibleEnumWit
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace enum_
 }  // namespace test

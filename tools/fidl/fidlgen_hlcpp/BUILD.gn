@@ -19,6 +19,7 @@ if (is_host) {
     ]
     sources = [
       "codegen.go",
+      "coding_tables.tmpl",
       "header.tmpl",
       "implementation.tmpl",
       "proxies_and_stubs_protocol.tmpl",
@@ -78,6 +79,10 @@ if (is_host) {
           {
             golden = "goldens/${info.name}_test_base.h.golden"
             candidate = "$_gen_dir/$_include_path/fidl_test_base.h"
+          },
+          {
+            golden = "goldens/${info.name}_tables.c.golden"
+            candidate = "$_gen_dir/$_include_path/tables.c"
           },
         ]
       }

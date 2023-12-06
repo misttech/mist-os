@@ -84,6 +84,7 @@ zx_status_t ChildSecondRequest::Clone(ChildSecondRequest* _result) const {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

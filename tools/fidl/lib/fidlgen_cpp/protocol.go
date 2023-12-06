@@ -645,7 +645,6 @@ type methodInner struct {
 	IncomingMessageStorageForResponse       name
 	IncomingMessageHandleStorageForResponse name
 
-	baseCodingTableName string
 	requestTypeShapeV2  TypeShape
 	responseTypeShapeV2 TypeShape
 
@@ -1082,7 +1081,6 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 	}
 
 	protocolName := c.compileNameVariants(p.Name)
-	codingTableName := codingTableName(p.Name)
 	hlMessaging := compileHlMessagingDetails(protocolName)
 	unifiedMessaging := compileUnifiedMessagingDetails(protocolName, p)
 	wireTypeNames := newWireTypeNames(protocolName)
@@ -1154,11 +1152,8 @@ func (c *compiler) compileProtocol(p fidlgen.Protocol) *Protocol {
 		wireMethod := newWireMethod(name.Wire.Name(), wireTypeNames, protocolName.Wire, methodMarker.Wire)
 		unifiedMethod := newUnifiedMethod(methodMarker.Wire, unifiedMessaging)
 		method := newMethod(methodInner{
-			nameVariants: name,
-			protocolName: protocolName,
-			// Using the raw identifier v.Name instead of the name after
-			// reserved words logic, since that's the behavior in fidlc.
-			baseCodingTableName:                     codingTableName + string(v.Name),
+			nameVariants:                            name,
+			protocolName:                            protocolName,
 			Marker:                                  methodMarker,
 			requestTypeShapeV2:                      TypeShape{requestTypeShapeV2},
 			responseTypeShapeV2:                     TypeShape{responseTypeShapeV2},

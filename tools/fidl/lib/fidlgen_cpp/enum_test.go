@@ -12,7 +12,7 @@ import (
 )
 
 func compileEnums(r fidlgen.Root) map[string]*Enum {
-	ir := compile(r)
+	ir := Compile(r)
 	enums := make(map[string]*Enum)
 	for _, v := range ir.Decls {
 		e := v.(*Enum)

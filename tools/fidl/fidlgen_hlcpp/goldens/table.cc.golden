@@ -7,7 +7,6 @@
 
 #include "lib/fidl/cpp/internal/implementation.h"
 
-
 //
 // Domain objects definitions
 //
@@ -5694,8 +5693,6 @@ zx_status_t SixtyFourOrdinalTable::Clone(SixtyFourOrdinalTable* result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace table
 }  // namespace test
-
 

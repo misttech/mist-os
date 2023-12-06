@@ -750,7 +750,7 @@ type Payloader interface {
 	AsParameters(*Type, *HandleInformation) []Parameter
 }
 
-func compile(r fidlgen.Root) *Root {
+func Compile(r fidlgen.Root) *Root {
 	root := Root{
 		Experiments: r.Experiments,
 		Library:     r.Name.Parse(),
@@ -937,8 +937,4 @@ func compile(r fidlgen.Root) *Root {
 	root.ContainsDriverReferences = c.containsDriverReferences
 
 	return &root
-}
-
-func compileFor(r fidlgen.Root, n string) *Root {
-	return compile(r.ForBindings(n))
 }

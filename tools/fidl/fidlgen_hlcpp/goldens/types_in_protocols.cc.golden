@@ -7,7 +7,6 @@
 
 #include "lib/fidl/cpp/internal/implementation.h"
 
-
 //
 // Domain objects definitions
 //
@@ -3153,6 +3152,7 @@ void Protocol_ErrorResource_Result::EnsureStorageInitialized(::fidl_xunion_tag_t
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
   namespace _internal {
@@ -4944,8 +4944,6 @@ zx_status_t Protocol_SyncProxy::ErrorResource(::test::typesinprotocols::Protocol
 
 #endif  // __Fuchsia__
 
-
 }  // namespace typesinprotocols
 }  // namespace test
-
 

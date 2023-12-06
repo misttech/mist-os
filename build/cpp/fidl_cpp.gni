@@ -390,7 +390,10 @@ template("fidl_cpp_family") {
         "$library_name_slashes/cpp/fidl.h",
         "$library_name_slashes/cpp/fidl_test_base.h",
       ]
-      generated_sources = [ "$library_name_slashes/cpp/fidl.cc" ]
+      generated_sources = [
+        "$library_name_slashes/cpp/fidl.cc",
+        "$library_name_slashes/cpp/tables.c",
+      ]
     }
 
     _hlcpp_target = "${target_name}_hlcpp"

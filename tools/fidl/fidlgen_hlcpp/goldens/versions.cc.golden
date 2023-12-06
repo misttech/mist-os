@@ -346,6 +346,7 @@ void Union::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 OtherProtocol::~OtherProtocol() = default;

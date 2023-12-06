@@ -612,6 +612,5 @@ void UnionLargeArray::EnsureStorageInitialized(::fidl_xunion_tag_t tag) {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace arrays
 }  // namespace test

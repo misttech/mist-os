@@ -11,8 +11,8 @@ import (
 
 func main() {
 	flags := cpp.NewCmdlineFlags("libfuzzer", nil)
-	fidl := flags.ParseAndLoadIR()
+	root := cpp.Compile(flags.ParseAndLoadIR())
 	generator := codegen.NewGenerator(flags)
-	generator.GenerateFiles(fidl, []string{"Header", "Source",
+	generator.GenerateFiles(root, []string{"Header", "Source",
 		"DecoderEncoderHeader", "DecoderEncoderSource"})
 }

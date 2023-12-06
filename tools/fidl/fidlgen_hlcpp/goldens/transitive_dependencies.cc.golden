@@ -43,6 +43,5 @@ zx_status_t Baz::Clone(Baz* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace transitivedependencies
 }  // namespace test

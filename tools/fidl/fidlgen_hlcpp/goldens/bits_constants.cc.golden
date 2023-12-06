@@ -16,6 +16,5 @@ namespace bitsconstants {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace bitsconstants
 }  // namespace test

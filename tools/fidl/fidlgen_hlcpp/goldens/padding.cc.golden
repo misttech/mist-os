@@ -553,6 +553,5 @@ zx_status_t Padding2ByteAlignmentLength6::Clone(Padding2ByteAlignmentLength6* _r
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace padding
 }  // namespace test

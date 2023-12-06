@@ -7,7 +7,6 @@
 
 #include "lib/fidl/cpp/internal/implementation.h"
 
-
 //
 // Domain objects definitions
 //
@@ -21698,6 +21697,7 @@ void UnknownInteractionsClosedDriverProtocol_StrictTwoWayTableErr_Result::Ensure
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
   
@@ -23303,6 +23303,7 @@ zx_status_t UnknownInteractionsProtocol_SyncProxy::FlexibleTwoWayTableErr(::test
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   
@@ -24375,6 +24376,7 @@ zx_status_t UnknownInteractionsAjarProtocol_SyncProxy::StrictTwoWayTableErr(::te
 
 #endif  // __Fuchsia__
 
+
 #ifdef __Fuchsia__
 
   
@@ -25212,8 +25214,6 @@ zx_status_t UnknownInteractionsClosedProtocol_SyncProxy::StrictTwoWayTableErr(::
 
 #endif  // __Fuchsia__
 
-
 }  // namespace unknowninteractions
 }  // namespace test
-
 

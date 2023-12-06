@@ -553,6 +553,7 @@ zx_status_t ProtocolRequestFlexibleResponseStrictResponse::Clone(ProtocolRequest
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

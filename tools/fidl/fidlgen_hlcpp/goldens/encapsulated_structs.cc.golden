@@ -220,6 +220,5 @@ zx_status_t TopLevelStruct::Clone(TopLevelStruct* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace encapsulatedstructs
 }  // namespace test

@@ -508,6 +508,7 @@ zx_status_t StructWithNullableUnion::Clone(StructWithNullableUnion* _result) con
 //
 // Proxies and stubs definitions
 //
+
 #ifdef __Fuchsia__
 
 namespace _internal {

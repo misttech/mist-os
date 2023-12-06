@@ -48,6 +48,5 @@ zx_status_t ExampleUseOfVectors::Clone(ExampleUseOfVectors* _result) const {
 //
 // Proxies and stubs definitions
 //
-
 }  // namespace vectors
 }  // namespace test
