@@ -500,7 +500,8 @@ mod tests {
     use {
         crate::model::{
             actions::{
-                start::should_return_early, ActionSet, ShutdownAction, StartAction, StopAction,
+                resolve::sandbox_construction::ComponentSandbox, start::should_return_early,
+                ActionSet, ShutdownAction, StartAction, StopAction,
             },
             component::{
                 Component, ComponentInstance, DictDispatcher, ExecutionState, InstanceState,
@@ -518,6 +519,7 @@ mod tests {
         async_trait::async_trait,
         cm_rust::ComponentDecl,
         cm_rust_testing::{ChildDeclBuilder, ComponentDeclBuilder},
+        cm_types::Name,
         fidl_fuchsia_sys2 as fsys, fuchsia, fuchsia_zircon as zx,
         moniker::Moniker,
         routing::resolving::ComponentAddress,
@@ -714,6 +716,9 @@ mod tests {
         );
         let (_, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
         let decl = ComponentDeclBuilder::new().add_lazy_child(TEST_CHILD_NAME).build();
+        let mut component_sandbox = ComponentSandbox::default();
+        let name = Name::new(TEST_CHILD_NAME).unwrap();
+        component_sandbox.child_dicts.insert(name, Dict::new());
         let resolved_component = Component {
             resolved_url: "".to_string(),
             context_to_resolve_children: None,
@@ -726,7 +731,7 @@ mod tests {
             &child,
             resolved_component,
             ComponentAddress::from_absolute_url(&child.component_url).unwrap(),
-            Dict::new(),
+            component_sandbox,
         )
         .await
         .unwrap();
