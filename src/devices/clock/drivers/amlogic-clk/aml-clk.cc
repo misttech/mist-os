@@ -802,23 +802,6 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
     }
   }
 
-  auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
-  if (endpoints.is_error()) {
-    zxlogf(ERROR, "Create endpoints failed: %s", endpoints.status_string());
-    return endpoints.error_value();
-  }
-
-  bool has_pbus = true;
-
-  status = device_connect_runtime_protocol(
-      parent, fuchsia_hardware_platform_bus::Service::PlatformBus::ServiceName,
-      fuchsia_hardware_platform_bus::Service::PlatformBus::Name,
-      endpoints->server.TakeHandle().release());
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to connect to platform bus: %s", zx_status_get_string(status));
-    has_pbus = false;
-  }
-
   auto clock_device = std::make_unique<amlogic_clock::AmlClock>(
       parent, std::move(*hiu_mmio), *std::move(dosbus_mmio), *std::move(msr_mmio),
       *std::move(cpuctrl_mmio), info.did);
@@ -829,11 +812,6 @@ zx_status_t AmlClock::Create(zx_device_t* parent) {
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-clk: Could not create clock device: %d", status);
     return status;
-  }
-
-  if (has_pbus) {
-    clock_device->Register(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>(
-        std::move(endpoints->client)));
   }
 
   // devmgr is now in charge of the memory for dev.
@@ -1218,18 +1196,6 @@ void AmlClock::ShutDown() {
   if (msr_mmio_) {
     msr_mmio_->reset();
   }
-}
-
-void AmlClock::Register(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus) {
-  clock_impl_protocol_t clk_proto = {
-      .ops = &clock_impl_protocol_ops_,
-      .ctx = this,
-  };
-
-  fdf::Arena arena('CLK_');
-  [[maybe_unused]] auto unused = pbus.buffer(arena)->RegisterProtocol(
-      ZX_PROTOCOL_CLOCK_IMPL, fidl::VectorView<uint8_t>::FromExternal(
-                                  reinterpret_cast<uint8_t*>(&clk_proto), sizeof(clk_proto)));
 }
 
 zx_status_t AmlClock::GetMesonRateClock(const uint32_t clk, MesonRateClock** out) {

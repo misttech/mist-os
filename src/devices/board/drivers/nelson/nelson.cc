@@ -132,6 +132,7 @@ int Nelson::Thread() {
   if ((status = ClkInit()) != ZX_OK) {
     zxlogf(ERROR, "ClkInit failed: %d", status);
   }
+  clock_init_steps_.clear();
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
@@ -268,6 +269,8 @@ int Nelson::Thread() {
   board_rev_property_ = root_.CreateUint("board_build", GetBoardRev());
   board_option_property_ = root_.CreateUint("board_option", GetBoardOption());
   display_id_property_ = root_.CreateUint("display_id", GetDisplayId());
+
+  ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 
   return ZX_OK;
 }

@@ -89,6 +89,7 @@ int Astro::Thread() {
   if ((status = ClkInit()) != ZX_OK) {
     zxlogf(ERROR, "ClkInit failed: %d", status);
   }
+  clock_init_steps_.clear();
 
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
@@ -188,6 +189,8 @@ int Astro::Thread() {
   if ((status = RamCtlInit()) != ZX_OK) {
     zxlogf(ERROR, "RamCtlInit failed: %d", status);
   }
+
+  ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 
   return ZX_OK;
 }

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.clockimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
-#include <fuchsia/hardware/clockimpl/cpp/banjo.h>
 #include <fuchsia/hardware/gpioimpl/cpp/banjo.h>
 #include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
@@ -155,7 +154,6 @@ class Sherlock : public SherlockType {
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
-  ddk::ClockImplProtocolClient clk_impl_;
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;

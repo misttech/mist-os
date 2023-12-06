@@ -15,7 +15,6 @@
         colocate: "true",
     },
     use: [
-        { service: "fuchsia.hardware.platform.bus.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
     ],
 }

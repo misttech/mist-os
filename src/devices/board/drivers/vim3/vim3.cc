@@ -125,6 +125,8 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+  clock_init_steps_.clear();
+
   // GpioInit() must be called after other subsystems that bind to GPIO have had a chance to add
   // their init steps.
   if ((status = GpioInit()) != ZX_OK) {
@@ -195,6 +197,8 @@ int Vim3::Thread() {
     init_txn_->Reply(ZX_ERR_INTERNAL);
     return status;
   }
+
+  ZX_ASSERT_MSG(clock_init_steps_.empty(), "Clock init steps added but not applied");
 
   init_txn_->Reply(status);
   return ZX_OK;
