@@ -19,7 +19,11 @@
 #include <zircon/errors.h>
 
 #include <cstdlib>
+#include <limits>
 #include <memory>
+
+#include <fbl/auto_lock.h>
+#include <fbl/mutex.h>
 
 namespace virtio_display {
 
@@ -40,7 +44,7 @@ class GpuDevice : public virtio::Device {
   static uint64_t GetRequestSize(zx::vmo& vmo);
 
   template <typename RequestType, typename ResponseType>
-  void send_command_response(const RequestType* cmd, ResponseType** res);
+  void send_command_response(const RequestType* request, ResponseType** response);
 
  private:
   sem_t request_sem_ = {};
@@ -54,44 +58,47 @@ class GpuDevice : public virtio::Device {
 };
 
 template <typename RequestType, typename ResponseType>
-void GpuDevice::send_command_response(const RequestType* cmd, ResponseType** res) {
-  size_t cmd_len = sizeof(RequestType);
-  size_t res_len = sizeof(ResponseType);
+void GpuDevice::send_command_response(const RequestType* request, ResponseType** response) {
+  static constexpr size_t request_size = sizeof(RequestType);
+  static constexpr size_t response_size = sizeof(ResponseType);
   FDF_LOG(INFO,
-          "Sending command (buffer at %p, length %zu), expecting reply (pointer at %p, length %zu)",
-          cmd, cmd_len, res, res_len);
+          "Sending request (%zu bytes at 0x%p) expecting response (%zu-byte buffer pointer at %p)",
+          request_size, request, response_size, response);
 
   // Keep this single message at a time
   sem_wait(&request_sem_);
   auto cleanup = fit::defer([this]() { sem_post(&request_sem_); });
 
-  uint16_t i;
-  struct vring_desc* desc = vring_.AllocDescChain(2, &i);
-  ZX_ASSERT(desc);
+  uint16_t request_ring_descriptor_index;
+  vring_desc* const request_ring_descriptor =
+      vring_.AllocDescChain(2, &request_ring_descriptor_index);
+  ZX_ASSERT(request_ring_descriptor);
 
-  auto gpu_req_base = reinterpret_cast<void*>(request_virt_addr_);
-  zx_paddr_t gpu_req_pa = request_phys_addr_;
+  uint8_t* const request_buffer = reinterpret_cast<uint8_t*>(request_virt_addr_);
+  std::memcpy(request_buffer, request, request_size);
 
-  memcpy(gpu_req_base, cmd, cmd_len);
-
-  desc->addr = gpu_req_pa;
-  desc->len = static_cast<uint32_t>(cmd_len);
-  desc->flags = VRING_DESC_F_NEXT;
+  const zx_paddr_t request_physical_address = request_phys_addr_;
+  request_ring_descriptor->addr = request_physical_address;
+  static_assert(request_size <= std::numeric_limits<uint32_t>::max());
+  request_ring_descriptor->len = static_cast<uint32_t>(request_size);
+  request_ring_descriptor->flags = VRING_DESC_F_NEXT;
 
   // Set the second descriptor to the response with the write bit set
-  desc = vring_.DescFromIndex(desc->next);
-  ZX_ASSERT(desc);
+  vring_desc* const response_ring_descriptor = vring_.DescFromIndex(request_ring_descriptor->next);
+  ZX_ASSERT(response_ring_descriptor);
 
-  *res = reinterpret_cast<ResponseType*>(static_cast<uint8_t*>(gpu_req_base) + cmd_len);
-  zx_paddr_t res_phys = gpu_req_pa + cmd_len;
-  memset(*res, 0, res_len);
+  uint8_t* const response_buffer = request_buffer + request_size;
+  *response = reinterpret_cast<ResponseType*>(response_buffer);
+  std::memset(response_buffer, 0, response_size);
 
-  desc->addr = res_phys;
-  desc->len = static_cast<uint32_t>(res_len);
-  desc->flags = VRING_DESC_F_WRITE;
+  const zx_paddr_t response_physical_address = request_physical_address + request_size;
+  response_ring_descriptor->addr = response_physical_address;
+  static_assert(response_size <= std::numeric_limits<uint32_t>::max());
+  response_ring_descriptor->len = static_cast<uint32_t>(response_size);
+  response_ring_descriptor->flags = VRING_DESC_F_WRITE;
 
   // Submit the transfer & wait for the response
-  vring_.SubmitChain(i);
+  vring_.SubmitChain(request_ring_descriptor_index);
   vring_.Kick();
   sem_wait(&response_sem_);
 }
