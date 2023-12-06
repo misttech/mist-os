@@ -23,14 +23,9 @@ use fuchsia_async::{
     DurationExt, {self as fasync},
 };
 use fuchsia_zircon as zx;
-use futures::{AsyncReadExt, AsyncWriteExt, TryStreamExt};
+use futures::{channel::oneshot, AsyncReadExt, AsyncWriteExt, TryStreamExt};
 use starnix_logging::log_error;
-use starnix_uapi::{
-    errors::Errno,
-    open_flags::OpenFlags,
-    ownership::{release_on_error, Releasable},
-    uapi,
-};
+use starnix_uapi::{open_flags::OpenFlags, uapi};
 use std::{ffi::CString, sync::Arc};
 
 use super::start_component;
@@ -74,6 +69,59 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
         .unwrap_or(uapi::winsize::default())
 }
 
+async fn spawn_console(
+    kernel: &Arc<Kernel>,
+    payload: fstarcontainer::ControllerSpawnConsoleRequest,
+) -> Result<Result<u8, i32>, Error> {
+    if let (Some(console_in), Some(console_out), Some(binary_path)) =
+        (payload.console_in, payload.console_out, payload.binary_path)
+    {
+        let binary_path = CString::new(binary_path)?;
+        let argv = payload
+            .argv
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(CString::new)
+            .collect::<Result<Vec<_>, _>>()?;
+        let environ = payload
+            .environ
+            .unwrap_or(vec![])
+            .into_iter()
+            .map(CString::new)
+            .collect::<Result<Vec<_>, _>>()?;
+        let window_size = to_winsize(payload.window_size);
+        let current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
+        let (sender, receiver) = oneshot::channel::<Result<u8, i32>>();
+        let pty = execute_task(
+            current_task,
+            move |_, current_task| {
+                let executable =
+                    current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
+                current_task.exec(executable, binary_path, argv, environ)?;
+                let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
+                let fd_flags = FdFlags::empty();
+                assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
+                assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
+                assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+                Ok(pty)
+            },
+            move |result| {
+                let _ = match result {
+                    Ok(ExitStatus::Exit(exit_code)) => sender.send(Ok(exit_code)),
+                    _ => sender.send(Err(zx::Status::CANCELED.into_raw())),
+                };
+            },
+        )?;
+        let _ = forward_to_pty(kernel, console_in, console_out, pty).map_err(|e| {
+            log_error!("failed to forward to terminal {:?}", e);
+        });
+
+        Ok(receiver.await?)
+    } else {
+        Ok(Err(zx::Status::INVALID_ARGS.into_raw()))
+    }
+}
+
 pub async fn serve_container_controller(
     request_stream: fstarcontainer::ControllerRequestStream,
     system_task: &CurrentTask,
@@ -88,56 +136,7 @@ pub async fn serve_container_controller(
                     });
                 }
                 fstarcontainer::ControllerRequest::SpawnConsole { payload, responder } => {
-                    if let (Some(console_in), Some(console_out), Some(binary_path)) =
-                        (payload.console_in, payload.console_out, payload.binary_path)
-                    {
-                        let binary_path = CString::new(binary_path)?;
-                        let argv = payload
-                            .argv
-                            .unwrap_or(vec![])
-                            .into_iter()
-                            .map(CString::new)
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let environ = payload
-                            .environ
-                            .unwrap_or(vec![])
-                            .into_iter()
-                            .map(CString::new)
-                            .collect::<Result<Vec<_>, _>>()?;
-                        match create_task_with_pty(
-                            system_task.kernel(),
-                            binary_path,
-                            argv,
-                            environ,
-                            to_winsize(payload.window_size),
-                        ) {
-                            Ok((current_task, pty)) => {
-                                execute_task(current_task, move |result| {
-                                    let _ = match result {
-                                        Ok(ExitStatus::Exit(exit_code)) => {
-                                            responder.send(Ok(exit_code))
-                                        }
-                                        _ => responder.send(Err(zx::Status::CANCELED.into_raw())),
-                                    };
-                                });
-                                let _ = forward_to_pty(
-                                    system_task.kernel(),
-                                    console_in,
-                                    console_out,
-                                    pty,
-                                )
-                                .map_err(|e| {
-                                    log_error!("failed to forward to terminal {:?}", e);
-                                });
-                            }
-                            Err(errno) => {
-                                log_error!("failed to create task with pty {:?}", errno);
-                                responder.send(Err(zx::Status::IO.into_raw()))?;
-                            }
-                        }
-                    } else {
-                        responder.send(Err(zx::Status::INVALID_ARGS.into_raw()))?;
-                    }
+                    responder.send(spawn_console(system_task.kernel(), payload).await?)?;
                 }
                 fstarcontainer::ControllerRequest::_UnknownMethod { .. } => (),
             }
@@ -167,27 +166,6 @@ async fn connect_to_vsock(
     )?;
 
     Ok(())
-}
-
-fn create_task_with_pty(
-    kernel: &Arc<Kernel>,
-    binary_path: CString,
-    argv: Vec<CString>,
-    environ: Vec<CString>,
-    window_size: uapi::winsize,
-) -> Result<(CurrentTask, FileHandle), Errno> {
-    let mut current_task = CurrentTask::create_init_child_process(kernel, &binary_path)?;
-    let pty = release_on_error!(current_task, (), {
-        let executable = current_task.open_file(binary_path.as_bytes(), OpenFlags::RDONLY)?;
-        current_task.exec(executable, binary_path, argv, environ)?;
-        let (pty, pts) = create_main_and_replica(&current_task, window_size)?;
-        let fd_flags = FdFlags::empty();
-        assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
-        assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
-        assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
-        Ok(pty)
-    });
-    Ok((current_task, pty))
 }
 
 fn forward_to_pty(

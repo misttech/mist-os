@@ -10,8 +10,8 @@ use crate::{
     mm::MemoryManager,
     signals::{deliver_signal, SignalActions, SignalInfo},
     task::{
-        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, TaskFlags,
-        ThreadGroup, ThreadGroupWriteGuard,
+        CurrentTask, ExceptionResult, ExitStatus, Kernel, ProcessGroup, Task, TaskBuilder,
+        TaskFlags, ThreadGroup, ThreadGroupWriteGuard,
     },
 };
 use anyhow::{format_err, Error};
@@ -22,14 +22,22 @@ use fuchsia_zircon::{
 use lock_sequence::{Locked, Unlocked};
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_warn, set_zx_name, trace_category_starnix, trace_instant,
-    CoreDumpInfo, TraceScope, MAX_ARGV_LENGTH,
+    firehose_trace_instant, log_error, log_warn, set_zx_name, trace_category_starnix,
+    trace_instant, CoreDumpInfo, TraceScope, MAX_ARGV_LENGTH,
 };
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{
-    errors::Errno, from_status_like_fdio, ownership::Releasable, pid_t, signals::SIGKILL,
+    errno,
+    errors::Errno,
+    from_status_like_fdio,
+    ownership::{Releasable, WeakRef},
+    pid_t,
+    signals::SIGKILL,
 };
-use std::{os::unix::thread::JoinHandleExt, sync::Arc};
+use std::{
+    os::unix::thread::JoinHandleExt,
+    sync::{mpsc::sync_channel, Arc},
+};
 
 extern "C" {
     /// The function which enters restricted mode. This function never technically returns, instead
@@ -401,19 +409,29 @@ pub fn create_zircon_process(
     Ok(TaskInfo { thread: None, thread_group, memory_manager })
 }
 
-pub fn execute_task<F>(mut current_task: CurrentTask, task_complete: F)
+pub fn execute_task<F, R, G>(
+    task_builder: TaskBuilder,
+    pre_run: F,
+    task_complete: G,
+) -> Result<R, Errno>
 where
-    F: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
+    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
+        + Send
+        + Sync
+        + 'static,
+    R: Send + Sync + 'static,
+    G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
+    let (sender, receiver) = sync_channel::<Result<R, Errno>>(1);
     // Set the process handle to the new task's process, so the new thread is spawned in that
     // process.
-    let process_handle = current_task.thread_group.process.raw_handle();
+    let process_handle = task_builder.task.thread_group.process.raw_handle();
     let old_process_handle = unsafe { thrd_set_zx_process(process_handle) };
 
-    let weak = current_task.weak_task();
-    let task = weak.upgrade().unwrap();
+    let weak_task = WeakRef::from(&task_builder.task);
+    let ref_task = weak_task.upgrade().unwrap();
     // Hold a lock on the task's thread slot until we have a chance to initialize it.
-    let mut task_thread_guard = task.thread.write();
+    let mut task_thread_guard = ref_task.thread.write();
 
     // Spawn the process' thread. Note, this closure ends up executing in the process referred to by
     // `process_handle`.
@@ -421,18 +439,31 @@ where
         .name("user-thread".to_string())
         .spawn(move || {
             let mut locked = Unlocked::new();
-            let run_result = match run_task(&mut locked, &mut current_task) {
-                Err(error) => {
-                    log_warn!("Died unexpectedly from {:?}! treating as SIGKILL", error);
-                    let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
+            let mut current_task: CurrentTask = task_builder.into();
+            let pre_run_result = pre_run(&mut locked, &mut current_task);
+            let mut pre_run_failed = pre_run_result.is_err();
 
-                    current_task.set_exit_status(&mut *current_task.write(), exit_status.clone());
-                    Ok(exit_status)
-                }
-                ok => ok,
-            };
+            if let Err(error) = sender.send(pre_run_result) {
+                log_error!("Unable to send `pre_run` result: {error:?}");
+                pre_run_failed = true;
+            }
 
-            task_complete(run_result);
+            if !pre_run_failed {
+                let run_result = match run_task(&mut locked, &mut current_task) {
+                    Err(error) => {
+                        log_warn!("Died unexpectedly from {error:?}! treating as SIGKILL");
+                        let exit_status = ExitStatus::Kill(SignalInfo::default(SIGKILL));
+
+                        current_task
+                            .set_exit_status(&mut *current_task.write(), exit_status.clone());
+                        Ok(exit_status)
+                    }
+                    ok => ok,
+                };
+
+                task_complete(run_result);
+            }
+
             // `release` must be called as the absolute last action on this thread to ensure that
             // any deferred release are done before it.
             current_task.release(());
@@ -452,9 +483,13 @@ where
 
     // Now that the task has a thread handle, update the thread's role using the policy configured.
     drop(task_thread_guard);
-    if let Err(err) = task.sync_scheduler_policy_to_role() {
+    if let Err(err) = ref_task.sync_scheduler_policy_to_role() {
         log_warn!(?err, "Couldn't update freshly spawned thread's profile.");
     }
+    receiver.recv().map_err(|e| {
+        log_error!("Unable to retrieve result from `pre_run`: {e:?}");
+        errno!(EINVAL)
+    })?
 }
 
 fn process_completed_exception(current_task: &mut CurrentTask, exception_result: ExceptionResult) {

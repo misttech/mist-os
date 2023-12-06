@@ -113,8 +113,11 @@ pub fn process_completed_restricted_exit(
     {
         let flags = current_task.flags();
         {
-            let CurrentTask { task, thread_state: ThreadState { registers, extended_pstate, .. } } =
-                current_task;
+            let CurrentTask {
+                task,
+                thread_state: ThreadState { registers, extended_pstate, .. },
+                ..
+            } = current_task;
             let task_state = task.write();
             if flags.contains(TaskFlags::TEMPORARY_SIGNAL_MASK)
                 || (!flags.contains(TaskFlags::EXITED)

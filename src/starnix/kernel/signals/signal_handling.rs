@@ -436,8 +436,9 @@ pub(crate) mod testing {
     use std::ops::DerefMut as _;
 
     pub(crate) fn dequeue_signal_for_test(current_task: &mut AutoReleasableTask) {
-        let CurrentTask { task, thread_state: ThreadState { registers, extended_pstate, .. } } =
-            current_task.deref_mut();
+        let CurrentTask {
+            task, thread_state: ThreadState { registers, extended_pstate, .. }, ..
+        } = current_task.deref_mut();
         let task_state = task.write();
         dequeue_signal(task, task_state, registers, extended_pstate);
     }
