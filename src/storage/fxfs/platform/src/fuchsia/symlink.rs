@@ -186,7 +186,6 @@ impl Node for FxSymlink {
     }
 }
 
-#[async_trait]
 impl FxNode for FxSymlink {
     fn object_id(&self) -> u64 {
         self.handle.object_id()

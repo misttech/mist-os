@@ -283,7 +283,6 @@ mod tests {
             directory::FxDirectory,
             node::{FxNode, GetResult, NodeCache},
         },
-        async_trait::async_trait,
         fuchsia_async as fasync,
         futures::future::join_all,
         fxfs::object_store::ObjectDescriptor,
@@ -297,7 +296,6 @@ mod tests {
     };
 
     struct FakeNode(u64, Arc<NodeCache>);
-    #[async_trait]
     impl FxNode for FakeNode {
         fn object_id(&self) -> u64 {
             self.0

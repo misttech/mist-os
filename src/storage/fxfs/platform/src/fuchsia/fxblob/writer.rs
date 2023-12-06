@@ -11,7 +11,6 @@ use {
         node::FxNode, volume::FxVolume,
     },
     anyhow::{anyhow, Context, Error},
-    async_trait::async_trait,
     delivery_blob::{
         compression::{decode_archive, ChunkInfo, ChunkedDecompressor},
         Type1Blob,
@@ -288,7 +287,6 @@ impl FxDeliveryBlob {
     }
 }
 
-#[async_trait]
 impl FxNode for FxDeliveryBlob {
     fn object_id(&self) -> u64 {
         self.handle.object_id()

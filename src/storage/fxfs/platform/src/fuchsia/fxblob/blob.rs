@@ -120,7 +120,6 @@ impl Drop for FxBlob {
 }
 
 /// Implements VFS pseudo-filesystem entries for blobs.
-#[async_trait]
 impl FxNode for FxBlob {
     fn object_id(&self) -> u64 {
         self.handle.object_id()

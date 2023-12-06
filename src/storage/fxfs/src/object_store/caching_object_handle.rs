@@ -269,7 +269,6 @@ mod tests {
         }
     }
 
-    #[async_trait]
     impl ObjectHandle for FakeSource {
         fn object_id(&self) -> u64 {
             unreachable!();

@@ -57,7 +57,6 @@ pub struct FxDirectory {
     watchers: Mutex<Watchers>,
 }
 
-#[async_trait]
 impl RootDir for FxDirectory {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry> {
         self as Arc<dyn DirectoryEntry>
@@ -316,7 +315,6 @@ impl Drop for FxDirectory {
     }
 }
 
-#[async_trait]
 impl FxNode for FxDirectory {
     fn object_id(&self) -> u64 {
         self.directory.object_id()

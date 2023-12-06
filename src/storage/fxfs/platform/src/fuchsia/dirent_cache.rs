@@ -220,13 +220,11 @@ impl DirentCacheKeyRef for (u64, &str) {
 mod tests {
     use {
         crate::fuchsia::{directory::FxDirectory, dirent_cache::DirentCache, node::FxNode},
-        async_trait::async_trait,
         fxfs::object_store::ObjectDescriptor,
         std::sync::Arc,
     };
 
     struct FakeNode(u64);
-    #[async_trait]
     impl FxNode for FakeNode {
         fn object_id(&self) -> u64 {
             self.0

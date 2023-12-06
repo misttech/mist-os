@@ -419,7 +419,6 @@ impl BlobDirectory {
     }
 }
 
-#[async_trait]
 impl FxNode for BlobDirectory {
     fn object_id(&self) -> u64 {
         self.directory.object_id()

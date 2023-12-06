@@ -212,7 +212,6 @@ impl Drop for FxFile {
     }
 }
 
-#[async_trait]
 impl FxNode for FxFile {
     fn object_id(&self) -> u64 {
         self.handle.object_id()
