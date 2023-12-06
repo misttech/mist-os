@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_io as fio;
 use futures::stream::FuturesUnordered;
 use futures::{
     channel::mpsc::{unbounded, UnboundedSender},
@@ -9,7 +11,7 @@ use futures::{
     FutureExt, StreamExt,
 };
 use namespace::{Entry as NamespaceEntry, Namespace, NamespaceError, Path as NamespacePath, Tree};
-use sandbox::{AnyCapability, Capability, Dict, Directory};
+use sandbox::{AnyCapability, Dict, Directory};
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -58,26 +60,29 @@ impl NamespaceBuilder {
     ) -> Result<(), BuildNamespaceError> {
         let dirname = path.dirname_ns_path();
 
-        // If these is no such entry, make an empty dictionary.
-        let dict: &mut AnyCapability = match self.entries.get_mut(&dirname) {
+        // Get the entry, or if it doesn't exist, make an empty dictionary.
+        let any: &AnyCapability = match self.entries.get(&dirname) {
+            Some(dir) => dir,
             None => {
                 let (dict, fut) =
                     make_dict_with_not_found_logging(path.dirname().into(), self.not_found.clone());
                 self.futures.push(fut);
                 self.entries.add(&dirname, Box::new(dict))?
             }
-            Some(dir) => dir,
         };
 
-        // Cast the entry as a dictionary. This may fail if the user added a duplicate
-        // namespace entry that is not a dictionary (see `add_entry`).
-        let dict: &mut Dict =
-            dict.try_into().map_err(|_e| NamespaceError::Duplicate(path.clone()))?;
+        // Cast the namespace entry as a Dict. This may fail if the user added a duplicate
+        // namespace entry that is not a Dict (see `add_entry`).
+        let dict: &Dict = any.try_into().map_err(|_e| NamespaceError::Duplicate(path.clone()))?;
 
-        if dict.entries.contains_key(path.basename()) {
-            return Err(NamespaceError::Duplicate(path.clone()).into());
+        // Insert the capability into the Dict.
+        {
+            let mut entries = dict.lock_entries();
+            if entries.contains_key(path.basename()) {
+                return Err(NamespaceError::Duplicate(path.clone()).into());
+            }
+            entries.insert(path.basename().to_owned(), cap);
         }
-        dict.entries.insert(path.basename().to_owned(), cap);
         Ok(())
     }
 
@@ -94,8 +99,6 @@ impl NamespaceBuilder {
     }
 
     pub fn serve(self: Self) -> Result<(Namespace, BoxFuture<'static, ()>), BuildNamespaceError> {
-        let mut futures = self.futures;
-
         let ns = self
             .entries
             .flatten()
@@ -104,16 +107,16 @@ impl NamespaceBuilder {
                 let directory: Directory = cap.try_into().map_err(|err| {
                     BuildNamespaceError::Conversion { path: path.clone(), err: Arc::new(err) }
                 })?;
-                let (client_end, fut) = Box::new(directory).to_zx_handle();
-                if let Some(fut) = fut {
-                    futures.push(fut);
-                }
+                let client_end: ClientEnd<fio::DirectoryMarker> = directory.into();
                 Ok(NamespaceEntry { path, directory: client_end.into() })
             })
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Vec<_>, _>>()?
+            .try_into()?;
 
+        let mut futures = self.futures;
         let fut = async move { while let Some(()) = futures.next().await {} };
-        Ok((ns.try_into()?, fut.boxed()))
+
+        Ok((ns, fut.boxed()))
     }
 }
 
@@ -156,7 +159,6 @@ mod tests {
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_fs::directory::DirEntry,
         fuchsia_zircon as zx,
-        fuchsia_zircon::HandleBased,
         futures::StreamExt,
         std::str::FromStr,
     };
@@ -179,7 +181,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_shadow() {
+    async fn test_shadow() {
         assert_matches!(parents_valid(vec!["/svc/foo/bar/Something", "/svc/Something"]), Err(_));
         assert_matches!(parents_valid(vec!["/svc/Something", "/svc/foo/bar/Something"]), Err(_));
         assert_matches!(parents_valid(vec!["/svc/Something", "/foo"]), Err(_));
@@ -197,7 +199,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_duplicate_object() {
+    async fn test_duplicate_object() {
         let mut namespace = NamespaceBuilder::new(ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
@@ -209,7 +211,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_duplicate_entry() {
+    async fn test_duplicate_entry() {
         let mut namespace = NamespaceBuilder::new(ignore_not_found());
         namespace.add_entry(open_cap(), &ns_path("/svc/a")).expect("");
         // Adding again will fail.
@@ -221,7 +223,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_duplicate_object_and_entry() {
+    async fn test_duplicate_object_and_entry() {
         let mut namespace = NamespaceBuilder::new(ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/svc/a")).expect("");
         assert_matches!(
@@ -234,7 +236,7 @@ mod tests {
     /// If we added a namespaced object at "/foo/bar", thus creating a namespace entry at "/foo",
     /// we cannot add another entry directly at "/foo" again.
     #[fuchsia::test]
-    fn test_duplicate_entry_at_object_parent() {
+    async fn test_duplicate_entry_at_object_parent() {
         let mut namespace = NamespaceBuilder::new(ignore_not_found());
         namespace.add_object(open_cap(), &ns_path("/foo/bar")).expect("");
         assert_matches!(
@@ -248,7 +250,7 @@ mod tests {
     /// "/foo/bar", as that would've required overwriting "/foo" with a namespace entry served by
     /// the framework.
     #[fuchsia::test]
-    fn test_duplicate_object_parent_at_entry() {
+    async fn test_duplicate_object_parent_at_entry() {
         let mut namespace = NamespaceBuilder::new(ignore_not_found());
         namespace.add_entry(open_cap(), &ns_path("/foo")).expect("");
         assert_matches!(
@@ -294,7 +296,7 @@ mod tests {
             .unwrap();
 
         // Make sure the server_end is received, and test connectivity.
-        let server_end: zx::Channel = receiver.0.recv().await.unwrap().into_handle().into();
+        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
 

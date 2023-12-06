@@ -1,18 +1,15 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    fuchsia_runtime::{HandleInfo, HandleType},
-    futures::channel::mpsc::UnboundedSender,
-    futures::future::{BoxFuture, FutureExt},
-    futures::stream::{FuturesUnordered, StreamExt},
-    process_builder::StartupHandle,
-    processargs::ProcessArgs,
-    sandbox::{AnyCapability, Dict, DictKey},
-    std::collections::HashMap,
-    std::iter::once,
-    thiserror::Error,
-};
+use fuchsia_runtime::{HandleInfo, HandleType};
+use futures::channel::mpsc::UnboundedSender;
+use futures::future::{BoxFuture, FutureExt};
+use process_builder::StartupHandle;
+use processargs::ProcessArgs;
+use sandbox::{AnyCapability, Dict, DictKey, OneShotHandle};
+use std::collections::HashMap;
+use std::iter::once;
+use thiserror::Error;
 
 mod namespace;
 
@@ -78,16 +75,13 @@ pub type DeliveryMap = HashMap<DictKey, DeliveryMapEntry>;
 /// by the framework, that path will be sent down `not_found`. Callers should either monitor
 /// the stream, or drop the receiver, to prevent unbounded buffering.
 ///
-/// On success, returns a future that services connection requests to those capabilities.
-/// The future will complete if there is no more work possible, such as if all connections
-/// to the items in the dictionary are closed.
+/// On success, returns a future that services the namespace.
 pub fn add_to_processargs(
     dict: Dict,
     processargs: &mut ProcessArgs,
     delivery_map: &DeliveryMap,
     not_found: UnboundedSender<String>,
 ) -> Result<BoxFuture<'static, ()>, DeliveryError> {
-    let mut futures: Vec<BoxFuture<'static, ()>> = Vec::new();
     let mut namespace = NamespaceBuilder::new(not_found);
 
     // Iterate over the delivery map.
@@ -100,7 +94,7 @@ pub fn add_to_processargs(
             namespace.add_entry(cap, path.as_ref()).map_err(DeliveryError::NamespaceError)
         }
         Delivery::Handle(info) => {
-            processargs.add_handles(once(translate_handle(cap, info, &mut futures)?));
+            processargs.add_handles(once(translate_handle(cap, info)?));
             Ok(())
         }
     })?;
@@ -108,13 +102,8 @@ pub fn add_to_processargs(
     let (namespace, namespace_fut) = namespace.serve().map_err(DeliveryError::NamespaceError)?;
     let namespace: Vec<_> = namespace.into();
     processargs.namespace_entries.extend(namespace);
-    futures.push(namespace_fut);
 
-    let mut futures_unordered = FuturesUnordered::new();
-    futures_unordered.extend(futures);
-
-    let fut = async move { while let Some(()) = futures_unordered.next().await {} };
-    Ok(fut.boxed())
+    Ok(namespace_fut.boxed())
 }
 
 #[derive(Error, Debug)]
@@ -133,30 +122,29 @@ pub enum DeliveryError {
 
     #[error("namespace configuration error: `{0}`")]
     NamespaceError(namespace::BuildNamespaceError),
+
+    #[error("capability `{0:?}` is not allowed to be installed into processargs")]
+    UnsupportedCapability(AnyCapability),
 }
 
-fn translate_handle(
-    cap: AnyCapability,
-    info: &HandleInfo,
-    handle_futures: &mut Vec<BoxFuture<'static, ()>>,
-) -> Result<StartupHandle, DeliveryError> {
+fn translate_handle(cap: AnyCapability, info: &HandleInfo) -> Result<StartupHandle, DeliveryError> {
     validate_handle_type(info.handle_type())?;
 
-    let (h, fut) = cap.to_zx_handle();
-    if let Some(fut) = fut {
-        handle_futures.push(fut);
-    }
+    let one_shot: OneShotHandle =
+        cap.clone().try_into().map_err(|_| DeliveryError::UnsupportedCapability(cap.clone()))?;
+    let handle = one_shot.get_handle().map_err(|_| DeliveryError::UnsupportedCapability(cap))?;
 
-    Ok(StartupHandle { handle: h, info: *info })
+    Ok(StartupHandle { handle, info: *info })
 }
 
 fn visit_map(
     map: &DeliveryMap,
-    mut dict: Dict,
+    dict: Dict,
     f: &mut impl FnMut(AnyCapability, &Delivery) -> Result<(), DeliveryError>,
 ) -> Result<(), DeliveryError> {
+    let mut entries = dict.lock_entries();
     for (key, entry) in map {
-        match dict.entries.remove(key) {
+        match entries.remove(key) {
             Some(value) => match entry {
                 DeliveryMapEntry::Delivery(delivery) => f(value, delivery)?,
                 DeliveryMapEntry::Dict(sub_map) => {
@@ -168,8 +156,8 @@ fn visit_map(
             None => return Err(DeliveryError::NotInDict(key.to_owned())),
         }
     }
-    if !dict.entries.is_empty() {
-        let keys = dict.entries.into_keys().collect();
+    if !entries.is_empty() {
+        let keys = entries.keys().cloned().collect();
         return Err(DeliveryError::UnusedCapabilities(keys));
     }
     Ok(())
@@ -189,21 +177,21 @@ mod test_util {
     use {
         fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
         fuchsia_zircon::HandleBased,
-        sandbox::{Handle, Open},
+        sandbox::{OneShotHandle, Open},
         vfs::{
             directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path, service,
         },
     };
 
-    pub struct Receiver(pub async_channel::Receiver<Handle>);
+    pub struct Receiver(pub async_channel::Receiver<OneShotHandle>);
 
     pub fn multishot() -> (Open, Receiver) {
-        let (sender, receiver) = async_channel::unbounded::<Handle>();
+        let (sender, receiver) = async_channel::unbounded::<OneShotHandle>();
 
         let open_fn = move |scope: ExecutionScope, channel: fasync::Channel| {
             let sender = sender.clone();
             scope.spawn(async move {
-                let capability = Handle::from(channel.into_zx_channel().into_handle());
+                let capability = OneShotHandle::from(channel.into_zx_channel().into_handle());
                 let _ = sender.send(capability).await;
             });
         };
@@ -240,7 +228,6 @@ mod test_util {
 
 #[cfg(test)]
 mod tests {
-
     use {
         super::*,
         crate::namespace::{ignore_not_found as ignore, BuildNamespaceError},
@@ -253,6 +240,7 @@ mod tests {
         fuchsia_zircon::{AsHandleRef, HandleBased, Peered, Signals, Time},
         futures::TryStreamExt,
         maplit::hashmap,
+        sandbox::OneShotHandle,
         std::str::FromStr,
         test_util::{multishot, open},
     };
@@ -277,8 +265,11 @@ mod tests {
         let (sock0, sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("stdin".to_string(), sock0.into());
+        let dict = Dict::new();
+        dict.lock_entries().insert(
+            "stdin".to_string(),
+            Box::new(OneShotHandle::from(sock0.into_handle().into_handle())),
+        );
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::Handle(HandleInfo::new(HandleType::FileDescriptor, 0))
@@ -307,16 +298,18 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_nested_dict() -> Result<()> {
+    async fn test_create_nested_dict() -> Result<()> {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
 
         // Put a socket at "/handles/stdin". This implements a capability bundling pattern.
-        let mut handles = Dict::new();
-        handles.entries.insert("stdin".to_string(), sock0.into());
-        let mut dict = Dict::new();
-        dict.entries.insert("handles".to_string(), Box::new(handles));
+        let handles = Dict::new();
+        handles
+            .lock_entries()
+            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
+        let dict = Dict::new();
+        dict.lock_entries().insert("handles".to_string(), Box::new(handles));
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -340,15 +333,17 @@ mod tests {
 
     /// Test accessing capabilities from a Dict inside a Dict.
     #[fuchsia::test]
-    async fn test_nested_clone_dict() -> Result<()> {
+    async fn test_access_in_nested_dict() -> Result<()> {
         let (ep0, ep1) = zx::EventPair::create();
 
         let mut processargs = ProcessArgs::new();
 
-        let mut handles = Dict::new();
-        handles.entries.insert("stdin".to_string(), ep0.into_handle().try_into().unwrap());
-        let mut dict = Dict::new();
-        dict.entries.insert("handles".to_string(), Box::new(handles));
+        let handles = Dict::new();
+        handles
+            .lock_entries()
+            .insert("stdin".to_string(), Box::new(OneShotHandle::from(ep0.into_handle())));
+        let dict = Dict::new();
+        dict.lock_entries().insert("handles".to_string(), Box::new(handles));
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -376,15 +371,16 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_wrong_dict_destructuring() {
+    async fn test_wrong_dict_destructuring() {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
 
         // The type of "/handles" is a socket capability but we try to open it as a dict and extract
         // a "stdin" inside. This should fail.
-        let mut dict = Dict::new();
-        dict.entries.insert("handles".to_string(), sock0.into());
+        let dict = Dict::new();
+        dict.lock_entries()
+            .insert("handles".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
 
         let delivery_map = hashmap! {
             "handles".to_string() => DeliveryMapEntry::Dict(hashmap! {
@@ -406,8 +402,9 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("stdin".to_string(), sock0.into());
+        let dict = Dict::new();
+        dict.lock_entries()
+            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
         let delivery_map = DeliveryMap::new();
 
         assert_matches!(
@@ -422,8 +419,9 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("stdin".to_string(), sock0.into());
+        let dict = Dict::new();
+        dict.lock_entries()
+            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::Handle(HandleInfo::new(HandleType::DirectoryRequest, 0))
@@ -463,9 +461,12 @@ mod tests {
         let peer_closed_open = multishot().0;
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("normal".to_string(), Box::new(open));
-        dict.entries.insert("closed".to_string(), Box::new(peer_closed_open));
+        let dict = Dict::new();
+        {
+            let mut entries = dict.lock_entries();
+            entries.insert("normal".to_string(), Box::new(open));
+            entries.insert("closed".to_string(), Box::new(peer_closed_open));
+        }
         let delivery_map = hashmap! {
             "normal".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
@@ -500,7 +501,7 @@ mod tests {
         fdio::service_connect_at(&dir, "fuchsia.Normal", server_end).unwrap();
 
         // Make sure the server_end is received, and test connectivity.
-        let server_end: zx::Channel = receiver.0.recv().await.unwrap().into_handle().into();
+        let server_end: zx::Channel = receiver.0.recv().await.unwrap().get_handle().unwrap().into();
         client_end.signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
         server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).unwrap();
 
@@ -528,8 +529,8 @@ mod tests {
         let directory = open.into_directory(fio::OpenFlags::DIRECTORY);
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("data".to_string(), Box::new(directory));
+        let dict = Dict::new();
+        dict.lock_entries().insert("data".to_string(), Box::new(directory));
         let delivery_map = hashmap! {
             "data".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespaceEntry(cm_types::Path::from_str("/data").unwrap())
@@ -586,8 +587,9 @@ mod tests {
         let (sock0, _sock1) = zx::Socket::create_stream();
 
         let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("stdin".to_string(), sock0.into());
+        let dict = Dict::new();
+        dict.lock_entries()
+            .insert("stdin".to_string(), Box::new(OneShotHandle::from(sock0.into_handle())));
         let delivery_map = hashmap! {
             "stdin".to_string() => DeliveryMapEntry::Delivery(
                 Delivery::NamespacedObject(cm_types::Path::from_str("/svc/fuchsia.Normal").unwrap())
@@ -601,30 +603,5 @@ mod tests {
             })
             if path.as_ref() == "/svc"
         );
-    }
-
-    #[fuchsia::test]
-    async fn dropping_future_stops_everything() -> Result<()> {
-        let (open, _receiver) = multishot();
-
-        let mut processargs = ProcessArgs::new();
-        let mut dict = Dict::new();
-        dict.entries.insert("a".to_string(), Box::new(open));
-        let delivery_map = hashmap! {
-            "a".to_string() => DeliveryMapEntry::Delivery(
-                Delivery::NamespacedObject(cm_types::Path::from_str("/svc/a").unwrap())
-            ),
-        };
-        let fut = add_to_processargs(dict, &mut processargs, &delivery_map, ignore())?;
-        drop(fut);
-
-        assert_eq!(processargs.namespace_entries.len(), 1);
-        let dir = processargs.namespace_entries.pop().unwrap().directory.into_proxy().unwrap();
-        let dir = dir.into_channel().unwrap().into_zx_channel();
-
-        let (client_end, server_end) = zx::Channel::create();
-        fdio::service_connect_at(&dir, "a", server_end).unwrap();
-        fasync::Channel::from_channel(client_end).unwrap().on_closed().await.unwrap();
-        Ok(())
     }
 }

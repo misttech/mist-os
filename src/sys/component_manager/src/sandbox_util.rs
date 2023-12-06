@@ -16,7 +16,7 @@ use {
         epitaph::ChannelEpitaphExt,
         AsyncChannel,
     },
-    fidl_fuchsia_io as fio, fuchsia_async as fasync,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio, fuchsia_async as fasync,
     fuchsia_zircon::{self as zx, HandleBased},
     futures::{
         future::BoxFuture,
@@ -31,7 +31,6 @@ use {
 };
 
 lazy_static! {
-    static ref AVAILABILITY: Name = "availability".parse().unwrap();
     static ref RECEIVER: Name = "receiver".parse().unwrap();
     static ref ROUTER: Name = "router".parse().unwrap();
     static ref SENDER: Name = "sender".parse().unwrap();
@@ -44,6 +43,8 @@ pub struct Message {
     pub target: WeakComponentInstance,
 }
 
+impl Capability for Message {}
+
 impl Message {
     pub fn take_handle_as_stream<P: ProtocolMarker>(self) -> P::RequestStream {
         let channel = AsyncChannel::from_channel(zx::Channel::from(self.handle))
@@ -52,9 +53,9 @@ impl Message {
     }
 }
 
-impl Capability for Message {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        (self.handle, None)
+impl Clone for Message {
+    fn clone(&self) -> Self {
+        panic!("TODO: unimplemented");
     }
 }
 
@@ -70,6 +71,12 @@ impl From<zx::Handle> for Message {
     }
 }
 
+impl Into<fsandbox::Capability> for Message {
+    fn into(self) -> fsandbox::Capability {
+        unimplemented!()
+    }
+}
+
 impl TryFrom<AnyCapability> for Message {
     type Error = ();
 
@@ -82,38 +89,38 @@ impl TryFrom<AnyCapability> for Message {
 
 #[async_trait]
 pub trait DictExt {
-    fn get_protocol<'a>(&'a self, name: &Name) -> Option<CapabilityDict<'a>>;
-    fn get_protocol_mut<'a>(&'a mut self, name: &Name) -> Option<CapabilityDictMut<'a>>;
-    fn get_or_insert_protocol_mut<'a>(&'a mut self, name: &Name) -> CapabilityDictMut<'a>;
+    fn get_protocol(&self, name: &Name) -> Option<CapabilityDict>;
+    fn get_protocol_mut(&self, name: &Name) -> Option<CapabilityDictMut>;
+    fn get_or_insert_protocol_mut(&self, name: &Name) -> CapabilityDictMut;
     async fn peek_receivers(&self) -> Option<(Name, Moniker)>;
     async fn read_receivers(&self) -> Option<(Name, Message)>;
 }
 
 #[async_trait]
 impl DictExt for Dict {
-    fn get_protocol<'a>(&'a self, name: &Name) -> Option<CapabilityDict<'a>> {
-        self.entries
+    fn get_protocol(&self, name: &Name) -> Option<CapabilityDict> {
+        self.lock_entries()
             .get(&name.as_str().to_string())
+            .cloned()
             .and_then(|value| value.try_into().ok())
             .map(|inner| CapabilityDict { inner })
     }
 
-    fn get_protocol_mut<'a>(&'a mut self, name: &Name) -> Option<CapabilityDictMut<'a>> {
-        self.entries
-            .get_mut(&name.as_str().to_string())
+    fn get_protocol_mut(&self, name: &Name) -> Option<CapabilityDictMut> {
+        self.lock_entries()
+            .get(&name.as_str().to_string())
+            .cloned()
             .and_then(|value| value.try_into().ok())
             .map(|inner| CapabilityDictMut { inner })
     }
 
-    fn get_or_insert_protocol_mut<'a>(&'a mut self, name: &Name) -> CapabilityDictMut<'a> {
-        CapabilityDictMut {
-            inner: self
-                .entries
-                .entry(name.as_str().to_string())
-                .or_insert(Box::new(Dict::new()))
-                .try_into()
-                .unwrap(),
-        }
+    fn get_or_insert_protocol_mut(&self, name: &Name) -> CapabilityDictMut {
+        let dict = self
+            .lock_entries()
+            .entry(name.as_str().to_string())
+            .or_insert(Box::new(Dict::new()))
+            .clone();
+        CapabilityDictMut { inner: dict.try_into().unwrap() }
     }
 
     /// Waits for any Receivers to become readable.
@@ -124,25 +131,33 @@ impl DictExt for Dict {
     /// Does not remove messages from Receivers.
     async fn peek_receivers(&self) -> Option<(Name, Moniker)> {
         let mut futures_unordered = FuturesUnordered::new();
-        for cap_name in self.entries.keys() {
-            let cap_dict = self.get_protocol(&cap_name.parse().unwrap()).unwrap();
-            if cap_dict.get_receiver().is_some() {
-                futures_unordered.push(async move {
-                    // It would be great if we could return the value from the `peek` call here,
-                    // but the lifetimes don't work out. Let's block on the peek call, and then
-                    // return the `cap_dict` so we can access the `peek` value again outside
-                    // of the `FuturesUnordered`.
-                    let _ = cap_dict.get_receiver().unwrap().peek().await;
-                    (cap_name, cap_dict)
-                });
+        // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
+        {
+            let entries = self.lock_entries();
+            for (cap_name, cap) in entries.iter() {
+                let dict: Dict = cap.clone().try_into().unwrap();
+                let cap_dict = CapabilityDict { inner: dict };
+                if let Some(receiver) = cap_dict.get_receiver() {
+                    let cap_name = cap_name.clone();
+                    let receiver = receiver.clone();
+                    futures_unordered.push(async move {
+                        // It would be great if we could return the value from the `peek` call here,
+                        // but the lifetimes don't work out. Let's block on the peek call, and then
+                        // return the `cap_dict` so we can access the `peek` value again outside
+                        // of the `FuturesUnordered`.
+                        let _ = receiver.peek().await;
+                        (cap_name, receiver)
+                    });
+                }
             }
+            drop(entries);
         }
         if futures_unordered.is_empty() {
             return None;
         }
-        let (name, cap_dict) =
+        let (name, receiver) =
             futures_unordered.next().await.expect("FuturesUnordered is not empty");
-        let message = cap_dict.get_receiver().unwrap().peek().await;
+        let message = receiver.peek().await;
         return Some((name.parse().unwrap(), message.target.moniker.clone()));
     }
 
@@ -152,12 +167,19 @@ impl DictExt for Dict {
     /// message that was received. Returns `None` if there are no Receivers in this Dict.
     async fn read_receivers(&self) -> Option<(Name, Message)> {
         let mut futures_unordered = FuturesUnordered::new();
-        for cap_name in self.entries.keys() {
-            let cap_dict = self.get_protocol(&cap_name.parse().unwrap()).unwrap();
-            if let Some(receiver) = cap_dict.get_receiver() {
-                let receiver = receiver.clone();
-                futures_unordered.push(async move { (cap_name, receiver.receive().await) });
+        // Extra scope is needed due to https://github.com/rust-lang/rust/issues/57478
+        {
+            let entries = self.lock_entries();
+            for (cap_name, cap) in entries.iter() {
+                let dict: Dict = cap.clone().try_into().unwrap();
+                let cap_dict = CapabilityDict { inner: dict };
+                if let Some(receiver) = cap_dict.get_receiver() {
+                    let cap_name = cap_name.clone();
+                    let receiver = receiver.clone();
+                    futures_unordered.push(async move { (cap_name, receiver.receive().await) });
+                }
             }
+            drop(entries);
         }
         if futures_unordered.is_empty() {
             return None;
@@ -169,46 +191,60 @@ impl DictExt for Dict {
 }
 
 /// A mutable dict for a single capability.
-pub struct CapabilityDict<'a> {
-    inner: &'a Dict,
+pub struct CapabilityDict {
+    inner: Dict,
 }
 
-impl<'a> CapabilityDict<'a> {
-    pub fn get_receiver(&self) -> Option<&Receiver<Message>> {
-        self.inner.entries.get(&RECEIVER.as_str().to_string()).and_then(|v| v.try_into().ok())
+impl CapabilityDict {
+    pub fn get_receiver(&self) -> Option<Receiver<Message>> {
+        self.inner
+            .lock_entries()
+            .get(&RECEIVER.as_str().to_string())
+            .cloned()
+            .and_then(|v| v.try_into().ok())
     }
 
-    pub fn get_router(&self) -> Option<&Router> {
-        self.inner.entries.get(&ROUTER.as_str().to_string()).and_then(|v| v.try_into().ok())
+    pub fn get_router(&self) -> Option<Router> {
+        self.inner
+            .lock_entries()
+            .get(&ROUTER.as_str().to_string())
+            .cloned()
+            .and_then(|v| v.try_into().ok())
     }
 }
 
 /// A mutable dict for a single capability.
-pub struct CapabilityDictMut<'a> {
-    inner: &'a mut Dict,
+pub struct CapabilityDictMut {
+    inner: Dict,
 }
 
-impl<'a> CapabilityDictMut<'a> {
-    pub fn get_router(&mut self) -> Option<&mut Router> {
-        self.inner.entries.get_mut(&ROUTER.as_str().to_string()).and_then(|v| v.try_into().ok())
+impl CapabilityDictMut {
+    pub fn get_router(&self) -> Option<Router> {
+        self.inner
+            .lock_entries()
+            .get(&ROUTER.as_str().to_string())
+            .cloned()
+            .and_then(|v| v.try_into().ok())
     }
 
-    pub fn insert_router(&mut self, router: Router) {
-        let old_val = self.inner.entries.insert(ROUTER.as_str().to_string(), Box::new(router));
-        assert!(old_val.is_none(), "overwrote a router, this shouldn't be possible");
+    pub fn insert_router(&self, router: Router) {
+        self.inner.lock_entries().insert(ROUTER.as_str().to_string(), Box::new(router));
     }
 
-    pub fn remove_router(&mut self) {
-        self.inner.entries.remove(&ROUTER.as_str().to_string());
+    pub fn remove_router(&self) {
+        self.inner.lock_entries().remove(&ROUTER.as_str().to_string());
     }
 
-    pub fn get_receiver(&mut self) -> Option<&mut Receiver<Message>> {
-        self.inner.entries.get_mut(&RECEIVER.as_str().to_string()).and_then(|v| v.try_into().ok())
+    pub fn get_receiver(&self) -> Option<Receiver<Message>> {
+        self.inner
+            .lock_entries()
+            .get(&RECEIVER.as_str().to_string())
+            .cloned()
+            .and_then(|v| v.try_into().ok())
     }
 
-    pub fn insert_receiver(&mut self, receiver: Receiver<Message>) {
-        let old_val = self.inner.entries.insert(RECEIVER.as_str().to_string(), Box::new(receiver));
-        assert!(old_val.is_none(), "overwrote a receiver, this shouldn't be possible");
+    pub fn insert_receiver(&self, receiver: Receiver<Message>) {
+        self.inner.lock_entries().insert(RECEIVER.as_str().to_string(), Box::new(receiver));
     }
 }
 

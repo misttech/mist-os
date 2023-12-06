@@ -1,86 +1,65 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{AnyCast, Capability, CloneError, Sender},
-    derivative::Derivative,
-    fidl::endpoints::{create_proxy, Proxy},
-    fidl_fuchsia_component_sandbox as fsandbox, fuchsia_async as fasync,
-    fuchsia_zircon::{self as zx, HandleBased},
-    futures::{
-        channel::mpsc,
-        future::{self, BoxFuture, Either},
-        lock::{MappedMutexGuard, Mutex, MutexGuard},
-        FutureExt, StreamExt,
-    },
-    std::fmt::Debug,
-    std::pin::pin,
-    std::sync::{self, Arc},
+use derivative::Derivative;
+use fidl::endpoints::{create_proxy, Proxy, ServerEnd};
+use fidl_fuchsia_component_sandbox as fsandbox;
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::{
+    channel::mpsc,
+    future::{self, Either},
+    lock::{MappedMutexGuard, Mutex, MutexGuard},
+    StreamExt,
 };
+use std::pin::pin;
+use std::sync::Arc;
 
-#[derive(Debug)]
-pub enum MessageOrTask<M: Capability + From<zx::Handle>> {
-    Message(M),
-    Task(fasync::Task<()>),
-}
+use crate::{registry, AnyCast, Capability, Sender};
 
-/// A capability that represents a Zircon handle.
-// TODO(fxbug.dev/298112397): Does Receiver need to implement Clone? If not, we could remove the Arc around the Mutex
+/// A capability that transfers another capability to a [Sender].
 #[derive(Capability, Derivative)]
 #[derivative(Debug)]
-pub struct Receiver<M: Capability + From<zx::Handle>> {
-    inner: Arc<Mutex<PeekableReceiver<M>>>,
-    sender: mpsc::UnboundedSender<MessageOrTask<M>>,
-    #[derivative(Debug = "ignore")]
-    sender_tasks: Arc<sync::Mutex<fasync::TaskGroup>>,
+pub struct Receiver<T: Capability + From<zx::Handle>> {
+    inner: Arc<Mutex<PeekableReceiver<T>>>,
+    sender: mpsc::UnboundedSender<T>,
+
+    /// The FIDL representation of this `Receiver`.
+    ///
+    /// This will be `Some` if was previously converted into a `ServerEnd`, such as by calling
+    /// [into_fidl], and the capability is not currently in the registry.
+    server_end: Option<ServerEnd<fsandbox::ReceiverMarker>>,
 }
 
-impl<M: Capability + From<zx::Handle>> Clone for Receiver<M> {
+impl<T: Capability + From<zx::Handle>> Clone for Receiver<T> {
     fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            sender: self.sender.clone(),
-            sender_tasks: self.sender_tasks.clone(),
-        }
+        Self { inner: self.inner.clone(), sender: self.sender.clone(), server_end: None }
     }
 }
 
-impl<M: Capability + From<zx::Handle>> Receiver<M> {
+impl<T: Capability + From<zx::Handle>> Receiver<T> {
     pub fn new() -> Self {
         let (sender, receiver) = mpsc::unbounded();
         Self {
             inner: Arc::new(Mutex::new(PeekableReceiver::new(receiver))),
             sender,
-            sender_tasks: Arc::new(sync::Mutex::new(fasync::TaskGroup::new())),
+            server_end: None,
         }
     }
 
-    pub fn new_sender(&self) -> Sender<M> {
+    pub fn new_sender(&self) -> Sender<T> {
         Sender::new(self.sender.clone())
     }
 
-    pub async fn receive(&self) -> M {
-        loop {
-            let mut receiver_guard = self.inner.lock().await;
-            // The following unwrap is infallible because we're also holding a sender
-            match receiver_guard.read().await {
-                MessageOrTask::Message(msg) => return msg,
-                MessageOrTask::Task(task) => {
-                    let mut sender_tasks = self.sender_tasks.lock().unwrap();
-                    sender_tasks.add(task);
-                }
-            }
-        }
+    pub async fn receive(&self) -> T {
+        let mut receiver_guard = self.inner.lock().await;
+        receiver_guard.read().await
     }
 
-    pub async fn peek<'a>(&'a self) -> MappedMutexGuard<'a, PeekableReceiver<M>, M> {
+    pub async fn peek<'a>(&'a self) -> MappedMutexGuard<'a, PeekableReceiver<T>, T> {
         let mut receiver_guard = self.inner.lock().await;
-        let tasks = receiver_guard.load_peek_value().await;
-        for task in tasks {
-            let mut sender_tasks = self.sender_tasks.lock().unwrap();
-            sender_tasks.add(task);
-        }
-        MutexGuard::map(receiver_guard, |receiver: &mut PeekableReceiver<M>| {
+        receiver_guard.load_peek_value().await;
+        MutexGuard::map(receiver_guard, |receiver: &mut PeekableReceiver<T>| {
             receiver.peek_value_mut().unwrap()
         })
     }
@@ -89,14 +68,10 @@ impl<M: Capability + From<zx::Handle>> Receiver<M> {
         let mut on_closed = receiver_proxy.on_closed();
         loop {
             match future::select(pin!(self.receive()), on_closed).await {
-                Either::Left((msg, fut)) => {
+                Either::Left((capability, fut)) => {
                     on_closed = fut;
-                    let (handle, fut) = msg.to_zx_handle();
-                    if let Some(fut) = fut {
-                        let mut sender_tasks = self.sender_tasks.lock().unwrap();
-                        sender_tasks.spawn(fut);
-                    }
-                    if let Err(_) = receiver_proxy.receive(handle) {
+                    let capability = capability.into_fidl();
+                    if let Err(_) = receiver_proxy.receive(capability) {
                         return;
                     }
                 }
@@ -106,67 +81,79 @@ impl<M: Capability + From<zx::Handle>> Receiver<M> {
             }
         }
     }
-}
 
-impl<M: Capability + From<zx::Handle>> Capability for Receiver<M> {
-    fn try_clone(&self) -> Result<Self, CloneError> {
-        Ok(self.clone())
+    /// Handles the `fuchsia.sandbox.Receiver` protocol for this Receiver
+    /// and moves it into the registry.
+    fn handle_and_register(self, proxy: fsandbox::ReceiverProxy, koid: zx::Koid) {
+        let receiver = self.clone();
+        let fut = async move {
+            receiver.handle_receiver(proxy).await;
+        };
+
+        // Move this capability into the registry.
+        let task = fasync::Task::spawn(fut);
+        registry::insert_with_task(Box::new(self), koid, task);
     }
 
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        let (receiver_proxy, receiver_server) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
-        let fut = async move {
-            self.handle_receiver(receiver_proxy).await;
-        };
-        (receiver_server.into_handle(), Some(fut.boxed()))
+    /// Sets this Receiver's server end to the provided one.
+    ///
+    /// This should only be used to put a remoted server end back into the Receiver after it is
+    /// removed from the registry.
+    pub(crate) fn set_server_end(&mut self, server_end: ServerEnd<fsandbox::ReceiverMarker>) {
+        self.server_end = Some(server_end)
+    }
+}
+
+impl<T: Capability + From<zx::Handle>> Capability for Receiver<T> {}
+
+impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for ServerEnd<fsandbox::ReceiverMarker> {
+    fn from(mut receiver: Receiver<T>) -> Self {
+        receiver.server_end.take().unwrap_or_else(|| {
+            let (receiver_proxy, server_end) = create_proxy::<fsandbox::ReceiverMarker>().unwrap();
+            receiver.handle_and_register(receiver_proxy, server_end.get_koid().unwrap());
+            server_end
+        })
+    }
+}
+
+impl<T: Capability + From<zx::Handle>> From<Receiver<T>> for fsandbox::Capability {
+    fn from(receiver: Receiver<T>) -> Self {
+        fsandbox::Capability::Receiver(receiver.into())
     }
 }
 
 /// This provides very similar functionality to `futures::stream::Peekable`, but allows a reference
-/// to a peeked message to be acquired outside of an async block, which is necessary to provide a
+/// to a peeked value to be acquired outside of an async block, which is necessary to provide a
 /// `MappedMutexGuard` of the peeked value.
-pub struct PeekableReceiver<M: Capability + From<zx::Handle>> {
-    receiver: mpsc::UnboundedReceiver<MessageOrTask<M>>,
-    peeked_message: Option<M>,
+pub struct PeekableReceiver<T: Capability + From<zx::Handle>> {
+    receiver: mpsc::UnboundedReceiver<T>,
+    peeked_value: Option<T>,
 }
 
-impl<M: Capability + From<zx::Handle>> PeekableReceiver<M> {
-    fn new(receiver: mpsc::UnboundedReceiver<MessageOrTask<M>>) -> Self {
-        Self { receiver, peeked_message: None }
+impl<T: Capability + From<zx::Handle>> PeekableReceiver<T> {
+    fn new(receiver: mpsc::UnboundedReceiver<T>) -> Self {
+        Self { receiver, peeked_value: None }
     }
 
     /// Returns the peeked value, if any.
-    fn peek_value_mut(&mut self) -> Option<&mut M> {
-        self.peeked_message.as_mut()
+    fn peek_value_mut(&mut self) -> Option<&mut T> {
+        self.peeked_value.as_mut()
     }
 
-    /// Blocks until a message has been loaded. Returns any sender tasks we received in the process
-    /// of waiting for the next message.
-    async fn load_peek_value(&mut self) -> Vec<fasync::Task<()>> {
-        let mut tasks = Vec::new();
-        if self.peeked_message.is_some() {
-            return tasks;
+    /// Blocks until a value has been loaded.
+    async fn load_peek_value(&mut self) {
+        if self.peeked_value.is_some() {
+            return;
         }
-        loop {
-            match self
-                .receiver
-                .next()
-                .await
-                .expect("this is infallible, we're also holding a sender")
-            {
-                MessageOrTask::Message(m) => {
-                    self.peeked_message = Some(m);
-                    return tasks;
-                }
-                MessageOrTask::Task(t) => tasks.push(t),
-            }
-        }
+        self.peeked_value = Some(
+            self.receiver.next().await.expect("this is infallible, we're also holding a sender"),
+        );
     }
 
-    /// Reads a new MessageOrTask from the receiver, and returns the value.
-    async fn read(&mut self) -> MessageOrTask<M> {
-        if let Some(m) = self.peeked_message.take() {
-            MessageOrTask::Message(m)
+    /// Reads a new value from the receiver, and returns the value.
+    async fn read(&mut self) -> T {
+        if let Some(value) = self.peeked_value.take() {
+            value
         } else {
             self.receiver.next().await.expect("this is infallible, we're also holding a sender")
         }

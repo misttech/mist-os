@@ -105,8 +105,7 @@ pub async fn build_component_sandbox(
                 }
             }
             cm_rust::UseSource::Self_ => {
-                if let Some(mut cap_dict) = output.program_output_dict.get_protocol_mut(source_name)
-                {
+                if let Some(cap_dict) = output.program_output_dict.get_protocol_mut(source_name) {
                     if let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) {
                         output
                             .program_input_dict
@@ -216,7 +215,7 @@ fn extend_dict_with_offer(
     }
     let source_name = offer.source_name();
     let target_name = offer.target_name();
-    if let Some(mut cap_dict) = target_dict.get_protocol_mut(target_name) {
+    if let Some(cap_dict) = target_dict.get_protocol_mut(target_name) {
         if cap_dict.get_router().is_some() {
             warn!(
                 "duplicate sources for protocol {} in a dict, unable to populate dict entry",

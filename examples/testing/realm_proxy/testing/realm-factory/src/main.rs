@@ -34,7 +34,7 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                     // Get a dict containing the capabilities exposed by the realm.
                     let (expose_dict, server_end) = endpoints::create_proxy().unwrap();
                     realm.root.controller().get_exposed_dict(server_end)?;
-                    let mut output_dict_entries = expose_dict.read().await?.unwrap();
+                    let mut output_dict_entries = expose_dict.read().await?;
 
                     // Mix in additional capabilities to the dict.
                     //
@@ -57,9 +57,10 @@ async fn serve_realm_factory(mut stream: RealmFactoryRequestStream) {
                         endpoints::create_request_stream::<fsandbox::ReceiverMarker>()?;
                     let factory = client::connect_to_protocol::<fsandbox::FactoryMarker>()?;
                     let () = factory.create_connector(echo_sender_server, echo_receiver_client)?;
+
                     output_dict_entries.push(fsandbox::DictItem {
                         key: format!("{}", fecho::EchoMarker::PROTOCOL_NAME),
-                        value: echo_sender_client.into(),
+                        value: fsandbox::Capability::Sender(echo_sender_client),
                     });
 
                     // Create the dict containing the capabilities to pass to the test.

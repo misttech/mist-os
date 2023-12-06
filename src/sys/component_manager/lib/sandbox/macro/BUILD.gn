@@ -34,9 +34,8 @@ rustc_test("sandbox_macro_tests") {
   edition = "2021"
 
   deps = [
-    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//src/sys/component_manager/lib/sandbox",
-    "//third_party/rust_crates:futures",
   ]
 
   source_root = "tests/test.rs"

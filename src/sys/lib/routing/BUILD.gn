@@ -73,6 +73,7 @@ rustc_library("routing") {
   if (is_fuchsia) {
     sources += [ "src/router.rs" ]
     deps += [
+      "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//src/storage/lib/vfs/rust:vfs",
       "//src/sys/component_manager/lib/sandbox",

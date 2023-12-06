@@ -1,88 +1,80 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use {
-    crate::{AnyCast, Capability, CloneError, ConversionError, Open},
-    anyhow::{anyhow, Context},
-    fidl::endpoints::ClientEnd,
-    fidl_fuchsia_io as fio, fidl_fuchsia_unknown as funknown,
-    fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
-    futures::future::BoxFuture,
-};
+use anyhow::{Context, Error};
+use fidl::endpoints::{create_request_stream, ClientEnd, ServerEnd};
+use fidl_fuchsia_component_sandbox as fsandbox;
+use fuchsia_async as fasync;
+use fuchsia_zircon::{self as zx, AsHandleRef};
+use futures::TryStreamExt;
+use std::sync::{Arc, Mutex};
 
-/// A capability that represents a Zircon handle.
-#[derive(Capability, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Handle(zx::Handle);
+use crate::{registry, AnyCast, Capability, ConversionError, Open};
 
-impl zx::HandleBased for Handle {}
+/// A capability that vends a single Zircon handle.
+#[derive(Capability, Clone, Debug)]
+pub struct OneShotHandle(Arc<Mutex<Option<zx::Handle>>>);
 
-impl zx::AsHandleRef for Handle {
-    fn as_handle_ref(&self) -> zx::HandleRef<'_> {
-        self.0.as_handle_ref()
-    }
-}
-
-impl Into<zx::Handle> for Handle {
-    fn into(self) -> zx::Handle {
-        self.0
-    }
-}
-
-impl From<zx::Handle> for Handle {
-    fn from(handle: zx::Handle) -> Self {
-        Handle(handle)
-    }
-}
-
-impl Handle {
-    /// Attempts to clone by calling `fuchsia.unknown.Cloneable/Clone2` on the handle.
+impl OneShotHandle {
+    /// Returns the handle in this [OneShotHandle], taking it out.
     ///
-    /// The handle must be a channel that speaks the `Cloneable` protocol.
-    fn try_fidl_clone(&self) -> Result<Self, CloneError> {
-        // Try to clone. Only works for channels.
-        let basic_info = self
-            .0
-            .basic_info()
-            .map_err(|status| anyhow!("failed to get handle info: {}", status))?;
-        if basic_info.object_type != zx::ObjectType::CHANNEL {
-            return Err(CloneError::NotSupported);
-        }
-
-        let (client_end, server_end) = zx::Channel::create();
-        let raw_handle = self.0.as_handle_ref().raw_handle();
-        // SAFETY: the channel is forgotten at the end of scope so it is not double closed.
-        unsafe {
-            let borrowed: zx::Channel = zx::Handle::from_raw(raw_handle).into();
-            let cloneable = funknown::CloneableSynchronousProxy::new(borrowed);
-            // TODO(b/306037927): Calling Clone2 on a channel that doesn't speak Cloneable may
-            // inadvertently close the channel.
-            let result = cloneable.clone2(server_end.into());
-            std::mem::forget(cloneable.into_channel());
-            result.context("failed to call Clone2")?;
-        }
-        Ok(Self(client_end.into_handle()))
+    /// Subsequent calls will return an `Unavailable` error.
+    pub fn get_handle(&self) -> Result<zx::Handle, fsandbox::HandleCapabilityError> {
+        self.0.lock().unwrap().take().ok_or(fsandbox::HandleCapabilityError::Unavailable)
     }
 }
 
-impl Capability for Handle {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        (self.into(), None)
+impl From<zx::Handle> for OneShotHandle {
+    fn from(handle: zx::Handle) -> Self {
+        OneShotHandle(Arc::new(Mutex::new(Some(handle))))
     }
+}
 
-    fn try_clone(&self) -> Result<Self, CloneError> {
-        // Try to clone with `fuchsia.unknown.Cloneable`.
-        if let Ok(clone) = self.try_fidl_clone() {
-            return Ok(clone);
+impl OneShotHandle {
+    /// Serves the `fuchsia.component.HandleCapability` protocol.
+    pub(crate) async fn serve_handle_capability(
+        &self,
+        mut stream: fsandbox::HandleCapabilityRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) =
+            stream.try_next().await.context("failed to read request from stream")?
+        {
+            match request {
+                fsandbox::HandleCapabilityRequest::Clone2 { request, control_handle: _ } => {
+                    // The clone is registered under the koid of the client end.
+                    let koid = request.basic_info().unwrap().related_koid;
+                    let server_end: ServerEnd<fsandbox::HandleCapabilityMarker> =
+                        request.into_channel().into();
+                    let stream = server_end.into_stream().unwrap();
+                    self.clone().serve_and_register(stream, koid);
+                }
+                fsandbox::HandleCapabilityRequest::GetHandle { responder } => {
+                    responder.send(self.get_handle()).context("failed to send response")?;
+                }
+            }
         }
 
-        // Try to duplicate.
-        if let Ok(dup) = self.0.duplicate_handle(zx::Rights::SAME_RIGHTS) {
-            return Ok(Self(dup));
-        }
-
-        Err(CloneError::NotSupported)
+        Ok(())
     }
 
+    /// Serves the `fuchsia.sandbox.HandleCapability` protocol for this OneShotHandle
+    /// and moves it into the registry.
+    fn serve_and_register(self, stream: fsandbox::HandleCapabilityRequestStream, koid: zx::Koid) {
+        let one_shot = self.clone();
+        let fut = async move {
+            one_shot
+                .serve_handle_capability(stream)
+                .await
+                .expect("failed to serve HandleCapability");
+        };
+
+        // Move this capability into the registry.
+        let task = fasync::Task::spawn(fut);
+        registry::insert_with_task(Box::new(self), koid, task);
+    }
+}
+
+impl Capability for OneShotHandle {
     fn try_into_capability(
         self,
         type_id: std::any::TypeId,
@@ -97,121 +89,156 @@ impl Capability for Handle {
     }
 }
 
-impl TryInto<Open> for Handle {
-    type Error = ConversionError;
+impl From<OneShotHandle> for ClientEnd<fsandbox::HandleCapabilityMarker> {
+    /// Serves the `fuchsia.sandbox.HandleCapability` protocol for this OneShotHandle
+    /// and moves it into the registry.
+    fn from(one_shot: OneShotHandle) -> Self {
+        let (client_end, stream) =
+            create_request_stream::<fsandbox::HandleCapabilityMarker>().unwrap();
+        one_shot.serve_and_register(stream, client_end.get_koid().unwrap());
+        client_end
+    }
+}
 
-    /// Attempts to convert into an Open that calls `fuchsia.io.Openable/Open` on this handle.
-    ///
-    /// The handle must be a channel that speaks the `Openable` protocol.
-    fn try_into(self: Self) -> Result<Open, Self::Error> {
-        let basic_info = self
-            .0
-            .basic_info()
-            .map_err(|status| anyhow!("failed to get handle info: {}", status))?;
-        if basic_info.object_type != zx::ObjectType::CHANNEL {
-            return Err(ConversionError::NotSupported);
-        }
-
-        let openable = ClientEnd::<fio::OpenableMarker>::from(self.0)
-            .into_proxy()
-            .context("failed to convert to proxy")?;
-
-        Ok(Open::new(
-            move |_scope: vfs::execution_scope::ExecutionScope,
-                  flags: fio::OpenFlags,
-                  relative_path: vfs::path::Path,
-                  server_end: zx::Channel| {
-                // TODO(b/306037927): Calling Open on a channel that doesn't speak Openable may
-                // inadvertently close the channel.
-                let _ = openable.open(
-                    flags,
-                    fio::ModeType::empty(),
-                    relative_path.as_str(),
-                    server_end.into(),
-                );
-            },
-            // TODO(b/298112397): Determine a more accurate dirent type.
-            fio::DirentType::Unknown,
-        ))
+impl From<OneShotHandle> for fsandbox::Capability {
+    fn from(one_shot: OneShotHandle) -> Self {
+        Self::Handle(one_shot.into())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Capability, Handle, Open};
-    use anyhow::Error;
-    use fidl::endpoints::{create_endpoints, spawn_stream_handler, Proxy};
-    use fidl_fuchsia_io as fio;
+    use super::*;
+    use crate::AnyCapability;
+    use anyhow::{anyhow, Context, Result};
+    use assert_matches::assert_matches;
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream, Proxy};
+    use fidl_fuchsia_component_sandbox as fsandbox;
     use fidl_fuchsia_unknown as funknown;
-    use fuchsia_zircon::{self as zx, HandleBased};
-    use futures::{channel::mpsc, StreamExt};
+    use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
+    use futures::try_join;
 
-    /// Tests that a handle to a channel that speaks `Cloneable` can be cloned.
+    /// Tests that the OneShotHandle implementation of the HandleCapability.GetHandle method
+    /// returns the handle held by the OneShotHandle.
     #[fuchsia::test]
-    async fn try_clone_cloneable() -> Result<(), Error> {
-        let (request_tx, mut request_rx) = mpsc::unbounded();
+    async fn one_shot_serve_get_handle() -> Result<()> {
+        // Create an Event and get its koid.
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
 
-        let cloneable_proxy: funknown::CloneableProxy = spawn_stream_handler(move |request| {
-            let request_tx = request_tx.clone();
-            async move {
-                match request {
-                    funknown::CloneableRequest::Clone2 { request, control_handle: _ } => {
-                        request_tx.unbounded_send(request).unwrap();
-                    }
-                }
-            }
-        })?;
+        let one_shot = OneShotHandle::from(event.into_handle());
 
-        let zx_handle: zx::Handle =
-            cloneable_proxy.into_channel().unwrap().into_zx_channel().into();
-        let handle: Handle = zx_handle.into();
+        let (handle_proxy, handle_stream) =
+            create_proxy_and_stream::<fsandbox::HandleCapabilityMarker>()?;
+        let server = one_shot.serve_handle_capability(handle_stream);
 
-        let clone = handle.try_clone()?;
-        assert!(!clone.is_invalid_handle());
+        let client = async move {
+            let handle = handle_proxy
+                .get_handle()
+                .await
+                .context("failed to call GetHandle")?
+                .map_err(|err| anyhow!("failed to get handle: {:?}", err))?;
 
-        // Cloning should send a channel request to Clone2.
-        let request = request_rx.next().await;
-        assert!(request.is_some());
+            // The handle should be for same Event that was in the OneShotHandle.
+            let got_koid = handle.get_koid().unwrap();
+            assert_eq!(got_koid, expected_koid);
+
+            Ok(())
+        };
+
+        try_join!(client, server).map(|_| ())?;
 
         Ok(())
     }
 
-    /// Tests that a handle to a channel that speaks `Openable` can be converted to Open.
+    /// Tests that the OneShotHandle implementation of the HandleCapability.GetHandle method
+    /// returns the Unavailable error if GetHandle is called twice.
     #[fuchsia::test]
-    async fn try_into_openable() -> Result<(), Error> {
-        let (object_tx, mut object_rx) = mpsc::unbounded();
+    async fn one_shot_serve_get_handle_unavailable() -> Result<()> {
+        let event = zx::Event::create();
+        let one_shot = OneShotHandle::from(event.into_handle());
 
-        let openable_proxy: fio::OpenableProxy = spawn_stream_handler(move |request| {
-            let object_tx = object_tx.clone();
-            async move {
-                match request {
-                    fio::OpenableRequest::Open { flags, mode, path, object, control_handle: _ } => {
-                        assert_eq!(flags, fio::OpenFlags::DIRECTORY);
-                        assert_eq!(mode, fio::ModeType::empty());
-                        assert_eq!(&path, "");
-                        object_tx.unbounded_send(object).unwrap();
-                    }
-                }
-            }
-        })?;
+        let (handle_proxy, handle_stream) =
+            create_proxy_and_stream::<fsandbox::HandleCapabilityMarker>()?;
+        let server = one_shot.serve_handle_capability(handle_stream);
 
-        let zx_handle: zx::Handle = openable_proxy.into_channel().unwrap().into_zx_channel().into();
-        let handle: Handle = zx_handle.into();
+        let client = async move {
+            let first_result =
+                handle_proxy.get_handle().await.context("failed to call GetHandle")?;
+            assert!(first_result.is_ok());
 
-        let open: Open = handle.try_into()?;
+            let second_result =
+                handle_proxy.get_handle().await.context("failed to call GetHandle")?;
+            assert_eq!(Err(fsandbox::HandleCapabilityError::Unavailable), second_result);
 
-        // Opening should send a server end to Open.
-        let scope = vfs::execution_scope::ExecutionScope::new();
-        let (_dir_client_end, dir_server_end) = create_endpoints::<fio::DirectoryMarker>();
-        open.open(
-            scope,
-            fio::OpenFlags::DIRECTORY,
-            ".".to_string(),
-            dir_server_end.into_channel().into(),
+            Ok(())
+        };
+
+        try_join!(client, server).map(|_| ())?;
+
+        Ok(())
+    }
+
+    #[fuchsia::test]
+    async fn one_shot_into_fidl() -> Result<()> {
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        let one_shot = OneShotHandle::from(event.into_handle());
+
+        // Convert the OneShotHandle to FIDL and back.
+        let fidl_capability: fsandbox::Capability = one_shot.into();
+
+        let any: AnyCapability =
+            fidl_capability.try_into().context("failed to convert from FIDL")?;
+        let one_shot: OneShotHandle = any.try_into().unwrap();
+
+        // Get the handle.
+        let handle = one_shot.get_handle().unwrap();
+
+        // The handle should be for same Event that was in the original OneShotHandle.
+        let got_koid = handle.get_koid().unwrap();
+        assert_eq!(got_koid, expected_koid);
+
+        Ok(())
+    }
+
+    /// Tests that a OneShotHandle can be cloned via `fuchsia.unknown/Cloneable.Clone2`
+    #[fuchsia::test]
+    async fn fidl_clone() -> Result<()> {
+        let event = zx::Event::create();
+        let expected_koid = event.get_koid().unwrap();
+
+        let one_shot = OneShotHandle::from(event.into_handle());
+
+        let client_end: ClientEnd<fsandbox::HandleCapabilityMarker> = one_shot.into();
+        let handle_cap_proxy = client_end.into_proxy().unwrap();
+
+        // Clone the HandleCapability with `Clone2`
+        let (clone_client_end, clone_server_end) = create_endpoints::<funknown::CloneableMarker>();
+        let _ = handle_cap_proxy.clone2(clone_server_end);
+        let clone_client_end: ClientEnd<fsandbox::HandleCapabilityMarker> =
+            clone_client_end.into_channel().into();
+        let clone_proxy = clone_client_end.into_proxy().unwrap();
+
+        // Get the handle from the clone.
+        let handle = clone_proxy.get_handle().await.context("failed to call GetHandle")?.unwrap();
+
+        // The handle should be for same Event that was in the original OneShotHandle.
+        let got_koid = handle.get_koid().unwrap();
+        assert_eq!(got_koid, expected_koid);
+
+        // Convert the original FIDL HandleCapability back to a Rust object.
+        let handle_cap_client_end = ClientEnd::<fsandbox::HandleCapabilityMarker>::new(
+            handle_cap_proxy.into_channel().unwrap().into_zx_channel(),
         );
+        let fidl_capability = fsandbox::Capability::Handle(handle_cap_client_end);
+        let any: AnyCapability = fidl_capability.try_into().unwrap();
+        let one_shot: OneShotHandle = any.try_into().unwrap();
 
-        let server_end = object_rx.next().await;
-        assert!(server_end.is_some());
+        // The original OneShotHandle should now not have a handle because it was taken
+        // out by the GetHandle call on the clone.
+        assert_matches!(one_shot.get_handle(), Err(fsandbox::HandleCapabilityError::Unavailable));
 
         Ok(())
     }

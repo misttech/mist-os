@@ -4,7 +4,7 @@
 
 use replace_with::replace_with;
 use routing::{Routable, Router};
-use sandbox::{Capability, Dict};
+use sandbox::Dict;
 use std::{
     fmt,
     ops::{Deref, DerefMut},
@@ -59,7 +59,7 @@ impl Inner {
             ProgramState::MissingInput | ProgramState::NotRunning { .. } => {
                 unreachable!("just started the program")
             }
-            ProgramState::Running { output } => output.try_clone().unwrap(),
+            ProgramState::Running { output } => output.clone(),
         }
     }
 

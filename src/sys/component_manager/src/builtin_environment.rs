@@ -104,7 +104,7 @@ use {
     fuchsia_zircon::{self as zx, Clock, HandleBased, Resource},
     futures::{future::BoxFuture, sink::drain, stream::FuturesUnordered, FutureExt, StreamExt},
     moniker::{Moniker, MonikerBase},
-    sandbox::{Capability, Dict, Receiver},
+    sandbox::{Dict, Receiver},
     std::sync::Arc,
     tracing::info,
 };
@@ -413,6 +413,7 @@ impl BuiltinDictBuilder {
         let receiver = Receiver::new();
         let router = new_terminating_router(receiver.clone());
         self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
+
         let capability_source = CapabilitySource::Builtin {
             capability: InternalCapability::Protocol(name.clone()),
             top_instance: Arc::downgrade(&self.top_instance),
@@ -1227,7 +1228,7 @@ impl BuiltinEnvironment {
     /// dict from the builtin environment. This is called in some tests because the tests create
     /// a new model but do not call `Model::start`.
     pub async fn discover_root_component(&self) {
-        self.model.discover_root_component(self.dict.try_clone().unwrap()).await;
+        self.model.discover_root_component(self.dict.clone()).await;
     }
 
     pub async fn wait_for_root_stop(&self) {
@@ -1236,7 +1237,7 @@ impl BuiltinEnvironment {
 
     pub async fn run_root(&mut self) -> Result<(), Error> {
         self.bind_service_fs_to_out().await?;
-        self.model.start(self.dict.try_clone().unwrap()).await;
+        self.model.start(self.dict.clone()).await;
         component::health().set_ok();
         self.wait_for_root_stop().await;
 

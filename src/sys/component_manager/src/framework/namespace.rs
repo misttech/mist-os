@@ -104,11 +104,8 @@ impl NamespaceCapabilityHost {
         for entry in entries {
             let path = entry.path;
             let dict = entry.dict.into_proxy().unwrap();
-            let items: Vec<_> = dict
-                .read()
-                .await
-                .map_err(|_| fcomponent::NamespaceError::DictRead)?
-                .map_err(|_| fcomponent::NamespaceError::DictRead)?;
+            let items: Vec<_> =
+                dict.read().await.map_err(|_| fcomponent::NamespaceError::DictRead)?;
             for item in items {
                 let capability: AnyCapability = item.value.try_into().unwrap();
                 let path = namespace::Path::new(format!("{}/{}", path, item.key))
@@ -172,30 +169,9 @@ mod tests {
         fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component_sandbox as fsandbox,
         fuchsia_async as fasync,
         fuchsia_component::client,
-        sandbox::{Capability, Dict, Handle, Receiver},
+        futures::TryStreamExt,
+        sandbox::{Dict, OneShotHandle, Receiver},
     };
-
-    async fn handle_receiver<T, Fut, F>(
-        mut receiver_stream: fsandbox::ReceiverRequestStream,
-        request_stream_handler: F,
-    ) where
-        T: endpoints::ProtocolMarker,
-        Fut: Future<Output = ()> + Send,
-        F: Fn(T::RequestStream) -> Fut + Send + Sync + Copy + 'static,
-    {
-        let mut task_group = fasync::TaskGroup::new();
-        while let Some(request) = receiver_stream.try_next().await.unwrap() {
-            match request {
-                fsandbox::ReceiverRequest::Receive { capability, control_handle: _ } => {
-                    task_group.spawn(async move {
-                        let server_end = ServerEnd::<T>::new(fidl::Channel::from(capability));
-                        let stream: T::RequestStream = server_end.into_stream().unwrap();
-                        request_stream_handler(stream).await;
-                    });
-                }
-            }
-        }
-    }
 
     async fn handle_echo_request_stream(response: &str, mut stream: fecho::EchoRequestStream) {
         while let Ok(Some(request)) = stream.try_next().await {
@@ -221,31 +197,30 @@ mod tests {
         let mut namespace_pairs = vec![];
         for (path, response) in [("/svc", "first"), ("/zzz/svc", "second")] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<Handle>::new();
+            let receiver = Receiver::<OneShotHandle>::new();
             let sender = receiver.new_sender();
 
             // Serve an Echo request handler on the Receiver.
-            let (handle, receiver_fut) = receiver.to_zx_handle();
-            let receiver_stream =
-                ServerEnd::<fsandbox::ReceiverMarker>::new(fidl::Channel::from(handle));
-            let receiver_stream = receiver_stream.into_stream().unwrap();
             tasks.add(fasync::Task::spawn(async move {
-                let t1 = receiver_fut.unwrap();
-                let t2 = handle_receiver::<fecho::EchoMarker, _, _>(receiver_stream, |stream| {
-                    handle_echo_request_stream(response, stream)
-                });
-                futures::join!(t1, t2);
+                loop {
+                    let one_shot = receiver.receive().await;
+                    let handle = one_shot.get_handle().unwrap();
+                    let stream: fecho::EchoRequestStream =
+                        ServerEnd::<fecho::EchoMarker>::from(handle).into_stream().unwrap();
+                    handle_echo_request_stream(response, stream).await;
+                }
             }));
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
+            dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
+
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictMarker>().unwrap();
             tasks.add(fasync::Task::spawn(async move {
                 dict.serve_dict(stream).await.unwrap();
             }));
-            let (handle, _) = sender.to_zx_handle();
-            dict_proxy.insert(fecho::EchoMarker::DEBUG_NAME, handle).await.unwrap().unwrap();
+
             namespace_pairs.push(fcomponent::NamespaceDictPair {
                 path: path.into(),
                 dict: dict_proxy.into_channel().unwrap().into_zx_channel().into(),
@@ -289,31 +264,30 @@ mod tests {
         let mut namespace_pairs = vec![];
         for path in ["/svc", "/svc/shadow"] {
             // Initialize the host and sender/receiver pair.
-            let receiver = Receiver::<Handle>::new();
+            let receiver = Receiver::<OneShotHandle>::new();
             let sender = receiver.new_sender();
 
             // Serve an Echo request handler on the Receiver.
-            let (handle, receiver_fut) = receiver.to_zx_handle();
-            let receiver_stream =
-                ServerEnd::<fsandbox::ReceiverMarker>::new(fidl::Channel::from(handle));
-            let receiver_stream = receiver_stream.into_stream().unwrap();
             tasks.add(fasync::Task::spawn(async move {
-                let t1 = receiver_fut.unwrap();
-                let t2 = handle_receiver::<fecho::EchoMarker, _, _>(receiver_stream, |stream| {
-                    handle_echo_request_stream("hello", stream)
-                });
-                futures::join!(t1, t2);
+                loop {
+                    let one_shot = receiver.receive().await;
+                    let handle = one_shot.get_handle().unwrap();
+                    let stream: fecho::EchoRequestStream =
+                        ServerEnd::<fecho::EchoMarker>::from(handle).into_stream().unwrap();
+                    handle_echo_request_stream("hello", stream).await;
+                }
             }));
 
             // Create a dictionary and add the Sender to it.
             let mut dict = Dict::new();
+            dict.lock_entries().insert(fecho::EchoMarker::DEBUG_NAME.to_string(), Box::new(sender));
+
             let (dict_proxy, stream) =
                 endpoints::create_proxy_and_stream::<fsandbox::DictMarker>().unwrap();
             tasks.add(fasync::Task::spawn(async move {
                 dict.serve_dict(stream).await.unwrap();
             }));
-            let (handle, _) = sender.to_zx_handle();
-            dict_proxy.insert(fecho::EchoMarker::DEBUG_NAME, handle).await.unwrap().unwrap();
+
             namespace_pairs.push(fcomponent::NamespaceDictPair {
                 path: path.into(),
                 dict: dict_proxy.into_channel().unwrap().into_zx_channel().into(),

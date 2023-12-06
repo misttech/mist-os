@@ -7,8 +7,46 @@ using zx;
 using fuchsia.io;
 using fuchsia.unknown;
 
-/// A capability of unknown type.
-alias Capability = zx.Handle;
+/// Maximum number of bytes in a [DataCapability].
+const MAX_DATA_LENGTH uint32 = 8192;
+
+/// Maximum number of items returned by [DictIterator].
+const MAX_DICT_ITEMS_CHUNK uint32 = 128;
+
+closed protocol HandleCapability {
+    compose fuchsia.unknown.Cloneable;
+
+    strict GetHandle() -> (resource struct {
+        handle zx.Handle;
+    }) error @generated_name("HandleCapabilityError") strict enum {
+        UNAVAILABLE = 1;
+    };
+};
+
+type DataCapability = flexible union {
+    1: bytes vector<byte>:MAX_DATA_LENGTH;
+    2: string string:MAX_DATA_LENGTH;
+    3: int64 int64;
+    4: uint64 uint64;
+};
+
+type OptionalCapability = resource struct {
+    value Capability:optional;
+};
+
+type Capability = flexible resource union {
+    1: unit @generated_name("UnitCapability") struct {};
+    2: opaque zx.Handle:EVENT;
+    3: handle client_end:HandleCapability;
+    4: data DataCapability;
+    5: cloneable client_end:fuchsia.unknown.Cloneable;
+    6: dict client_end:Dict;
+    7: sender client_end:Sender;
+    8: receiver server_end:Receiver;
+    9: open client_end:fuchsia.io.Openable;
+   10: directory client_end:fuchsia.io.Directory;
+   11: optional OptionalCapability;
+};
 
 /// The key of a [`DictItem`].
 alias DictKey = string:MAX;
@@ -27,53 +65,101 @@ type DictError = flexible enum {
     /// The Dict already contains an item with the given key.
     ALREADY_EXISTS = 2;
 
-    /// The `Capability` handle was invalid.
-    BAD_HANDLE = 3;
-
-    /// A capability could not be cloned.
-    NOT_CLONEABLE = 4;
+    /// The Capability is invalid.
+    ///
+    /// Capabilites must be created by sandbox, via
+    /// `fuchsia.component.sandbox.Factory` or returned from other
+    /// Component Framework APIs.
+    BAD_CAPABILITY = 3;
 };
 
-closed protocol Dict {
+@discoverable
+open protocol Dict {
+    /// Creates a new connection to the same underlying dictionary.
+    ///
+    /// Use `Copy` to a new dictionary with clones of all the exiting entries.
+    compose fuchsia.unknown.Cloneable;
+
     /// Inserts a key-value pair into the dict.
     ///
     /// * error `DictError.ALREADY_EXISTS` if the dict already contains an
     /// item with the same key.
-    strict Insert(DictItem) -> () error DictError;
+    flexible Insert(DictItem) -> () error DictError;
 
-    /// Removes a key from the dict, returning the [`Capability`] value.
+    /// Get a clone of a capability from this dictionary.
     ///
     /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
-    strict Remove(struct {
+    flexible Get(struct {
         key DictKey;
     }) -> (resource struct {
         capability Capability;
     }) error DictError;
 
-    /// Returns all items in this dict, sorted by key in natural order. Requires
-    /// that all capabilities in the dict are cloneable. This will clone each
-    /// capability in the dict and return handles to the cloned capabilities.
+    /// Removes a key from the dict, returning the [`Capability`] value.
     ///
-    /// * error `DictError.NOT_CLONEABLE` if any of the capabilities in the dict
-    /// could not be cloned.
-    strict Read() -> (resource struct {
-        items vector<DictItem>:MAX;
+    /// * error `DictError.NOT_FOUND` if the dict does not contain the key.
+    flexible Remove(struct {
+        key DictKey;
+    }) -> (resource struct {
+        capability Capability;
     }) error DictError;
+
+    /// Returns all items in this dict, sorted by key in natural order.
+    ///
+    /// This operation creates shallow clones of values.
+    // TODO(b/314361448): Remove once callers use Dict.Enumerate instead
+    flexible Read() -> (resource struct {
+        items vector<DictItem>:MAX;
+    });
+
+    /// Create a new dictionary that contains a clone of all the entries in
+    /// this dictionary.
+    ///
+    /// For example, if this dictionary contains nested dictionaries, the newly
+    /// created dictionary will contain references to those same nested
+    /// dictionaries because the entries are cloned rather than copied.
+    flexible Copy(resource struct {
+        request server_end:Dict;
+    });
+
+    /// Enumerates the entries in this dictionary.
+    ///
+    /// Creates a clone of each item during enumeration.
+    flexible Enumerate(resource struct {
+        contents server_end:DictIterator;
+    });
+
+    /// Removes all the entries in this dictionary.
+    ///
+    /// If `contents` is not provided, all the items are discarded without
+    /// enumerating them.
+    flexible Drain(resource struct {
+        contents server_end:<DictIterator, optional>;
+    });
+};
+
+open protocol DictIterator {
+    flexible GetNext() -> (resource struct {
+        items vector<DictItem>:MAX_DICT_ITEMS_CHUNK;
+    });
 };
 
 @discoverable
-closed protocol Sender {
+open protocol Sender {
     compose fuchsia.io.Openable;
     compose fuchsia.unknown.Cloneable;
 
-    /// Sends a single Capability handle over this sender.
+    /// Sends a Capability over this sender.
     strict Send(resource struct {
         capability Capability;
     });
 };
 
-closed protocol Receiver {
-    /// Receives a single Capability handle.
+@discoverable
+open protocol Receiver {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Receives a Capability.
     strict Receive(resource struct {
         capability Capability;
     });
@@ -90,6 +176,7 @@ open protocol Factory {
 
     /// Creates a [`Dict`] initialized with `items`.
     strict CreateDict(resource struct {
+        // TODO(fxbug.dev/306043410): Accept a DictIterator
         items vector<DictItem>:MAX;
         server_end server_end:Dict;
     }) -> () error DictError;

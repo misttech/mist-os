@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Context, Error};
 use futures::{lock::Mutex, FutureExt};
-use sandbox::{AnyCapability, Capability, Data, Dict, Lazy, Optional};
+use sandbox::{AnyCapability, Data, Dict, Lazy, Optional};
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use thiserror::Error;
@@ -69,34 +69,37 @@ impl Interface {
 
     /// Put the capability into the incoming dictionary.
     pub async fn insert(&self, name: decl::CapabilityName, cap: AnyCapability) {
-        let mut inner = self.inner.lock().await;
-        inner.incoming.entries.insert(name, cap);
+        let inner = self.inner.lock().await;
+        inner.incoming.lock_entries().insert(name, cap);
     }
 
     /// Take the capability out of the outgoing dictionary.
     pub async fn remove(&self, name: &decl::CapabilityName) -> Option<AnyCapability> {
-        let mut inner = self.inner.lock().await;
-        inner.outgoing.entries.remove(name)
+        let inner = self.inner.lock().await;
+        let entry = inner.outgoing.lock_entries().remove(name);
+        entry
     }
 
     /// Get a clone of the capability from the outgoing dictionary.
     pub async fn get(&self, name: &decl::CapabilityName) -> Option<AnyCapability> {
         let inner = self.inner.lock().await;
-        inner.outgoing.entries.get(name)?.try_clone().ok()
+        let entry = inner.outgoing.lock_entries().get(name).cloned();
+        entry
     }
 
     /// Get a clone of the capability from the incoming dictionary.
     /// Should only be used by the interface owner.
     async fn get_incoming(&self, name: &decl::CapabilityName) -> Option<AnyCapability> {
         let inner = self.inner.lock().await;
-        inner.incoming.entries.get(name)?.try_clone().ok()
+        let entry = inner.incoming.lock_entries().get(name).cloned();
+        entry
     }
 
     /// Put the capability into the outgoing dictionary.
     /// Should only be used by the interface owner.
     async fn insert_outgoing(&self, name: decl::CapabilityName, cap: AnyCapability) {
-        let mut inner = self.inner.lock().await;
-        inner.outgoing.entries.insert(name, cap);
+        let inner = self.inner.lock().await;
+        inner.outgoing.lock_entries().insert(name, cap);
     }
 }
 
@@ -191,7 +194,7 @@ pub async fn resolve(
         Ok(match source {
             decl::Ref::Hammerspace => {
                 // Create the capability out of thin air.
-                Box::new(Data::new(cap_name.clone())) as AnyCapability
+                Box::new(Data::String(cap_name.clone())) as AnyCapability
             }
             decl::Ref::Parent => {
                 // Get the capability from the incoming dictionary of the current interface.
@@ -436,9 +439,8 @@ mod test {
             .expect("child_b doesn't have the capability in its program interface")
             .try_into()
             .expect("failed to convert to Lazy");
-        let cap: Data<String> =
-            lazy.get().await.unwrap().try_into().expect("failed to convert to Data<String>");
-        assert_eq!(cap.value, "cap");
+        let cap: Data = lazy.get().await.unwrap().try_into().expect("failed to convert to Data");
+        assert_eq!(cap, Data::String("cap".to_string()));
     }
 
     // Tests that a capability exposed with optional availability can be used with
@@ -518,8 +520,8 @@ mod test {
             lazy.get().await.unwrap().try_into().expect("failed to convert to Optional");
         // The Optional should contain a value because child_a exposed it from a valid source.
         let any: AnyCapability = optional.0.expect("optional is missing value");
-        let cap: Data<String> = any.try_into().expect("failed to convert to Data<String>");
-        assert_eq!(cap.value, "cap");
+        let cap: Data = any.try_into().expect("failed to convert to Data");
+        assert_eq!(cap, Data::String("cap".to_string()));
     }
 
     // Tests that a capability used with transitional availability from a source that does not

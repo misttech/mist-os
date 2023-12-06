@@ -16,7 +16,7 @@ use fuchsia_zircon::{self as zx, Clock};
 use futures::{future::BoxFuture, Future, FutureExt, TryStreamExt};
 use routing::policy::ScopedPolicyChecker;
 use runner::component::{ChannelEpitaph, Controllable, Controller};
-use sandbox::{Capability, Dict, Open, Receiver};
+use sandbox::{Dict, Open, Receiver};
 use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
@@ -196,19 +196,23 @@ impl ElfRunnerProgram {
     /// - `job`: Each ELF component run by this runner will live inside a job that is a
     ///   child of the provided job.
     fn new(job: zx::Job, resources: Arc<ElfRunnerResources>) -> Self {
-        let mut output = Dict::new();
-        let mut svc = Dict::new();
         let elf_runner_receiver = Receiver::new();
-        svc.entries.insert(
-            fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
-            Box::new(elf_runner_receiver.new_sender()),
-        );
         let snapshot_provider_receiver = Receiver::new();
-        svc.entries.insert(
-            freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
-            Box::new(snapshot_provider_receiver.new_sender()),
-        );
-        output.entries.insert(SVC.to_string(), Box::new(svc));
+
+        let output = Dict::new();
+        let svc = Dict::new();
+        {
+            let mut entries = svc.lock_entries();
+            entries.insert(
+                fcrunner::ComponentRunnerMarker::PROTOCOL_NAME.to_string(),
+                Box::new(elf_runner_receiver.new_sender()),
+            );
+            entries.insert(
+                freport::SnapshotProviderMarker::PROTOCOL_NAME.to_string(),
+                Box::new(snapshot_provider_receiver.new_sender()),
+            );
+        }
+        output.lock_entries().insert(SVC.to_string(), Box::new(svc));
 
         let elf_runner = elf_runner::ElfRunner::new(
             job.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
@@ -259,7 +263,7 @@ impl ElfRunnerProgram {
 
     /// Serves requests coming from `outgoing_dir` using `self.output`.
     fn serve_outgoing(&self, outgoing_dir: ServerEnd<fio::DirectoryMarker>) {
-        let output = self.output.try_clone().unwrap();
+        let output = self.output.clone();
         let open: Open = output.try_into().unwrap();
         open.open(
             self.execution_scope.clone(),

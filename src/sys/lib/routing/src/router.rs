@@ -5,6 +5,7 @@
 use anyhow::{anyhow, Context, Result};
 use cm_types::Availability;
 use fidl::epitaph::ChannelEpitaphExt;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use futures::{
@@ -12,11 +13,10 @@ use futures::{
         mpsc::UnboundedSender,
         oneshot::{self, Canceled},
     },
-    future::BoxFuture,
     Future,
 };
 use moniker::Moniker;
-use sandbox::{AnyCapability, Capability, CloneError, Dict, Open, Path};
+use sandbox::{AnyCapability, Capability, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
 
@@ -67,15 +67,8 @@ impl fmt::Debug for Router {
     }
 }
 
-impl Capability for Router {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        todo!("some FIDL protocol for routing")
-    }
-
-    fn try_clone(&self) -> Result<Self, CloneError> {
-        Ok(self.clone())
-    }
-}
+// TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability
+impl Capability for Router {}
 
 /// If `T` is [`Routable`], then a `Weak<T>` is also [`Routable`], except the request
 /// may fail if the weak pointer has expired.
@@ -215,17 +208,20 @@ impl Router {
     }
 }
 
+impl From<Router> for fsandbox::Capability {
+    fn from(_router: Router) -> Self {
+        unimplemented!("TODO(b/314343346): Complete or remove the Router implementation of sandbox::Capability")
+    }
+}
+
 impl Routable for AnyCapability {
     fn route(&self, request: Request, completer: Completer) {
-        let capability = match self.try_clone() {
-            Ok(capability) => capability,
-            Err(error) => return Router::new_error(error.into()).route(request, completer),
-        };
+        let capability = self.clone();
         match try_get_routable(self) {
             Ok(router) => router.route(request, completer),
             Err(_) => {
                 if request.relative_path.is_empty() {
-                    completer.complete(Ok(capability.try_clone().unwrap()));
+                    completer.complete(Ok(capability.clone()));
                 } else {
                     completer.complete(Err(anyhow!("the capability does not support routing")))
                 }
@@ -285,10 +281,11 @@ fn try_get_routable<'a>(capability: &'a AnyCapability) -> Result<&'a dyn Routabl
 impl Routable for Dict {
     fn route(&self, mut request: Request, completer: Completer) {
         let Some(name) = request.relative_path.next() else {
-            completer.complete(Ok(Box::new(self.try_clone().unwrap())));
+            completer.complete(Ok(Box::new(self.clone())));
             return;
         };
-        let Some(capability) = self.entries.get(&name) else {
+        let entries = self.lock_entries();
+        let Some(capability) = entries.get(&name) else {
             completer.complete(Err(anyhow!("item {} is not present in dictionary", name)));
             return;
         };
@@ -329,7 +326,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn availability_good() {
-        let source = Box::new(Data::new("hello")) as AnyCapability;
+        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
         let base = Router::from_routable(source);
         let proxy = base.availability(Availability::Optional);
         let capability = route(
@@ -343,13 +340,13 @@ mod tests {
         )
         .await
         .unwrap();
-        let capability: Data<&str> = capability.try_into().unwrap();
-        assert_eq!(capability.value, "hello");
+        let capability: Data = capability.try_into().unwrap();
+        assert_eq!(capability, Data::String("hello".to_string()));
     }
 
     #[fuchsia::test]
     async fn availability_bad() {
-        let source = Box::new(Data::new("hello")) as AnyCapability;
+        let source: AnyCapability = Box::new(Data::String("hello".to_string()));
         let base = Router::from_routable(source);
         let proxy = base.availability(Availability::Optional);
         let error = route(

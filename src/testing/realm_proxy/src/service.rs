@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use {
-    anyhow::{Error, Result},
+    anyhow::{anyhow, Context, Error, Result},
     fidl::endpoints,
+    fidl::endpoints::ControlHandle,
     fidl_fuchsia_component_sandbox as fsandbox,
     fidl_fuchsia_testing_harness::{OperationError, RealmProxy_Request, RealmProxy_RequestStream},
     fuchsia_async as fasync,
@@ -141,22 +142,51 @@ pub async fn serve(realm: RealmInstance, stream: RealmProxy_RequestStream) -> Re
 pub async fn handle_receiver<T, Fut, F>(
     mut receiver_stream: fsandbox::ReceiverRequestStream,
     request_stream_handler: F,
-) -> Result<(), fidl::Error>
+) -> Result<(), Error>
 where
     T: endpoints::ProtocolMarker,
     Fut: Future<Output = ()> + Send,
     F: Fn(T::RequestStream) -> Fut + Send + Sync + Copy + 'static,
 {
-    let mut task_group = fasync::TaskGroup::new();
-    while let Some(request) = receiver_stream.try_next().await? {
+    let mut receive_tasks = fasync::TaskGroup::new();
+    while let Some(request) =
+        receiver_stream.try_next().await.context("failed to read request from stream")?
+    {
         match request {
-            fsandbox::ReceiverRequest::Receive { capability, control_handle: _control_handle } => {
-                task_group.spawn(async move {
-                    let server_end =
-                        endpoints::ServerEnd::<T>::new(fidl::Channel::from(capability));
+            fsandbox::ReceiverRequest::Clone2 { .. } => {
+                unimplemented!()
+            }
+            fsandbox::ReceiverRequest::Receive { capability, control_handle } => {
+                let fsandbox::Capability::Handle(handle_cap_client_end) = capability else {
+                    control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                    return Err(anyhow!("capability is not a HandleCapability"));
+                };
+                let handle_cap_proxy = handle_cap_client_end.into_proxy().unwrap();
+                receive_tasks.spawn(async move {
+                    // This assumes the HandleCapability vends only a single handle, so it does
+                    // not call GetHandle in a loop, as that would return Unavailable after
+                    // the first handle.
+                    let result = match handle_cap_proxy.get_handle().await {
+                        Ok(result) => result,
+                        Err(err) => {
+                            error!("failed to call GetHandle: {:?}", err);
+                            return;
+                        }
+                    };
+                    let handle = match result {
+                        Ok(handle) => handle,
+                        Err(err) => {
+                            error!("failed to get handle: {:?}", err);
+                            return;
+                        }
+                    };
+                    let server_end = endpoints::ServerEnd::<T>::new(fidl::Channel::from(handle));
                     let stream: T::RequestStream = server_end.into_stream().unwrap();
                     request_stream_handler(stream).await;
                 });
+            }
+            fsandbox::ReceiverRequest::_UnknownMethod { .. } => {
+                unimplemented!()
             }
         }
     }

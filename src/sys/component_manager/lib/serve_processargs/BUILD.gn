@@ -20,6 +20,8 @@ rustc_library("serve_processargs") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-runtime",
     "//src/lib/process_builder",
     "//src/sys/component_manager/lib/processargs",

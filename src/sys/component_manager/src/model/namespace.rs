@@ -318,7 +318,7 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                                 let sender: Sender<Message> = sender
                                     .try_into()
                                     .expect("router returned unexpected capability type");
-                                sender.send_message(Message {
+                                sender.send(Message {
                                     handle,
                                     flags,
                                     target: weak_component.clone(),

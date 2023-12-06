@@ -2,104 +2,90 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::{self as zx, AsHandleRef};
-use futures::future::BoxFuture;
-use sandbox::{AnyCapability, Capability, CloneError, ConversionError, ErasedCapability, Handle};
+use fidl_fuchsia_component_sandbox as fsandbox;
+use sandbox::{AnyCapability, Capability, ConversionError, ErasedCapability};
 use std::any::{Any, TypeId};
 use std::borrow::BorrowMut;
 use std::fmt::Debug;
 
-/// A test-only capability that derives [Capability].
-#[derive(Capability, Debug)]
-struct TestHandle(zx::Handle);
+/// A capability that holds a string.
+#[derive(Capability, Clone, Debug)]
+#[capability(as_trait(ReadString))]
+struct StringCapability(pub String);
 
-impl Capability for TestHandle {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        (self.0, None)
-    }
-
+impl Capability for StringCapability {
     fn try_into_capability(self, type_id: TypeId) -> Result<Box<dyn Any>, ConversionError> {
-        assert_eq!(type_id, TypeId::of::<Handle>());
-        Ok(Box::new(Handle::from(self.0)))
+        if type_id == TypeId::of::<Self>() {
+            return Ok(Box::new(self) as Box<dyn Any>);
+        } else if type_id == TypeId::of::<IntCapability>() {
+            // StringCapability converted to IntCapability holds the string's length.
+            let int_cap = IntCapability(self.0.len() as i64);
+            return Ok(Box::new(int_cap));
+        }
+        Err(ConversionError::NotSupported)
+    }
+}
+
+trait ReadString {
+    fn read(&self) -> String;
+}
+
+impl ReadString for StringCapability {
+    fn read(&self) -> String {
+        self.0.clone()
+    }
+}
+
+impl From<StringCapability> for fsandbox::Capability {
+    fn from(_capability: StringCapability) -> Self {
+        unimplemented!()
+    }
+}
+
+/// A capability that holds an integer.
+#[derive(Capability, Clone, Debug)]
+struct IntCapability(pub i64);
+
+impl Capability for IntCapability {}
+
+impl From<IntCapability> for fsandbox::Capability {
+    fn from(_capability: IntCapability) -> Self {
+        unimplemented!()
     }
 }
 
 /// Tests that the derived TryFrom<AnyCapability> impl can downcast the capability into Self.
 #[test]
 fn test_try_from_any_into_self() {
-    let event = zx::Event::create();
-    let expected_koid = event.get_koid().unwrap();
-
-    let cap = TestHandle(event.into());
+    let cap = StringCapability("hello".to_string());
     let any: AnyCapability = Box::new(cap);
 
-    // Downcast back into TestHandle.
-    let cap: TestHandle = any.try_into().expect("failed to downcast");
+    // Downcast back into StringCapability.
+    let cap: StringCapability = any.try_into().expect("failed to downcast");
 
-    assert_eq!(cap.0.get_koid().unwrap(), expected_koid);
+    assert_eq!(cap.0, "hello".to_string());
 }
 
 /// Tests that the derived TryFrom<AnyCapability> impl can convert the capability into
 /// a non-Self type using [Convert.try_into_capability].
 #[test]
 fn test_try_from_any_convert() {
-    let event = zx::Event::create();
-    let expected_koid = event.get_koid().unwrap();
-
-    let cap = TestHandle(event.into());
+    let cap = StringCapability("hello".to_string());
     let any: AnyCapability = Box::new(cap);
 
-    // Convert from type-erased TestHandle into Handle.
-    let cap: Handle = any.try_into().expect("failed to convert");
+    // Convert from type-erased StringCapability into IntCapability.
+    let int_cap: IntCapability = any.try_into().expect("failed to convert");
 
-    assert_eq!(cap.as_handle_ref().get_koid().unwrap(), expected_koid);
-}
-
-/// A cloneable capability that holds a string.
-#[derive(Capability, Clone, Debug)]
-struct TestCloneable(pub String);
-
-trait ReadString {
-    fn read(&self) -> String;
-}
-
-impl ReadString for TestCloneable {
-    fn read(&self) -> String {
-        self.0.clone()
-    }
-}
-
-impl Capability for TestCloneable {
-    fn to_zx_handle(self) -> (zx::Handle, Option<BoxFuture<'static, ()>>) {
-        unimplemented!()
-    }
-
-    fn try_clone(&self) -> Result<Self, CloneError> {
-        Ok(self.clone())
-    }
-}
-
-/// Tests that the try_clone impl succeeds.
-#[test]
-fn test_try_clone() {
-    let cap = TestCloneable("hello".to_string());
-    let clone = cap.try_clone().expect("failed to clone");
-    assert_eq!(clone.0, "hello".to_string());
-}
-
-/// Tests that the default try_clone impl returns an error.
-#[test]
-fn test_try_clone_none() {
-    let cap = TestHandle(zx::Handle::invalid());
-    assert!(cap.try_clone().is_err());
+    assert_eq!(int_cap.0, "hello".len() as i64);
 }
 
 /// Tests that the default try_into_capability impl succeeds in converting to the `Self` type.
 #[test]
 fn test_convert_to_self_only() {
-    let cap = TestCloneable("hello".to_string());
-    let converted: Box<dyn Any> = cap.try_into_capability(TypeId::of::<TestCloneable>()).unwrap();
-    let cap: TestCloneable = *converted.downcast::<TestCloneable>().unwrap();
+    let cap = StringCapability("hello".to_string());
+    let converted: Box<dyn Any> =
+        cap.try_into_capability(TypeId::of::<StringCapability>()).unwrap();
+    let cap: StringCapability = *converted.downcast::<StringCapability>().unwrap();
     assert_eq!(cap.0, "hello".to_string());
 }
 
@@ -107,56 +93,56 @@ fn test_convert_to_self_only() {
 /// non-`Self` type.
 #[test]
 fn test_convert_to_self_only_wrong_type() {
-    let cap = TestCloneable("hello".to_string());
-    let convert_result = cap.try_into_capability(TypeId::of::<TestHandle>());
-    // TestCloneable can only be converted to itself, not to TestHandle.
+    let cap = IntCapability(123);
+    let convert_result = cap.try_into_capability(TypeId::of::<StringCapability>());
+    // IntCapability can only be converted to itself, not to StringCapability.
     assert!(convert_result.is_err());
 }
 
 /// Tests the `TryFrom<&AnyCapability>` to reference downcast conversion.
 #[test]
 fn try_from_any_ref() {
-    let cap = TestHandle(zx::Handle::invalid());
+    let cap = StringCapability("hello".to_string());
     let any: AnyCapability = Box::new(cap);
 
     let from: &AnyCapability = &any;
-    let to: &TestHandle = from.try_into().unwrap();
+    let to: &StringCapability = from.try_into().unwrap();
 
-    assert!(to.0.is_invalid());
+    assert_eq!(to.0, "hello".to_string());
 }
 
 /// Tests the `TryFrom<&mut AnyCapability>` to mut reference downcast conversion.
 #[test]
 fn try_from_any_mut_ref() {
-    let cap = TestHandle(zx::Handle::invalid());
+    let cap = StringCapability("hello".to_string());
     let mut any: AnyCapability = Box::new(cap);
 
     let from: &mut AnyCapability = &mut any;
-    let to: &mut TestHandle = from.try_into().unwrap();
+    let to: &mut StringCapability = from.try_into().unwrap();
 
-    assert!(to.0.is_invalid());
+    assert_eq!(to.0, "hello".to_string());
 }
 
 /// Tests the `TryFrom<&dyn ErasedCapability>` to reference downcast conversion.
 #[test]
 fn try_from_dyn_erased_ref() {
-    let cap = TestHandle(zx::Handle::invalid());
+    let cap = StringCapability("hello".to_string());
     let any: AnyCapability = Box::new(cap);
 
     let from: &dyn ErasedCapability = any.as_ref();
-    let to: &TestHandle = from.try_into().unwrap();
+    let to: &StringCapability = from.try_into().unwrap();
 
-    assert!(to.0.is_invalid());
+    assert_eq!(to.0, "hello".to_string());
 }
 
 /// Tests the `TryFrom<&mut dyn ErasedCapability>` to mut reference downcast conversion.
 #[test]
 fn try_from_dyn_erased_mut_ref() {
-    let cap = TestHandle(zx::Handle::invalid());
+    let cap = StringCapability("hello".to_string());
     let mut any: AnyCapability = Box::new(cap);
 
     let from: &mut dyn ErasedCapability = any.borrow_mut();
-    let to: &mut TestHandle = from.try_into().unwrap();
+    let to: &mut StringCapability = from.try_into().unwrap();
 
-    assert!(to.0.is_invalid());
+    assert_eq!(to.0, "hello".to_string());
 }

@@ -13,9 +13,10 @@ use {
     cm_util::TaskGroup,
     fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd},
     fidl_fuchsia_component_sandbox as fsandbox,
+    fuchsia_zircon::AsHandleRef,
     futures::prelude::*,
     lazy_static::lazy_static,
-    sandbox::{Dict, Handle, Receiver},
+    sandbox::{AnyCapability, Dict, OneShotHandle, Receiver},
     std::sync::Arc,
     tracing::warn,
 };
@@ -97,14 +98,13 @@ impl FactoryCapabilityHost {
         sender_server: ServerEnd<fsandbox::SenderMarker>,
         receiver_client: ClientEnd<fsandbox::ReceiverMarker>,
     ) {
-        let receiver = Receiver::<Handle>::new();
+        let receiver = Receiver::<OneShotHandle>::new();
         let sender = receiver.new_sender();
         self.tasks.spawn(async move {
             receiver.handle_receiver(receiver_client.into_proxy().unwrap()).await;
         });
-        self.tasks.spawn(async move {
-            sender.serve_sender(sender_server.into_stream().unwrap()).await;
-        });
+        let sender_client_end_koid = sender_server.basic_info().unwrap().related_koid;
+        sender.serve_and_register(sender_server.into_stream().unwrap(), sender_client_end_koid);
     }
 
     fn create_dict(
@@ -113,12 +113,17 @@ impl FactoryCapabilityHost {
         server_end: ServerEnd<fsandbox::DictMarker>,
     ) -> Result<(), fsandbox::DictError> {
         let mut dict = Dict::new();
+        let mut entries = dict.lock_entries();
         for item in items {
-            let cap = Box::new(Handle::from(item.value));
-            if dict.entries.insert(item.key, cap).is_some() {
+            let cap = Box::new(
+                AnyCapability::try_from(item.value)
+                    .map_err(|_| fsandbox::DictError::BadCapability)?,
+            );
+            if entries.insert(item.key, cap).is_some() {
                 return Err(fsandbox::DictError::AlreadyExists);
             }
         }
+        drop(entries);
         self.tasks.spawn(async move {
             let _ = dict.serve_dict(server_end.into_stream().unwrap()).await;
         });
@@ -154,11 +159,22 @@ impl FrameworkCapability for FactoryFrameworkCapability {
 mod tests {
     use super::*;
     use {
-        assert_matches::assert_matches,
         fidl::endpoints,
         fuchsia_async as fasync,
         fuchsia_zircon::{self as zx, AsHandleRef, HandleBased},
     };
+
+    async fn get_handle_from_fidl_capability(capability: fsandbox::Capability) -> zx::Handle {
+        let fsandbox::Capability::Handle(handle_capability) = capability else {
+            panic!("unexpected FIDL Capability variant");
+        };
+        let handle_capability = handle_capability.into_proxy().unwrap();
+        handle_capability
+            .get_handle()
+            .await
+            .expect("failed to call GetHandle")
+            .expect("GetHandle returned an error")
+    }
 
     #[fuchsia::test]
     async fn create_connector() {
@@ -179,11 +195,14 @@ mod tests {
 
         let event = zx::Event::create();
         let expected_koid = event.get_koid().unwrap();
-        sender_proxy.send_(event.into_handle()).unwrap();
+        sender_proxy.send_(OneShotHandle::from(event.into_handle()).into()).unwrap();
 
         let request = receiver_stream.try_next().await.unwrap().unwrap();
-        let fsandbox::ReceiverRequest::Receive { capability, .. } = request;
-        assert_eq!(capability.get_koid().unwrap(), expected_koid);
+        let fsandbox::ReceiverRequest::Receive { capability, .. } = request else {
+            panic!("unexpected ReceiverRequest");
+        };
+        let handle = get_handle_from_fidl_capability(capability).await;
+        assert_eq!(handle.get_koid().unwrap(), expected_koid);
     }
 
     #[fuchsia::test]
@@ -197,39 +216,31 @@ mod tests {
             host.serve(stream).await.unwrap();
         });
 
+        // Create a dict with items that contain `OneShotHandle`s, and get the handle koids.
         let (items, expected_koids): (Vec<_>, Vec<_>) = (0..2)
             .into_iter()
             .map(|i| {
                 let event = zx::Event::create();
                 let key = format!("key{}", i);
                 let koid = event.get_koid().unwrap();
-                let value = event.into_handle();
+                let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
                 (fsandbox::DictItem { key, value }, koid)
             })
             .unzip();
         let (dict_proxy, server_end) = endpoints::create_proxy::<fsandbox::DictMarker>().unwrap();
         factory_proxy.create_dict(items, server_end).await.unwrap().unwrap();
 
-        let mut items = dict_proxy.read().await.unwrap().unwrap();
-        let item = items.remove(0);
-        assert_matches!(
-            item,
-            fsandbox::DictItem {
-                key,
-                value,
-            }
-            if key == "key0" && value.get_koid().unwrap() == expected_koids[0]
-        );
-        let item = items.remove(0);
-        assert_matches!(
-            item,
-            fsandbox::DictItem {
-                key,
-                value,
-            }
-            if key == "key1" && value.get_koid().unwrap() == expected_koids[1]
-        );
-        assert!(items.is_empty());
+        // Read the items back from the dict.
+        let items = dict_proxy.read().await.unwrap();
+
+        assert_eq!(items.len(), 2);
+
+        // Each item's key koid should match the item passed to CreateDict.
+        for (i, item) in items.into_iter().enumerate() {
+            assert_eq!(item.key, format!("key{}", i));
+            let handle = get_handle_from_fidl_capability(item.value).await;
+            assert!(handle.get_koid().unwrap() == expected_koids[i]);
+        }
     }
 
     #[fuchsia::test]
@@ -248,7 +259,7 @@ mod tests {
             .map(|_| {
                 let event = zx::Event::create();
                 let key = "dup_key".into();
-                let value = event.into_handle();
+                let value: fsandbox::Capability = OneShotHandle::from(event.into_handle()).into();
                 fsandbox::DictItem { key, value }
             })
             .collect();

@@ -8,7 +8,7 @@ use futures::channel::oneshot::{self};
 use moniker::Moniker;
 use replace_with::replace_with;
 use routing::{Routable, Router};
-use sandbox::{Capability, Data, Dict, Open};
+use sandbox::{Data, Dict, Opaque, Open};
 use std::{
     collections::HashMap,
     fmt,
@@ -79,7 +79,7 @@ impl Inner {
                 unreachable!("just resolved the component")
             }
             ComponentState::Resolved(ref resolved) => {
-                Router::from_routable(resolved.output.try_clone().unwrap())
+                Router::from_routable(resolved.output.clone())
             }
         }
     }
@@ -178,26 +178,27 @@ fn resolve_impl(
     let mut program_input = Dict::new();
 
     // Hacky way to get some runner. In practice we'd want to lazily route it via a router.
-    let runner = unresolved.input.entries.get("runner").unwrap().try_clone().unwrap();
-    let runner: Data<Runner> = runner.try_into().unwrap();
-    let program: Program = Program::new(name.to_owned(), runner.value.clone());
+    let runner = unresolved.input.lock_entries().get("runner").unwrap().clone();
+    let runner: Opaque<Runner> = runner.try_into().unwrap();
+    let program: Program = Program::new(name.to_owned(), runner.0.clone());
 
     // Hacky way to get some resolver. In practice we'd want to lazily route it via a router.
-    let resolver = unresolved.input.entries.get("resolver").unwrap().try_clone().unwrap();
-    let resolver: Data<Resolver> = resolver.try_into().unwrap();
+    let resolver = unresolved.input.lock_entries().get("resolver").unwrap().clone();
+    let resolver: Opaque<Resolver> = resolver.try_into().unwrap();
     let children: HashMap<decl::ComponentName, Component> = decl
         .children
         .iter()
-        .map(|child| {
-            (child.name.clone(), Component::new(child.name.clone(), resolver.value.clone()))
-        })
+        .map(|child| (child.name.clone(), Component::new(child.name.clone(), resolver.0.clone())))
         .collect();
 
     // For now, all children get the same runner and resolver.
     let pass_runner_resolver = || {
-        let mut dict = Dict::new();
-        dict.entries.insert("runner".to_string(), Box::new(runner.clone()));
-        dict.entries.insert("resolver".to_string(), Box::new(resolver.clone()));
+        let dict = Dict::new();
+        {
+            let mut entries = dict.lock_entries();
+            entries.insert("runner".to_string(), Box::new(runner.clone()));
+            entries.insert("resolver".to_string(), Box::new(resolver.clone()));
+        }
         dict
     };
     let mut children_inputs: HashMap<decl::ComponentName, Dict> =
@@ -218,7 +219,7 @@ fn resolve_impl(
             &children_outputs,
         )?;
         let cap = router.availability(use_.availability);
-        program_input.entries.insert(use_.name, Box::new(cap));
+        program_input.lock_entries().insert(use_.name, Box::new(cap));
     }
 
     for offer in decl.offers {
@@ -238,10 +239,10 @@ fn resolve_impl(
                 .get_mut(&child_name)
                 .ok_or_else(|| TargetError::ChildDoesNotExist(child_name.clone()))?,
         };
-        target_dict.entries.insert(offer.name.clone(), Box::new(cap));
+        target_dict.lock_entries().insert(offer.name.clone(), Box::new(cap));
     }
 
-    let mut output = Dict::new();
+    let output = Dict::new();
     for expose in decl.exposes {
         let router = route_from(
             &expose.name,
@@ -251,7 +252,7 @@ fn resolve_impl(
             &children_outputs,
         )?;
         let cap = router.availability(expose.availability);
-        output.entries.insert(expose.name.clone(), Box::new(cap));
+        output.lock_entries().insert(expose.name.clone(), Box::new(cap));
     }
 
     program.set_input(program_input);
@@ -289,7 +290,6 @@ mod test {
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
     use moniker::MonikerBase;
-    use routing::Request;
     use serve_processargs::{ignore_not_found, NamespaceBuilder};
     use vfs::{
         directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
@@ -364,9 +364,9 @@ mod test {
                 "root" => Dict::new(),
                 "child_a" => {
                     // child_a should see a request for "cap".
-                    let mut output = Dict::new();
-                    let cap = Data::new("hello".to_owned());
-                    output.entries.insert("cap".to_owned(), Box::new(cap));
+                    let output = Dict::new();
+                    let cap = Data::String("hello".to_owned());
+                    output.lock_entries().insert("cap".to_owned(), Box::new(cap));
                     output
                 }
                 "child_b" => {
@@ -379,9 +379,12 @@ mod test {
         };
         let runner = Runner(Arc::new(runner));
 
-        let mut root_input = Dict::new();
-        root_input.entries.insert("resolver".to_string(), Box::new(Data::new(resolver.clone())));
-        root_input.entries.insert("runner".to_string(), Box::new(Data::new(runner.clone())));
+        let root_input = Dict::new();
+        {
+            let mut entries = root_input.lock_entries();
+            entries.insert("resolver".to_string(), Box::new(Opaque(resolver.clone())));
+            entries.insert("runner".to_string(), Box::new(Opaque(runner.clone())));
+        }
 
         // Resolve the root component.
         let root = Component::new("root".to_string(), resolver.clone());
@@ -415,7 +418,7 @@ mod test {
 
         // Using the input dict of child_b, check we can obtain "cap".
         let router = Router::from_routable(input);
-        let request = Request {
+        let request = routing::Request {
             rights: None,
             relative_path: sandbox::Path::new("cap"),
             target_moniker: Moniker::new(vec![
@@ -426,8 +429,8 @@ mod test {
         };
         let cap = routing::route(&router, request).await.context("route")?;
         eprintln!("Obtained capability {:?}", cap);
-        let cap: Data<String> = cap.try_into().context("convert to Data")?;
-        assert_eq!(&cap.value, "hello");
+        let cap: Data = cap.try_into().context("convert to Data")?;
+        assert_eq!(cap, Data::String("hello".to_string()));
         Ok(())
     }
 
@@ -588,8 +591,8 @@ mod test {
                     // Add the Open to the output dictionary. "fuchsia.echo.Echo" is the name of
                     // the capability in the output dictionary of the component
                     // (component-to-component interface).
-                    let mut output = Dict::new();
-                    output.entries.insert("fuchsia.echo.Echo".to_string(), Box::new(echo));
+                    let output = Dict::new();
+                    output.lock_entries().insert("fuchsia.echo.Echo".to_string(), Box::new(echo));
                     output
                 }
                 "child_b" => {
@@ -606,7 +609,7 @@ mod test {
                     // This corresponds to a UseDecl that uses "fuchsia.echo.Echo" from the
                     // input dictionary (component-to-component contract).
                     let echo = input.into_open(
-                        Request {
+                        routing::Request {
                             rights: None,
                             relative_path: sandbox::Path::new("fuchsia.echo.Echo"),
                             target_moniker: Moniker::try_from(vec!["child_b"]).unwrap(),
@@ -644,9 +647,11 @@ mod test {
         };
         let runner = Runner(Arc::new(runner));
 
-        let mut root_input = Dict::new();
-        root_input.entries.insert("resolver".to_string(), Box::new(Data::new(resolver.clone())));
-        root_input.entries.insert("runner".to_string(), Box::new(Data::new(runner.clone())));
+        let root_input = Dict::new();
+        root_input
+            .lock_entries()
+            .insert("resolver".to_string(), Box::new(Opaque(resolver.clone())));
+        root_input.lock_entries().insert("runner".to_string(), Box::new(Opaque(runner.clone())));
 
         // Resolve the root component.
         let root = Component::new("root".to_string(), resolver.clone());

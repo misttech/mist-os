@@ -75,7 +75,7 @@ use {
         lock::{MappedMutexGuard, Mutex, MutexGuard},
     },
     moniker::{ChildName, ChildNameBase, Moniker, MonikerBase},
-    sandbox::{Capability, Dict, Receiver},
+    sandbox::{Dict, Receiver},
     std::iter::Iterator,
     std::{
         boxed::Box,
@@ -571,7 +571,7 @@ impl ComponentInstance {
             .collection_dicts
             .get(&Name::new(&collection_name).unwrap())
             .expect("dict missing for declared collection");
-        let child_dict = collection_dict.try_clone().unwrap();
+        let child_dict = collection_dict.copy();
 
         let (child, discover_fut) = state
             .add_child(
@@ -1370,8 +1370,8 @@ impl ResolvedInstanceState {
             address,
             anonymized_services: HashMap::new(),
             component_input_dict: component_sandbox.component_input_dict,
-            program_input_dict: component_sandbox.program_input_dict.try_clone().unwrap(),
-            program_output_dict: component_sandbox.program_output_dict.try_clone().unwrap(),
+            program_input_dict: component_sandbox.program_input_dict.clone(),
+            program_output_dict: component_sandbox.program_output_dict.clone(),
             collection_dicts: component_sandbox.collection_dicts,
             dict_waiter: None,
         };
@@ -1384,9 +1384,8 @@ impl ResolvedInstanceState {
     // Waits for any receiver in our program dict to become readable.
     pub fn wait_on_program_output_dict(&mut self, component: &Arc<ComponentInstance>) {
         let weak_component = WeakComponentInstance::new(component);
-        self.dict_waiter = Some(DictWaiter::new(
-            self.program_output_dict.try_clone().unwrap(),
-            move |name, target_moniker| {
+        self.dict_waiter =
+            Some(DictWaiter::new(self.program_output_dict.clone(), move |name, target_moniker| {
                 let name = name.clone();
                 async move {
                     if let Ok(component) = weak_component.upgrade() {
@@ -1411,8 +1410,7 @@ impl ResolvedInstanceState {
                     }
                 }
                 .boxed()
-            },
-        ));
+            }));
     }
 
     fn dispatch_receivers_to_providers(

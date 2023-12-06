@@ -18,7 +18,6 @@ use {
     ::routing::{component_instance::ComponentInstanceInterface, resolving::ComponentAddress},
     async_trait::async_trait,
     cm_util::io::clone_dir,
-    sandbox::Capability,
     sandbox_construction::build_component_sandbox,
     std::{ops::DerefMut, sync::Arc},
 };
@@ -111,7 +110,7 @@ async fn do_resolve(component: &Arc<ComponentInstance>) -> Result<Component, Res
                         });
                     }
                     InstanceState::Unresolved(unresolved_state) => {
-                        unresolved_state.component_input_dict.try_clone().unwrap()
+                        unresolved_state.component_input_dict.clone()
                     }
                 };
                 let component_sandbox =

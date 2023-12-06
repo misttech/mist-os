@@ -35,7 +35,7 @@ use {
     fidl_fuchsia_process as fprocess, fidl_fuchsia_sys2 as fsys, fuchsia_zircon as zx,
     futures::channel::oneshot,
     moniker::Moniker,
-    sandbox::Capability,
+    std::string::ToString,
     std::sync::Arc,
     tracing::warn,
 };
@@ -434,7 +434,7 @@ async fn make_execution_runtime(
         .expect("component must be resolved in order to start");
 
     let dict_dispatcher = DictDispatcher::new(
-        resolved_state.program_output_dict.try_clone().unwrap(),
+        resolved_state.program_output_dict.clone(),
         decl.capabilities.clone(),
         outgoing_dir.clone(),
         WeakComponentInstance::new(&component),
