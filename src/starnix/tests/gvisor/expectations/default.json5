@@ -344,6 +344,7 @@
                 "MountTest.BindSlaveToShared",
                 "MountTest.BindSlaveToSlave",
                 "MountTest.ChangeMountFlags",
+                "MountTest.DetachedMountBindFails",
                 "MountTest.LargeTreePropagationEvent",
                 "MountTest.MaxMounts",
                 "MountTest.MountInfo",
