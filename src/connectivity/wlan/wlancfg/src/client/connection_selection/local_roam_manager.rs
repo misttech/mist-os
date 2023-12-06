@@ -18,7 +18,7 @@ use {
         channel::mpsc, future::BoxFuture, select, stream::FuturesUnordered, FutureExt, StreamExt,
     },
     std::sync::Arc,
-    tracing::info,
+    tracing::{info, warn},
 };
 
 /// If there isn't a change in reasons to roam or significant change in RSSI, wait a while between
@@ -26,6 +26,8 @@ use {
 const TIME_BETWEEN_ROAM_SCANS_IF_NO_CHANGE: zx::Duration = zx::Duration::from_minutes(15);
 const MIN_TIME_BETWEEN_ROAM_SCANS: zx::Duration = zx::Duration::from_minutes(1);
 const MIN_RSSI_CHANGE_TO_ROAM_SCAN: f64 = 5.0;
+
+type RoamSearchResult = (Result<Option<types::ScannedCandidate>, anyhow::Error>, ConnectionData);
 
 /// Local Roam Manager is implemented as a trait so that it can be stubbed out in unit tests.
 pub trait LocalRoamManagerApi: Send + Sync {
@@ -37,23 +39,26 @@ pub trait LocalRoamManagerApi: Send + Sync {
 
     fn handle_connection_start(
         &mut self,
-
         quality_data: bss_selection::BssQualityData,
         connection_start_time: fasync::Time,
         network: types::NetworkIdentifier,
         credential: config_management::Credential,
+        bssid: types::Bssid,
     );
 
     fn get_signal_data(&self) -> Option<SignalData>;
 }
 
 /// Data tracked about a connection to make decisions about whether to roam.
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 struct ConnectionData {
     /// Identifier for the network. Used to find other APs in the same network, and to track
     /// whether the connection on an iface has changed.
     network: types::NetworkIdentifier,
     /// The credential used to connect, to make sure the network config used to roam matches
     credential: config_management::Credential,
+    bssid: types::Bssid,
     quality_data: bss_selection::BssQualityData,
     roam_decision_data: RoamDecisionData,
 }
@@ -62,12 +67,14 @@ impl ConnectionData {
     fn new(
         network: types::NetworkIdentifier,
         credential: config_management::Credential,
+        bssid: types::Bssid,
         quality_data: bss_selection::BssQualityData,
         connection_start_time: fasync::Time,
     ) -> Self {
         Self {
             network,
             credential,
+            bssid,
             roam_decision_data: RoamDecisionData::new(
                 quality_data.signal_data.ewma_rssi.get(),
                 connection_start_time,
@@ -79,21 +86,18 @@ impl ConnectionData {
 
 #[cfg_attr(test, derive(Debug))]
 pub struct RoamSearchRequest {
-    network: types::NetworkIdentifier,
-    /// Credential is used to ensure that the correct network config data is used.
-    credential: config_management::Credential,
+    connection_data: ConnectionData,
     /// This is used to tell the state machine to roam. The state machine should drop its end of
     /// the channel to ignore roam requests if the connection has already changed.
     _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
 }
 
 impl RoamSearchRequest {
-    pub fn new(
-        network: types::NetworkIdentifier,
-        credential: config_management::Credential,
+    fn new(
+        connection_data: ConnectionData,
         _roam_req_sender: mpsc::UnboundedSender<types::ScannedCandidate>,
     ) -> Self {
-        RoamSearchRequest { network, credential, _roam_req_sender }
+        RoamSearchRequest { connection_data, _roam_req_sender }
     }
 }
 
@@ -110,15 +114,15 @@ pub struct LocalRoamManager {
 /// to LocalRoamManagerService, which may send a roam request to the connected state through
 /// the provided channel.
 pub struct LocalRoamManagerService {
-    roam_futures: FuturesUnordered<
-        BoxFuture<'static, Result<Option<types::ScannedCandidate>, anyhow::Error>>,
-    >,
+    roam_futures: FuturesUnordered<BoxFuture<'static, RoamSearchResult>>,
     connection_selector: Arc<ConnectionSelector>,
     // Receive requests for roam searches.
     roam_search_receiver: mpsc::UnboundedReceiver<RoamSearchRequest>,
     telemetry_sender: TelemetrySender,
 }
 
+#[derive(Clone)]
+#[cfg_attr(test, derive(Debug))]
 struct RoamDecisionData {
     time_prev_roam_scan: fasync::Time,
     roam_reasons_prev_scan: Vec<bss_selection::RoamReason>,
@@ -189,11 +193,7 @@ impl LocalRoamManagerApi for LocalRoamManager {
                 > MIN_RSSI_CHANGE_TO_ROAM_SCAN;
             if is_scan_old || has_new_reason || is_rssi_different {
                 // Initiate roam scan.
-                let req = RoamSearchRequest::new(
-                    connection_data.network.clone(),
-                    connection_data.credential.clone(),
-                    responder,
-                );
+                let req = RoamSearchRequest::new(connection_data.clone(), responder);
                 let _ = self.roam_search_sender.unbounded_send(req);
 
                 // Updated fields for tracking roam scan decisions
@@ -211,8 +211,10 @@ impl LocalRoamManagerApi for LocalRoamManager {
         connection_start_time: fasync::Time,
         network: types::NetworkIdentifier,
         credential: config_management::Credential,
+        bssid: types::Bssid,
     ) {
-        let data = ConnectionData::new(network, credential, quality_data, connection_start_time);
+        let data =
+            ConnectionData::new(network, credential, bssid, quality_data, connection_start_time);
 
         self.connection_data = Some(data);
     }
@@ -256,14 +258,26 @@ impl LocalRoamManagerService {
 
                     let roam_fut = get_connection_selection_future(
                         self.connection_selector.clone(),
-                        req.network,
-                        req.credential
+                        req.connection_data
                     );
                     self.roam_futures.push(roam_fut.boxed());
                     self.telemetry_sender.send(TelemetryEvent::RoamingScan);
-                }
-                _roam_candidate = self.roam_futures.select_next_some() => {
-                    // Roam scan results will be handled here
+                },
+                (roam_search_result, connection_data) = self.roam_futures.select_next_some() => {
+                    // A temporary basic implementation for deciding whether to roam for getting
+                    // initial data. This will be improved before proactive roaming is
+                    // actually turned on.
+                    match roam_search_result {
+                        Ok(Some(roam_candidate)) => {
+                            if roam_candidate.bss.bssid != connection_data.bssid {
+                                self.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
+                            }
+                        }
+                        Ok(None) => {
+                            warn!("No roam candidates found in scan. This is unexpected, as at least the currently connected BSS should be found.");
+                        }
+                        Err(e) => warn!("An error occured during the roam scan: {:?}", e),
+                    }
                 }
             }
         }
@@ -272,10 +286,15 @@ impl LocalRoamManagerService {
 
 async fn get_connection_selection_future(
     connection_selector: Arc<ConnectionSelector>,
-    network: types::NetworkIdentifier,
-    credential: config_management::Credential,
-) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
-    connection_selector.find_and_select_roam_candidate(network, credential).await
+    connection_data: ConnectionData,
+) -> RoamSearchResult {
+    let resp = connection_selector
+        .find_and_select_roam_candidate(
+            connection_data.network.clone(),
+            &connection_data.credential,
+        )
+        .await;
+    (resp, connection_data)
 }
 
 #[cfg(test)]
@@ -292,16 +311,17 @@ mod tests {
                 testing::{
                     create_inspect_persistence_channel,
                     fakes::{FakeSavedNetworksManager, FakeScanRequester},
-                    generate_random_channel, generate_random_network_identifier,
-                    generate_random_password,
+                    generate_random_bss, generate_random_bssid, generate_random_channel,
+                    generate_random_network_identifier, generate_random_password,
                 },
             },
         },
         fuchsia_async::TestExecutor,
         futures::task::Poll,
+        ieee80211::MacAddrBytes,
         pin_utils::pin_mut,
         test_util::{assert_gt, assert_lt},
-        wlan_common::assert_variant,
+        wlan_common::{assert_variant, random_fidl_bss_description, security::SecurityDescriptor},
     };
 
     struct RoamManagerTestValues {
@@ -312,6 +332,8 @@ mod tests {
         /// A randomly generated WPA2 network identifier and password to use in tests.
         network: types::NetworkIdentifier,
         credential: config_management::Credential,
+        // A randomly generated BSSID representing the currently connected BSSID.
+        bssid: types::Bssid,
     }
 
     fn roam_manager_test_setup() -> RoamManagerTestValues {
@@ -322,6 +344,7 @@ mod tests {
         let (roam_req_sender, _roam_req_receiver) = mpsc::unbounded();
         let network = generate_random_network_identifier();
         let credential = generate_random_password();
+        let bssid = generate_random_bssid();
 
         RoamManagerTestValues {
             roam_manager,
@@ -330,6 +353,7 @@ mod tests {
             telemetry_receiver,
             network,
             credential,
+            bssid,
         }
     }
 
@@ -364,6 +388,7 @@ mod tests {
             connect_start_time,
             test_values.network.clone(),
             test_values.credential.clone(),
+            test_values.bssid,
         );
 
         // Send some periodic stats to the RoamManager for a connection with poor signal.
@@ -375,8 +400,8 @@ mod tests {
         // Check that a scan request is sent to the Roam Manager Service.
         let received_roam_req = test_values.roam_search_receiver.try_next();
         assert_variant!(received_roam_req, Ok(Some(req)) => {
-            assert_eq!(req.network, test_values.network);
-            assert_eq!(req.credential, test_values.credential);
+            assert_eq!(req.connection_data.network, test_values.network);
+            assert_eq!(req.connection_data.credential, test_values.credential);
         });
 
         // Verify that a telemerty event is sent for the RSSI and RSSI velocity
@@ -415,6 +440,7 @@ mod tests {
             connect_start_time,
             test_values.network.clone(),
             test_values.credential.clone(),
+            test_values.bssid,
         );
 
         // Send some stats with RSSI and SNR getting worse to the LocalRoamManager.
@@ -485,6 +511,7 @@ mod tests {
             connect_start_time,
             test_values.network.clone(),
             test_values.credential.clone(),
+            test_values.bssid,
         );
 
         // Send some periodic stats to the RoamManager for a connection with poor signal.
@@ -496,8 +523,8 @@ mod tests {
         // Check that a scan request is sent to the Roam Manager Service.
         let received_roam_req = test_values.roam_search_receiver.try_next();
         assert_variant!(received_roam_req, Ok(Some(req)) => {
-            assert_eq!(req.network, test_values.network);
-            assert_eq!(req.credential, test_values.credential);
+            assert_eq!(req.connection_data.network, test_values.network);
+            assert_eq!(req.connection_data.credential, test_values.credential);
         });
 
         // Send stats with a worse RSSI and check that a roam scan is not initiated
@@ -520,17 +547,29 @@ mod tests {
         roam_manager_service: LocalRoamManagerService,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         fake_scan_requester: Arc<FakeScanRequester>,
-        id: types::NetworkIdentifier,
+        /// A randomly generated WPA2 network identifier and password to use in tests.
+        network: types::NetworkIdentifier,
         credential: config_management::Credential,
+        // A randomly generated BSSID representing the currently connected BSSID.
+        bssid: types::Bssid,
     }
 
     fn roam_service_test_setup() -> RoamManagerServiceTestValues {
+        let network = generate_random_network_identifier();
+        let credential = generate_random_password();
+        let bssid = generate_random_bssid();
+        // Add the network config to the saved networks manager for network selection to find.
+        let config =
+            config_management::NetworkConfig::new(network.clone(), credential.clone(), true)
+                .expect("failed to create config");
+        let fake_saved_networks =
+            Arc::new(FakeSavedNetworksManager::new_with_saved_networks(vec![config.into()]));
+
         let (roam_search_sender, roam_search_receiver) = mpsc::unbounded();
         let (roam_req_sender, _roam_req_receiver) = mpsc::unbounded();
         let (persistence_req_sender, _persistence_stream) = create_inspect_persistence_channel();
         let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
-        let fake_saved_networks = Arc::new(FakeSavedNetworksManager::new());
         let fake_scan_requester = Arc::new(FakeScanRequester::new());
         let selector = Arc::new(ConnectionSelector::new(
             fake_saved_networks.clone(),
@@ -539,8 +578,6 @@ mod tests {
             persistence_req_sender,
             telemetry_sender.clone(),
         ));
-        let id = generate_random_network_identifier();
-        let credential = generate_random_password();
 
         let roam_manager_service =
             LocalRoamManagerService::new(roam_search_receiver, telemetry_sender, selector);
@@ -551,9 +588,72 @@ mod tests {
             roam_manager_service,
             telemetry_receiver,
             fake_scan_requester,
-            id,
+            network,
             credential,
+            bssid,
         }
+    }
+
+    /// Build a connection data based on the test values' network info and the provided quality
+    /// data and time.
+    fn gen_connection_data(
+        test_values: &RoamManagerServiceTestValues,
+        quality_data: bss_selection::BssQualityData,
+        time: fasync::Time,
+    ) -> ConnectionData {
+        ConnectionData::new(
+            test_values.network.clone(),
+            test_values.credential.clone(),
+            test_values.bssid,
+            quality_data,
+            time,
+        )
+    }
+
+    /// Generate scan results using the network identifier in test values, one for each
+    /// provided BSSID.
+    fn gen_scan_result_with_bssids(
+        test_values: &RoamManagerServiceTestValues,
+        bssids: Vec<types::Bssid>,
+    ) -> Vec<types::ScanResult> {
+        use rand::Rng;
+        bssids
+            .into_iter()
+            .map(|bssid| {
+                let bss_description = fidl_internal::BssDescription {
+                    bssid: bssid.to_array(),
+                    ..random_fidl_bss_description!()
+                };
+                types::ScanResult {
+                    ssid: test_values.network.ssid.clone(),
+                    // A WPA2 network is generated for the test values.
+                    security_type_detailed: types::SecurityTypeDetailed::Wpa2Personal,
+                    compatibility: types::Compatibility::Supported,
+                    entries: vec![types::Bss {
+                        compatibility: wlan_common::scan::Compatibility::expect_some(vec![
+                            SecurityDescriptor::WPA2_PERSONAL,
+                        ]),
+                        bss_description: bss_description.into(),
+                        ..generate_random_bss()
+                    }],
+                }
+            })
+            .collect()
+    }
+
+    fn low_bss_quality_data() -> bss_selection::BssQualityData {
+        let low_rssi = -75;
+        let low_snr = 15;
+        bss_selection::BssQualityData::new(
+            SignalData::new(
+                low_rssi,
+                low_snr,
+                EWMA_SMOOTHING_FACTOR,
+                EWMA_VELOCITY_SMOOTHING_FACTOR,
+            ),
+            generate_random_channel(),
+            PastConnectionList::default(),
+        )
     }
 
     // Test that when LocalRoamManagerService gets a roam scan request, it initiates bss selection.
@@ -561,20 +661,20 @@ mod tests {
     fn test_roam_manager_service_initiates_network_seleciton() {
         let mut exec = TestExecutor::new();
         let mut test_values = roam_service_test_setup();
-        // Add scan result to send back; FakeScanRequester needs a value to send.
-        exec.run_singlethreaded(test_values.fake_scan_requester.add_scan_result(Ok(vec![])));
-        exec.run_singlethreaded(test_values.fake_scan_requester.add_scan_result(Ok(vec![])));
+        let connection_data =
+            gen_connection_data(&test_values, low_bss_quality_data(), fasync::Time::now());
+        // Add scan result to send back with another BSS to connect to.
+        let other_bssid = generate_random_bssid();
+        let scan_results =
+            gen_scan_result_with_bssids(&test_values, vec![test_values.bssid, other_bssid]);
+        exec.run_singlethreaded(test_values.fake_scan_requester.add_scan_result(Ok(scan_results)));
 
         let serve_fut = test_values.roam_manager_service.serve();
         pin_mut!(serve_fut);
         assert_variant!(exec.run_until_stalled(&mut serve_fut), Poll::Pending);
 
         // Send a request for the LocalRoamManagerService to initiate bss selection.
-        let req = RoamSearchRequest::new(
-            test_values.id.clone(),
-            test_values.credential,
-            test_values.roam_req_sender,
-        );
+        let req = RoamSearchRequest::new(connection_data.clone(), test_values.roam_req_sender);
         test_values.roam_search_sender.unbounded_send(req).expect("Failed to send roam search req");
 
         // Progress the RoamManager future to process the request for a roam search.
@@ -595,5 +695,17 @@ mod tests {
             test_values.fake_scan_requester.verify_scan_request((scan_reason, ssids, channels));
         pin_mut!(verify_scan_fut);
         assert_variant!(&mut exec.run_until_stalled(&mut verify_scan_fut), Poll::Ready(()));
+
+        //  A metric will be logged for BSS selection, ignore it.
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::BssSelectionResult { .. }))
+        );
+
+        // Verify that a metric is logged for the roam connect that would happen
+        assert_variant!(
+            test_values.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::WouldRoamConnect))
+        );
     }
 }

@@ -312,7 +312,7 @@ impl ConnectionSelector {
     pub async fn find_and_select_roam_candidate(
         &self,
         network: types::NetworkIdentifier,
-        credential: network_config::Credential,
+        credential: &network_config::Credential,
     ) -> Result<Option<types::ScannedCandidate>, Error> {
         // Scan for APs in this network
         // TODO(fxbug.dev/132103) Use an active scan in cases where a faster scan is justified.
@@ -364,7 +364,7 @@ impl ConnectionSelector {
                 .lookup(&network)
                 .await
                 .into_iter()
-                .find(|c| c.credential == credential)
+                .find(|c| &c.credential == credential)
             {
                 candidates.append(&mut merge_config_and_scan_data(config, &mut s));
             } else {

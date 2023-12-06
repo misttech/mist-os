@@ -282,6 +282,10 @@ pub enum TelemetryEvent {
     /// Notify telemetry that there was a decision to look for networks to roam to after evaluating
     /// the existing connection.
     RoamingScan,
+    /// Proactive roams do not happen yet, but we want to analyze metrics for when they would
+    /// happen. Roams are set up to log metrics when disconnects happen to roam, so this event
+    /// covers when roams would happen but no actual disconnect happens.
+    WouldRoamConnect,
     /// Counts of saved networks and count of configurations for each of those networks, to be
     /// recorded periodically.
     SavedNetworkCount {
@@ -1321,6 +1325,9 @@ impl Telemetry {
             }
             TelemetryEvent::RoamingScan => {
                 self.stats_logger.log_roaming_scan_metrics().await;
+            }
+            TelemetryEvent::WouldRoamConnect => {
+                self.stats_logger.log_would_roam_connect().await;
             }
             TelemetryEvent::SavedNetworkCount {
                 saved_network_count,
@@ -2881,6 +2888,19 @@ impl StatsLogger {
             self.cobalt_1dot1_proxy,
             log_occurrence,
             metrics::POLICY_PROACTIVE_ROAMING_SCAN_COUNTS_METRIC_ID,
+            1,
+            &[],
+        );
+    }
+
+    /// Log metrics that will be used to analyze when roaming would happen before roams are
+    /// enabled. This doesn't effect general disconnect metrics, including ones that include roam
+    /// event codes.
+    async fn log_would_roam_connect(&mut self) {
+        log_cobalt_1dot1!(
+            self.cobalt_1dot1_proxy,
+            log_occurrence,
+            metrics::NETWORK_ROAMING_DISCONNECT_COUNTS_METRIC_ID,
             1,
             &[],
         );

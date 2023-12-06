@@ -586,6 +586,7 @@ async fn connected_state(
         connect_start_time,
         options.currently_fulfilled_connection.target.network.clone(),
         options.currently_fulfilled_connection.target.credential.clone(),
+        options.ap_state.original().bssid,
     );
 
     // Keep track of the connection's average signal strength for future scoring.

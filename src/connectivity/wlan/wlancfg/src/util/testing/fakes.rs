@@ -310,6 +310,7 @@ impl LocalRoamManagerApi for FakeLocalRoamManager {
         _connection_start_time: fasync::Time,
         _network: client_types::NetworkIdentifier,
         _credential: Credential,
+        _bssid: client_types::Bssid,
     ) {
         self.signal_data = Some(quality_data.signal_data);
     }

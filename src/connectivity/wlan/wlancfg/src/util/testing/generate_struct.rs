@@ -74,9 +74,14 @@ pub fn generate_random_sme_scan_result() -> fidl_sme::ScanResult {
     }
 }
 
+pub fn generate_random_bssid() -> types::Bssid {
+    let mut rng = rand::thread_rng();
+    Bssid::from(rng.gen::<[u8; 6]>())
+}
+
 pub fn generate_random_bss() -> types::Bss {
     let mut rng = rand::thread_rng();
-    let bssid: Bssid = Bssid::from(rng.gen::<[u8; 6]>());
+    let bssid = generate_random_bssid();
     let rssi = rng.gen_range(-100..20);
     let channel = generate_random_channel();
     let timestamp = zx::Time::from_nanos(rng.gen());
@@ -269,8 +274,8 @@ pub fn generate_random_network_identifier() -> types::NetworkIdentifier {
 /// Generate a password of 8 to 64 random bytes.
 pub fn generate_random_password() -> Credential {
     let mut rng = rand::thread_rng();
-    let mut password = vec![0; rng.gen_range(8..64)];
-    rng.fill_bytes(&mut password);
+    let password =
+        vec![0; rng.gen_range(8..64)].into_iter().map(|_| rng.gen_range(0..128)).collect();
     Credential::Password(password)
 }
 
