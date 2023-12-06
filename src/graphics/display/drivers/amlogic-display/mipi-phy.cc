@@ -219,23 +219,23 @@ zx::result<std::unique_ptr<MipiPhy>> MipiPhy::Create(ddk::PDevFidl& pdev,
 
 void MipiPhy::Dump() {
   zxlogf(INFO, "%s: DUMPING PHY REGS", __func__);
-  zxlogf(INFO, "MIPI_DSI_PHY_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_PHY_CTRL));
-  zxlogf(INFO, "MIPI_DSI_CHAN_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_CTRL));
-  zxlogf(INFO, "MIPI_DSI_CHAN_STS = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CHAN_STS));
-  zxlogf(INFO, "MIPI_DSI_CLK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM));
-  zxlogf(INFO, "MIPI_DSI_HS_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_HS_TIM));
-  zxlogf(INFO, "MIPI_DSI_LP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_TIM));
-  zxlogf(INFO, "MIPI_DSI_ANA_UP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_UP_TIM));
-  zxlogf(INFO, "MIPI_DSI_INIT_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_INIT_TIM));
-  zxlogf(INFO, "MIPI_DSI_WAKEUP_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_WAKEUP_TIM));
-  zxlogf(INFO, "MIPI_DSI_LPOK_TIM = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LPOK_TIM));
-  zxlogf(INFO, "MIPI_DSI_LP_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_LP_WCHDOG));
-  zxlogf(INFO, "MIPI_DSI_ANA_CTRL = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ANA_CTRL));
-  zxlogf(INFO, "MIPI_DSI_CLK_TIM1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_CLK_TIM1));
-  zxlogf(INFO, "MIPI_DSI_TURN_WCHDOG = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TURN_WCHDOG));
-  zxlogf(INFO, "MIPI_DSI_ULPS_CHECK = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_ULPS_CHECK));
-  zxlogf(INFO, "MIPI_DSI_TEST_CTRL0 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL0));
-  zxlogf(INFO, "MIPI_DSI_TEST_CTRL1 = 0x%x", READ32_REG(DSI_PHY, MIPI_DSI_TEST_CTRL1));
+  zxlogf(INFO, "MIPI_DSI_PHY_CTRL = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_PHY_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CHAN_CTRL = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_CHAN_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CHAN_STS = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_CHAN_STS));
+  zxlogf(INFO, "MIPI_DSI_CLK_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_CLK_TIM));
+  zxlogf(INFO, "MIPI_DSI_HS_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_HS_TIM));
+  zxlogf(INFO, "MIPI_DSI_LP_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_LP_TIM));
+  zxlogf(INFO, "MIPI_DSI_ANA_UP_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_ANA_UP_TIM));
+  zxlogf(INFO, "MIPI_DSI_INIT_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_INIT_TIM));
+  zxlogf(INFO, "MIPI_DSI_WAKEUP_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_WAKEUP_TIM));
+  zxlogf(INFO, "MIPI_DSI_LPOK_TIM = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_LPOK_TIM));
+  zxlogf(INFO, "MIPI_DSI_LP_WCHDOG = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_LP_WCHDOG));
+  zxlogf(INFO, "MIPI_DSI_ANA_CTRL = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_ANA_CTRL));
+  zxlogf(INFO, "MIPI_DSI_CLK_TIM1 = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_CLK_TIM1));
+  zxlogf(INFO, "MIPI_DSI_TURN_WCHDOG = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_TURN_WCHDOG));
+  zxlogf(INFO, "MIPI_DSI_ULPS_CHECK = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_ULPS_CHECK));
+  zxlogf(INFO, "MIPI_DSI_TEST_CTRL0 = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_TEST_CTRL0));
+  zxlogf(INFO, "MIPI_DSI_TEST_CTRL1 = 0x%x", dsi_phy_mmio_->Read32(MIPI_DSI_TEST_CTRL1));
   zxlogf(INFO, "");
 
   zxlogf(INFO, "#############################");

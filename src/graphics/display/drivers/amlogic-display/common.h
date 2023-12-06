@@ -26,8 +26,6 @@
 
 #define CLEAR_MASK32(x, dest, mask) WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) & ~(mask)))
 
-#define READ32_REG(x, a) READ32_##x##_REG(a)
-
 // Should match display_mmios table in board driver
 enum {
   MMIO_VPU,                   // VPU (Video Processing Unit)

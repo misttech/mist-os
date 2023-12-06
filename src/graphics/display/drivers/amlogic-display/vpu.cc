@@ -119,7 +119,7 @@ zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
 
 bool Vpu::CheckAndClaimHardwareOwnership() {
   ZX_DEBUG_ASSERT(initialized_);
-  uint32_t regVal = READ32_REG(VPU, VPP_DUMMY_DATA);
+  uint32_t regVal = vpu_mmio_->Read32(VPP_DUMMY_DATA);
   if (regVal == kFirstTimeLoadMagicNumber) {
     // we have already been loaded once. don't set again.
     return false;

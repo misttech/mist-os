@@ -427,7 +427,7 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   vpu_mmio_->Write32(lcd_timing_.vs_vs_addr, L_VSYNC_VS_ADDR);
   vpu_mmio_->Write32(lcd_timing_.vs_ve_addr, L_VSYNC_VE_ADDR);
 
-  vpu_mmio_->Write32(READ32_REG(VPU, VPP_MISC) & ~(VPP_OUT_SATURATE), VPP_MISC);
+  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) & ~(VPP_OUT_SATURATE), VPP_MISC);
 
   // Ready to be used
   clock_enabled_ = true;

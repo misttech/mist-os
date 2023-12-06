@@ -669,7 +669,7 @@ void Osd::HwInit() {
   vpu_mmio_->Write32(display_width_, VPP_POSTBLEND_H_SIZE);
 
   // init vpu fifo control register
-  uint32_t regVal = READ32_REG(VPU, VPP_OFIFO_SIZE);
+  uint32_t regVal = vpu_mmio_->Read32(VPP_OFIFO_SIZE);
   regVal = 0xfff << 20;
   regVal |= (0xfff + 1);
   vpu_mmio_->Write32(regVal, VPP_OFIFO_SIZE);
@@ -740,9 +740,9 @@ void Osd::Dump() {
   rdma_->DumpRdmaRegisters();
 }
 
-#define LOG_REG(reg) zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), READ32_REG(VPU, (reg)))
-#define LOG_REG_INSTANCE(reg, offset, index)                                               \
-  zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), READ32_REG(VPU, (reg)), \
+#define LOG_REG(reg) zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg, (reg), vpu_mmio_->Read32((reg)))
+#define LOG_REG_INSTANCE(reg, offset, index)                                                 \
+  zxlogf(INFO, "reg[0x%x]: 0x%08x " #reg " #%d", (reg) + (offset), vpu_mmio_->Read32((reg)), \
          index + 1)
 void Osd::DumpNonRdmaRegisters() {
   uint32_t offset = 0;

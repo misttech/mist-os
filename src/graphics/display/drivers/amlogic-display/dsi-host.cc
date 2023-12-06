@@ -425,25 +425,27 @@ zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bit
 }
 
 void DsiHost::Dump() {
-  zxlogf(INFO, "MIPI_DSI_TOP_SW_RESET = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_SW_RESET));
-  zxlogf(INFO, "MIPI_DSI_TOP_CLK_CNTL = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_CLK_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_CNTL = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_CNTL = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_SUSPEND_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_LINE = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_SUSPEND_LINE));
-  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_PIX = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_SUSPEND_PIX));
-  zxlogf(INFO, "MIPI_DSI_TOP_MEAS_CNTL = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEAS_CNTL));
-  zxlogf(INFO, "MIPI_DSI_TOP_STAT = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_STAT));
+  zxlogf(INFO, "MIPI_DSI_TOP_SW_RESET = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET));
+  zxlogf(INFO, "MIPI_DSI_TOP_CLK_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CLK_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_CNTL = 0x%x",
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_LINE = 0x%x",
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_LINE));
+  zxlogf(INFO, "MIPI_DSI_TOP_SUSPEND_PIX = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SUSPEND_PIX));
+  zxlogf(INFO, "MIPI_DSI_TOP_MEAS_CNTL = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_CNTL));
+  zxlogf(INFO, "MIPI_DSI_TOP_STAT = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_STAT));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE0 = 0x%x",
-         READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEAS_STAT_TE0));
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_TE0));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_TE1 = 0x%x",
-         READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEAS_STAT_TE1));
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_TE1));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS0 = 0x%x",
-         READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEAS_STAT_VS0));
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_VS0));
   zxlogf(INFO, "MIPI_DSI_TOP_MEAS_STAT_VS1 = 0x%x",
-         READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEAS_STAT_VS1));
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEAS_STAT_VS1));
   zxlogf(INFO, "MIPI_DSI_TOP_INTR_CNTL_STAT = 0x%x",
-         READ32_REG(MIPI_DSI, MIPI_DSI_TOP_INTR_CNTL_STAT));
-  zxlogf(INFO, "MIPI_DSI_TOP_MEM_PD = 0x%x", READ32_REG(MIPI_DSI, MIPI_DSI_TOP_MEM_PD));
+         mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_INTR_CNTL_STAT));
+  zxlogf(INFO, "MIPI_DSI_TOP_MEM_PD = 0x%x", mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_MEM_PD));
 }
 
 }  // namespace amlogic_display
