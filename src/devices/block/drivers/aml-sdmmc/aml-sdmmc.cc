@@ -4,7 +4,6 @@
 
 #include "aml-sdmmc.h"
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/sdmmc/c/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.

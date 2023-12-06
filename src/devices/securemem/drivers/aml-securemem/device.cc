@@ -5,7 +5,6 @@
 #include "device.h"
 
 #include <fidl/fuchsia.tee/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async/default.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>

@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/aml-usb-phy-v2/aml-usb-phy.h"
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>

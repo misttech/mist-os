@@ -4,7 +4,6 @@
 
 #include "zircon_platform_device.h"
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/magma/platform/platform_mmio.h>

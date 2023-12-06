@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/usb-peripheral/usb-peripheral.h"
 
-#include <fuchsia/hardware/platform/device/c/banjo.h>
 #include <fuchsia/hardware/usb/dci/c/banjo.h>
 #include <fuchsia/hardware/usb/dci/cpp/banjo.h>
 #include <lib/ddk/binding.h>

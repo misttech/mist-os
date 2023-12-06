@@ -5,7 +5,6 @@
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv1.h"
 
 #include <fidl/fuchsia.hardware.serial/cpp/wire.h>
-#include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
