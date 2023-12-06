@@ -1837,7 +1837,7 @@ assembly_input_bundle("driver_framework_v2") {
 # valid build-types: all
 #
 assembly_input_bundle("starnix_support") {
-  cache_packages = [
+  flexible_packages = [
     "//src/starnix/runner:starnix_package",
     "//src/starnix/kernel:starnix_kernel_package",
   ]
@@ -2820,7 +2820,7 @@ assembly_input_bundle("session_manager") {
 # feature_set_levels: minimal
 # build-types: all
 assembly_input_bundle("element_manager") {
-  cache_packages = [ "//src/session/bin/element_manager" ]
+  flexible_packages = [ "//src/session/bin/element_manager" ]
 }
 
 # UI support
@@ -2909,7 +2909,7 @@ assembly_input_bundle("ui_package_user_and_userdebug") {
 #
 assembly_input_bundle(
     "ui_package_eng_userdebug_with_synthetic_device_support") {
-  cache_packages = [ "//src/ui:ui_with_synthetic_device_support_package" ]
+  flexible_packages = [ "//src/ui:ui_with_synthetic_device_support_package" ]
 }
 
 # Fan support
