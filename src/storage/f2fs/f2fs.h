@@ -51,7 +51,6 @@
 #include "src/storage/lib/vfs/cpp/service.h"
 
 #include "lib/inspect/cpp/inspect.h"
-#include "lib/inspect/service/cpp/service.h"
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"

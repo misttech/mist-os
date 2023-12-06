@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_F2FS_COMPONENT_RUNNER_H_
 #define SRC_STORAGE_F2FS_COMPONENT_RUNNER_H_
 
+#include <lib/inspect/component/cpp/component.h>
+
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
 namespace f2fs {
@@ -47,6 +49,8 @@ class ComponentRunner final : public PlatformVfs {
 
   // These are only initialized by configure after a call to the startup service.
   std::unique_ptr<F2fs> f2fs_;
+
+  std::optional<inspect::ComponentInspector> exposed_inspector_ = {};
 };
 
 }  // namespace f2fs

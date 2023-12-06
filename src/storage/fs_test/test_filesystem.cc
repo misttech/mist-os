@@ -11,7 +11,6 @@
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
-#include <lib/inspect/service/cpp/reader.h>
 #include <lib/sys/cpp/component_context.h>
 
 #include <gtest/gtest.h>
