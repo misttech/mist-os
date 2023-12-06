@@ -25,7 +25,21 @@ zx_status_t NetworkPort::Init(Role role) {
     zxlogf(WARNING, "netdev_ifc_ invalid, port likely removed.");
     return ZX_ERR_BAD_STATE;
   }
-  zx_status_t status = netdev_ifc_.AddPort(port_id_, this, &network_port_protocol_ops_);
+
+  using Context = std::tuple<libsync::Completion, zx_status_t>;
+  Context context;
+
+  netdev_ifc_.AddPort(
+      port_id_, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        zxlogf(WARNING, "AddPort callback called: %s", zx_status_get_string(status));
+        auto& [port_added, out_status] = *static_cast<Context*>(ctx);
+        out_status = status;
+        port_added.Signal();
+      },
+      &context);
+  auto& [port_added, status] = context;
+  port_added.Wait();
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
     netdev_ifc_.clear();

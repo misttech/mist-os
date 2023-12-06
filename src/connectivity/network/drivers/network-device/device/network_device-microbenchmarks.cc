@@ -30,10 +30,22 @@ class FakeDeviceImpl : public ddk::NetworkPortProtocol<FakeDeviceImpl>,
 
   FakeDeviceImpl(perftest::RepeatState* state) : perftest_state_(state) {}
 
-  zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie) {
     iface_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-    ZX_ASSERT_OK(iface_.AddPort(kPortId, this, &network_port_protocol_ops_), "AddPort failed");
-    return ZX_OK;
+
+    using Context = std::tuple<network_device_impl_init_callback, void*>;
+    std::unique_ptr context = std::make_unique<Context>(callback, cookie);
+
+    iface_.AddPort(
+        kPortId, this, &network_port_protocol_ops_,
+        [](void* ctx, zx_status_t status) {
+          std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+          auto [callback, cookie] = *context;
+          ZX_ASSERT_OK(status, "AddPort failed");
+          callback(cookie, status);
+        },
+        context.release());
   }
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie) {
     callback(cookie, ZX_OK);

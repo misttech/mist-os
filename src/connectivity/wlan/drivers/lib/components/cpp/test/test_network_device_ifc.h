@@ -25,14 +25,16 @@ class TestNetworkDeviceIfc : public ::ddk::NetworkDeviceIfcProtocol<TestNetworkD
       port_status_changed_.Call(id, new_status);
     }
   }
-  zx_status_t NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port) {
+  void NetworkDeviceIfcAddPort(uint8_t id, const network_port_protocol_t* port,
+                               network_device_ifc_add_port_callback callback, void* cookie) {
     if (port) {
       port_proto_ = *port;
     }
     if (add_port_.HasExpectations()) {
-      return add_port_.Call(id, port);
+      callback(cookie, add_port_.Call(id, port));
+    } else {
+      callback(cookie, ZX_OK);
     }
-    return ZX_OK;
   }
   void NetworkDeviceIfcRemovePort(uint8_t id) {
     if (remove_port_.HasExpectations()) {

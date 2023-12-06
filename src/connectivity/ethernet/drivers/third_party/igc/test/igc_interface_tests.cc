@@ -86,8 +86,17 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
     // Verify that the netdev has been created during initialization process.
     EXPECT_EQ(1U, parent_->child_count());
 
+    libsync::Completion initialized;
     // AddPort() will be called inside this function and will also be verified.
-    driver_->NetworkDeviceImplInit(&ifc_);
+    driver_->NetworkDeviceImplInit(
+        &ifc_,
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* initialized = static_cast<libsync::Completion*>(ctx);
+          EXPECT_EQ(status, ZX_OK);
+          initialized->Signal();
+        },
+        &initialized);
+    initialized.Wait();
   }
 
   void TearDown() override {
@@ -99,9 +108,10 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
   }
 
   // network_device_ifc_protocol_ops_t implementations
-  zx_status_t AddPort(uint8_t id, const network_port_protocol_t* port) {
+  void AddPort(uint8_t id, const network_port_protocol_t* port,
+               network_device_ifc_add_port_callback callback, void* cookie) {
     EXPECT_EQ(id, ei::kPortId);
-    return ZX_OK;
+    callback(cookie, ZX_OK);
   }
 
   void CompleteRx(const rx_buffer_t* rx_list, size_t rx_count) {
@@ -138,9 +148,9 @@ class IgcInterfaceTest : public gtest::RealLoopFixture {
   // The fake protocol handles the calls from driver to netdev driver.
   network_device_ifc_protocol_ops_t ifc_ops_ = {
       .add_port =
-          [](void* ctx, uint8_t id, const network_port_protocol_t* port) {
-            return ((IgcInterfaceTest*)ctx)->AddPort(id, port);
-          },
+          [](void* ctx, uint8_t id, const network_port_protocol_t* port,
+             network_device_ifc_add_port_callback callback,
+             void* cookie) { ((IgcInterfaceTest*)ctx)->AddPort(id, port, callback, cookie); },
 
       .complete_rx =
           [](void* ctx, const rx_buffer_t* rx_list, size_t rx_count) {

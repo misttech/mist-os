@@ -87,7 +87,7 @@ class Device : public DeviceType,
   void GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync& completer) override;
 
   // NetworkDevice::Callbacks implementation
-  zx_status_t NetDevInit() override;
+  void NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::InitTxn txn) override;
   void NetDevRelease() override;
   void NetDevStart(wlan::drivers::components::NetworkDevice::Callbacks::StartTxn txn) override;
   void NetDevStop(wlan::drivers::components::NetworkDevice::Callbacks::StopTxn txn) override;

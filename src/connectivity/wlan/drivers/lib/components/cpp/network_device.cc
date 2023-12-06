@@ -118,9 +118,11 @@ void NetworkDevice::CompleteTx(cpp20::span<Frame> frames, zx_status_t status) {
 }
 
 // NetworkDeviceImpl implementation
-zx_status_t NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                          network_device_impl_init_callback callback,
+                                          void* cookie) {
   netdev_ifc_ = ::ddk::NetworkDeviceIfcProtocolClient(iface);
-  return callbacks_->NetDevInit();
+  callbacks_->NetDevInit(Callbacks::InitTxn(callback, cookie));
 }
 
 void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback callback,

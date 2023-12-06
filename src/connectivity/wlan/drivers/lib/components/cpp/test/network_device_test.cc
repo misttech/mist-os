@@ -31,11 +31,12 @@ struct TestNetworkDevice : public NetworkDevice::Callbacks {
       release_.Call();
     }
   }
-  zx_status_t NetDevInit() override {
+  void NetDevInit(NetworkDevice::Callbacks::InitTxn txn) override {
     if (init_.HasExpectations()) {
-      return init_.Call();
+      txn.Reply(init_.Call());
+    } else {
+      txn.Reply(ZX_OK);
     }
-    return ZX_OK;
   }
   void NetDevStart(NetworkDevice::Callbacks::StartTxn txn) override {
     txn.Reply(ZX_OK);
@@ -179,18 +180,6 @@ TEST(NetworkDeviceTest, Stop) {
   device.stop_.VerifyAndClear();
 }
 
-TEST(NetworkDeviceTest, NetDevIfcProto) {
-  auto parent = MockDevice::FakeRootParent();
-  TestNetworkDevice device(parent.get());
-  wlan::drivers::components::test::TestNetworkDeviceIfc netdev_ifc;
-  network_device_ifc_protocol_t proto = netdev_ifc.GetProto();
-
-  ASSERT_OK(device.network_device_.NetworkDeviceImplInit(&proto));
-
-  EXPECT_EQ(device.network_device_.NetDevIfcProto().ctx, proto.ctx);
-  EXPECT_EQ(device.network_device_.NetDevIfcProto().ops, proto.ops);
-}
-
 struct NetworkDeviceTestFixture : public ::zxtest::Test {
   static constexpr uint8_t kVmoId = 13;
   static constexpr uint8_t kPortId = 8;
@@ -199,7 +188,16 @@ struct NetworkDeviceTestFixture : public ::zxtest::Test {
 
   void SetUp() override {
     kVmoSize = zx_system_get_page_size();
-    device_.network_device_.NetworkDeviceImplInit(&netdev_ifc_.GetProto());
+    libsync::Completion initialized;
+    device_.network_device_.NetworkDeviceImplInit(
+        &netdev_ifc_.GetProto(),
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* initialized = static_cast<libsync::Completion*>(ctx);
+          EXPECT_OK(status);
+          initialized->Signal();
+        },
+        &initialized);
+    initialized.Wait();
     // Make sure we have these correct or tests are gonna start crashing.
     ASSERT_EQ(device_.network_device_.NetDevIfcProto().ctx, netdev_ifc_.GetProto().ctx);
     ASSERT_EQ(device_.network_device_.NetDevIfcProto().ops, netdev_ifc_.GetProto().ops);

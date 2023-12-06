@@ -4,6 +4,8 @@
 
 #include "test_util.h"
 
+#include <lib/sync/cpp/completion.h>
+
 #include <iostream>
 
 #include <gtest/gtest.h>
@@ -100,7 +102,20 @@ zx_status_t FakeNetworkPortImpl::AddPort(uint8_t port_id,
   if (port_added_) {
     return ZX_ERR_ALREADY_EXISTS;
   }
-  zx_status_t status = ifc_client.AddPort(port_id, this, &network_port_protocol_ops_);
+
+  using Context = std::tuple<libsync::Completion, zx_status_t>;
+  Context context;
+
+  ifc_client.AddPort(
+      port_id, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        auto& [port_added, out_status] = *static_cast<Context*>(ctx);
+        out_status = status;
+        port_added.Signal();
+      },
+      &context);
+  auto& [port_added, status] = context;
+  port_added.Wait();
   if (status != ZX_OK) {
     return status;
   }
@@ -153,10 +168,11 @@ FakeNetworkDeviceImpl::~FakeNetworkDeviceImpl() {
   }
 }
 
-zx_status_t FakeNetworkDeviceImpl::NetworkDeviceImplInit(
-    const network_device_ifc_protocol_t* iface) {
+void FakeNetworkDeviceImpl::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                                  network_device_impl_init_callback callback,
+                                                  void* cookie) {
   device_client_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  return ZX_OK;
+  callback(cookie, ZX_OK);
 }
 
 void FakeNetworkDeviceImpl::NetworkDeviceImplStart(network_device_impl_start_callback callback,

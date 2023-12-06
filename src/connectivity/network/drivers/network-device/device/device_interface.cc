@@ -9,6 +9,7 @@
 #include <lib/fidl/cpp/wire/sync_call.h>
 #include <lib/fidl/cpp/wire/traits.h>
 #include <lib/fit/defer.h>
+#include <lib/sync/cpp/completion.h>
 
 #include <fbl/alloc_checker.h>
 
@@ -240,7 +241,26 @@ zx_status_t DeviceInterface::Init() {
   }
 
   // Init session with parent.
-  if (zx_status_t status = device_.Init(this, &network_device_ifc_protocol_ops_); status != ZX_OK) {
+  using Context = std::tuple<libsync::Completion, zx_status_t>;
+  Context context;
+  device_.Init(
+      this, &network_device_ifc_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        Context* context = static_cast<Context*>(ctx);
+        auto& [initialized, out_status] = *context;
+        out_status = status;
+        initialized.Signal();
+      },
+      &context);
+  auto& [initialized, status] = context;
+  // Waiting for Init to complete here simplifies the creation process of DeviceInterface at the
+  // expense of blocking the calling thread until Init is complete. This requires that netdevice
+  // allows some re-entrant calls as many drivers will call AddPort during initialization. Vendor
+  // drivers need to be cautious with locks to ensure that further re-entrant calls from AddPort
+  // will not cause a deadlock. When migrating to FIDL this call and wait should be replaced by a
+  // synchronous FIDL call.
+  initialized.Wait();
+  if (status != ZX_OK) {
     LOGF_ERROR("init: NetworkDevice Init failed: %s", zx_status_get_string(status));
     return status;
   }
@@ -307,69 +327,76 @@ void DeviceInterface::NetworkDeviceIfcPortStatusChanged(uint8_t port_id,
   });
 }
 
-zx_status_t DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
-                                                     const network_port_protocol_t* port_proto) {
+void DeviceInterface::NetworkDeviceIfcAddPort(uint8_t port_id,
+                                              const network_port_protocol_t* port_proto,
+                                              network_device_ifc_add_port_callback callback,
+                                              void* cookie) {
   LOGF_TRACE("%s(%d)", __FUNCTION__, port_id);
-  auto port_client = ddk::NetworkPortProtocolClient(port_proto);
+  const zx_status_t status = [&] {
+    auto port_client = ddk::NetworkPortProtocolClient(port_proto);
 
-  // Creating a MacAddrDeviceInterface may interact with the device, do that without holding the
-  // control lock to prevent deadlocks
-  std::unique_ptr<MacAddrDeviceInterface> mac;
-  mac_addr_protocol_t* mac_proto = nullptr;
-  port_client.GetMac(&mac_proto);
-  if (mac_proto) {
-    ddk::MacAddrProtocolClient mac_client(mac_proto);
-    if (mac_client.is_valid()) {
-      zx::result status = MacAddrDeviceInterface::Create(mac_client);
-      if (status.is_error()) {
-        LOGF_ERROR("failed to instantiate MAC information for port %d: %s", port_id,
-                   status.status_string());
-        return status.status_value();
+    // Creating a MacAddrDeviceInterface may interact with the device, do that without holding the
+    // control lock to prevent deadlocks
+    std::unique_ptr<MacAddrDeviceInterface> mac;
+    mac_addr_protocol_t* mac_proto = nullptr;
+    port_client.GetMac(&mac_proto);
+    if (mac_proto) {
+      ddk::MacAddrProtocolClient mac_client(mac_proto);
+      if (mac_client.is_valid()) {
+        zx::result status = MacAddrDeviceInterface::Create(mac_client);
+        if (status.is_error()) {
+          LOGF_ERROR("failed to instantiate MAC information for port %d: %s", port_id,
+                     status.status_string());
+          return status.status_value();
+        }
+        mac = std::move(status.value());
       }
-      mac = std::move(status.value());
     }
-  }
 
-  fbl::AutoLock lock(&control_lock_);
-  // Don't allow new ports if tearing down.
-  if (teardown_state_ != TeardownState::RUNNING) {
-    LOGF_WARN("port %d not added, teardown in progress", port_id);
-    return ZX_ERR_BAD_STATE;
-  }
-  if (port_id >= ports_.size()) {
-    LOGF_ERROR("port id %d out of allowed range: [0, %ld)", port_id, ports_.size());
-    return ZX_ERR_INVALID_ARGS;
-  }
-  PortSlot& port_slot = ports_[port_id];
-  if (port_slot.port != nullptr) {
-    LOGF_ERROR("port %d already exists", port_id);
-    return ZX_ERR_ALREADY_EXISTS;
-  }
+    fbl::AutoLock lock(&control_lock_);
+    // Don't allow new ports if tearing down.
+    if (teardown_state_ != TeardownState::RUNNING) {
+      LOGF_WARN("port %d not added, teardown in progress", port_id);
+      return ZX_ERR_BAD_STATE;
+    }
+    if (port_id >= ports_.size()) {
+      LOGF_ERROR("port id %d out of allowed range: [0, %ld)", port_id, ports_.size());
+      return ZX_ERR_INVALID_ARGS;
+    }
+    PortSlot& port_slot = ports_[port_id];
+    if (port_slot.port != nullptr) {
+      LOGF_ERROR("port %d already exists", port_id);
+      return ZX_ERR_ALREADY_EXISTS;
+    }
 
-  fbl::AllocChecker checker;
-  const netdev::wire::PortId salted_id = {
-      .base = port_id,
-      // NB: This relies on wrapping overflow.
-      .salt = static_cast<uint8_t>(port_slot.salt + 1),
-  };
-  std::unique_ptr<DevicePort> port(
-      new (&checker) DevicePort(this, dispatcher_, salted_id, port_client, std::move(mac),
-                                fit::bind_member<&DeviceInterface::OnPortTeardownComplete>(this)));
-  if (!checker.check()) {
-    LOGF_ERROR("failed to allocate port memory");
-    return ZX_ERR_NO_MEMORY;
-  }
+    fbl::AllocChecker checker;
+    const netdev::wire::PortId salted_id = {
+        .base = port_id,
+        // NB: This relies on wrapping overflow.
+        .salt = static_cast<uint8_t>(port_slot.salt + 1),
+    };
+    std::unique_ptr<DevicePort> port(new (&checker) DevicePort(
+        this, dispatcher_, salted_id, port_client, std::move(mac),
+        fit::bind_member<&DeviceInterface::OnPortTeardownComplete>(this)));
+    if (!checker.check()) {
+      LOGF_ERROR("failed to allocate port memory");
+      return ZX_ERR_NO_MEMORY;
+    }
 
-  // Clear port_client to prevent deferred call from notifying removal.
-  port_client.clear();
-  // Update slot with newly created port and its salt.
-  port_slot.salt = salted_id.salt;
-  port_slot.port = std::move(port);
+    // Clear port_client to prevent deferred call from notifying removal.
+    port_client.clear();
+    // Update slot with newly created port and its salt.
+    port_slot.salt = salted_id.salt;
+    port_slot.port = std::move(port);
 
-  for (auto& watcher : port_watchers_) {
-    watcher.PortAdded(salted_id);
-  }
-  return ZX_OK;
+    for (auto& watcher : port_watchers_) {
+      watcher.PortAdded(salted_id);
+    }
+    return ZX_OK;
+  }();
+  // The lambda ensures that control_lock_ is NOT held during this callback. Receivers of the call
+  // might call back into netdev from this callback.
+  callback(cookie, status);
 }
 
 void DeviceInterface::NetworkDeviceIfcRemovePort(uint8_t port_id) {

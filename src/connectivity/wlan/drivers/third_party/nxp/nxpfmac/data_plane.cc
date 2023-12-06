@@ -183,7 +183,7 @@ std::optional<wlan::drivers::components::Frame> DataPlane::AcquireFrame() {
 
 void DataPlane::NetDevRelease() { sync_completion_signal(&network_device_released_); }
 
-zx_status_t DataPlane::NetDevInit() { return ZX_OK; }
+void DataPlane::NetDevInit(InitTxn txn) { txn.Reply(ZX_OK); }
 
 void DataPlane::NetDevStart(StartTxn txn) { txn.Reply(ZX_OK); }
 

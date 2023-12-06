@@ -54,8 +54,16 @@ struct DataPlaneTest : public zxtest::Test {
     data_plane_ = test_data_plane_->GetDataPlane();
     net_device_ = test_data_plane_->GetNetDevice();
     ASSERT_OK(device_get_protocol(net_device_, ZX_PROTOCOL_NETWORK_DEVICE_IMPL, &netdev_proto_));
-    ASSERT_OK(
-        network_device_impl_init(&netdev_proto_, netdev_ifc_proto_.ctx, netdev_ifc_proto_.ops));
+    libsync::Completion initialized;
+    network_device_impl_init(
+        &netdev_proto_, netdev_ifc_proto_.ctx, netdev_ifc_proto_.ops,
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* initialized = static_cast<libsync::Completion*>(ctx);
+          EXPECT_OK(status);
+          initialized->Signal();
+        },
+        &initialized);
+    initialized.Wait();
     // Ensure that the netdevice has prepared a VMO, otherwise it won't complete TX or RX frames.
     ASSERT_OK(zx::vmo::create(2048, 0, &netdev_vmo_));
     network_device_impl_prepare_vmo_callback callback = [](void*, int) {};

@@ -5,7 +5,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/defer.h>
-#include <lib/sync/completion.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/global.h>
 
 #include <future>
@@ -1621,7 +1621,16 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
     // Add a port with an invalid ID.
     FakeNetworkPortImpl fake_port;
     network_port_protocol_t proto = fake_port.protocol();
-    ASSERT_EQ(impl_.client().AddPort(MAX_PORTS, proto.ctx, proto.ops), ZX_ERR_INVALID_ARGS);
+    libsync::Completion port_added;
+    impl_.client().AddPort(
+        MAX_PORTS, proto.ctx, proto.ops,
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* port_added = static_cast<libsync::Completion*>(ctx);
+          EXPECT_EQ(status, ZX_ERR_INVALID_ARGS);
+          port_added->Signal();
+        },
+        &port_added);
+    port_added.Wait();
     // Port should NOT have been removed if AddPort fails.
     ASSERT_FALSE(fake_port.removed());
   }
@@ -1630,7 +1639,16 @@ TEST_F(NetworkDeviceTest, RejectsInvalidPortIds) {
     // Add a port with a duplicate ID.
     FakeNetworkPortImpl fake_port;
     network_port_protocol_t proto = fake_port.protocol();
-    ASSERT_EQ(impl_.client().AddPort(kPort13, proto.ctx, proto.ops), ZX_ERR_ALREADY_EXISTS);
+    libsync::Completion port_added;
+    impl_.client().AddPort(
+        kPort13, proto.ctx, proto.ops,
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* port_added = static_cast<libsync::Completion*>(ctx);
+          EXPECT_EQ(status, ZX_ERR_ALREADY_EXISTS);
+          port_added->Signal();
+        },
+        &port_added);
+    port_added.Wait();
     // Port should NOT have been removed if AddPort fails.
     ASSERT_FALSE(fake_port.removed());
   }

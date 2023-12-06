@@ -64,7 +64,8 @@ class NetdeviceMigration
       __TA_EXCLUDES(rx_lock_) __TA_EXCLUDES(vmo_lock_);
 
   // For NetworkDeviceImplProtocol.
-  zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface);
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie);
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie)
       __TA_EXCLUDES(tx_lock_) __TA_EXCLUDES(rx_lock_);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)

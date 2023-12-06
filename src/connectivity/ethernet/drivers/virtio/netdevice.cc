@@ -295,15 +295,25 @@ port_status_t NetworkDevice::ReadStatus() const {
   };
 }
 
-zx_status_t NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void NetworkDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                          network_device_impl_init_callback callback,
+                                          void* cookie) {
   fbl::AutoLock lock(&state_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  zx_status_t status = ifc_.AddPort(kPortId, this, &network_port_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+  using Context = std::tuple<network_device_impl_init_callback, void*>;
+  std::unique_ptr context = std::make_unique<Context>(callback, cookie);
+
+  ifc_.AddPort(
+      kPortId, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+        auto [callback, cookie] = *context;
+        if (status != ZX_OK) {
+          zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+        }
+        callback(cookie, status);
+      },
+      context.release());
 }
 
 void NetworkDevice::NetworkDeviceImplStart(network_device_impl_start_callback callback,

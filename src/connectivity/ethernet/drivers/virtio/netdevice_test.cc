@@ -142,7 +142,15 @@ class NetworkDeviceTests : public zxtest::Test,
         .ops = &network_device_ifc_protocol_ops_,
         .ctx = this,
     };
-    ASSERT_OK(device_->NetworkDeviceImplInit(&protocol));
+    libsync::Completion initialized;
+    device_->NetworkDeviceImplInit(
+        &protocol,
+        [](void* ctx, zx_status_t status) {
+          EXPECT_OK(status);
+          static_cast<libsync::Completion*>(ctx)->Signal();
+        },
+        &initialized);
+    initialized.Wait();
     ASSERT_TRUE(port_.is_valid());
     mac_addr_protocol_t* mac_proto = nullptr;
     port_.GetMac(&mac_proto);
@@ -189,11 +197,12 @@ class NetworkDeviceTests : public zxtest::Test,
     EXPECT_EQ(port_id, NetworkDevice::kPortId);
     port_status_queue_.push(*new_status);
   }
-  zx_status_t NetworkDeviceIfcAddPort(uint8_t port_id, const network_port_protocol_t* port) {
+  void NetworkDeviceIfcAddPort(uint8_t port_id, const network_port_protocol_t* port,
+                               network_device_ifc_add_port_callback callback, void* cookie) {
     EXPECT_EQ(port_id, NetworkDevice::kPortId);
     EXPECT_FALSE(port_.is_valid());
     port_ = ddk::NetworkPortProtocolClient(port);
-    return ZX_OK;
+    callback(cookie, ZX_OK);
   }
   void NetworkDeviceIfcRemovePort(uint8_t port_id) { ADD_FAILURE("Port should never be removed"); }
   void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count) {

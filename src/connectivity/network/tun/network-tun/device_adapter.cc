@@ -4,7 +4,7 @@
 
 #include "device_adapter.h"
 
-#include <lib/sync/completion.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/global.h>
 #include <zircon/status.h>
 
@@ -43,9 +43,11 @@ zx_status_t DeviceAdapter::BindPort(uint8_t port_id, fidl::ServerEnd<netdev::Por
   return device_->BindPort(port_id, std::move(req));
 }
 
-zx_status_t DeviceAdapter::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void DeviceAdapter::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                          network_device_impl_init_callback callback,
+                                          void* cookie) {
   device_iface_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  return ZX_OK;
+  callback(cookie, ZX_OK);
 }
 
 void DeviceAdapter::NetworkDeviceImplStart(network_device_impl_start_callback callback,
@@ -406,7 +408,19 @@ void DeviceAdapter::OnPortStatusChanged(uint8_t port_id, const port_status_t& ne
 
 zx_status_t DeviceAdapter::AddPort(PortAdapter& port) {
   network_port_protocol_t proto = port.proto();
-  return device_iface_.AddPort(port.id(), proto.ctx, proto.ops);
+  using Context = std::tuple<libsync::Completion, zx_status_t>;
+  Context context;
+  device_iface_.AddPort(
+      port.id(), proto.ctx, proto.ops,
+      [](void* ctx, zx_status_t status) {
+        auto& [port_added, out_status] = *static_cast<Context*>(ctx);
+        out_status = status;
+        port_added.Signal();
+      },
+      &context);
+  auto& [port_added, status] = context;
+  port_added.Wait();
+  return status;
 }
 
 void DeviceAdapter::RemovePort(uint8_t port_id) { device_iface_.RemovePort(port_id); }

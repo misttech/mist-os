@@ -478,7 +478,9 @@ void Device::GetPowerSaveMode(fdf::Arena& arena, GetPowerSaveModeCompleter::Sync
   completer.buffer(arena).ReplySuccess(builder.Build());
 }
 
-zx_status_t Device::NetDevInit() { return ZX_OK; }
+void Device::NetDevInit(wlan::drivers::components::NetworkDevice::Callbacks::InitTxn txn) {
+  txn.Reply(ZX_OK);
+}
 
 void Device::NetDevRelease() {
   // Don't need to do anything here, the release of wlanif should take care of all releasing

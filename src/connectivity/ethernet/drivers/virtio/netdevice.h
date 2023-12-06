@@ -70,7 +70,8 @@ class NetworkDevice : public Device,
   void IrqConfigChange() override __TA_EXCLUDES(state_lock_);
 
   // NetworkDeviceImpl protocol:
-  zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface);
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie);
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie);
   void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);

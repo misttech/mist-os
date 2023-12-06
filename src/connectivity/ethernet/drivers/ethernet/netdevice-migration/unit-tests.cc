@@ -82,8 +82,9 @@ class MockNetworkDeviceIfc : public ddk::Device<MockNetworkDeviceIfc>,
 
   MOCK_METHOD(void, NetworkDeviceIfcPortStatusChanged,
               (uint8_t id, const port_status_t* new_status));
-  MOCK_METHOD(zx_status_t, NetworkDeviceIfcAddPort,
-              (uint8_t id, const network_port_protocol_t* port));
+  MOCK_METHOD(void, NetworkDeviceIfcAddPort,
+              (uint8_t id, const network_port_protocol_t* port,
+               network_device_ifc_add_port_callback callback, void* cookie));
   MOCK_METHOD(void, NetworkDeviceIfcRemovePort, (uint8_t id));
   MOCK_METHOD(void, NetworkDeviceIfcCompleteRx, (const rx_buffer_t* rx_list, size_t rx_count));
   MOCK_METHOD(void, NetworkDeviceIfcCompleteTx, (const tx_result_t* rx_list, size_t tx_count));
@@ -146,11 +147,23 @@ class NetdeviceMigrationTest : public ::testing::Test {
           return ZX_OK;
         });
     ASSERT_NO_FATAL_FAILURE(CreateDevice());
-    EXPECT_CALL(
-        mock_network_device_ifc_,
-        NetworkDeviceIfcAddPort(netdevice_migration::NetdeviceMigration::kPortId, testing::_))
-        .Times(1);
-    ASSERT_OK(device_->NetworkDeviceImplInit(&mock_network_device_ifc_.proto()));
+    EXPECT_CALL(mock_network_device_ifc_,
+                NetworkDeviceIfcAddPort(netdevice_migration::NetdeviceMigration::kPortId,
+                                        testing::_, testing::_, testing::_))
+        .Times(1)
+        .WillOnce([](uint8_t id, const network_port_protocol_t* port,
+                     network_device_ifc_add_port_callback callback,
+                     void* cookie) { callback(cookie, ZX_OK); });
+    libsync::Completion initialized;
+    device_->NetworkDeviceImplInit(
+        &mock_network_device_ifc_.proto(),
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* completion = static_cast<libsync::Completion*>(ctx);
+          EXPECT_OK(status);
+          completion->Signal();
+        },
+        &initialized);
+    initialized.Wait();
   }
 
   void NetdevImplStart(zx_status_t expected) {
@@ -334,7 +347,16 @@ TEST_F(NetdeviceMigrationDefaultSetupTest, LifetimeTest) {
 }
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, NetworkDeviceImplInit) {
-  ASSERT_STATUS(Device().NetworkDeviceImplInit(&MockNetworkDevice().proto()), ZX_ERR_ALREADY_BOUND);
+  libsync::Completion init_called;
+  Device().NetworkDeviceImplInit(
+      &MockNetworkDevice().proto(),
+      [](void* ctx, zx_status_t status) {
+        libsync::Completion* init_called = static_cast<libsync::Completion*>(ctx);
+        EXPECT_STATUS(status, ZX_ERR_ALREADY_BOUND);
+        init_called->Signal();
+      },
+      &init_called);
+  init_called.Wait();
 }
 
 TEST_F(NetdeviceMigrationDefaultSetupTest, NetworkDeviceImplStartStop) {

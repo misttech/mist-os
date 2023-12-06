@@ -721,20 +721,29 @@ void Gvnic::DdkRelease() { delete this; }
 // The quotes in the comments in this section come from the documentation of these fields in
 // sdk/fidl/fuchsia.hardware.network.driver/network-device.fidl
 
-zx_status_t Gvnic::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void Gvnic::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                  network_device_impl_init_callback callback, void* cookie) {
   // "`Init` is only called once during the lifetime of the device..."
   static bool called = false;
   ZX_ASSERT_MSG(!called, "NetworkDeviceImplInit already called.");
   called = true;
 
+  using Context = std::tuple<network_device_impl_init_callback, void*>;
+  auto context = std::make_unique<Context>(callback, cookie);
+
   fbl::AutoLock lock(&ifc_lock_);
   ifc_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  zx_status_t status = ifc_.AddPort(kNetworkPortId, this, &network_port_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+  ifc_.AddPort(
+      kNetworkPortId, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+        auto [callback, cookie] = *context;
+        if (status != ZX_OK) {
+          zxlogf(ERROR, "Failed to add port: %s", zx_status_get_string(status));
+        }
+        callback(cookie, status);
+      },
+      context.release());
 }
 
 void Gvnic::NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie) {

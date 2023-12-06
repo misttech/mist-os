@@ -91,8 +91,9 @@ class SimDataPath {
 
   network_device_ifc_protocol_ops_t ifc_ops_ = {
       .add_port =
-          [](void* ctx, uint8_t id, const network_port_protocol_t* port) {
-            return static_cast<SimDataPath*>(ctx)->OnAddPort(id, port);
+          [](void* ctx, uint8_t id, const network_port_protocol_t* port,
+             network_device_ifc_add_port_callback callback, void* cookie) {
+            callback(cookie, static_cast<SimDataPath*>(ctx)->OnAddPort(id, port));
           },
       .remove_port = [](void* ctx,
                         uint8_t id) { static_cast<SimDataPath*>(ctx)->OnRemovePort(id); },

@@ -209,17 +209,31 @@ void NetdeviceMigration::EthernetIfcRecv(const uint8_t* data_buffer, size_t data
   }
 }
 
-zx_status_t NetdeviceMigration::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void NetdeviceMigration::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                               network_device_impl_init_callback callback,
+                                               void* cookie) {
   if (netdevice_.is_valid()) {
-    return ZX_ERR_ALREADY_BOUND;
+    callback(cookie, ZX_ERR_ALREADY_BOUND);
+    return;
   }
   netdevice_ = ddk::NetworkDeviceIfcProtocolClient(iface);
-  zx_status_t status = netdevice_.AddPort(kPortId, this, &network_port_protocol_ops_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
-    return status;
-  }
-  return ZX_OK;
+
+  using Context = std::pair<network_device_impl_init_callback, void*>;
+
+  std::unique_ptr context = std::make_unique<Context>(callback, cookie);
+  netdevice_.AddPort(
+      kPortId, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+        auto [callback, cookie] = *context;
+        if (status != ZX_OK) {
+          zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+          callback(cookie, status);
+          return;
+        }
+        callback(cookie, ZX_OK);
+      },
+      context.release());
 }
 
 void NetdeviceMigration::NetworkDeviceImplStart(network_device_impl_start_callback callback,

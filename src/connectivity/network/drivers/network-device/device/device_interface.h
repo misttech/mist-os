@@ -77,7 +77,8 @@ class DeviceInterface : public fidl::WireServer<netdev::Device>,
 
   // NetworkDevice interface implementation.
   void NetworkDeviceIfcPortStatusChanged(uint8_t port_id, const port_status_t* new_status);
-  zx_status_t NetworkDeviceIfcAddPort(uint8_t port_id, const network_port_protocol_t* port);
+  void NetworkDeviceIfcAddPort(uint8_t port_id, const network_port_protocol_t* port,
+                               network_device_ifc_add_port_callback callback, void* cookie);
   void NetworkDeviceIfcRemovePort(uint8_t port_id);
   void NetworkDeviceIfcCompleteRx(const rx_buffer_t* rx_list, size_t rx_count);
   void NetworkDeviceIfcCompleteTx(const tx_result_t* tx_list, size_t tx_count);

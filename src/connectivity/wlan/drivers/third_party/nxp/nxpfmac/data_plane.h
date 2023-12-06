@@ -61,7 +61,7 @@ class DataPlane : public wlan::drivers::components::NetworkDevice::Callbacks {
 
   // NetworkDevice::Callbacks implementation
   void NetDevRelease() override;
-  zx_status_t NetDevInit() override;
+  void NetDevInit(InitTxn txn) override;
   void NetDevStart(StartTxn txn) override;
   void NetDevStop(StopTxn txn) override;
   void NetDevGetInfo(device_impl_info_t* out_info) override;

@@ -196,17 +196,26 @@ struct WlanInterfaceTest : public zxtest::Test,
     // implementation of the netdevice ifc.
     network_device_impl_protocol_t netdev_proto;
     ASSERT_OK(device_get_protocol(net_device, ZX_PROTOCOL_NETWORK_DEVICE_IMPL, &netdev_proto));
-    ASSERT_OK(
-        network_device_impl_init(&netdev_proto, netdev_ifc_proto_.ctx, netdev_ifc_proto_.ops));
+    libsync::Completion initialized;
+    network_device_impl_init(
+        &netdev_proto, netdev_ifc_proto_.ctx, netdev_ifc_proto_.ops,
+        [](void* ctx, zx_status_t status) {
+          libsync::Completion* initialized = static_cast<libsync::Completion*>(ctx);
+          EXPECT_OK(status);
+          initialized->Signal();
+        },
+        &initialized);
+    initialized.Wait();
   }
 
-  static zx_status_t OnAddPort(void* ctx, uint8_t, const network_port_protocol_t* proto) {
+  static void OnAddPort(void* ctx, uint8_t, const network_port_protocol_t* proto,
+                        network_device_ifc_add_port_callback callback, void* cookie) {
     auto ifc = static_cast<WlanInterfaceTest*>(ctx);
     ifc->net_port_proto_ = *proto;
     EXPECT_NOT_NULL(proto->ctx);
     EXPECT_NOT_NULL(proto->ops);
     sync_completion_signal(&ifc->on_add_port_called_);
-    return ZX_OK;
+    callback(cookie, ZX_OK);
   }
   static void OnRemovePort(void* ctx, uint8_t) {
     auto ifc = static_cast<WlanInterfaceTest*>(ctx);

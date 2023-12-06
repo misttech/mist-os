@@ -347,6 +347,7 @@ closed protocol NetworkDeviceIfc {
     ///
     /// + request `id` new port identifier.
     /// + request `port` handle to network port implementation.
+    @async
     strict AddPort(resource struct {
         id fuchsia.hardware.network.BasePortId;
         port client_end:NetworkPort;
@@ -541,6 +542,7 @@ closed protocol NetworkDeviceImpl {
     /// + request `iface` handle to the device interface.
     /// - response `s` initialization status. A value other than `ZX_OK` will
     /// cause the device to unbind.
+    @async
     strict Init(resource struct {
         iface client_end:NetworkDeviceIfc;
     }) -> (struct {

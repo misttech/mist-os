@@ -32,6 +32,8 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   class Callbacks {
    public:
     // Takes zx_status_t as parameter, call txn.Reply(status) to complete transaction.
+    using InitTxn = AsyncTxn<zx_status_t>;
+    // Takes zx_status_t as parameter, call txn.Reply(status) to complete transaction.
     using StartTxn = AsyncTxn<zx_status_t>;
     // Does not take a parameter, call txn.Reply() to complete transaction.
     using StopTxn = AsyncTxn<>;
@@ -41,9 +43,12 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
     // Called when the underlying device is released.
     virtual void NetDevRelease() = 0;
 
-    // Called as part of the initialization of the device. Returning anything but ZX_OK from this
-    // will prevent the device from being created.
-    virtual zx_status_t NetDevInit() = 0;
+    // Called as part of the initialization of the device. The device is considered initialized
+    // after txn.Reply() has been called with a ZX_OK status as parameter. The device can call
+    // txn.Reply() at any time, either during the invocation of NetDevInit or at a later time from
+    // the same thread or another thread. Call txn.Reply() with anything but ZX_OK will prevent the
+    // device from being created.
+    virtual void NetDevInit(InitTxn txn) = 0;
 
     // Start the device's data path. The data path is considered started after txn.Reply() has been
     // called with a ZX_OK status as parameter. The device can call txn.Reply() at any time, either
@@ -158,7 +163,8 @@ class NetworkDevice final : public ::ddk::NetworkDeviceImplProtocol<NetworkDevic
   void CompleteTx(cpp20::span<Frame> frames, zx_status_t status);
 
   // NetworkDeviceImpl implementation
-  zx_status_t NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface);
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie);
   void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie)
       __TA_EXCLUDES(started_mutex_);
   void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie)

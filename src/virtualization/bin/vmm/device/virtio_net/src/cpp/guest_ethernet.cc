@@ -232,23 +232,35 @@ void GuestEthernet::FinishShutdownIfRequired() {
   }
 }
 
-zx_status_t GuestEthernet::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface) {
+void GuestEthernet::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                          network_device_impl_init_callback callback,
+                                          void* cookie) {
   FX_CHECK(!parent_.is_valid()) << "NetworkDeviceImplInit called multiple times";
   parent_ = ddk::NetworkDeviceIfcProtocolClient(iface);
 
+  using Context = std::tuple<GuestEthernet*, network_device_impl_init_callback, void*>;
+  std::unique_ptr context = std::make_unique<Context>(this, callback, cookie);
+
   // Create port.
-  zx_status_t status = parent_.AddPort(kPortId, this, &network_port_protocol_ops_);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to add port: " << zx_status_get_string(status);
-    return status;
-  }
+  parent_.AddPort(
+      kPortId, this, &network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+        auto [guest_ethernet, callback, cookie] = *context;
+        if (status != ZX_OK) {
+          FX_LOGS(ERROR) << "Failed to add port: " << zx_status_get_string(status);
+          callback(cookie, status);
+          return;
+        }
 
-  // Inform our parent that the port is active.
-  port_status_t port_status;
-  NetworkPortGetStatus(&port_status);
-  parent_.PortStatusChanged(kPortId, &port_status);
+        // Inform our parent that the port is active.
+        port_status_t port_status;
+        guest_ethernet->NetworkPortGetStatus(&port_status);
+        guest_ethernet->parent_.PortStatusChanged(kPortId, &port_status);
 
-  return ZX_OK;
+        callback(cookie, ZX_OK);
+      },
+      context.release());
 }
 
 void GuestEthernet::NetworkDeviceImplStart(network_device_impl_start_callback callback,

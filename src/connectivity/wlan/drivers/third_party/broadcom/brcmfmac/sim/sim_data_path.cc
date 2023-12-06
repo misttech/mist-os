@@ -55,7 +55,16 @@ void SimDataPath::Init(drivers::components::NetworkDevice* net_dev) {
   ZX_ASSERT(net_dev);
   net_dev_ = net_dev;
 
-  net_dev_->NetworkDeviceImplInit(&ifc_protocol_);
+  sync_completion_t initialized;
+  net_dev_->NetworkDeviceImplInit(
+      &ifc_protocol_,
+      [](void* ctx, zx_status_t status) {
+        sync_completion_t* initialized = static_cast<sync_completion_t*>(ctx);
+        ZX_ASSERT(status == ZX_OK);
+        sync_completion_signal(initialized);
+      },
+      &initialized);
+  sync_completion_wait(&initialized, ZX_TIME_INFINITE);
   net_dev_->NetworkDeviceImplGetInfo(&device_info_);
 
   // setup tx vmo, which is just a single frame of size kMaxFrameSize
