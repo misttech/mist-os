@@ -293,29 +293,25 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         let target = component.clone();
         let task = async move {
             if let UseDecl::Protocol(use_protocol_decl) = &use_ {
-                if let Ok(state) = target.lock_resolved_state().await {
-                    // The capability dict can be missing if we used a capability from our
-                    // parent but the parent did not offer this capability.
-                    let target_path = use_protocol_decl.target_path.split();
-                    if let Some(router) = state.program_input_dict.get_router(target_path) {
-                        let (cap_receiver, completer) = Completer::new();
-                        router.route(
-                            Request {
-                                rights: Some(flags),
-                                relative_path: sandbox::Path::new(relative_path.as_str()),
-                                target_moniker: weak_component.moniker.clone(),
-                                availability: use_protocol_decl.availability.clone(),
-                            },
-                            completer,
-                        );
-                        if let Ok(sender) = cap_receiver.await {
-                            let handle = server_end.into_handle();
-                            let sender: Sender<Message> = sender
-                                .try_into()
-                                .expect("router returned unexpected capability type");
-                            sender.send(Message { handle, flags, target: weak_component.clone() });
-                            return;
-                        }
+                if let Some(router) = target.lock_resolved_state().await.ok().and_then(|state| {
+                    state.program_input_dict.get_router(use_protocol_decl.target_path.split())
+                }) {
+                    let (cap_receiver, completer) = Completer::new();
+                    router.route(
+                        Request {
+                            rights: Some(flags),
+                            relative_path: sandbox::Path::new(relative_path.as_str()),
+                            target_moniker: weak_component.moniker.clone(),
+                            availability: use_protocol_decl.availability.clone(),
+                        },
+                        completer,
+                    );
+                    if let Ok(sender) = cap_receiver.await {
+                        let handle = server_end.into_handle();
+                        let sender: Sender<Message> =
+                            sender.try_into().expect("router returned unexpected capability type");
+                        sender.send(Message { handle, flags, target: weak_component.clone() });
+                        return;
                     }
                 }
             }

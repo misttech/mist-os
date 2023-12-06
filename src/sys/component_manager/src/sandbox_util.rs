@@ -279,6 +279,7 @@ impl CapabilityDictMut {
         self.inner.lock_entries().remove(&ROUTER.as_str().to_string());
     }
 
+    #[allow(unused)]
     pub fn get_receiver(&self) -> Option<Receiver<Message>> {
         self.inner
             .lock_entries()

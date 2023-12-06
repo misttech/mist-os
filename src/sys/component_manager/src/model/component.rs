@@ -9,7 +9,7 @@ use {
     crate::model::{
         actions::{
             resolve::sandbox_construction::{
-                extend_dict_with_offers, CapabilitySourceFactory, ComponentSandbox,
+                build_component_sandbox, extend_dict_with_offers, CapabilitySourceFactory,
             },
             shutdown, start, ActionSet, DestroyChildAction, DiscoverAction, ResolveAction,
             ShutdownAction, StartAction, StopAction, UnresolveAction,
@@ -1322,6 +1322,9 @@ pub struct ResolvedInstanceState {
     /// The dict containing all capabilities that the parent wished to provide to us.
     pub component_input_dict: Dict,
 
+    /// The dict containing all capabilities that we expose.
+    pub component_output_dict: Dict,
+
     /// The dict containing all capabilities that we use.
     pub program_input_dict: Dict,
 
@@ -1333,7 +1336,7 @@ pub struct ResolvedInstanceState {
     /// dynamic offers).
     collection_dicts: HashMap<Name, Dict>,
 
-    /// This waiter holds the component dict, and invokes a start command if the receiver
+    /// This waiter holds the component dict, and invokes a start command if any receiver
     /// becomes available. The stop command sets this to a new DictWaiter.
     pub dict_waiter: Option<DictWaiter>,
 }
@@ -1343,7 +1346,7 @@ impl ResolvedInstanceState {
         component: &Arc<ComponentInstance>,
         resolved_component: Component,
         address: ComponentAddress,
-        component_sandbox: ComponentSandbox,
+        component_input_dict: Dict,
     ) -> Result<Self, ResolveActionError> {
         // TODO(https://fxbug.dev/120627): Determine whether this is expected to fail.
         let exposed_dir = ExposedDir::new(
@@ -1358,6 +1361,7 @@ impl ResolvedInstanceState {
             resolved_component.package.clone().map(|p| p.package_dir),
         )?;
         let environments = Self::instantiate_environments(component, &resolved_component.decl);
+        let decl = resolved_component.decl.clone();
         let mut state = Self {
             execution_scope: ExecutionScope::new(),
             resolved_component,
@@ -1369,13 +1373,27 @@ impl ResolvedInstanceState {
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
-            component_input_dict: component_sandbox.component_input_dict,
-            program_input_dict: component_sandbox.program_input_dict.clone(),
-            program_output_dict: component_sandbox.program_output_dict.clone(),
-            collection_dicts: component_sandbox.collection_dicts,
+            component_input_dict,
+            component_output_dict: Dict::new(),
+            program_input_dict: Dict::new(),
+            program_output_dict: Dict::new(),
+            collection_dicts: HashMap::new(),
             dict_waiter: None,
         };
-        state.add_static_children(component, component_sandbox.child_dicts).await?;
+        state.add_static_children(component).await?;
+
+        let component_sandbox = build_component_sandbox(
+            component,
+            &state.children,
+            &decl,
+            &state.component_input_dict,
+            &mut state.component_output_dict,
+            &mut state.program_input_dict,
+            &mut state.program_output_dict,
+            &mut state.collection_dicts,
+        );
+        state.discover_static_children(component_sandbox.child_dicts).await;
+
         state.wait_on_program_output_dict(component);
         state.dispatch_receivers_to_providers(component, component_sandbox.sources_and_receivers);
         Ok(state)
@@ -1660,7 +1678,6 @@ impl ResolvedInstanceState {
     /// a result indicating if the new child instance has been successfully added.
     /// Like `add_child`, but doesn't register a `Discover` action, and therefore
     /// doesn't return a future to wait for.
-    #[cfg(test)]
     pub async fn add_child_no_discover(
         &mut self,
         component: &Arc<ComponentInstance>,
@@ -1691,13 +1708,17 @@ impl ResolvedInstanceState {
         let child_moniker =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
 
-        let sources_and_receivers = extend_dict_with_offers(
-            &self.component_input_dict,
-            &self.program_output_dict,
-            &dynamic_offers,
-            &mut child_dict,
-        );
-        self.dispatch_receivers_to_providers(component, sources_and_receivers);
+        if !dynamic_offers.is_empty() {
+            let sources_and_receivers = extend_dict_with_offers(
+                component,
+                &self.children,
+                &self.component_input_dict,
+                &self.program_output_dict,
+                &dynamic_offers,
+                &mut child_dict,
+            );
+            self.dispatch_receivers_to_providers(component, sources_and_receivers);
+        }
 
         if self.get_child(&child_moniker).is_some() {
             return Err(AddChildError::InstanceAlreadyExists {
@@ -1801,22 +1822,28 @@ impl ResolvedInstanceState {
     async fn add_static_children(
         &mut self,
         component: &Arc<ComponentInstance>,
-        mut child_dicts: HashMap<Name, Dict>,
     ) -> Result<(), ResolveActionError> {
         // We can't hold an immutable reference to `self` while passing a mutable reference later
         // on. To get around this, clone the children.
         let children = self.resolved_component.decl.children.clone();
         for child in &children {
-            let child_name = Name::new(&child.name).unwrap();
-            let child_dict = child_dicts.remove(&child_name).expect("missing child dict");
-            let _ = self.add_child(component, child, None, None, None, child_dict).await.map_err(
-                |err| ResolveActionError::AddStaticChildError {
-                    child_name: child.name.to_string(),
-                    err,
-                },
-            )?;
+            self.add_child_no_discover(component, child, None).await.map_err(|err| {
+                ResolveActionError::AddStaticChildError { child_name: child.name.to_string(), err }
+            })?;
         }
         Ok(())
+    }
+
+    async fn discover_static_children(&self, mut child_dicts: HashMap<Name, Dict>) {
+        for (child_name, child_instance) in &self.children {
+            let child_name = Name::new(child_name.name()).unwrap();
+            let child_dict = child_dicts.remove(&child_name).expect("missing child dict");
+            let _discover_fut = child_instance
+                .clone()
+                .lock_actions()
+                .await
+                .register_no_wait(&child_instance, DiscoverAction::new(child_dict));
+        }
     }
 }
 
@@ -2922,7 +2949,7 @@ pub mod tests {
             &comp,
             resolved_component,
             ComponentAddress::from(&comp.component_url, &comp).await.unwrap(),
-            ComponentSandbox::default(),
+            Dict::new(),
         )
         .await
         .unwrap();
