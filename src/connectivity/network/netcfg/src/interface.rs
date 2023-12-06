@@ -15,6 +15,7 @@ use crate::DeviceClass;
 
 const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
+const INTERFACE_PREFIX_AP: &str = "ap";
 
 #[derive(PartialEq, Eq, Serialize, Deserialize, Debug, Clone)]
 pub(crate) enum PersistentIdentifier {
@@ -111,6 +112,7 @@ fn name_matches_interface_type(name: &str, interface_type: &crate::InterfaceType
     match interface_type {
         crate::InterfaceType::Wlan => name.starts_with(INTERFACE_PREFIX_WLAN),
         crate::InterfaceType::Ethernet => name.starts_with(INTERFACE_PREFIX_ETHERNET),
+        crate::InterfaceType::Ap => name.starts_with(INTERFACE_PREFIX_AP),
     }
 }
 
@@ -319,6 +321,7 @@ impl<'a> FileBackedConfig<'a> {
         let prefix = match interface_type {
             crate::InterfaceType::Wlan => "wlant",
             crate::InterfaceType::Ethernet => "etht",
+            crate::InterfaceType::Ap => "apt",
         };
         (format!("{}{}", prefix, id), None)
     }
@@ -513,6 +516,7 @@ impl DynamicNameCompositionRule {
             DynamicNameCompositionRule::DeviceClass => Ok(match info.device_class.into() {
                 crate::InterfaceType::Wlan => INTERFACE_PREFIX_WLAN,
                 crate::InterfaceType::Ethernet => INTERFACE_PREFIX_ETHERNET,
+                crate::InterfaceType::Ap => INTERFACE_PREFIX_AP,
             }
             .to_string()),
             DynamicNameCompositionRule::NormalizedMac => {
@@ -755,6 +759,7 @@ mod tests {
         match ty {
             crate::InterfaceType::Ethernet => fhwnet::DeviceClass::Ethernet,
             crate::InterfaceType::Wlan => fhwnet::DeviceClass::Wlan,
+            crate::InterfaceType::Ap => fhwnet::DeviceClass::WlanAp,
         }
     }
 
@@ -818,6 +823,13 @@ mod tests {
         "wlanx9";
         "unknown_wlan2"
     )]
+    #[test_case(
+        "unknown",
+        [0x0a, 0x0a, 0x0a, 0x0a, 0x0a, 0x0a],
+        crate::InterfaceType::Ap,
+        "apxa";
+        "unknown_ap"
+    )]
     fn test_generate_name(
         topological_path: &'static str,
         mac: [u8; 6],
@@ -855,6 +867,8 @@ mod tests {
         expected_size: 1 }];
         "single_interface"
     )]
+    // TODO(https://fxbug.dev/56559): Change the expected values
+    // once devices are identified by their MAC address.
     // Test case that shares the same topo path and interface name, with
     // different MAC address. New interface should not be added.
     #[test_case([StableNameTestCase {
@@ -865,8 +879,8 @@ mod tests {
         expected_size: 1}, StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
-        interface_type: crate::InterfaceType::Wlan,
-        want_name: "wlanp0014",
+        interface_type: crate::InterfaceType::Ap,
+        want_name: "app0014",
         expected_size: 1 }];
         "two_interfaces_different_mac"
     )]
@@ -943,6 +957,10 @@ mod tests {
         let (name_1, id_1) = interface_config.generate_temporary_name(crate::InterfaceType::Wlan);
         assert_eq!(&name_1, "wlant1");
         assert_matches!(id_1, None);
+
+        let (name_2, id_2) = interface_config.generate_temporary_name(crate::InterfaceType::Ap);
+        assert_eq!(&name_2, "apt2");
+        assert_matches!(id_2, None);
     }
 
     #[test]

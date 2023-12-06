@@ -179,6 +179,7 @@ pub struct FilterConfig {
 pub enum InterfaceType {
     Ethernet,
     Wlan,
+    Ap,
 }
 
 impl From<fidl_fuchsia_hardware_network::DeviceClass> for InterfaceType {
@@ -190,7 +191,8 @@ impl From<fidl_fuchsia_hardware_network::DeviceClass> for InterfaceType {
 impl From<DeviceClass> for InterfaceType {
     fn from(device_class: DeviceClass) -> Self {
         match device_class {
-            DeviceClass::Wlan | DeviceClass::WlanAp => InterfaceType::Wlan,
+            DeviceClass::Wlan => InterfaceType::Wlan,
+            DeviceClass::WlanAp => InterfaceType::Ap,
             DeviceClass::Ethernet
             | DeviceClass::Virtual
             | DeviceClass::Ppp
@@ -318,7 +320,17 @@ impl FilterEnabledState {
         interface_type: Option<InterfaceType>,
         interface_id: NonZeroU64,
     ) -> bool {
-        interface_type.as_ref().map(|ty| self.interface_types.contains(ty)).unwrap_or(false)
+        interface_type
+            .as_ref()
+            .map(|ty| match ty {
+                InterfaceType::Wlan | InterfaceType::Ethernet => self.interface_types.contains(ty),
+                // An AP device can be filtered by specifying AP or WLAN.
+                InterfaceType::Ap => {
+                    self.interface_types.contains(ty)
+                        | self.interface_types.contains(&InterfaceType::Wlan)
+                }
+            })
+            .unwrap_or(false)
             || self.masquerade_enabled_interface_ids.contains(&interface_id)
     }
 
@@ -1951,7 +1963,7 @@ impl<'a> NetCfg<'a> {
 
         let interface_type = device_info.interface_type();
         let metric = match interface_type {
-            InterfaceType::Wlan => self.interface_metrics.wlan_metric,
+            InterfaceType::Wlan | InterfaceType::Ap => self.interface_metrics.wlan_metric,
             InterfaceType::Ethernet => self.interface_metrics.eth_metric,
         }
         .into();
@@ -4609,7 +4621,7 @@ mod tests {
     "nat_rules": [],
     "rdr_rules": []
   },
-  "filter_enabled_interface_types": ["wlan"],
+  "filter_enabled_interface_types": ["wlan", "ap"],
   "interface_metrics": {
     "wlan_metric": 100,
     "eth_metric": 10
@@ -4660,7 +4672,10 @@ mod tests {
         assert_eq!(Vec::<String>::new(), nat_rules);
         assert_eq!(Vec::<String>::new(), rdr_rules);
 
-        assert_eq!(HashSet::from([InterfaceType::Wlan]), filter_enabled_interface_types);
+        assert_eq!(
+            HashSet::from([InterfaceType::Wlan, InterfaceType::Ap]),
+            filter_enabled_interface_types
+        );
 
         let expected_metrics =
             InterfaceMetrics { wlan_metric: Metric(100), eth_metric: Metric(10) };
@@ -5100,6 +5115,7 @@ mod tests {
         let types_ethernet: HashSet<InterfaceType> =
             [InterfaceType::Ethernet].iter().cloned().collect();
         let types_wlan: HashSet<InterfaceType> = [InterfaceType::Wlan].iter().cloned().collect();
+        let types_ap: HashSet<InterfaceType> = [InterfaceType::Ap].iter().cloned().collect();
 
         let id = const_unwrap_option(NonZeroU64::new(10));
 
@@ -5132,6 +5148,15 @@ mod tests {
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
 
         fes.enable_masquerade_interface_id(id);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
+
+        let mut fes = FilterEnabledState::new(types_ap);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), false);
+        assert_eq!(fes.should_enable(Some(wlan_ap_info.interface_type()), id), true);
+        assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), false);
+
+        fes.enable_masquerade_interface_id(id);
+        assert_eq!(fes.should_enable(Some(wlan_info.interface_type()), id), true);
         assert_eq!(fes.should_enable(Some(ethernet_info.interface_type()), id), true);
     }
 
