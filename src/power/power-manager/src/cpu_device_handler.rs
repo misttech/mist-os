@@ -36,8 +36,6 @@ use std::rc::Rc;
 ///     - SetPerformanceState
 ///
 /// FIDL dependencies:
-///     - fuchsia.device.Controller: used via the owned DeviceControlHandler to control the
-///       performance states of a CPU device
 ///     - fuchsia.hardware.cpu_ctrl.Device: used to query descriptions of CPU performance states
 //
 // TODO(fxbug.dev/84191): Update summary when CpuControlHandler is removed.
@@ -81,15 +79,16 @@ impl<'a, 'b> CpuDeviceHandlerBuilder<'a, 'b> {
     }
 
     /// Test-only interface to construct a builder with fake proxies
+    /// TODO(b/308880233): Merge DeviceControlHandler with CpuDeviceHandler.
     #[cfg(test)]
     fn new_with_proxies(
         driver_path: String,
-        controller_proxy: fidl_fuchsia_device::ControllerProxy,
+        cpu_device_proxy: fcpu_ctrl::DeviceProxy,
         cpu_ctrl_proxy: fcpu_ctrl::DeviceProxy,
     ) -> Self {
         let dev_handler_builder = DeviceControlHandlerBuilder::new()
             .driver_path(&driver_path)
-            .driver_proxy(controller_proxy);
+            .driver_proxy(cpu_device_proxy);
         Self {
             driver_path,
             dev_handler_builder,
@@ -333,7 +332,7 @@ mod tests {
     use std::cell::Cell;
 
     // Creates a fake fuchsia.device.Controller proxy
-    fn setup_fake_controller_proxy() -> fidl_fuchsia_device::ControllerProxy {
+    fn setup_fake_cpu_driver_proxy() -> fcpu_ctrl::DeviceProxy {
         let perf_state = Rc::new(Cell::new(0));
         let perf_state_clone_1 = perf_state.clone();
         let perf_state_clone_2 = perf_state.clone();
@@ -383,7 +382,7 @@ mod tests {
     async fn setup_simple_test_node(pstates: Vec<PState>) -> Rc<CpuDeviceHandler> {
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_controller_proxy(),
+            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         builder.build_and_init().await
@@ -475,7 +474,7 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_controller_proxy(),
+            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -487,7 +486,7 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_controller_proxy(),
+            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -499,7 +498,7 @@ mod tests {
         ];
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_controller_proxy(),
+            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates),
         );
         assert!(builder.build().unwrap().init().await.is_err());
@@ -516,7 +515,7 @@ mod tests {
         let inspector = inspect::Inspector::default();
         let builder = CpuDeviceHandlerBuilder::new_with_proxies(
             "fake_path".to_string(),
-            setup_fake_controller_proxy(),
+            setup_fake_cpu_driver_proxy(),
             setup_fake_cpu_ctrl_proxy(pstates.clone()),
         )
         .with_inspect_root(inspector.root());

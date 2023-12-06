@@ -52,7 +52,7 @@ class FakeMmio {
 
 using CpuCtrlSyncClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
 using ThermalSyncClient = fidl::WireSyncClient<fuchsia_thermal::Device>;
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
+using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 
 constexpr size_t kBigClusterIdx =
     static_cast<size_t>(fuchsia_thermal::wire::PowerDomain::kBigClusterPowerDomain);
@@ -424,7 +424,7 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   // states.
   for (uint32_t i = 0; i < kFakeOperatingPoints.count; i++) {
     uint32_t out_state = UINT32_MAX;
-    zx_status_t st = dut_->DdkSetPerformanceState(i, &out_state);
+    zx_status_t st = dut_->SetPerformanceStateInternal(i, &out_state);
 
     // Make sure the call succeeded.
     EXPECT_OK(st);
@@ -444,7 +444,7 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   for (uint32_t i = kFakeOperatingPoints.count; i < kMaxDevicePerformanceStates; i++) {
     const uint16_t kInitialOperatingPoint = thermal_.ActiveOperatingPoint();
     uint32_t out_state = UINT32_MAX;
-    zx_status_t st = dut_->DdkSetPerformanceState(i, &out_state);
+    zx_status_t st = dut_->SetPerformanceStateInternal(i, &out_state);
 
     // This is not a supported performance state.
     EXPECT_NOT_OK(st);

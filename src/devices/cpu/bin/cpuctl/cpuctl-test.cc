@@ -25,8 +25,7 @@ constexpr uint32_t kNumLogicalCores = 4;
 
 constexpr uint64_t kLogicalCoreIds[kNumLogicalCores] = {1, 2, 3, 4};
 
-class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device>,
-                      public fidl::testing::WireTestBase<fuchsia_device::Controller> {
+class FakeCpuDevice : public fidl::testing::WireTestBase<cpuctrl::Device> {
  public:
   unsigned int PstateSetCount() const { return pstate_set_count_; }
 
@@ -73,13 +72,13 @@ void FakeCpuDevice::GetLogicalCoreId(GetLogicalCoreIdRequestView request,
 void FakeCpuDevice::SetPerformanceState(SetPerformanceStateRequestView request,
                                         SetPerformanceStateCompleter::Sync& completer) {
   if (request->requested_state > std::size(kTestPstates)) {
-    completer.Reply(ZX_ERR_NOT_SUPPORTED, request->requested_state);
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
     return;
   }
 
   pstate_set_count_++;
   current_pstate_ = request->requested_state;
-  completer.Reply(ZX_OK, request->requested_state);
+  completer.ReplySuccess(request->requested_state);
 }
 
 void FakeCpuDevice::GetCurrentPerformanceState(
@@ -90,9 +89,8 @@ void FakeCpuDevice::GetCurrentPerformanceState(
 class TestCpuPerformanceDomain : public CpuPerformanceDomain {
  public:
   // Permit Explicit Construction
-  TestCpuPerformanceDomain(fidl::ClientEnd<cpuctrl::Device> cpu_client,
-                           fidl::ClientEnd<fuchsia_device::Controller> device_client)
-      : CpuPerformanceDomain(std::move(cpu_client), std::move(device_client)) {}
+  TestCpuPerformanceDomain(fidl::ClientEnd<cpuctrl::Device> cpu_client)
+      : CpuPerformanceDomain(std::move(cpu_client)) {}
 };
 
 class PerformanceDomainTest : public zxtest::Test {
@@ -114,12 +112,7 @@ void PerformanceDomainTest::SetUp() {
   fidl::BindServer(loop_.dispatcher(), std::move(cpu_endpoints->server),
                    static_cast<fidl::WireServer<cpuctrl::Device>*>(&cpu_));
 
-  zx::result device_endpoints = fidl::CreateEndpoints<fuchsia_device::Controller>();
-  ASSERT_OK(device_endpoints);
-  fidl::BindServer(loop_.dispatcher(), std::move(device_endpoints->server),
-                   static_cast<fidl::WireServer<fuchsia_device::Controller>*>(&cpu_));
-
-  pd_.emplace(std::move(cpu_endpoints->client), std::move(device_endpoints->client));
+  pd_.emplace(std::move(cpu_endpoints->client));
   ASSERT_OK(loop_.StartThread("performance-domain-test-fidl-thread"));
 }
 

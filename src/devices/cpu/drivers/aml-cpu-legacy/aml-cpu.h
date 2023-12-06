@@ -11,6 +11,8 @@
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/mmio/mmio.h>
 
+#include <mutex>
+
 #include <ddktl/device.h>
 #include <ddktl/protocol/empty-protocol.h>
 #include <fbl/macros.h>
@@ -21,8 +23,8 @@ namespace fuchsia_cpuctrl = fuchsia_hardware_cpu_ctrl;
 namespace fuchsia_thermal = fuchsia_hardware_thermal;
 
 class AmlCpu;
-using DeviceType = ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin,
-                               ddk::PerformanceTunable, ddk::AutoSuspendable>;
+using DeviceType =
+    ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin, ddk::AutoSuspendable>;
 
 class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL> {
  public:
@@ -32,20 +34,23 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
       : DeviceType(device),
         thermal_client_(std::move(thermal_client)),
         power_domain_index_(power_domain_index),
-        cluster_core_count_(cluster_core_count) {}
+        cluster_core_count_(cluster_core_count),
+        current_pstate_(fuchsia_cpuctrl::wire::kDevicePerformanceStateP0) {}
 
   static zx_status_t Create(void* context, zx_device_t* device);
 
   // Implements DDK Device Ops
   void DdkRelease();
 
-  // Implements ddk::PerformanceTunable.
-  zx_status_t DdkSetPerformanceState(uint32_t requested_state, uint32_t* out_state);
+  zx_status_t SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state);
   zx_status_t DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state);
 
   // Fidl server interface implementation.
   void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
                                GetPerformanceStateInfoCompleter::Sync& completer) override;
+  void SetPerformanceState(SetPerformanceStateRequestView request,
+                           SetPerformanceStateCompleter::Sync& completer) override;
+  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
@@ -62,6 +67,9 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   fidl::WireSyncClient<fuchsia_thermal::Device> thermal_client_;
   size_t power_domain_index_;
   uint32_t cluster_core_count_;
+
+  std::mutex lock_;
+  uint32_t current_pstate_ __TA_GUARDED(lock_);
 
  protected:
   inspect::Inspector inspector_;

@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.hardware.power/cpp/wire.h>
 #include <lib/inspect/cpp/inspector.h>
 
+#include <mutex>
 #include <optional>
 #include <vector>
 
@@ -24,8 +25,8 @@ namespace amlogic_cpu {
 namespace fuchsia_cpuctrl = fuchsia_hardware_cpu_ctrl;
 
 class AmlCpu;
-using DeviceType = ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin,
-                               ddk::PerformanceTunable, ddk::AutoSuspendable>;
+using DeviceType =
+    ddk::Device<AmlCpu, ddk::Messageable<fuchsia_cpuctrl::Device>::Mixin, ddk::AutoSuspendable>;
 
 class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL> {
  public:
@@ -40,8 +41,9 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
         cpudiv16_(std::move(cpudiv16)),
         cpuscaler_(std::move(cpuscaler)),
         pwr_(std::move(pwr)),
-        current_pstate_(operating_points.size() -
-                        1)  // Assume the core is running at the slowest clock to begin.
+        current_pstate_(
+            static_cast<uint32_t>(operating_points.size() -
+                                  1))  // Assume the core is running at the slowest clock to begin.
         ,
         operating_points_(operating_points),
         core_count_(core_count) {}
@@ -56,13 +58,15 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   // Implements DDK Device Ops
   void DdkRelease();
 
-  // Implements ddk::PerformanceTunable.
-  zx_status_t DdkSetPerformanceState(uint32_t requested_state, uint32_t* out_state);
+  zx_status_t SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state);
   zx_status_t DdkConfigureAutoSuspend(bool enable, uint8_t requested_sleep_state);
 
   // Fidl server interface implementation.
   void GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
                                GetPerformanceStateInfoCompleter::Sync& completer) override;
+  void SetPerformanceState(SetPerformanceStateRequestView request,
+                           SetPerformanceStateCompleter::Sync& completer) override;
+  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
   void GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) override;
   void GetLogicalCoreId(GetLogicalCoreIdRequestView request,
                         GetLogicalCoreIdCompleter::Sync& completer) override;
@@ -82,7 +86,8 @@ class AmlCpu : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_CPU_CTRL
   // This is from an optional fragment.
   fidl::WireSyncClient<fuchsia_hardware_power::Device> pwr_;
 
-  size_t current_pstate_;
+  std::mutex lock_;
+  uint32_t current_pstate_ __TA_GUARDED(lock_);
   const std::vector<operating_point_t> operating_points_;
 
   const uint32_t core_count_;

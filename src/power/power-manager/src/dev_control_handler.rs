@@ -11,10 +11,9 @@ use crate::utils::result_debug_panic::ResultDebugPanic;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
 use async_utils::event::Event as AsyncEvent;
-use fidl_fuchsia_device as fdev;
+use fidl_fuchsia_hardware_cpu_ctrl as fcpu_ctrl;
 use fidl_fuchsia_io as fio;
 use fuchsia_inspect::{self as inspect, NumericProperty, Property};
-use fuchsia_zircon as zx;
 use serde_derive::Deserialize;
 use serde_json as json;
 use std::cell::RefCell;
@@ -23,8 +22,7 @@ use std::rc::Rc;
 
 /// Node: DeviceControlHandler
 ///
-/// Summary: Provides an interface to control the power, performance, and sleep states of a devhost
-///          device
+/// Summary: Provides an interface to control the performance state of a devhost device
 ///
 /// Handles Messages:
 ///     - GetPerformanceState
@@ -33,15 +31,14 @@ use std::rc::Rc;
 /// Sends Messages: N/A
 ///
 /// FIDL dependencies:
-///     - fuchsia.device.Controller: the node uses this protocol to control the power, performance,
-///       and sleep states of a devhost device
+///     - fuchsia.hardware.cpu_ctrl.Device: used to control the performance of the CPU device
 
-pub const MAX_PERF_STATES: u32 = fdev::MAX_DEVICE_PERFORMANCE_STATES;
+pub const MAX_PERF_STATES: u32 = fcpu_ctrl::MAX_DEVICE_PERFORMANCE_STATES;
 
 /// A builder for constructing the DeviceControlhandler node
 pub struct DeviceControlHandlerBuilder<'a> {
     driver_path: Option<String>,
-    driver_proxy: Option<fdev::ControllerProxy>,
+    driver_proxy: Option<fcpu_ctrl::DeviceProxy>,
     inspect_root: Option<&'a inspect::Node>,
 }
 
@@ -60,7 +57,7 @@ impl<'a> DeviceControlHandlerBuilder<'a> {
     }
 
     #[cfg(test)]
-    pub fn driver_proxy(mut self, proxy: fdev::ControllerProxy) -> Self {
+    pub fn driver_proxy(mut self, proxy: fcpu_ctrl::DeviceProxy) -> Self {
         self.driver_proxy = Some(proxy);
         self
     }
@@ -112,7 +109,7 @@ impl<'a> DeviceControlHandlerBuilder<'a> {
 
 pub struct DeviceControlHandler {
     driver_path: String,
-    driver_proxy: RefCell<Option<fdev::ControllerProxy>>,
+    driver_proxy: RefCell<Option<fcpu_ctrl::DeviceProxy>>,
 
     /// A struct for managing Component Inspection data
     inspect: InspectData,
@@ -203,18 +200,16 @@ impl DeviceControlHandler {
         let proxy = self.driver_proxy.borrow();
 
         // Make the FIDL call
-        let (status, _out_state) = proxy
+        let _out_state = proxy
             .as_ref()
             .ok_or(format_err!("Missing driver_proxy"))
             .or_debug_panic()?
             .set_performance_state(in_state)
             .await
-            .map_err(|e| format_err!("{}: set_performance_state IPC failed: {}", self.name(), e))?;
-
-        // Check the status code
-        zx::Status::ok(status).map_err(|e| {
-            format_err!("{}: set_performance_state driver returned error: {}", self.name(), e)
-        })?;
+            .map_err(|e| format_err!("{}: set_performance_state IPC failed: {}", self.name(), e))?
+            .map_err(|e| {
+                format_err!("{}: set_performance_state driver returned error: {}", self.name(), e)
+            })?;
 
         Ok(())
     }
@@ -245,13 +240,12 @@ impl Node for DeviceControlHandler {
             let path = self.driver_path.strip_prefix(DEV).ok_or_else(|| {
                 anyhow::anyhow!("driver_path={} not in {}", self.driver_path, DEV)
             })?;
-            let controller_path = path.to_owned() + "/device_controller";
 
             let proxy = device_watcher::wait_for_device_with(&dir, |info| {
                 (path == info.filename).then(|| {
                     fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
-                        fdev::ControllerMarker,
-                    >(&dir, &controller_path)
+                        fcpu_ctrl::DeviceMarker,
+                    >(&dir, &path)
                 })
             })
             .await??;
@@ -312,21 +306,21 @@ pub mod tests {
     pub fn fake_dev_ctrl_driver(
         get_performance_state: impl Fn() -> u32 + 'static,
         mut set_performance_state: impl FnMut(u32) + 'static,
-    ) -> fdev::ControllerProxy {
+    ) -> fcpu_ctrl::DeviceProxy {
         let (proxy, mut stream) =
-            fidl::endpoints::create_proxy_and_stream::<fdev::ControllerMarker>().unwrap();
+            fidl::endpoints::create_proxy_and_stream::<fcpu_ctrl::DeviceMarker>().unwrap();
         fasync::Task::local(async move {
             while let Ok(req) = stream.try_next().await {
                 match req {
-                    Some(fdev::ControllerRequest::GetCurrentPerformanceState { responder }) => {
+                    Some(fcpu_ctrl::DeviceRequest::GetCurrentPerformanceState { responder }) => {
                         let _ = responder.send(get_performance_state());
                     }
-                    Some(fdev::ControllerRequest::SetPerformanceState {
+                    Some(fcpu_ctrl::DeviceRequest::SetPerformanceState {
                         requested_state,
                         responder,
                     }) => {
                         set_performance_state(requested_state as u32);
-                        let _ = responder.send(zx::Status::OK.into_raw(), requested_state);
+                        let _ = responder.send(Ok(requested_state));
                     }
                     Some(other) => panic!("Unexpected request: {:?}", other),
                     None => return, // Client connection closed
@@ -413,7 +407,7 @@ pub mod tests {
     async fn test_inspect_data() {
         let inspector = inspect::Inspector::default();
         let _node = DeviceControlHandlerBuilder::new()
-            .driver_proxy(fidl::endpoints::create_proxy::<fdev::ControllerMarker>().unwrap().0)
+            .driver_proxy(fidl::endpoints::create_proxy::<fcpu_ctrl::DeviceMarker>().unwrap().0)
             .inspect_root(inspector.root())
             .build_and_init()
             .await;

@@ -25,7 +25,7 @@
 #include "fidl/fuchsia.hardware.thermal/cpp/wire.h"
 
 namespace {
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
+using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 using fuchsia_hardware_thermal::wire::kMaxDvfsDomains;
 using fuchsia_hardware_thermal::wire::PowerDomain;
 
@@ -87,14 +87,6 @@ namespace amlogic_cpu {
 
 zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
   zx_status_t status;
-  // Initialize an array with the maximum possible number of PStates since we
-  // determine the actual number of PStates at runtime by querying the thermal
-  // driver.
-  device_performance_state_info_t perf_states[kMaxDevicePerformanceStates];
-  for (size_t i = 0; i < kMaxDevicePerformanceStates; i++) {
-    perf_states[i].state_id = static_cast<uint8_t>(i);
-    perf_states[i].restore_latency = 0;
-  }
 
   // Determine the cluster size of each cluster.
   auto cluster_sizes =
@@ -186,10 +178,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
       return ZX_ERR_NOT_FOUND;
     }
 
-    const uint8_t perf_state_count = static_cast<uint8_t>(opps.count);
-    zxlogf(INFO, "aml-cpu: Creating CPU Device for domain %zu with %u operating points\n", i,
-           opps.count);
-
     // If the FIDL client has been previously consumed, create a new one. Then build the CPU device
     // and consume the FIDL client.
     if (!thermal_fidl_client) {
@@ -213,7 +201,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
     status = cpu_device->DdkAdd(ddk::DeviceAddArgs(name)
                                     .set_flags(DEVICE_ADD_NON_BINDABLE)
                                     .set_proto_id(ZX_PROTOCOL_CPU_CTRL)
-                                    .set_performance_states({perf_states, perf_state_count})
                                     .set_inspect_vmo(cpu_device->inspector_.DuplicateVmo()));
 
     if (status != ZX_OK) {
@@ -230,9 +217,10 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
 
 void AmlCpu::DdkRelease() { delete this; }
 
-zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* out_state) {
+zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state) {
   zx_status_t status;
   fuchsia_thermal::wire::OperatingPoint opps;
+  std::scoped_lock lock(lock_);
 
   status = GetThermalOperatingPoints(&opps);
   if (status != ZX_OK) {
@@ -240,6 +228,7 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
     return status;
   }
 
+  // States in range [0, opps.count) are supported.
   if (requested_state >= opps.count) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -255,6 +244,8 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
   }
 
   *out_state = requested_state;
+  current_pstate_ = requested_state;
+
   return ZX_OK;
 }
 
@@ -282,10 +273,25 @@ void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
 
   const uint16_t pstate = PstateToOperatingPoint(request->state, opps.count);
 
-  fuchsia_hardware_cpu_ctrl::wire::CpuPerformanceStateInfo result;
+  fuchsia_cpuctrl::wire::CpuPerformanceStateInfo result;
   result.frequency_hz = opps.opp[pstate].freq_hz;
   result.voltage_uv = opps.opp[pstate].volt_uv;
   completer.ReplySuccess(result);
+}
+
+void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
+                                 SetPerformanceStateCompleter::Sync& completer) {
+  uint32_t out_state = 0;
+  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess(out_state);
+}
+
+void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  std::scoped_lock lock(lock_);
+  completer.Reply(current_pstate_);
 }
 
 zx_status_t AmlCpu::GetThermalOperatingPoints(fuchsia_thermal::wire::OperatingPoint* out) {

@@ -11,6 +11,9 @@ using zx;
 const FREQUENCY_UNKNOWN int64 = -1;
 const VOLTAGE_UNKNOWN int64 = -1;
 
+const DEVICE_PERFORMANCE_STATE_P0 uint32 = 0;
+const MAX_DEVICE_PERFORMANCE_STATES uint32 = 20;
+
 /// A collection of some basic information for a given performance state.
 type CpuPerformanceStateInfo = struct {
     /// Frequency the core is operating at in hertz.
@@ -27,6 +30,22 @@ closed protocol Device {
         state uint32;
     }) -> (struct {
         info CpuPerformanceStateInfo;
+    }) error zx.Status;
+
+    /// Gets the current performance state of the device.
+    strict GetCurrentPerformanceState() -> (struct {
+        out_state uint32;
+    });
+
+    /// Set the performance state of this device to the requested performance state.
+    /// Returns ZX_OK, if the device is in a working state and the performance state is changed to
+    /// requested_state successfully. out_state will be same as requested_state.
+    /// Returns error status, if switching to the requested_state was unsuccessful. out_state
+    /// is the state that the device is currently in.
+    strict SetPerformanceState(struct {
+        requested_state uint32;
+    }) -> (struct {
+        out_state uint32;
     }) error zx.Status;
 
     /// Returns the number of logical cores contained within this performance

@@ -25,13 +25,11 @@ class CpuPerformanceDomain {
 
  protected:
   // Don't allow explicit construction.
-  explicit CpuPerformanceDomain(fidl::ClientEnd<cpuctrl::Device> cpu_client,
-                                fidl::ClientEnd<fuchsia_device::Controller> device_client)
-      : cpu_client_(std::move(cpu_client)), device_client_(std::move(device_client)) {}
+  explicit CpuPerformanceDomain(fidl::ClientEnd<cpuctrl::Device> cpu_client)
+      : cpu_client_(std::move(cpu_client)) {}
 
  private:
   fidl::WireSyncClient<cpuctrl::Device> cpu_client_;
-  fidl::WireSyncClient<fuchsia_device::Controller> device_client_;
 
   // Don't use this directly. Instead call GetPerformanceStates().
   std::vector<cpuctrl::wire::CpuPerformanceStateInfo> cached_pstates_;

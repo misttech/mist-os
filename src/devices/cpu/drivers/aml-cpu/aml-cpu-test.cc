@@ -26,11 +26,11 @@
 
 namespace amlogic_cpu {
 
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
+using fuchsia_hardware_cpu_ctrl::wire::kMaxDevicePerformanceStates;
 using CpuCtrlClient = fidl::WireSyncClient<fuchsia_cpuctrl::Device>;
 using inspect::InspectTestHelper;
 
-#define MHZ(x) ((x)*1000000)
+#define MHZ(x) ((x) * 1000000)
 
 constexpr uint32_t kPdArmA53 = 1;
 
@@ -332,7 +332,7 @@ TEST_F(AmlCpuBindingTest, UnorderedOperatingPoints) {
   AmlCpu* dev = child->GetDeviceContext<AmlCpu>();
 
   uint32_t out_state;
-  EXPECT_OK(dev->DdkSetPerformanceState(0, &out_state));
+  EXPECT_OK(dev->SetPerformanceStateInternal(0, &out_state));
   EXPECT_EQ(out_state, 0);
 
   incoming_.SyncCall([](IncomingNamespace* infra) {
@@ -490,7 +490,7 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   power_.SetVoltage(min_pstate.volt_uv);
 
   uint32_t out_state = UINT32_MAX;
-  zx_status_t result = dut_.DdkSetPerformanceState(min_pstate_index, &out_state);
+  zx_status_t result = dut_.SetPerformanceStateInternal(min_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, min_pstate_index);
   auto rate = scaler_clock_.rate();
@@ -504,7 +504,7 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   power_.SetVoltage(max_pstate.volt_uv);
 
   out_state = UINT32_MAX;
-  result = dut_.DdkSetPerformanceState(max_pstate_index, &out_state);
+  result = dut_.SetPerformanceStateInternal(max_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, max_pstate_index);
   rate = scaler_clock_.rate();
@@ -512,7 +512,7 @@ TEST_F(AmlCpuTestFixture, TestSetPerformanceState) {
   ASSERT_EQ(rate.value(), max_pstate.freq_hz);
 
   // Set to the pstate that we're already at and make sure that it's a no-op.
-  result = dut_.DdkSetPerformanceState(max_pstate_index, &out_state);
+  result = dut_.SetPerformanceStateInternal(max_pstate_index, &out_state);
   EXPECT_OK(result);
   EXPECT_EQ(out_state, max_pstate_index);
 }

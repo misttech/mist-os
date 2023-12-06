@@ -9,26 +9,21 @@
 
 #include <iostream>
 
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
+using cpuctrl::wire::kMaxDevicePerformanceStates;
 
 namespace {
-const std::string kControllerSuffix = "device_controller";
 const std::string kDeviceSuffix = "device_protocol";
 }  // namespace
 
 zx::result<CpuPerformanceDomain> CpuPerformanceDomain::CreateFromPath(const std::string& path) {
-  std::string device_controller_path = path + "/" + kControllerSuffix;
   std::string device_protocol_path = path + "/" + kDeviceSuffix;
 
   zx::result cpu = component::Connect<cpuctrl::Device>(device_protocol_path);
   if (cpu.is_error()) {
     return cpu.take_error();
   }
-  zx::result device = component::Connect<fuchsia_device::Controller>(device_controller_path);
-  if (device.is_error()) {
-    return device.take_error();
-  }
-  return zx::ok(CpuPerformanceDomain(std::move(cpu.value()), std::move(device.value())));
+
+  return zx::ok(CpuPerformanceDomain(std::move(cpu.value())));
 }
 
 std::pair<zx_status_t, uint64_t> CpuPerformanceDomain::GetNumLogicalCores() {
@@ -42,7 +37,7 @@ CpuPerformanceDomain::GetCurrentPerformanceState() {
       .frequency_hz = cpuctrl::wire::kFrequencyUnknown,
       .voltage_uv = cpuctrl::wire::kVoltageUnknown,
   };
-  auto resp = device_client_->GetCurrentPerformanceState();
+  auto resp = cpu_client_->GetCurrentPerformanceState();
 
   if (resp.status() != ZX_OK) {
     return std::make_tuple(resp.status(), 0, kEmptyPstate);
@@ -87,17 +82,17 @@ zx_status_t CpuPerformanceDomain::SetPerformanceState(uint32_t new_performance_s
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  auto result = device_client_->SetPerformanceState(new_performance_state);
+  auto result = cpu_client_->SetPerformanceState(new_performance_state);
 
   if (result.status() != ZX_OK) {
     return result.status();
   }
 
-  if (result.value().status != ZX_OK) {
-    return result.value().status;
+  if (result->is_error()) {
+    return result->error_value();
   }
 
-  if (result.value().out_state != new_performance_state) {
+  if (result->value()->out_state != new_performance_state) {
     return ZX_ERR_INTERNAL;
   }
 

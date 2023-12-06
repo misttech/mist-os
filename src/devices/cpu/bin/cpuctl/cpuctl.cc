@@ -25,7 +25,7 @@
 
 #include "performance-domain.h"
 
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
+using cpuctrl::wire::kMaxDevicePerformanceStates;
 using ListCb = std::function<void(const char*)>;
 
 constexpr char kCpuDevicePath[] = "/dev/class/cpu-ctrl";

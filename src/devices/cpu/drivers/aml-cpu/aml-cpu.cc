@@ -39,6 +39,8 @@ constexpr zx_off_t kCpuVersionOffsetA1 = 0x220;
 constexpr uint32_t kCpuGetDvfsTableIndexFuncId = 0x82000088;
 constexpr uint64_t kDefaultClusterId = 0;
 
+constexpr uint32_t kInitialPstate = fuchsia_cpuctrl::wire::kDevicePerformanceStateP0;
+
 }  // namespace
 
 zx_status_t AmlCpu::GetPopularVoltageTable(const zx::resource& smc_resource,
@@ -211,13 +213,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
                 return a.freq_hz > b.freq_hz;
               });
 
-    const size_t perf_state_count = pd_op_points.size();
-    auto perf_states = std::make_unique<device_performance_state_info_t[]>(perf_state_count);
-    for (size_t j = 0; j < perf_state_count; j++) {
-      perf_states[j].state_id = static_cast<uint8_t>(j);
-      perf_states[j].restore_latency = 0;
-    }
-
     auto device =
         std::make_unique<AmlCpu>(parent, std::move(pll_div16_client), std::move(cpu_div16_client),
                                  std::move(cpu_scaler_client), std::move(power_client),
@@ -234,7 +229,6 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
     st = device->DdkAdd(ddk::DeviceAddArgs(perf_domain.name)
                             .set_flags(DEVICE_ADD_NON_BINDABLE)
                             .set_proto_id(ZX_PROTOCOL_CPU_CTRL)
-                            .set_performance_states({perf_states.get(), perf_state_count})
                             .set_inspect_vmo(device->inspector_.DuplicateVmo()));
 
     if (st != ZX_OK) {
@@ -250,7 +244,9 @@ zx_status_t AmlCpu::Create(void* context, zx_device_t* parent) {
 
 void AmlCpu::DdkRelease() { delete this; }
 
-zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* out_state) {
+zx_status_t AmlCpu::SetPerformanceStateInternal(uint32_t requested_state, uint32_t* out_state) {
+  std::scoped_lock lock(lock_);
+
   if (requested_state >= operating_points_.size()) {
     zxlogf(ERROR, "%s: Requested performance state is out of bounds, state = %u\n", __func__,
            requested_state);
@@ -367,8 +363,6 @@ zx_status_t AmlCpu::DdkSetPerformanceState(uint32_t requested_state, uint32_t* o
 }
 
 zx_status_t AmlCpu::Init() {
-  constexpr uint32_t kInitialPstate = 0;
-
   if (plldiv16_.is_valid()) {
     fidl::WireResult result = plldiv16_->Enable();
     if (!result.ok()) {
@@ -425,7 +419,8 @@ zx_status_t AmlCpu::Init() {
   }
 
   uint32_t actual;
-  zx_status_t result = DdkSetPerformanceState(kInitialPstate, &actual);
+  // Returns ZX_ERR_OUT_OF_RANGE if `operating_points_` is empty.
+  zx_status_t result = SetPerformanceStateInternal(kInitialPstate, &actual);
 
   if (result != ZX_OK) {
     zxlogf(ERROR, "%s: Failed to set initial performance state, st = %d", __func__, result);
@@ -454,11 +449,26 @@ void AmlCpu::GetPerformanceStateInfo(GetPerformanceStateInfoRequestView request,
     return;
   }
 
-  fuchsia_hardware_cpu_ctrl::wire::CpuPerformanceStateInfo result;
+  fuchsia_cpuctrl::wire::CpuPerformanceStateInfo result;
   result.frequency_hz = operating_points_[request->state].freq_hz;
   result.voltage_uv = operating_points_[request->state].volt_uv;
 
   completer.ReplySuccess(result);
+}
+
+void AmlCpu::SetPerformanceState(SetPerformanceStateRequestView request,
+                                 SetPerformanceStateCompleter::Sync& completer) {
+  uint32_t out_state = 0;
+  zx_status_t status = SetPerformanceStateInternal(request->requested_state, &out_state);
+  if (status != ZX_OK) {
+    completer.ReplyError(status);
+  }
+  completer.ReplySuccess(out_state);
+}
+
+void AmlCpu::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
+  std::scoped_lock lock(lock_);
+  completer.Reply(current_pstate_);
 }
 
 void AmlCpu::GetNumLogicalCores(GetNumLogicalCoresCompleter::Sync& completer) {
