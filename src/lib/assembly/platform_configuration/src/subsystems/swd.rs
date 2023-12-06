@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::platform_config::swd_config::{
     OtaConfigs, PolicyConfig, PolicyLabels, SwdConfig, UpdateChecker, VerificationFailureAction,
 };
@@ -55,7 +55,7 @@ impl DefaultByBuildType for SwdConfig {
             policy: Some(PolicyLabels::default_by_build_type(build_type)),
             update_checker: Some(UpdateChecker::default_by_build_type(build_type)),
             on_verification_failure: VerificationFailureAction::default(),
-            tuf_config_path: None,
+            tuf_config_paths: vec![],
             include_configurator: false,
         }
     }
@@ -97,6 +97,17 @@ impl DefineSubsystemConfiguration<SwdConfig> for SwdSubsystemConfig {
             }
         }
 
+        for tuf_config in &subsystem_config.tuf_config_paths {
+            let filename = tuf_config.file_name().ok_or(anyhow!(
+                "Failed to get the filename from the tuf config: {}",
+                &tuf_config
+            ))?;
+            builder.package("pkg-resolver").config_data(FileEntry {
+                source: tuf_config.clone(),
+                destination: format!("repositories/{}", filename),
+            })?;
+        }
+
         if subsystem_config.include_configurator {
             builder.platform_bundle("system_update_configurator");
         }
@@ -114,6 +125,7 @@ impl SwdSubsystemConfig {
     ) -> anyhow::Result<()> {
         match update_checker {
             UpdateChecker::OmahaClient(OtaConfigs {
+                channels_path,
                 policy_config,
                 include_empty_eager_config,
                 ..
@@ -134,6 +146,13 @@ impl SwdSubsystemConfig {
                     .field("allow_reboot_when_idle", policy_config.allow_reboot_when_idle)?
                     .field("retry_delay_seconds", policy_config.retry_delay_seconds)?
                     .field("fuzz_percentage_range", policy_config.fuzz_percentage_range)?;
+
+                if let Some(channel_config) = channels_path {
+                    builder.package("omaha-client").config_data(FileEntry {
+                        source: channel_config.clone(),
+                        destination: "channel_config.json".into(),
+                    })?;
+                }
             }
             UpdateChecker::SystemUpdateChecker => {
                 builder.platform_bundle("system_update_checker");
@@ -257,7 +276,7 @@ mod tests {
             policy: None,
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
-            tuf_config_path: None,
+            tuf_config_paths: vec![],
             ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);
@@ -275,7 +294,7 @@ mod tests {
             policy: None,
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
-            tuf_config_path: None,
+            tuf_config_paths: vec![],
             ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);
@@ -301,7 +320,7 @@ mod tests {
             policy: None,
             update_checker: None,
             on_verification_failure: VerificationFailureAction::default(),
-            tuf_config_path: None,
+            tuf_config_paths: vec![],
             ..Default::default()
         };
         let policy = config.policy.value_or_default_from_build_type(build_type);

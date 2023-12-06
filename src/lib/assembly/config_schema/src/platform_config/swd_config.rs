@@ -15,7 +15,7 @@ pub struct SwdConfig {
     pub policy: Option<PolicyLabels>,
     pub update_checker: Option<UpdateChecker>,
     pub on_verification_failure: VerificationFailureAction,
-    pub tuf_config_path: Option<Utf8PathBuf>,
+    pub tuf_config_paths: Vec<Utf8PathBuf>,
     pub include_configurator: bool,
 }
 
@@ -135,7 +135,7 @@ mod tests {
               },
               "policy": "unrestricted",
               "on_verification_failure": "reboot",
-              "tuf_config_path": "/path/to/tuf_config.json",
+              "tuf_config_paths": ["/path/to/tuf_config.json"],
             }
         "#;
 
@@ -159,7 +159,7 @@ mod tests {
                     include_empty_eager_config: false,
                 })),
                 on_verification_failure: VerificationFailureAction::Reboot,
-                tuf_config_path: Some(Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap()),
+                tuf_config_paths: vec![Utf8PathBuf::from_str("/path/to/tuf_config.json").unwrap()],
                 ..Default::default()
             }
         );
