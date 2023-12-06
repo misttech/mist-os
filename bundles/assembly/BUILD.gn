@@ -396,6 +396,13 @@ assembly_input_bundle("virtcon") {
   bootfs_packages = [ "//src/bringup/bin/virtcon:package" ]
 }
 
+assembly_input_bundle("virtcon_disable") {
+  kernel_cmdline = [
+    "virtcon.hide-on-boot",
+    "virtcon.disable=true",
+  ]
+}
+
 # All eng build type products will include this Assembly Input Bundle.
 # These kernel args should be refactored so that the AIBs have logical names.
 #

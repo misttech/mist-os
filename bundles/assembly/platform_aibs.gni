@@ -24,6 +24,7 @@ bootstrap_user_platform_aib_names = [
 
   # Graphics
   "virtcon",
+  "virtcon_disable",
 
   # Kernel args
   "kernel_args_user",

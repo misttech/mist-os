@@ -31,6 +31,7 @@ BOOTSTRAP_USER_PLATFORM_AIB_NAMES = [
     "live_usb",
     "resources",
     "virtcon",
+    "virtcon_disable",
 ]
 
 # These are the userdebug platform AIBs that are used by bootstrap

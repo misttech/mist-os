@@ -23,6 +23,8 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
             };
         if enable_virtual_console {
             builder.platform_bundle("virtcon");
+        } else {
+            builder.platform_bundle("virtcon_disable");
         }
         Ok(())
     }
