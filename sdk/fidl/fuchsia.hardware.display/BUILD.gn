@@ -14,6 +14,7 @@ fidl("fuchsia.hardware.display") {
     "event.fidl",
     "image.fidl",
     "layer.fidl",
+    "overview.fidl",
     "provider.fidl",
     "virtcon.fidl",
   ]
