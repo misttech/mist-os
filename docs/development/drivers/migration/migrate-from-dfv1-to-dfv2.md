@@ -809,7 +809,7 @@ you can print out logs using the `logger.logf()` function or using these
 [macros][logger-h], for example:
 
 ```cpp
-FDF_LOGL(INFO, *logger(), "Example log message here");
+FDF_LOG(INFO, "Example log message here");
 ```
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
