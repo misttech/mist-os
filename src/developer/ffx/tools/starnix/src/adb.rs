@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::{Context, Result};
 use argh::{ArgsInfo, FromArgs};
-use async_net::{TcpListener, TcpStream};
+use async_net::{Ipv4Addr, TcpListener, TcpStream};
 use fho::SimpleWriter;
 use fidl_fuchsia_developer_ffx::{TargetCollectionProxy, TargetQuery};
 use fidl_fuchsia_developer_remotecontrol as rc;
@@ -13,6 +13,8 @@ use futures::io::AsyncReadExt;
 use futures::stream::StreamExt;
 use futures::FutureExt;
 use signal_hook::{consts::signal::SIGINT, iterator::Signals};
+use std::io::ErrorKind;
+use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -53,6 +55,14 @@ pub struct StarnixAdbCommand {
     /// which port to serve the adb server on
     #[argh(option, short = 'p', default = "5556")]
     pub port: u16,
+
+    /// path to the adb client command
+    #[argh(option, default = "String::from(\"adb\")")]
+    pub adb: String,
+
+    /// disable automatically running "adb connect"
+    #[argh(switch)]
+    pub no_autoconnect: bool,
 }
 
 async fn connect_to_rcs(
@@ -93,11 +103,9 @@ pub async fn starnix_adb(
     };
     let mut controller_proxy = reconnect().await?;
 
-    println!("starnix adb - listening");
-
     let mut signals = Signals::new(&[SIGINT]).unwrap();
     let handle = signals.handle();
-    let thread = std::thread::spawn(move || {
+    let signal_thread = std::thread::spawn(move || {
         if let Some(signal) = signals.forever().next() {
             assert_eq!(signal, SIGINT);
             eprintln!("Caught interrupt. Shutting down starnix adb bridge...");
@@ -105,10 +113,31 @@ pub async fn starnix_adb(
         }
     });
 
-    let address = &format!("127.0.0.1:{}", &command.port);
-    let listener = TcpListener::bind(address).await.expect("cannot bind to adb address");
-    println!("The adb bridge is listening on {}", address);
-    println!("To connect: adb connect {}", address);
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, command.port))
+        .await
+        .expect("cannot bind to adb address");
+    let listen_address = listener.local_addr().expect("cannot get adb server address");
+
+    if !command.no_autoconnect {
+        // It's necessary to run adb connect on a separate thread so it doesn't block the async
+        // executor running the socket listener.
+        let adb_path = command.adb.clone();
+        std::thread::spawn(move || {
+            let mut adb_command = Command::new(&adb_path);
+            adb_command.arg("connect").arg(listen_address.to_string());
+            match adb_command.status() {
+                Ok(_) => {}
+                Err(io_err) if io_err.kind() == ErrorKind::NotFound => {
+                    panic!("Could not find adb binary named `{adb_path}`. If your adb is not in your $PATH, use the --adb flag to specify where to find it.");
+                }
+                Err(io_err) => {
+                    panic!("Failed to run `${adb_command:?}`: {io_err:?}");
+                }
+            }
+        });
+    } else {
+        println!("ADB bridge started. To connect: adb connect {listen_address}");
+    }
 
     while let Some(stream) = listener.incoming().next().await {
         if controller_proxy.1.load(Ordering::SeqCst) {
@@ -121,7 +150,7 @@ pub async fn starnix_adb(
         controller_proxy
             .0
             .vsock_connect(ADB_DEFAULT_PORT, sbridge)
-            .map_err(|e| anyhow!("Error connecting to adbd: {:?}", e))?;
+            .context("connecting to adbd")?;
 
         let reconnect_flag = Arc::clone(&controller_proxy.1);
         fasync::Task::spawn(async move {
@@ -134,7 +163,7 @@ pub async fn starnix_adb(
     }
 
     handle.close();
-    thread.join().expect("signal thread to shutdown without panic");
+    signal_thread.join().expect("signal thread to shutdown without panic");
     Ok(())
 }
 
