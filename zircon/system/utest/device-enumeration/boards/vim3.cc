@@ -15,6 +15,7 @@ TEST_F(DeviceEnumerationTest, Vim3Test) {
       "sys/platform/05:06:1/aml-gpio",
       "sys/platform/05:06:1/aml-gpio/gpio-init",
       "sys/platform/05:06:14/clocks",
+      "sys/platform/05:06:14/clocks/clock-init",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c",
       "sys/platform/05:00:2:2/i2c-2/aml-i2c/i2c/i2c-2-50",

@@ -160,7 +160,7 @@ zx_status_t Astro::AudioInit() {
     return status;
   }
 
-  auto sleep = [&arena = gpio_init_arena_](zx::duration delay) {
+  auto sleep = [&arena = init_arena_](zx::duration delay) {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());
   };
 

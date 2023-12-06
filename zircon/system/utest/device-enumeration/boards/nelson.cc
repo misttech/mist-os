@@ -52,6 +52,7 @@ TEST_F(DeviceEnumerationTest, NelsonTest) {
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:05:1c/aml_nna",
       "sys/platform/05:05:22/clocks",
+      "sys/platform/05:05:22/clocks/clock-init",
       "sys/platform/05:05:a/aml-thermal-pll/thermal",
       "class/thermal/000",
       // "sys/platform/05:03:1e/cpu",

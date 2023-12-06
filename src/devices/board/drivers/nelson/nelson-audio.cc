@@ -174,7 +174,7 @@ zx_status_t Nelson::AudioInit() {
       }},
   };
 
-  auto sleep = [&arena = gpio_init_arena_](zx::duration delay) {
+  auto sleep = [&arena = init_arena_](zx::duration delay) {
     return fuchsia_hardware_gpioimpl::wire::InitCall::WithDelay(arena, delay.get());
   };
 

@@ -5,6 +5,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_NELSON_NELSON_H_
 #define SRC_DEVICES_BOARD_DRIVERS_NELSON_NELSON_H_
 
+#include <fidl/fuchsia.hardware.clockimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/clockimpl/cpp/banjo.h>
@@ -165,11 +166,11 @@ class Nelson : public NelsonType {
   }
 
   fuchsia_hardware_gpioimpl::wire::InitCall GpioSetAltFunction(uint64_t function) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(gpio_init_arena_, function);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithAltFunction(init_arena_, function);
   }
 
   fuchsia_hardware_gpioimpl::wire::InitCall GpioSetDriveStrength(uint64_t ds_ua) {
-    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(gpio_init_arena_, ds_ua);
+    return fuchsia_hardware_gpioimpl::wire::InitCall::WithDriveStrengthUa(init_arena_, ds_ua);
   }
 
   // TODO(fxbug.dev/108070): Switch to fdf::SyncClient when it is available.
@@ -177,8 +178,9 @@ class Nelson : public NelsonType {
   ddk::IommuProtocolClient iommu_;
   ddk::GpioImplProtocolClient gpio_impl_;
   ddk::ClockImplProtocolClient clk_impl_;
-  fidl::Arena<> gpio_init_arena_;
+  fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::wire::InitStep> gpio_init_steps_;
+  std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
 
   thrd_t thread_;
   std::optional<uint32_t> board_rev_;

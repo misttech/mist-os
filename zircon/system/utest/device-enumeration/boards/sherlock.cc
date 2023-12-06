@@ -12,6 +12,7 @@ TEST_F(DeviceEnumerationTest, SherlockTest) {
       "sys/platform/05:04:1/aml-gpio",
       "sys/platform/05:04:1/aml-gpio/gpio-init",
       "sys/platform/05:00:14/clocks",
+      "sys/platform/05:00:14/clocks/clock-init",
       "sys/platform/05:00:1c/aml_light",
       "sys/platform/05:00:2/i2c-0/aml-i2c",
       "sys/platform/05:00:2:1/i2c-1/aml-i2c",

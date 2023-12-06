@@ -44,6 +44,7 @@ TEST_F(DeviceEnumerationTest, AstroTest) {
 
       "sys/platform/05:00:2/i2c-0/aml-i2c/i2c/i2c-0-57/tcs3400_light/tcs-3400",
       "sys/platform/05:03:11/clocks",
+      "sys/platform/05:03:11/clocks/clock-init",
       "sys/platform/05:03:12:1/aml_tdm/astro-audio-i2s-out",
       "sys/platform/05:03:13/aml_pdm/astro-audio-pdm-in",
       "sys/platform/05:03:1a/aml_securemem/aml-securemem",
