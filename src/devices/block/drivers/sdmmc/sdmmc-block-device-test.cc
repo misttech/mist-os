@@ -8,6 +8,14 @@
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
+#include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/client.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/server.h>
@@ -24,22 +32,65 @@
 
 #include "fake-sdmmc-device.h"
 #include "sdmmc-partition-device.h"
+#include "sdmmc-root-device.h"
 #include "sdmmc-rpmb-device.h"
 #include "sdmmc-types.h"
-#include "src/devices/testing/mock-ddk/mock-device.h"
 
 namespace sdmmc {
 
+class TestSdmmcRootDevice : public SdmmcRootDevice {
+ public:
+  // Modify these static variables to configure the behaviour of this test device.
+  static bool is_sd_;
+  static FakeSdmmcDevice sdmmc_;
+
+  TestSdmmcRootDevice(fdf::DriverStartArgs start_args,
+                      fdf::UnownedSynchronizedDispatcher dispatcher)
+      : SdmmcRootDevice(std::move(start_args), std::move(dispatcher)) {}
+
+ protected:
+  zx_status_t Init(
+      fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata) override {
+    zx_status_t status;
+    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
+    if (status = sdmmc->RefreshHostInfo(); status != ZX_OK) {
+      return status;
+    }
+    if (status = sdmmc->HwReset(); status != ZX_OK) {
+      return status;
+    }
+
+    std::unique_ptr<SdmmcBlockDevice> block_device;
+    if (status = SdmmcBlockDevice::Create(this, std::move(sdmmc), &block_device); status != ZX_OK) {
+      return status;
+    }
+    if (status = is_sd_ ? block_device->ProbeSd(*metadata) : block_device->ProbeMmc(*metadata);
+        status != ZX_OK) {
+      return status;
+    }
+    if (status = block_device->AddDevice(); status != ZX_OK) {
+      return status;
+    }
+    child_device_ = std::move(block_device);
+    return ZX_OK;
+  }
+};
+
+bool TestSdmmcRootDevice::is_sd_;
+FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
+
+struct IncomingNamespace {
+  fdf_testing::TestNode node{"root"};
+  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  compat::DeviceServer device_server;
+};
+
 class SdmmcBlockDeviceTest : public zxtest::Test {
  public:
-  SdmmcBlockDeviceTest() : loop_(&kAsyncLoopConfigAttachToCurrentThread) {
-    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-    dut_ = std::make_unique<SdmmcBlockDevice>(parent_.get(), std::move(sdmmc));
-    dut_->SetBlockInfo(FakeSdmmcDevice::kBlockSize, FakeSdmmcDevice::kBlockCount);
-    for (size_t i = 0; i < (FakeSdmmcDevice::kBlockSize / sizeof(kTestData)); i++) {
-      test_block_.insert(test_block_.end(), kTestData, kTestData + sizeof(kTestData));
-    }
-  }
+  SdmmcBlockDeviceTest()
+      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
+        incoming_(env_dispatcher_->async_dispatcher(), std::in_place),
+        loop_(&kAsyncLoopConfigAttachToCurrentThread) {}
 
   void SetUp() override {
     sdmmc_.Reset();
@@ -53,7 +104,7 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     });
 
     sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) -> void {
-      *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+      *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
       out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
       out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
       out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -67,18 +118,88 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     });
   }
 
-  void TearDown() override {
-    dut_->StopWorkerThread();
-    if (added_) {
-      [[maybe_unused]] auto ptr = dut_.release();
+  zx_status_t StartDriverForMmc() { return StartDriver(/*is_sd=*/false); }
+  zx_status_t StartDriverForSd() { return StartDriver(/*is_sd=*/true); }
+
+  zx_status_t StartDriver(bool is_sd) {
+    TestSdmmcRootDevice::is_sd_ = is_sd;
+    if (is_sd) {
+      sdmmc_.set_command_callback(SD_SEND_IF_COND,
+                                  [](const sdmmc_req_t& req, uint32_t out_response[4]) {
+                                    out_response[0] = req.arg & 0xfff;
+                                  });
+
+      sdmmc_.set_command_callback(SD_APP_SEND_OP_COND, [](uint32_t out_response[4]) {
+        out_response[0] = 0xc000'0000;  // Set busy and CCS bits.
+      });
+
+      sdmmc_.set_command_callback(SD_SEND_RELATIVE_ADDR, [](uint32_t out_response[4]) {
+        out_response[0] = 0x100;  // Set READY_FOR_DATA bit in SD status.
+      });
+
+      sdmmc_.set_command_callback(SDMMC_SEND_CSD, [](uint32_t out_response[4]) {
+        out_response[1] = 0x1234'0000;
+        out_response[2] = 0x0000'5678;
+        out_response[3] = 0x4000'0000;  // Set CSD_STRUCTURE to indicate SDHC/SDXC.
+      });
     }
+
+    // Initialize driver test environment.
+    fuchsia_driver_framework::DriverStartArgs start_args;
+    fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client;
+    fit::result metadata = fidl::Persist(CreateMetadata(/*removable=*/is_sd));
+    if (!metadata.is_ok()) {
+      return metadata.error_value().status();
+    }
+    incoming_.SyncCall([&](IncomingNamespace* incoming) mutable {
+      auto start_args_result = incoming->node.CreateStartArgsAndServe();
+      ASSERT_TRUE(start_args_result.is_ok());
+      start_args = std::move(start_args_result->start_args);
+      outgoing_directory_client = std::move(start_args_result->outgoing_directory_client);
+
+      ASSERT_OK(incoming->env.Initialize(std::move(start_args_result->incoming_directory_server)));
+
+      incoming->device_server.Init("default", "");
+      // Serve metadata.
+      ASSERT_OK(incoming->device_server.AddMetadata(DEVICE_METADATA_SDMMC, metadata->data(),
+                                                    metadata->size()));
+      ASSERT_OK(incoming->device_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                              &incoming->env.incoming_directory()));
+    });
+
+    // Start dut_.
+    auto result = runtime_.RunToCompletion(dut_.Start(std::move(start_args)));
+    if (!result.is_ok()) {
+      return result.status_value();
+    }
+
+    const std::unique_ptr<SdmmcBlockDevice>* block_device =
+        std::get_if<std::unique_ptr<SdmmcBlockDevice>>(&dut_->child_device());
+    if (block_device == nullptr) {
+      return ZX_ERR_BAD_STATE;
+    }
+    block_device_ = block_device->get();
+
+    block_device_->SetBlockInfo(FakeSdmmcDevice::kBlockSize, FakeSdmmcDevice::kBlockCount);
+    for (size_t i = 0; i < (FakeSdmmcDevice::kBlockSize / sizeof(kTestData)); i++) {
+      test_block_.insert(test_block_.end(), kTestData, kTestData + sizeof(kTestData));
+    }
+
+    user_ = GetBlockClient(USER_DATA_PARTITION);
+    if (!user_.is_valid()) {
+      return ZX_ERR_BAD_STATE;
+    }
+    if (!is_sd) {
+      boot1_ = GetBlockClient(BOOT_PARTITION_1);
+      boot2_ = GetBlockClient(BOOT_PARTITION_2);
+    }
+    return ZX_OK;
   }
 
   void QueueBlockOps();
   void QueueRpmbRequests();
 
  protected:
-  static constexpr uint32_t kBlockCount = 0x100000;
   static constexpr size_t kBlockOpSize = BlockOperation::OperationSize(sizeof(block_op_t));
   static constexpr uint32_t kMaxOutstandingOps = 16;
 
@@ -114,63 +235,18 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
         .enable_cache(true)
         .removable(removable)
         .max_command_packing(16)
+        .use_fidl(false)
         .Build();
   }
 
-  void AddMmcDevice(bool rpmb = false) {
-    EXPECT_OK(dut_->ProbeMmc(CreateMetadata()));
+  void BindRpmbClient() {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_rpmb::Rpmb>();
+    ASSERT_OK(endpoints.status_value());
 
-    EXPECT_OK(dut_->AddDevice());
-    added_ = true;
-
-    user_ = GetBlockClient(USER_DATA_PARTITION);
-    boot1_ = GetBlockClient(BOOT_PARTITION_1);
-    boot2_ = GetBlockClient(BOOT_PARTITION_2);
-
-    ASSERT_TRUE(user_.is_valid());
-
-    if (rpmb) {
-      auto iter = dut_->zxdev()->children().begin();
-      std::advance(iter, RPMB_PARTITION);
-
-      auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_rpmb::Rpmb>();
-      ASSERT_OK(endpoints.status_value());
-
-      binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
-                                  (*iter)->GetDeviceContext<RpmbDevice>());
-      ASSERT_OK(loop_.StartThread("rpmb-client-thread"));
-      rpmb_client_.Bind(std::move(endpoints->client), loop_.dispatcher());
-    }
-  }
-
-  void AddSdDevice(bool removable = false) {
-    sdmmc_.set_command_callback(SD_SEND_IF_COND,
-                                [](const sdmmc_req_t& req, uint32_t out_response[4]) {
-                                  out_response[0] = req.arg & 0xfff;
-                                });
-
-    sdmmc_.set_command_callback(SD_APP_SEND_OP_COND, [](uint32_t out_response[4]) {
-      out_response[0] = 0xc000'0000;  // Set busy and CCS bits.
-    });
-
-    sdmmc_.set_command_callback(SD_SEND_RELATIVE_ADDR, [](uint32_t out_response[4]) {
-      out_response[0] = 0x100;  // Set READY_FOR_DATA bit in SD status.
-    });
-
-    sdmmc_.set_command_callback(SDMMC_SEND_CSD, [](uint32_t out_response[4]) {
-      out_response[1] = 0x1234'0000;
-      out_response[2] = 0x0000'5678;
-      out_response[3] = 0x4000'0000;  // Set CSD_STRUCTURE to indicate SDHC/SDXC.
-    });
-
-    EXPECT_OK(dut_->ProbeSd(CreateMetadata(removable)));
-
-    EXPECT_OK(dut_->AddDevice());
-    added_ = true;
-
-    user_ = GetBlockClient(USER_DATA_PARTITION);
-
-    ASSERT_TRUE(user_.is_valid());
+    binding_ = fidl::BindServer(loop_.dispatcher(), std::move(endpoints->server),
+                                block_device_->child_rpmb_device().get());
+    ASSERT_OK(loop_.StartThread("rpmb-client-thread"));
+    rpmb_client_.Bind(std::move(endpoints->client), loop_.dispatcher());
   }
 
   void MakeBlockOp(uint8_t opcode, uint32_t length, uint64_t offset,
@@ -246,31 +322,33 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
     }
   }
 
-  ddk::BlockImplProtocolClient GetBlockClient(MockDevice* device, size_t index) {
-    auto partition = device->children().begin();
-    std::advance(partition, index);
-    if (partition == device->children().end()) {
-      return ddk::BlockImplProtocolClient();
+  ddk::BlockImplProtocolClient GetBlockClient(SdmmcBlockDevice* device, EmmcPartition partition) {
+    for (const auto& partition_device : device->child_partition_devices()) {
+      if (partition_device->partition() == partition) {
+        block_impl_protocol_t proto = {.ops = &partition_device->block_impl_protocol_ops(),
+                                       .ctx = partition_device.get()};
+        return ddk::BlockImplProtocolClient(&proto);
+      }
     }
-    block_impl_protocol_t proto;
-    device_get_protocol(partition->get(), ZX_PROTOCOL_BLOCK_IMPL, &proto);
-    return ddk::BlockImplProtocolClient(&proto);
+    return ddk::BlockImplProtocolClient();
   }
 
-  ddk::BlockImplProtocolClient GetBlockClient(size_t index) {
-    return GetBlockClient(dut_->zxdev(), index);
+  ddk::BlockImplProtocolClient GetBlockClient(EmmcPartition partition) {
+    return GetBlockClient(block_device_, partition);
   }
 
-  FakeSdmmcDevice sdmmc_;
-  std::shared_ptr<MockDevice> parent_ = MockDevice::FakeRootParent();
-  std::unique_ptr<SdmmcBlockDevice> dut_;
+  FakeSdmmcDevice& sdmmc_ = TestSdmmcRootDevice::sdmmc_;
+  fdf_testing::DriverRuntime runtime_;
+  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
+  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  fdf_testing::DriverUnderTest<TestSdmmcRootDevice> dut_;
+  SdmmcBlockDevice* block_device_;
   ddk::BlockImplProtocolClient user_;
   ddk::BlockImplProtocolClient boot1_;
   ddk::BlockImplProtocolClient boot2_;
   fidl::WireSharedClient<fuchsia_hardware_rpmb::Rpmb> rpmb_client_;
   std::atomic<bool> run_threads_ = true;
   async::Loop loop_;
-  bool added_ = false;
 
  private:
   static constexpr uint8_t kTestData[] = {
@@ -289,20 +367,20 @@ class SdmmcBlockDeviceTest : public zxtest::Test {
 };
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQuery) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   size_t block_op_size;
   block_info_t info;
   user_.Query(&info, &block_op_size);
 
-  EXPECT_EQ(info.block_count, kBlockCount);
+  EXPECT_EQ(info.block_count, FakeSdmmcDevice::kBlockCount);
   EXPECT_EQ(info.block_size, FakeSdmmcDevice::kBlockSize);
   EXPECT_EQ(block_op_size, kBlockOpSize);
   EXPECT_FALSE(info.flags & FLAG_REMOVABLE);
 }
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
-  AddSdDevice(/*removable=*/true);
+  ASSERT_OK(StartDriverForSd());
 
   size_t block_op_size;
   block_info_t info;
@@ -314,7 +392,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQuerySdRemovable) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -365,7 +443,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueue) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0x100000, &op1));
@@ -418,7 +496,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockImplQueueOutOfRange) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
-  AddSdDevice();
+  ASSERT_OK(StartDriverForSd());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -457,7 +535,7 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForSdBlockTransfer) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -496,7 +574,7 @@ TEST_F(SdmmcBlockDeviceTest, NoCmd12ForMmcBlockTransfer) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(
@@ -541,15 +619,14 @@ TEST_F(SdmmcBlockDeviceTest, ErrorsPropagate) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
-  AddMmcDevice();
-
   sdmmc_.set_host_info({
       .caps = 0,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
-  EXPECT_OK(dut_->Init());
+
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(
@@ -561,14 +638,17 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
   EXPECT_OK(sync_completion_wait(&ctx1.completion, zx::duration::infinite().get()));
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
+}
 
+TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailureWhenAutoCmd12) {
   sdmmc_.set_host_info({
       .caps = SDMMC_HOST_CAP_AUTO_CMD12,
       .max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded,
       .max_transfer_size_non_dma = 0,
       .prefs = 0,
   });
-  EXPECT_OK(dut_->Init());
+
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op2;
   ASSERT_NO_FATAL_FAILURE(
@@ -579,11 +659,11 @@ TEST_F(SdmmcBlockDeviceTest, SendCmd12OnCommandFailure) {
 
   EXPECT_OK(sync_completion_wait(&ctx2.completion, zx::duration::infinite().get()));
   EXPECT_TRUE(op2->private_storage()->completed);
-  EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 20);
+  EXPECT_EQ(sdmmc_.command_counts().at(SDMMC_STOP_TRANSMISSION), 10);
 }
 
 TEST_F(SdmmcBlockDeviceTest, Trim) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 10, 100, &op1));
@@ -642,7 +722,7 @@ TEST_F(SdmmcBlockDeviceTest, Trim) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_TRIM, 10, 10, &op1));
@@ -692,7 +772,7 @@ TEST_F(SdmmcBlockDeviceTest, TrimErrors) {
   EXPECT_NOT_OK(op5->private_storage()->status);
 }
 
-TEST_F(SdmmcBlockDeviceTest, DdkLifecycle) {
+TEST_F(SdmmcBlockDeviceTest, OnlyUserDataPartitionExists) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -704,13 +784,14 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycle) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
-  dut_->DdkAsyncRemove();
-  EXPECT_EQ(parent_->descendant_count(), 2);
+  EXPECT_EQ(block_device_->child_partition_devices().size(), 1);
+  EXPECT_EQ(block_device_->child_partition_devices()[0]->partition(), USER_DATA_PARTITION);
+  EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, DdkLifecycleBootPartitionsExistButNotUsed) {
+TEST_F(SdmmcBlockDeviceTest, BootPartitionsExistButNotUsed) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -723,13 +804,14 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleBootPartitionsExistButNotUsed) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
-  dut_->DdkAsyncRemove();
-  EXPECT_EQ(parent_->descendant_count(), 2);
+  EXPECT_EQ(block_device_->child_partition_devices().size(), 1);
+  EXPECT_EQ(block_device_->child_partition_devices()[0]->partition(), USER_DATA_PARTITION);
+  EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootPartitions) {
+TEST_F(SdmmcBlockDeviceTest, WithBootPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -742,13 +824,16 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootPartitions) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
-  dut_->DdkAsyncRemove();
-  EXPECT_EQ(parent_->descendant_count(), 4);
+  EXPECT_EQ(block_device_->child_partition_devices().size(), 3);
+  EXPECT_EQ(block_device_->child_partition_devices()[0]->partition(), USER_DATA_PARTITION);
+  EXPECT_EQ(block_device_->child_partition_devices()[1]->partition(), BOOT_PARTITION_1);
+  EXPECT_EQ(block_device_->child_partition_devices()[2]->partition(), BOOT_PARTITION_2);
+  EXPECT_EQ(block_device_->child_rpmb_device(), nullptr);
 }
 
-TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootAndRpmbPartitions) {
+TEST_F(SdmmcBlockDeviceTest, WithBootAndRpmbPartitions) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
@@ -762,59 +847,18 @@ TEST_F(SdmmcBlockDeviceTest, DdkLifecycleWithBootAndRpmbPartitions) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
 
-  dut_->DdkAsyncRemove();
-  EXPECT_EQ(parent_->descendant_count(), 5);
+  EXPECT_EQ(block_device_->child_partition_devices().size(), 3);
+  EXPECT_EQ(block_device_->child_partition_devices()[0]->partition(), USER_DATA_PARTITION);
+  EXPECT_EQ(block_device_->child_partition_devices()[1]->partition(), BOOT_PARTITION_1);
+  EXPECT_EQ(block_device_->child_partition_devices()[2]->partition(), BOOT_PARTITION_2);
+  EXPECT_NE(block_device_->child_rpmb_device(), nullptr);
 }
 
 TEST_F(SdmmcBlockDeviceTest, CompleteTransactions) {
-  std::optional<block::Operation<OperationContext>> op1;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
-
-  std::optional<block::Operation<OperationContext>> op2;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 5, 0x8000, &op2));
-
-  std::optional<block::Operation<OperationContext>> op3;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_FLUSH, 0, 0, &op3));
-
-  std::optional<block::Operation<OperationContext>> op4;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 1, 0x400, &op4));
-
-  std::optional<block::Operation<OperationContext>> op5;
-  ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_READ, 10, 0x2000, &op5));
-
-  CallbackContext ctx(5);
-
-  {
-    auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-    auto dut = std::make_unique<SdmmcBlockDevice>(parent_.get(), std::move(sdmmc));
-    dut->SetBlockInfo(FakeSdmmcDevice::kBlockSize, FakeSdmmcDevice::kBlockCount);
-    EXPECT_OK(dut->AddDevice());
-    [[maybe_unused]] auto ptr = dut.release();
-
-    ddk::BlockImplProtocolClient user = GetBlockClient(ptr->zxdev(), USER_DATA_PARTITION);
-    ASSERT_TRUE(user.is_valid());
-
-    user.Queue(op1->operation(), OperationCallback, &ctx);
-    user.Queue(op2->operation(), OperationCallback, &ctx);
-    user.Queue(op3->operation(), OperationCallback, &ctx);
-    user.Queue(op4->operation(), OperationCallback, &ctx);
-    user.Queue(op5->operation(), OperationCallback, &ctx);
-  }
-
-  EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
-
-  EXPECT_TRUE(op1->private_storage()->completed);
-  EXPECT_TRUE(op2->private_storage()->completed);
-  EXPECT_TRUE(op3->private_storage()->completed);
-  EXPECT_TRUE(op4->private_storage()->completed);
-  EXPECT_TRUE(op5->private_storage()->completed);
-}
-
-TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnUnbind) {
-  AddMmcDevice();
-  dut_->StopWorkerThread();  // Stop the worker thread so queued requests don't get completed.
+  ASSERT_OK(StartDriverForMmc());
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -839,8 +883,6 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnUnbind) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  dut_->DdkUnbind(ddk::UnbindTxn(dut_->zxdev()));
-
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
   EXPECT_TRUE(op1->private_storage()->completed);
@@ -850,9 +892,10 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnUnbind) {
   EXPECT_TRUE(op5->private_storage()->completed);
 }
 
-TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnSuspend) {
-  AddMmcDevice();
-  dut_->StopWorkerThread();
+TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnStop) {
+  ASSERT_OK(StartDriverForMmc());
+  block_device_
+      ->StopWorkerThread();  // Stop the worker thread so queued requests don't get completed.
 
   std::optional<block::Operation<OperationContext>> op1;
   ASSERT_NO_FATAL_FAILURE(MakeBlockOp(BLOCK_OPCODE_WRITE, 1, 0, &op1));
@@ -877,7 +920,9 @@ TEST_F(SdmmcBlockDeviceTest, CompleteTransactionsOnSuspend) {
   user_.Queue(op4->operation(), OperationCallback, &ctx);
   user_.Queue(op5->operation(), OperationCallback, &ctx);
 
-  dut_->DdkSuspend(ddk::SuspendTxn(dut_->zxdev(), 0, false, 0));
+  zx::result prepare_stop_result = runtime_.RunToCompletion(dut_.PrepareStop());
+  EXPECT_OK(prepare_stop_result.status_value());
+  EXPECT_OK(dut_.Stop());
 
   EXPECT_OK(sync_completion_wait(&ctx.completion, zx::duration::infinite().get()));
 
@@ -899,19 +944,17 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusRetry) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 1;
   });
   sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](const sdmmc_req_t& req) {
-    // Fail twice before succeeding.
+    // Fail two out of three times during ProbeMmc, and then succeed for
+    // SdmmcBlockDevice::AddDevice.
     static uint32_t call_count = 0;
-    if (++call_count >= 3) {
-      call_count = 0;
+    if (++call_count % 3 == 0 || call_count > 9) {
       return ZX_OK;
     } else {
       return ZX_ERR_IO_DATA_INTEGRITY;
     }
   });
 
-  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
-  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
+  EXPECT_OK(StartDriverForMmc());
 }
 
 TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
@@ -927,13 +970,11 @@ TEST_F(SdmmcBlockDeviceTest, ProbeMmcSendStatusFail) {
   sdmmc_.set_command_callback(SDMMC_SEND_STATUS,
                               [](const sdmmc_req_t& req) { return ZX_ERR_IO_DATA_INTEGRITY; });
 
-  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
-  EXPECT_NOT_OK(dut.ProbeMmc(CreateMetadata()));
+  EXPECT_NOT_OK(StartDriverForMmc());
 }
 
 TEST_F(SdmmcBlockDeviceTest, QueryBootPartitions) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
@@ -954,7 +995,7 @@ TEST_F(SdmmcBlockDeviceTest, QueryBootPartitions) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
@@ -1024,7 +1065,7 @@ TEST_F(SdmmcBlockDeviceTest, AccessBootPartitions) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot2_.is_valid());
 
@@ -1078,7 +1119,7 @@ TEST_F(SdmmcBlockDeviceTest, BootPartitionRepeatedAccess) {
 }
 
 TEST_F(SdmmcBlockDeviceTest, AccessBootPartitionOutOfRange) {
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
   ASSERT_TRUE(boot1_.is_valid());
 
@@ -1143,10 +1184,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHs) {
                SDMMC_HOST_PREFS_DISABLE_HSDDR,
   });
 
-  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
-  EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
+  EXPECT_OK(StartDriverForMmc());
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS);
 }
@@ -1167,10 +1205,7 @@ TEST_F(SdmmcBlockDeviceTest, ProbeUsesPrefsHsDdr) {
       .prefs = SDMMC_HOST_PREFS_DISABLE_HS200 | SDMMC_HOST_PREFS_DISABLE_HS400,
   });
 
-  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
-  EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
+  EXPECT_OK(StartDriverForMmc());
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HSDDR);
 }
@@ -1210,16 +1245,13 @@ TEST_F(SdmmcBlockDeviceTest, ProbeHs400) {
 
   sdmmc_.set_host_info({.prefs = 0});
 
-  auto sdmmc = std::make_unique<SdmmcDevice>(sdmmc_.GetClient());
-  SdmmcBlockDevice dut(parent_.get(), std::move(sdmmc));
-  EXPECT_OK(dut.Init());
-  EXPECT_OK(dut.ProbeMmc(CreateMetadata()));
+  EXPECT_OK(StartDriverForMmc());
 
   EXPECT_EQ(sdmmc_.timing(), SDMMC_TIMING_HS400);
 }
 
 TEST_F(SdmmcBlockDeviceTest, ProbeSd) {
-  AddSdDevice();
+  ASSERT_OK(StartDriverForSd());
 
   size_t block_op_size;
   block_info_t info;
@@ -1243,7 +1275,8 @@ TEST_F(SdmmcBlockDeviceTest, RpmbPartition) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
 
   sync_completion_t completion;
   rpmb_client_->GetDeviceInfo().ThenExactlyOnce(
@@ -1357,8 +1390,9 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestLimit) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
-  dut_->StopWorkerThread();
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
+  block_device_->StopWorkerThread();
 
   zx::vmo tx_frames;
   ASSERT_OK(zx::vmo::create(512, 0, &tx_frames));
@@ -1489,7 +1523,7 @@ void SdmmcBlockDeviceTest::QueueRpmbRequests() {
 
 TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
-    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -1502,7 +1536,8 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
 
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
@@ -1552,7 +1587,7 @@ TEST_F(SdmmcBlockDeviceTest, RpmbRequestsGetToRun) {
 
 TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
-    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -1565,7 +1600,8 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
 
   ASSERT_TRUE(boot1_.is_valid());
   ASSERT_TRUE(boot2_.is_valid());
@@ -1619,7 +1655,7 @@ TEST_F(SdmmcBlockDeviceTest, BlockOpsGetToRun) {
 
 TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
-    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -1633,7 +1669,8 @@ TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
     out_data[MMC_EXT_CSD_GENERIC_CMD6_TIME] = 0;
   });
 
-  AddMmcDevice(/*rpmb=*/true);
+  ASSERT_OK(StartDriverForMmc());
+  BindRpmbClient();
 
   zx::result rpmb_ends = fidl::CreateEndpoints<fuchsia_hardware_rpmb::Rpmb>();
   ASSERT_OK(rpmb_ends.status_value());
@@ -1658,7 +1695,7 @@ TEST_F(SdmmcBlockDeviceTest, GetRpmbClient) {
 
 TEST_F(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
-    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -1670,13 +1707,14 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
     out_data[MMC_EXT_CSD_MAX_PACKED_READS] = 62;
   });
 
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
-  ASSERT_TRUE(parent_->GetLatestChild()->GetInspectVmo().is_valid());
+  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
 
   // IO error count should be zero after initialization.
   inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
+  inspector.ReadInspect(inspect_vmo);
 
   const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -1746,7 +1784,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
   EXPECT_TRUE(op1->private_storage()->completed);
   EXPECT_OK(op1->private_storage()->status);
 
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
+  inspector.ReadInspect(inspect_vmo);
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -1775,7 +1813,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
   EXPECT_TRUE(op2->private_storage()->completed);
   EXPECT_NOT_OK(op2->private_storage()->status);
 
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
+  inspector.ReadInspect(inspect_vmo);
 
   root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -1791,7 +1829,7 @@ TEST_F(SdmmcBlockDeviceTest, Inspect) {
 
 TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
-    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(kBlockCount);
+    *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;
@@ -1801,12 +1839,13 @@ TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
     out_data[MMC_EXT_CSD_DEVICE_LIFE_TIME_EST_TYP_B] = 6;
   });
 
-  AddMmcDevice();
+  ASSERT_OK(StartDriverForMmc());
 
-  ASSERT_TRUE(parent_->GetLatestChild()->GetInspectVmo().is_valid());
+  const zx::vmo inspect_vmo = block_device_->inspector().DuplicateVmo();
+  ASSERT_TRUE(inspect_vmo.is_valid());
 
   inspect::InspectTestHelper inspector;
-  inspector.ReadInspect(parent_->GetLatestChild()->GetInspectVmo());
+  inspector.ReadInspect(inspect_vmo);
 
   const inspect::Hierarchy* root = inspector.hierarchy().GetByPath({"sdmmc_core"});
   ASSERT_NOT_NULL(root);
@@ -1828,3 +1867,5 @@ TEST_F(SdmmcBlockDeviceTest, InspectInvalidLifetime) {
 }
 
 }  // namespace sdmmc
+
+FUCHSIA_DRIVER_EXPORT(sdmmc::TestSdmmcRootDevice);

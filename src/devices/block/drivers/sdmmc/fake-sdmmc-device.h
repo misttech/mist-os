@@ -47,7 +47,7 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
   static constexpr size_t kBlockMask = ~static_cast<size_t>(kBlockSize - 1);
 
   // This is a placeholder value, not currently enforced.
-  static constexpr size_t kBlockCount = 0x10000;
+  static constexpr size_t kBlockCount = 0x100000;
 
   FakeSdmmcDevice() : proto_{.ops = &sdmmc_protocol_ops_, .ctx = this}, host_info_({}) {
     for (auto& store : registered_vmos_) {
@@ -69,6 +69,23 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
 
     command_counts_.clear();
     command_callbacks_.clear();
+    requests_.clear();
+    interrupt_cb_ = {};
+    set_signal_voltage_status_ = ZX_OK;
+    set_bus_width_status_ = ZX_OK;
+    set_bus_freq_status_ = ZX_OK;
+    set_timing_status_ = ZX_OK;
+    perform_tuning_status_ = ZX_OK;
+    signal_voltage_ = SDMMC_VOLTAGE_MAX;
+    bus_width_ = SDMMC_BUS_WIDTH_ONE;
+    bus_freq_ = 0;
+    timing_ = SDMMC_TIMING_MAX;
+    erase_group_start_.reset();
+    erase_group_end_.reset();
+
+    for (size_t i = 0; i < std::size(registered_vmos_); i++) {
+      registered_vmos_[i].reset();
+    }
   }
 
   zx_status_t SdmmcHostInfo(sdmmc_host_info_t* out_info);

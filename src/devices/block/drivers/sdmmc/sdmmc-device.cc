@@ -100,7 +100,11 @@ zx_status_t SdmmcDevice::Init(bool use_fidl) {
   // Reset any previous initializations in a way that works with unit testing.
   using_fidl_ = use_fidl;
 
-  if (use_fidl && root_device_ != nullptr) {
+  if (root_device_ == nullptr) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  if (use_fidl) {
     auto client_end =
         root_device_->driver_incoming()->Connect<fuchsia_hardware_sdmmc::SdmmcService::Sdmmc>();
     if (client_end.is_error() || !client_end->is_valid()) {

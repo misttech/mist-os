@@ -143,9 +143,13 @@ class SdmmcBlockDevice {
   SdmmcRootDevice* parent() { return parent_; }
 
   // Visible for testing.
-  zx_status_t Init(bool use_fidl = false) { return sdmmc_->Init(use_fidl); }
   void StopWorkerThread() TA_EXCL(lock_);
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
+  const inspect::Inspector& inspector() const { return inspector_; }
+  const std::vector<std::unique_ptr<PartitionDevice>>& child_partition_devices() const {
+    return child_partition_devices_;
+  }
+  const std::unique_ptr<RpmbDevice>& child_rpmb_device() const { return child_rpmb_device_; }
 
  private:
   // An arbitrary limit to prevent RPMB clients from flooding us with requests.

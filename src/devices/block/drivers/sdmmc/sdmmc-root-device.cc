@@ -7,7 +7,6 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/metadata.h>
-#include <lib/driver/component/cpp/driver_export.h>
 
 #include <memory>
 
@@ -166,5 +165,3 @@ zx_status_t SdmmcRootDevice::Init(
 }
 
 }  // namespace sdmmc
-
-FUCHSIA_DRIVER_EXPORT(sdmmc::SdmmcRootDevice);

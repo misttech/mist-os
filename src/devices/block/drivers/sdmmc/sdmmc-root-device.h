@@ -33,9 +33,19 @@ class SdmmcRootDevice : public fdf::DriverBase {
   async_dispatcher_t* driver_async_dispatcher() const { return dispatcher(); }
   const std::optional<std::string>& driver_node_name() const { return node_name(); }
 
- private:
-  zx_status_t Init(fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata);
+  // Visible for testing.
+  const std::variant<std::unique_ptr<SdioControllerDevice>, std::unique_ptr<SdmmcBlockDevice>>&
+  child_device() const {
+    return child_device_;
+  }
 
+ protected:
+  virtual zx_status_t Init(fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata> metadata);
+
+  std::variant<std::unique_ptr<SdioControllerDevice>, std::unique_ptr<SdmmcBlockDevice>>
+      child_device_;
+
+ private:
   // Returns the SDMMC metadata with default values for any fields that are not present (or if the
   // metadata itself is not present). Returns an error if the metadata could not be decoded.
   zx::result<fidl::ObjectView<fuchsia_hardware_sdmmc::wire::SdmmcMetadata>> GetMetadata(
@@ -49,9 +59,6 @@ class SdmmcRootDevice : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> parent_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::Node> root_node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-
-  std::variant<std::unique_ptr<SdioControllerDevice>, std::unique_ptr<SdmmcBlockDevice>>
-      child_device_;
 };
 
 }  // namespace sdmmc
