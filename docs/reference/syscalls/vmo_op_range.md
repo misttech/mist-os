@@ -55,11 +55,11 @@ children, and for slice children of such vmos. Provided range must be page align
 [`zx_vmo_write()`](/docs/reference/syscalls/vmo_write.md), except that it is able to be done more
 efficiently and save memory by de-duping to shared zero pages. Requires the **ZX_RIGHT_WRITE** right.
 
-**ZX_VMO_OP_LOCK** - Locks a range of pages in a discardable VMO, preventing them from being
-discarded by the kernel. Guaranteed to successfully lock the VMO and return **ZX_OK** if the
-arguments are valid.  *buffer* should point to a `zx_vmo_lock_state_t` struct, and *buffer_size*
-should accommodate the struct. Returns information about the locked and previously discarded ranges
-in *buffer*, so that clients can reinitialize discarded contents if needed.
+**ZX_VMO_OP_LOCK** - Locks a range of pages in a VMO created with **ZX_VMO_DISCARDABLE**, preventing
+them from being discarded by the kernel. Guaranteed to successfully lock the VMO and return
+**ZX_OK** if the arguments are valid.  *buffer* should point to a `zx_vmo_lock_state_t` struct, and
+*buffer_size* should accommodate the struct. Returns information about the locked and previously
+discarded ranges in *buffer*, so that clients can reinitialize discarded contents if needed.
 
 The entire VMO should be locked at once, so *offset* should be 0 and *size* should be the current
 size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
@@ -84,21 +84,21 @@ typedef struct zx_vmo_lock_state {
 } zx_vmo_lock_state_t;
 ```
 
-**ZX_VMO_OP_TRY_LOCK** - Locks a range of pages in a discardable VMO, preventing them from being
-discarded by the kernel. Will only succeed if the range has not already been discarded by the
-kernel, and will fail with **ZX_ERR_UNAVAILABLE** otherwise. This operation is meant as a
-lightweight alternative to **ZX_VMO_OP_LOCK** for trying to lock the VMO without having to set up
-the *buffer* argument. It also affords clients the choice to not take any action following failure
-to lock the VMO; clients must use **ZX_VMO_OP_LOCK** if they wish to lock the VMO again.
+**ZX_VMO_OP_TRY_LOCK** - Locks a range of pages in a VMO created with **ZX_VMO_DISCARDABLE**,
+preventing them from being discarded by the kernel. Will only succeed if the range has not already
+been discarded by the kernel, and will fail with **ZX_ERR_UNAVAILABLE** otherwise. This operation is
+meant as a lightweight alternative to **ZX_VMO_OP_LOCK** for trying to lock the VMO without having
+to set up the *buffer* argument. It also affords clients the choice to not take any action following
+failure to lock the VMO; clients must use **ZX_VMO_OP_LOCK** if they wish to lock the VMO again.
 
 The entire VMO should be locked at once, so *offset* should be 0 and *size* should be the current
 size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
 **ZX_RIGHT_READ** or **ZX_RIGHT_WRITE** right. Note that locking itself does not commit any pages in
 the VMO; it just marks the state of the VMO as “undiscardable” by the kernel.
 
-**ZX_VMO_OP_UNLOCK** - Unlocks a range of pages in a discardable VMO, indicating that the kernel is
-free to discard them under memory pressure. Unlocked pages that have not been discarded yet will be
-counted as committed pages.
+**ZX_VMO_OP_UNLOCK** - Unlocks a range of pages in a VMO created with **ZX_VMO_DISCARDABLE**,
+indicating that the kernel is free to discard them under memory pressure. Unlocked pages that have
+not been discarded yet will be counted as committed pages.
 
 The entire VMO should be unlocked at once, so *offset* should be 0 and *size* should be the current
 size of the VMO (the page-aligned size as would be returned by [`zx_vmo_get_size()`]). Requires the
@@ -182,10 +182,11 @@ failed.
 a valid operation, *size* is zero and *op* is a cache operation, or *op* was **ZX_VMO_OP_DECOMMIT**
 and range was not page aligned.
 
-**ZX_ERR_NOT_SUPPORTED**  *op* was **ZX_VMO_OP_LOCK**, **ZX_VMO_OP_TRY_LOCK** or
-**ZX_VMO_OP_UNLOCK** and the VMO is not discardable, or *op* was **ZX_VMO_OP_DECOMMIT** and the
-underlying VMO does not allow decommiting, or *op* was **ZX_VMO_OP_CACHE_INVALIDATE** and
-`kernel.enable-debugging-syscalls` is false.
+**ZX_ERR_NOT_SUPPORTED** under any of these conditions:
+- *op* was **ZX_VMO_OP_LOCK**, **ZX_VMO_OP_TRY_LOCK** or **ZX_VMO_OP_UNLOCK** and the VMO was not
+  created with **ZX_VMO_DISCARDABLE**.
+- *op* was **ZX_VMO_OP_DECOMMIT** and the underlying VMO does not allow decommiting.
+- *op* was **ZX_VMO_OP_CACHE_INVALIDATE** and `kernel.enable-debugging-syscalls` is false.
 
 **ZX_ERR_UNAVAILABLE** *op* was **ZX_VMO_OP_TRY_LOCK**, the VMO was discardable and the VMO has been
 discarded by the kernel.
