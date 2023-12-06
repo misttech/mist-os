@@ -302,18 +302,18 @@ zx::result<> DsiHost::ConfigureDsiHostController(const display_setting_t& disp_s
 }
 
 void DsiHost::PhyEnable() {
-  WRITE32_REG(HHI, HHI_MIPI_CNTL0,
-              MIPI_CNTL0_CMN_REF_GEN_CTRL(0x29) | MIPI_CNTL0_VREF_SEL(VREF_SEL_VR) |
-                  MIPI_CNTL0_LREF_SEL(LREF_SEL_L_ROUT) | MIPI_CNTL0_LBG_EN |
-                  MIPI_CNTL0_VR_TRIM_CNTL(0x7) | MIPI_CNTL0_VR_GEN_FROM_LGB_EN);
-  WRITE32_REG(HHI, HHI_MIPI_CNTL1, MIPI_CNTL1_DSI_VBG_EN | MIPI_CNTL1_CTL);
-  WRITE32_REG(HHI, HHI_MIPI_CNTL2, MIPI_CNTL2_DEFAULT_VAL);  // 4 lane
+  hhi_mmio_->Write32(MIPI_CNTL0_CMN_REF_GEN_CTRL(0x29) | MIPI_CNTL0_VREF_SEL(VREF_SEL_VR) |
+                         MIPI_CNTL0_LREF_SEL(LREF_SEL_L_ROUT) | MIPI_CNTL0_LBG_EN |
+                         MIPI_CNTL0_VR_TRIM_CNTL(0x7) | MIPI_CNTL0_VR_GEN_FROM_LGB_EN,
+                     HHI_MIPI_CNTL0);
+  hhi_mmio_->Write32(MIPI_CNTL1_DSI_VBG_EN | MIPI_CNTL1_CTL, HHI_MIPI_CNTL1);
+  hhi_mmio_->Write32(MIPI_CNTL2_DEFAULT_VAL, HHI_MIPI_CNTL2);  // 4 lane
 }
 
 void DsiHost::PhyDisable() {
-  WRITE32_REG(HHI, HHI_MIPI_CNTL0, 0);
-  WRITE32_REG(HHI, HHI_MIPI_CNTL1, 0);
-  WRITE32_REG(HHI, HHI_MIPI_CNTL2, 0);
+  hhi_mmio_->Write32(0, HHI_MIPI_CNTL0);
+  hhi_mmio_->Write32(0, HHI_MIPI_CNTL1);
+  hhi_mmio_->Write32(0, HHI_MIPI_CNTL2);
 }
 
 void DsiHost::SetSignalPower(bool on) {
@@ -382,7 +382,7 @@ zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bit
     // Enable dwc mipi_dsi_host's clock
     SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CLK_CNTL, 0x3, 0, 2);
 
-    WRITE32_REG(MIPI_DSI, MIPI_DSI_TOP_MEM_PD, 0);
+    mipi_dsi_mmio_->Write32(0, MIPI_DSI_TOP_MEM_PD);
     zx::nanosleep(zx::deadline_after(zx::msec(10)));
 
     // Initialize host in command mode first

@@ -116,37 +116,37 @@ zx::result<> MipiPhy::PhyCfgLoad(uint32_t bitrate) {
 
 void MipiPhy::PhyInit() {
   // Enable phy clock.
-  WRITE32_REG(DSI_PHY, MIPI_DSI_PHY_CTRL,
-              PHY_CTRL_TXDDRCLK_EN | PHY_CTRL_DDRCLKPATH_EN | PHY_CTRL_CLK_DIV_COUNTER |
-                  PHY_CTRL_CLK_DIV_EN | PHY_CTRL_BYTECLK_EN);
+  dsi_phy_mmio_->Write32(PHY_CTRL_TXDDRCLK_EN | PHY_CTRL_DDRCLKPATH_EN | PHY_CTRL_CLK_DIV_COUNTER |
+                             PHY_CTRL_CLK_DIV_EN | PHY_CTRL_BYTECLK_EN,
+                         MIPI_DSI_PHY_CTRL);
 
   // Toggle PHY CTRL RST
   SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 1, PHY_CTRL_RST_START, PHY_CTRL_RST_BITS);
   SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 0, PHY_CTRL_RST_START, PHY_CTRL_RST_BITS);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_CLK_TIM,
-              (dsi_phy_cfg_.clk_trail | (dsi_phy_cfg_.clk_post << 8) |
-               (dsi_phy_cfg_.clk_zero << 16) | (dsi_phy_cfg_.clk_prepare << 24)));
+  dsi_phy_mmio_->Write32((dsi_phy_cfg_.clk_trail | (dsi_phy_cfg_.clk_post << 8) |
+                          (dsi_phy_cfg_.clk_zero << 16) | (dsi_phy_cfg_.clk_prepare << 24)),
+                         MIPI_DSI_CLK_TIM);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_CLK_TIM1, dsi_phy_cfg_.clk_pre);
+  dsi_phy_mmio_->Write32(dsi_phy_cfg_.clk_pre, MIPI_DSI_CLK_TIM1);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_HS_TIM,
-              (dsi_phy_cfg_.hs_exit | (dsi_phy_cfg_.hs_trail << 8) | (dsi_phy_cfg_.hs_zero << 16) |
-               (dsi_phy_cfg_.hs_prepare << 24)));
+  dsi_phy_mmio_->Write32((dsi_phy_cfg_.hs_exit | (dsi_phy_cfg_.hs_trail << 8) |
+                          (dsi_phy_cfg_.hs_zero << 16) | (dsi_phy_cfg_.hs_prepare << 24)),
+                         MIPI_DSI_HS_TIM);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_LP_TIM,
-              (dsi_phy_cfg_.lp_lpx | (dsi_phy_cfg_.lp_ta_sure << 8) |
-               (dsi_phy_cfg_.lp_ta_go << 16) | (dsi_phy_cfg_.lp_ta_get << 24)));
+  dsi_phy_mmio_->Write32((dsi_phy_cfg_.lp_lpx | (dsi_phy_cfg_.lp_ta_sure << 8) |
+                          (dsi_phy_cfg_.lp_ta_go << 16) | (dsi_phy_cfg_.lp_ta_get << 24)),
+                         MIPI_DSI_LP_TIM);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_ANA_UP_TIM, ANA_UP_TIME);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_INIT_TIM, dsi_phy_cfg_.init);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_WAKEUP_TIM, dsi_phy_cfg_.wakeup);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_LPOK_TIM, LPOK_TIME);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_ULPS_CHECK, ULPS_CHECK_TIME);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_LP_WCHDOG, LP_WCHDOG_TIME);
-  WRITE32_REG(DSI_PHY, MIPI_DSI_TURN_WCHDOG, TURN_WCHDOG_TIME);
+  dsi_phy_mmio_->Write32(ANA_UP_TIME, MIPI_DSI_ANA_UP_TIM);
+  dsi_phy_mmio_->Write32(dsi_phy_cfg_.init, MIPI_DSI_INIT_TIM);
+  dsi_phy_mmio_->Write32(dsi_phy_cfg_.wakeup, MIPI_DSI_WAKEUP_TIM);
+  dsi_phy_mmio_->Write32(LPOK_TIME, MIPI_DSI_LPOK_TIM);
+  dsi_phy_mmio_->Write32(ULPS_CHECK_TIME, MIPI_DSI_ULPS_CHECK);
+  dsi_phy_mmio_->Write32(LP_WCHDOG_TIME, MIPI_DSI_LP_WCHDOG);
+  dsi_phy_mmio_->Write32(TURN_WCHDOG_TIME, MIPI_DSI_TURN_WCHDOG);
 
-  WRITE32_REG(DSI_PHY, MIPI_DSI_CHAN_CTRL, 0);
+  dsi_phy_mmio_->Write32(0, MIPI_DSI_CHAN_CTRL);
 }
 
 void MipiPhy::Shutdown() {
@@ -156,7 +156,7 @@ void MipiPhy::Shutdown() {
 
   // Power down DSI
   dsiimpl_.PowerDown();
-  WRITE32_REG(DSI_PHY, MIPI_DSI_CHAN_CTRL, 0x1f);
+  dsi_phy_mmio_->Write32(0x1f, MIPI_DSI_CHAN_CTRL);
   SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 0, 7, 1);
   phy_enabled_ = false;
 }

@@ -124,7 +124,7 @@ bool Vpu::CheckAndClaimHardwareOwnership() {
     // we have already been loaded once. don't set again.
     return false;
   }
-  WRITE32_REG(VPU, VPP_DUMMY_DATA, kFirstTimeLoadMagicNumber);
+  vpu_mmio_->Write32(kFirstTimeLoadMagicNumber, VPP_DUMMY_DATA);
   first_time_load_ = true;
   return true;
 }
@@ -134,7 +134,7 @@ void Vpu::SetupPostProcessorOutputInterface() {
 
   // init vpu fifo control register
   SET_BIT32(VPU, VPP_OFIFO_SIZE, 0xFFF, 0, 12);
-  WRITE32_REG(VPU, VPP_HOLD_LINES, 0x08080808);
+  vpu_mmio_->Write32(0x08080808, VPP_HOLD_LINES);
   // default probe_sel, for highlight en
   SET_BIT32(VPU, VPP_MATRIX_CTRL, 0x7, 12, 3);
 }
@@ -158,15 +158,17 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
       // VPP WRAP OSD1 matrix
       // TODO(fxbug.dev/107649): Also set VPP_WRAP_OSD2/3 when OSD2/3 is
       // supported.
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET0_1, ((m[0] & 0xfff) << 16) | (m[1] & 0xfff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET2, m[2] & 0xfff);
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF00_01, ((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF02_10, ((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF11_12, ((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF20_21, ((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_COEF22, m[11] & 0x1fff);
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET0_1, ((m[18] & 0xfff) << 16) | (m[19] & 0xfff));
-      WRITE32_REG(VPU, VPP_WRAP_OSD1_MATRIX_OFFSET2, m[20] & 0xfff);
+      vpu_mmio_->Write32(((m[0] & 0xfff) << 16) | (m[1] & 0xfff),
+                         VPP_WRAP_OSD1_MATRIX_PRE_OFFSET0_1);
+      vpu_mmio_->Write32(m[2] & 0xfff, VPP_WRAP_OSD1_MATRIX_PRE_OFFSET2);
+      vpu_mmio_->Write32(((m[3] & 0x1fff) << 16) | (m[4] & 0x1fff), VPP_WRAP_OSD1_MATRIX_COEF00_01);
+      vpu_mmio_->Write32(((m[5] & 0x1fff) << 16) | (m[6] & 0x1fff), VPP_WRAP_OSD1_MATRIX_COEF02_10);
+      vpu_mmio_->Write32(((m[7] & 0x1fff) << 16) | (m[8] & 0x1fff), VPP_WRAP_OSD1_MATRIX_COEF11_12);
+      vpu_mmio_->Write32(((m[9] & 0x1fff) << 16) | (m[10] & 0x1fff),
+                         VPP_WRAP_OSD1_MATRIX_COEF20_21);
+      vpu_mmio_->Write32(m[11] & 0x1fff, VPP_WRAP_OSD1_MATRIX_COEF22);
+      vpu_mmio_->Write32(((m[18] & 0xfff) << 16) | (m[19] & 0xfff), VPP_WRAP_OSD1_MATRIX_OFFSET0_1);
+      vpu_mmio_->Write32(m[20] & 0xfff, VPP_WRAP_OSD1_MATRIX_OFFSET2);
       SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 1, 0, 1);
       break;
     }
@@ -174,7 +176,7 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
       ZX_ASSERT_MSG(false, "Invalid color conversion mode: %d", static_cast<int>(mode));
   }
 
-  WRITE32_REG(VPU, DOLBY_PATH_CTRL, 0xf);
+  vpu_mmio_->Write32(0xf, DOLBY_PATH_CTRL);
 
   // Disables VPP POST2 matrix.
   SET_BIT32(VPU, VPP_POST2_MATRIX_EN_CTRL, 0, 0, 1);
@@ -225,10 +227,10 @@ void Vpu::ConfigureClock() {
       .WriteTo(&*hhi_mmio_);
 
   // dmc_arb_config
-  WRITE32_REG(VPU, VPU_RDARB_MODE_L1C1, 0x0);
-  WRITE32_REG(VPU, VPU_RDARB_MODE_L1C2, 0x10000);
-  WRITE32_REG(VPU, VPU_RDARB_MODE_L2C1, 0x900000);
-  WRITE32_REG(VPU, VPU_WRARB_MODE_L2C1, 0x20000);
+  vpu_mmio_->Write32(0x0, VPU_RDARB_MODE_L1C1);
+  vpu_mmio_->Write32(0x10000, VPU_RDARB_MODE_L1C2);
+  vpu_mmio_->Write32(0x900000, VPU_RDARB_MODE_L2C1);
+  vpu_mmio_->Write32(0x20000, VPU_WRARB_MODE_L2C1);
 }
 
 namespace {

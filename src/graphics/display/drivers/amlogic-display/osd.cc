@@ -460,54 +460,54 @@ void Osd::FlipOnVsync(uint8_t idx, const display_config_t* config,
 
 void Osd::DefaultSetup() {
   // osd blend ctrl
-  WRITE32_REG(VPU, VIU_OSD_BLEND_CTRL,
-              4 << 29 | 0 << 27 |  // blend2_premult_en
-                  1 << 26 |        // blend_din0 input to blend0
-                  0 << 25 |        // blend1_dout to blend2
-                  0 << 24 |        // blend1_din3 input to blend1
-                  1 << 20 |        // blend_din_en
-                  0 << 16 |        // din_premult_en
-                  1 << 0);         // din_reoder_sel = OSD1
+  vpu_mmio_->Write32(4 << 29 | 0 << 27 |  // blend2_premult_en
+                         1 << 26 |        // blend_din0 input to blend0
+                         0 << 25 |        // blend1_dout to blend2
+                         0 << 24 |        // blend1_din3 input to blend1
+                         1 << 20 |        // blend_din_en
+                         0 << 16 |        // din_premult_en
+                         1 << 0,          // din_reoder_sel = OSD1
+                     VIU_OSD_BLEND_CTRL);
 
   // vpp osd1 blend ctrl
-  WRITE32_REG(VPU, OSD1_BLEND_SRC_CTRL,
-              (0 & 0xf) << 0 | (0 & 0x1) << 4 | (3 & 0xf) << 8 |  // postbld_src3_sel
-                  (0 & 0x1) << 16 |                               // postbld_osd1_premult
-                  (1 & 0x1) << 20);
+  vpu_mmio_->Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (3 & 0xf) << 8 |  // postbld_src3_sel
+                         (0 & 0x1) << 16 |                               // postbld_osd1_premult
+                         (1 & 0x1) << 20,
+                     OSD1_BLEND_SRC_CTRL);
   // vpp osd2 blend ctrl
-  WRITE32_REG(VPU, OSD2_BLEND_SRC_CTRL,
-              (0 & 0xf) << 0 | (0 & 0x1) << 4 | (0 & 0xf) << 8 |  // postbld_src4_sel
-                  (0 & 0x1) << 16 |                               // postbld_osd2_premult
-                  (1 & 0x1) << 20);
+  vpu_mmio_->Write32((0 & 0xf) << 0 | (0 & 0x1) << 4 | (0 & 0xf) << 8 |  // postbld_src4_sel
+                         (0 & 0x1) << 16 |                               // postbld_osd2_premult
+                         (1 & 0x1) << 20,
+                     OSD2_BLEND_SRC_CTRL);
 
   // used default dummy data
-  WRITE32_REG(VPU, VIU_OSD_BLEND_DUMMY_DATA0, 0x0 << 16 | 0x0 << 8 | 0x0);
+  vpu_mmio_->Write32(0x0 << 16 | 0x0 << 8 | 0x0, VIU_OSD_BLEND_DUMMY_DATA0);
   // used default dummy alpha data
-  WRITE32_REG(VPU, VIU_OSD_BLEND_DUMMY_ALPHA, 0x0 << 20 | 0x0 << 11 | 0x0);
+  vpu_mmio_->Write32(0x0 << 20 | 0x0 << 11 | 0x0, VIU_OSD_BLEND_DUMMY_ALPHA);
 
   // osdx setting
-  WRITE32_REG(VPU, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H, (fb_width_ - 1) << 16);
+  vpu_mmio_->Write32((fb_width_ - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_H);
 
-  WRITE32_REG(VPU, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V, (fb_height_ - 1) << 16);
+  vpu_mmio_->Write32((fb_height_ - 1) << 16, VPU_VIU_OSD_BLEND_DIN0_SCOPE_V);
 
-  WRITE32_REG(VPU, VIU_OSD_BLEND_BLEND0_SIZE, fb_height_ << 16 | fb_width_);
-  WRITE32_REG(VPU, VIU_OSD_BLEND_BLEND1_SIZE, fb_height_ << 16 | fb_width_);
+  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND0_SIZE);
+  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND1_SIZE);
   SET_BIT32(VPU, DOLBY_PATH_CTRL, 0x3, 2, 2);
 
-  WRITE32_REG(VPU, VPP_OSD1_IN_SIZE, fb_height_ << 16 | fb_width_);
+  vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VPP_OSD1_IN_SIZE);
 
   // setting blend scope
-  WRITE32_REG(VPU, VPP_OSD1_BLD_H_SCOPE, 0 << 16 | (fb_width_ - 1));
-  WRITE32_REG(VPU, VPP_OSD1_BLD_V_SCOPE, 0 << 16 | (fb_height_ - 1));
+  vpu_mmio_->Write32(0 << 16 | (fb_width_ - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_->Write32(0 << 16 | (fb_height_ - 1), VPP_OSD1_BLD_V_SCOPE);
 
   // Set geometry to normal mode
   uint32_t data32 = ((fb_width_ - 1) & 0xfff) << 16;
-  WRITE32_REG(VPU, VPU_VIU_OSD1_BLK0_CFG_W3, data32);
+  vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W3);
   data32 = ((fb_height_ - 1) & 0xfff) << 16;
-  WRITE32_REG(VPU, VPU_VIU_OSD1_BLK0_CFG_W4, data32);
+  vpu_mmio_->Write32(data32, VPU_VIU_OSD1_BLK0_CFG_W4);
 
-  WRITE32_REG(VPU, VPU_VIU_OSD1_BLK0_CFG_W1, ((fb_width_ - 1) & 0x1fff) << 16);
-  WRITE32_REG(VPU, VPU_VIU_OSD1_BLK0_CFG_W2, ((fb_height_ - 1) & 0x1fff) << 16);
+  vpu_mmio_->Write32(((fb_width_ - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W1);
+  vpu_mmio_->Write32(((fb_height_ - 1) & 0x1fff) << 16, VPU_VIU_OSD1_BLK0_CFG_W2);
 
   // enable osd blk0
   osd1_registers.ctrl_stat.ReadFrom(&(*vpu_mmio_))
@@ -543,10 +543,10 @@ void Osd::EnableScaling(bool enable) {
     /* enable osd scaler */
     data32 |= 1 << 2; /* enable osd scaler */
     data32 |= 1 << 3; /* enable osd scaler path */
-    WRITE32_REG(VPU, VPU_VPP_OSD_SC_CTRL0, data32);
+    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SC_CTRL0);
   } else {
     /* disable osd scaler path */
-    WRITE32_REG(VPU, VPU_VPP_OSD_SC_CTRL0, 0);
+    vpu_mmio_->Write32(0, VPU_VPP_OSD_SC_CTRL0);
   }
   hf_phase_step = (src_w << 18) / dst_w;
   hf_phase_step = (hf_phase_step << 6);
@@ -558,11 +558,11 @@ void Osd::EnableScaling(bool enable) {
   data32 = 0x0;
   if (enable) {
     data32 = (((src_h - 1) & 0x1fff) | ((src_w - 1) & 0x1fff) << 16);
-    WRITE32_REG(VPU, VPU_VPP_OSD_SCI_WH_M1, data32);
+    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCI_WH_M1);
     data32 = (((display_width_ - 1) & 0xfff));
-    WRITE32_REG(VPU, VPU_VPP_OSD_SCO_H_START_END, data32);
+    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_H_START_END);
     data32 = (((display_height_ - 1) & 0xfff));
-    WRITE32_REG(VPU, VPU_VPP_OSD_SCO_V_START_END, data32);
+    vpu_mmio_->Write32(data32, VPU_VPP_OSD_SCO_V_START_END);
   }
   data32 = 0x0;
   if (enable) {
@@ -570,21 +570,21 @@ void Osd::EnableScaling(bool enable) {
         (vf_bank_len & 0x7) | ((vsc_ini_rcv_num & 0xf) << 3) | ((vsc_ini_rpt_p0_num & 0x3) << 8);
     data32 |= 1 << 24;
   }
-  WRITE32_REG(VPU, VPU_VPP_OSD_VSC_CTRL0, data32);
+  vpu_mmio_->Write32(data32, VPU_VPP_OSD_VSC_CTRL0);
   data32 = 0x0;
   if (enable) {
     data32 |=
         (hf_bank_len & 0x7) | ((hsc_ini_rcv_num & 0xf) << 3) | ((hsc_ini_rpt_p0_num & 0x3) << 8);
     data32 |= 1 << 22;
   }
-  WRITE32_REG(VPU, VPU_VPP_OSD_HSC_CTRL0, data32);
+  vpu_mmio_->Write32(data32, VPU_VPP_OSD_HSC_CTRL0);
   data32 = 0x0;
   if (enable) {
     data32 |= (bot_ini_phase & 0xffff) << 16;
     SET_BIT32(VPU, VPU_VPP_OSD_HSC_PHASE_STEP, hf_phase_step, 0, 28);
     SET_BIT32(VPU, VPU_VPP_OSD_HSC_INI_PHASE, 0, 0, 16);
     SET_BIT32(VPU, VPU_VPP_OSD_VSC_PHASE_STEP, vf_phase_step, 0, 28);
-    WRITE32_REG(VPU, VPU_VPP_OSD_VSC_INI_PHASE, data32);
+    vpu_mmio_->Write32(data32, VPU_VPP_OSD_VSC_INI_PHASE);
   }
 }
 
@@ -666,13 +666,13 @@ zx_status_t Osd::ConfigAfbc() {
 
 void Osd::HwInit() {
   // Setup VPP horizontal width
-  WRITE32_REG(VPU, VPP_POSTBLEND_H_SIZE, display_width_);
+  vpu_mmio_->Write32(display_width_, VPP_POSTBLEND_H_SIZE);
 
   // init vpu fifo control register
   uint32_t regVal = READ32_REG(VPU, VPP_OFIFO_SIZE);
   regVal = 0xfff << 20;
   regVal |= (0xfff + 1);
-  WRITE32_REG(VPU, VPP_OFIFO_SIZE, regVal);
+  vpu_mmio_->Write32(regVal, VPP_OFIFO_SIZE);
 
   // init osd fifo control and set DDR request priority to be urgent
   regVal = 1;
@@ -682,8 +682,8 @@ void Osd::HwInit() {
   regVal |= 2 << 24;
   regVal |= 1 << 31;
   regVal |= 32 << 12;  // fifo_depth_val: 32*8 = 256
-  WRITE32_REG(VPU, VPU_VIU_OSD1_FIFO_CTRL_STAT, regVal);
-  WRITE32_REG(VPU, VPU_VIU_OSD2_FIFO_CTRL_STAT, regVal);
+  vpu_mmio_->Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
+  vpu_mmio_->Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
 
   SET_MASK32(VPU, VPP_MISC, VPP_POSTBLEND_EN);
   CLEAR_MASK32(VPU, VPP_MISC, VPP_PREBLEND_EN);
@@ -726,9 +726,9 @@ void Osd::HwInit() {
   }
 
   // update blending
-  WRITE32_REG(VPU, VPP_OSD1_BLD_H_SCOPE, 0 << 16 | (display_width_ - 1));
-  WRITE32_REG(VPU, VPP_OSD1_BLD_V_SCOPE, 0 << 16 | (display_height_ - 1));
-  WRITE32_REG(VPU, VPU_VPP_OUT_H_V_SIZE, display_width_ << 16 | display_height_);
+  vpu_mmio_->Write32(0 << 16 | (display_width_ - 1), VPP_OSD1_BLD_H_SCOPE);
+  vpu_mmio_->Write32(0 << 16 | (display_height_ - 1), VPP_OSD1_BLD_V_SCOPE);
+  vpu_mmio_->Write32(display_width_ << 16 | display_height_, VPU_VPP_OUT_H_V_SIZE);
 
   // Configure AFBC Engine's one-time programmable fields, so it's ready
   ConfigAfbc();
