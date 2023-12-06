@@ -196,9 +196,9 @@ static bool x86_test_destroy_unified() {
   constexpr uint64_t kTestAspaceSize = 4ull * PAGE_SIZE;
   constexpr uint64_t kTestSharedAspaceBase = kTestAspaceSize + PAGE_SIZE;
   X86ArchVmAspace restricted(0, kTestAspaceSize, /*mmu_flags=*/0);
-  EXPECT_EQ(ZX_OK, restricted.Init());
+  EXPECT_EQ(ZX_OK, restricted.InitRestricted());
   X86ArchVmAspace shared(kTestSharedAspaceBase, kTestAspaceSize, /*mmu_flags=*/0);
-  EXPECT_EQ(ZX_OK, shared.InitPrepopulated());
+  EXPECT_EQ(ZX_OK, shared.InitShared());
 
   // Create a unified aspace consisting of the above aspaces.
   X86ArchVmAspace unified(0, kTestAspaceSize, /*mmu_flags=*/0);

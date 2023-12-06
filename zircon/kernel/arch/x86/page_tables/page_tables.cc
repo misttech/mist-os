@@ -255,7 +255,7 @@ void X86PageTableBase::ConsistencyManager::Finish() {
     arch::DeviceMemoryBarrier();
   }
   pt_->TlbInvalidate(&tlb_);
-  if (pt_->IsRestricted()) {
+  if (pt_->IsRestricted() && pt_->referenced_pt_ != nullptr) {
     // TODO(https://fxbug.dev/132980): This TLB invalidation could be wrapped into the preceding
     // one so long as we built the target mask correctly.
     Guard<Mutex> a{AssertOrderedLock, &pt_->referenced_pt_->lock_,
@@ -395,15 +395,20 @@ zx_status_t X86PageTableBase::Init(void* ctx,
   return ZX_OK;
 }
 
+zx_status_t X86PageTableBase::InitRestricted(void* ctx, page_alloc_fn_t test_paf) {
+  role_ = PageTableRole::kRestricted;
+  return Init(ctx, test_paf);
+}
+
 // We disable analysis due to the write to |pages_| tripping it up.  It is safe
 // to write to |pages_| since this is part of object construction.
-zx_status_t X86PageTableBase::InitPrepopulated(
-    void* ctx, vaddr_t base, size_t size, page_alloc_fn_t test_paf) TA_NO_THREAD_SAFETY_ANALYSIS {
+zx_status_t X86PageTableBase::InitShared(void* ctx, vaddr_t base, size_t size,
+                                         page_alloc_fn_t test_paf) TA_NO_THREAD_SAFETY_ANALYSIS {
   zx_status_t status = Init(ctx, test_paf);
   if (status != ZX_OK) {
     return status;
   }
-  has_prepopulated_pml4_ = true;
+  role_ = PageTableRole::kShared;
 
   PageTableLevel top = top_level();
   const uint start = vaddr_to_index(top, base);
@@ -430,6 +435,8 @@ zx_status_t X86PageTableBase::InitUnified(void* ctx, X86PageTableBase* shared, v
                                           size_t shared_size, X86PageTableBase* restricted,
                                           vaddr_t restricted_base, size_t restricted_size,
                                           page_alloc_fn_t test_paf) {
+  DEBUG_ASSERT(restricted->IsRestricted());
+  DEBUG_ASSERT(shared->IsShared());
   // Validate that the shared and restricted page tables do not overlap and do not share a PML4
   // entry.
   PageTableLevel top = top_level();
@@ -449,22 +456,19 @@ zx_status_t X86PageTableBase::InitUnified(void* ctx, X86PageTableBase* shared, v
   if (status != ZX_OK) {
     return status;
   }
-  is_unified_ = true;
+  role_ = PageTableRole::kUnified;
 
   // Validate the restricted page table and set its metadata.
   {
     Guard<Mutex> a{AssertOrderedLock, &restricted->lock_, restricted->LockOrder()};
     DEBUG_ASSERT(restricted->virt_);
     DEBUG_ASSERT(restricted->referenced_pt_ == nullptr);
-    DEBUG_ASSERT(!restricted->is_shared_);
-    DEBUG_ASSERT(!restricted->is_restricted_);
 
     // Assert that there are no entries in the restricted page table.
     for (uint i = restricted_start; i < restricted_end; i++) {
       DEBUG_ASSERT(!IS_PAGE_PRESENT(restricted->virt_[i]));
     }
 
-    restricted->is_restricted_ = true;
     restricted->referenced_pt_ = this;
     restricted->num_references_++;
   }
@@ -473,9 +477,7 @@ zx_status_t X86PageTableBase::InitUnified(void* ctx, X86PageTableBase* shared, v
   {
     Guard<Mutex> a{AssertOrderedLock, &shared->lock_, shared->LockOrder()};
     DEBUG_ASSERT(shared->virt_);
-    DEBUG_ASSERT(shared->has_prepopulated_pml4_);
     DEBUG_ASSERT(shared->referenced_pt_ == nullptr);
-    DEBUG_ASSERT(!shared->is_restricted_);
 
     // Set up the PML4 so we capture any mappings created prior to creation of this unified page
     // table.
@@ -486,8 +488,6 @@ zx_status_t X86PageTableBase::InitUnified(void* ctx, X86PageTableBase* shared, v
         virt_[i] = curr_entry;
       }
     }
-
-    shared->is_shared_ = true;
     shared->num_references_++;
   }
 
@@ -515,8 +515,8 @@ void X86PageTableBase::UpdateEntry(ConsistencyManager* cm, PageTableLevel level,
     return;
   }
 
-  if (level == PageTableLevel::PML4_L && has_prepopulated_pml4_) {
-    // If this is a prepopulated page table, the only possible modification should be removal of
+  if (level == PageTableLevel::PML4_L && IsShared()) {
+    // If this is a shared page table, the only possible modification should be removal of
     // the accessed flag.
     DEBUG_ASSERT(olde == (newe | X86_MMU_PG_A));
   }
@@ -534,7 +534,7 @@ void X86PageTableBase::UnmapEntry(ConsistencyManager* cm, PageTableLevel level, 
                                   volatile pt_entry_t* pte, bool was_terminal) {
   DEBUG_ASSERT(pte);
   if (level == PageTableLevel::PML4_L) {
-    DEBUG_ASSERT(!has_prepopulated_pml4_);
+    DEBUG_ASSERT(!IsShared());
   }
 
   pt_entry_t olde = *pte;
@@ -769,9 +769,9 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
     // we unmapped anything in the lower level, check to see if that
     // level is now empty.
     bool unmap_page_table = page_aligned(level, unmap_vaddr) && unmap_size >= ps;
-    // If the PML4 was prepopulated, we cannot unmap it here as other page tables may be
+    // If the top level page is shared, we cannot unmap it here as other page tables may be
     // referencing its entries.
-    if (has_prepopulated_pml4_ && level == PageTableLevel::PML4_L) {
+    if (IsShared() && level == PageTableLevel::PML4_L) {
       unmap_page_table = false;
     } else if (!unmap_page_table && lower_unmapped) {
       unmap_page_table = page_table_is_clear(next_table);
@@ -782,7 +782,7 @@ zx::result<bool> X86PageTableBase::RemoveMapping(volatile pt_entry_t* table, Pag
               (uintptr_t)next_table, ptable_phys);
 
       vm_page_t* page = paddr_to_vm_page(ptable_phys);
-      if (level == PageTableLevel::PML4_L && IsRestricted()) {
+      if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
         Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
         pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
         DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
@@ -912,9 +912,9 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
     } else {
       // See if we need to create a new table.
       if (!IS_PAGE_PRESENT(pt_val)) {
-        // We should never need to do this in a prepopulated PML4.
+        // We should never need to do this in a shared PML4.
         if (level == PageTableLevel::PML4_L) {
-          DEBUG_ASSERT(!has_prepopulated_pml4_);
+          DEBUG_ASSERT(!IsShared());
         }
         volatile pt_entry_t* m = AllocatePageTable();
         if (m == nullptr) {
@@ -930,7 +930,7 @@ zx_status_t X86PageTableBase::AddMapping(volatile pt_entry_t* table, uint mmu_fl
 
         LTRACEF_LEVEL(2, "new table %p at level %d\n", m, static_cast<int>(level));
 
-        if (level == PageTableLevel::PML4_L && IsRestricted()) {
+        if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
           Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
           pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
           DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
@@ -1116,7 +1116,7 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
   bool unmapped = false;
   size_t ps = page_size(level);
   uint index = vaddr_to_index(level, cursor.vaddr());
-  bool always_recurse = level == PageTableLevel::PML4_L && (is_shared_ || is_restricted_);
+  bool always_recurse = level == PageTableLevel::PML4_L && (IsShared() || IsRestricted());
   for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
     volatile pt_entry_t* e = table + index;
     pt_entry_t pt_val = *e;
@@ -1178,9 +1178,9 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
     if (!unmap_page_table && lower_unmapped) {
       unmap_page_table = page_table_is_clear(next_table);
     }
-    // If the PML4 was prepopulated, we cannot unmap it here as other page tables may be
+    // If the top level page is shared, we cannot unmap it here as other page tables may be
     // referencing its entries.
-    if (has_prepopulated_pml4_ && level == PageTableLevel::PML4_L) {
+    if (IsShared() && level == PageTableLevel::PML4_L) {
       unmap_page_table = false;
     }
     if (unmap_page_table) {
@@ -1188,7 +1188,7 @@ bool X86PageTableBase::HarvestMapping(volatile pt_entry_t* table,
               (uintptr_t)next_table, ptable_phys);
 
       vm_page_t* page = paddr_to_vm_page(ptable_phys);
-      if (level == PageTableLevel::PML4_L && IsRestricted()) {
+      if (level == PageTableLevel::PML4_L && IsRestricted() && referenced_pt_ != nullptr) {
         Guard<Mutex> a{AssertOrderedLock, &referenced_pt_->lock_, referenced_pt_->LockOrder()};
         pt_entry_t* referenced_entry = (pt_entry_t*)referenced_pt_->virt() + index;
         DEBUG_ASSERT(check_equal_ignore_flags(*referenced_entry, *e));
@@ -1488,7 +1488,7 @@ void X86PageTableBase::Destroy(vaddr_t base, size_t size) {
   if (IsUnified()) {
     return DestroyUnified();
   }
-  return DestroyIndependent(base, size);
+  return DestroyIndividual(base, size);
 }
 
 void X86PageTableBase::DestroyUnified() {
@@ -1517,9 +1517,6 @@ void X86PageTableBase::DestroyUnified() {
     // referenced by many other unified page tables.
     DEBUG_ASSERT(shared->num_references_ > 0);
     shared->num_references_--;
-    if (shared->num_references_ == 0) {
-      shared->is_shared_ = false;
-    }
   }
   {
     Guard<Mutex> a{AssertOrderedLock, &restricted->lock_, restricted->LockOrder()};
@@ -1528,14 +1525,13 @@ void X86PageTableBase::DestroyUnified() {
 
     restricted->num_references_--;
     restricted->referenced_pt_ = nullptr;
-    restricted->is_restricted_ = false;
   }
 
   Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
   FreeTopLevelPage();
 }
 
-void X86PageTableBase::DestroyIndependent(vaddr_t base, size_t size) {
+void X86PageTableBase::DestroyIndividual(vaddr_t base, size_t size) {
   DEBUG_ASSERT(!IsUnified());
 
   // This lock should be uncontended since Destroy is not supposed to be called in parallel with
@@ -1543,10 +1539,10 @@ void X86PageTableBase::DestroyIndependent(vaddr_t base, size_t size) {
   Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
   DEBUG_ASSERT(num_references_ == 0);
 
-  // If this page table has a prepopulated PML4, we need to manually clean up the entries we
-  // created in InitPrepopulated. We know for sure that these entries are no longer referenced by
+  // If this page table has a shared top level page, we need to manually clean up the entries we
+  // created in InitShared. We know for sure that these entries are no longer referenced by
   // other page tables because we expect those page tables to have been destroyed before this one.
-  if (has_prepopulated_pml4_) {
+  if (IsShared()) {
     DEBUG_ASSERT(virt_ != nullptr);
 
     PageTableLevel top = top_level();
@@ -1583,8 +1579,8 @@ void X86PageTableBase::DestroyIndependent(vaddr_t base, size_t size) {
       for (uint i = start; i < end; ++i) {
         DEBUG_ASSERT_MSG(!IS_PAGE_PRESENT(table[i]),
                          "Destroy() called on page table with entry 0x%" PRIx64
-                         " still present at index %u; aspace size: %zu, prepopulated_pml4_: %d\n",
-                         table[i], i, size, has_prepopulated_pml4_);
+                         " still present at index %u; aspace size: %zu, is_shared_: %d\n",
+                         table[i], i, size, IsShared());
       }
     }
   }

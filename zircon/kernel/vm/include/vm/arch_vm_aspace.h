@@ -49,13 +49,30 @@ class ArchVmAspaceInterface {
   // page tables.
   using page_alloc_fn_t = zx_status_t (*)(uint alloc_flags, vm_page** p, paddr_t* pa);
 
-  // This method initializes an empty ArchVmAspace.
+  // The Init* methods are used to initialize the ArchVmAspace. The method that should be used is
+  // dependent on the type of address space being created.
+  //
+  // `Init`: This is used to create a regular address space with no special features. In
+  //    architectures that do not support unified address spaces, it is also used to create shared
+  //    and restricted address spaces. However, when unified address spaces are supported, the
+  //    shared and restricted address spaces should be created with `InitShared` and
+  //    `InitRestricted`.
+  //
+  // `InitShared`: This is used to create a shared address space, whose contents can be
+  //    accessed from multiple unified address spaces. These address spaces have a statically
+  //    initialized top level page.
+  //
+  // `InitRestricted`: This is used to create a restricted address space, whose contents can be
+  //    accessed from a single unified address space.
+  //
+  // `InitUnified`: This is used to create a unified address space. This type of address space
+  //    owns no mappings of its own; rather, it is composed of a shared address space and a
+  //    restricted address space. As a result, it expects `InitShared` to have been called
+  //    on the shared address space, and expects `InitRestricted` to have been called on the
+  //    restricted address space.
   virtual zx_status_t Init() = 0;
-
-  // This method initializes an ArchVmAspace just like Init, but also prepopulates the top level
-  // page table. Either Init, InitPrepopulated, or InitUnified can be called to set up an
-  // ArchVmAspace, but not both.
-  virtual zx_status_t InitPrepopulated() = 0;
+  virtual zx_status_t InitShared() = 0;
+  virtual zx_status_t InitRestricted() = 0;
   virtual zx_status_t InitUnified(ArchVmAspaceInterface& shared,
                                   ArchVmAspaceInterface& restricted) = 0;
 
@@ -74,7 +91,7 @@ class ArchVmAspaceInterface {
   // cleanup at the higher layers. Note that this does not apply to unified aspaces, which may
   // still contain some mappings when Destroy() is called.
   //
-  // It is safe to call Destroy even if Init, InitPrepopulated, or InitUnified failed.
+  // It is safe to call Destroy even if Init, InitShared, InitRestricted, or InitUnified failed.
   // Once destroy has been called it is a user error to call any of the other methods on the aspace,
   // unless specifically stated otherwise, and doing so may cause a panic.
   virtual zx_status_t Destroy() = 0;

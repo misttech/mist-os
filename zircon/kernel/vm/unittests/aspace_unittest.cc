@@ -489,7 +489,7 @@ static bool vmaspace_unified_accessed_test() {
   constexpr vaddr_t kSharedAspaceSize = USER_ASPACE_BASE + USER_ASPACE_SIZE - kSharedAspaceBase;
   fbl::RefPtr<VmAspace> restricted_aspace =
       VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User,
-                       "test restricted aspace", VmAspace::ShareOpt::None);
+                       "test restricted aspace", VmAspace::ShareOpt::Restricted);
   fbl::RefPtr<VmAspace> shared_aspace =
       VmAspace::Create(kSharedAspaceBase, kSharedAspaceSize, VmAspace::Type::User,
                        "test shared aspace", VmAspace::ShareOpt::Shared);

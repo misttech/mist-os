@@ -58,14 +58,18 @@ class VmAspace : public fbl::DoublyLinkedListable<VmAspace*>, public fbl::RefCou
   // The returned aspace will start at |base| and span |size|.
   //
   // If |share_opt| is ShareOpt::Shared, we're creating a shared address space, and the underlying
-  // ArchVmAspace will be initialized using the `InitPrepopulated` method instead of the normal
+  // ArchVmAspace will be initialized using the `InitShared` method instead of the normal
   // `Init` method.
+  //
+  // If |share_opt| is ShareOpt::Restricted, we're creating a restricted address space, and the
+  // underlying ArchVmAspace will be initialized using the `InitRestricted` method.
   //
   // Although reference counted, the returned VmAspace must be explicitly destroyed via Destroy.
   //
   // Returns null on failure (e.g. due to resource starvation).
   enum class ShareOpt {
     None,
+    Restricted,
     Shared,
   };
   static fbl::RefPtr<VmAspace> Create(vaddr_t base, size_t size, Type type, const char* name,

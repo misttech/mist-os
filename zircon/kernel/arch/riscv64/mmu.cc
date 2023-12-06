@@ -1384,8 +1384,8 @@ zx_status_t Riscv64ArchVmAspace::Init() {
   return ZX_OK;
 }
 
-zx_status_t Riscv64ArchVmAspace::InitPrepopulated() { return ZX_ERR_NOT_SUPPORTED; }
-
+zx_status_t Riscv64ArchVmAspace::InitShared() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t Riscv64ArchVmAspace::InitRestricted() { return ZX_ERR_NOT_SUPPORTED; }
 zx_status_t Riscv64ArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
                                              ArchVmAspaceInterface& restricted) {
   return ZX_ERR_NOT_SUPPORTED;

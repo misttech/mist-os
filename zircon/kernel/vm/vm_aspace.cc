@@ -149,7 +149,9 @@ zx_status_t VmAspace::Init(ShareOpt share_opt) {
   // initialize the architecturally specific part
   zx_status_t status;
   if (share_opt == ShareOpt::Shared) {
-    status = arch_aspace_.InitPrepopulated();
+    status = arch_aspace_.InitShared();
+  } else if (share_opt == ShareOpt::Restricted) {
+    status = arch_aspace_.InitRestricted();
   } else {
     status = arch_aspace_.Init();
   }

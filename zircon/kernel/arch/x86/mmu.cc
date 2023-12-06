@@ -704,9 +704,9 @@ zx_status_t X86ArchVmAspace::Init() {
   return ZX_OK;
 }
 
-zx_status_t X86ArchVmAspace::InitPrepopulated() {
+zx_status_t X86ArchVmAspace::InitRestricted() {
   canary_.Assert();
-  // Prepopulated ArchVmAspaces are only allowed with user address spaces.
+  // Restricted ArchVmAspaces are only allowed with user address spaces.
   DEBUG_ASSERT(flags_ == 0);
 
   X86PageTableMmu* mmu = new (&page_table_storage_.mmu) X86PageTableMmu();
@@ -719,7 +719,7 @@ zx_status_t X86ArchVmAspace::InitPrepopulated() {
     }
   }
 
-  zx_status_t status = mmu->InitPrepopulated(this, base_, size_, test_page_alloc_func_);
+  zx_status_t status = mmu->InitRestricted(this, test_page_alloc_func_);
   if (status != ZX_OK) {
     return status;
   }
@@ -729,8 +729,38 @@ zx_status_t X86ArchVmAspace::InitPrepopulated() {
     return status;
   }
 
-  LTRACEF("user aspace: pt phys %#" PRIxPTR ", virt %p, pcid %#hx\n", pt_->phys(), pt_->virt(),
-          pcid_);
+  LTRACEF("user restricted aspace: pt phys %#" PRIxPTR ", virt %p, pcid %#hx\n", pt_->phys(),
+          pt_->virt(), pcid_);
+  return ZX_OK;
+}
+
+zx_status_t X86ArchVmAspace::InitShared() {
+  canary_.Assert();
+  // Shared ArchVmAspaces are only allowed with user address spaces.
+  DEBUG_ASSERT(flags_ == 0);
+
+  X86PageTableMmu* mmu = new (&page_table_storage_.mmu) X86PageTableMmu();
+  pt_ = mmu;
+
+  if (g_x86_feature_pcid_enabled) {
+    zx_status_t status = AllocatePCID();
+    if (status != ZX_OK) {
+      return status;
+    }
+  }
+
+  zx_status_t status = mmu->InitShared(this, base_, size_, test_page_alloc_func_);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  status = mmu->AliasKernelMappings();
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  LTRACEF("user shared aspace: pt phys %#" PRIxPTR ", virt %p, pcid %#hx\n", pt_->phys(),
+          pt_->virt(), pcid_);
   return ZX_OK;
 }
 

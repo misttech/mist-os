@@ -27,6 +27,14 @@ enum class PageTableLevel {
   PML4_L = 3,
 };
 
+// Different roles a page table can fulfill when running with unified aspaces.
+enum class PageTableRole : uint8_t {
+  kIndependent,
+  kRestricted,
+  kShared,
+  kUnified,
+};
+
 // Structure for tracking an upcoming TLB invalidation
 struct PendingTlbInvalidation {
   struct Item {
@@ -91,23 +99,25 @@ class X86PageTableBase {
   using EnlargeOperation = ArchVmAspaceInterface::EnlargeOperation;
 
   // Returns whether this page table is restricted.
-  bool IsRestricted() const TA_REQ(lock_) { return is_restricted_; }
+  // We do so by verifying that it was created with `InitRestricted` and has been linked to a
+  // unified page table.
+  bool IsRestricted() const { return role_ == PageTableRole::kRestricted; }
 
   // Returns whether this page table is shared.
-  bool IsShared() const TA_REQ(lock_) { return is_shared_; }
+  bool IsShared() const { return role_ == PageTableRole::kShared; }
 
   // Returns whether this page table is unified.
-  bool IsUnified() const { return is_unified_; }
+  bool IsUnified() const { return role_ == PageTableRole::kUnified; }
 
   // Accessors for the shared and restricted page tables on a unified page table.
   // We can turn off thread safety analysis as these accessors should only be used on unified page
   // tables, for which both the shared and restricted page table pointers are notionally const.
   X86PageTableBase* get_shared_pt() TA_NO_THREAD_SAFETY_ANALYSIS {
-    DEBUG_ASSERT(is_unified_);
+    DEBUG_ASSERT(IsUnified());
     return shared_pt_;
   }
   X86PageTableBase* get_restricted_pt() TA_NO_THREAD_SAFETY_ANALYSIS {
-    DEBUG_ASSERT(is_unified_);
+    DEBUG_ASSERT(IsUnified());
     return referenced_pt_;
   }
 
@@ -129,30 +139,30 @@ class X86PageTableBase {
   // Returns 1 for unified page tables and 0 for all other page tables. This establishes an
   // ordering that is used when the lock_ is acquired. The restricted page table lock is acquired
   // first, and the unified page table lock is acquired afterwards.
-  uint32_t LockOrder() const { return is_unified_ ? 1 : 0; }
+  uint32_t LockOrder() const { return IsUnified() ? 1 : 0; }
 
  protected:
   using page_alloc_fn_t = ArchVmAspaceInterface::page_alloc_fn_t;
 
   // Initialize an empty page table, assigning this given context to it.
   zx_status_t Init(void* ctx, page_alloc_fn_t test_paf = nullptr);
+  // Initialize an empty page table and mark it as restricted.
+  zx_status_t InitRestricted(void* ctx, page_alloc_fn_t test_paf = nullptr);
   // Initialize a page table, assign the given context, and prepopulate the top level page table
   // entries.
-  zx_status_t InitPrepopulated(void* ctx, vaddr_t base, size_t size,
-                               page_alloc_fn_t test_paf = nullptr);
+  zx_status_t InitShared(void* ctx, vaddr_t base, size_t size, page_alloc_fn_t test_paf = nullptr);
   // Initialize a page table, assign the given context, and set it up as a unified page table with
   // entries from the given page tables.
   //
   // The shared and restricted page tables must satisfy the following requirements:
-  // 1) The shared page table must set |has_prepopulated_pml4_| to true.
-  // 2) Both the shared and restricted page tables must have been initialized prior to this call.
-  // 3) The shared page table may not have |is_restricted_| set to true.
-  // 4) The restricted page table may not have either |is_restricted_| or |is_shared_| set to true.
+  // 1) The shared page table must set only |is_shared_| to true.
+  // 2) The restricted page table must set only |is_restricted_| to true.
+  // 3) Both the shared and restricted page tables must have been initialized prior to this call.
   zx_status_t InitUnified(void* ctx, X86PageTableBase* shared, vaddr_t shared_base,
                           size_t shared_size, X86PageTableBase* restricted, vaddr_t restricted_base,
                           size_t restricted_size, page_alloc_fn_t test_paf = nullptr);
 
-  // Calls DestroyUnified if this is a unified page table and DestroyIndependent if it is not.
+  // Calls DestroyUnified if this is a unified page table and DestroyIndividual if it is not.
   void Destroy(vaddr_t base, size_t size);
 
   // Returns the highest level of the page tables
@@ -245,7 +255,7 @@ class X86PageTableBase {
 
   // Release the resources associated with this page table.  |base| and |size|
   // are only used for debug checks that the page tables have no more mappings.
-  void DestroyIndependent(vaddr_t base, size_t size);
+  void DestroyIndividual(vaddr_t base, size_t size);
 
   // Releases the resources exclusively owned by this unified page table, and update the relevant
   // metadata on the associated restricted and shared page tables.
@@ -264,17 +274,9 @@ class X86PageTableBase {
   // restricted page tables, so we must hold the lock_ when doing so.
   uint32_t num_references_ TA_GUARDED(lock_) = 0;
 
-  // This is true if this page table has a prepopulated top level page table.
-  // It should set be once by InitPrepopulated and then never modified.
-  bool has_prepopulated_pml4_ = false;
-
-  // This is only set by InitUnified and should not be modified anywhere else.
-  bool is_unified_ = false;
-
-  // These values are set by InitUnified on the shared and restricted address spaces provided to
-  // that function. Since they are modified by another page table, they must be guarded by lock_.
-  bool is_shared_ TA_GUARDED(lock_) = false;
-  bool is_restricted_ TA_GUARDED(lock_) = false;
+  // The role this page table plays in unified aspaces, if any. This should only be set by the
+  // Init* functions, and should not be modified anywhere else.
+  PageTableRole role_ = PageTableRole::kIndependent;
 
   // A reference to another page table that shares entries with this one.
   // If is_restricted_ is set to true, this references the associated unified page table.

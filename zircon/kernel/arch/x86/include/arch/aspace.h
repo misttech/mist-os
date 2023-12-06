@@ -28,7 +28,8 @@ class X86PageTableMmu final : public X86PageTableBase {
  public:
   using X86PageTableBase::Destroy;
   using X86PageTableBase::Init;
-  using X86PageTableBase::InitPrepopulated;
+  using X86PageTableBase::InitRestricted;
+  using X86PageTableBase::InitShared;
   using X86PageTableBase::InitUnified;
 
   // Initialize the kernel page table, assigning the given context to it.
@@ -90,7 +91,8 @@ class X86ArchVmAspace final : public ArchVmAspaceInterface {
   using ArchVmAspaceInterface::page_alloc_fn_t;
 
   zx_status_t Init() override;
-  zx_status_t InitPrepopulated() override;
+  zx_status_t InitRestricted() override;
+  zx_status_t InitShared() override;
   zx_status_t InitUnified(ArchVmAspaceInterface& shared,
                           ArchVmAspaceInterface& restricted) override;
 

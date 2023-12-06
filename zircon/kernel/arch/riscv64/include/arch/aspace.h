@@ -32,7 +32,8 @@ class Riscv64ArchVmAspace final : public ArchVmAspaceInterface {
   using ArchVmAspaceInterface::page_alloc_fn_t;
 
   zx_status_t Init() override;
-  zx_status_t InitPrepopulated() override;
+  zx_status_t InitShared() override;
+  zx_status_t InitRestricted() override;
   zx_status_t InitUnified(ArchVmAspaceInterface& shared,
                           ArchVmAspaceInterface& restricted) override;
 

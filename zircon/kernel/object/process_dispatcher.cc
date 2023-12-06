@@ -297,7 +297,6 @@ zx_status_t ProcessDispatcher::Initialize(SharedAspaceType type) {
     snprintf(aspace_name, sizeof(aspace_name), "proc:%" PRIu64, get_koid());
     const VmAspace::ShareOpt share_opt =
         kUseUnifiedAspace ? VmAspace::ShareOpt::Shared : VmAspace::ShareOpt::None;
-    ;
     if (!shareable_state_->Initialize(kSharedAspaceBase, kSharedAspaceSize, aspace_name,
                                       share_opt)) {
       return ZX_ERR_NO_MEMORY;
@@ -305,9 +304,10 @@ zx_status_t ProcessDispatcher::Initialize(SharedAspaceType type) {
   } else if (type == SharedAspaceType::Shared) {
     // Create the restricted address space.
     snprintf(aspace_name, sizeof(aspace_name), "proc(restricted):%" PRIu64, get_koid());
-    restricted_aspace_ =
-        VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize, VmAspace::Type::User, aspace_name,
-                         VmAspace::ShareOpt::None);
+    const VmAspace::ShareOpt share_opt =
+        kUseUnifiedAspace ? VmAspace::ShareOpt::Restricted : VmAspace::ShareOpt::None;
+    restricted_aspace_ = VmAspace::Create(kPrivateAspaceBase, kPrivateAspaceSize,
+                                          VmAspace::Type::User, aspace_name, share_opt);
     if (!restricted_aspace_) {
       return ZX_ERR_NO_MEMORY;
     }

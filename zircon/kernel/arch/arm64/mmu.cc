@@ -1772,8 +1772,8 @@ zx_status_t ArmArchVmAspace::Init() {
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::InitPrepopulated() { return ZX_ERR_NOT_SUPPORTED; }
-
+zx_status_t ArmArchVmAspace::InitShared() { return ZX_ERR_NOT_SUPPORTED; }
+zx_status_t ArmArchVmAspace::InitRestricted() { return ZX_ERR_NOT_SUPPORTED; }
 zx_status_t ArmArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
                                          ArchVmAspaceInterface& restricted) {
   return ZX_ERR_NOT_SUPPORTED;
