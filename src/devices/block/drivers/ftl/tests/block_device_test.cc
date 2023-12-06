@@ -231,10 +231,11 @@ TEST(BlockDeviceTest, Query) {
   size_t operation_size;
   device.BlockImplQuery(&info, &operation_size);
 
-  constexpr block_info_t kInfo = {
-      kNumPages, kPageSize, fuchsia_hardware_block::wire::kMaxTransferUnbounded, FLAG_TRIM_SUPPORT};
+  ASSERT_EQ(info.block_count, kNumPages);
+  ASSERT_EQ(info.block_size, kPageSize);
+  ASSERT_EQ(info.max_transfer_size, fuchsia_hardware_block::wire::kMaxTransferUnbounded);
+  ASSERT_EQ(info.flags, FLAG_TRIM_SUPPORT);
 
-  ASSERT_BYTES_EQ(&info, &kInfo, sizeof(info));
   ASSERT_GT(operation_size, sizeof(block_op_t));
 }
 
