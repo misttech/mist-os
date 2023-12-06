@@ -2210,7 +2210,7 @@ pub(crate) fn confirm_reachable<I, D, SC, C>(
         |NudState { neighbors, last_gc: _ }, sync_ctx| {
             match neighbors.entry(neighbor) {
                 Entry::Vacant(_) => {
-                    tracing::error!(
+                    tracing::debug!(
                         "got an upper-layer confirmation for non-existent neighbor entry {}",
                         neighbor
                     );
