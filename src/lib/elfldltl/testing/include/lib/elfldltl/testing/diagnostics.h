@@ -46,7 +46,7 @@ class ExpectedSingleError {
   template <typename T>
   using expected_t = typename ExpectedType<T>::type;
 
-  ExpectedSingleError(const ExpectedSingleError& other) : expected_(other.expected) {}
+  ExpectedSingleError(const ExpectedSingleError& other) : expected_(other.expected_) {}
 
   explicit ExpectedSingleError(Args... args) : expected_(std::move(args)...) {}
 
@@ -112,6 +112,7 @@ class ExpectedSingleError {
   elfldltl::Diagnostics<std::reference_wrapper<ExpectedSingleError>> diag_{*this, kFlags};
 };
 
+// Deduction guide.
 template <typename... Args>
 ExpectedSingleError(Args...)
     -> ExpectedSingleError<ExpectedSingleError<>::expected_t<std::decay_t<Args>>...>;
@@ -129,6 +130,51 @@ constexpr auto ExpectOkDiagnostics() {
   };
   return elfldltl::Diagnostics(fail, elfldltl::DiagnosticsFlags{.extra_checking = true});
 }
+
+template <class... ExpectedErrors>
+class ExpectedErrorList {
+ public:
+  constexpr explicit ExpectedErrorList(ExpectedErrors... errors) : errors_{std::move(errors)...} {}
+
+  auto& diag() { return diag_; }
+
+  template <typename... Args>
+  bool operator()(Args&&... args) {
+    EXPECT_LT(next_, kCount) << "too many errors";
+    if (next_ < kCount) {
+      ExpectError(kSeq, next_++, std::forward<Args>(args)...);
+    } else {
+      ExpectOkDiagnostics().FormatError(std::forward<Args>(args)...);
+    }
+    return true;
+  }
+
+  ~ExpectedErrorList() { EXPECT_EQ(next_, kCount) << "fewer errors than expected"; }
+
+ private:
+  static constexpr size_t kCount = sizeof...(ExpectedErrors);
+  static constexpr auto kSeq = std::make_index_sequence<kCount>();
+
+  // Diagnostic flags for signaling as much information as possible.
+  static constexpr elfldltl::DiagnosticsFlags kFlags = {
+      .multiple_errors = true,
+      .warnings_are_errors = false,
+      .extra_checking = true,
+  };
+
+  template <size_t... I, class... Args>
+  bool ExpectError(std::index_sequence<I...> seq, size_t idx, Args&&... args) const {
+    return ((idx == I && std::get<I>(errors_)(std::forward<Args>(args)...)) || ...);
+  }
+
+  std::tuple<ExpectedErrors...> errors_;
+  size_t next_ = 0;
+  elfldltl::Diagnostics<std::reference_wrapper<ExpectedErrorList>> diag_{*this, kFlags};
+};
+
+// Deduction guide.
+template <class... ExpectedErrors>
+ExpectedErrorList(ExpectedErrors&&...) -> ExpectedErrorList<std::decay_t<ExpectedErrors>...>;
 
 }  // namespace elfldltl::testing
 

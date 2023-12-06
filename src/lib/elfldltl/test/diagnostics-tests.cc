@@ -19,6 +19,7 @@
 
 namespace {
 
+using elfldltl::testing::ExpectedErrorList;
 using elfldltl::testing::ExpectedSingleError;
 
 TEST(ElfldltlDiagnosticsTests, PrintfDiagnosticsReport) {
@@ -206,17 +207,25 @@ TEST(ElfldltlDiagnosticsTests, ResourceLimit) {
   }
 }
 
-TEST(ElfldltlDiagnosticsTests, SystemError) {
-  {
-    ExpectedSingleError expected("error", elfldltl::PosixError{EPERM});
-    expected.diag().SystemError("error", elfldltl::PosixError{EPERM});
-  }
+TEST(ElfldltlDiagnosticsTests,
+     SystemError){{ExpectedSingleError expected("error", elfldltl::PosixError{EPERM});
+expected.diag().SystemError("error", elfldltl::PosixError{EPERM});
+}
 #ifdef __Fuchsia__
-  {
-    ExpectedSingleError expected("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
-    expected.diag().SystemError("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
-  }
+{
+  ExpectedSingleError expected("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
+  expected.diag().SystemError("error", elfldltl::ZirconError{ZX_ERR_NOT_SUPPORTED});
+}
 #endif
+}
+
+TEST(ElfldltlDiagnosticsTests, ExpectedErrorList) {
+  ExpectedErrorList expected{
+      ExpectedSingleError{"abc ", 123},
+      ExpectedSingleError{"def ", 456},
+  };
+  expected.diag().FormatError("abc ", 123);
+  expected.diag().FormatError("def ", 456);
 }
 
 }  // namespace
