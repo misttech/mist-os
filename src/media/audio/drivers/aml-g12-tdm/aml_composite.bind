@@ -32,3 +32,7 @@ optional node "clock-pll" {
 optional node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }
+
+optional node "clock-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.clock.BIND_INIT_STEP.CLOCK;
+}

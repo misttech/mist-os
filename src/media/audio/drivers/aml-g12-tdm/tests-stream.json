@@ -91,5 +91,17 @@
                 }
             }
         ]
+    },
+    {
+        "node": "clock-init",
+        "tests": [
+            {
+                "name": "Match",
+                "expected": "match",
+                "device": {
+                    "fuchsia.BIND_INIT_STEP": "fuchsia.clock.BIND_INIT_STEP.CLOCK"
+                }
+            }
+        ]
     }
 ]

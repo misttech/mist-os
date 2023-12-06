@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -141,7 +142,7 @@ zx_status_t Sherlock::AudioInit() {
   constexpr size_t device_name_max_length = 32;
 
   std::vector<fdf::ParentSpec> sherlock_tdm_i2s_parents;
-  sherlock_tdm_i2s_parents.reserve(5);
+  sherlock_tdm_i2s_parents.reserve(6);
 
   const auto gpio_init_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
@@ -149,11 +150,21 @@ zx_status_t Sherlock::AudioInit() {
   const auto gpio_init_props = std::vector{
       fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
-  const auto gpio_init_parent = std::vector{
-      fdf::ParentSpec{{gpio_init_rules, gpio_init_props}},
+
+  const auto clock_init_rules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+  };
+  const auto clock_init_props = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
   };
 
-  sherlock_tdm_i2s_parents.push_back(gpio_init_parent[0]);
+  const auto init_parents = std::vector{
+      fdf::ParentSpec{{gpio_init_rules, gpio_init_props}},
+      fdf::ParentSpec{{clock_init_rules, clock_init_props}},
+  };
+
+  sherlock_tdm_i2s_parents.insert(sherlock_tdm_i2s_parents.end(), init_parents.begin(),
+                                  init_parents.end());
 
   // Add a spec for the enable audio GPIO pin.
   auto enable_audio_gpio_rules = std::vector{
@@ -416,7 +427,7 @@ zx_status_t Sherlock::AudioInit() {
     {
       auto tdm_spec = fdf::CompositeNodeSpec{{
           "aml_tdm_dai_out",
-          gpio_init_parent,
+          init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                               fidl::ToWire(fidl_arena, tdm_spec));
@@ -485,7 +496,7 @@ zx_status_t Sherlock::AudioInit() {
     {
       auto pdm_spec = fdf::CompositeNodeSpec{{
           "aml_pdm",
-          gpio_init_parent,
+          init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
                                                               fidl::ToWire(fidl_arena, pdm_spec));
@@ -553,7 +564,7 @@ zx_status_t Sherlock::AudioInit() {
     {
       auto tdm_spec = fdf::CompositeNodeSpec{{
           "aml_tdm_dai_in",
-          gpio_init_parent,
+          init_parents,
       }};
       auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                               fidl::ToWire(fidl_arena, tdm_spec));

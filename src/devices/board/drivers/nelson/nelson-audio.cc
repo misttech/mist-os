@@ -13,6 +13,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -51,6 +52,13 @@ const std::vector<fdf::NodeProperty> kGpioInitProps = std::vector{
     fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
+const std::vector<fdf::BindRule> kClockInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+const std::vector<fdf::NodeProperty> kClockInitProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+
 const std::vector<fdf::BindRule> kAudioEnableGpioRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -76,12 +84,14 @@ const std::vector<fdf::NodeProperty> kOutCodecProps = std::vector{
 
 const std::vector<fdf::ParentSpec> kOutControllerParents = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+    fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
     fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
     fdf::ParentSpec{{kOutCodecRules, kOutCodecProps}},
 };
 
-const std::vector<fdf::ParentSpec> kParentSpecGpioInit = std::vector{
+const std::vector<fdf::ParentSpec> kParentSpecInit = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+    fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
 };
 
 // Codec composite node specifications.
@@ -395,7 +405,7 @@ zx_status_t Nelson::AudioInit() {
 
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_out",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                             fidl::ToWire(fidl_arena, tdm_spec));
@@ -459,7 +469,7 @@ zx_status_t Nelson::AudioInit() {
 
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_in",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, tdm_dev),
                                                             fidl::ToWire(fidl_arena, tdm_spec));
@@ -506,7 +516,7 @@ zx_status_t Nelson::AudioInit() {
 
     auto pdm_spec = fdf::CompositeNodeSpec{{
         "aml_pdm",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, dev_in),
                                                             fidl::ToWire(fidl_arena, pdm_spec));

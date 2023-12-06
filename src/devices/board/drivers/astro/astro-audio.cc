@@ -13,6 +13,7 @@
 #include <lib/driver/component/cpp/node_add_args.h>
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
+#include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/codec/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/gpio/cpp/bind.h>
@@ -80,6 +81,13 @@ const std::vector<fdf::NodeProperty> kGpioInitProps{
     fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
 };
 
+const std::vector<fdf::BindRule> kClockInitRules = std::vector{
+    fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+const std::vector<fdf::NodeProperty> kClockInitProps = std::vector{
+    fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+};
+
 const std::vector<fdf::BindRule> kAudioEnableGpioRules{
     fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                             bind_fuchsia_gpio::BIND_FIDL_PROTOCOL_SERVICE),
@@ -129,12 +137,14 @@ const std::vector<fdf::NodeProperty> kFaultGpioProps{
 
 const std::vector<fdf::ParentSpec> kTdmI2sSpec = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+    fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
     fdf::ParentSpec{{kAudioEnableGpioRules, kAudioEnableGpioProps}},
     fdf::ParentSpec{{kCodecRules, kCodecProps}},
 };
 
-const std::vector<fdf::ParentSpec> kParentSpecGpioInit = std::vector{
+const std::vector<fdf::ParentSpec> kParentSpecInit = std::vector{
     fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+    fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
 };
 
 zx_status_t Astro::AudioInit() {
@@ -240,7 +250,7 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_OUT;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_out",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, tdm_dev),
                                                             fidl::ToWire(arena, tdm_spec));
@@ -421,7 +431,7 @@ zx_status_t Astro::AudioInit() {
     tdm_dev.did() = PDEV_DID_AMLOGIC_DAI_IN;
     auto tdm_spec = fdf::CompositeNodeSpec{{
         "aml_tdm_dai_in",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, tdm_dev),
                                                             fidl::ToWire(arena, tdm_spec));
@@ -485,7 +495,7 @@ zx_status_t Astro::AudioInit() {
 
     auto pdm_spec = fdf::CompositeNodeSpec{{
         "aml_pdm",
-        kParentSpecGpioInit,
+        kParentSpecInit,
     }};
     auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(arena, dev_in),
                                                             fidl::ToWire(arena, pdm_spec));

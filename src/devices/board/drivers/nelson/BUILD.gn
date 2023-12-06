@@ -207,6 +207,7 @@ fuchsia_driver("nelson-module-driver") {
     "//src/devices/bind/fuchsia.amlogic.platform.s905d3:fuchsia.amlogic.platform.s905d3_cpp",
     "//src/devices/bind/fuchsia.ams.platform:fuchsia.ams.platform_cpp",
     "//src/devices/bind/fuchsia.arm.platform:fuchsia.arm.platform_cpp",
+    "//src/devices/bind/fuchsia.clock:fuchsia.clock_cpp",
     "//src/devices/bind/fuchsia.codec:fuchsia.codec_cpp",
     "//src/devices/bind/fuchsia.display.dsi:fuchsia.display.dsi_cpp",
     "//src/devices/bind/fuchsia.goodix.platform:fuchsia.goodix.platform_cpp",

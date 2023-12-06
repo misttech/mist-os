@@ -58,3 +58,7 @@ optional node "codec-03" {
   fuchsia.BIND_FIDL_PROTOCOL == fuchsia.codec.BIND_FIDL_PROTOCOL.SERVICE;
   fuchsia.BIND_CODEC_INSTANCE == 3;
 }
+
+node "clock-init" {
+  fuchsia.BIND_INIT_STEP == fuchsia.clock.BIND_INIT_STEP.CLOCK;
+}

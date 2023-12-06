@@ -94,6 +94,13 @@ zx_status_t Vim3::AudioInit() {
       fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_gpio::BIND_INIT_STEP_GPIO),
   };
 
+  const std::vector<fdf::BindRule> kClockInitRules = std::vector{
+      fdf::MakeAcceptBindRule(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+  };
+  const std::vector<fdf::NodeProperty> kClockInitProps = std::vector{
+      fdf::MakeProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
+  };
+
   const std::vector<fdf::BindRule> kClkBindRules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia::FIDL_PROTOCOL,
                               bind_fuchsia_clock::BIND_FIDL_PROTOCOL_SERVICE),
@@ -119,6 +126,7 @@ zx_status_t Vim3::AudioInit() {
 
   std::vector<fdf::ParentSpec> kControllerParents = std::vector{
       fdf::ParentSpec{{kGpioInitRules, kGpioInitProps}},
+      fdf::ParentSpec{{kClockInitRules, kClockInitProps}},
       fdf::ParentSpec{{kClkBindRules, kClkProperties}},
       fdf::ParentSpec{{kHifiPllBindRules, kHifiPllProperties}},
   };
