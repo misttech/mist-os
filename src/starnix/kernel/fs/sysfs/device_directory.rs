@@ -237,7 +237,7 @@ impl FileOps for ReadAheadKbFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let updated = data.read_all()?;
-        not_implemented!("updating read_ahead_kb to {}", String::from_utf8_lossy(&updated));
+        not_implemented!("updating read_ahead_kb");
         Ok(updated.len())
     }
 }

@@ -16,7 +16,7 @@ use crate::{
 use derivative::Derivative;
 use selinux::security_server::SecurityServer;
 use starnix_lock::Mutex;
-use starnix_logging::not_implemented;
+use starnix_logging::{log_debug, not_implemented};
 use starnix_uapi::{
     device_type::DeviceType,
     errno, error,
@@ -167,7 +167,7 @@ struct SeLoad {
 
 impl BytesFileOps for SeLoad {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!("got selinux policy, length {}, ignoring", data.len());
+        not_implemented!("ignoring selinux policy");
         self.security_server.load_policy(data).map_err(|_| errno!(EINVAL))
     }
 }
@@ -228,8 +228,8 @@ impl BytesFileOps for SeCreate {
 struct SeCheckReqProt;
 impl BytesFileOps for SeCheckReqProt {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        let checkreqprot = parse_unsigned_file::<u32>(&data)?;
-        not_implemented!("selinux checkreqprot: {}", checkreqprot);
+        let _checkreqprot = parse_unsigned_file::<u32>(&data)?;
+        not_implemented!("selinux checkreqprot");
         Ok(())
     }
 }
@@ -237,7 +237,8 @@ impl BytesFileOps for SeCheckReqProt {
 struct SeContext;
 impl BytesFileOps for SeContext {
     fn write(&self, _current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
-        not_implemented!("selinux validate context: {}", String::from_utf8_lossy(&data));
+        not_implemented!("selinux validate context");
+        log_debug!("selinux context: {}", String::from_utf8_lossy(&data));
         Ok(())
     }
 }
