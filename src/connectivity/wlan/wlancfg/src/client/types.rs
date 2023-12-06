@@ -73,8 +73,8 @@ pub fn convert_to_sme_disconnect_reason(
 
 // An internal version of fidl_policy::ScanResult that can be cloned
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug))]
-#[derive(Clone, PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 pub struct ScanResult {
     /// Network properties used to distinguish between networks and to group
     /// individual APs.
@@ -103,8 +103,8 @@ pub enum ScanObservation {
 
 // An internal version of fidl_policy::Bss with extended information
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug))]
-#[derive(Clone, PartialEq)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Clone)]
 pub struct Bss {
     /// MAC address for the AP interface.
     pub bssid: Bssid,
@@ -127,6 +127,10 @@ pub struct Bss {
 impl Bss {
     pub fn is_compatible(&self) -> bool {
         self.compatibility.is_some()
+    }
+
+    pub fn is_same_bssid_and_security(&self, other: &Bss) -> bool {
+        self.bssid == other.bssid && self.compatibility == other.compatibility
     }
 }
 
@@ -188,8 +192,7 @@ pub struct InternalSavedNetworkData {
 }
 #[derive(Clone)]
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
-#[cfg_attr(test, derive(Debug))]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub struct ScannedCandidate {
     pub network: NetworkIdentifier,
     pub security_type_detailed: SecurityTypeDetailed,
@@ -198,6 +201,16 @@ pub struct ScannedCandidate {
     pub network_has_multiple_bss: bool,
     pub authenticator: SecurityAuthenticator,
     pub saved_network_info: InternalSavedNetworkData,
+}
+
+impl ScannedCandidate {
+    // Returns if the two candidates represent the same BSS, ignore scan time variables.
+    pub fn is_same_bss_security_and_credential(&self, other: &ScannedCandidate) -> bool {
+        self.network == other.network
+            && self.security_type_detailed == other.security_type_detailed
+            && self.credential == other.credential
+            && self.bss.is_same_bssid_and_security(&other.bss)
+    }
 }
 
 /// Selected network candidate for a connection.
