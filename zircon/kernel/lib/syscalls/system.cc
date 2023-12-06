@@ -10,6 +10,7 @@
 #include <lib/debuglog.h>
 #include <lib/fit/defer.h>
 #include <lib/instrumentation/asan.h>
+#include <lib/relaxed_atomic.h>
 #include <lib/syscalls/forward.h>
 #include <lib/zbi-format/kernel.h>
 #include <lib/zbi-format/zbi.h>
@@ -21,6 +22,8 @@
 #include <trace.h>
 #include <zircon/boot/crash-reason.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls-next.h>
 #include <zircon/syscalls/resource.h>
 #include <zircon/syscalls/system.h>
 #include <zircon/types.h>
@@ -31,6 +34,8 @@
 #include <arch/mp.h>
 #include <dev/hw_watchdog.h>
 #include <dev/interrupt.h>
+#include <kernel/cpu.h>
+#include <kernel/idle_power_thread.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
 #include <kernel/range_check.h>
@@ -653,4 +658,16 @@ zx_status_t sys_system_get_performance_info(zx_handle_t resource, uint32_t topic
   }
 
   return ZX_OK;
+}
+
+// TODO(fxbug.dev/137058): Reconcile with HaltToken, zx_system_powerctl, and
+// kernel-initiated-oom-reboot.
+zx_status_t sys_system_suspend_enter(zx_handle_t resource, zx_time_t resume_deadline) {
+  const zx_status_t validate_status =
+      validate_ranged_resource(resource, ZX_RSRC_KIND_SYSTEM, ZX_RSRC_SYSTEM_CPU_BASE, 1);
+  if (validate_status != ZX_OK) {
+    return validate_status;
+  }
+
+  return IdlePowerThread::TransitionAllActiveToSuspend(resume_deadline);
 }

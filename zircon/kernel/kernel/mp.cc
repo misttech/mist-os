@@ -301,7 +301,7 @@ static zx_status_t mp_unplug_cpu_mask_single_locked(cpu_num_t cpu_id, zx_time_t 
   }
 
   // Request to take the target offline.
-  status = percpu_to_unplug.idle_power_thread.TransitionToOffline(deadline).status;
+  status = percpu_to_unplug.idle_power_thread.TransitionActiveToOffline(deadline).status;
   if (status != ZX_OK) {
     return status;
   }

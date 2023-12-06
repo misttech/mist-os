@@ -1626,16 +1626,16 @@ void thread_secondary_cpu_entry() {
 
   percpu& current_cpu = percpu::GetCurrent();
 
-  // Signal the idle/power thread to transition to online but don't wait for it, since it cannot run
+  // Signal the idle/power thread to transition to active but don't wait for it, since it cannot run
   // until this thread either blocks or exits below. The idle thread will run immediately upon exit
   // and complete the transition, if necessary.
   const IdlePowerThread::TransitionResult result =
-      current_cpu.idle_power_thread.TransitionToOnline(ZX_TIME_INFINITE_PAST);
+      current_cpu.idle_power_thread.TransitionOfflineToActive(ZX_TIME_INFINITE_PAST);
 
-  // The first time a secondary CPU comes online after boot the CPU power thread is already in the
-  // online state. If the CPU power thread is not in its initial online state, it is being returned
-  // to online from offline or suspend and needs to be revived to resume its normal function.
-  if (result.starting_state != IdlePowerThread::State::Online) {
+  // The first time a secondary CPU becomes active after boot the CPU power thread is already in the
+  // active state. If the CPU power thread is not in its initial active state, it is being returned
+  // to active from offline and needs to be revived to resume its normal function.
+  if (result.starting_state != IdlePowerThread::State::Active) {
     Thread::ReviveIdlePowerThread(arch_curr_cpu_num());
   }
 

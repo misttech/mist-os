@@ -4,12 +4,19 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "kernel/idle_power_thread.h"
+
 #include <assert.h>
+#include <lib/fit/defer.h>
 #include <lib/ktrace.h>
+#include <platform.h>
 #include <zircon/errors.h>
+#include <zircon/time.h>
 
 #include <arch/interrupt.h>
+#include <arch/mp.h>
 #include <arch/ops.h>
+#include <kernel/cpu.h>
 #include <kernel/mp.h>
 #include <kernel/percpu.h>
 #include <kernel/thread.h>
@@ -19,18 +26,24 @@ namespace {
 
 constexpr bool kEnableRunloopTracing = false;
 
-constexpr const fxt::InternedString& ToString(IdlePowerThread::State state) {
+constexpr const fxt::InternedString& ToInternedString(IdlePowerThread::State state) {
   using fxt::operator""_intern;
   switch (state) {
     case IdlePowerThread::State::Offline:
       return "offline"_intern;
     case IdlePowerThread::State::Suspend:
       return "suspend"_intern;
-    case IdlePowerThread::State::Online:
-      return "online"_intern;
+    case IdlePowerThread::State::Active:
+      return "active"_intern;
+    case IdlePowerThread::State::Wakeup:
+      return "wakeup"_intern;
     default:
       return "unknown"_intern;
   }
+}
+
+[[maybe_unused]] constexpr const char* ToString(IdlePowerThread::State state) {
+  return ToInternedString(state).string;
 }
 
 }  // anonymous namespace
@@ -47,15 +60,15 @@ void IdlePowerThread::FlushAndHalt() {
 
 int IdlePowerThread::Run(void* arg) {
   const cpu_num_t cpu_num = arch_curr_cpu_num();
-  percpu& this_cpu = percpu::GetCurrent();
+  IdlePowerThread& this_idle_power_thread = percpu::GetCurrent().idle_power_thread;
   for (;;) {
-    const StateMachine state = this_cpu.idle_power_thread.state_.load(ktl::memory_order_acquire);
+    const StateMachine state = this_idle_power_thread.state_.load(ktl::memory_order_acquire);
     if (state.target != state.current) {
       ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE_ENABLE(
-          kEnableRunloopTracing, "kernel:sched", "transition", ("from", ToString(state.current)),
-          ("to", ToString(state.target)));
-      dprintf(INFO, "CPU %u: %s -> %s\n", cpu_num, ToString(state.current).string,
-              ToString(state.target).string);
+          kEnableRunloopTracing, "kernel:sched", "transition",
+          ("from", ToInternedString(state.current)), ("to", ToInternedString(state.target)));
+      dprintf(INFO, "CPU %u: %s -> %s\n", cpu_num, ToInternedString(state.current).string,
+              ToInternedString(state.target).string);
 
       switch (state.target) {
         case State::Offline: {
@@ -71,16 +84,23 @@ int IdlePowerThread::Run(void* arg) {
           break;
         }
 
-        default:
-          this_cpu.idle_power_thread.state_.store({.current = state.target, .target = state.target},
-                                                  ktl::memory_order_release);
-          this_cpu.idle_power_thread.complete_.Signal();
+        default: {
+          // Complete the requested transition, which could be interrupted by a wake trigger.
+          StateMachine expected = state;
+          const bool success = this_idle_power_thread.CompareExchangeState(
+              expected, {.current = state.target, .target = state.target});
+          DEBUG_ASSERT_MSG(success || expected == kSuspendToWakeup || expected == kWakeup,
+                           "current=%s target=%s", ToString(expected.current),
+                           ToString(expected.target));
+          this_idle_power_thread.complete_.Signal();
           break;
+        }
       }
 
-      // If the power thread just transitioned to online, reschedule to ensure that the run queue is
-      // evaluated. Otherwise, this thread may continue to run the idle loop until the next IPI.
-      if (state.target == State::Online) {
+      // If the power thread just transitioned to Active or Wakeup, reschedule to ensure that the
+      // run queue is evaluated. Otherwise, this thread may continue to run the idle loop until the
+      // next IPI.
+      if (state.target == State::Active || state.target == State::Wakeup) {
         Thread::Current::Reschedule();
       }
     } else {
@@ -99,8 +119,7 @@ IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expect
   // Attempt to move from the expected state to the transitional state.
   StateMachine expected{.current = expected_state, .target = expected_state};
   const StateMachine transitional{.current = expected_state, .target = target_state};
-  if (!state_.compare_exchange_strong(expected, transitional, ktl::memory_order_acq_rel,
-                                      ktl::memory_order_relaxed)) {
+  if (!CompareExchangeState(expected, transitional)) {
     // The move to the transitional state failed because the current state is already the target
     // state. Indicate that the transition did not occur but the target state is achieved anyway by
     // returning the original state.
@@ -128,15 +147,233 @@ IdlePowerThread::TransitionResult IdlePowerThread::TransitionFromTo(State expect
 
   // Wait for the transition to the target state to complete or timeout, looping to deal with
   // spurious wakeups.
+  StateMachine state;
   do {
     const zx_status_t status = complete_.WaitDeadline(timeout_at, Interruptible::No);
     if (status != ZX_OK) {
       return {status, expected_state};
     }
-    expected = state_.load(ktl::memory_order_acquire);
-    DEBUG_ASSERT(expected.target == target_state);
-  } while (expected.current != target_state);
+    state = state_.load(ktl::memory_order_acquire);
+
+    // If the current or target state changed while waiting, this transition may have been reversed
+    // before the current thread could observe the successful transition. This can happen if an
+    // interrupt transitions the current CPU from Suspend back to Active after a successful
+    // transition to Suspend, but before this thread starts waiting for completion.
+    if (state.target != target_state) {
+      return {ZX_ERR_CANCELED, state.current};
+    }
+  } while (state.current != target_state);
 
   // The transition from the expected state to the target state was successful.
   return {ZX_OK, expected_state};
 }
+
+zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_time_t resume_at) {
+  // Prevent re-entrant calls to suspend.
+  Guard<Mutex> guard{TransitionLock::Get()};
+
+  if (resume_at < current_time()) {
+    return ZX_ERR_TIMED_OUT;
+  }
+
+  // Set the global suspended flag so that other subsystems can act appropriately during suspend.
+  active_cpus_suspended_.store(true, ktl::memory_order_release);
+  auto restore_suspend_flag =
+      fit::defer([] { active_cpus_suspended_.store(false, ktl::memory_order_release); });
+
+  // Move to the boot CPU which will be suspended last.
+  auto restore_affinity = fit::defer(
+      [previous_affinity = Thread::Current::Get()->SetCpuAffinity(cpu_num_to_mask(BOOT_CPU_ID))] {
+        Thread::Current::Get()->SetCpuAffinity(previous_affinity);
+      });
+  DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
+
+  // TODO(eieio): Consider temporarily pinning the debuglog notifier thread to the boot CPU to give
+  // it a chance to notify readers during the non-boot CPU suspend sequence. This is not needed for
+  // correctness, since the debuglog critical sections are protected by a spinlock, which prevents
+  // the local CPU from being suspended while held. However, given that readers might also get
+  // suspended on non-boot CPUs, this may not have much effect on timeliness of log output.
+
+  // Keep track of which non-boot CPUs to resume.
+  const cpu_mask_t cpus_active_before_suspend =
+      mp_get_active_mask() & ~cpu_num_to_mask(BOOT_CPU_ID);
+  dprintf(INFO, "Active non-boot CPUs before suspend: %#x\n", cpus_active_before_suspend);
+
+  // Suspend all of the active CPUs besides the boot CPU.
+  dprintf(INFO, "Suspending non-boot CPUs...\n");
+
+  const Deadline suspend_timeout_at = Deadline::after(ZX_MIN(1));
+  cpu_mask_t cpus_to_suspend = cpus_active_before_suspend;
+  while (cpus_to_suspend != 0) {
+    const cpu_num_t cpu_id = highest_cpu_set(cpus_to_suspend);
+    const TransitionResult active_to_suspend_result =
+        percpu::Get(cpu_id).idle_power_thread.TransitionFromTo(State::Active, State::Suspend,
+                                                               suspend_timeout_at.when());
+    if (active_to_suspend_result.status != ZX_OK) {
+      KERNEL_OOPS("Failed to transition CPU %u to suspend: %d\n", cpu_id,
+                  active_to_suspend_result.status);
+      break;
+    }
+
+    cpus_to_suspend &= ~cpu_num_to_mask(cpu_id);
+  }
+
+  if (cpus_to_suspend != 0) {
+    dprintf(INFO, "Aborting suspend and resuming non-boot CPUs...\n");
+  } else {
+    dprintf(INFO, "Done suspending non-boot CPUs.\n");
+
+    // Set the resume timer before suspending the boot CPU.
+    if (resume_at != ZX_TIME_INFINITE) {
+      dprintf(INFO, "Setting boot CPU to resume at time %" PRId64 "\n", resume_at);
+      resume_timer_.SetOneshot(
+          resume_at,
+          +[](Timer* timer, zx_time_t now, void* resume_at_ptr) {
+            // Verify this handler is running in the correct context.
+            DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
+
+            const WakeResult wake_result = WakeBootCpu();
+            const char* message_prefix = wake_result == WakeResult::SuspendAborted
+                                             ? "Wakeup before suspend completed. Aborting suspend"
+                                             : "Resuming boot CPU";
+
+            const zx_duration_t resume_delta =
+                zx_time_sub_time(now, *static_cast<zx_time_t*>(resume_at_ptr));
+            dprintf(INFO, "%s at time %" PRId64 ", %" PRId64 "ns after target resume time.\n",
+                    message_prefix, now, resume_delta);
+          },
+          &resume_at);
+    } else {
+      // TODO(eieio): Check that at least one wake source is configured if no resume time is set.
+      // Maybe this check needs require at least one wake source if the resume time is too far in
+      // the future?
+      dprintf(INFO, "No resume timer set. System will not resume.\n");
+    }
+
+    dprintf(INFO, "Attempting to suspend boot CPU...\n");
+
+    // Suspend the boot CPU to finalize the active CPU suspend operation.
+    IdlePowerThread& boot_idle_power_thread = percpu::Get(BOOT_CPU_ID).idle_power_thread;
+    const TransitionResult active_to_suspend_result = boot_idle_power_thread.TransitionFromTo(
+        State::Active, State::Suspend, suspend_timeout_at.when());
+
+    // Cancel the resume timer in case it wasn't the reason for the wakeup.
+    resume_timer_.Cancel();
+
+    switch (active_to_suspend_result.status) {
+      case ZX_ERR_TIMED_OUT:
+        dprintf(INFO, "Timed out waiting for boot CPU to suspend!\n");
+        break;
+
+      case ZX_ERR_CANCELED:
+        dprintf(INFO, "Boot CPU resumed.\n");
+        DEBUG_ASSERT_MSG(active_to_suspend_result.starting_state == State::Wakeup,
+                         "startring_state=%s", ToString(active_to_suspend_result.starting_state));
+        break;
+
+      case ZX_ERR_BAD_STATE:
+        dprintf(INFO, "Boot CPU suspend aborted.\n");
+        DEBUG_ASSERT_MSG(active_to_suspend_result.starting_state == State::Wakeup,
+                         "startring_state=%s", ToString(active_to_suspend_result.starting_state));
+        break;
+
+      default:
+        DEBUG_ASSERT_MSG(
+            false, "Unexpected result from boot CPU suspend: status=%d starting_state=%s",
+            active_to_suspend_result.status, ToString(active_to_suspend_result.starting_state));
+    }
+
+    // If the boot CPU is in the Wakeup state, set it to Active.
+    StateMachine expected = kWakeup;
+    const bool succeeded = boot_idle_power_thread.CompareExchangeState(expected, kActive);
+    DEBUG_ASSERT_MSG(succeeded || expected == kActive, "current=%s target=%s",
+                     ToString(expected.current), ToString(expected.target));
+  }
+
+  // Resume all non-boot CPUs that were successfully suspended.
+  dprintf(INFO, "Resuming non-boot CPUs...\n");
+
+  const Deadline resume_timeout_at = Deadline::after(ZX_MIN(1));
+  cpu_mask_t cpus_to_resume = cpus_active_before_suspend ^ cpus_to_suspend;
+  while (cpus_to_resume != 0) {
+    const cpu_num_t cpu_id = highest_cpu_set(cpus_to_resume);
+    const TransitionResult suspend_to_active_result =
+        percpu::Get(cpu_id).idle_power_thread.TransitionFromTo(State::Suspend, State::Active,
+                                                               resume_timeout_at.when());
+    if (suspend_to_active_result.status != ZX_OK) {
+      KERNEL_OOPS("Failed to transition CPU %u to active: %d\n", cpu_id,
+                  suspend_to_active_result.status);
+      break;
+    }
+
+    cpus_to_resume &= ~cpu_num_to_mask(cpu_id);
+  }
+  DEBUG_ASSERT(cpus_to_resume == 0);
+
+  dprintf(INFO, "Done resuming non-boot CPUs.\n");
+  return ZX_OK;
+}
+
+IdlePowerThread::WakeResult IdlePowerThread::WakeBootCpu() {
+  DEBUG_ASSERT(active_cpus_suspended());
+
+  // Poke the boot CPU when preemption is reenabled to ensure it responds to the potential state
+  // change.
+  Thread::Current::Get()->preemption_state().PreemptSetPending(cpu_num_to_mask(BOOT_CPU_ID));
+
+  IdlePowerThread& boot_idle_power_thread = percpu::Get(BOOT_CPU_ID).idle_power_thread;
+
+  // Attempt to transition the boot CPU from Suspend to Wakeup. This method may be running on the
+  // boot CPU and interrupting the context of the idle/power thread.
+  StateMachine expected = kSuspend;
+  do {
+    bool success = boot_idle_power_thread.CompareExchangeState(expected, kSuspendToWakeup);
+    if (success) {
+      return WakeResult::Resumed;
+    }
+
+    // If the current state is Active or Active-to-Suspend, this wake up occurred before or during
+    // the Active-to-Suspend transition of the boot CPU. Set the state to Wakeup to prevent the
+    // Active-to-Suspend transition, which would cause this wake up to be missed.
+    if (expected == kActive || expected == kActiveToSuspend) {
+      success = boot_idle_power_thread.CompareExchangeState(expected, kWakeup);
+      if (success) {
+        return WakeResult::SuspendAborted;
+      }
+    }
+
+    // Try again if the previous attempt collided with completing the Active-to-Suspend transition.
+  } while (expected == kSuspend);
+
+  // Racing with another wake trigger can cause the attempts above to gracefully fail. However,
+  // colliding with other states is an error.
+  DEBUG_ASSERT_MSG(expected == kSuspendToWakeup || expected == kWakeup, "current=%s target=%s",
+                   ToString(expected.current), ToString(expected.target));
+  return WakeResult::Resumed;
+}
+
+#include <lib/console.h>
+
+static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
+  if (argc < 2) {
+  notenoughargs:
+    printf("not enough arguments\n");
+    printf("%s enter <resume after ns>\n", argv[0].str);
+    return -1;
+  }
+
+  if (!strcmp(argv[1].str, "enter")) {
+    if (argc < 3) {
+      goto notenoughargs;
+    }
+
+    const zx_time_t resume_at = zx_time_add_duration(current_time(), argv[2].i);
+    return IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
+  }
+
+  return 0;
+}
+
+STATIC_COMMAND_START
+STATIC_COMMAND_MASKED("suspend", "processor suspend commands", &cmd_suspend, CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_END(suspend)

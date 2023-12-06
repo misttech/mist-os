@@ -336,6 +336,8 @@ toc:
     path: /docs/reference/syscalls/system_get_performance_info.md
   - title: "zx_system_set_performance_info"
     path: /docs/reference/syscalls/system_set_performance_info.md
+  - title: "zx_system_suspend_enter"
+    path: /docs/reference/syscalls/system_suspend_enter.md
 - title: "DDK"
   section:
   - title: "zx_bti_create"
