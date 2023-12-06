@@ -287,6 +287,8 @@ impl vfs::node::Node for FxFile {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, zx::Status> {
         let props = self.handle.get_properties().await.map_err(map_to_status)?;
+        let descriptor =
+            self.handle.uncached_handle().get_descriptor().await.map_err(map_to_status)?;
         Ok(attributes!(
             requested_attributes,
             Mutable {
@@ -309,6 +311,8 @@ impl vfs::node::Node for FxFile {
                 link_count: props.refs,
                 id: self.handle.object_id(),
                 change_time: props.change_time.as_nanos(),
+                options: descriptor.clone().map(|a| a.0),
+                root_hash: descriptor.clone().map(|a| a.1),
             }
         ))
     }
@@ -545,11 +549,15 @@ mod tests {
             close_file_checked, open_file_checked, TestFixture, TestFixtureOptions,
         },
         anyhow::format_err,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_io as fio,
+        fsverity_merkle::{MerkleTreeBuilder, Sha256Struct},
+        fuchsia_async as fasync,
         fuchsia_fs::file,
         fuchsia_zircon::Status,
         futures::join,
         fxfs::object_handle::INVALID_OBJECT_ID,
+        mundane::hash::Digest,
+        rand::{thread_rng, Rng},
         std::sync::{
             atomic::{self, AtomicBool},
             Arc,
@@ -1639,6 +1647,113 @@ mod tests {
 
             fasync::unblock(move || vmo.write(b"hello", 0).expect("write failed")).await;
         }
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_get_attributes_fsverity_enabled_file() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let mut data: Vec<u8> = vec![0x00u8; 1052672];
+        thread_rng().fill(&mut data[..]);
+
+        for chunk in data.chunks(8192) {
+            file.write(chunk)
+                .await
+                .expect("FIDL call failed")
+                .map_err(Status::from_raw)
+                .expect("write failed");
+        }
+
+        let mut builder = MerkleTreeBuilder::new(Sha256Struct::new(vec![0xFF; 8], 4096));
+        builder.write(data.as_slice());
+        let tree = builder.finish();
+        let expected_root = tree.root().bytes().to_vec();
+
+        let expected_descriptor = fio::VerificationOptions {
+            hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+            salt: Some(vec![0xFF; 8]),
+            ..Default::default()
+        };
+
+        file.enable_verity(&expected_descriptor)
+            .await
+            .expect("FIDL transport error")
+            .expect("enable verity failed");
+
+        let (_, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::ROOT_HASH | fio::NodeAttributesQuery::OPTIONS)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes
+                .options
+                .expect("verification options not present in immutable attributes"),
+            expected_descriptor
+        );
+        assert_eq!(
+            immutable_attributes.root_hash.expect("root hash not present in immutable attributes"),
+            expected_root
+        );
+
+        fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_get_attributes_fsverity_not_enabled() {
+        let fixture = TestFixture::new().await;
+        let root = fixture.root();
+
+        let file = open_file_checked(
+            &root,
+            fio::OpenFlags::CREATE
+                | fio::OpenFlags::RIGHT_READABLE
+                | fio::OpenFlags::RIGHT_WRITABLE
+                | fio::OpenFlags::NOT_DIRECTORY,
+            "foo",
+        )
+        .await;
+
+        let mut data: Vec<u8> = vec![0x00u8; 8192];
+        thread_rng().fill(&mut data[..]);
+
+        file.write(&data)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("write failed");
+
+        let () = file
+            .sync()
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("sync failed");
+
+        let (_, immutable_attributes) = file
+            .get_attributes(fio::NodeAttributesQuery::ROOT_HASH | fio::NodeAttributesQuery::OPTIONS)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("get_attributes failed");
+
+        assert_eq!(immutable_attributes.options, None);
+        assert_eq!(immutable_attributes.root_hash, None);
 
         fixture.close().await;
     }

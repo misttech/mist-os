@@ -72,6 +72,12 @@ type NodeAttributesQuery = strict bits : uint64 {
     ACCESS_TIME = 0x1000;
     @available(added=HEAD)
     CHANGE_TIME = 0x2000;
+
+    /// Fsverity attributes.
+    @available(added=HEAD)
+    OPTIONS = 0x4000;
+    @available(added=HEAD)
+    ROOT_HASH = 0x8000;
 };
 
 type MutableNodeAttributes = table {
@@ -141,6 +147,14 @@ type NodeAttributes2 = struct {
         /// Time of last change to the metadata in nanoseconds since the Unix epoch, UTC.
         @available(added=HEAD)
         7: change_time uint64;
+
+        /// Contains the verification options for fsverity-enabled files.
+        @available(added=HEAD)
+        8: options VerificationOptions;
+
+        /// The root hash for the file. Not all filesystems support this across all files.
+        @available(added=HEAD)
+        9: root_hash vector<uint8>:64;
     };
 };
 

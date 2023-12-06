@@ -41,7 +41,7 @@ use {
         ops::{Bound, Range},
         sync::{
             atomic::{self, AtomicU64},
-            Arc,
+            Arc, Mutex,
         },
     },
     storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef},
@@ -58,7 +58,10 @@ pub struct DataObjectHandle<S: HandleOwner> {
     handle: StoreObjectHandle<S>,
     attribute_id: u64,
     content_size: AtomicU64,
-    verified_file: bool,
+    fsverity_descriptor: Mutex<Option<FsverityMetadata>>,
+    // TODO(b/309656632): This should store the entire merkle tree and not just the leaf nodes.
+    // Potentially store a pager-backed vmo instead of passing around a boxed array.
+    merkle_tree: Mutex<Option<Box<[u8]>>>,
 }
 
 impl<S: HandleOwner> DataObjectHandle<S> {
@@ -68,7 +71,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         permanent_keys: bool,
         attribute_id: u64,
         size: u64,
-        verified_file: bool,
+        fsverity_descriptor: Option<FsverityMetadata>,
         options: HandleOptions,
         trace: bool,
     ) -> Self {
@@ -76,7 +79,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             handle: StoreObjectHandle::new(owner, object_id, permanent_keys, options, trace),
             attribute_id,
             content_size: AtomicU64::new(size),
-            verified_file,
+            fsverity_descriptor: Mutex::new(fsverity_descriptor),
+            merkle_tree: Mutex::new(None),
         }
     }
 
@@ -89,7 +93,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
     }
 
     pub fn verified_file(&self) -> bool {
-        self.verified_file
+        self.fsverity_descriptor.lock().unwrap().is_some()
     }
 
     pub fn store(&self) -> &ObjectStore {
@@ -102,6 +106,17 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 
     pub fn handle(&self) -> &StoreObjectHandle<S> {
         &self.handle
+    }
+
+    // TODO(b/309656632): This should take a pager-backed vmo instead of a boxed array.
+    pub fn set_merkle_tree(&self, merkle_tree: Box<[u8]>) {
+        let mut merkle_tree_guard = self.merkle_tree.lock().unwrap();
+        *merkle_tree_guard = Some(merkle_tree);
+    }
+
+    pub fn set_descriptor(&self, descriptor: FsverityMetadata) {
+        let mut fsverity_descriptor_guard = self.fsverity_descriptor.lock().unwrap();
+        *fsverity_descriptor_guard = Some(descriptor);
     }
 
     /// Extend the file with the given extent.  The only use case for this right now is for files
@@ -175,6 +190,39 @@ impl<S: HandleOwner> DataObjectHandle<S> {
         self.handle.zero(transaction, self.attribute_id(), range).await
     }
 
+    /// The cached value for `self.fsverity_descriptor` is set either in `open_object` or on
+    /// `enable_verity`. If set, translates `self.fsverity_descriptor` into an
+    /// fio::VerificationOptions instance and a root hash. Otherwise, returns None.
+    pub async fn get_descriptor(
+        &self,
+    ) -> Result<Option<(fio::VerificationOptions, Vec<u8>)>, Error> {
+        let fsverity_descriptor = self.fsverity_descriptor.lock().unwrap();
+        if let Some(metadata) = fsverity_descriptor.clone() {
+            let (options, root_hash) = match metadata.root_digest {
+                RootDigest::Sha256(root_hash) => (
+                    fio::VerificationOptions {
+                        hash_algorithm: Some(fio::HashAlgorithm::Sha256),
+                        salt: Some(metadata.salt),
+                        ..Default::default()
+                    },
+                    root_hash.to_vec(),
+                ),
+                RootDigest::Sha512(root_hash) => (
+                    fio::VerificationOptions {
+                        hash_algorithm: Some(fio::HashAlgorithm::Sha512),
+                        salt: Some(metadata.salt),
+                        ..Default::default()
+                    },
+                    root_hash,
+                ),
+            };
+
+            Ok(Some((options, root_hash)))
+        } else {
+            Ok(None)
+        }
+    }
+
     /// Reads the data attribute and computes a merkle tree from the data. The values of the
     /// parameters required to build the merkle tree are supplied by `descriptor` (i.e. salt,
     /// hash_algorithm, etc.) Writes the leaf nodes of the merkle tree to an attribute with id
@@ -238,6 +286,8 @@ impl<S: HandleOwner> DataObjectHandle<S> {
             }
         };
         let mut transaction = self.new_transaction().await?;
+        let descriptor = FsverityMetadata { root_digest, salt };
+        self.set_descriptor(descriptor.clone());
         transaction.add(
             self.store().store_object_id(),
             Mutation::replace_or_insert_object(
@@ -246,10 +296,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
                     DEFAULT_DATA_ATTRIBUTE_ID,
                     AttributeKey::Attribute,
                 ),
-                ObjectValue::verified_attribute(
-                    self.get_size(),
-                    FsverityMetadata { root_digest, salt },
-                ),
+                ObjectValue::verified_attribute(self.get_size(), descriptor),
             ),
         );
         transaction.commit().await?;
@@ -1066,6 +1113,7 @@ impl<S: HandleOwner> DataObjectHandle<S> {
 impl<S: HandleOwner> AssociatedObject for DataObjectHandle<S> {
     fn will_apply_mutation(&self, mutation: &Mutation, _object_id: u64, _manager: &ObjectManager) {
         match mutation {
+            // TODO(b/308898343): Add match arms for merkle tree and fsverity descriptor.
             Mutation::ObjectStore(ObjectStoreMutation {
                 item: ObjectItem { value: ObjectValue::Attribute { size }, .. },
                 ..

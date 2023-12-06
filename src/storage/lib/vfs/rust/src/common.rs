@@ -282,7 +282,7 @@ macro_rules! attributes {
                 },
                 immutable_attributes: fio::ImmutableNodeAttributes {
                     $($immut_a: if $requested.contains(attribute_query!($immut_a)) {
-                        Some($immut_v)
+                        Option::from($immut_v)
                     } else {
                         None
                     }),*,

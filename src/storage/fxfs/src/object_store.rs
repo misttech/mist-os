@@ -806,7 +806,7 @@ impl ObjectStore {
         crypt: Option<Arc<dyn Crypt>>,
     ) -> Result<DataObjectHandle<S>, Error> {
         let store = owner.as_ref().as_ref();
-        let mut fsverity_enabled = false;
+        let mut fsverity_descriptor = None;
         let item = store
             .tree
             .find(&ObjectKey::attribute(
@@ -819,8 +819,8 @@ impl ObjectStore {
 
         let size = match item.value {
             ObjectValue::Attribute { size } => size,
-            ObjectValue::VerifiedAttribute { size, .. } => {
-                fsverity_enabled = true;
+            ObjectValue::VerifiedAttribute { size, fsverity_metadata } => {
+                fsverity_descriptor = Some(fsverity_metadata);
                 size
             }
             _ => bail!(anyhow!(FxfsError::Inconsistent).context("open_object: Expected attribute")),
@@ -844,17 +844,25 @@ impl ObjectStore {
         } else {
             false
         };
-
-        Ok(DataObjectHandle::new(
+        let data_object_handle = DataObjectHandle::new(
             owner.clone(),
             object_id,
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             size,
-            fsverity_enabled,
+            fsverity_descriptor.clone(),
             options,
             false,
-        ))
+        );
+        if fsverity_descriptor.is_some() {
+            match data_object_handle.read_attr(FSVERITY_MERKLE_ATTRIBUTE_ID).await? {
+                None => {
+                    return Err(anyhow!(FxfsError::NotFound));
+                }
+                Some(data) => data_object_handle.set_merkle_tree(data),
+            }
+        }
+        Ok(data_object_handle)
     }
 
     // See the comment on create_object for the semantics of the `crypt` argument.  If object_id ==
@@ -944,7 +952,7 @@ impl ObjectStore {
             permanent,
             DEFAULT_DATA_ATTRIBUTE_ID,
             0,
-            false,
+            None,
             options,
             false,
         ))
@@ -2115,7 +2123,8 @@ pub async fn load_store_info(
 mod tests {
     use {
         super::{
-            StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
+            StoreInfo, DEFAULT_DATA_ATTRIBUTE_ID, FSVERITY_MERKLE_ATTRIBUTE_ID,
+            MAX_STORE_INFO_SERIALIZED_SIZE, OBJECT_ID_HI_MASK,
         },
         crate::{
             errors::FxfsError,
@@ -2268,6 +2277,18 @@ mod tests {
                     0,
                     FsverityMetadata { root_digest: RootDigest::Sha256([0; 32]), salt: vec![] },
                 ),
+            ),
+        );
+
+        transaction.add(
+            store.store_object_id(),
+            Mutation::replace_or_insert_object(
+                ObjectKey::attribute(
+                    object.object_id(),
+                    FSVERITY_MERKLE_ATTRIBUTE_ID,
+                    AttributeKey::Attribute,
+                ),
+                ObjectValue::attribute(0),
             ),
         );
 
