@@ -8,7 +8,6 @@
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
 
-#include <algorithm>
 #include <cstring>
 #include <sstream>
 
@@ -143,8 +142,7 @@ void PositionTest::ValidatePositionInfo() {
                     << ring_buffer_pcm_format().frame_rate << " Hz, " << nsec_per_notif
                     << " nsec/notif, " << nsec_per_notif * notifications_per_ring()
                     << " nsec/ring.";
-      FX_LOGS(INFO) << "    Notif    Position___Delta"
-                    << "           Timestamp_____Delta   "
+      FX_LOGS(INFO) << "    Notif    Position___Delta" << "           Timestamp_____Delta   "
                     << "             Arrival_____Delta";
       for (auto idx = 0u; idx < notifications_.size(); ++idx) {
         uint32_t position_delta = (ring_buffer_bytes + notifications_[idx].position -
@@ -184,14 +182,14 @@ void PositionTest::ValidatePositionInfo() {
 // Verify position notifications at fast rate (64/sec: 32 notifs/ring in a 0.5-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
   constexpr auto kNotifsPerRingBuffer = 32u;
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Request a 0.5-second ring-buffer.
   ASSERT_NO_FAILURE_OR_SKIP(
       RequestBuffer(ring_buffer_pcm_format().frame_rate / 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
 
   // After numerous notifications (in this case, twice around the ring), stop updating position info
   // (but let notifications continue). Ensure that the rate of advance is within acceptable range.
@@ -204,14 +202,14 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifyFast, {
 // Verify position notifications at slow rate (1/sec: 2 notifs/ring in a 2-second buffer).
 DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
   constexpr auto kNotifsPerRingBuffer = 2u;
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMinFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Request a 2-second ring-buffer.
   ASSERT_NO_FAILURE_OR_SKIP(
       RequestBuffer(ring_buffer_pcm_format().frame_rate * 2, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
 
   // After numerous notifications (in this case, twice around the ring), stop updating position info
   // (but let notifications continue). Ensure that the rate of advance is within acceptable range.
@@ -227,7 +225,7 @@ DEFINE_POSITION_TEST_CLASS(PositionNotifySlow, {
 // Verify that NO position notifications arrive after Stop is called.
 DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   constexpr auto kNotifsPerRingBuffer = 32u;
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   // Set notifications to be rapid, with a small ring buffer and a large notifications-per-buffer.
@@ -235,25 +233,25 @@ DEFINE_POSITION_TEST_CLASS(NoPositionNotifyAfterStop, {
   // 32 ms and notifications should arrive every 1 msec!
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(6144, kNotifsPerRingBuffer));
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStart());
+  ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferStart());
 
   //  After just a few position notifications, stop the ring buffer. From the Stop callback itself,
   // register a position callback that will fail the test if any further notification occurs.
   ASSERT_NO_FAILURE_OR_SKIP(ExpectPositionNotifyCount(3u));
-  RequestStopAndExpectNoPositionNotifications();
+  RequestRingBufferStopAndExpectNoPositionNotifications();
   WaitForError();
 });
 
 // Verify no position notifications arrive if notifications_per_ring is 0.
 DEFINE_POSITION_TEST_CLASS(PositionNotifyNone, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferChannelWithMaxFormat());
   ASSERT_NO_FAILURE_OR_SKIP(RequestRingBufferProperties());
   ASSERT_NO_FAILURE_OR_SKIP(RequestBuffer(8000, 0));
   ASSERT_NO_FAILURE_OR_SKIP(DisallowPositionNotifications());
   ASSERT_NO_FAILURE_OR_SKIP(EnablePositionNotifications());
 
-  RequestStart();
+  RequestRingBufferStart();
   WaitForError();
 });
 

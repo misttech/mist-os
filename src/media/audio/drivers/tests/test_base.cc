@@ -43,20 +43,6 @@ void TestBase::SetUp() {
     ConnectToBluetoothDevice();
   } else {
     switch (entry.driver_type) {
-      case DriverType::StreamConfigInput:
-        [[fallthrough]];
-      case DriverType::StreamConfigOutput:
-        CreateStreamConfigFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::StreamConfig,
-                                  fuchsia::hardware::audio::StreamConfigConnectorPtr>(
-                device_entry()));
-
-        break;
-      case DriverType::Dai:
-        CreateDaiFromChannel(
-            ConnectWithTrampoline<fuchsia::hardware::audio::Dai,
-                                  fuchsia::hardware::audio::DaiConnectorPtr>(device_entry()));
-        break;
       case DriverType::Codec:
         CreateCodecFromChannel(
             ConnectWithTrampoline<fuchsia::hardware::audio::Codec,
@@ -75,15 +61,29 @@ void TestBase::SetUp() {
               Connect<fuchsia::hardware::audio::CompositePtr>(device_entry()));
         }
         break;
+      case DriverType::Dai:
+        CreateDaiFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::Dai,
+                                  fuchsia::hardware::audio::DaiConnectorPtr>(device_entry()));
+        break;
+      case DriverType::StreamConfigInput:
+        [[fallthrough]];
+      case DriverType::StreamConfigOutput:
+        CreateStreamConfigFromChannel(
+            ConnectWithTrampoline<fuchsia::hardware::audio::StreamConfig,
+                                  fuchsia::hardware::audio::StreamConfigConnectorPtr>(
+                device_entry()));
+
+        break;
     }
   }
 }
 
 void TestBase::TearDown() {
-  stream_config_.Unbind();
-  dai_.Unbind();
   codec_.Unbind();
   composite_.Unbind();
+  dai_.Unbind();
+  stream_config_.Unbind();
 
   if (realm_.has_value()) {
     // We're about to shut down the realm; unbind to unhook the error handler.
@@ -173,27 +173,6 @@ DeviceType TestBase::Connect(const DeviceEntry& device_entry) {
   return std::move(device);
 }
 
-void TestBase::CreateStreamConfigFromChannel(
-    fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) {
-  stream_config_ = channel.Bind();
-
-  // If no device was enumerated, don't waste further time.
-  if (!stream_config_.is_bound()) {
-    FAIL() << "Failed to get stream channel for this device";
-  }
-  AddErrorHandler(stream_config_, "StreamConfig");
-}
-
-void TestBase::CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel) {
-  dai_ = channel.Bind();
-
-  // If no device was enumerated, don't waste further time.
-  if (!dai_.is_bound()) {
-    FAIL() << "Failed to get DAI channel for this device";
-  }
-  AddErrorHandler(dai_, "DAI");
-}
-
 void TestBase::CreateCodecFromChannel(
     fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> channel) {
   codec_ = channel.Bind();
@@ -216,9 +195,32 @@ void TestBase::CreateCompositeFromChannel(
   AddErrorHandler(composite_, "Composite");
 }
 
+void TestBase::CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel) {
+  dai_ = channel.Bind();
+
+  // If no device was enumerated, don't waste further time.
+  if (!dai_.is_bound()) {
+    FAIL() << "Failed to get DAI channel for this device";
+  }
+  AddErrorHandler(dai_, "DAI");
+}
+
+void TestBase::CreateStreamConfigFromChannel(
+    fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel) {
+  stream_config_ = channel.Bind();
+
+  // If no device was enumerated, don't waste further time.
+  if (!stream_config_.is_bound()) {
+    FAIL() << "Failed to get stream channel for this device";
+  }
+  AddErrorHandler(stream_config_, "StreamConfig");
+}
+
 // Request that the driver return the format ranges that it supports.
-void TestBase::RequestFormats() {
-  if (device_entry().isComposite()) {
+void TestBase::RetrieveRingBufferFormats() {
+  if (device_entry().isCodec()) {
+    // Nothing to do here, for now.
+  } else if (device_entry().isComposite()) {
     RequestTopologies();
 
     // If there is a ring buffer id, request the ring buffer formats for this endpoint.
@@ -284,8 +286,7 @@ void TestBase::RequestFormats() {
             dai_formats_.push_back(std::move(supported_dai_formats[i]));
           }
         }));
-  } else if (device_entry().isCodec()) {
-  } else {
+  } else if (device_entry().isStreamConfig()) {
     stream_config()->GetSupportedFormats(AddCallback(
         "GetSupportedFormats",
         [this](std::vector<fuchsia::hardware::audio::SupportedFormats> supported_formats) {
@@ -298,6 +299,8 @@ void TestBase::RequestFormats() {
             ring_buffer_pcm_formats_.push_back(std::move(format_set));
           }
         }));
+  } else {
+    FAIL() << "unknown driver type";
   }
   ExpectCallbacks();
   if (!HasFailure()) {
@@ -513,7 +516,7 @@ void TestBase::RequestTopologies() {
   SignalProcessingConnect();
   zx_status_t status = ZX_OK;
   sp_->GetElements(AddCallback(
-      "Composite::GetElements",
+      "signalprocessing::Reader::GetElements",
       [this,
        &status](fuchsia::hardware::audio::signalprocessing::Reader_GetElements_Result result) {
         status = result.is_err() ? result.err() : ZX_OK;
@@ -548,7 +551,7 @@ void TestBase::RequestTopologies() {
   ASSERT_TRUE(!elements_.empty());
 
   sp_->GetTopologies(AddCallback(
-      "Composite::GetTopologies",
+      "signalprocessing::Reader::GetTopologies",
       [this](fuchsia::hardware::audio::signalprocessing::Reader_GetTopologies_Result result) {
         ASSERT_TRUE(!result.is_err());
         topologies_ = std::move(result.response().topologies);

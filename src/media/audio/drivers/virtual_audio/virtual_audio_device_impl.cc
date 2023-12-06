@@ -5,6 +5,7 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/zx/clock.h>
+#include <zircon/errors.h>
 
 #include <memory>
 
@@ -21,17 +22,18 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
                                zx_device_t* dev_node, async_dispatcher_t* fidl_dispatcher) {
   std::optional<bool> is_input;
   switch (cfg.device_specific()->Which()) {
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
-      is_input = cfg.device_specific()->stream_config()->is_input();
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
+      zxlogf(ERROR, "Codec device type creation not supported");
+      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
+      // Composite drivers do not have a direction (is_input is undefined).
       break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kDai:
       is_input = cfg.device_specific()->dai()->is_input();
       break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      // Composite drivers do not have a direction (is_input is undefined).
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
+      is_input = cfg.device_specific()->stream_config()->is_input();
       break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
-      [[fallthrough]];
     default:
       zxlogf(ERROR, "Device type creation not supported");
       return fit::error(fuchsia_virtualaudio::Error::kInternal);
@@ -56,17 +58,18 @@ VirtualAudioDeviceImpl::Create(const fuchsia_virtualaudio::Configuration& cfg,
       });
 
   switch (cfg.device_specific()->Which()) {
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
-      device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
+      zxlogf(ERROR, "Codec device type creation not supported");
+      return fit::error(fuchsia_virtualaudio::Error::kInternal);
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
+      device->driver_ = std::make_unique<VirtualAudioComposite>(cfg, device, dev_node);
       break;
     case fuchsia_virtualaudio::DeviceSpecific::Tag::kDai:
       device->driver_ = std::make_unique<VirtualAudioDai>(cfg, device, dev_node);
       break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kComposite:
-      device->driver_ = std::make_unique<VirtualAudioComposite>(cfg, device, dev_node);
+    case fuchsia_virtualaudio::DeviceSpecific::Tag::kStreamConfig:
+      device->driver_ = std::make_unique<VirtualAudioStreamWrapper>(cfg, device, dev_node);
       break;
-    case fuchsia_virtualaudio::DeviceSpecific::Tag::kCodec:
-      [[fallthrough]];
     default:
       zxlogf(ERROR, "Device type creation not supported");
       return fit::error(fuchsia_virtualaudio::Error::kInternal);

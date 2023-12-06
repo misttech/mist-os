@@ -9,8 +9,6 @@
 #include <lib/fdio/fdio.h>
 #include <lib/syslog/cpp/macros.h>
 
-#include <algorithm>
-#include <cstdint>
 #include <cstring>
 #include <string_view>
 
@@ -46,7 +44,7 @@ void BasicTest::TearDown() {
 //
 // fuchsia.hardware.audio.Health
 // We expect a response, and we allow 'healthy' to be either unspecified or TRUE.
-void BasicTest::RequestHealthState() {
+void BasicTest::RequestHealthAndExpectHealthy() {
   GetHealthState(AddCallback("GetHealthState", [](fuchsia::hardware::audio::HealthState state) {
     EXPECT_TRUE(!state.has_healthy() || state.healthy());
   }));
@@ -54,268 +52,82 @@ void BasicTest::RequestHealthState() {
 }
 
 void BasicTest::GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb) {
-  if (device_entry().isStreamConfig()) {
-    stream_config()->GetHealthState(std::move(cb));
-  } else if (device_entry().isDai()) {
-    dai()->GetHealthState(std::move(cb));
-  } else if (device_entry().isCodec()) {
+  if (device_entry().isCodec()) {
     codec()->GetHealthState(std::move(cb));
   } else if (device_entry().isComposite()) {
     composite()->GetHealthState(std::move(cb));
+  } else if (device_entry().isDai()) {
+    dai()->GetHealthState(std::move(cb));
+  } else if (device_entry().isStreamConfig()) {
+    stream_config()->GetHealthState(std::move(cb));
   }
 }
 
-// fuchsia.hardware.audio.signalprocessing
-// TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
-// Proposed test cases listed below:
-//
-// BasicTest cases:
-// SignalProcessingSupport
-//    SignalProcessingConnector::SignalProcessingConnect returns and does not close channel.
-//    child protocol channel stays bound if supported, and closes with ZX_ERR_NOT_SUPPORTED if not.
-// SignalProcessingElements
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If GetElements closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    GetElements returns a vector with [1,64] entries.
-//    Implies that GetTopologies must return a non-empty vector.
-//    For each element:
-//      id and type are required.
-//      ElementType matches the TypeSpecificElement.
-//      Save the elements in a set, for recognition in later cases.
-// SignalProcessingTopologies
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If GetTopologies closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    GetTopologies returns a vector with [1,64] entries
-//    Implies that GetElements must return a non-empty vector.
-//    WatchTopology returns a value that is in the range returned by GetTopologies.
-//    For each topology element:
-//        id and processing_elements_edge_pairs are required.
-//    For each processing_elements_edge_pairs entry:
-//        processing_element_id_from and processing_element_id_to are both known (in elements set).
-// WatchTopologyWhilePending
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If GetTopologies closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    GetTopologies returns a vector with [1,64] entries
-//    WatchTopology returns a value that is in the range returned by GetTopologies.
-//    WatchTopology (again) closes the protocol channel with ZX_ERR_BAD_STATE
-// InitialElementState
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    WatchElementState immediately returns when initially called.
-//    Callback contains a valid complete ElementState that matches the ElementType.
-// WatchElementStateBadId
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    WatchElementState(badId) returns ZX_ERR_INVALID_ARGS and does not close. Fail on other error.
-// WatchElementStateWhilePending
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    WatchElementState immediately returns when initially called.
-//    WatchElementState (again) closes the protocol channel with ZX_ERR_BAD_STATE
-
-// AdminTest cases:
-// SetTopologySupported
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    SetTopology returns callback.
-//    WatchTopology acknowledges the change made by SetTopology.
-// SetTopologyBadId
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    SetTopology(badId) returns ZX_ERR_INVALID_ARGS, does not close channel. Fail on other error.
-//    WatchTopology does not return.
-// SetTopologyInvalidated
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    First make a change that invalidates the SignalProcessing configuration, then
-//    WatchTopology should ... return ZX_ERR_BAD_STATE and not close channel?
-//    SetTopology should return ZX_ERR_BAD_STATE and not close channel.
-// SetTopologyReconfigured
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    First invalidate the SignalProcessing configuration, then retrieve the new topologies.
-//    SetTopology returns callback (does not fail or close channel).
-//    WatchTopology acknowledges the change made by SetTopology.
-// SetElementState
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    SetElementState returns callback.  Any other observable state?
-// SetElementStateElementSpecific
-//    Detailed checks of specific input or output fields that are unique to the element type.
-//    ... likely multiple test cases here, one for each ElementType
-// SetElementStateNoChange
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    SetElementState does not returns callback, trigger WatchElementStateChange or close channel.
-// SetElementStateBadId
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    SetElementState(badId) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
-// SetElementStateBadValues
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
-// SetElementStateInvalidated
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    First make a change that invalidates the SignalProcessing configuration, then
-//    SetElementState should return ZX_ERR_BAD_STATE and not close channel.
-// SetElementStateReconfigured
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    First invalidate the SignalProcessing configuration, then retrieve new elements/topologies.
-//    SetElementState returns callback (does not fail or close channel).
-// WatchElementStateChange
-//    If SignalProcessingConnect not supported earlier, SKIP.
-//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
-//    Else set a static var for this driver instance that SignalProcessing is supported.
-//    WatchElementState pends until SetElementState is called.
-//    Upon change, returns callback with values that match SetElementState.
-
-// Codec channel requests
-//
-// TODO(fxbug.dev/124865): Add tests for Codec protocol methods.
-// Proposed test cases listed below:
-//
-// BasicTest cases:
-// GetProperties -
-//    Codec::GetProperties must return callback.  plug_detect_capabilities is required.
-//    Shareable with Dai::GetDaiFormats?
-//
-// InitialPlugState
-//    Codec::WatchPlugState immediately return from first call.
-//    .plug_state and .plug_change_time are always required.
-//    Returned value must match GetProperties.plug_detect_capabilities.
-// SubsequentPlugState (only for virtual drivers where we can inject plug changes)
-//    WatchPlugState doesn't return until VAD plug state change.
-//    .plug_state and .plug_change_time are always required.
-//    Returned value must match GetProperties.plug_detect_capabilities.
-//    .plug_change_time > time of VAD plug state change, but < now.
-//    Presumably this is OK for a BasicTest to change, since this is an ephemeral virtual instance.
-//
-// GetFormats
-//    Codec::GetDaiFormats returns a vector with [1, 64] DaiSupportedFormats entries.
-//    For each entry:
-//      .number_of_channels has at least 1 value, these are distinct (and increasing?).
-//      .sample_formats has at least 1 value, these are distinct.
-//      .frame_formats has at least 1 value, these are distinct.
-//      .frame_rates has at least 1 value, these are distinct and increasing.
-//      .bits_per_slot has at least 1 value, these are distinct and increasing.
-//      .bits_per_sample has at least 1 value, these are distinct and increasing.
-//      .bits_per_sample <= .bits_per_slot max value.
-//    (Is there ANY scenario in which we expect ERROR instead of valid response?)
-//
-// CheckIsBridgeable
-//    Codec::IsBridgeable returns a callback, with `supports_bridged_mode` that we save for later.
-
-// AdminTest cases:
-// SetBridgeModeFalse
-//    Codec::SetBridgeMode(false) returns ZX_OK and does not close channel.
-// SetBridgeModeTrue
-//    GTEST_SKIP if Codec::IsBridgeable returned FALSE earlier.
-//    Else, Codec::SetBridgeMode(true) returns ZX_OK and does not close channel.
-//    (Does any other observable change occur?)
-//    Presumably this is OK for a BasicTest to change, as long as we restore the previous value.
-//
-// SetFormatSupported
-//    Codec::SetDaiFormat returns a CodecFormatInfo that matches the earlier DaiSupportedFormats.
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// SetFormatUnsupported
-//    Codec::SetDaiFormat returns the expected zx_status_t (what is expected?).
-//    Codec should still be usable, after an error is returned.
-//
-// Reset
-//    Codec::Reset returns a callback.
-//    (Does this reset SignalProcessing state?  What other observable state is reset?)
-//    Shareable with Dai::Reset?
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-//
-// Start
-//    Codec::Start returns a callback, with `start_time` > when Start was called, but < now.
-//    (Does any other observable change occur?)
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// StartWhileStarted
-//    (We should define what we expect in this error case. Return callback? Don't close channel?)
-//    Codec should still be usable, after an error is returned.
-//
-// Stop
-//    Codec::Stop returns a callback, with `stop_time` > when Stop was called, but < now.
-//    (Does any other observable change occur?)
-//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
-// StopWhileStopped
-//    Codec::Stop returns a callback, and does not close channel.
-
-// Stream channel requests
+// Basic (non-privileged) requests
 //
 // Request stream properties including unique ID (which must be unique between input and output).
 // TODO(mpuryear): actually ensure that this differs between input and output.
-void BasicTest::RequestStreamProperties() {
+void BasicTest::RetrieveProperties() {
   stream_config()->GetProperties(AddCallback(
       "StreamConfig::GetProperties", [this](fuchsia::hardware::audio::StreamProperties prop) {
-        stream_props_ = std::move(prop);
+        properties_ = std::move(prop);
 
-        if (stream_props_->has_unique_id()) {
+        if (properties_->has_unique_id()) {
           char id_buf[2 * kUniqueIdLength + 1];
           std::snprintf(id_buf, sizeof(id_buf),
                         "%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x%02x",
-                        stream_props_->unique_id()[0], stream_props_->unique_id()[1],
-                        stream_props_->unique_id()[2], stream_props_->unique_id()[3],
-                        stream_props_->unique_id()[4], stream_props_->unique_id()[5],
-                        stream_props_->unique_id()[6], stream_props_->unique_id()[7],
-                        stream_props_->unique_id()[8], stream_props_->unique_id()[9],
-                        stream_props_->unique_id()[10], stream_props_->unique_id()[11],
-                        stream_props_->unique_id()[12], stream_props_->unique_id()[13],
-                        stream_props_->unique_id()[14], stream_props_->unique_id()[15]);
+                        properties_->unique_id()[0], properties_->unique_id()[1],
+                        properties_->unique_id()[2], properties_->unique_id()[3],
+                        properties_->unique_id()[4], properties_->unique_id()[5],
+                        properties_->unique_id()[6], properties_->unique_id()[7],
+                        properties_->unique_id()[8], properties_->unique_id()[9],
+                        properties_->unique_id()[10], properties_->unique_id()[11],
+                        properties_->unique_id()[12], properties_->unique_id()[13],
+                        properties_->unique_id()[14], properties_->unique_id()[15]);
           FX_LOGS(DEBUG) << "Received unique_id " << id_buf;
         }
 
-        ASSERT_TRUE(stream_props_->has_is_input());
+        ASSERT_TRUE(properties_->has_is_input());
         if (driver_type() == DriverType::StreamConfigInput) {
           ASSERT_TRUE(prop.is_input());
         } else {
           ASSERT_FALSE(prop.is_input());
         }
 
-        if (stream_props_->has_can_mute()) {
-          *stream_props_->mutable_can_mute() = stream_props_->can_mute();
+        if (properties_->has_can_mute()) {
+          *properties_->mutable_can_mute() = properties_->can_mute();
         }
-        if (stream_props_->has_can_agc()) {
-          *stream_props_->mutable_can_agc() = stream_props_->can_agc();
+        if (properties_->has_can_agc()) {
+          *properties_->mutable_can_agc() = properties_->can_agc();
         }
 
-        ASSERT_TRUE(stream_props_->has_min_gain_db());
-        ASSERT_TRUE(stream_props_->has_max_gain_db());
-        ASSERT_TRUE(stream_props_->has_gain_step_db());
-        ASSERT_TRUE(stream_props_->min_gain_db() <= stream_props_->max_gain_db());
-        ASSERT_TRUE(stream_props_->gain_step_db() >= 0);
-        if (stream_props_->max_gain_db() > stream_props_->min_gain_db()) {
-          EXPECT_GE(stream_props_->gain_step_db(), 0.0f);
+        ASSERT_TRUE(properties_->has_min_gain_db());
+        ASSERT_TRUE(properties_->has_max_gain_db());
+        ASSERT_TRUE(properties_->has_gain_step_db());
+        ASSERT_TRUE(properties_->min_gain_db() <= properties_->max_gain_db());
+        ASSERT_TRUE(properties_->gain_step_db() >= 0);
+        if (properties_->max_gain_db() > properties_->min_gain_db()) {
+          EXPECT_GE(properties_->gain_step_db(), 0.0f);
         } else {
-          EXPECT_EQ(stream_props_->gain_step_db(), 0.0f);
+          EXPECT_EQ(properties_->gain_step_db(), 0.0f);
         }
 
-        ASSERT_TRUE(stream_props_->has_plug_detect_capabilities());
+        ASSERT_TRUE(properties_->has_plug_detect_capabilities());
 
-        if (stream_props_->has_manufacturer()) {
-          FX_LOGS(DEBUG) << "Received manufacturer " << stream_props_->manufacturer();
+        if (properties_->has_manufacturer()) {
+          FX_LOGS(DEBUG) << "Received manufacturer " << properties_->manufacturer();
         }
-        if (stream_props_->has_product()) {
-          FX_LOGS(DEBUG) << "Received product " << stream_props_->product();
+        if (properties_->has_product()) {
+          FX_LOGS(DEBUG) << "Received product " << properties_->product();
         }
 
-        ASSERT_TRUE(stream_props_->has_clock_domain());
+        ASSERT_TRUE(properties_->has_clock_domain());
       }));
   ExpectCallbacks();
 }
 
 // Fail if the returned formats are not complete, unique and within ranges.
-void BasicTest::ValidateFormatCorrectness() {
+void BasicTest::ValidateRingBufferFormatSets() {
   for (size_t i = 0; i < ring_buffer_pcm_formats().size(); ++i) {
     SCOPED_TRACE(testing::Message() << "ring_buffer_pcm_format[" << i << "]");
     auto& format_set = ring_buffer_pcm_formats()[i];
@@ -446,21 +258,21 @@ void BasicTest::ValidateFormatCorrectness() {
 
 // Request that the driver return its gain capabilities and current state, expecting a response.
 void BasicTest::WatchGainStateAndExpectUpdate() {
-  ASSERT_TRUE(stream_props_);
+  ASSERT_TRUE(properties_);
 
   // We reconnect the stream every time we run a test, and by driver interface definition the driver
   // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
   stream_config()->WatchGainState(
       AddCallback("WatchGainState", [this](fuchsia::hardware::audio::GainState gain_state) {
         EXPECT_TRUE(gain_state.has_gain_db());
-        EXPECT_GE(gain_state.gain_db(), stream_props_->min_gain_db());
-        EXPECT_LE(gain_state.gain_db(), stream_props_->max_gain_db());
+        EXPECT_GE(gain_state.gain_db(), properties_->min_gain_db());
+        EXPECT_LE(gain_state.gain_db(), properties_->max_gain_db());
 
         // If we're muted, then we must be capable of muting.
-        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || stream_props_->can_mute());
+        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || properties_->can_mute());
         // If AGC is enabled, then we must be capable of AGC.
         EXPECT_TRUE(!gain_state.has_agc_enabled() || !gain_state.agc_enabled() ||
-                    stream_props_->can_agc());
+                    properties_->can_agc());
 
         LogGainState((previous_gain_state_ ? "Storing previous gain: " : "Received new gain: "),
                      gain_state);
@@ -473,7 +285,7 @@ void BasicTest::WatchGainStateAndExpectUpdate() {
 
 // Request that the driver return its current gain state, expecting no response (no change).
 void BasicTest::WatchGainStateAndExpectNoUpdate() {
-  ASSERT_TRUE(stream_props_);
+  ASSERT_TRUE(properties_);
   ASSERT_TRUE(previous_gain_state_);
   stream_config()->WatchGainState([](fuchsia::hardware::audio::GainState gain_state) {
     LogGainState("Unexpected gain update received: ", gain_state);
@@ -487,11 +299,11 @@ void BasicTest::WatchGainStateAndExpectNoUpdate() {
 void BasicTest::RequestSetGain() {
   // We reconnect the stream every time we run a test. By interface definition a driver must reply
   // to the first watch request, so we get gain state by issuing a watch FIDL call before this case.
-  ASSERT_TRUE(stream_props_);
+  ASSERT_TRUE(properties_);
   ASSERT_TRUE(previous_gain_state_);
 
-  if (stream_props_->max_gain_db() == stream_props_->min_gain_db() && !stream_props_->can_mute() &&
-      !stream_props_->can_agc()) {
+  if (properties_->max_gain_db() == properties_->min_gain_db() && !properties_->can_mute() &&
+      !properties_->can_agc()) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
                  << previous_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
@@ -502,18 +314,17 @@ void BasicTest::RequestSetGain() {
   fuchsia::hardware::audio::GainState set_gain_state;
   EXPECT_EQ(previous_gain_state_->Clone(&set_gain_state), ZX_OK);
   // Change to a different gain_db.
-  *set_gain_state.mutable_gain_db() = stream_props_->min_gain_db();
-  if (previous_gain_state_->gain_db() == stream_props_->min_gain_db()) {
-    *set_gain_state.mutable_gain_db() += stream_props_->gain_step_db();
+  *set_gain_state.mutable_gain_db() = properties_->min_gain_db();
+  if (previous_gain_state_->gain_db() == properties_->min_gain_db()) {
+    *set_gain_state.mutable_gain_db() += properties_->gain_step_db();
   }
   // Toggle muted if we can change it (explicitly set it to false, if we can't).
   *set_gain_state.mutable_muted() =
-      stream_props_->can_mute() && !(set_gain_state.has_muted() && set_gain_state.muted());
+      properties_->can_mute() && !(set_gain_state.has_muted() && set_gain_state.muted());
 
   // Toggle AGC if we can change it (explicitly set it to false, if we can't).
   *set_gain_state.mutable_agc_enabled() =
-      stream_props_->can_agc() &&
-      !(set_gain_state.has_agc_enabled() && set_gain_state.agc_enabled());
+      properties_->can_agc() && !(set_gain_state.has_agc_enabled() && set_gain_state.agc_enabled());
 
   LogGainState("Setting gain: ", set_gain_state);
   stream_config()->SetGain(std::move(set_gain_state));
@@ -530,9 +341,9 @@ void BasicTest::WatchPlugStateAndExpectUpdate() {
 
         ASSERT_TRUE(plug_state_.has_plugged());
         if (!plug_state_.plugged()) {
-          ASSERT_TRUE(stream_props_);
-          ASSERT_TRUE(stream_props_->has_plug_detect_capabilities());
-          EXPECT_NE(stream_props_->plug_detect_capabilities(),
+          ASSERT_TRUE(properties_);
+          ASSERT_TRUE(properties_->has_plug_detect_capabilities());
+          EXPECT_NE(properties_->plug_detect_capabilities(),
                     fuchsia::hardware::audio::PlugDetectCapabilities::HARDWIRED)
               << "Device reported plug capabilities as HARDWIRED, but now reports as unplugged";
         }
@@ -561,14 +372,14 @@ void BasicTest::WatchPlugStateAndExpectNoUpdate() {
 // Test cases that target each of the various Stream channel commands
 
 // Verify the driver responds to the GetHealthState query.
-DEFINE_BASIC_TEST_CLASS(Health, { RequestHealthState(); });
+DEFINE_BASIC_TEST_CLASS(Health, { RequestHealthAndExpectHealthy(); });
 
 // Verify a valid unique_id, manufacturer, product and gain capabilities is successfully received.
-DEFINE_BASIC_TEST_CLASS(StreamProperties, { RequestStreamProperties(); });
+DEFINE_BASIC_TEST_CLASS(StreamProperties, { RetrieveProperties(); });
 
 // Verify the initial WatchGainState responses are successfully received.
 DEFINE_BASIC_TEST_CLASS(GetInitialGainState, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
 
   WatchGainStateAndExpectUpdate();
   WaitForError();
@@ -576,7 +387,7 @@ DEFINE_BASIC_TEST_CLASS(GetInitialGainState, {
 
 // Verify that no response is received, for a subsequent WatchGainState request.
 DEFINE_BASIC_TEST_CLASS(WatchGainSecondTimeNoResponse, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
 
   WatchGainStateAndExpectNoUpdate();
@@ -585,7 +396,7 @@ DEFINE_BASIC_TEST_CLASS(WatchGainSecondTimeNoResponse, {
 
 // Verify valid set gain responses are successfully received.
 DEFINE_BASIC_TEST_CLASS(SetGain, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
 
   RequestSetGain();
@@ -593,17 +404,17 @@ DEFINE_BASIC_TEST_CLASS(SetGain, {
 });
 
 // Verify that format-retrieval responses are successfully received and are complete and valid.
-DEFINE_BASIC_TEST_CLASS(FormatCorrectness, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
-  ASSERT_NO_FAILURE_OR_SKIP(RequestFormats());
+DEFINE_BASIC_TEST_CLASS(RingBufferFormats, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveRingBufferFormats());
 
-  ValidateFormatCorrectness();
+  ValidateRingBufferFormatSets();
   WaitForError();
 });
 
 // Verify that a valid initial plug detect response is successfully received.
 DEFINE_BASIC_TEST_CLASS(GetInitialPlugState, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
 
   WatchPlugStateAndExpectUpdate();
   WaitForError();
@@ -614,7 +425,7 @@ DEFINE_BASIC_TEST_CLASS(GetInitialPlugState, {
 
 // Verify that no response is received, for a subsequent WatchPlugState request.
 DEFINE_BASIC_TEST_CLASS(WatchPlugSecondTimeNoResponse, {
-  ASSERT_NO_FAILURE_OR_SKIP(RequestStreamProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(WatchPlugStateAndExpectUpdate());
 
   WatchPlugStateAndExpectNoUpdate();
@@ -635,34 +446,226 @@ DEFINE_BASIC_TEST_CLASS(Topology, { RequestTopologies(); });
   }
 
 void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
-  if (device_entry.isStreamConfig()) {
+  if (device_entry.isCodec()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
+  } else if (device_entry.isComposite()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
+    REGISTER_BASIC_TEST(Topology, device_entry);
+  } else if (device_entry.isDai()) {
+    REGISTER_BASIC_TEST(Health, device_entry);
+  } else if (device_entry.isStreamConfig()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(StreamProperties, device_entry);
     REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
     REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
     REGISTER_BASIC_TEST(SetGain, device_entry);
-    REGISTER_BASIC_TEST(FormatCorrectness, device_entry);
+    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
-  } else if (device_entry.isDai()) {
-    REGISTER_BASIC_TEST(Health, device_entry);
-  } else if (device_entry.isCodec()) {
-    REGISTER_BASIC_TEST(Health, device_entry);
-  } else if (device_entry.isComposite()) {
-    REGISTER_BASIC_TEST(Health, device_entry);
-    REGISTER_BASIC_TEST(Topology, device_entry);
   } else {
     FAIL() << "Unknown device type for entry '" << device_entry.filename << "'";
   }
-  // TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
-  //   GetProperties, GetDaiFormats and GetRingBufferFormats).
-  // TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
-  // TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
-  // TODO(fxbug.dev/124865): Add tests for Codec protocol methods (specifically Reset, Start, Stop,
-  //   IsBridgeable, SetBridgeMode, GetDaiFormats, SetDaiFormat, WatchPlugState and GetProperties).
-  // TODO(b/302704556): Add tests for Watch-while-still-pending (specifically WatchGainState,
-  //   WatchPlugState, WatchClockRecoveryPositionInfo, WatchDelayInfo, WatchElementState and
-  //   WatchTopology).
 }
+
+// TODO(fxbug.dev/124865): Add tests for Codec protocol methods (specifically Reset, Start, Stop,
+//   IsBridgeable, SetBridgeMode, GetDaiFormats, SetDaiFormat, WatchPlugState and GetProperties).
+
+// TODO(fxbug.dev/124865): Add testing for Composite protocol methods.
+
+// TODO(fxbug.dev/124865): Add testing for Dai protocol methods (specifically Reset,
+//   GetProperties, GetDaiFormats and GetRingBufferFormats).
+
+// TODO(b/302704556): Add tests for Watch-while-still-pending (specifically WatchGainState,
+//   WatchPlugState, WatchClockRecoveryPositionInfo, WatchDelayInfo, WatchElementState and
+//   WatchTopology).
+
+// TODO(fxbug.dev/126734): Add testing for SignalProcessing methods.
+//
+// Proposed test cases for fuchsia.hardware.audio.signalprocessing listed below:
+// BasicTest cases:
+// SignalProcessingSupport
+//    SignalProcessingConnector::SignalProcessingConnect returns and does not close channel.
+//    child protocol channel stays bound if supported, and closes with ZX_ERR_NOT_SUPPORTED if
+//    not.
+// SignalProcessingElements
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If GetElements closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    GetElements returns a vector with [1,64] entries.
+//    Implies that GetTopologies must return a non-empty vector.
+//    For each element:
+//      id and type are required.
+//      ElementType matches the TypeSpecificElement.
+//      Save the elements in a set, for recognition in later cases.
+// SignalProcessingTopologies
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If GetTopologies closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    GetTopologies returns a vector with [1,64] entries
+//    Implies that GetElements must return a non-empty vector.
+//    WatchTopology returns a value that is in the range returned by GetTopologies.
+//    For each topology element:
+//        id and processing_elements_edge_pairs are required.
+//    For each processing_elements_edge_pairs entry:
+//        processing_element_id_from and processing_element_id_to are both known (in elements
+//        set).
+// WatchTopologyWhilePending
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If GetTopologies closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    GetTopologies returns a vector with [1,64] entries
+//    WatchTopology returns a value that is in the range returned by GetTopologies.
+//    WatchTopology (again) closes the protocol channel with ZX_ERR_BAD_STATE
+// InitialElementState
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
+//    error. Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState immediately returns when initially called.
+//    Callback contains a valid complete ElementState that matches the ElementType.
+// WatchElementStateBadId
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    WatchElementState(badId) returns ZX_ERR_INVALID_ARGS and does not close. Fail on other
+//    error.
+// WatchElementStateWhilePending
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If WatchElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other
+//    error. Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState immediately returns when initially called.
+//    WatchElementState (again) closes the protocol channel with ZX_ERR_BAD_STATE
+
+// AdminTest cases:
+// SetTopologySupported
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    SetTopology returns callback.
+//    WatchTopology acknowledges the change made by SetTopology.
+// SetTopologyBadId
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    SetTopology(badId) returns ZX_ERR_INVALID_ARGS, does not close channel. Fail on other error.
+//    WatchTopology does not return.
+// SetTopologyInvalidated
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve topologies. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    First make a change that invalidates the SignalProcessing configuration, then
+//    WatchTopology should ... return ZX_ERR_BAD_STATE and not close channel?
+//    SetTopology should return ZX_ERR_BAD_STATE and not close channel.
+// SetTopologyReconfigured
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    First invalidate the SignalProcessing configuration, then retrieve the new topologies.
+//    SetTopology returns callback (does not fail or close channel).
+//    WatchTopology acknowledges the change made by SetTopology.
+// SetElementState
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    SetElementState returns callback.  Any other observable state?
+// SetElementStateElementSpecific
+//    Detailed checks of specific input or output fields that are unique to the element type.
+//    ... likely multiple test cases here, one for each ElementType
+// SetElementStateNoChange
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    If SetElementState closes channel with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    SetElementState does not returns callback, trigger WatchElementStateChange or close channel.
+// SetElementStateBadId
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    SetElementState(badId) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
+// SetElementStateBadValues
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    SetElementState(badVal) returns ZX_ERR_INVALID_ARGS, not close channel. Fail on other error.
+// SetElementStateInvalidated
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    First make a change that invalidates the SignalProcessing configuration, then
+//    SetElementState should return ZX_ERR_BAD_STATE and not close channel.
+// SetElementStateReconfigured
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    First invalidate the SignalProcessing configuration, then retrieve new elements/topologies.
+//    SetElementState returns callback (does not fail or close channel).
+// WatchElementStateChange
+//    If SignalProcessingConnect not supported earlier, SKIP.
+//    Retrieve elements. If closes with ZX_ERR_NOT_SUPPORTED, SKIP. Fail on any other error.
+//    Else set a static var for this driver instance that SignalProcessing is supported.
+//    WatchElementState pends until SetElementState is called.
+//    Upon change, returns callback with values that match SetElementState.
+
+// Codec channel requests
+//
+// TODO(fxbug.dev/124865): Add tests for Codec protocol methods.
+// Proposed test cases listed below:
+//
+// BasicTest cases:
+// GetProperties -
+//    Codec::GetProperties must return callback.  plug_detect_capabilities is required.
+//    Shareable with Dai::GetDaiFormats?
+//
+// InitialPlugState
+//    Codec::WatchPlugState immediately return from first call.
+//    .plug_state and .plug_change_time are always required.
+//    Returned value must match GetProperties.plug_detect_capabilities.
+// SubsequentPlugState (only for virtual drivers where we can inject plug changes)
+//    WatchPlugState doesn't return until VAD plug state change.
+//    .plug_state and .plug_change_time are always required.
+//    Returned value must match GetProperties.plug_detect_capabilities.
+//    .plug_change_time > time of VAD plug state change, but < now.
+//    Presumably this is OK for a BasicTest to change, since this is an ephemeral virtual
+//    instance.
+//
+// GetFormats
+//    Codec::GetDaiFormats returns a vector with [1, 64] DaiSupportedFormats entries.
+//    For each entry:
+//      .number_of_channels has at least 1 value, these are distinct (and increasing?).
+//      .sample_formats has at least 1 value, these are distinct.
+//      .frame_formats has at least 1 value, these are distinct.
+//      .frame_rates has at least 1 value, these are distinct and increasing.
+//      .bits_per_slot has at least 1 value, these are distinct and increasing.
+//      .bits_per_sample has at least 1 value, these are distinct and increasing.
+//      .bits_per_sample <= .bits_per_slot max value.
+//    (Is there ANY scenario in which we expect ERROR instead of valid response?)
+//
+// CheckIsBridgeable
+//    Codec::IsBridgeable returns a callback, with `supports_bridged_mode` that we save for later.
+
+// AdminTest cases:
+// SetBridgeModeFalse
+//    Codec::SetBridgeMode(false) returns ZX_OK and does not close channel.
+// SetBridgeModeTrue
+//    GTEST_SKIP if Codec::IsBridgeable returned FALSE earlier.
+//    Else, Codec::SetBridgeMode(true) returns ZX_OK and does not close channel.
+//    (Does any other observable change occur?)
+//    Presumably this is OK for a BasicTest to change, as long as we restore the previous value.
+//
+// SetFormatSupported
+//    Codec::SetDaiFormat returns a CodecFormatInfo that matches the earlier DaiSupportedFormats.
+//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
+// SetFormatUnsupported
+//    Codec::SetDaiFormat returns the expected zx_status_t (what is expected?).
+//    Codec should still be usable, after an error is returned.
+//
+// Reset
+//    Codec::Reset returns a callback.
+//    (Does this reset SignalProcessing state?  What other observable state is reset?)
+//    Shareable with Dai::Reset?
+//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
+//
+// Start
+//    Codec::Start returns a callback, with `start_time` > when Start was called, but < now.
+//    (Does any other observable change occur?)
+//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
+// StartWhileStarted
+//    (We should define what we expect in this error case. Return callback? Don't close channel?)
+//    Codec should still be usable, after an error is returned.
+//
+// Stop
+//    Codec::Stop returns a callback, with `stop_time` > when Stop was called, but < now.
+//    (Does any other observable change occur?)
+//    Is this OK for a BasicTest to change? We can't retrieve/restore the previous state.
+// StopWhileStopped
+//    Codec::Stop returns a callback, and does not close channel.
 
 }  // namespace media::audio::drivers::test

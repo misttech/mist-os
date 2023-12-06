@@ -28,10 +28,10 @@ class BasicTest : public TestBase {
  protected:
   void TearDown() override;
 
-  void RequestHealthState();
+  void RequestHealthAndExpectHealthy();
   void GetHealthState(fuchsia::hardware::audio::Health::GetHealthStateCallback cb);
 
-  void RequestStreamProperties();
+  void RetrieveProperties();
 
   void WatchGainStateAndExpectUpdate();
   void WatchGainStateAndExpectNoUpdate();
@@ -41,14 +41,16 @@ class BasicTest : public TestBase {
   void WatchPlugStateAndExpectUpdate();
   void WatchPlugStateAndExpectNoUpdate();
 
-  void ValidateFormatCorrectness();
+  void ValidateRingBufferFormatSets();
 
  private:
   static constexpr size_t kUniqueIdLength = 16;
 
   // BasicTest cannot permanently change device state. Optionals ensure we fetch stream props and
   // initial gain state (to later restore it), before calling any method that alters device state.
-  std::optional<fuchsia::hardware::audio::StreamProperties> stream_props_;
+  // We will repurpose properties_ to contain properties for all driver types (Codec, Composite,
+  // Dai) not just StreamConfig.
+  std::optional<fuchsia::hardware::audio::StreamProperties> properties_;
   std::optional<fuchsia::hardware::audio::GainState> previous_gain_state_;
 
   bool changed_gain_state_ = false;

@@ -11,7 +11,6 @@
 #include <lib/zx/result.h>
 
 #include <cstdio>
-#include <deque>
 
 #include <ddktl/device.h>
 

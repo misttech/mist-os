@@ -9,9 +9,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/result.h>
-
-#include <cstdio>
-#include <deque>
+#include <zircon/errors.h>
 
 #include <ddktl/device.h>
 

@@ -35,19 +35,19 @@ class AdminTest : public TestBase {
   void RequestRingBufferChannelWithMinFormat();
   void RequestRingBufferChannelWithMaxFormat();
 
-  void CalculateFrameSize();
+  void CalculateRingBufferFrameSize();
 
   void RequestRingBufferProperties();
   void RequestBuffer(uint32_t min_ring_buffer_frames, uint32_t notifications_per_ring);
   void ActivateChannelsAndExpectSuccess(uint64_t active_channels_bitmask);
   void ActivateChannelsAndExpectFailure(uint64_t active_channels_bitmask);
 
-  void RequestStart();
-  void RequestStartAndExpectDisconnect(zx_status_t expected_error);
+  void RequestRingBufferStart();
+  void RequestRingBufferStartAndExpectDisconnect(zx_status_t expected_error);
 
-  void RequestStop();
-  void RequestStopAndExpectNoPositionNotifications();
-  void RequestStopAndExpectDisconnect(zx_status_t expected_error);
+  void RequestRingBufferStop();
+  void RequestRingBufferStopAndExpectNoPositionNotifications();
+  void RequestRingBufferStopAndExpectDisconnect(zx_status_t expected_error);
 
   // Set flag so position notifications (even already-enqueued ones!) cause failures.
   void FailOnPositionNotifications() { fail_on_position_notification_ = true; }

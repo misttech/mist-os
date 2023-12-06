@@ -8,20 +8,19 @@
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fuchsia/hardware/audio/cpp/fidl.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/interface_handle.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/device/audio.h>
 #include <zircon/rights.h>
 
-#include "lib/fidl/cpp/interface_handle.h"
-#include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
 #include "src/media/audio/lib/test/test_fixture.h"
 
 namespace media::audio::drivers::test {
 
-// We enable top-level methods (e.g. TestBase::RequestFormats, BasicTest::RequestStreamProperties,
-// AdminTest::RequestBuffer) to skip or produce multiple errors and then cause a test case to
-// exit-early once they return, even if no fatal errors were triggered.
+// We enable top-level methods (e.g. TestBase::RetrieveRingBufferFormats,
+// BasicTest::RetrieveProperties, AdminTest::RequestBuffer) to skip or produce multiple errors and
+// then cause a test case to exit-early once they return, even if no fatal errors were triggered.
 // Gtest defines NO macro for this case -- only ASSERT_NO_FATAL_FAILURE -- so we define our own.
 // Macro definition in headers is discouraged (at best), but this is used in local test code only.
 #define ASSERT_NO_FAILURE_OR_SKIP(statement, ...)          \
@@ -33,38 +32,18 @@ namespace media::audio::drivers::test {
   } while (0)
 
 enum DriverType : uint16_t {
-  StreamConfigInput = 0,
-  StreamConfigOutput = 1,
+  Codec = 0,
+  Composite = 1,
   Dai = 2,
-  Codec = 3,
-  Composite = 4
+  StreamConfigInput = 3,
+  StreamConfigOutput = 4,
 };
-inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
-  switch (dev_dir) {
-    case DriverType::StreamConfigInput:
-      return (out << "StreamConfig(In)");
-    case DriverType::StreamConfigOutput:
-      return (out << "StreamConfig(Out)");
-    case DriverType::Dai:
-      return (out << "Dai");
-    case DriverType::Codec:
-      return (out << "Codec");
-    case DriverType::Composite:
-      return (out << "Composite");
-  }
-}
 
-enum DeviceType : uint16_t { BuiltIn = 0, Virtual = 1, A2DP = 2 };
-inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type) {
-  switch (device_type) {
-    case DeviceType::BuiltIn:
-      return (out << "Built-in");
-    case DeviceType::Virtual:
-      return (out << "VirtualAudio");
-    case DeviceType::A2DP:
-      return (out << "A2DP");
-  }
-}
+enum DeviceType : uint16_t {
+  A2DP = 0,
+  BuiltIn = 1,
+  Virtual = 2,
+};
 
 struct DeviceEntry {
   std::variant<std::monostate, fidl::UnownedClientEnd<fuchsia_io::Directory>> dir;
@@ -73,13 +52,13 @@ struct DeviceEntry {
   DeviceType device_type;
 
   bool isA2DP() const { return device_type == DeviceType::A2DP; }
+  bool isCodec() const { return driver_type == DriverType::Codec; }
+  bool isComposite() const { return driver_type == DriverType::Composite; }
+  bool isDai() const { return driver_type == DriverType::Dai; }
   bool isStreamConfig() const {
     return driver_type == DriverType::StreamConfigInput ||
            driver_type == DriverType::StreamConfigOutput;
   }
-  bool isDai() const { return driver_type == DriverType::Dai; }
-  bool isCodec() const { return driver_type == DriverType::Codec; }
-  bool isComposite() const { return driver_type == DriverType::Composite; }
 
   bool operator<(const DeviceEntry& rhs) const {
     return std::tie(dir, filename, driver_type, device_type) <
@@ -98,16 +77,16 @@ std::string inline DevNameForEntry(const DeviceEntry& device_entry) {
       (device_entry.device_type == DeviceType::Virtual ? "Virtual" : device_entry.filename);
 
   switch (device_entry.driver_type) {
-    case DriverType::StreamConfigInput:
-      return "audio-input/" + device_name;
-    case DriverType::StreamConfigOutput:
-      return "audio-output/" + device_name;
-    case DriverType::Dai:
-      return "dai/" + device_name;
     case DriverType::Codec:
       return "codec/" + device_name;
     case DriverType::Composite:
       return "audio-composite/" + device_name;
+    case DriverType::Dai:
+      return "dai/" + device_name;
+    case DriverType::StreamConfigInput:
+      return "audio-input/" + device_name;
+    case DriverType::StreamConfigOutput:
+      return "audio-output/" + device_name;
   }
 }
 std::string inline TestNameForEntry(const std::string& test_class_name,
@@ -129,12 +108,12 @@ class TestBase : public media::audio::test::TestFixture {
   template <typename DeviceType>
   DeviceType Connect(const DeviceEntry& device_entry);
   void ConnectToBluetoothDevice();
-  void CreateStreamConfigFromChannel(
-      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);
-  void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
   void CreateCodecFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Codec> channel);
   void CreateCompositeFromChannel(
       fidl::InterfaceHandle<fuchsia::hardware::audio::Composite> channel);
+  void CreateDaiFromChannel(fidl::InterfaceHandle<fuchsia::hardware::audio::Dai> channel);
+  void CreateStreamConfigFromChannel(
+      fidl::InterfaceHandle<fuchsia::hardware::audio::StreamConfig> channel);
 
   const DeviceEntry& device_entry() const { return device_entry_; }
   DriverType driver_type() const { return device_entry_.driver_type; }
@@ -142,7 +121,7 @@ class TestBase : public media::audio::test::TestFixture {
 
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // know the supported formats, so this is implemented in this shared parent class.
-  void RequestFormats();
+  void RetrieveRingBufferFormats();
 
   // BasicTest (non-destructive) and AdminTest (destructive or RingBuffer) cases both need to
   // connect to fuchsia.hardware.audio.signalprocessing and query the supported topologies, so this
@@ -156,12 +135,12 @@ class TestBase : public media::audio::test::TestFixture {
     return ring_buffer_pcm_formats_;
   }
 
+  fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
+  fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
+  fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
   fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig>& stream_config() {
     return stream_config_;
   }
-  fidl::InterfacePtr<fuchsia::hardware::audio::Dai>& dai() { return dai_; }
-  fidl::InterfacePtr<fuchsia::hardware::audio::Codec>& codec() { return codec_; }
-  fidl::InterfacePtr<fuchsia::hardware::audio::Composite>& composite() { return composite_; }
 
   const fuchsia::hardware::audio::PcmFormat& min_ring_buffer_format() const {
     return min_ring_buffer_format_;
@@ -201,10 +180,10 @@ class TestBase : public media::audio::test::TestFixture {
 
   const DeviceEntry& device_entry_;
 
-  fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig> stream_config_;
-  fidl::InterfacePtr<fuchsia::hardware::audio::Dai> dai_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Codec> codec_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Composite> composite_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::Dai> dai_;
+  fidl::InterfacePtr<fuchsia::hardware::audio::StreamConfig> stream_config_;
   fidl::InterfacePtr<fuchsia::hardware::audio::Health> health_;
 
   std::vector<fuchsia::hardware::audio::PcmSupportedFormats> ring_buffer_pcm_formats_;
@@ -222,6 +201,32 @@ class TestBase : public media::audio::test::TestFixture {
   std::optional<uint64_t> ring_buffer_id_;  // Ring buffer process element id.
   std::optional<uint64_t> dai_id_;          // DAI interconnect process element id.
 };
+
+inline std::ostream& operator<<(std::ostream& out, const DriverType& dev_dir) {
+  switch (dev_dir) {
+    case DriverType::Codec:
+      return (out << "Codec");
+    case DriverType::Composite:
+      return (out << "Composite");
+    case DriverType::Dai:
+      return (out << "Dai");
+    case DriverType::StreamConfigInput:
+      return (out << "StreamConfig(In)");
+    case DriverType::StreamConfigOutput:
+      return (out << "StreamConfig(Out)");
+  }
+}
+
+inline std::ostream& operator<<(std::ostream& out, const DeviceType& device_type) {
+  switch (device_type) {
+    case DeviceType::A2DP:
+      return (out << "A2DP");
+    case DeviceType::BuiltIn:
+      return (out << "Built-in");
+    case DeviceType::Virtual:
+      return (out << "VirtualAudio");
+  }
+}
 
 }  // namespace media::audio::drivers::test
 

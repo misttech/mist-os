@@ -16,7 +16,6 @@
 #include <zircon/system/public/zircon/compiler.h>
 
 #include <string>
-#include <thread>
 
 #include <gtest/gtest.h>
 
@@ -42,11 +41,11 @@ static const struct {
   const char* path;
   DriverType driver_type;
 } kAudioDevNodes[] = {
+    {.path = "/dev/class/audio-composite", .driver_type = DriverType::Composite},
     {.path = "/dev/class/audio-input", .driver_type = DriverType::StreamConfigInput},
     {.path = "/dev/class/audio-output", .driver_type = DriverType::StreamConfigOutput},
-    {.path = "/dev/class/dai", .driver_type = DriverType::Dai},
     {.path = "/dev/class/codec", .driver_type = DriverType::Codec},
-    {.path = "/dev/class/audio-composite", .driver_type = DriverType::Composite},
+    {.path = "/dev/class/dai", .driver_type = DriverType::Dai},
 };
 
 // Our thread and dispatcher must exist during the entirety of test execution; create it now.
@@ -151,8 +150,8 @@ void DeviceHost::DetectDevices(bool devfs_only, bool no_virtual_audio) {
 }
 
 // Optionally called during DetectDevices. Create virtual_audio instances (StreamConfig input and
-// output, Dai input and output, and Composite) using the default configuration settings (which
-// should pass all tests).
+// output, Dai input and output, and Composite) using the
+// default configuration settings (which should pass all tests).
 void DeviceHost::AddVirtualDevices() {
   const std::string kControlNodePath =
       fxl::Concatenate({"/dev/", fuchsia::virtualaudio::CONTROL_NODE_NAME});
@@ -167,15 +166,17 @@ void DeviceHost::AddVirtualDevices() {
   ASSERT_EQ(num_inputs, 0u) << num_inputs << " virtual_audio inputs already exist (should be 0)";
   ASSERT_EQ(num_outputs, 0u) << num_outputs << " virtual_audio outputs already exist (should be 0)";
   ASSERT_EQ(num_unspecified_direction, 0u)
-      << num_outputs
+      << num_unspecified_direction
       << " virtual_audio devices with unspecified direction already exist (should be 0)";
+
+  // Composite has no directionality; is_input = true is unused.
+  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
+
+  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::DAI, dai_input_);
+  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::DAI, dai_output_);
 
   AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_input_);
   AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::STREAM_CONFIG, stream_config_output_);
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::DAI, dai_input_);
-  AddVirtualDevice(false, fuchsia::virtualaudio::DeviceType::DAI, dai_output_);
-  // No direction support in composite devices, is_input = true is unused.
-  AddVirtualDevice(true, fuchsia::virtualaudio::DeviceType::COMPOSITE, composite_);
 }
 
 void DeviceHost::AddVirtualDevice(bool is_input,
@@ -183,25 +184,25 @@ void DeviceHost::AddVirtualDevice(bool is_input,
                                   fuchsia::virtualaudio::DevicePtr& device_ptr) {
   const char* direction = is_input ? "input" : "output";
   const char* type;
-
   switch (device_type) {
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig:
-      type = "StreamConfig";
-      break;
-    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
-      type = "Dai";
-      break;
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kCodec:
       type = "Codec";
       break;
     case fuchsia::virtualaudio::DeviceSpecific::Tag::kComposite:
       type = "Composite";
       break;
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kDai:
+      type = "Dai";
+      break;
+    case fuchsia::virtualaudio::DeviceSpecific::Tag::kStreamConfig:
+      type = "StreamConfig";
+      break;
     default:
       ZX_ASSERT(0);
   }
   fuchsia::virtualaudio::Direction configuration_direction;
   configuration_direction.set_is_input(is_input);
+
   fuchsia::virtualaudio::Control_GetDefaultConfiguration_Result config_result;
   zx_status_t status = controller_->GetDefaultConfiguration(
       device_type, std::move(configuration_direction), &config_result);
@@ -247,11 +248,11 @@ zx_status_t DeviceHost::QuitDeviceLoop() {
 
   libsync::Completion done;
   async::PostTask(device_loop_.dispatcher(), [this, &done]() {
-    stream_config_input_.set_error_handler(nullptr);
-    stream_config_output_.set_error_handler(nullptr);
+    composite_.set_error_handler(nullptr);
     dai_input_.set_error_handler(nullptr);
     dai_output_.set_error_handler(nullptr);
-    composite_.set_error_handler(nullptr);
+    stream_config_input_.set_error_handler(nullptr);
+    stream_config_output_.set_error_handler(nullptr);
 
     if (controller_.is_bound()) {
       zx_status_t status = controller_->RemoveAll();

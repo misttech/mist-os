@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/zx/result.h>
+#include <zircon/errors.h>
 
 #include <ddktl/fidl.h>
 
@@ -108,16 +109,16 @@ void VirtualAudioControlImpl::GetDefaultConfiguration(
     GetDefaultConfigurationRequestView request, GetDefaultConfigurationCompleter::Sync& completer) {
   fidl::Arena arena;
   switch (request->type) {
-    case fuchsia_virtualaudio::wire::DeviceType::kStreamConfig:
-      completer.ReplySuccess(
-          fidl::ToWire(arena, VirtualAudioStream::GetDefaultConfig(request->direction.is_input())));
+    case fuchsia_virtualaudio::wire::DeviceType::kComposite:
+      completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
       break;
     case fuchsia_virtualaudio::wire::DeviceType::kDai:
       completer.ReplySuccess(
           fidl::ToWire(arena, VirtualAudioDai::GetDefaultConfig(request->direction.is_input())));
       break;
-    case fuchsia_virtualaudio::wire::DeviceType::kComposite:
-      completer.ReplySuccess(fidl::ToWire(arena, VirtualAudioComposite::GetDefaultConfig()));
+    case fuchsia_virtualaudio::wire::DeviceType::kStreamConfig:
+      completer.ReplySuccess(
+          fidl::ToWire(arena, VirtualAudioStream::GetDefaultConfig(request->direction.is_input())));
       break;
     default:
       ZX_ASSERT_MSG(0, "Unknown device type");
