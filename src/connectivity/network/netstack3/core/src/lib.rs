@@ -52,10 +52,7 @@ use lock_order::lock::UnlockedAccess;
 use lock_order::Locked;
 use net_types::{
     ethernet::Mac,
-    ip::{
-        AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
-        Subnet,
-    },
+    ip::{AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet},
     SpecifiedAddr,
 };
 use tracing::trace;
@@ -83,73 +80,6 @@ use crate::{
     },
 };
 pub(crate) use trace::trace_duration;
-
-/// Map an expression over either version of one or more addresses.
-///
-/// `map_addr_version!` when given a value of a type which is an enum with two
-/// variants - `V4` and `V6` - matches on the variants, and for both variants,
-/// invokes an expression on the inner contents. `$addr` is both the name of the
-/// variable to match on, and the name that the address will be bound to for the
-/// scope of the expression.
-///
-/// `map_addr_version!` when given a list of values and their types (all enums
-/// with variants `V4` and `V6`), matches on the tuple of values and invokes the
-/// `$match` expression when all values are of the same variant. Otherwise the
-/// `$mismatch` expression is invoked.
-///
-/// To make it concrete, the expression `map_addr_version!(bar: Foo; blah(bar))`
-/// desugars to:
-///
-/// ```rust,ignore
-/// match bar {
-///     Foo::V4(bar) => blah(bar),
-///     Foo::V6(bar) => blah(bar),
-/// }
-/// ```
-///
-/// Also,
-/// `map_addr_version!((foo: Foo, bar: Bar); blah(foo, bar), unreachable!())`
-/// desugars to:
-///
-/// ```rust,ignore
-/// match (foo, bar) {
-///     (Foo::V4(foo), Bar::V4(bar)) => blah(foo, bar),
-///     (Foo::V6(foo), Bar::V6(bar)) => blah(foo, bar),
-///     _ => unreachable!(),
-/// }
-/// ```
-#[macro_export]
-macro_rules! map_addr_version {
-    ($addr:ident: $ty:tt; $expr:expr) => {
-        match $addr {
-            $ty::V4($addr) => $expr,
-            $ty::V6($addr) => $expr,
-        }
-    };
-    ($addr:ident: $ty:tt; $expr_v4:expr, $expr_v6:expr) => {
-        match $addr {
-            $ty::V4($addr) => $expr_v4,
-            $ty::V6($addr) => $expr_v6,
-        }
-    };
-    (( $( $addr:ident : $ty:tt ),+ ); $match:expr, $mismatch:expr) => {
-        match ( $( $addr ),+ ) {
-            ( $( $ty::V4( $addr ) ),+ ) => $match,
-            ( $( $ty::V6( $addr ) ),+ ) => $match,
-            _ => $mismatch,
-        }
-    };
-    (( $( $addr:ident : $ty:tt ),+ ); $match_v4:expr, $match_v6:expr, $mismatch:expr) => {
-        match ( $( $addr ),+ ) {
-            ( $( $ty::V4( $addr ) ),+ ) => $match_v4,
-            ( $( $ty::V6( $addr ) ),+ ) => $match_v6,
-            _ => $mismatch,
-        }
-    };
-    (( $( $addr:ident : $ty:tt ),+ ); $match:expr, $mismatch:expr,) => {
-        map_addr_version!(($( $addr: $ty ),+); $match, $mismatch)
-    };
-}
 
 /// A builder for [`StackState`].
 #[derive(Default, Clone)]
@@ -650,11 +580,10 @@ pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
     device: &DeviceId<NonSyncCtx>,
     addr: SpecifiedAddr<IpAddr>,
 ) -> Result<(), error::NotFoundError> {
-    let addr = addr.into();
-    map_addr_version!(
-        addr: IpAddr;
-        crate::device::del_ip_addr(&sync_ctx, ctx, device, &addr)
-    )
+    match addr.into() {
+        IpAddr::V4(addr) => crate::device::del_ip_addr(&sync_ctx, ctx, device, &addr),
+        IpAddr::V6(addr) => crate::device::del_ip_addr(&sync_ctx, ctx, device, &addr),
+    }
 }
 
 /// Selects the device to use for gateway routes when the device was unspecified
@@ -666,12 +595,14 @@ pub fn select_device_for_gateway<NonSyncCtx: NonSyncContext>(
     gateway: SpecifiedAddr<IpAddr>,
 ) -> Option<DeviceId<NonSyncCtx>> {
     let mut sync_ctx = Locked::new(sync_ctx);
-    let gateway: IpAddr<SpecifiedAddr<Ipv4Addr>, SpecifiedAddr<Ipv6Addr>> = gateway.into();
-    map_addr_version!(
-        gateway: IpAddr;
-        ip::forwarding::select_device_for_gateway::<Ipv4, _, _>(&mut sync_ctx, gateway),
-        ip::forwarding::select_device_for_gateway::<Ipv6, _, _>(&mut sync_ctx, gateway)
-    )
+    match gateway.into() {
+        IpAddr::V4(gateway) => {
+            ip::forwarding::select_device_for_gateway::<Ipv4, _, _>(&mut sync_ctx, gateway)
+        }
+        IpAddr::V6(gateway) => {
+            ip::forwarding::select_device_for_gateway::<Ipv6, _, _>(&mut sync_ctx, gateway)
+        }
+    }
 }
 
 /// Gets the routing metric for the device.
@@ -758,7 +689,7 @@ mod tests {
     use ip_test_macro::ip_test;
     use net_declare::{net_subnet_v4, net_subnet_v6};
     use net_types::{
-        ip::{AddrSubnet, Ip, IpAddress, Ipv4, Ipv6},
+        ip::{AddrSubnet, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6},
         Witness,
     };
     use test_case::test_case;
