@@ -13,6 +13,7 @@
     device_set_profile_by_role;
     device_get_protocol;
     get_root_resource;
+    get_iommu_resource;
     get_ioport_resource;
     get_mmio_resource;
     get_irq_resource;

@@ -119,6 +119,7 @@ zx_status_t SystemInstance::InitializeDriverHostSvcDir() {
       "fuchsia.kernel.MmioResource",       "fuchsia.kernel.IrqResource",
       "fuchsia.kernel.SmcResource",        "fuchsia.logger.LogSink",
       "fuchsia.scheduler.ProfileProvider", "fuchsia.tracing.provider.Registry",
+      "fuchsia.kernel.IommuResource",
   };
   return driver_host_svc_->Initialize(std::move(incoming_services), cpp20::span(kAllowedServices));
 }

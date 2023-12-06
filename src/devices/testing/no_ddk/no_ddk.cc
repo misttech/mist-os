@@ -97,6 +97,9 @@ __EXPORT
 zx_handle_t get_ioport_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT
+zx_handle_t get_iommu_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
+
+__EXPORT
 zx_handle_t get_mmio_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT

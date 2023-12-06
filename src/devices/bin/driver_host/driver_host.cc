@@ -914,6 +914,22 @@ int main(int argc, char** argv) {
     }
   }
 
+  zx::resource iommu_resource;
+  {
+    zx::result client_end = component::Connect<fkernel::IommuResource>();
+    if (client_end.is_error()) {
+      LOGF(WARNING, "Failed to connect to iommu_resource.");
+    }
+
+    fidl::WireResult result = fidl::WireCall(*client_end)->Get();
+
+    if (!result.ok()) {
+      LOGF(WARNING, "Failed to get iommu_resource.");
+    } else {
+      iommu_resource = std::move(result.value().resource);
+    }
+  }
+
   zx::resource irq_resource;
   {
     zx::result client_end = component::Connect<fkernel::IrqResource>();
@@ -971,7 +987,8 @@ int main(int argc, char** argv) {
 
   DriverHostContext ctx(&kAsyncLoopConfigAttachToCurrentThread, std::move(root_resource),
                         std::move(mmio_resource), std::move(ioport_resource),
-                        std::move(irq_resource), std::move(info_resource), std::move(smc_resource));
+                        std::move(irq_resource), std::move(info_resource), std::move(smc_resource),
+                        std::move(iommu_resource));
 
   RegisterContextForApi(&ctx);
 

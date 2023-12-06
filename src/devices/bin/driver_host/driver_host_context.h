@@ -30,14 +30,15 @@ class DriverHostContext {
   explicit DriverHostContext(const async_loop_config_t* config, zx::resource root_resource = {},
                              zx::resource mmio_resource = {}, zx::resource ioport_resource = {},
                              zx::resource irq_resource = {}, zx::resource info_resource = {},
-                             zx::resource smc_resource = {})
+                             zx::resource smc_resource = {}, zx::resource iommu_resource = {})
       : loop_(config),
         root_resource_(std::move(root_resource)),
         mmio_resource_(std::move(mmio_resource)),
         ioport_resource_(std::move(ioport_resource)),
         irq_resource_(std::move(irq_resource)),
         info_resource_(std::move(info_resource)),
-        smc_resource_(std::move(smc_resource)) {}
+        smc_resource_(std::move(smc_resource)),
+        iommu_resource_(std::move(iommu_resource)) {}
 
   ~DriverHostContext();
 
@@ -134,7 +135,7 @@ class DriverHostContext {
   const zx::resource& ioport_resource() { return ioport_resource_; }
   const zx::resource& info_resource() { return info_resource_; }
   const zx::resource& smc_resource() { return smc_resource_; }
-
+  const zx::resource& iommu_resource() { return iommu_resource_; }
   const zx::resource& irq_resource() { return irq_resource_; }
 
   ApiLock& api_lock() TA_RET_CAP(api_lock_) { return api_lock_; }
@@ -167,8 +168,8 @@ class DriverHostContext {
   fbl::DoublyLinkedList<fbl::RefPtr<zx_driver>> drivers_;
   fbl::DoublyLinkedList<fbl::RefPtr<dfv2::Driver>> dfv2_drivers_;
 
-  fbl::TaggedDoublyLinkedList<zx_device*, zx_device::DeferListTag> defer_device_list_
-      TA_GUARDED(api_lock_);
+  fbl::TaggedDoublyLinkedList<zx_device*, zx_device::DeferListTag> defer_device_list_ TA_GUARDED(
+      api_lock_);
   int enumerators_ TA_GUARDED(api_lock_) = 0;
 
   zx::resource root_resource_;
@@ -177,6 +178,7 @@ class DriverHostContext {
   zx::resource irq_resource_;
   zx::resource info_resource_;
   zx::resource smc_resource_;
+  zx::resource iommu_resource_;
 
   DriverHostInspect inspect_;
 
