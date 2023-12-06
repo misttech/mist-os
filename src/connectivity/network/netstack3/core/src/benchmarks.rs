@@ -31,11 +31,11 @@ use packet_formats::{
 
 use crate::{
     device::{receive_frame, DeviceId},
+    state::StackStateBuilder,
     testutil::{
         benchmarks::{black_box, Bencher},
         Ctx, FakeEventDispatcherBuilder, FAKE_CONFIG_V4,
     },
-    StackStateBuilder,
 };
 
 // NOTE: Extra tests that are too expensive to run during benchmarks can be

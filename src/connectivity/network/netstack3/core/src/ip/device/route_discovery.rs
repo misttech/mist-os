@@ -288,7 +288,8 @@ mod tests {
             Ctx, DispatchedEvent, FakeEventDispatcherConfig, TestIpExt as _,
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        DeviceId, TimerId, TimerIdInner,
+        time::TimerIdInner,
+        DeviceId, TimerId,
     };
 
     #[derive(Default)]

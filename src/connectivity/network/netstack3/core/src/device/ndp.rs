@@ -177,7 +177,8 @@ mod tests {
             FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC, FAKE_CONFIG_V6,
             IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        Instant, NonSyncContext, SyncCtx, TimerId, TimerIdInner,
+        time::TimerIdInner,
+        Instant, NonSyncContext, SyncCtx, TimerId,
     };
 
     #[derive(Debug, PartialEq, Copy, Clone)]

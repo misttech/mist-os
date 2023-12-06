@@ -568,11 +568,13 @@ mod tests {
             },
             testutil::FakeIpDeviceIdCtx,
         },
+        state::StackStateBuilder,
         testutil::{
             assert_empty, new_rng, run_with_many_seeds, Ctx, FakeEventDispatcherConfig,
             TestIpExt as _, DEFAULT_INTERFACE_METRIC,
         },
-        StackStateBuilder, TimerId, TimerIdInner,
+        time::TimerIdInner,
+        TimerId,
     };
 
     /// A fake [`IgmpContext`] that stores the [`MulticastGroupSet`] and an

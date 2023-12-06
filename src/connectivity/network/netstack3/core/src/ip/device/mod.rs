@@ -2166,11 +2166,13 @@ mod tests {
             },
             gmp::GmpDelayedReportTimerId,
         },
+        state::StackStateBuilder,
         testutil::{
             assert_empty, Ctx, DispatchedEvent, FakeCtx, FakeNonSyncCtx, FakeSyncCtx,
             TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        StackStateBuilder, TimerId, TimerIdInner,
+        time::TimerIdInner,
+        TimerId,
     };
 
     #[test]

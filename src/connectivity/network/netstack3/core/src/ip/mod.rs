@@ -3487,12 +3487,13 @@ mod tests {
             testutil::is_in_ip_multicast,
             types::{AddableEntryEither, AddableMetric, RawMetric},
         },
+        state::StackState,
         testutil::{
             assert_empty, handle_timer, new_rng, set_logger_for_test, Ctx, FakeCtx,
             FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        DeviceId, StackState,
+        DeviceId,
     };
 
     // Some helper functions

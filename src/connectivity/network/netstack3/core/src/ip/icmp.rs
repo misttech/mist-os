@@ -4127,12 +4127,12 @@ mod tests {
             testutil::DualStackSendIpPacketMeta,
             IpCounters, SendIpPacketMeta,
         },
+        state::StackStateBuilder,
         testutil::{
             assert_empty, handle_queued_rx_packets, Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6,
         },
         transport::udp::UdpStateBuilder,
-        StackStateBuilder,
     };
 
     impl<I: Ip> SocketId<I> {

@@ -60,8 +60,10 @@ lib_sources = [
   "src/socket/address.rs",
   "src/socket/datagram.rs",
   "src/socket/mod.rs",
+  "src/state.rs",
   "src/sync.rs",
   "src/testutil.rs",
+  "src/time.rs",
   "src/trace.rs",
   "src/transport/integration.rs",
   "src/transport/mod.rs",
@@ -78,6 +80,7 @@ lib_sources = [
   "src/transport/tcp/socket/mod.rs",
   "src/transport/tcp/state.rs",
   "src/transport/udp.rs",
+  "src/work_queue.rs",
 ]
 
 lib_deps = [

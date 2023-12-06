@@ -1783,7 +1783,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        context::{testutil::FakeInstant, EventContext},
+        context::{testutil::FakeInstant, EventContext, TimerContext},
         device::{testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{
@@ -1794,7 +1794,6 @@ mod tests {
             IpDeviceContext, IpLayerEvent, IpLayerIpExt, IpStateContext,
         },
         testutil::*,
-        TimerContext,
     };
 
     enum AddressType {

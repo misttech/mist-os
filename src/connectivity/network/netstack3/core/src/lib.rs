@@ -30,530 +30,40 @@ mod algorithm;
 pub mod benchmarks;
 pub mod context;
 pub(crate) mod convert;
-pub(crate) mod counters;
+pub mod counters;
 pub mod data_structures;
 pub mod device;
 pub mod error;
 pub mod ip;
 mod lock_ordering;
 pub mod socket;
+pub mod state;
 pub mod sync;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
+pub mod time;
 mod trace;
 pub mod transport;
+pub mod work_queue;
 
 use alloc::vec::Vec;
-use core::{fmt::Debug, time};
 
-use derivative::Derivative;
-#[cfg(test)]
-use lock_order::lock::UnlockedAccess;
 use lock_order::Locked;
 use net_types::{
-    ethernet::Mac,
     ip::{AddrSubnetEither, GenericOverIp, Ip, IpAddr, IpInvariant, Ipv4, Ipv6, Ipv6Addr, Subnet},
     SpecifiedAddr,
 };
-use tracing::trace;
 
-#[cfg(test)]
-use crate::{context::CounterContext, counters::Counter};
 use crate::{
-    context::{EventContext, InstantBindingsTypes, RngContext, TimerContext, TracingContext},
-    device::{
-        arp::ArpCounters, ethernet::EthernetLinkDevice, DeviceCounters, DeviceId, DeviceLayerState,
-        DeviceLayerTimerId, DeviceLayerTypes,
-    },
-    ip::{
-        device::{
-            slaac::SlaacCounters, state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler,
-            Ipv4DeviceTimerId, Ipv6DeviceTimerId,
-        },
-        icmp::{IcmpBindingsContext, IcmpRxCounters, IcmpTxCounters, NdpCounters},
-        IpCounters, IpLayerTimerId, Ipv4Counters, Ipv4State, Ipv6Counters, Ipv6State,
-    },
-    transport::{
-        tcp::socket::TcpBindingsTypes,
-        udp::{UdpBindingsContext, UdpCounters},
-        TransportLayerState, TransportLayerTimerId,
-    },
+    context::RngContext,
+    device::DeviceId,
+    ip::device::{state::AddrSubnetAndManualConfigEither, DualStackDeviceHandler},
 };
+pub use context::{BindingsTypes, NonSyncContext, ReferenceNotifiers, SyncCtx};
+pub use time::{handle_timer, Instant, TimerId};
+pub use work_queue::WorkQueueReport;
+
 pub(crate) use trace::trace_duration;
-
-/// A builder for [`StackState`].
-#[derive(Default, Clone)]
-pub struct StackStateBuilder {
-    transport: transport::TransportStateBuilder,
-    ipv4: ip::Ipv4StateBuilder,
-    ipv6: ip::Ipv6StateBuilder,
-}
-
-impl StackStateBuilder {
-    /// Get the builder for the transport layer state.
-    pub fn transport_builder(&mut self) -> &mut transport::TransportStateBuilder {
-        &mut self.transport
-    }
-
-    /// Get the builder for the IPv4 state.
-    pub fn ipv4_builder(&mut self) -> &mut ip::Ipv4StateBuilder {
-        &mut self.ipv4
-    }
-
-    /// Get the builder for the IPv6 state.
-    pub fn ipv6_builder(&mut self) -> &mut ip::Ipv6StateBuilder {
-        &mut self.ipv6
-    }
-
-    /// Consume this builder and produce a `StackState`.
-    pub fn build_with_ctx<C: NonSyncContext>(self, ctx: &mut C) -> StackState<C> {
-        StackState {
-            transport: self.transport.build_with_ctx(ctx),
-            ipv4: self.ipv4.build(),
-            ipv6: self.ipv6.build(),
-            device: DeviceLayerState::new(),
-            #[cfg(test)]
-            timer_counters: Default::default(),
-        }
-    }
-}
-
-/// The state associated with the network stack.
-pub struct StackState<BT: BindingsTypes> {
-    transport: TransportLayerState<BT>,
-    ipv4: Ipv4State<BT::Instant, DeviceId<BT>>,
-    ipv6: Ipv6State<BT::Instant, DeviceId<BT>>,
-    device: DeviceLayerState<BT>,
-    #[cfg(test)]
-    timer_counters: TimerCounters,
-}
-
-impl<BT: BindingsTypes> StackState<BT> {
-    pub(crate) fn ip_counters<I: Ip>(&self) -> &IpCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.as_ref().counters(),
-            |IpInvariant(state)| state.ipv6.as_ref().counters(),
-        )
-    }
-
-    pub(crate) fn ipv4(&self) -> &Ipv4State<BT::Instant, DeviceId<BT>> {
-        &self.ipv4
-    }
-
-    pub(crate) fn ipv6(&self) -> &Ipv6State<BT::Instant, DeviceId<BT>> {
-        &self.ipv6
-    }
-
-    pub(crate) fn icmp_tx_counters<I: Ip>(&self) -> &IcmpTxCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.icmp_tx_counters(),
-            |IpInvariant(state)| state.ipv6.icmp_tx_counters(),
-        )
-    }
-
-    pub(crate) fn icmp_rx_counters<I: Ip>(&self) -> &IcmpRxCounters<I> {
-        I::map_ip(
-            IpInvariant(self),
-            |IpInvariant(state)| state.ipv4.icmp_rx_counters(),
-            |IpInvariant(state)| state.ipv6.icmp_rx_counters(),
-        )
-    }
-
-    pub(crate) fn ndp_counters(&self) -> &NdpCounters {
-        &self.ipv6.ndp_counters()
-    }
-
-    pub(crate) fn device_counters(&self) -> &DeviceCounters {
-        &self.device.counters()
-    }
-
-    pub(crate) fn arp_counters(&self) -> &ArpCounters {
-        &self.device.arp_counters()
-    }
-
-    pub(crate) fn udp_counters<I: Ip>(&self) -> &UdpCounters<I> {
-        &self.transport.udp_counters::<I>()
-    }
-
-    pub(crate) fn slaac_counters(&self) -> &SlaacCounters {
-        &self.ipv6.slaac_counters()
-    }
-}
-
-/// Stack counters for export outside of core.
-pub struct StackCounters<'a> {
-    /// IPv4 layer common counters.
-    pub ipv4_common: &'a IpCounters<Ipv4>,
-    /// IPv6 layer common counters.
-    pub ipv6_common: &'a IpCounters<Ipv6>,
-    /// IPv4 layer specific counters.
-    pub ipv4: &'a Ipv4Counters,
-    /// IPv6 layer specific counters.
-    pub ipv6: &'a Ipv6Counters,
-    /// ARP layer counters.
-    pub arp: &'a ArpCounters,
-    /// UDP layer counters for IPv4.
-    pub udpv4: &'a UdpCounters<Ipv4>,
-    /// UDP layer counters for IPv6.
-    pub udpv6: &'a UdpCounters<Ipv6>,
-    /// ICMP layer counters for IPv4 Rx-path.
-    pub icmpv4_rx: &'a IcmpRxCounters<Ipv4>,
-    /// ICMP layer counters for IPv4 Tx-path.
-    pub icmpv4_tx: &'a IcmpTxCounters<Ipv4>,
-    /// ICMP layer counters for IPv6 Rx-path.
-    pub icmpv6_rx: &'a IcmpRxCounters<Ipv6>,
-    /// ICMP layer counters for IPv4 Tx-path.
-    pub icmpv6_tx: &'a IcmpTxCounters<Ipv6>,
-    /// NDP counters.
-    pub ndp: &'a NdpCounters,
-    /// Device layer counters.
-    pub devices: &'a DeviceCounters,
-}
-
-/// Visitor for stack counters.
-pub trait CounterVisitor {
-    /// Performs a user-defined operation on stack counters.
-    fn visit_counters(&self, counters: StackCounters<'_>);
-}
-
-/// Provides access to stack counters via a visitor.
-pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx<C>, visitor: &V) {
-    let counters = StackCounters {
-        ipv4_common: sync_ctx.state.ip_counters::<Ipv4>(),
-        ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
-        ipv4: sync_ctx.state.ipv4().counters(),
-        ipv6: sync_ctx.state.ipv6().counters(),
-        arp: sync_ctx.state.arp_counters(),
-        udpv4: sync_ctx.state.udp_counters::<Ipv4>(),
-        udpv6: sync_ctx.state.udp_counters::<Ipv6>(),
-        icmpv4_rx: sync_ctx.state.icmp_rx_counters::<Ipv4>(),
-        icmpv4_tx: sync_ctx.state.icmp_tx_counters::<Ipv4>(),
-        icmpv6_rx: sync_ctx.state.icmp_rx_counters::<Ipv6>(),
-        icmpv6_tx: sync_ctx.state.icmp_tx_counters::<Ipv6>(),
-        ndp: sync_ctx.state.ndp_counters(),
-        devices: sync_ctx.state.device_counters(),
-    };
-    visitor.visit_counters(counters);
-}
-
-/// A context trait determining the types to be used for reference notifications.
-pub trait ReferenceNotifiers {
-    /// The receiver for shared reference destruction notifications.
-    type ReferenceReceiver<T: 'static>: 'static;
-    /// The notifier for shared reference destruction notifications.
-    type ReferenceNotifier<T: Send + 'static>: sync::RcNotifier<T> + 'static;
-
-    /// Creates a new Notifier/Receiver pair for `T`.
-    ///
-    /// `debug_references` is given to provide information on outstanding
-    /// references that caused the notifier to be requested.
-    fn new_reference_notifier<T: Send + 'static, D: Debug>(
-        debug_references: D,
-    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
-}
-
-/// A marker trait for all the types stored in core objects that are specified
-/// by bindings.
-pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
-
-impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
-
-/// The non-synchronized context for the stack.
-pub trait NonSyncContext:
-    BindingsTypes
-    + RngContext
-    + TimerContext<TimerId<Self>>
-    + EventContext<
-        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantBindingsTypes>::Instant>,
-    > + EventContext<
-        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantBindingsTypes>::Instant>,
-    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
-    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-    + EventContext<
-        ip::device::nud::Event<
-            Mac,
-            device::EthernetDeviceId<Self>,
-            Ipv4,
-            <Self as InstantBindingsTypes>::Instant,
-        >,
-    > + EventContext<
-        ip::device::nud::Event<
-            Mac,
-            device::EthernetDeviceId<Self>,
-            Ipv6,
-            <Self as InstantBindingsTypes>::Instant,
-        >,
-    > + UdpBindingsContext<Ipv4, DeviceId<Self>>
-    + UdpBindingsContext<Ipv6, DeviceId<Self>>
-    + IcmpBindingsContext<Ipv4, DeviceId<Self>>
-    + IcmpBindingsContext<Ipv6, DeviceId<Self>>
-    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
-    + device::DeviceLayerEventDispatcher
-    + device::socket::NonSyncContext<DeviceId<Self>>
-    + ReferenceNotifiers
-    + TracingContext
-    + 'static
-{
-}
-impl<
-        C: BindingsTypes
-            + RngContext
-            + TimerContext<TimerId<Self>>
-            + EventContext<
-                ip::device::IpDeviceEvent<
-                    DeviceId<Self>,
-                    Ipv4,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<
-                ip::device::IpDeviceEvent<
-                    DeviceId<Self>,
-                    Ipv6,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
-            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
-            + EventContext<
-                ip::device::nud::Event<
-                    Mac,
-                    device::EthernetDeviceId<Self>,
-                    Ipv4,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + EventContext<
-                ip::device::nud::Event<
-                    Mac,
-                    device::EthernetDeviceId<Self>,
-                    Ipv6,
-                    <Self as InstantBindingsTypes>::Instant,
-                >,
-            > + UdpBindingsContext<Ipv4, DeviceId<Self>>
-            + UdpBindingsContext<Ipv6, DeviceId<Self>>
-            + IcmpBindingsContext<Ipv4, DeviceId<Self>>
-            + IcmpBindingsContext<Ipv6, DeviceId<Self>>
-            + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
-            + device::DeviceLayerEventDispatcher
-            + device::socket::NonSyncContext<DeviceId<Self>>
-            + TracingContext
-            + ReferenceNotifiers
-            + 'static,
-    > NonSyncContext for C
-{
-}
-
-/// The synchronized context.
-pub struct SyncCtx<BT: BindingsTypes> {
-    /// Contains the state of the stack.
-    pub state: StackState<BT>,
-}
-
-impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
-    /// Create a new `SyncCtx`.
-    pub fn new(non_sync_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
-        SyncCtx { state: StackStateBuilder::default().build_with_ctx(non_sync_ctx) }
-    }
-}
-
-/// The identifier for any timer event.
-#[derive(Derivative)]
-#[derivative(
-    Clone(bound = ""),
-    Eq(bound = ""),
-    PartialEq(bound = ""),
-    Hash(bound = ""),
-    Debug(bound = "")
-)]
-pub struct TimerId<C: NonSyncContext>(TimerIdInner<C>);
-
-#[derive(Derivative)]
-#[derivative(
-    Clone(bound = ""),
-    Eq(bound = ""),
-    PartialEq(bound = ""),
-    Hash(bound = ""),
-    Debug(bound = "")
-)]
-enum TimerIdInner<C: NonSyncContext> {
-    /// A timer event in the device layer.
-    DeviceLayer(DeviceLayerTimerId<C>),
-    /// A timer event in the transport layer.
-    TransportLayer(TransportLayerTimerId<C>),
-    /// A timer event in the IP layer.
-    IpLayer(IpLayerTimerId),
-    /// A timer event for an IPv4 device.
-    Ipv4Device(Ipv4DeviceTimerId<DeviceId<C>>),
-    /// A timer event for an IPv6 device.
-    Ipv6Device(Ipv6DeviceTimerId<DeviceId<C>>),
-    /// A no-op timer event (used for tests)
-    #[cfg(test)]
-    Nop(usize),
-}
-
-impl<C: NonSyncContext> From<DeviceLayerTimerId<C>> for TimerId<C> {
-    fn from(id: DeviceLayerTimerId<C>) -> TimerId<C> {
-        TimerId(TimerIdInner::DeviceLayer(id))
-    }
-}
-
-impl<C: NonSyncContext> From<Ipv4DeviceTimerId<DeviceId<C>>> for TimerId<C> {
-    fn from(id: Ipv4DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
-        TimerId(TimerIdInner::Ipv4Device(id))
-    }
-}
-
-impl<C: NonSyncContext> From<Ipv6DeviceTimerId<DeviceId<C>>> for TimerId<C> {
-    fn from(id: Ipv6DeviceTimerId<DeviceId<C>>) -> TimerId<C> {
-        TimerId(TimerIdInner::Ipv6Device(id))
-    }
-}
-
-impl<C: NonSyncContext> From<IpLayerTimerId> for TimerId<C> {
-    fn from(id: IpLayerTimerId) -> TimerId<C> {
-        TimerId(TimerIdInner::IpLayer(id))
-    }
-}
-
-impl<C: NonSyncContext> From<TransportLayerTimerId<C>> for TimerId<C> {
-    fn from(id: TransportLayerTimerId<C>) -> Self {
-        TimerId(TimerIdInner::TransportLayer(id))
-    }
-}
-
-impl_timer_context!(
-    C: NonSyncContext,
-    TimerId<C>,
-    DeviceLayerTimerId<C>,
-    TimerId(TimerIdInner::DeviceLayer(id)),
-    id
-);
-impl_timer_context!(
-    C: NonSyncContext,
-    TimerId<C>,
-    IpLayerTimerId,
-    TimerId(TimerIdInner::IpLayer(id)),
-    id
-);
-impl_timer_context!(
-    C: NonSyncContext,
-    TimerId<C>,
-    Ipv4DeviceTimerId<DeviceId<C>>,
-    TimerId(TimerIdInner::Ipv4Device(id)),
-    id
-);
-impl_timer_context!(
-    C: NonSyncContext,
-    TimerId<C>,
-    Ipv6DeviceTimerId<DeviceId<C>>,
-    TimerId(TimerIdInner::Ipv6Device(id)),
-    id
-);
-impl_timer_context!(
-    C: NonSyncContext,
-    TimerId<C>,
-    TransportLayerTimerId<C>,
-    TimerId(TimerIdInner::TransportLayer(id)),
-    id
-);
-
-/// Handles a generic timer event.
-pub fn handle_timer<NonSyncCtx: NonSyncContext>(
-    sync_ctx: &SyncCtx<NonSyncCtx>,
-    ctx: &mut NonSyncCtx,
-    id: TimerId<NonSyncCtx>,
-) {
-    trace!("handle_timer: dispatching timerid: {:?}", id);
-    let mut sync_ctx = Locked::new(sync_ctx);
-
-    match id {
-        TimerId(TimerIdInner::DeviceLayer(x)) => {
-            device::handle_timer(&mut sync_ctx, ctx, x);
-        }
-        TimerId(TimerIdInner::TransportLayer(x)) => {
-            transport::handle_timer(&mut sync_ctx, ctx, x);
-        }
-        TimerId(TimerIdInner::IpLayer(x)) => {
-            ip::handle_timer(&mut sync_ctx, ctx, x);
-        }
-        TimerId(TimerIdInner::Ipv4Device(x)) => {
-            ip::device::handle_ipv4_timer(&mut sync_ctx, ctx, x);
-        }
-        TimerId(TimerIdInner::Ipv6Device(x)) => {
-            ip::device::handle_ipv6_timer(&mut sync_ctx, ctx, x);
-        }
-        #[cfg(test)]
-        TimerId(TimerIdInner::Nop(_)) => {
-            sync_ctx.with_counters(|counters: &TimerCounters| counters.nop.increment());
-        }
-    }
-}
-
-#[cfg(test)]
-/// Timer-related counters.
-#[derive(Default)]
-struct TimerCounters {
-    /// Count of no-op timers handled.
-    pub(crate) nop: Counter,
-}
-
-#[cfg(test)]
-impl<C: NonSyncContext> UnlockedAccess<crate::lock_ordering::TimerCounters> for SyncCtx<C> {
-    type Data = TimerCounters;
-    type Guard<'l> = &'l TimerCounters where Self: 'l;
-
-    fn access(&self) -> Self::Guard<'_> {
-        &self.state.timer_counters
-    }
-}
-
-#[cfg(test)]
-impl<NonSyncCtx: NonSyncContext, L> CounterContext<TimerCounters>
-    for Locked<&SyncCtx<NonSyncCtx>, L>
-{
-    fn with_counters<O, F: FnOnce(&TimerCounters) -> O>(&self, cb: F) -> O {
-        cb(self.unlocked_access::<crate::lock_ordering::TimerCounters>())
-    }
-}
-
-/// A type representing an instant in time.
-///
-/// `Instant` can be implemented by any type which represents an instant in
-/// time. This can include any sort of real-world clock time (e.g.,
-/// [`std::time::Instant`]) or fake time such as in testing.
-pub trait Instant: Sized + Ord + Copy + Clone + Debug + Send + Sync {
-    /// Returns the amount of time elapsed from another instant to this one.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if `earlier` is later than `self`.
-    fn duration_since(&self, earlier: Self) -> time::Duration;
-
-    /// Returns the amount of time elapsed from another instant to this one,
-    /// saturating at zero.
-    fn saturating_duration_since(&self, earlier: Self) -> time::Duration;
-
-    /// Returns `Some(t)` where `t` is the time `self + duration` if `t` can be
-    /// represented as `Instant` (which means it's inside the bounds of the
-    /// underlying data structure), `None` otherwise.
-    fn checked_add(&self, duration: time::Duration) -> Option<Self>;
-
-    /// Unwraps the result from `checked_add`.
-    ///
-    /// # Panics
-    ///
-    /// This function will panic if the addition makes the clock wrap around.
-    fn add(&self, duration: time::Duration) -> Self {
-        self.checked_add(duration).unwrap_or_else(|| {
-            panic!("clock wraps around when adding {:?} to {:?}", duration, *self);
-        })
-    }
-
-    /// Returns `Some(t)` where `t` is the time `self - duration` if `t` can be
-    /// represented as `Instant` (which means it's inside the bounds of the
-    /// underlying data structure), `None` otherwise.
-    fn checked_sub(&self, duration: time::Duration) -> Option<Self>;
-}
 
 /// Get all IPv4 and IPv6 address/subnet pairs configured on a device
 pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
@@ -668,18 +178,6 @@ pub(crate) fn request_context_del_routes_v6<NonSyncCtx: NonSyncContext>(
         del_device.clone(),
         del_gateway,
     )
-}
-
-/// A common type returned by functions that perform bounded amounts of work.
-///
-/// This exists so cooperative task execution and yielding can be sensibly
-/// performed when dealing with long work queues.
-#[derive(Debug, Eq, PartialEq)]
-pub enum WorkQueueReport {
-    /// All the available work was done.
-    AllDone,
-    /// There's still pending work to do, execution was cut short.
-    Pending,
 }
 
 #[cfg(test)]
@@ -833,7 +331,7 @@ mod tests {
             expected_second_result,
         } = test_case;
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
-            Ctx::new_with_builder(crate::StackStateBuilder::default());
+            Ctx::new_with_builder(crate::state::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
         let gateway_subnet = I::map_ip(
@@ -913,7 +411,7 @@ mod tests {
     #[test_case(false; "when there is no on-link route to the gateway")]
     fn select_device_for_gateway<I: Ip + TestIpExt>(on_link_route: bool) {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
-            Ctx::new_with_builder(crate::StackStateBuilder::default());
+            Ctx::new_with_builder(crate::state::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
         let device_id: DeviceId<_> = crate::device::add_ethernet_device(
@@ -980,7 +478,7 @@ mod tests {
     #[ip_test]
     fn test_route_tracks_interface_metric<I: Ip + TestIpExt>() {
         let FakeCtx { sync_ctx, mut non_sync_ctx } =
-            Ctx::new_with_builder(crate::StackStateBuilder::default());
+            Ctx::new_with_builder(crate::state::StackStateBuilder::default());
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
 
         let metric = RawMetric(9999);

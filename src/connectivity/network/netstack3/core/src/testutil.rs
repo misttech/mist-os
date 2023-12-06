@@ -70,7 +70,9 @@ use crate::{
         types::{AddableEntry, AddableMetric, RawMetric},
         IpLayerEvent,
     },
+    state::StackStateBuilder,
     sync::Mutex,
+    time::TimerId,
     transport::{
         tcp::{
             buffer::{
@@ -82,7 +84,7 @@ use crate::{
         },
         udp::{self, UdpBindingsContext},
     },
-    StackStateBuilder, SyncCtx, TimerId,
+    SyncCtx,
 };
 
 /// The default interface routing metric for test interfaces.
@@ -1357,7 +1359,7 @@ pub(crate) fn handle_timer(
     _ctx: &mut (),
     id: TimerId<FakeNonSyncCtx>,
 ) {
-    crate::handle_timer(sync_ctx, non_sync_ctx, id)
+    crate::time::handle_timer(sync_ctx, non_sync_ctx, id)
 }
 
 pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: ethernet::MaxFrameSize =
@@ -1490,7 +1492,7 @@ mod tests {
             IpLayerHandler,
         },
         socket::address::SocketIpAddr,
-        TimerIdInner,
+        time::TimerIdInner,
     };
 
     #[test]

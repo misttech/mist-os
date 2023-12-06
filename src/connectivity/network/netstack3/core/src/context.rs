@@ -80,13 +80,24 @@
 //!
 //! [`ArpContext`]: crate::device::arp::ArpContext
 
-use core::{ffi::CStr, time::Duration};
+use core::{ffi::CStr, fmt::Debug, time::Duration};
 
 use lock_order::Locked;
+use net_types::{
+    ethernet::Mac,
+    ip::{Ipv4, Ipv6},
+};
 use packet::{BufferMut, Serializer};
 use rand::{CryptoRng, RngCore};
 
-use crate::{Instant, NonSyncContext, SyncCtx};
+use crate::{
+    device::{self, ethernet::EthernetLinkDevice, DeviceId, DeviceLayerTypes},
+    ip::{self, icmp::IcmpBindingsContext},
+    state::{StackState, StackStateBuilder},
+    sync,
+    transport::{tcp::socket::TcpBindingsTypes, udp::UdpBindingsContext},
+    Instant, TimerId,
+};
 
 /// A marker trait indicating that the implementor is not the [`FakeSyncCtx`]
 /// type found in test environments.
@@ -292,6 +303,124 @@ pub trait TracingContext {
     /// Care should be taken to avoid a duration's scope spanning an `await`
     /// point in asynchronous code.
     fn duration(&self, name: &'static CStr) -> Self::DurationScope;
+}
+
+/// A context trait determining the types to be used for reference notifications.
+pub trait ReferenceNotifiers {
+    /// The receiver for shared reference destruction notifications.
+    type ReferenceReceiver<T: 'static>: 'static;
+    /// The notifier for shared reference destruction notifications.
+    type ReferenceNotifier<T: Send + 'static>: sync::RcNotifier<T> + 'static;
+
+    /// Creates a new Notifier/Receiver pair for `T`.
+    ///
+    /// `debug_references` is given to provide information on outstanding
+    /// references that caused the notifier to be requested.
+    fn new_reference_notifier<T: Send + 'static, D: Debug>(
+        debug_references: D,
+    ) -> (Self::ReferenceNotifier<T>, Self::ReferenceReceiver<T>);
+}
+
+/// A marker trait for all the types stored in core objects that are specified
+/// by bindings.
+pub trait BindingsTypes: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
+impl<O> BindingsTypes for O where O: InstantBindingsTypes + DeviceLayerTypes + TcpBindingsTypes {}
+
+/// The non-synchronized context for the stack.
+pub trait NonSyncContext:
+    BindingsTypes
+    + RngContext
+    + TimerContext<TimerId<Self>>
+    + EventContext<
+        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv4, <Self as InstantBindingsTypes>::Instant>,
+    > + EventContext<
+        ip::device::IpDeviceEvent<DeviceId<Self>, Ipv6, <Self as InstantBindingsTypes>::Instant>,
+    > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+    + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
+    + EventContext<
+        ip::device::nud::Event<
+            Mac,
+            device::EthernetDeviceId<Self>,
+            Ipv4,
+            <Self as InstantBindingsTypes>::Instant,
+        >,
+    > + EventContext<
+        ip::device::nud::Event<
+            Mac,
+            device::EthernetDeviceId<Self>,
+            Ipv6,
+            <Self as InstantBindingsTypes>::Instant,
+        >,
+    > + UdpBindingsContext<Ipv4, DeviceId<Self>>
+    + UdpBindingsContext<Ipv6, DeviceId<Self>>
+    + IcmpBindingsContext<Ipv4, DeviceId<Self>>
+    + IcmpBindingsContext<Ipv6, DeviceId<Self>>
+    + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+    + device::DeviceLayerEventDispatcher
+    + device::socket::NonSyncContext<DeviceId<Self>>
+    + ReferenceNotifiers
+    + TracingContext
+    + 'static
+{
+}
+impl<
+        C: BindingsTypes
+            + RngContext
+            + TimerContext<TimerId<Self>>
+            + EventContext<
+                ip::device::IpDeviceEvent<
+                    DeviceId<Self>,
+                    Ipv4,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + EventContext<
+                ip::device::IpDeviceEvent<
+                    DeviceId<Self>,
+                    Ipv6,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv4>>
+            + EventContext<ip::IpLayerEvent<DeviceId<Self>, Ipv6>>
+            + EventContext<
+                ip::device::nud::Event<
+                    Mac,
+                    device::EthernetDeviceId<Self>,
+                    Ipv4,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + EventContext<
+                ip::device::nud::Event<
+                    Mac,
+                    device::EthernetDeviceId<Self>,
+                    Ipv6,
+                    <Self as InstantBindingsTypes>::Instant,
+                >,
+            > + UdpBindingsContext<Ipv4, DeviceId<Self>>
+            + UdpBindingsContext<Ipv6, DeviceId<Self>>
+            + IcmpBindingsContext<Ipv4, DeviceId<Self>>
+            + IcmpBindingsContext<Ipv6, DeviceId<Self>>
+            + ip::device::nud::LinkResolutionContext<EthernetLinkDevice>
+            + device::DeviceLayerEventDispatcher
+            + device::socket::NonSyncContext<DeviceId<Self>>
+            + TracingContext
+            + ReferenceNotifiers
+            + 'static,
+    > NonSyncContext for C
+{
+}
+
+/// The synchronized context.
+pub struct SyncCtx<BT: BindingsTypes> {
+    /// Contains the state of the stack.
+    pub state: StackState<BT>,
+}
+
+impl<NonSyncCtx: NonSyncContext> SyncCtx<NonSyncCtx> {
+    /// Create a new `SyncCtx`.
+    pub fn new(non_sync_ctx: &mut NonSyncCtx) -> SyncCtx<NonSyncCtx> {
+        SyncCtx { state: StackStateBuilder::default().build_with_ctx(non_sync_ctx) }
+    }
 }
 
 /// Fake implementations of context traits.

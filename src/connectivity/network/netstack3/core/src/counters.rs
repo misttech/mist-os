@@ -2,9 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! Types and utilities for working with packet statistic counters.
+//! Types for working with and exposing packet statistic counters.
 
 use core::sync::atomic::{AtomicU64, Ordering};
+use net_types::ip::{Ipv4, Ipv6};
+
+use crate::{
+    device::{arp::ArpCounters, DeviceCounters},
+    ip::{
+        icmp::{IcmpRxCounters, IcmpTxCounters, NdpCounters},
+        IpCounters, Ipv4Counters, Ipv6Counters,
+    },
+    transport::udp::UdpCounters,
+    NonSyncContext, SyncCtx,
+};
 
 /// An atomic counter for packet statistics, e.g. IPv4 packets received.
 #[derive(Debug, Default)]
@@ -27,4 +38,60 @@ impl Counter {
         let Self(v) = self;
         v.load(Ordering::Relaxed)
     }
+}
+
+/// Stack counters for export outside of core.
+pub struct StackCounters<'a> {
+    /// IPv4 layer common counters.
+    pub ipv4_common: &'a IpCounters<Ipv4>,
+    /// IPv6 layer common counters.
+    pub ipv6_common: &'a IpCounters<Ipv6>,
+    /// IPv4 layer specific counters.
+    pub ipv4: &'a Ipv4Counters,
+    /// IPv6 layer specific counters.
+    pub ipv6: &'a Ipv6Counters,
+    /// ARP layer counters.
+    pub arp: &'a ArpCounters,
+    /// UDP layer counters for IPv4.
+    pub udpv4: &'a UdpCounters<Ipv4>,
+    /// UDP layer counters for IPv6.
+    pub udpv6: &'a UdpCounters<Ipv6>,
+    /// ICMP layer counters for IPv4 Rx-path.
+    pub icmpv4_rx: &'a IcmpRxCounters<Ipv4>,
+    /// ICMP layer counters for IPv4 Tx-path.
+    pub icmpv4_tx: &'a IcmpTxCounters<Ipv4>,
+    /// ICMP layer counters for IPv6 Rx-path.
+    pub icmpv6_rx: &'a IcmpRxCounters<Ipv6>,
+    /// ICMP layer counters for IPv4 Tx-path.
+    pub icmpv6_tx: &'a IcmpTxCounters<Ipv6>,
+    /// NDP counters.
+    pub ndp: &'a NdpCounters,
+    /// Device layer counters.
+    pub devices: &'a DeviceCounters,
+}
+
+/// Visitor for stack counters.
+pub trait CounterVisitor {
+    /// Performs a user-defined operation on stack counters.
+    fn visit_counters(&self, counters: StackCounters<'_>);
+}
+
+/// Provides access to stack counters via a visitor.
+pub fn inspect_counters<C: NonSyncContext, V: CounterVisitor>(sync_ctx: &SyncCtx<C>, visitor: &V) {
+    let counters = StackCounters {
+        ipv4_common: sync_ctx.state.ip_counters::<Ipv4>(),
+        ipv6_common: sync_ctx.state.ip_counters::<Ipv6>(),
+        ipv4: sync_ctx.state.ipv4().counters(),
+        ipv6: sync_ctx.state.ipv6().counters(),
+        arp: sync_ctx.state.arp_counters(),
+        udpv4: sync_ctx.state.udp_counters::<Ipv4>(),
+        udpv6: sync_ctx.state.udp_counters::<Ipv6>(),
+        icmpv4_rx: sync_ctx.state.icmp_rx_counters::<Ipv4>(),
+        icmpv4_tx: sync_ctx.state.icmp_tx_counters::<Ipv4>(),
+        icmpv6_rx: sync_ctx.state.icmp_rx_counters::<Ipv6>(),
+        icmpv6_tx: sync_ctx.state.icmp_tx_counters::<Ipv6>(),
+        ndp: sync_ctx.state.ndp_counters(),
+        devices: sync_ctx.state.device_counters(),
+    };
+    visitor.visit_counters(counters);
 }
