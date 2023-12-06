@@ -8,33 +8,42 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fdio/fdio.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/compiler.h>
 
-#include <cstring>
-#include <string_view>
+#include <string>
 
 namespace media::audio::drivers::test {
 
+// TODO(b/313655758): when audio drivers are fixed, enable+remove this flag.
+constexpr bool kTestSetGainMissingGainDb = false;
+// TODO(b/313655706): when audio drivers are fixed, enable+remove this flag.
+constexpr bool kTestSetGainDbNan = false;
+
 constexpr bool kLogGainValues = false;
-void LogGainState(std::string_view prologue,
+
+std::string to_string(const fuchsia::hardware::audio::GainState& gain_state) {
+  return std::string(gain_state.has_gain_db() ? std::to_string(gain_state.gain_db())
+                                              : "UNSPECIFIED")
+      .append(" dB, muted is ")
+      .append((gain_state.has_muted() ? (gain_state.muted() ? "true" : "false") : "UNSPECIFIED"))
+      .append(", AGC is ")
+      .append((gain_state.has_agc_enabled() ? (gain_state.agc_enabled() ? "enabled" : "disabled")
+                                            : "UNSPECIFIED"));
+}
+
+void LogGainState(const std::string& prologue,
                   const fuchsia::hardware::audio::GainState& gain_state) {
   if constexpr (kLogGainValues) {
-    FX_LOGS(INFO)
-        << prologue
-        << (gain_state.has_gain_db() ? std::to_string(gain_state.gain_db()) : "UNSPECIFIED")
-        << " dB, muted is "
-        << (gain_state.has_muted() ? (gain_state.muted() ? "true" : "false") : "UNSPECIFIED")
-        << ", AGC is "
-        << (gain_state.has_agc_enabled() ? (gain_state.agc_enabled() ? "enabled" : "disabled")
-                                         : "UNSPECIFIED");
+    FX_LOGS(INFO) << prologue << to_string(gain_state);
   }
 }
 
 void BasicTest::TearDown() {
-  // Restore previous_gain_state_, if we changed the gain in this test case.
-  if (stream_config().is_bound() && previous_gain_state_ && changed_gain_state_) {
-    LogGainState("Restoring previous gain: ", *previous_gain_state_);
-    stream_config()->SetGain(std::move(*previous_gain_state_));
-    previous_gain_state_.reset();
+  // Restore initial_gain_state_, if we changed the gain in this test case.
+  if (stream_config().is_bound() && initial_gain_state_ && set_gain_state_) {
+    LogGainState("Restoring initial gain: ", *initial_gain_state_);
+    stream_config()->SetGain(std::move(*initial_gain_state_));
+    initial_gain_state_.reset();
   }
 
   TestBase::TearDown();
@@ -104,6 +113,9 @@ void BasicTest::RetrieveProperties() {
         ASSERT_TRUE(properties_->has_min_gain_db());
         ASSERT_TRUE(properties_->has_max_gain_db());
         ASSERT_TRUE(properties_->has_gain_step_db());
+        ASSERT_TRUE(std::isfinite(properties_->min_gain_db()));
+        ASSERT_TRUE(std::isfinite(properties_->max_gain_db()));
+        ASSERT_TRUE(std::isfinite(properties_->gain_step_db()));
         ASSERT_TRUE(properties_->min_gain_db() <= properties_->max_gain_db());
         ASSERT_TRUE(properties_->gain_step_db() >= 0);
         if (properties_->max_gain_db() > properties_->min_gain_db()) {
@@ -260,24 +272,32 @@ void BasicTest::ValidateRingBufferFormatSets() {
 void BasicTest::WatchGainStateAndExpectUpdate() {
   ASSERT_TRUE(properties_);
 
-  // We reconnect the stream every time we run a test, and by driver interface definition the driver
+  // We reconnect the stream every time we run a test. Per driver interface definition, the driver
   // must reply to the first watch request, so we get gain state by issuing a watch FIDL call.
   stream_config()->WatchGainState(
       AddCallback("WatchGainState", [this](fuchsia::hardware::audio::GainState gain_state) {
-        EXPECT_TRUE(gain_state.has_gain_db());
+        LogGainState((initial_gain_state_ ? "Received new gain: " : "Storing initial gain: "),
+                     gain_state);
+
+        ASSERT_TRUE(gain_state.has_gain_db());
         EXPECT_GE(gain_state.gain_db(), properties_->min_gain_db());
         EXPECT_LE(gain_state.gain_db(), properties_->max_gain_db());
 
-        // If we're muted, then we must be capable of muting.
-        EXPECT_TRUE(!gain_state.has_muted() || !gain_state.muted() || properties_->can_mute());
-        // If AGC is enabled, then we must be capable of AGC.
-        EXPECT_TRUE(!gain_state.has_agc_enabled() || !gain_state.agc_enabled() ||
-                    properties_->can_agc());
+        // If we specify mute and are muted, then we must be capable of muting.
+        EXPECT_FALSE(gain_state.has_muted() && gain_state.muted() && !properties_->can_mute());
+        // If we specify and enable AGC, then we must be capable of AGC.
+        EXPECT_FALSE(gain_state.has_agc_enabled() && gain_state.agc_enabled() &&
+                     !properties_->can_agc());
 
-        LogGainState((previous_gain_state_ ? "Storing previous gain: " : "Received new gain: "),
-                     gain_state);
-        if (!previous_gain_state_) {
-          previous_gain_state_ = std::move(gain_state);
+        if (!initial_gain_state_) {
+          initial_gain_state_ = std::move(gain_state);
+        }
+        if (expected_gain_state_) {
+          EXPECT_EQ(gain_state.gain_db(), expected_gain_state_->gain_db());
+          EXPECT_EQ(gain_state.has_muted() && gain_state.muted(),
+                    expected_gain_state_->has_muted() && expected_gain_state_->muted());
+          EXPECT_EQ(gain_state.has_agc_enabled() && gain_state.agc_enabled(),
+                    expected_gain_state_->has_agc_enabled() && expected_gain_state_->agc_enabled());
         }
       }));
   ExpectCallbacks();
@@ -286,48 +306,110 @@ void BasicTest::WatchGainStateAndExpectUpdate() {
 // Request that the driver return its current gain state, expecting no response (no change).
 void BasicTest::WatchGainStateAndExpectNoUpdate() {
   ASSERT_TRUE(properties_);
-  ASSERT_TRUE(previous_gain_state_);
-  stream_config()->WatchGainState([](fuchsia::hardware::audio::GainState gain_state) {
-    LogGainState("Unexpected gain update received: ", gain_state);
-    FAIL();
+  ASSERT_TRUE(initial_gain_state_);
+  stream_config()->WatchGainState([](const fuchsia::hardware::audio::GainState& gain_state) {
+    FAIL() << "Unexpected gain update received: " << to_string(gain_state);
   });
 }
 
-// Determine an appropriate gain state to request, then call other method to request that driver set
-// gain. This method assumes that the driver already successfully responded to a GetInitialGainState
-// request. If this device's gain is fixed and cannot be changed, then SKIP the test.
-void BasicTest::RequestSetGain() {
-  // We reconnect the stream every time we run a test. By interface definition a driver must reply
-  // to the first watch request, so we get gain state by issuing a watch FIDL call before this case.
+// Determine an appropriate gain state to set (one that represents a change), then request that the
+// driver do so. This method assumes that the driver has already successfully responded to a
+// GetInitialGainState request. If this device's gain state cannot be changed, SKIP the test.
+void BasicTest::SetGainStateChange() {
   ASSERT_TRUE(properties_);
-  ASSERT_TRUE(previous_gain_state_);
-
   if (properties_->max_gain_db() == properties_->min_gain_db() && !properties_->can_mute() &&
       !properties_->can_agc()) {
     GTEST_SKIP() << "*** Audio " << driver_type() << " has fixed gain ("
-                 << previous_gain_state_->gain_db()
+                 << initial_gain_state_->gain_db()
                  << " dB) and cannot MUTE or AGC. Skipping SetGain test. ***";
   }
-  changed_gain_state_ = true;
 
-  // Base our new gain settings on the old ones: avoid existing values.
-  fuchsia::hardware::audio::GainState set_gain_state;
-  EXPECT_EQ(previous_gain_state_->Clone(&set_gain_state), ZX_OK);
-  // Change to a different gain_db.
-  *set_gain_state.mutable_gain_db() = properties_->min_gain_db();
-  if (previous_gain_state_->gain_db() == properties_->min_gain_db()) {
-    *set_gain_state.mutable_gain_db() += properties_->gain_step_db();
-  }
+  // Ensure we've retrieved initial gain settings, so we can restore them after this test case.
+  ASSERT_TRUE(initial_gain_state_);
+  expected_gain_state_ = fuchsia::hardware::audio::GainState{};
+  ASSERT_EQ(initial_gain_state_->Clone(&expected_gain_state_.value()), ZX_OK);
+
+  // Base our new gain settings on the old ones: avoid existing values so this Set is a change.
+  // If we got this far, we know we can change something (even if it isn't gain_db).
+  *expected_gain_state_->mutable_gain_db() =
+      (initial_gain_state_->gain_db() == properties_->min_gain_db() ? properties_->max_gain_db()
+                                                                    : properties_->min_gain_db());
   // Toggle muted if we can change it (explicitly set it to false, if we can't).
-  *set_gain_state.mutable_muted() =
-      properties_->can_mute() && !(set_gain_state.has_muted() && set_gain_state.muted());
-
+  *expected_gain_state_->mutable_muted() =
+      properties_->can_mute() &&
+      !(expected_gain_state_->has_muted() && expected_gain_state_->muted());
   // Toggle AGC if we can change it (explicitly set it to false, if we can't).
-  *set_gain_state.mutable_agc_enabled() =
-      properties_->can_agc() && !(set_gain_state.has_agc_enabled() && set_gain_state.agc_enabled());
+  *expected_gain_state_->mutable_agc_enabled() =
+      properties_->can_agc() &&
+      !(expected_gain_state_->has_agc_enabled() && expected_gain_state_->agc_enabled());
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  ASSERT_EQ(expected_gain_state_->Clone(&gain_state_to_set), ZX_OK);
 
-  LogGainState("Setting gain: ", set_gain_state);
-  stream_config()->SetGain(std::move(set_gain_state));
+  RequestSetGain(std::move(gain_state_to_set));
+}
+
+// Call SetGain with the current gain state.
+void BasicTest::SetGainStateNoChange() {
+  ASSERT_TRUE(initial_gain_state_);
+  ASSERT_FALSE(set_gain_state_);
+
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  ASSERT_EQ(initial_gain_state_->Clone(&gain_state_to_set), ZX_OK);
+  RequestSetGain(std::move(gain_state_to_set));
+}
+
+void BasicTest::SetGainDb(std::optional<float> gain_db) {
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  if (gain_db) {
+    *gain_state_to_set.mutable_gain_db() = *gain_db;
+  }
+  RequestSetGain(std::move(gain_state_to_set));
+}
+
+void BasicTest::SetImpossibleMute() {
+  ASSERT_TRUE(properties_);
+
+  if (properties_->has_can_mute() && properties_->can_mute()) {
+    GTEST_SKIP() << "*** Audio " << driver_type() << " can MUTE. Skipping SetBadMute test. ***";
+    __UNREACHABLE;
+  }
+
+  // Base our new gain settings on the old ones: avoid existing values so this Set is a change.
+  ASSERT_TRUE(initial_gain_state_);
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  ASSERT_EQ(initial_gain_state_->Clone(&gain_state_to_set), ZX_OK);
+  *gain_state_to_set.mutable_muted() = true;
+
+  RequestSetGain(std::move(gain_state_to_set));
+}
+
+void BasicTest::SetImpossibleAgc() {
+  ASSERT_TRUE(properties_);
+
+  if (properties_->has_can_agc() && properties_->can_agc()) {
+    GTEST_SKIP() << "*** Audio " << driver_type()
+                 << " can enable/disable AGC. Skipping SetBadAgc test. ***";
+    __UNREACHABLE;
+  }
+
+  // Base our new gain settings on the old ones: avoid existing values so this Set is a change.
+  ASSERT_TRUE(initial_gain_state_);
+  fuchsia::hardware::audio::GainState gain_state_to_set;
+  ASSERT_EQ(initial_gain_state_->Clone(&gain_state_to_set), ZX_OK);
+  *gain_state_to_set.mutable_agc_enabled() = true;
+
+  RequestSetGain(std::move(gain_state_to_set));
+}
+
+void BasicTest::RequestSetGain(fuchsia::hardware::audio::GainState gain_state) {
+  if (!device_entry().isStreamConfig()) {
+    FAIL() << "device_entry is not StreamConfig";
+    return;
+  }
+
+  LogGainState("Setting gain: ", gain_state);
+  set_gain_state_ = true;
+  stream_config()->SetGain(std::move(gain_state));
 }
 
 // Request that the driver return its current plug state, expecting a valid response.
@@ -395,11 +477,94 @@ DEFINE_BASIC_TEST_CLASS(WatchGainSecondTimeNoResponse, {
 });
 
 // Verify valid set gain responses are successfully received.
-DEFINE_BASIC_TEST_CLASS(SetGain, {
+DEFINE_BASIC_TEST_CLASS(SetGainCausesNotification, {
   ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
   ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
 
-  RequestSetGain();
+  ASSERT_NO_FAILURE_OR_SKIP(SetGainStateChange());
+  WatchGainStateAndExpectUpdate();
+  WaitForError();
+});
+
+// Verify valid set gain responses are successfully received.
+DEFINE_BASIC_TEST_CLASS(SetGainUnchangedDoesNotCauseNotification, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
+
+  ASSERT_NO_FAILURE_OR_SKIP(SetGainStateNoChange());
+  WatchGainStateAndExpectNoUpdate();
+  WaitForError();
+});
+
+// Verify invalid set gain responses are simply ignored (no disconnect or failed FIDL call).
+// Importantly, NO gain-change notification should be emitted.
+DEFINE_BASIC_TEST_CLASS(SetGainInvalidGainValuesAreIgnored, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
+
+  // For the remaining SetGain calls, we will fail if we EVER receive a gain-change notification.
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectNoUpdate());
+
+  if constexpr (kTestSetGainMissingGainDb) {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for missing gain_db");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(std::nullopt));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for gain_db too low");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(min_gain_db() - 1.0f));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for gain_db too high");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(max_gain_db() + 1.0f));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for gain_db -Infinity");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(-INFINITY));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for gain_db +Infinity");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(INFINITY));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  if constexpr (kTestSetGainDbNan) {
+    SCOPED_TRACE(testing::Message() << "Testing SetGain for gain_db Nan");
+    ASSERT_NO_FAILURE_OR_SKIP(SetGainDb(NAN));
+    ASSERT_NO_FAILURE_OR_SKIP(RequestHealthAndExpectHealthy());
+  }
+
+  WaitForError();
+});
+
+// Verify invalid set MUTE is simply ignored (no disconnect or failed FIDL call). This is testable
+// only if the device cannot MUTE. Importantly, NO gain-change notification should be emitted.
+DEFINE_BASIC_TEST_CLASS(SetGainInvalidMuteIsIgnored, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
+
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectNoUpdate());
+  ASSERT_NO_FAILURE_OR_SKIP(SetImpossibleMute());
+  RequestHealthAndExpectHealthy();
+  WaitForError();
+});
+
+// Verify invalid set AGC is simply ignored (no disconnect or failed FIDL call). This is testable
+// only if the device has no AGC. Importantly, NO gain-change notification should be emitted.
+DEFINE_BASIC_TEST_CLASS(SetGainInvalidAgcIsIgnored, {
+  ASSERT_NO_FAILURE_OR_SKIP(RetrieveProperties());
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectUpdate());
+
+  ASSERT_NO_FAILURE_OR_SKIP(WatchGainStateAndExpectNoUpdate());
+  ASSERT_NO_FAILURE_OR_SKIP(SetImpossibleAgc());
+  RequestHealthAndExpectHealthy();
   WaitForError();
 });
 
@@ -456,10 +621,14 @@ void RegisterBasicTestsForDevice(const DeviceEntry& device_entry) {
   } else if (device_entry.isStreamConfig()) {
     REGISTER_BASIC_TEST(Health, device_entry);
     REGISTER_BASIC_TEST(StreamProperties, device_entry);
+    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
     REGISTER_BASIC_TEST(GetInitialGainState, device_entry);
     REGISTER_BASIC_TEST(WatchGainSecondTimeNoResponse, device_entry);
-    REGISTER_BASIC_TEST(SetGain, device_entry);
-    REGISTER_BASIC_TEST(RingBufferFormats, device_entry);
+    REGISTER_BASIC_TEST(SetGainCausesNotification, device_entry);
+    REGISTER_BASIC_TEST(SetGainUnchangedDoesNotCauseNotification, device_entry);
+    REGISTER_BASIC_TEST(SetGainInvalidGainValuesAreIgnored, device_entry);
+    REGISTER_BASIC_TEST(SetGainInvalidMuteIsIgnored, device_entry);
+    REGISTER_BASIC_TEST(SetGainInvalidAgcIsIgnored, device_entry);
     REGISTER_BASIC_TEST(GetInitialPlugState, device_entry);
     REGISTER_BASIC_TEST(WatchPlugSecondTimeNoResponse, device_entry);
   } else {

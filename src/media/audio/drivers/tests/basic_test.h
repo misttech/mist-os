@@ -36,24 +36,34 @@ class BasicTest : public TestBase {
   void WatchGainStateAndExpectUpdate();
   void WatchGainStateAndExpectNoUpdate();
 
-  void RequestSetGain();
+  void SetGainStateChange();
+  void SetGainStateNoChange();
+  void SetGainDb(std::optional<float> gain_db);
+  void SetImpossibleMute();
+  void SetImpossibleAgc();
 
   void WatchPlugStateAndExpectUpdate();
   void WatchPlugStateAndExpectNoUpdate();
 
   void ValidateRingBufferFormatSets();
 
+  float min_gain_db() const { return properties_->min_gain_db(); }
+  float max_gain_db() const { return properties_->max_gain_db(); }
+
  private:
   static constexpr size_t kUniqueIdLength = 16;
+
+  void RequestSetGain(fuchsia::hardware::audio::GainState gain_state);
 
   // BasicTest cannot permanently change device state. Optionals ensure we fetch stream props and
   // initial gain state (to later restore it), before calling any method that alters device state.
   // We will repurpose properties_ to contain properties for all driver types (Codec, Composite,
   // Dai) not just StreamConfig.
   std::optional<fuchsia::hardware::audio::StreamProperties> properties_;
-  std::optional<fuchsia::hardware::audio::GainState> previous_gain_state_;
+  std::optional<fuchsia::hardware::audio::GainState> initial_gain_state_;
+  std::optional<fuchsia::hardware::audio::GainState> expected_gain_state_;
+  bool set_gain_state_ = false;
 
-  bool changed_gain_state_ = false;
   fuchsia::hardware::audio::PlugState plug_state_;
 };
 
