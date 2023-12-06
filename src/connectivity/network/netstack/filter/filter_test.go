@@ -864,7 +864,7 @@ func TestFilterUpdates(t *testing.T) {
 				NetworkProtocols: []stack.NetworkProtocolFactory{ipv4.NewProtocol, ipv6.NewProtocol},
 			})
 
-			defaultTables := stack.DefaultTables(s.Clock(), s.Rand())
+			defaultTables := stack.DefaultTables(s.Clock(), s.InsecureRNG())
 
 			expectedV4Table := test.v4Table(defaultTables)
 			expectedV6Table := test.v6Table(defaultTables)
@@ -1246,7 +1246,7 @@ func TestNATUpdates(t *testing.T) {
 				t.Fatalf("CreateNICWithOptions(%d, _, %#v): %s", nicID, opts, err)
 			}
 
-			defaultTables := stack.DefaultTables(s.Clock(), s.Rand())
+			defaultTables := stack.DefaultTables(s.Clock(), s.InsecureRNG())
 
 			expectedV4Table := test.v4Table(defaultTables)
 			expectedV6Table := test.v6Table(defaultTables)

@@ -139,11 +139,12 @@ type Stack struct {
 	uniqueIDGenerator UniqueID
 
 	// randomGenerator is an injectable pseudo random generator that can be
-	// used when a random number is required.
-	randomGenerator *rand.Rand
+	// used when a random number is required. It must not be used in
+	// security-sensitive contexts.
+	insecureRNG *rand.Rand
 
 	// secureRNG is a cryptographically secure random number generator.
-	secureRNG io.Reader
+	secureRNG cryptorand.RNG
 
 	// sendBufferSize holds the min/default/max send buffer sizes for
 	// endpoints other than TCP.
@@ -343,6 +344,7 @@ func New(opts Options) *Stack {
 	if opts.SecureRNG == nil {
 		opts.SecureRNG = cryptorand.Reader
 	}
+	secureRNG := cryptorand.RNGFrom(opts.SecureRNG)
 
 	randSrc := opts.RandSource
 	if randSrc == nil {
@@ -354,13 +356,13 @@ func New(opts Options) *Stack {
 		// we wrap it in a simple thread-safe version.
 		randSrc = &lockedRandomSource{src: rand.NewSource(v)}
 	}
-	randomGenerator := rand.New(randSrc)
+	insecureRNG := rand.New(randSrc)
 
 	if opts.IPTables == nil {
 		if opts.DefaultIPTables == nil {
 			opts.DefaultIPTables = DefaultTables
 		}
-		opts.IPTables = opts.DefaultIPTables(clock, randomGenerator)
+		opts.IPTables = opts.DefaultIPTables(clock, insecureRNG)
 	}
 
 	opts.NUDConfigs.resetInvalidFields()
@@ -378,12 +380,12 @@ func New(opts Options) *Stack {
 		handleLocal:                  opts.HandleLocal,
 		tables:                       opts.IPTables,
 		icmpRateLimiter:              NewICMPRateLimiter(clock),
-		seed:                         randomGenerator.Uint32(),
+		seed:                         secureRNG.Uint32(),
 		nudConfigs:                   opts.NUDConfigs,
 		uniqueIDGenerator:            opts.UniqueID,
 		nudDisp:                      opts.NUDDisp,
-		randomGenerator:              randomGenerator,
-		secureRNG:                    opts.SecureRNG,
+		insecureRNG:                  insecureRNG,
+		secureRNG:                    secureRNG,
 		sendBufferSize: tcpip.SendBufferSizeOption{
 			Min:     MinBufferSize,
 			Default: DefaultBufferSize,
@@ -395,7 +397,7 @@ func New(opts Options) *Stack {
 			Max:     DefaultMaxBufferSize,
 		},
 		tcpInvalidRateLimit: defaultTCPInvalidRateLimit,
-		tsOffsetSecret:      randomGenerator.Uint32(),
+		tsOffsetSecret:      secureRNG.Uint32(),
 	}
 
 	// Add specified network protocols.
@@ -1321,7 +1323,7 @@ func (s *Stack) findRouteWithLocalAddrFromAnyInterfaceRLocked(outgoingNIC *nic, 
 // leave through any interface unless the route is link-local.
 //
 // If no local address is provided, the stack will select a local address. If no
-// remote address is provided, the stack wil use a remote address equal to the
+// remote address is provided, the stack will use a remote address equal to the
 // local address.
 func (s *Stack) FindRoute(id tcpip.NICID, localAddr, remoteAddr tcpip.Address, netProto tcpip.NetworkProtocolNumber, multicastLoop bool) (*Route, tcpip.Error) {
 	s.mu.RLock()
@@ -1625,7 +1627,7 @@ func (s *Stack) AddStaticNeighbor(nicID tcpip.NICID, protocol tcpip.NetworkProto
 }
 
 // RemoveNeighbor removes an IP to MAC address association previously created
-// either automically or by AddStaticNeighbor. Returns ErrBadAddress if there
+// either automatically or by AddStaticNeighbor. Returns ErrBadAddress if there
 // is no association with the provided address.
 func (s *Stack) RemoveNeighbor(nicID tcpip.NICID, protocol tcpip.NetworkProtocolNumber, addr tcpip.Address) tcpip.Error {
 	s.mu.RLock()
@@ -2096,15 +2098,16 @@ func (s *Stack) Seed() uint32 {
 	return s.seed
 }
 
-// Rand returns a reference to a pseudo random generator that can be used
-// to generate random numbers as required.
-func (s *Stack) Rand() *rand.Rand {
-	return s.randomGenerator
+// InsecureRNG returns a reference to a pseudo random generator that can be used
+// to generate random numbers as required. It is not cryptographically secure
+// and should not be used for security sensitive work.
+func (s *Stack) InsecureRNG() *rand.Rand {
+	return s.insecureRNG
 }
 
 // SecureRNG returns the stack's cryptographically secure random number
 // generator.
-func (s *Stack) SecureRNG() io.Reader {
+func (s *Stack) SecureRNG() cryptorand.RNG {
 	return s.secureRNG
 }
 

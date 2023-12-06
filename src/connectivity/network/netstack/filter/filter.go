@@ -111,7 +111,7 @@ type Filter struct {
 }
 
 func New(s *stack.Stack, nicInfoProvider NicInfoProvider) *Filter {
-	defaultTables := stack.DefaultTables(s.Clock(), s.Rand())
+	defaultTables := stack.DefaultTables(s.Clock(), s.InsecureRNG())
 	defaultV4Table := defaultTables.GetTable(stack.FilterID, false /* ipv6 */)
 	defaultV6Table := defaultTables.GetTable(stack.FilterID, true /* ipv6 */)
 	defaultV4NATTable := defaultTables.GetTable(stack.NATID, false /* ipv6 */)

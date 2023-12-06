@@ -77,9 +77,6 @@
                 // https://fxbug.dev/67016
                 "AllUDPSockets/UDPSocketPairTest.ReceiveOrigDstAddrDefault/*",
                 "AllUDPSockets/UDPSocketPairTest.SetAndGetReceiveOrigDstAddr/*",
-
-                // https://fxbug.dev/136359
-                "AllInetTests/UdpSocketTest.ReconnectDoesNotClearWriteShutdown/*",
             ],
         },
         {

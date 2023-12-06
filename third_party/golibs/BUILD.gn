@@ -2338,6 +2338,7 @@ go_library("gvisor.dev/gvisor") {
     "pkg/rand/rand_linux.go",
     "pkg/rand/rand_linux_state_autogen.go",
     "pkg/rand/rand_state_autogen.go",
+    "pkg/rand/rng.go",
     "pkg/refs/refcounter.go",
     "pkg/refs/refs_map.go",
     "pkg/refs/refs_state_autogen.go",

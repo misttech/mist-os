@@ -437,6 +437,17 @@ func (e *endpoint) NetworkProtocolNumber() tcpip.NetworkProtocolNumber {
 	return e.protocol.Number()
 }
 
+// getID returns a random uint16 number (other than zero) to be used as ID in
+// the IPv4 header.
+func (e *endpoint) getID() uint16 {
+	rng := e.protocol.stack.SecureRNG()
+	id := rng.Uint16()
+	for id == 0 {
+		id = rng.Uint16()
+	}
+	return id
+}
+
 func (e *endpoint) addIPHeader(srcAddr, dstAddr tcpip.Address, pkt stack.PacketBufferPtr, params stack.NetworkHeaderParams, options header.IPv4OptionsSerializer) tcpip.Error {
 	hdrLen := header.IPv4MinimumSize
 	var optLen int
@@ -455,10 +466,9 @@ func (e *endpoint) addIPHeader(srcAddr, dstAddr tcpip.Address, pkt stack.PacketB
 	// RFC 6864 section 4.3 mandates uniqueness of ID values for non-atomic
 	// datagrams. Since the DF bit is never being set here, all datagrams
 	// are non-atomic and need an ID.
-	id := e.protocol.ids[hashRoute(srcAddr, dstAddr, params.Protocol, e.protocol.hashIV)%buckets].Add(1)
 	ipH.Encode(&header.IPv4Fields{
 		TotalLength: uint16(length),
-		ID:          uint16(id),
+		ID:          e.getID(),
 		TTL:         params.TTL,
 		TOS:         params.TOS,
 		Protocol:    uint8(params.Protocol),
@@ -628,7 +638,7 @@ func (e *endpoint) WriteHeaderIncludedPacket(r *stack.Route, pkt stack.PacketBuf
 		// non-atomic datagrams, so assign an ID to all such datagrams
 		// according to the definition given in RFC 6864 section 4.
 		if ipH.Flags()&header.IPv4FlagDontFragment == 0 || ipH.Flags()&header.IPv4FlagMoreFragments != 0 || ipH.FragmentOffset() > 0 {
-			ipH.SetID(uint16(e.protocol.ids[hashRoute(r.LocalAddress(), r.RemoteAddress(), 0 /* protocol */, e.protocol.hashIV)%buckets].Add(1)))
+			ipH.SetID(e.getID())
 		}
 	}
 
@@ -1514,6 +1524,8 @@ type protocol struct {
 
 	ids    []atomicbitops.Uint32
 	hashIV uint32
+	// idTS is the unix timestamp in milliseconds 'ids' was last accessed.
+	idTS atomicbitops.Int64
 
 	fragmentation *fragmentation.Fragmentation
 
