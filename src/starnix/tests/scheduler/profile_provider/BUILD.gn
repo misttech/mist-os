@@ -10,7 +10,12 @@ import("//src/starnix/tests/build/starnix_linux_test_executable.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":starnix_profile_provider_integration_test" ]
+  deps = []
+
+  # TODO(https://fxbug.dev/137012): Re-enable on asan builders.
+  if (!is_asan) {
+    deps += [ ":starnix_profile_provider_integration_test" ]
+  }
 }
 
 rustc_binary("profile_provider_integration_test_bin") {
