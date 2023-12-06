@@ -6,20 +6,32 @@
 
 load(":fuchsia_shell_task.bzl", "shell_task_rule")
 
-def ffx_task_rule(*, implementation, toolchains = [], **kwargs):
+def ffx_task_rule(*, implementation, toolchains = [], attrs = {}, **kwargs):
     """Starlark higher-order rule for creating ffx-based tasks."""
 
     def _fuchsia_task_ffx_impl(ctx, make_shell_task):
         sdk = ctx.toolchains["@fuchsia_sdk//fuchsia:toolchain"]
 
         def _make_ffx_task(prepend_args = [], *runfiles):
-            return make_shell_task([sdk.ffx] + prepend_args, *runfiles)
+            return make_shell_task(
+                [ctx.attr._run_ffx, "--ffx", sdk.ffx] + prepend_args,
+                default_argument_scope = "global",
+                *runfiles
+            )
 
         return implementation(ctx, _make_ffx_task)
 
     return shell_task_rule(
         implementation = _fuchsia_task_ffx_impl,
         toolchains = ["@fuchsia_sdk//fuchsia:toolchain"] + toolchains,
+        attrs = {
+            "_run_ffx": attr.label(
+                doc = "The task runner used to run ffx tasks.",
+                default = "//fuchsia/tools:run_ffx",
+                executable = True,
+                cfg = "exec",
+            ),
+        } | attrs,
         **kwargs
     )
 

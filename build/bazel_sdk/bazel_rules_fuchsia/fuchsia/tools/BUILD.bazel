@@ -79,6 +79,13 @@ py_binary(
 )
 
 py_binary(
+    name = "run_ffx",
+    srcs = ["run_ffx.py"],
+    python_version = "PY3",
+    deps = [":fuchsia_task_lib"],
+)
+
+py_binary(
     name = "register_debug_symbols",
     srcs = ["register_debug_symbols.py"],
     python_version = "PY3",

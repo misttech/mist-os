@@ -11,7 +11,7 @@ def fuchsia_task_rule(*, implementation, **kwargs):
     """Starlark higher-order rule for creating task primitives."""
 
     def _fuchsia_task_impl(ctx, make_workflow, collect_arguments):
-        def _make_fuchsia_task(task_runner, prepend_args = [], runfiles = []):
+        def _make_fuchsia_task(task_runner, prepend_args = [], runfiles = [], default_argument_scope = "explicit"):
             task_args, task_runfiles = collect_arguments(prepend_args, runfiles, task_runner)
             return make_workflow(
                 FuchsiaWorkflowInfo(
@@ -19,7 +19,7 @@ def fuchsia_task_rule(*, implementation, **kwargs):
                         ctx.label: FuchsiaTaskEntityInfo(
                             task_runner = task_runner[DefaultInfo].files_to_run.executable.short_path,
                             args = task_args,
-                            default_argument_scope = ctx.attr.default_argument_scope,
+                            default_argument_scope = ctx.attr.default_argument_scope or default_argument_scope,
                         ),
                     },
                     entrypoint = ctx.label,

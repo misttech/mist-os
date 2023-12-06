@@ -8,7 +8,7 @@ load(":fuchsia_task.bzl", "fuchsia_task_rule")
 
 def shell_task_rule(*, implementation, attrs = {}, **kwargs):
     def _shell_task_impl(ctx, make_fuchsia_task):
-        def _make_shell_task(command = [], runfiles = []):
+        def _make_shell_task(command = [], runfiles = [], **kwargs):
             executable, arguments = (command[0], command[1:]) if command else (None, [])
             if type(executable) == "Target":
                 runfiles.append(executable)
@@ -16,7 +16,7 @@ def shell_task_rule(*, implementation, attrs = {}, **kwargs):
                     executable[DefaultInfo].files_to_run.executable,
                 ] + arguments
 
-            return make_fuchsia_task(ctx.attr._shell_task_runner, command, runfiles = runfiles)
+            return make_fuchsia_task(ctx.attr._shell_task_runner, command, runfiles = runfiles, **kwargs)
 
         return implementation(ctx, _make_shell_task)
 

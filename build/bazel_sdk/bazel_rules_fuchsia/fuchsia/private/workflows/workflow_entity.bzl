@@ -101,8 +101,8 @@ def workflow_entity_rule(*, implementation, attrs = {}, **kwargs):
             ),
             "default_argument_scope": attr.string(
                 doc = "The scope of arguments to use for the workflow entity.",
-                default = "explicit",
-                values = ["explicit", "workflow", "global"],
+                default = "",
+                values = ["", "explicit", "workflow", "global"],
             ),
             "inputs": attr.label_list(
                 doc = "Task dependencies. Use `$location(path/to/file)` to reference these in arguments.",
