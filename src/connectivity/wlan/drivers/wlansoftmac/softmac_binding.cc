@@ -574,14 +574,13 @@ void SoftmacBinding::EthernetImplStop() {
 }
 
 void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                         ethernet_impl_queue_tx_callback completion_cb,
-                                         void* cookie) {
-  eth::BorrowedOperation<> op(netbuf, completion_cb, cookie, sizeof(ethernet_netbuf_t));
+                                         ethernet_impl_queue_tx_callback callback, void* cookie) {
+  eth::BorrowedOperation<> op(netbuf, callback, cookie, sizeof(ethernet_netbuf_t));
   softmac_handle_->QueueEthFrameTx(std::move(op));
 }
 
-zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
-                                                 size_t data_size) {
+zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value,
+                                                 const uint8_t* data_buffer, size_t data_size) {
   ldebug(0, nullptr, "Entering.");
   if (param == ETHERNET_SETPARAM_PROMISC) {
     // See fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
@@ -595,6 +594,10 @@ zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value, 
     return ZX_OK;
   }
   return ZX_ERR_NOT_SUPPORTED;
+}
+
+void SoftmacBinding::EthernetImplGetBti(zx_handle_t* out_bti) {
+  lerror("WLAN does not support ETHERNET_FEATURE_DMA");
 }
 
 zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,

@@ -104,9 +104,10 @@ class SoftmacBinding : public DeviceInterface,
       __TA_EXCLUDES(ethernet_proxy_lock_);
   void EthernetImplStop() __TA_EXCLUDES(ethernet_proxy_lock_);
   void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                           ethernet_impl_queue_tx_callback completion_cb, void* cookie);
-  static zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
+                           ethernet_impl_queue_tx_callback callback, void* cookie);
+  static zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data_buffer,
                                           size_t data_size);
+  static void EthernetImplGetBti(zx_handle_t* out_bti);
 
   const zx_protocol_device_t eth_device_ops_ = {
       .version = DEVICE_OPS_VERSION,
@@ -124,13 +125,15 @@ class SoftmacBinding : public DeviceInterface,
       },
       .queue_tx =
           [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
-             ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-            AsSoftmacBinding(ctx)->EthernetImplQueueTx(options, netbuf, completion_cb, cookie);
+             ethernet_impl_queue_tx_callback callback, void* cookie) {
+            AsSoftmacBinding(ctx)->EthernetImplQueueTx(options, netbuf, callback, cookie);
           },
-      .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data,
+      .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data_buffer,
                       size_t data_size) -> zx_status_t {
-        return SoftmacBinding::EthernetImplSetParam(param, value, data, data_size);
+        return SoftmacBinding::EthernetImplSetParam(param, value, data_buffer, data_size);
       },
+      .get_bti = [](void* ctx,
+                    zx_handle_t* out_bti) { SoftmacBinding::EthernetImplGetBti(out_bti); },
   };
 
   std::mutex ethernet_proxy_lock_;
