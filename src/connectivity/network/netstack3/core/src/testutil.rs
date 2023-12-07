@@ -1372,7 +1372,7 @@ pub fn add_route<NonSyncCtx: crate::NonSyncContext>(
     ctx: &mut NonSyncCtx,
     entry: crate::ip::types::AddableEntryEither<crate::device::DeviceId<NonSyncCtx>>,
 ) -> Result<(), crate::ip::forwarding::AddRouteError> {
-    let mut sync_ctx = crate::Locked::new(sync_ctx);
+    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
     match entry {
         crate::ip::types::AddableEntryEither::V4(entry) => {
             crate::ip::forwarding::testutil::add_route::<Ipv4, _, _>(&mut sync_ctx, ctx, entry)
@@ -1391,7 +1391,7 @@ pub fn del_routes_to_subnet<NonSyncCtx: crate::NonSyncContext>(
     ctx: &mut NonSyncCtx,
     subnet: net_types::ip::SubnetEither,
 ) -> crate::error::Result<()> {
-    let mut sync_ctx = crate::Locked::new(sync_ctx);
+    let mut sync_ctx = lock_order::Locked::new(sync_ctx);
 
     match subnet {
         SubnetEither::V4(subnet) => crate::ip::forwarding::testutil::del_routes_to_subnet::<

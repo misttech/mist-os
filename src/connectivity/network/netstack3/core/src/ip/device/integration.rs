@@ -1002,7 +1002,7 @@ impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
             return Err(crate::error::ExistsError);
         }
 
-        crate::request_context_add_route(ctx, entry.into());
+        crate::ip::forwarding::request_context_add_route::<Ipv6, _, _>(ctx, entry);
         Ok(())
     }
 
@@ -1012,10 +1012,10 @@ impl<C: NonSyncContext> Ipv6DiscoveredRoutesContext<C>
         device_id: &Self::DeviceId,
         Ipv6DiscoveredRoute { subnet, gateway }: Ipv6DiscoveredRoute,
     ) {
-        crate::request_context_del_routes_v6(
+        crate::ip::forwarding::request_context_del_routes::<Ipv6, _, _>(
             ctx,
             subnet,
-            device_id,
+            device_id.clone(),
             gateway.map(|g| (*g).into_specified()),
         );
     }
