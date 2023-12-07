@@ -21,7 +21,6 @@ closed protocol TestDevice {
     /// Add Test Device with some powerargs
     strict AddDeviceWithPowerArgs(struct {
         info vector<fuchsia.device.DevicePowerStateInfo>:MAX;
-        perf_state_info vector<fuchsia.device.DevicePerformanceStateInfo>:MAX;
         make_visible bool;
     }) -> () error zx.Status;
     /// Get current power state of the device

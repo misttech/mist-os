@@ -87,7 +87,6 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   zx_status_t AddMetadata(uint32_t type, const void* data, size_t size);
   zx_status_t GetMetadata(uint32_t type, void* buf, size_t buflen, size_t* actual);
   zx_status_t GetMetadataSize(uint32_t type, size_t* out_size);
-  zx::result<uint32_t> SetPerformanceStateOp(uint32_t state);
 
   void InitReply(zx_status_t status);
   zx_status_t ConnectFragmentFidl(const char* fragment_name, const char* service_name,
@@ -149,11 +148,8 @@ class Device : public std::enable_shared_from_this<Device>, public devfs_fidl::D
   void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
   void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
                                SetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
 
   // This calls Unbind on the device and then frees it.
   void UnbindAndRelease();

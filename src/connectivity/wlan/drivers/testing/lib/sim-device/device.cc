@@ -57,11 +57,6 @@ void DeviceAddArgs::CopyRawDeviceAddArgs(const device_add_args_t& args) {
   if (args.power_states) {
     power_states_.assign(args.power_states, args.power_states + args.power_state_count);
   }
-  performance_states_.clear();
-  if (args.performance_states) {
-    performance_states_.assign(args.performance_states,
-                               args.performance_states + args.performance_state_count);
-  }
   fidl_service_offer_strings_.clear();
   if (args.fidl_service_offers) {
     fidl_service_offer_strings_.assign(args.fidl_service_offers,
@@ -80,11 +75,6 @@ void DeviceAddArgs::SetRawPointers() {
   args_.power_states = power_states_.empty() ? nullptr : power_states_.data();
   ZX_ASSERT(power_states_.size() <= std::numeric_limits<decltype(args_.power_state_count)>::max());
   args_.power_state_count = static_cast<uint8_t>(power_states_.size());
-
-  args_.performance_states = performance_states_.empty() ? nullptr : performance_states_.data();
-  ZX_ASSERT(performance_states_.size() <=
-            std::numeric_limits<decltype(args_.performance_state_count)>::max());
-  args_.performance_state_count = static_cast<uint8_t>(performance_states_.size());
 
   // This needs to be a two step process, we need to store the strings as std::strings to manage
   // the memory and then we need to have an array of char* that fidl_service_offers can point to.

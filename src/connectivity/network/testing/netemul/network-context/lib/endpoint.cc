@@ -241,15 +241,6 @@ class NetworkDeviceImpl : public EndpointImpl,
     callback(ZX_ERR_NOT_SUPPORTED);
   }
 
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCallback callback) override {
-    callback(0);
-  }
-
-  void SetPerformanceState(uint32_t requested_state,
-                           SetPerformanceStateCallback callback) override {
-    callback(ZX_ERR_NOT_SUPPORTED, 0);
-  }
-
  private:
   void ListenForFrames() {
     if (!tun_device_.is_bound()) {

@@ -157,7 +157,6 @@ struct MockDevice : public std::enable_shared_from_this<MockDevice> {
   void UnbindOp();
   void ReleaseOp();
   void SuspendNewOp(uint8_t requested_state, bool enable_wake, uint8_t suspend_reason);
-  zx_status_t SetPerformanceStateOp(uint32_t requested_state, uint32_t* out_state);
   zx_status_t ConfigureAutoSuspendOp(bool enable, uint8_t requested_state);
   void ResumeNewOp(uint32_t requested_state);
   bool MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn);

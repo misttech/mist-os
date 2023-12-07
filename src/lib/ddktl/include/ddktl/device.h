@@ -216,21 +216,6 @@ class Suspendable : public base_mixin {
 };
 
 template <typename D>
-class PerformanceTunable : public base_mixin {
- protected:
-  static constexpr void InitOp(zx_protocol_device_t* proto) {
-    internal::CheckPerformanceTunable<D>();
-    proto->set_performance_state = set_performance_state;
-  }
-
- private:
-  static zx_status_t set_performance_state(void* ctx, uint32_t requested_state,
-                                           uint32_t* out_state) {
-    return static_cast<D*>(ctx)->DdkSetPerformanceState(requested_state, out_state);
-  }
-};
-
-template <typename D>
 class AutoSuspendable : public base_mixin {
  protected:
   static constexpr void InitOp(zx_protocol_device_t* proto) {
@@ -409,12 +394,6 @@ class DeviceAddArgs {
   DeviceAddArgs& set_power_states(cpp20::span<const device_power_state_info_t> power_states) {
     args_.power_states = power_states.data();
     args_.power_state_count = static_cast<uint8_t>(power_states.size());
-    return *this;
-  }
-  DeviceAddArgs& set_performance_states(
-      cpp20::span<const device_performance_state_info_t> performance_states) {
-    args_.performance_states = performance_states.data();
-    args_.performance_state_count = static_cast<uint8_t>(performance_states.size());
     return *this;
   }
 

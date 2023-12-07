@@ -26,7 +26,6 @@ DriverHostInspect::DriverHostInspect() {
   // Device defaults
   auto default_node = root_node().CreateChild("device_defaults");
   SetDeviceDefaultPowerStates(default_node);
-  SetDeviceDefaultPerfStates(default_node);
   SetDeviceDefaultStateMapping(default_node);
   static_values_.emplace(std::move(default_node));
 }
@@ -51,18 +50,6 @@ void DriverHostInspect::SetDeviceDefaultPowerStates(inspect::Node& parent) {
   static_values_.emplace(std::move(power_states));
 }
 
-void DriverHostInspect::SetDeviceDefaultPerfStates(inspect::Node& parent) {
-  auto perf_states = parent.CreateChild("default_performance_states");
-  for (size_t i = 0; i < std::size(internal::kDeviceDefaultPerfStates); i++) {
-    const auto& info = internal::kDeviceDefaultPerfStates[i];
-    auto& state = performance_states_[i];
-    state.emplace(perf_states, info.state_id);
-    state->restore_latency.Set(info.restore_latency);
-    static_values_.emplace(std::move(state->performance_state));
-  }
-  static_values_.emplace(std::move(perf_states));
-}
-
 void DriverHostInspect::SetDeviceDefaultStateMapping(inspect::Node& parent) {
   auto state_mapping = parent.CreateChild("default_system_power_state_mapping");
   for (size_t i = 0; i < internal::kDeviceDefaultStateMapping.size(); i++) {
@@ -70,7 +57,6 @@ void DriverHostInspect::SetDeviceDefaultStateMapping(inspect::Node& parent) {
     auto& state = state_mappings_[i];
     state.emplace(state_mapping, i);
     state->power_state.Set(static_cast<uint8_t>(info->dev_state));
-    state->performance_state.Set(info->performance_state);
     state->wakeup_enable.Set(info->wakeup_enable);
     state->suspend_flag.Set(info->suspend_flag);
     static_values_.emplace(std::move(state->system_power_state));
@@ -264,9 +250,6 @@ void DeviceInspect::set_ops(const zx_protocol_device_t& ops) {
   if (ops.resume) {
     ops_str.Append("resume ");
   }
-  if (ops.set_performance_state) {
-    ops_str.Append("set_performance_state ");
-  }
   if (ops.configure_auto_suspend) {
     ops_str.Append("configure_auto_suspend ");
   }
@@ -350,13 +333,6 @@ InspectCallStats& DeviceInspect::MessageOpStats() {
   return *message_stats_;
 }
 
-void DeviceInspect::set_current_performance_state(uint32_t state) {
-  if (!current_performance_state_) {
-    current_performance_state_ = device_node_.CreateUint("current_performance_state", 0);
-  }
-  current_performance_state_.Set(state);
-}
-
 void DeviceInspect::set_auto_suspend(bool value) {
   if (!auto_suspend_) {
     auto_suspend_ = device_node_.CreateBool("auto_suspend", false);
@@ -382,26 +358,6 @@ void DeviceInspect::set_power_states(const device_power_state_info_t* power_stat
     state->restore_latency.Set(info.restore_latency);
     state->wakeup_capable.Set(info.wakeup_capable);
     state->system_wake_state.Set(info.system_wake_state);
-  }
-}
-
-void DeviceInspect::set_performance_states(
-    const device_performance_state_info_t* performance_states, uint8_t count) {
-  if (performance_states == internal::kDeviceDefaultPerfStates) {
-    // To increase readability of inspect data and save space, default performance state is only
-    // included in driver host, and not per device.
-    return;
-  }
-  if (!performance_states_node_) {
-    performance_states_node_ = device_node_.CreateChild("performance_states");
-  }
-  for (uint8_t i = 0; i < count; i++) {
-    const auto& info = performance_states[i];
-    auto& state = performance_states_[info.state_id];
-    if (!state) {
-      state.emplace(performance_states_node_, info.state_id);
-    }
-    state->restore_latency.Set(info.restore_latency);
   }
 }
 

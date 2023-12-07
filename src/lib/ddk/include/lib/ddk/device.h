@@ -211,26 +211,6 @@ typedef struct zx_protocol_device {
   // This hook will only be executed on the devhost's main thread.
   void (*resume)(void* ctx, uint32_t requested_state);
 
-  //@ ## set_performance_state
-  // The set_performance_state hook is used for transitioning the performant state of
-  // a device.
-  //
-  // requested_state is always a working performant state that is published during
-  // device_add.
-  //
-  // On success, the out_state is same as the requested_state. If the device is in working state,
-  // the transition is made immediately.
-  // On failure, the out_state is the performance state the device is currently in.
-  // If the device is not in working state, driver will return ZX_ERR_UNAVAILABLE and out_state will
-  // be fully working performance state.
-  //
-  // This hook assumes that the drivers are aware of their current sleep state and current
-  // performance state.
-  //
-  // This hook will only be executed on the devhost's main thread.
-  //
-  zx_status_t (*set_performance_state)(void* ctx, uint32_t requested_state, uint32_t* out_state);
-
   //@ ## configure_autosuspend
   // The configure_autosuspend hook is used for configuring whether a driver can
   // auto suspend the device depending on the activity and idleness of the device.

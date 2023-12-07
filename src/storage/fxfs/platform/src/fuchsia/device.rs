@@ -568,12 +568,6 @@ impl BlockServer {
             VolumeAndNodeRequest::SetMinDriverLogSeverity { severity: _, responder } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
             }
-            VolumeAndNodeRequest::GetCurrentPerformanceState { responder } => {
-                responder.send(Default::default())?;
-            }
-            VolumeAndNodeRequest::SetPerformanceState { requested_state: _, responder } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, Default::default())?;
-            }
         }
         Ok(())
     }

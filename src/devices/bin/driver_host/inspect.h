@@ -100,16 +100,6 @@ struct DevicePowerStates {
   inspect::IntProperty system_wake_state;
 };
 
-// Helper class for device inspect
-struct DevicePerformanceStates {
-  explicit DevicePerformanceStates(inspect::Node& parent, uint32_t state_id) {
-    performance_state = parent.CreateChild(std::to_string(state_id));
-    restore_latency = performance_state.CreateInt("restore_latency", 0);
-  }
-  inspect::Node performance_state;
-  inspect::IntProperty restore_latency;
-};
-
 class DriverHostInspect {
  public:
   DriverHostInspect();
@@ -140,8 +130,6 @@ class DriverHostInspect {
   // Data for nodes stored in static_values_.
   std::array<std::optional<DevicePowerStates>, std::size(internal::kDeviceDefaultPowerStates)>
       power_states_;
-  std::array<std::optional<DevicePerformanceStates>, std::size(internal::kDeviceDefaultPerfStates)>
-      performance_states_;
   std::array<std::optional<DeviceSystemPowerStateMapping>,
              std::size(internal::kDeviceDefaultStateMapping)>
       state_mappings_;
@@ -276,12 +264,6 @@ class DeviceInspect {
   std::array<std::optional<DevicePowerStates>, fuchsia_device::wire::kMaxDevicePowerStates>
       power_states_{};
   inspect::Node power_states_node_;
-
-  std::array<std::optional<DevicePerformanceStates>,
-             fuchsia_device::wire::kMaxDevicePerformanceStates>
-      performance_states_{};
-  inspect::Node performance_states_node_;
-  inspect::UintProperty current_performance_state_;
 
   std::array<std::optional<DeviceSystemPowerStateMapping>,
              fuchsia_device_manager::wire::kMaxSystemPowerStates>

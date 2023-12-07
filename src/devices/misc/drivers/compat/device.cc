@@ -819,18 +819,6 @@ bool Device::MessageOp(fidl::IncomingHeaderAndMessage msg, device_fidl_txn_t txn
   return false;
 }
 
-zx::result<uint32_t> Device::SetPerformanceStateOp(uint32_t state) {
-  if (!HasOp(ops_, &zx_protocol_device_t::set_performance_state)) {
-    return zx::error(ZX_ERR_NOT_SUPPORTED);
-  }
-  uint32_t out_state;
-  zx_status_t status = ops_->set_performance_state(compat_symbol_.context, state, &out_state);
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(out_state);
-}
-
 void Device::InitReply(zx_status_t status) {
   fpromise::promise<void, zx_status_t> promise =
       fpromise::make_result_promise<void, zx_status_t>(fpromise::ok());
@@ -1081,10 +1069,6 @@ void Device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
           });
 }
 
-void Device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(0);
-}
-
 void Device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
   fidl::Arena arena;
   auto bind_request = fdf::wire::NodeControllerRequestBindRequest::Builder(arena)
@@ -1159,12 +1143,6 @@ void Device::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
   FuchsiaLogSeverity severity = static_cast<FuchsiaLogSeverity>(request->severity);
   logger().SetSeverity(severity);
   completer.Reply(ZX_OK);
-}
-
-void Device::SetPerformanceState(SetPerformanceStateRequestView request,
-                                 SetPerformanceStateCompleter::Sync& completer) {
-  zx::result result = SetPerformanceStateOp(request->requested_state);
-  completer.Reply(result.status_value(), result.is_ok() ? result.value() : 0);
 }
 
 }  // namespace compat

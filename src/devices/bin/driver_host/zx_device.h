@@ -189,26 +189,6 @@ struct zx_device
     completion.Wait();
   }
 
-  zx_status_t SetPerformanceStateOp(uint32_t requested_state, uint32_t* out_state) {
-    if (!ops_.set_performance_state) {
-      return ZX_ERR_NOT_SUPPORTED;
-    }
-
-    libsync::Completion completion;
-    zx_status_t status;
-
-    async::PostTask(driver->dispatcher()->async_dispatcher(), [&]() {
-      TraceLabelBuffer trace_label;
-      TRACE_DURATION("driver_host:driver-hooks",
-                     get_trace_label("set_performance_state", &trace_label));
-      status = ops_.set_performance_state(ctx(), requested_state, out_state);
-      completion.Signal();
-    });
-
-    completion.Wait();
-    return status;
-  }
-
   zx_status_t ConfigureAutoSuspendOp(bool enable, uint8_t requested_state) {
     if (!ops_.configure_auto_suspend) {
       return ZX_ERR_NOT_SUPPORTED;
@@ -392,8 +372,6 @@ struct zx_device
                                        fuchsia_device::wire::kMaxDevicePowerStates>;
   using SystemPowerStateMapping = std::array<fuchsia_device::wire::SystemPowerStateInfo,
                                              fuchsia_device_manager::wire::kMaxSystemPowerStates>;
-  using PerformanceStates = std::array<fuchsia_device::wire::DevicePerformanceStateInfo,
-                                       fuchsia_device::wire::kMaxDevicePerformanceStates>;
 
   bool has_composite() const;
   void set_composite(fbl::RefPtr<CompositeDevice> composite, bool fragment = true);
@@ -408,7 +386,6 @@ struct zx_device
   fbl::RefPtr<FidlProxyDevice> fidl_proxy();
 
   const DevicePowerStates& GetPowerStates() const;
-  const PerformanceStates& GetPerformanceStates() const;
 
   zx_status_t SetPowerStates(const device_power_state_info_t* power_states, uint8_t count);
 
@@ -417,7 +394,6 @@ struct zx_device
     return power_states_[static_cast<uint8_t>(requested_state)].is_supported;
   }
 
-  bool IsPerformanceStateSupported(uint32_t requested_state);
   bool auto_suspend_configured() { return auto_suspend_configured_; }
   void set_auto_suspend_configured(bool value) {
     auto_suspend_configured_ = value;
@@ -426,17 +402,7 @@ struct zx_device
 
   zx_status_t SetSystemPowerStateMapping(const SystemPowerStateMapping& mapping);
 
-  zx_status_t SetPerformanceStates(const device_performance_state_info_t* performance_states,
-                                   uint8_t count);
-
   const SystemPowerStateMapping& GetSystemPowerStateMapping() const;
-
-  uint32_t current_performance_state() { return current_performance_state_; }
-
-  void set_current_performance_state(uint32_t state) {
-    current_performance_state_ = state;
-    inspect_->set_current_performance_state(state);
-  }
 
   zx_status_t get_dev_power_state_from_mapping(uint32_t flags,
                                                fuchsia_device::wire::SystemPowerStateInfo* info,
@@ -482,11 +448,8 @@ struct zx_device
   void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
   void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
                                SetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
 
   explicit zx_device(DriverHostContext* ctx, std::string name, fbl::RefPtr<Driver> driver);
 
@@ -558,10 +521,8 @@ struct zx_device
 
   std::string rebind_drv_name_ = {};
 
-  PerformanceStates performance_states_;
   DevicePowerStates power_states_;
   SystemPowerStateMapping system_power_states_mapping_;
-  uint32_t current_performance_state_ = fuchsia_device::wire::kDevicePerformanceStateP0;
   bool auto_suspend_configured_ = false;
 
   // Runtime protocols served by the parent.

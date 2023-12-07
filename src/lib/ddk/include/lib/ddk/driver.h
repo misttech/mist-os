@@ -153,13 +153,6 @@ typedef struct device_add_args {
   // Number of power states in the list
   uint8_t power_state_count;
 
-  // List of performant states that the device supports.
-  // List cannot be more than MAX_DEVICE_PERFORMANCE_STATES size.
-  const device_performance_state_info_t* performance_states;
-
-  // Number of performant power states in the list
-  uint8_t performance_state_count;
-
   // Optional custom protocol for this device
   uint32_t proto_id;
 
@@ -203,13 +196,6 @@ typedef struct device_init_reply_args {
 
   // Number of power states in the list
   uint8_t power_state_count;
-
-  // List of performant states that the device supports.
-  // List cannot be more than MAX_DEVICE_PERFORMANCE_STATES size.
-  const device_performance_state_info_t* performance_states;
-
-  // Number of performant power states in the list
-  uint8_t performance_state_count;
 } device_init_reply_args_t;
 
 struct zx_driver_rec {

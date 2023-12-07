@@ -21,7 +21,6 @@ using fuchsia_device::wire::DevicePerformanceStateInfo;
 using fuchsia_device::wire::DevicePowerState;
 using fuchsia_device::wire::DevicePowerStateInfo;
 using fuchsia_device::wire::kDevicePerformanceStateP0;
-using fuchsia_device::wire::kMaxDevicePerformanceStates;
 using fuchsia_device::wire::kMaxDevicePowerStates;
 using fuchsia_device::wire::SystemPowerStateInfo;
 using fuchsia_device_manager::wire::SystemPowerState;
@@ -74,14 +73,10 @@ class PowerTestCase : public zxtest::Test {
   }
 
   void AddChildWithPowerArgs(DevicePowerStateInfo *states, uint8_t sleep_state_count,
-                             DevicePerformanceStateInfo *perf_states, uint8_t perf_state_count,
                              bool add_invisible = false) {
     auto power_states =
         ::fidl::VectorView<DevicePowerStateInfo>::FromExternal(states, sleep_state_count);
-    auto perf_power_states =
-        ::fidl::VectorView<DevicePerformanceStateInfo>::FromExternal(perf_states, perf_state_count);
-    auto response = child1_device_client->AddDeviceWithPowerArgs(power_states, perf_power_states,
-                                                                 add_invisible);
+    auto response = child1_device_client->AddDeviceWithPowerArgs(power_states, add_invisible);
     ASSERT_OK(response.status());
     zx_status_t call_status = ZX_OK;
     if (response->is_error()) {
@@ -127,8 +122,7 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_Less) {
   states[0].state_id = DevicePowerState::kDevicePowerStateD1;
   states[0].is_supported = true;
   auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
+      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states), false);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -144,8 +138,7 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_More) {
     states[i].is_supported = true;
   }
   auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
+      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states), false);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -163,8 +156,7 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_MissingRequired) {
     states[i].is_supported = true;
   }
   auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
+      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states), false);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -184,8 +176,7 @@ TEST_F(PowerTestCase, InvalidDevicePowerCaps_DuplicateCaps) {
   states[2].state_id = DevicePowerState::kDevicePowerStateD3Cold;
   states[2].is_supported = true;
   auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
+      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states), false);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -202,8 +193,7 @@ TEST_F(PowerTestCase, AddDevicePowerCaps_Success) {
   states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
   states[1].is_supported = true;
   auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
+      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states), false);
   ASSERT_OK(response.status());
   zx_status_t call_status = ZX_OK;
   if (response->is_error()) {
@@ -225,206 +215,7 @@ TEST_F(PowerTestCase, AddDevicePowerCaps_MakeVisible_Success) {
   states[2].is_supported = true;
   states[2].restore_latency = 1000;
 
-  DevicePerformanceStateInfo perf_states[3];
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[0].restore_latency = 0;
-  perf_states[1].state_id = 1;
-  perf_states[1].is_supported = true;
-  perf_states[1].restore_latency = 100;
-  perf_states[2].state_id = 2;
-  perf_states[2].is_supported = true;
-  perf_states[2].restore_latency = 1000;
-
-  AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states), true);
-}
-
-TEST_F(PowerTestCase, InvalidDevicePerformanceCaps_MissingRequired) {
-  std::array<DevicePowerStateInfo, 2> states;
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  std::array<DevicePerformanceStateInfo, 10> perf_states;
-  perf_states[0].state_id = 1;
-  perf_states[0].is_supported = true;
-  perf_states[1].state_id = 2;
-  perf_states[1].is_supported = true;
-
-  auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      fidl::VectorView<DevicePerformanceStateInfo>::FromExternal(perf_states), false);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-
-  ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
-}
-
-TEST_F(PowerTestCase, InvalidDevicePerformanceCaps_Duplicate) {
-  std::array<DevicePowerStateInfo, 2> states;
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  std::array<DevicePerformanceStateInfo, 10> perf_states;
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[1].state_id = kDevicePerformanceStateP0;
-  perf_states[1].is_supported = true;
-  perf_states[2].state_id = 1;
-  perf_states[2].is_supported = true;
-
-  auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      fidl::VectorView<DevicePerformanceStateInfo>::FromExternal(perf_states), false);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-
-  ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
-}
-
-TEST_F(PowerTestCase, InvalidDevicePerformanceCaps_More) {
-  std::array<DevicePowerStateInfo, 2> states;
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  std::array<DevicePerformanceStateInfo, kMaxDevicePerformanceStates + 1> perf_states;
-  for (size_t i = 0; i < (kMaxDevicePerformanceStates + 1); i++) {
-    perf_states[i].state_id = static_cast<int32_t>(i);
-    perf_states[i].is_supported = true;
-  }
-  auto response = child1_device_client->AddDeviceWithPowerArgs(
-      fidl::VectorView<DevicePowerStateInfo>::FromExternal(states),
-      fidl::VectorView<DevicePerformanceStateInfo>::FromExternal(perf_states), false);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-
-  ASSERT_STATUS(call_status, ZX_ERR_INVALID_ARGS);
-}
-
-TEST_F(PowerTestCase, AddDevicePerformanceCaps_NoCaps) {
-  std::array<DevicePowerStateInfo, 2> states;
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-  auto power_states = ::fidl::VectorView<DevicePowerStateInfo>::FromExternal(states);
-
-  // This is the default case. By default, the devhost fills in the fully performance state.
-  auto response = child1_device_client->AddDeviceWithPowerArgs(
-      std::move(power_states), ::fidl::VectorView<DevicePerformanceStateInfo>(), false);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-
-  ASSERT_STATUS(call_status, ZX_OK);
-}
-
-TEST_F(PowerTestCase, AddDevicePerformanceCaps_Success) {
-  std::array<DevicePowerStateInfo, 2> states;
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-  auto power_states = ::fidl::VectorView<DevicePowerStateInfo>::FromExternal(states);
-
-  std::array<DevicePerformanceStateInfo, 2> perf_states;
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[1].state_id = 1;
-  perf_states[1].is_supported = true;
-  auto performance_states =
-      ::fidl::VectorView<DevicePerformanceStateInfo>::FromExternal(perf_states);
-
-  auto response = child1_device_client->AddDeviceWithPowerArgs(
-      std::move(power_states), std::move(performance_states), false);
-  ASSERT_OK(response.status());
-  zx_status_t call_status = ZX_OK;
-  if (response->is_error()) {
-    call_status = response->error_value();
-  }
-
-  ASSERT_STATUS(call_status, ZX_OK);
-}
-
-TEST_F(PowerTestCase, SetPerformanceState_Success) {
-  // Add Capabilities
-  DevicePowerStateInfo states[2];
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  DevicePerformanceStateInfo perf_states[3];
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[0].restore_latency = 0;
-  perf_states[1].state_id = 1;
-  perf_states[1].is_supported = true;
-  perf_states[1].restore_latency = 100;
-  perf_states[2].state_id = 2;
-  perf_states[2].is_supported = true;
-  perf_states[2].restore_latency = 1000;
-
-  AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
-
-  auto perf_change_result = child2_device_controller->SetPerformanceState(1);
-  ASSERT_OK(perf_change_result.status());
-  const auto &perf_change_response = perf_change_result.value();
-  ASSERT_OK(perf_change_response.status);
-  ASSERT_EQ(perf_change_response.out_state, 1);
-
-  auto response2 = child2_device_controller->GetCurrentPerformanceState();
-  ASSERT_OK(response2.status());
-  ASSERT_EQ(response2.value().out_state, 1);
-}
-
-TEST_F(PowerTestCase, SetPerformanceStateFail_HookNotPresent) {
-  // Parent does not support SetPerformanceState hook.
-
-  auto perf_change_result = parent_device_controller->SetPerformanceState(0);
-  ASSERT_OK(perf_change_result.status());
-  const auto &perf_change_response = perf_change_result.value();
-  ASSERT_EQ(perf_change_response.status, ZX_ERR_NOT_SUPPORTED);
-}
-
-TEST_F(PowerTestCase, SetPerformanceStateFail_UnsupportedState) {
-  // Add Capabilities
-  DevicePowerStateInfo states[2];
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  DevicePerformanceStateInfo perf_states[2];
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[0].restore_latency = 0;
-  perf_states[1].state_id = 1;
-  perf_states[1].is_supported = true;
-  perf_states[1].restore_latency = 100;
-
-  AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
-
-  auto perf_change_result = child2_device_controller->SetPerformanceState(2);
-  ASSERT_OK(perf_change_result.status());
-  const auto &perf_change_response = perf_change_result.value();
-  ASSERT_EQ(perf_change_response.status, ZX_ERR_INVALID_ARGS);
+  AddChildWithPowerArgs(states, std::size(states), true);
 }
 
 // TODO(http://fxbug.dev/119962): Re-enable this test after fixing.
@@ -442,7 +233,7 @@ TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonReboot) {
   states[2].state_id = DevicePowerState::kDevicePowerStateD3Cold;
   states[2].is_supported = true;
   states[2].restore_latency = 1000;
-  AddChildWithPowerArgs(states, std::size(states), nullptr, 0);
+  AddChildWithPowerArgs(states, std::size(states));
 
   ASSERT_OK(devmgr.SuspendDriverManager());
 
@@ -498,7 +289,7 @@ TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonRebootRecovery) {
   states[2].state_id = DevicePowerState::kDevicePowerStateD3Cold;
   states[2].is_supported = true;
   states[2].restore_latency = 1000;
-  AddChildWithPowerArgs(states, std::size(states), nullptr, 0);
+  AddChildWithPowerArgs(states, std::size(states));
 
   // TODO(http://fxbug.dev/119962): Modify GetTerminationSystemState response.
 
@@ -538,36 +329,4 @@ TEST_F(PowerTestCase, DISABLED_SystemSuspend_SuspendReasonRebootRecovery) {
   ASSERT_OK(call_status);
   ASSERT_EQ(parent_dev_suspend_response->value()->cur_state,
             DevicePowerState::kDevicePowerStateD3Cold);
-}
-
-TEST_F(PowerTestCase, SelectiveResume_AfterSetPerformanceState) {
-  // Add Capabilities
-  DevicePowerStateInfo states[2];
-  states[0].state_id = DevicePowerState::kDevicePowerStateD0;
-  states[0].is_supported = true;
-  states[1].state_id = DevicePowerState::kDevicePowerStateD3Cold;
-  states[1].is_supported = true;
-
-  DevicePerformanceStateInfo perf_states[3];
-  perf_states[0].state_id = kDevicePerformanceStateP0;
-  perf_states[0].is_supported = true;
-  perf_states[0].restore_latency = 0;
-  perf_states[1].state_id = 1;
-  perf_states[1].is_supported = true;
-  perf_states[1].restore_latency = 100;
-  perf_states[2].state_id = 2;
-  perf_states[2].is_supported = true;
-  perf_states[2].restore_latency = 1000;
-
-  AddChildWithPowerArgs(states, std::size(states), perf_states, std::size(perf_states));
-
-  auto perf_change_result = child2_device_controller->SetPerformanceState(1);
-  ASSERT_OK(perf_change_result.status());
-  const auto &perf_change_response = perf_change_result.value();
-  ASSERT_OK(perf_change_response.status);
-  ASSERT_EQ(perf_change_response.out_state, 1);
-
-  auto response2 = child2_device_controller->GetCurrentPerformanceState();
-  ASSERT_OK(response2.status());
-  ASSERT_EQ(response2.value().out_state, 1);
 }

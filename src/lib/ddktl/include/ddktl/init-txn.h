@@ -32,14 +32,10 @@ class InitTxn {
   // This can be called from any thread - it does not necessarily need to be called before
   // the Init() hook returns.
   void Reply(zx_status_t status, const device_power_state_info_t* power_states = nullptr,
-             const uint8_t power_state_count = 0,
-             const device_performance_state_info_t* perf_power_states = nullptr,
-             const uint8_t perf_power_state_count = 0) {
+             const uint8_t power_state_count = 0) {
     device_init_reply_args_t args = {};
     args.power_states = power_states;
     args.power_state_count = power_state_count;
-    args.performance_states = perf_power_states;
-    args.performance_state_count = perf_power_state_count;
 
     ZX_ASSERT_MSG(dev_, "InitTxn did not contain any device pointer.\n");
     ZX_ASSERT_MSG(!replied_, "Cannot reply to InitTxn twice.");

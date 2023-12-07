@@ -287,18 +287,6 @@ constexpr void CheckResumable() {
                 "'void DdkResume(ResumeTxn)'.");
 }
 
-DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_set_performance_state, DdkSetPerformanceState);
-
-template <typename D>
-constexpr void CheckPerformanceTunable() {
-  static_assert(has_ddk_set_performance_state<D>::value,
-                "PerformanceTunable classes must implement DdkSetPerformanceState");
-  static_assert(std::is_same<decltype(&D::DdkSetPerformanceState),
-                             zx_status_t (D::*)(uint32_t, uint32_t*)>::value,
-                "DdkSetPerformanceState must be a public non-static member function with signature "
-                "'zx_status_t DdkSetPerformanceState(uint32_t, uint32_t*)'.");
-}
-
 DDKTL_INTERNAL_DECLARE_HAS_MEMBER_FN(has_ddk_rxrpc, DdkRxrpc);
 
 template <typename D>

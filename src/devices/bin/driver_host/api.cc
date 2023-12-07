@@ -173,20 +173,6 @@ __EXPORT zx_status_t device_add_from_driver(zx_driver_t* drv, zx_device_t* paren
     }
   }
 
-  if (args->performance_states && (args->performance_state_count != 0)) {
-    if (zx_status_t status =
-            dev->SetPerformanceStates(args->performance_states, args->performance_state_count);
-        status != ZX_OK) {
-      return status;
-    }
-  } else {
-    if (zx_status_t status = dev->SetPerformanceStates(
-            internal::kDeviceDefaultPerfStates, std::size(internal::kDeviceDefaultPerfStates));
-        status != ZX_OK) {
-      return status;
-    }
-  }
-
   // Set default system to device power state mapping. This can be later
   // updated by the system power manager.
   if (zx_status_t status = dev->SetSystemPowerStateMapping(internal::kDeviceDefaultStateMapping);

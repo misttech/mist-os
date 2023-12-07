@@ -95,10 +95,6 @@ void zx_device::set_rebind_drv_name(std::string drv_name) {
 
 const zx_device::DevicePowerStates& zx_device::GetPowerStates() const { return power_states_; }
 
-const zx_device::PerformanceStates& zx_device::GetPerformanceStates() const {
-  return performance_states_;
-}
-
 const zx_device::SystemPowerStateMapping& zx_device::GetSystemPowerStateMapping() const {
   return system_power_states_mapping_;
 }
@@ -135,34 +131,6 @@ zx_status_t zx_device::SetPowerStates(const device_power_state_info_t* power_sta
     return ZX_ERR_INVALID_ARGS;
   }
   inspect_->set_power_states(power_states, count);
-  return ZX_OK;
-}
-
-zx_status_t zx_device::SetPerformanceStates(
-    const device_performance_state_info_t* performance_states, uint8_t count) {
-  if (count < fuchsia_device::wire::kMinDevicePerformanceStates ||
-      count > fuchsia_device::wire::kMaxDevicePerformanceStates) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  bool visited[fuchsia_device::wire::kMaxDevicePerformanceStates] = {false};
-  for (uint8_t i = 0; i < count; i++) {
-    const auto& info = performance_states[i];
-    if (info.state_id >= std::size(visited)) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (visited[info.state_id]) {
-      return ZX_ERR_INVALID_ARGS;
-    }
-    fuchsia_device::wire::DevicePerformanceStateInfo* state = &(performance_states_[info.state_id]);
-    state->state_id = info.state_id;
-    state->is_supported = true;
-    state->restore_latency = info.restore_latency;
-    visited[info.state_id] = true;
-  }
-  if (!(performance_states_[fuchsia_device::wire::kDevicePerformanceStateP0].is_supported)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  inspect_->set_performance_states(performance_states, count);
   return ZX_OK;
 }
 
@@ -354,13 +322,6 @@ bool zx_device::is_fidl_proxy() const { return is_fidl_proxy_ && !!fidl_proxy_; 
 
 fbl::RefPtr<FidlProxyDevice> zx_device::fidl_proxy() { return fidl_proxy_; }
 
-bool zx_device::IsPerformanceStateSupported(uint32_t requested_state) {
-  if (requested_state >= fuchsia_device::wire::kMaxDevicePerformanceStates) {
-    return false;
-  }
-  return performance_states_[requested_state].is_supported;
-}
-
 void zx_device::add_child(zx_device* child) {
   children_.push_back(child);
   inspect_->increment_child_count();
@@ -457,10 +418,6 @@ void zx_device::Bind(BindRequestView request, BindCompleter::Sync& completer) {
   });
 }
 
-void zx_device::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Reply(current_performance_state());
-}
-
 void zx_device::Rebind(RebindRequestView request, RebindCompleter::Sync& completer) {
   set_rebind_drv_name(std::string(request->driver.get()));
   // This will be called after the device is rebound. If DriverManager finds a driver for this
@@ -525,12 +482,4 @@ void zx_device::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView reque
   auto status =
       zx_driver()->set_driver_min_log_severity(static_cast<fx_log_severity_t>(request->severity));
   completer.Reply(status);
-}
-
-void zx_device::SetPerformanceState(SetPerformanceStateRequestView request,
-                                    SetPerformanceStateCompleter::Sync& completer) {
-  uint32_t out_state;
-  zx_status_t status = driver_host_context()->DeviceSetPerformanceState(
-      fbl::RefPtr(this), request->requested_state, &out_state);
-  completer.Reply(status, out_state);
 }

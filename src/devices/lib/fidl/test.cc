@@ -20,9 +20,6 @@ class TestInterface : public devfs_fidl::DeviceInterface {
     return false;
   }
 
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override {
-    completer.Reply(1);
-  }
   void ConnectToDeviceFidl(fuchsia_device::wire::ControllerConnectToDeviceFidlRequest* request,
                            ConnectToDeviceFidlCompleter::Sync& completer) override {
     ZX_PANIC("Unimplemented");
@@ -56,10 +53,6 @@ class TestInterface : public devfs_fidl::DeviceInterface {
       SetMinDriverLogSeverityCompleter::Sync& completer) override {
     ZX_PANIC("Unimplemented");
   }
-  void SetPerformanceState(fuchsia_device::wire::ControllerSetPerformanceStateRequest* request,
-                           SetPerformanceStateCompleter::Sync& completer) override {
-    ZX_PANIC("Unimplemented");
-  }
 };
 
 class MultiplexTest : public zxtest::TestWithParam<std::tuple<bool, bool>> {
@@ -91,28 +84,6 @@ TEST_P(MultiplexTest, CheckUnimplemented) {
         [&did_run, include_node](fidl::WireUnownedResult<fuchsia_io::Node::Query>& result) {
           did_run = true;
           if (include_node) {
-            ASSERT_OK(result.status());
-          } else {
-            ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);
-          }
-        });
-    ASSERT_OK(loop.RunUntilIdle());
-    ASSERT_TRUE(did_run);
-  }
-
-  {
-    zx::result controller = fidl::CreateEndpoints<fuchsia_device::Controller>();
-    ASSERT_OK(controller);
-    server.ServeMultiplexed(controller->server.TakeChannel(), include_node, include_controller);
-
-    bool did_run = false;
-    fidl::WireClient controller_client{std::move(controller->client), loop.dispatcher()};
-    controller_client->GetCurrentPerformanceState().Then(
-        [&did_run, include_controller](
-            fidl::WireUnownedResult<fuchsia_device::Controller::GetCurrentPerformanceState>&
-                result) {
-          did_run = true;
-          if (include_controller) {
             ASSERT_OK(result.status());
           } else {
             ASSERT_STATUS(result.status(), ZX_ERR_PEER_CLOSED);

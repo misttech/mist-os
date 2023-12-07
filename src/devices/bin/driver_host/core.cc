@@ -68,8 +68,6 @@ void DriverHostContext::DeviceDestroy(zx_device_t* dev) {
       .suspend = +[](void* ctx, uint8_t requested_state, bool enable_wake,
                      uint8_t suspend_reason) { device_invalid_fatal(ctx); },
       .resume = +[](void* ctx, uint32_t) { device_invalid_fatal(ctx); },
-      .set_performance_state = +[](void* ctx, uint32_t requested_state, uint32_t* out_state)
-          -> zx_status_t { device_invalid_fatal(ctx); },
       .rxrpc = +[](void* ctx, zx_handle_t) -> zx_status_t { device_invalid_fatal(ctx); },
       .message =
           +[](void* ctx, fidl_incoming_msg_t, device_fidl_txn_t) { device_invalid_fatal(ctx); },
@@ -219,14 +217,6 @@ const char* removal_problem(uint32_t flags) {
 }
 
 }  // namespace
-
-uint32_t get_perf_state(const fbl::RefPtr<zx_device>& dev, uint32_t requested_perf_state) {
-  // Give preference to the performance state that is explicitly for this device.
-  if (dev->current_performance_state() != fuchsia_device::wire::kDevicePerformanceStateP0) {
-    return dev->current_performance_state();
-  }
-  return requested_perf_state;
-}
 
 }  // namespace internal
 
@@ -390,9 +380,6 @@ void DriverHostContext::DeviceInitReply(const fbl::RefPtr<zx_device_t>& dev, zx_
     if (args && args->power_states && args->power_state_count != 0) {
       dev->SetPowerStates(args->power_states, args->power_state_count);
     }
-    if (args && args->performance_states && (args->performance_state_count != 0)) {
-      dev->SetPerformanceStates(args->performance_states, args->performance_state_count);
-    }
   }
 
   if (dev->init_cb == nullptr) {
@@ -503,10 +490,6 @@ void DriverHostContext::DeviceSuspendReply(const fbl::RefPtr<zx_device_t>& dev, 
 void DriverHostContext::DeviceResumeReply(const fbl::RefPtr<zx_device_t>& dev, zx_status_t status,
                                           uint8_t out_power_state, uint32_t out_perf_state) {
   if (dev->resume_cb) {
-    if (out_power_state == static_cast<uint8_t>(DevicePowerState::kDevicePowerStateD0)) {
-      // Update the current performance state.
-      dev->set_current_performance_state(out_perf_state);
-    }
     dev->resume_cb(status, out_power_state, out_perf_state);
   } else {
     LOGD(FATAL, *dev, "Device %p cannot reply to resume, no callback set", dev.get());
@@ -563,9 +546,8 @@ void DriverHostContext::DeviceSystemResume(const fbl::RefPtr<zx_device>& dev,
       auto& sys_power_states = dev->GetSystemPowerStateMapping();
 
       // Subtract 1 from `target_system_state` because it uses a 1-based index
-      uint32_t performance_state = sys_power_states.at(target_system_state - 1).performance_state;
-
-      uint32_t requested_perf_state = internal::get_perf_state(dev, performance_state);
+      uint32_t requested_perf_state =
+          sys_power_states.at(target_system_state - 1).performance_state;
       dev->ops().resume(dev->ctx(), requested_perf_state);
       api_lock_.Acquire();
     }
@@ -579,25 +561,6 @@ void DriverHostContext::DeviceSystemResume(const fbl::RefPtr<zx_device>& dev,
   }
   dev->resume_cb(status, static_cast<uint8_t>(DevicePowerState::kDevicePowerStateD0),
                  fuchsia_device::wire::kDevicePerformanceStateP0);
-}
-
-zx_status_t DriverHostContext::DeviceSetPerformanceState(const fbl::RefPtr<zx_device>& dev,
-                                                         uint32_t requested_state,
-                                                         uint32_t* out_state) {
-  if (!(dev->IsPerformanceStateSupported(requested_state))) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (dev->ops().set_performance_state) {
-    zx_status_t status = dev->ops().set_performance_state(dev->ctx(), requested_state, out_state);
-    if (!(dev->IsPerformanceStateSupported(*out_state))) {
-      LOGD(FATAL, *dev,
-           "Device %p 'set_performance_state' hook returned an unsupported performance state",
-           dev.get());
-    }
-    dev->set_current_performance_state(*out_state);
-    return status;
-  }
-  return ZX_ERR_NOT_SUPPORTED;
 }
 
 void DriverHostContext::QueueDeviceForFinalization(zx_device_t* device) {

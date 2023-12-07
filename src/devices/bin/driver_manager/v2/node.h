@@ -316,11 +316,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void ScheduleUnbind(ScheduleUnbindCompleter::Sync& completer) override;
   void GetTopologicalPath(GetTopologicalPathCompleter::Sync& completer) override;
   void GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) override;
   void SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
                                SetMinDriverLogSeverityCompleter::Sync& completer) override;
-  void SetPerformanceState(SetPerformanceStateRequestView request,
-                           SetPerformanceStateCompleter::Sync& completer) override;
 
   // This is called when fuchsia_driver_host::Driver is closed.
   void on_fidl_error(fidl::UnbindInfo info) override;

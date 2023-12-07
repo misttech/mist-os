@@ -18,8 +18,7 @@ const MAX_DRIVER_PATH_LEN uint64 = 1024;
 /// for performance states.
 const MAX_DEVICE_POWER_STATES uint32 = 5;
 const MIN_DEVICE_POWER_STATES uint32 = 2; // D0 & D3COLD
-const MAX_DEVICE_PERFORMANCE_STATES uint32 = 20;
-const MIN_DEVICE_PERFORMANCE_STATES uint32 = 1; // Fully performant state
+
 @deprecated("devices will be services in the future")
 type DeviceSignal = strict bits : uint32 {
     /// Indicates the device is ready for reading.
@@ -177,24 +176,5 @@ closed protocol Controller {
         severity fuchsia.logger.LogLevelFilter;
     }) -> (struct {
         status zx.Status;
-    });
-
-    /// Gets the current performance state of the device.
-    strict GetCurrentPerformanceState() -> (struct {
-        out_state uint32;
-    });
-
-    /// Set the performance state of this device to the requested performance state. This is only
-    /// called for the current device and none of the descendants are aware of the state
-    /// transition.
-    /// Returns ZX_OK, if the device is in a working state and the performance state is changed to
-    /// requested_state successfully. out_state will be same as requested_state.
-    /// Returns error status, if switching to the requested_state was unsuccessful. out_state
-    /// is the state that the device is currently in.
-    strict SetPerformanceState(struct {
-        requested_state uint32;
-    }) -> (struct {
-        status zx.Status;
-        out_state uint32;
     });
 };

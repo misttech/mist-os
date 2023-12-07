@@ -1202,17 +1202,8 @@ void Node::GetMinDriverLogSeverity(GetMinDriverLogSeverityCompleter::Sync& compl
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
-void Node::GetCurrentPerformanceState(GetCurrentPerformanceStateCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void Node::SetMinDriverLogSeverity(SetMinDriverLogSeverityRequestView request,
                                    SetMinDriverLogSeverityCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-void Node::SetPerformanceState(SetPerformanceStateRequestView request,
-                               SetPerformanceStateCompleter::Sync& completer) {
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 

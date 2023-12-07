@@ -295,14 +295,6 @@ constexpr device_power_state_info_t kPowerStates[] = {
     device_power_state_info_t{.state_id = DEV_POWER_STATE_D0},
     device_power_state_info_t{.state_id = DEV_POWER_STATE_D1},
 };
-constexpr device_performance_state_info_t kPerformanceStates[] = {
-    device_performance_state_info_t{.state_id = DEV_PERFORMANCE_STATE_P0,
-                                    .restore_latency = ZX_MSEC(3)},
-    device_performance_state_info_t{.state_id = DEV_PERFORMANCE_STATE_P0,
-                                    .restore_latency = ZX_MSEC(4)},
-    device_performance_state_info_t{.state_id = DEV_PERFORMANCE_STATE_P0,
-                                    .restore_latency = ZX_MSEC(5)},
-};
 const char *kFidlProtocolOffers[] = {
     "one",
     "two",
@@ -326,14 +318,6 @@ class DeviceAddArgsTest : public ::testing::Test {
       EXPECT_EQ(left.power_states[i].state_id, right.power_states[i].state_id);
     }
 
-    EXPECT_NE(left.performance_states, right.performance_states);
-    ASSERT_EQ(left.performance_state_count, right.performance_state_count);
-    for (size_t i = 0; i < left.performance_state_count; ++i) {
-      EXPECT_EQ(left.performance_states[i].state_id, right.performance_states[i].state_id);
-      EXPECT_EQ(left.performance_states[i].restore_latency,
-                right.performance_states[i].restore_latency);
-    }
-
     EXPECT_NE(left.fidl_service_offers, right.fidl_service_offers);
     ASSERT_EQ(left.fidl_service_offer_count, right.fidl_service_offer_count);
     for (size_t i = 0; i < left.fidl_service_offer_count; ++i) {
@@ -347,8 +331,6 @@ class DeviceAddArgsTest : public ::testing::Test {
       .ops = &kProtoOps,
       .power_states = kPowerStates,
       .power_state_count = std::size(kPowerStates),
-      .performance_states = kPerformanceStates,
-      .performance_state_count = std::size(kPerformanceStates),
       .fidl_service_offers = kFidlProtocolOffers,
       .fidl_service_offer_count = std::size(kFidlProtocolOffers),
   };
