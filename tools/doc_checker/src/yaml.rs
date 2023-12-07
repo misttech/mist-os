@@ -338,8 +338,8 @@ impl DocYamlCheck for YamlChecker {
                     // All includes are /docs/... so just append the root.
                     let additional_paths = includes
                         .iter()
-                        // TODO(wilkinsonclay): Followup with ignoring yaml included from /reference.
-                        //.filter(|p| !p.starts_with("/reference"))
+                        //Ignoring yaml included from /reference.
+                        .filter(|p| !p.starts_with("/reference"))
                         .map(|p| self.root_dir.join(p.strip_prefix('/').unwrap_or(p.as_str())))
                         .filter(|p| {
                             if p == &current_yaml.included_file {
