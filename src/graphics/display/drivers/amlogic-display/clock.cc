@@ -72,12 +72,6 @@ void DumpDisplaySettings(const display_setting_t& settings) {
 
 }  // namespace
 
-#define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
-#define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
-
-#define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
-#define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
-
 // static
 LcdTiming Clock::CalculateLcdTiming(const display_setting_t& d) {
   LcdTiming out;

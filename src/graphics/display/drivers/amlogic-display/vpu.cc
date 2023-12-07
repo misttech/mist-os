@@ -70,15 +70,6 @@ constexpr VideoInputModuleId kVideoInputModuleId = VideoInputModuleId::kVideoInp
 #define RESET4_LEVEL 0x90
 #define RESET7_LEVEL 0x9c
 
-#define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
-#define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
-
-#define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
-#define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
-
-#define READ32_RESET_REG(a) reset_mmio_->Read32(a)
-#define WRITE32_RESET_REG(a, v) reset_mmio_->Write32(v, a)
-
 zx_status_t Vpu::Init(ddk::PDevFidl& pdev) {
   ZX_ASSERT(!initialized_);
 
@@ -665,7 +656,7 @@ void Vpu::CapturePrintRegisters() {
 
   zxlogf(INFO, "Dumping from 0x1300 to 0x1373");
   for (int i = 0x1300; i <= 0x1373; i++) {
-    zxlogf(INFO, "reg[0x%x] = 0x%x", i, READ32_VPU_REG(i << 2));
+    zxlogf(INFO, "reg[0x%x] = 0x%x", i, vpu_mmio_->Read32(i << 2));
   }
 }
 

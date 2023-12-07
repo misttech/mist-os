@@ -9,9 +9,6 @@
 #include <hwreg/bitfields.h>
 #include <hwreg/mmio.h>
 
-#define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
-#define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
-
 #define VPU_VIU_OSD1_CTRL_STAT (0x1a10 << 2)
 #define VPU_VIU_OSD1_COLOR_ADDR (0x1a11 << 2)
 #define VPU_VIU_OSD1_COLOR (0x1a12 << 2)

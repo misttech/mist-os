@@ -36,9 +36,6 @@
 
 namespace amlogic_display {
 
-#define READ32_VPU_REG(a) vpu_mmio_->Read32(a)
-#define WRITE32_VPU_REG(a, v) vpu_mmio_->Write32(v, a)
-
 namespace {
 constexpr uint32_t kMaximumAlpha = 0xff;
 

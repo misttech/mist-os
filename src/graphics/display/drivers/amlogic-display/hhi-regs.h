@@ -12,9 +12,6 @@
 // This datasheet is distributed by Khadas for the VIM3, at
 // https://dl.khadas.com/hardware/VIM3/Datasheet/A311D_Datasheet_08_Wesion.pdf
 
-#define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
-#define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
-
 // clang-format off
 #define HHI_MIPI_CNTL0 (0x000 << 2)
 #define HHI_MIPI_CNTL1 (0x001 << 2)

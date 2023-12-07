@@ -15,12 +15,6 @@
 
 namespace amlogic_display {
 
-#define READ32_MIPI_DSI_REG(a) mipi_dsi_mmio_->Read32(a)
-#define WRITE32_MIPI_DSI_REG(a, v) mipi_dsi_mmio_->Write32(v, a)
-
-#define READ32_HHI_REG(a) hhi_mmio_->Read32(a)
-#define WRITE32_HHI_REG(a, v) hhi_mmio_->Write32(v, a)
-
 namespace {
 
 constexpr uint8_t kEmptySequence[] = {};

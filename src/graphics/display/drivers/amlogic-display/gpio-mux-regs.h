@@ -5,9 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_GPIO_MUX_REGS_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_GPIO_MUX_REGS_H_
 
-#define READ32_GPIO_MUX_REG(a) gpio_mux_mmio_->Read32(a)
-#define WRITE32_GPIO_MUX_REG(a, v) gpio_mux_mmio_->Write32(v, a)
-
 // Register offsets from the A311D datasheet section 8.9.2 "GPIO Multiplex
 // Function", Table 8-23 "Pin Mux Registers".
 //

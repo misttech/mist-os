@@ -11,9 +11,6 @@
 
 namespace amlogic_display {
 
-#define READ32_DSI_PHY_REG(a) dsi_phy_mmio_->Read32(a)
-#define WRITE32_DSI_PHY_REG(a, v) dsi_phy_mmio_->Write32(v, a)
-
 template <typename T>
 constexpr inline uint8_t NsToLaneByte(T x, uint32_t lanebytetime) {
   return (static_cast<uint8_t>((x + lanebytetime - 1) / lanebytetime) & 0xFF);
