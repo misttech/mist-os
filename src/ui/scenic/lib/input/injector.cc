@@ -28,6 +28,10 @@ constexpr zx::duration kLatencyHistogramInitialStep = zx::msec(1);
 constexpr uint64_t kLatencyHistogramStepMultiplier = 2;
 constexpr size_t kLatencyHistogramBuckets = 14;
 
+// Retain this many touch event buckets.  This ensures we see at most this
+// many of them even if there isn't 10 minutes of consistent touch activity.
+constexpr size_t kNumRetainedTouchEventBuckets = 10;
+
 uint64_t GetCurrentMinute(const zx::time timestamp) { return timestamp.get() / zx::min(1).get(); }
 
 }  // namespace
@@ -79,7 +83,7 @@ void InjectorInspector::UpdateHistory(const zx::time now) {
   history_.front().num_injected_events++;
 
   // Pop off everything older than |kNumMinutesOfHistory|.
-  while (history_.size() > 1 &&
+  while (history_.size() > kNumRetainedTouchEventBuckets &&
          (current_minute - history_.back().minute_key) >= kNumMinutesOfHistory) {
     history_.pop_back();
   }
