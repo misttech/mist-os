@@ -194,18 +194,15 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
 }
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateHdmiVout(zx_device_t* parent) {
+  zx::result<std::unique_ptr<HdmiHost>> hdmi_host_result = HdmiHost::Create(parent);
+  if (hdmi_host_result.is_error()) {
+    zxlogf(ERROR, "Could not create HDMI host: %s", hdmi_host_result.status_string());
+    return hdmi_host_result.take_error();
+  }
+
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<HdmiHost> hdmi_host = fbl::make_unique_checked<HdmiHost>(&alloc_checker, parent);
-  if (!alloc_checker.check()) {
-    return zx::error(ZX_ERR_NO_MEMORY);
-  }
-
-  if (zx_status_t status = hdmi_host->Init(); status != ZX_OK) {
-    zxlogf(ERROR, "Could not initialize HDMI host: %s", zx_status_get_string(status));
-    return zx::error(status);
-  }
-
-  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(&alloc_checker, std::move(hdmi_host));
+  std::unique_ptr<Vout> vout =
+      fbl::make_unique_checked<Vout>(&alloc_checker, std::move(hdmi_host_result).value());
   if (!alloc_checker.check()) {
     zxlogf(ERROR, "Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);

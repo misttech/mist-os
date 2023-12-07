@@ -88,9 +88,28 @@ struct cea_timing {
 // VPU and HHI register handling, HDMI parameters, etc.
 class HdmiHost {
  public:
-  explicit HdmiHost(zx_device_t* parent) : pdev_(ddk::PDevFidl::FromFragment(parent)) {}
+  // `hdmi_transmitter` must not be null.
+  //
+  // `vpu_mmio` is the VPU MMIO register region. It must be a valid MMIO buffer.
+  //
+  // `hhi_mmio` is the HHI (HIU) MMIO register region. It must be a valid MMIO
+  // buffer.
+  //
+  // `gpio_mux_mmio` is the GPIO Multiplexer (PERIPHS_REGS) MMIO register
+  // region. It must be a valid MMIO buffer.
+  //
+  // The VPU, HIU and PERIPHS_REGS register regions are defined in Section 8.1
+  // "Memory Map" of the AMLogic A311D datasheet.
+  HdmiHost(std::unique_ptr<HdmiTransmitter> hdmi_transmitter, fdf::MmioBuffer vpu_mmio,
+           fdf::MmioBuffer hhi_mmio, fdf::MmioBuffer gpio_mux_mmio);
 
-  zx_status_t Init();
+  HdmiHost(const HdmiHost&) = delete;
+  HdmiHost(HdmiHost&&) = delete;
+  HdmiHost& operator=(const HdmiHost&) = delete;
+  HdmiHost& operator=(HdmiHost&&) = delete;
+
+  static zx::result<std::unique_ptr<HdmiHost>> Create(zx_device_t* parent);
+
   zx_status_t HostOn();
   void HostOff();
 
@@ -115,13 +134,11 @@ class HdmiHost {
   void ConfigureOd3Div(uint32_t div_sel);
   void WaitForPllLocked();
 
-  ddk::PDevFidl pdev_;
-
   std::unique_ptr<HdmiTransmitter> hdmi_transmitter_;
 
-  std::optional<fdf::MmioBuffer> vpu_mmio_;
-  std::optional<fdf::MmioBuffer> hhi_mmio_;
-  std::optional<fdf::MmioBuffer> gpio_mux_mmio_;
+  fdf::MmioBuffer vpu_mmio_;
+  fdf::MmioBuffer hhi_mmio_;
+  fdf::MmioBuffer gpio_mux_mmio_;
 };
 
 }  // namespace amlogic_display

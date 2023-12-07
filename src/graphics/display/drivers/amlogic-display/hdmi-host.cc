@@ -7,6 +7,8 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/ddk/debug.h>
 #include <lib/device-protocol/pdev-fidl.h>
+#include <lib/mmio/mmio-buffer.h>
+#include <zircon/errors.h>
 
 #include <limits>
 
@@ -207,71 +209,101 @@ zx::result<std::unique_ptr<HdmiTransmitter>> CreateHdmiTransmitter(ddk::PDevFidl
 
 }  // namespace
 
-zx_status_t HdmiHost::Init() {
-  // TODO(fxbug.dev/132267): Replace the multi-step initialization with
-  // the builder / factory pattern.
-  auto status = pdev_.MapMmio(MMIO_VPU, &vpu_mmio_);
+HdmiHost::HdmiHost(std::unique_ptr<HdmiTransmitter> hdmi_transmitter, fdf::MmioBuffer vpu_mmio,
+                   fdf::MmioBuffer hhi_mmio, fdf::MmioBuffer gpio_mux_mmio)
+    : hdmi_transmitter_(std::move(hdmi_transmitter)),
+      vpu_mmio_(std::move(vpu_mmio)),
+      hhi_mmio_(std::move(hhi_mmio)),
+      gpio_mux_mmio_(std::move(gpio_mux_mmio)) {
+  ZX_DEBUG_ASSERT(hdmi_transmitter_ != nullptr);
+}
+
+// static
+zx::result<std::unique_ptr<HdmiHost>> HdmiHost::Create(zx_device_t* parent) {
+  ddk::PDevFidl pdev = ddk::PDevFidl::FromFragment(parent);
+  if (!pdev.is_valid()) {
+    zxlogf(ERROR, "Could not get the platform device client.");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+
+  std::optional<fdf::MmioBuffer> vpu_mmio;
+  zx_status_t status = pdev.MapMmio(MMIO_VPU, &vpu_mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map VPU mmio: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
+  ZX_ASSERT(vpu_mmio.has_value());
 
-  status = pdev_.MapMmio(MMIO_HHI, &hhi_mmio_);
+  std::optional<fdf::MmioBuffer> hhi_mmio;
+  status = pdev.MapMmio(MMIO_HHI, &hhi_mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map HHI mmio: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
+  ZX_ASSERT(hhi_mmio.has_value());
 
-  status = pdev_.MapMmio(MMIO_GPIO_MUX, &gpio_mux_mmio_);
+  std::optional<fdf::MmioBuffer> gpio_mux_mmio;
+  status = pdev.MapMmio(MMIO_GPIO_MUX, &gpio_mux_mmio);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not map GPIO MUX mmio: %s", zx_status_get_string(status));
-    return status;
+    return zx::error(status);
   }
+  ZX_ASSERT(gpio_mux_mmio.has_value());
 
-  zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter = CreateHdmiTransmitter(pdev_);
+  zx::result<std::unique_ptr<HdmiTransmitter>> hdmi_transmitter = CreateHdmiTransmitter(pdev);
   if (hdmi_transmitter.is_error()) {
     zxlogf(ERROR, "Could not create HDMI transmitter: %s", hdmi_transmitter.status_string());
-    return hdmi_transmitter.status_value();
+    return hdmi_transmitter.take_error();
   }
-  hdmi_transmitter_ = std::move(hdmi_transmitter).value();
-  return ZX_OK;
+  ZX_ASSERT(hdmi_transmitter.value() != nullptr);
+
+  fbl::AllocChecker alloc_checker;
+  std::unique_ptr<HdmiHost> hdmi_host = fbl::make_unique_checked<HdmiHost>(
+      &alloc_checker, std::move(hdmi_transmitter).value(), std::move(*vpu_mmio),
+      std::move(*hhi_mmio), std::move(*gpio_mux_mmio));
+  if (!alloc_checker.check()) {
+    zxlogf(ERROR, "Could not allocate memory for the HdmiHost instance.");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  return zx::ok(std::move(hdmi_host));
 }
 
 zx_status_t HdmiHost::HostOn() {
   /* Step 1: Initialize various clocks related to the HDMI Interface*/
-  gpio_mux_mmio_->Write32(
-      SetFieldValue32(gpio_mux_mmio_->Read32(PAD_PULL_UP_EN_REG3), /*field_begin_bit=*/0,
+  gpio_mux_mmio_.Write32(
+      SetFieldValue32(gpio_mux_mmio_.Read32(PAD_PULL_UP_EN_REG3), /*field_begin_bit=*/0,
                       /*field_size_bits=*/2, /*field_value=*/0),
       PAD_PULL_UP_EN_REG3);
-  gpio_mux_mmio_->Write32(
-      SetFieldValue32(gpio_mux_mmio_->Read32(PAD_PULL_UP_REG3), /*field_begin_bit=*/0,
+  gpio_mux_mmio_.Write32(
+      SetFieldValue32(gpio_mux_mmio_.Read32(PAD_PULL_UP_REG3), /*field_begin_bit=*/0,
                       /*field_size_bits=*/2, /*field_value=*/0),
       PAD_PULL_UP_REG3);
-  gpio_mux_mmio_->Write32(
-      SetFieldValue32(gpio_mux_mmio_->Read32(P_PREG_PAD_GPIO3_EN_N), /*field_begin_bit=*/0,
+  gpio_mux_mmio_.Write32(
+      SetFieldValue32(gpio_mux_mmio_.Read32(P_PREG_PAD_GPIO3_EN_N), /*field_begin_bit=*/0,
                       /*field_size_bits=*/2, /*field_value=*/3),
       P_PREG_PAD_GPIO3_EN_N);
-  gpio_mux_mmio_->Write32(
-      SetFieldValue32(gpio_mux_mmio_->Read32(PERIPHS_PIN_MUX_B), /*field_begin_bit=*/0,
+  gpio_mux_mmio_.Write32(
+      SetFieldValue32(gpio_mux_mmio_.Read32(PERIPHS_PIN_MUX_B), /*field_begin_bit=*/0,
                       /*field_size_bits=*/8, /*field_value=*/0x11),
       PERIPHS_PIN_MUX_B);
 
   // enable clocks
   HdmiClockControl::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .SetHdmiTxSystemClockDivider(1)
       .set_hdmi_tx_system_clock_enabled(true)
       .set_hdmi_tx_system_clock_selection(
           HdmiClockControl::HdmiTxSystemClockSource::kExternalOscillator24Mhz)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
 
   // enable clk81 (needed for HDMI module and a bunch of other modules)
-  HhiGclkMpeg2Reg::Get().ReadFrom(&(*hhi_mmio_)).set_clk81_en(1).WriteTo(&(*hhi_mmio_));
+  HhiGclkMpeg2Reg::Get().ReadFrom(&hhi_mmio_).set_clk81_en(1).WriteTo(&hhi_mmio_);
 
   // TODO(fxbug.com/132123): HDMI memory was supposed to be powered on during
   // the VPU power sequence. The AMLogic-supplied bringup code pauses for 5us
   // between each bit flip.
-  auto memory_power0 = MemoryPower0::Get().ReadFrom(&hhi_mmio_.value());
+  auto memory_power0 = MemoryPower0::Get().ReadFrom(&hhi_mmio_);
   memory_power0.set_hdmi_memory0_powered_off(false);
   memory_power0.set_hdmi_memory1_powered_off(false);
   memory_power0.set_hdmi_memory2_powered_off(false);
@@ -280,7 +312,7 @@ zx_status_t HdmiHost::HostOn() {
   memory_power0.set_hdmi_memory5_powered_off(false);
   memory_power0.set_hdmi_memory6_powered_off(false);
   memory_power0.set_hdmi_memory7_powered_off(false);
-  memory_power0.WriteTo(&hhi_mmio_.value());
+  memory_power0.WriteTo(&hhi_mmio_);
 
   zx::result<> reset_result = hdmi_transmitter_->Reset();  // only supports 1 display for now
   if (reset_result.is_error()) {
@@ -292,10 +324,10 @@ zx_status_t HdmiHost::HostOn() {
 
 void HdmiHost::HostOff() {
   /* Close HDMITX PHY */
-  hhi_mmio_->Write32(0, HHI_HDMI_PHY_CNTL0);
-  hhi_mmio_->Write32(0, HHI_HDMI_PHY_CNTL3);
+  hhi_mmio_.Write32(0, HHI_HDMI_PHY_CNTL0);
+  hhi_mmio_.Write32(0, HHI_HDMI_PHY_CNTL3);
   /* Disable HPLL */
-  hhi_mmio_->Write32(0, HHI_HDMI_PLL_CNTL0);
+  hhi_mmio_.Write32(0, HHI_HDMI_PLL_CNTL0);
 }
 
 zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
@@ -314,34 +346,34 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   pll_param clock_params = CalculateClockParameters(timing);
   ConfigurePll(clock_params);
 
-  vpu_mmio_->Write32(0, VPU_ENCP_VIDEO_EN);
-  vpu_mmio_->Write32(0, VPU_ENCI_VIDEO_EN);
-  vpu_mmio_->Write32(0x4040, VPU_ENCP_VIDEO_MODE);
-  vpu_mmio_->Write32(0x18, VPU_ENCP_VIDEO_MODE_ADV);
+  vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_EN);
+  vpu_mmio_.Write32(0, VPU_ENCI_VIDEO_EN);
+  vpu_mmio_.Write32(0x4040, VPU_ENCP_VIDEO_MODE);
+  vpu_mmio_.Write32(0x18, VPU_ENCP_VIDEO_MODE_ADV);
 
   // Connect both VIUs (Video Input Units) to the Progressive Encoder (ENCP),
   // assuming the display is progressive.
   VideoInputUnitEncoderMuxControl::Get()
-      .ReadFrom(&*vpu_mmio_)
+      .ReadFrom(&vpu_mmio_)
       .set_vsync_shared_by_viu_blocks(false)
       .set_viu1_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kProgressive)
       .set_viu2_encoder_selection(VideoInputUnitEncoderMuxControl::Encoder::kProgressive)
-      .WriteTo(&*vpu_mmio_);
+      .WriteTo(&vpu_mmio_);
 
-  vpu_mmio_->Write32(16, VPU_ENCP_VIDEO_VSO_BEGIN);
-  vpu_mmio_->Write32(32, VPU_ENCP_VIDEO_VSO_END);
+  vpu_mmio_.Write32(16, VPU_ENCP_VIDEO_VSO_BEGIN);
+  vpu_mmio_.Write32(32, VPU_ENCP_VIDEO_VSO_END);
 
-  vpu_mmio_->Write32(0, VPU_ENCI_VIDEO_EN);
-  vpu_mmio_->Write32(1, VPU_ENCP_VIDEO_EN);
+  vpu_mmio_.Write32(0, VPU_ENCI_VIDEO_EN);
+  vpu_mmio_.Write32(1, VPU_ENCP_VIDEO_EN);
 
-  vpu_mmio_->Write32((encoder_timing.venc_pixel_repeat) ? ((encoder_timing.htotal << 1) - 1)
-                                                        : (encoder_timing.htotal - 1),
-                     VPU_ENCP_VIDEO_MAX_PXCNT);
-  vpu_mmio_->Write32(encoder_timing.vtotal - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
+  vpu_mmio_.Write32((encoder_timing.venc_pixel_repeat) ? ((encoder_timing.htotal << 1) - 1)
+                                                       : (encoder_timing.htotal - 1),
+                    VPU_ENCP_VIDEO_MAX_PXCNT);
+  vpu_mmio_.Write32(encoder_timing.vtotal - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
 
   if (encoder_timing.venc_pixel_repeat) {
-    vpu_mmio_->Write32(
-        SetFieldValue32(vpu_mmio_->Read32(VPU_ENCP_VIDEO_MODE_ADV), /*field_begin_bit=*/0,
+    vpu_mmio_.Write32(
+        SetFieldValue32(vpu_mmio_.Read32(VPU_ENCP_VIDEO_MODE_ADV), /*field_begin_bit=*/0,
                         /*field_size_bits=*/1, /*field_value=*/1),
         VPU_ENCP_VIDEO_MODE_ADV);
   }
@@ -350,8 +382,8 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   ConfigEncoder(encoder_timing);
 
   // Configure VDAC
-  hhi_mmio_->Write32(0, HHI_VDAC_CNTL0_G12A);
-  hhi_mmio_->Write32(8, HHI_VDAC_CNTL1_G12A);  // set Cdac_pwd [whatever that is]
+  hhi_mmio_.Write32(0, HHI_VDAC_CNTL0_G12A);
+  hhi_mmio_.Write32(8, HHI_VDAC_CNTL1_G12A);  // set Cdac_pwd [whatever that is]
 
   static constexpr designware_hdmi::ColorParam kColorParams{
       .input_color_format = designware_hdmi::ColorFormat::kCf444,
@@ -388,30 +420,26 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
       .set_cntl_chroma_dnsmp(2)
       .set_cntl_hdmi_dith_en(0)
       .set_rounding_enable(1)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // setup some magic registers
   VpuHdmiDithCntlReg::Get()
-      .ReadFrom(&(*vpu_mmio_))
+      .ReadFrom(&vpu_mmio_)
       .set_cntl_hdmi_dith_en(1)
       .set_hsync_invert(0)
       .set_vsync_invert(0)
-      .WriteTo(&(*vpu_mmio_));
+      .WriteTo(&vpu_mmio_);
 
   // reset vpu bridge
-  uint32_t wr_rate = VpuHdmiSettingReg::Get().ReadFrom(&(*vpu_mmio_)).wr_rate();
-  vpu_mmio_->Write32(0, VPU_ENCP_VIDEO_EN);
-  VpuHdmiSettingReg::Get()
-      .ReadFrom(&(*vpu_mmio_))
-      .set_src_sel(0)
-      .set_wr_rate(0)
-      .WriteTo(&(*vpu_mmio_));
+  uint32_t wr_rate = VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).wr_rate();
+  vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_EN);
+  VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).set_src_sel(0).set_wr_rate(0).WriteTo(&vpu_mmio_);
   usleep(1);
-  vpu_mmio_->Write32(1, VPU_ENCP_VIDEO_EN);
+  vpu_mmio_.Write32(1, VPU_ENCP_VIDEO_EN);
   usleep(1);
-  VpuHdmiSettingReg::Get().ReadFrom(&(*vpu_mmio_)).set_wr_rate(wr_rate).WriteTo(&(*vpu_mmio_));
+  VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).set_wr_rate(wr_rate).WriteTo(&vpu_mmio_);
   usleep(1);
-  VpuHdmiSettingReg::Get().ReadFrom(&(*vpu_mmio_)).set_src_sel(2).WriteTo(&(*vpu_mmio_));
+  VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).set_src_sel(2).WriteTo(&vpu_mmio_);
 
   // setup hdmi phy
   ConfigPhy();
@@ -538,21 +566,21 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   int venc_hsync = timings.hsync / kHdmiTransmitterPixelRepeatDivisionFactor *
                    kEncoderPixelRepeatMultiplicationFactor;
 
-  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPU_ENCP_VIDEO_MODE), /*field_begin_bit=*/14,
-                                     /*field_size_bits=*/1, /*field_value=*/1),
-                     VPU_ENCP_VIDEO_MODE);  // DE Signal polarity
-  vpu_mmio_->Write32(timings.hsync + timings.hback, VPU_ENCP_VIDEO_HAVON_BEGIN);
-  vpu_mmio_->Write32(timings.hsync + timings.hback + timings.hactive - 1, VPU_ENCP_VIDEO_HAVON_END);
+  vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(VPU_ENCP_VIDEO_MODE), /*field_begin_bit=*/14,
+                                    /*field_size_bits=*/1, /*field_value=*/1),
+                    VPU_ENCP_VIDEO_MODE);  // DE Signal polarity
+  vpu_mmio_.Write32(timings.hsync + timings.hback, VPU_ENCP_VIDEO_HAVON_BEGIN);
+  vpu_mmio_.Write32(timings.hsync + timings.hback + timings.hactive - 1, VPU_ENCP_VIDEO_HAVON_END);
 
-  vpu_mmio_->Write32(timings.vsync + timings.vback, VPU_ENCP_VIDEO_VAVON_BLINE);
-  vpu_mmio_->Write32(timings.vsync + timings.vback + timings.vactive - 1,
-                     VPU_ENCP_VIDEO_VAVON_ELINE);
+  vpu_mmio_.Write32(timings.vsync + timings.vback, VPU_ENCP_VIDEO_VAVON_BLINE);
+  vpu_mmio_.Write32(timings.vsync + timings.vback + timings.vactive - 1,
+                    VPU_ENCP_VIDEO_VAVON_ELINE);
 
-  vpu_mmio_->Write32(0, VPU_ENCP_VIDEO_HSO_BEGIN);
-  vpu_mmio_->Write32(timings.hsync, VPU_ENCP_VIDEO_HSO_END);
+  vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_HSO_BEGIN);
+  vpu_mmio_.Write32(timings.hsync, VPU_ENCP_VIDEO_HSO_END);
 
-  vpu_mmio_->Write32(0, VPU_ENCP_VIDEO_VSO_BLINE);
-  vpu_mmio_->Write32(timings.vsync, VPU_ENCP_VIDEO_VSO_ELINE);
+  vpu_mmio_.Write32(0, VPU_ENCP_VIDEO_VSO_BLINE);
+  vpu_mmio_.Write32(timings.vsync, VPU_ENCP_VIDEO_VSO_ELINE);
 
   // Below calculations assume no pixel repeat and progressive mode.
   // HActive Start/End
@@ -562,15 +590,15 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   int h_end = h_begin + venc_active_pixels;
   h_end = h_end % venc_total_pixels;  // wrap around if needed
 
-  vpu_mmio_->Write32(h_begin, VPU_ENCP_DE_H_BEGIN);
-  vpu_mmio_->Write32(h_end, VPU_ENCP_DE_H_END);
+  vpu_mmio_.Write32(h_begin, VPU_ENCP_DE_H_BEGIN);
+  vpu_mmio_.Write32(h_end, VPU_ENCP_DE_H_END);
 
   // VActive Start/End
   int v_begin = timings.vsync + timings.vback;
   int v_end = v_begin + active_lines;
 
-  vpu_mmio_->Write32(v_begin, VPU_ENCP_DE_V_BEGIN_EVEN);
-  vpu_mmio_->Write32(v_end, VPU_ENCP_DE_V_END_EVEN);
+  vpu_mmio_.Write32(v_begin, VPU_ENCP_DE_V_BEGIN_EVEN);
+  vpu_mmio_.Write32(v_end, VPU_ENCP_DE_V_END_EVEN);
 
   if (timings.interlace_mode) {
     // TODO: Add support for interlace mode
@@ -588,8 +616,8 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
 
   int hs_end = hs_begin + venc_hsync;
   hs_end = hs_end % venc_total_pixels;
-  vpu_mmio_->Write32(hs_begin, VPU_ENCP_DVI_HSO_BEGIN);
-  vpu_mmio_->Write32(hs_end, VPU_ENCP_DVI_HSO_END);
+  vpu_mmio_.Write32(hs_begin, VPU_ENCP_DVI_HSO_BEGIN);
+  vpu_mmio_.Write32(hs_end, VPU_ENCP_DVI_HSO_END);
 
   // VSync Timings
   int vs_begin;
@@ -601,12 +629,12 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   int vs_end = vs_begin + timings.vsync;
   vs_end = vs_end % total_lines;
 
-  vpu_mmio_->Write32(vs_begin, VPU_ENCP_DVI_VSO_BLINE_EVN);
-  vpu_mmio_->Write32(vs_end, VPU_ENCP_DVI_VSO_ELINE_EVN);
-  vpu_mmio_->Write32(hs_begin, VPU_ENCP_DVI_VSO_BEGIN_EVN);
-  vpu_mmio_->Write32(hs_begin, VPU_ENCP_DVI_VSO_END_EVN);
+  vpu_mmio_.Write32(vs_begin, VPU_ENCP_DVI_VSO_BLINE_EVN);
+  vpu_mmio_.Write32(vs_end, VPU_ENCP_DVI_VSO_ELINE_EVN);
+  vpu_mmio_.Write32(hs_begin, VPU_ENCP_DVI_VSO_BEGIN_EVN);
+  vpu_mmio_.Write32(hs_begin, VPU_ENCP_DVI_VSO_END_EVN);
 
-  vpu_mmio_->Write32(0, VPU_HDMI_SETTING);
+  vpu_mmio_.Write32(0, VPU_HDMI_SETTING);
   // hsync, vsync active high. output CbYCr (GRB)
   // TODO: output desired format is hardcoded here to CbYCr (GRB)
   uint32_t vpu_hdmi_setting = 0b100 << 5;
@@ -616,24 +644,24 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   if (timings.vpol) {
     vpu_hdmi_setting |= (1 << 3);
   }
-  vpu_mmio_->Write32(vpu_hdmi_setting, VPU_HDMI_SETTING);
+  vpu_mmio_.Write32(vpu_hdmi_setting, VPU_HDMI_SETTING);
 
   if (timings.venc_pixel_repeat) {
-    vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPU_HDMI_SETTING), /*field_begin_bit=*/8,
-                                       /*field_size_bits=*/1, /*field_value=*/1),
-                       VPU_HDMI_SETTING);
+    vpu_mmio_.Write32(SetFieldValue32(vpu_mmio_.Read32(VPU_HDMI_SETTING), /*field_begin_bit=*/8,
+                                      /*field_size_bits=*/1, /*field_value=*/1),
+                      VPU_HDMI_SETTING);
   }
 
   // Select ENCP data to HDMI
-  VpuHdmiSettingReg::Get().ReadFrom(&(*vpu_mmio_)).set_src_sel(2).WriteTo(&(*vpu_mmio_));
+  VpuHdmiSettingReg::Get().ReadFrom(&vpu_mmio_).set_src_sel(2).WriteTo(&vpu_mmio_);
 
   zxlogf(INFO, "done");
 }
 
 void HdmiHost::ConfigPhy() {
-  HhiHdmiPhyCntl0Reg::Get().FromValue(0).WriteTo(&(*hhi_mmio_));
+  HhiHdmiPhyCntl0Reg::Get().FromValue(0).WriteTo(&hhi_mmio_);
   HhiHdmiPhyCntl1Reg::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .set_hdmi_tx_phy_soft_reset(0)
       .set_hdmi_tx_phy_clk_en(0)
       .set_hdmi_fifo_enable(0)
@@ -648,39 +676,39 @@ void HdmiHost::ConfigPhy() {
       .set_new_prbs_sel(0)
       .set_new_prbs_prbsmode(0)
       .set_new_prbs_mode(0)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
 
   HhiHdmiPhyCntl1Reg::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .set_hdmi_tx_phy_soft_reset(1)
       .set_hdmi_tx_phy_clk_en(1)
       .set_hdmi_fifo_enable(1)
       .set_hdmi_fifo_wr_enable(1)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
   usleep(2);
   HhiHdmiPhyCntl1Reg::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .set_hdmi_tx_phy_soft_reset(0)
       .set_hdmi_tx_phy_clk_en(1)
       .set_hdmi_fifo_enable(1)
       .set_hdmi_fifo_wr_enable(1)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
   usleep(2);
   HhiHdmiPhyCntl1Reg::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .set_hdmi_tx_phy_soft_reset(1)
       .set_hdmi_tx_phy_clk_en(1)
       .set_hdmi_fifo_enable(1)
       .set_hdmi_fifo_wr_enable(1)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
   usleep(2);
   HhiHdmiPhyCntl1Reg::Get()
-      .ReadFrom(&(*hhi_mmio_))
+      .ReadFrom(&hhi_mmio_)
       .set_hdmi_tx_phy_soft_reset(0)
       .set_hdmi_tx_phy_clk_en(1)
       .set_hdmi_fifo_enable(1)
       .set_hdmi_fifo_wr_enable(1)
-      .WriteTo(&(*hhi_mmio_));
+      .WriteTo(&hhi_mmio_);
   usleep(2);
 
   // The following configuration for HDMI PHY control register 0, 3 and 5 only
@@ -691,9 +719,9 @@ void HdmiHost::ConfigPhy() {
   // TODO(fxbug.dev/124984): Set the PHY control registers properly if the
   // display uses a 4k resolution (3840 x 2160 or higher).
   HhiHdmiPhyCntl0Reg::Get().FromValue(0).set_hdmi_ctl1(0x33eb).set_hdmi_ctl2(0x4242).WriteTo(
-      &(*hhi_mmio_));
-  HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&(*hhi_mmio_));
-  HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&(*hhi_mmio_));
+      &hhi_mmio_);
+  HhiHdmiPhyCntl3Reg::Get().FromValue(0x2ab0ff3b).WriteTo(&hhi_mmio_);
+  HhiHdmiPhyCntl5Reg::Get().FromValue(0x00000003).WriteTo(&hhi_mmio_);
 
   usleep(20);
   zxlogf(INFO, "done!");
