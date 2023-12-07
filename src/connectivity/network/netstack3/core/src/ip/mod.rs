@@ -5252,7 +5252,7 @@ mod tests {
         .unwrap()
         .into();
         crate::device::testutil::enable_device(sync_ctx, non_sync_ctx, &loopback_id);
-        crate::add_ip_addr_subnet(
+        crate::device::add_ip_addr_subnet(
             sync_ctx,
             non_sync_ctx,
             &loopback_id,

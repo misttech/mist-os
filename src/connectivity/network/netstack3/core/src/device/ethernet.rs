@@ -2259,14 +2259,14 @@ mod tests {
         assert!(!contains_addr(&sync_ctx, &device, ip3));
 
         // Del ip1 (ok)
-        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &ip1).unwrap();
+        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip1).unwrap();
         assert!(!contains_addr(&sync_ctx, &device, ip1));
         assert!(contains_addr(&sync_ctx, &device, ip2));
         assert!(!contains_addr(&sync_ctx, &device, ip3));
 
         // Del ip1 again (ip1 not found)
         assert_eq!(
-            crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &ip1),
+            crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip1),
             Err(NotFoundError)
         );
         assert!(!contains_addr(&sync_ctx, &device, ip1));
@@ -2432,7 +2432,7 @@ mod tests {
         );
 
         // Remove ip1
-        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &ip1).unwrap();
+        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip1).unwrap();
         assert!(!contains_addr(&sync_ctx, &device, ip1));
         assert!(contains_addr(&sync_ctx, &device, ip2));
 
@@ -2674,7 +2674,7 @@ mod tests {
         // Remove ip1 from the device.
         //
         // Should get packets destined for the solicited node address and ip2.
-        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &ip1).unwrap();
+        crate::device::del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip1).unwrap();
         receive_simple_ip_packet_test(
             &mut sync_ctx,
             &mut non_sync_ctx,

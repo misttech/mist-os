@@ -187,7 +187,7 @@ fn get_interface_addresses(ctx: &Ctx) -> Vec<psocket::InterfaceAddresses> {
                 // on the non-sync context is a recipe for deadlocks. That's
                 // not an issue here since the non-sync context isn't being
                 // passed into `get_all_ip_addr_subnets`.
-                let addresses = netstack3_core::get_all_ip_addr_subnets(&*sync_ctx, d)
+                let addresses = netstack3_core::device::get_all_ip_addr_subnets(&*sync_ctx, d)
                     .into_iter()
                     .map(fidl_fuchsia_net_ext::FromExt::from_ext)
                     .collect();

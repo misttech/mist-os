@@ -66,7 +66,6 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::{
-    add_ip_addr_subnet,
     context::{
         EventContext, InstantBindingsTypes, InstantContext, RngContext, TimerContext,
         TracingContext,
@@ -824,7 +823,7 @@ fn add_loopback_ip_addrs<NonSyncCtx: NonSyncContext>(
                 .expect("error creating IPv6 loopback AddrSub"),
         ),
     ] {
-        add_ip_addr_subnet(sync_ctx, non_sync_ctx, loopback, addr_subnet)?
+        netstack3_core::device::add_ip_addr_subnet(sync_ctx, non_sync_ctx, loopback, addr_subnet)?
     }
     Ok(())
 }

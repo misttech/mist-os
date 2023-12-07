@@ -1886,7 +1886,7 @@ mod tests {
             );
 
             for subnet in subnets {
-                crate::device::del_ip_addr(sync_ctx, ctx, &device, &subnet.addr())
+                crate::device::del_ip_addr(sync_ctx, ctx, &device, subnet.addr())
                     .expect("failed to remove addr from device");
             }
         }

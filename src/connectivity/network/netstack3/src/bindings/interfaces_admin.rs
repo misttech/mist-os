@@ -780,7 +780,12 @@ async fn remove_address(ctx: &mut Ctx, id: BindingId, address: fnet::Subnet) -> 
         // make it impossible to make this mistake by centralizing the
         // "source of truth" for addresses on a device.
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
-        return match netstack3_core::del_ip_addr(sync_ctx, non_sync_ctx, &core_id, specified_addr) {
+        return match netstack3_core::device::del_ip_addr(
+            sync_ctx,
+            non_sync_ctx,
+            &core_id,
+            specified_addr,
+        ) {
             Ok(()) => true,
             Err(netstack3_core::error::NotFoundError) => false,
         };
@@ -1116,7 +1121,7 @@ async fn run_address_state_provider(
     let add_to_core_result = {
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
         let device_id = non_sync_ctx.devices.get_core_id(id).expect("interface not found");
-        netstack3_core::add_ip_addr_subnet(
+        netstack3_core::device::add_ip_addr_subnet(
             sync_ctx,
             non_sync_ctx,
             &device_id,
@@ -1260,7 +1265,7 @@ async fn run_address_state_provider(
 
     if remove_address {
         assert_matches!(
-            netstack3_core::del_ip_addr(sync_ctx, non_sync_ctx, &device_id, address),
+            netstack3_core::device::del_ip_addr(sync_ctx, non_sync_ctx, &device_id, address),
             Ok(())
         );
     }

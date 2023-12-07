@@ -1006,7 +1006,7 @@ mod tests {
         assert_eq!(non_sync_ctx.frames_sent().len(), 5);
 
         // Remove local ip
-        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &dev_id, &local_ip().into_specified()).unwrap();
+        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &dev_id, local_ip().into_specified()).unwrap();
         assert_eq!(get_address_assigned(&sync_ctx, &dev_id, local_ip()), None);
         assert_matches!(get_address_assigned(&sync_ctx, &dev_id, remote_ip()), Some(false));
         assert_eq!(non_sync_ctx.frames_sent().len(), 5);
@@ -3698,8 +3698,7 @@ mod tests {
         ]);
 
         // Deleting the address should cancel its SLAAC timers.
-        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &expected_addr.into_specified())
-            .unwrap();
+        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, expected_addr.into_specified()).unwrap();
         assert_empty(get_global_ipv6_addrs(&sync_ctx, &device));
         non_sync_ctx.timer_ctx().assert_no_timers_installed();
     }
@@ -3714,8 +3713,7 @@ mod tests {
         let sync_ctx = &sync_ctx;
 
         // Deleting the address should cancel its SLAAC timers.
-        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, &expected_addr.into_specified())
-            .unwrap();
+        del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, expected_addr.into_specified()).unwrap();
         assert_empty(get_global_ipv6_addrs(&sync_ctx, &device).into_iter().filter(
             |e| match e.config {
                 Ipv6AddrConfig::Slaac(SlaacConfig::Temporary(_)) => true,

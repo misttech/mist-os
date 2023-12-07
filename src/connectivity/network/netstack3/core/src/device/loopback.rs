@@ -642,11 +642,11 @@ mod tests {
         let addr = addr.addr();
         assert_eq!(&get_addrs()[..], [addr]);
 
-        assert_eq!(crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, &addr), Ok(()));
+        assert_eq!(crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, addr), Ok(()));
         assert_eq!(get_addrs(), []);
 
         assert_eq!(
-            crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, &addr),
+            crate::device::del_ip_addr(sync_ctx, &mut non_sync_ctx, &device, addr),
             Err(NotFoundError)
         );
     }

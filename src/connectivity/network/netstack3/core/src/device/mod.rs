@@ -26,7 +26,9 @@ use derivative::Derivative;
 use lock_order::{lock::UnlockedAccess, Locked};
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
+    ip::{
+        AddrSubnetEither, Ip, IpAddr, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu,
+    },
     BroadcastAddr, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _,
 };
 use packet::{Buf, BufferMut};
@@ -52,9 +54,10 @@ use crate::{
         socket::HeldSockets,
         state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
     },
+    error,
     error::{
-        ExistsError, NeighborRemovalError, NotFoundError, NotSupportedError,
-        SetIpAddressPropertiesError, StaticNeighborInsertionError,
+        ExistsError, NeighborRemovalError, NotSupportedError, SetIpAddressPropertiesError,
+        StaticNeighborInsertionError,
     },
     ip::{
         device::{
@@ -63,8 +66,8 @@ use crate::{
                 AddrSubnetAndManualConfigEither, AssignedAddress as _, IpDeviceFlags,
                 Ipv4DeviceConfigurationAndFlags, Ipv6DeviceConfigurationAndFlags, Lifetime,
             },
-            DelIpv6Addr, IpDeviceIpExt, IpDeviceStateContext, Ipv4DeviceConfigurationUpdate,
-            Ipv6DeviceConfigurationUpdate,
+            DelIpv6Addr, DualStackDeviceHandler, IpDeviceIpExt, IpDeviceStateContext,
+            Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
         },
         forwarding::IpForwardingDeviceContext,
         types::RawMetric,
@@ -161,13 +164,15 @@ where
     }
 }
 
-pub(crate) fn get_routing_metric<NonSyncCtx: NonSyncContext, L>(
-    sync_ctx: &mut Locked<&SyncCtx<NonSyncCtx>, L>,
+/// Gets the routing metric for the device.
+pub fn get_routing_metric<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
     device_id: &DeviceId<NonSyncCtx>,
 ) -> RawMetric {
+    let mut sync_ctx = Locked::new(sync_ctx);
     match device_id {
-        DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(sync_ctx, id),
-        DeviceId::Loopback(id) => self::loopback::get_routing_metric(sync_ctx, id),
+        DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(&mut sync_ctx, id),
+        DeviceId::Loopback(id) => self::loopback::get_routing_metric(&mut sync_ctx, id),
     }
 }
 
@@ -923,11 +928,19 @@ pub(crate) fn set_promiscuous_mode<NonSyncCtx: NonSyncContext>(
     }
 }
 
+/// Get all IPv4 and IPv6 address/subnet pairs configured on a device
+pub fn get_all_ip_addr_subnets<NonSyncCtx: NonSyncContext>(
+    sync_ctx: &SyncCtx<NonSyncCtx>,
+    device: &DeviceId<NonSyncCtx>,
+) -> Vec<AddrSubnetEither> {
+    DualStackDeviceHandler::get_all_ip_addr_subnets(&mut Locked::new(sync_ctx), device)
+}
+
 /// Adds an IP address and associated subnet to this device.
 ///
 /// For IPv6, this function also joins the solicited-node multicast group and
 /// begins performing Duplicate Address Detection (DAD).
-pub(crate) fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
+pub fn add_ip_addr_subnet<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
@@ -984,19 +997,17 @@ pub fn set_ip_addr_properties<NonSyncCtx: NonSyncContext, A: IpAddress>(
     }
 }
 
-/// Removes an IP address and associated subnet from this device.
-///
-/// Should only be called on user action.
-pub(crate) fn del_ip_addr<NonSyncCtx: NonSyncContext, A: IpAddress>(
+/// Delete an IP address on a device.
+pub fn del_ip_addr<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-    addr: &SpecifiedAddr<A>,
-) -> Result<(), NotFoundError> {
-    trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
+    addr: impl Into<SpecifiedAddr<IpAddr>>,
+) -> Result<(), error::NotFoundError> {
     let mut sync_ctx = Locked::new(sync_ctx);
-
-    match Into::into(*addr) {
+    let addr = addr.into();
+    trace!("del_ip_addr: removing addr {:?} from device {:?}", addr, device);
+    match addr.into() {
         IpAddr::V4(addr) => crate::ip::device::del_ipv4_addr(&mut sync_ctx, ctx, &device, &addr),
         IpAddr::V6(addr) => crate::ip::device::del_ipv6_addr_with_reason(
             &mut sync_ctx,
@@ -1421,19 +1432,23 @@ pub(crate) mod testutil {
 #[cfg(test)]
 mod tests {
     use alloc::vec::Vec;
-    use core::num::NonZeroU8;
+    use core::{num::NonZeroU8, time::Duration};
 
     use const_unwrap::const_unwrap_option;
     use net_declare::net_mac;
-    use net_types::ip::AddrSubnet;
+    use net_types::ip::{AddrSubnet, AddrSubnetEither};
     use test_case::test_case;
 
     use super::*;
     use crate::{
-        ip::device::{slaac::SlaacConfiguration, IpDeviceConfigurationUpdate},
-        testutil::{
-            Ctx, TestIpExt as _, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+        context::testutil::FakeInstant,
+        error,
+        ip::device::{
+            slaac::SlaacConfiguration,
+            state::{Ipv4AddrConfig, Ipv6AddrManualConfig, Lifetime},
+            IpDeviceConfigurationUpdate,
         },
+        testutil::{Ctx, TestIpExt, DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE},
     };
 
     #[test]
@@ -1669,5 +1684,107 @@ mod tests {
 
         check_transmitted(&mut non_sync_ctx, &device, 1);
         assert_eq!(non_sync_ctx.state_mut().tx_available, <[DeviceId::<_>; 0]>::default());
+    }
+
+    fn test_add_remove_ip_addresses<I: Ip + TestIpExt>(
+        addr_config: Option<I::ManualAddressConfig<FakeInstant>>,
+    ) {
+        let config = I::FAKE_CONFIG;
+        let Ctx { sync_ctx, mut non_sync_ctx } = crate::testutil::FakeCtx::default();
+        let device = crate::device::add_ethernet_device(
+            &sync_ctx,
+            config.local_mac,
+            IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
+            DEFAULT_INTERFACE_METRIC,
+        )
+        .into();
+        crate::device::testutil::enable_device(&sync_ctx, &mut non_sync_ctx, &device);
+
+        let ip = I::get_other_ip_address(1).get();
+        let prefix = config.subnet.prefix();
+        let addr_subnet = AddrSubnetEither::new(ip.into(), prefix).unwrap();
+
+        // IP doesn't exist initially.
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            None
+        );
+
+        // Add IP (OK).
+        if let Some(addr_config) = addr_config {
+            add_ip_addr_subnet(
+                &sync_ctx,
+                &mut non_sync_ctx,
+                &device,
+                AddrSubnetAndManualConfigEither::new::<I>(
+                    AddrSubnet::new(ip, prefix).unwrap(),
+                    addr_config,
+                ),
+            )
+            .unwrap();
+        } else {
+            let () =
+                add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap();
+        }
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            Some(addr_subnet)
+        );
+
+        // Add IP again (already exists).
+        assert_eq!(
+            add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, addr_subnet).unwrap_err(),
+            error::ExistsError
+        );
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            Some(addr_subnet)
+        );
+
+        // Add IP with different subnet (already exists).
+        let wrong_addr_subnet = AddrSubnetEither::new(ip.into(), prefix - 1).unwrap();
+        assert_eq!(
+            add_ip_addr_subnet(&sync_ctx, &mut non_sync_ctx, &device, wrong_addr_subnet)
+                .unwrap_err(),
+            error::ExistsError
+        );
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            Some(addr_subnet)
+        );
+
+        let ip: SpecifiedAddr<IpAddr> = SpecifiedAddr::new(ip.into()).unwrap();
+        // Del IP (ok).
+        let () = del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip).unwrap();
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            None
+        );
+
+        // Del IP again (not found).
+        assert_eq!(
+            del_ip_addr(&sync_ctx, &mut non_sync_ctx, &device, ip).unwrap_err(),
+            error::NotFoundError
+        );
+        assert_eq!(
+            get_all_ip_addr_subnets(&sync_ctx, &device).into_iter().find(|&a| a == addr_subnet),
+            None
+        );
+    }
+
+    #[test_case(None; "with no AddressConfig specified")]
+    #[test_case(Some(Ipv4AddrConfig {
+        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+    }); "with AddressConfig specified")]
+    fn test_add_remove_ipv4_addresses(addr_config: Option<Ipv4AddrConfig<FakeInstant>>) {
+        test_add_remove_ip_addresses::<Ipv4>(addr_config);
+    }
+
+    #[test_case(None; "with no AddressConfig specified")]
+    #[test_case(Some(Ipv6AddrManualConfig {
+        valid_until: Lifetime::Finite(FakeInstant::from(Duration::from_secs(1)))
+    }); "with AddressConfig specified")]
+    fn test_add_remove_ipv6_addresses(addr_config: Option<Ipv6AddrManualConfig<FakeInstant>>) {
+        test_add_remove_ip_addresses::<Ipv6>(addr_config);
     }
 }

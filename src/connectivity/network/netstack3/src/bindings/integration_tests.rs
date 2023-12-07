@@ -23,7 +23,6 @@ use net_types::{
     SpecifiedAddr, Witness as _,
 };
 use netstack3_core::{
-    add_ip_addr_subnet,
     device::{
         ethernet::resolve_ethernet_link_addr, insert_static_neighbor_entry,
         update_ipv6_configuration, DeviceId,
@@ -541,8 +540,13 @@ impl TestSetupBuilder {
                             .get_core_id(if_id)
                             .unwrap_or_else(|| panic!("failed to get device {if_id} info"));
 
-                        add_ip_addr_subnet(sync_ctx, non_sync_ctx, &core_id, addr)
-                            .expect("add interface address")
+                        netstack3_core::device::add_ip_addr_subnet(
+                            sync_ctx,
+                            non_sync_ctx,
+                            &core_id,
+                            addr,
+                        )
+                        .expect("add interface address")
                     });
 
                     let (_, subnet) = addr.addr_subnet();

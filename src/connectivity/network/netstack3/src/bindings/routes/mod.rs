@@ -410,7 +410,7 @@ fn to_entry<I: Ip>(
     sync_ctx: &Arc<SyncCtx<BindingsNonSyncCtxImpl>>,
     addable_entry: netstack3_core::ip::types::AddableEntry<I::Addr, DeviceId>,
 ) -> netstack3_core::ip::types::Entry<I::Addr, DeviceId> {
-    let device_metric = netstack3_core::get_routing_metric(sync_ctx, &addable_entry.device);
+    let device_metric = netstack3_core::device::get_routing_metric(sync_ctx, &addable_entry.device);
     addable_entry.resolve_metric(device_metric)
 }
 
@@ -521,7 +521,8 @@ async fn handle_change<I: Ip>(
             .inner
             .iter()
             .map(|(entry, data)| {
-                let device_metric = netstack3_core::get_routing_metric(sync_ctx, &entry.device);
+                let device_metric =
+                    netstack3_core::device::get_routing_metric(sync_ctx, &entry.device);
                 entry.clone().resolve_metric(device_metric).with_generation(data.generation)
             })
             .collect::<Vec<_>>(),
