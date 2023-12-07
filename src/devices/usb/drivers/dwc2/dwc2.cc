@@ -967,11 +967,6 @@ zx_status_t Dwc2::Init() {
     return status;
   }
 
-  if ((status = InitController()) != ZX_OK) {
-    zxlogf(ERROR, "Dwc2::Init InitController failed: %d", status);
-    return status;
-  }
-
   zx::result result = outgoing_.AddService<fuchsia_hardware_usb_dci::UsbDciService>(
       fuchsia_hardware_usb_dci::UsbDciService::InstanceHandler({
           .device = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
@@ -1131,6 +1126,12 @@ zx_status_t Dwc2::UsbDciSetInterface(const usb_dci_interface_protocol_t* interfa
   }
 
   dci_intf_ = ddk::UsbDciInterfaceProtocolClient(interface);
+
+  auto status = InitController();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "Dwc2::Init InitController failed: %d", status);
+    return status;
+  }
 
   return ZX_OK;
 }

@@ -119,7 +119,6 @@ zx_status_t UsbPeripheral::Init() {
     return status;
   }
 
-  dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
   size_t metasize = 0;
   status = device_get_metadata_size(parent(), DEVICE_METADATA_USB_CONFIG, &metasize);
   if (status != ZX_OK) {
@@ -194,8 +193,11 @@ zx_status_t UsbPeripheral::Init() {
   if (status != ZX_OK) {
     return status;
   }
-  SetDefaultConfig(reinterpret_cast<FunctionDescriptor*>(config->functions),
-                   (metasize - sizeof(UsbConfig)) / sizeof(FunctionDescriptor));
+  status = SetDefaultConfig(reinterpret_cast<FunctionDescriptor*>(config->functions),
+                            (metasize - sizeof(UsbConfig)) / sizeof(FunctionDescriptor));
+  if (status != ZX_OK) {
+    dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
+  }
 
   usb_monitor_.Start();
   return ZX_OK;
@@ -338,12 +340,20 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
 
   zxlogf(DEBUG, "usb_device_function_registered functions_registered = true");
   functions_registered_ = true;
-  if (listener_.is_valid()) {
-    if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
-      return status.status();
-    }
+  if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
+    // If you expected a call here, the listener_ might have been closed before it got called. This
+    // shouldn't crash the driver though.
+    zxlogf(DEBUG, "FunctionRegistered failed %s", status.error().FormatDescription().c_str());
   }
-  return DeviceStateChanged();
+
+  auto status = DeviceStateChanged();
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "DeviceStateChanged failed %d", status);
+    return status;
+  }
+
+  lock.release();
+  return dci_.SetInterface(this, &usb_dci_interface_protocol_ops_);
 }
 
 void UsbPeripheral::FunctionCleared() {
