@@ -130,6 +130,9 @@ const char kNoAutoAttachLimboHelp[] = R"(  --no-auto-attach-limbo
 const char kSignalWhenReadyHelp[] = R"(  --signal-when-ready=<pid>
       Send SIGUSR1 to pid when ready for interactive commands.)";
 
+const char kStreamFileHelp[] = R"(  --stream-file=<path>
+      Stream the contents of the given file, usually a pipe, to the console.)";
+
 }  // namespace
 
 cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOptions* options,
@@ -164,6 +167,7 @@ cmdline::Status ParseCommandLine(int argc, const char* argv[], CommandLineOption
                    &CommandLineOptions::no_auto_attach_limbo);
   parser.AddSwitch("signal-when-ready", 0, kSignalWhenReadyHelp,
                    &CommandLineOptions::signal_when_ready);
+  parser.AddSwitch("stream-file", 0, kStreamFileHelp, &CommandLineOptions::stream_files);
 
   // Special --help switch which doesn't exist in the options structure.
   bool requested_help = false;
