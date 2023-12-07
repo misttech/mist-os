@@ -107,6 +107,8 @@ declare_args() {
 
   # Host-only tests.  These cannot have any dependency on an assembled platform
   # image, or the compiled OS itself, not even for their host_test_data().
+  #
+  # These will be added to the build using the host toolchain.
   host_test_labels = []
 
   # A developer-only argument that is used to add tests to the build without
@@ -117,6 +119,8 @@ declare_args() {
   # If you add labels to this variable, these will be included in the 'host'
   # artifact set, which represents an additional set of host-only software that
   # is produced by the build.
+  #
+  # These will be added to the build using the host toolchain.
   host_labels = []
   legacy_host_labels = []
 
@@ -1773,7 +1777,13 @@ validated_test_types_group("host_tests") {
   testonly = true
   visibility = [ ":*" ]
   allowed_test_types = [ "host_only" ]
-  deps = host_test_labels
+
+  deps = []
+  foreach(label, host_test_labels) {
+    # Strip any toolchain that is provided, and replace with the host toolchain.
+    full_label = get_label_info(label, "label_no_toolchain")
+    deps += [ "$full_label($host_toolchain)" ]
+  }
 }
 
 # Can be any test-type. This is for local-developer use only.  It is not for use
