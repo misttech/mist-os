@@ -420,6 +420,7 @@ void Node::Kill(KillCompleter::Sync& completer) {
 
 void Node::CompleteBind(zx::result<> result) {
   if (result.is_error()) {
+    LOGF(WARNING, "Bind failed for node '%s'", MakeComponentMoniker().c_str());
     driver_component_.reset();
   }
   auto completer = std::move(pending_bind_completer_);
