@@ -10,7 +10,7 @@
     program: {
         runner: "driver",
         bind: "meta/bind/aml-ram.bindbc",
-        colocate: "false",
+        colocate: "true",
         compat: "driver/aml-ram.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
