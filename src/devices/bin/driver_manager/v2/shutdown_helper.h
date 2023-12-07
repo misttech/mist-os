@@ -81,6 +81,8 @@ class ShutdownHelper {
 
   ~ShutdownHelper() = default;
 
+  static const char* NodeStateAsString(NodeState state);
+
   // Begin the removal process for a Node. This function ensures that a Node is
   // only removed after all of its children are removed. It also ensures that
   // a Node is only removed after the driver that is bound to it has been stopped.
@@ -113,7 +115,8 @@ class ShutdownHelper {
 
   bool IsShuttingDown() const;
 
-  const char* NodeStateAsString() const;
+  const char* NodeStateAsString() const { return ShutdownHelper::NodeStateAsString(node_state_); }
+
   NodeState node_state() const { return node_state_; }
 
   // TODO(fxb/132254): Handle shutdown intent priority. Currently it's possible

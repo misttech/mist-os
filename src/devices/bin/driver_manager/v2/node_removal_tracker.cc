@@ -59,10 +59,8 @@ void NodeRemovalTracker::OnRemovalTimeout() {
     if (node.state == NodeState::kStopped) {
       continue;
     }
-    LOGF(INFO, "  Node '%s' waiting on %s", node.name.c_str(),
-         node.state == NodeState::kWaitingOnDriver     ? "driver"
-         : node.state == NodeState::kWaitingOnChildren ? "children"
-                                                       : "nothing");
+    LOGF(INFO, "  Node '%s' in state %s", node.name.c_str(),
+         ShutdownHelper::NodeStateAsString(node.state));
   }
 }
 

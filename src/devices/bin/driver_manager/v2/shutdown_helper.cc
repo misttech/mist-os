@@ -205,8 +205,8 @@ void ShutdownHelper::NotifyRemovalTracker() {
 
 bool ShutdownHelper::IsShuttingDown() const { return node_state_ != NodeState::kRunning; }
 
-const char* ShutdownHelper::NodeStateAsString() const {
-  switch (node_state_) {
+const char* ShutdownHelper::NodeStateAsString(NodeState state) {
+  switch (state) {
     case NodeState::kRunning:
       return "kRunning";
     case NodeState::kPrestop:
