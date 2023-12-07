@@ -1672,8 +1672,6 @@ TEST_F(Magma, ExecuteCommandTwoCommandBuffers) {
 
 TEST_F(Magma, FlowControl) {
   TestConnection test;
-  if (test.is_virtmagma())
-    GTEST_SKIP();
 
   // Each call to Buffer is 2 messages.
   // Without flow control, this will trigger a policy exception (too many channel messages)
