@@ -85,7 +85,7 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 //
 // This definition is weak in case the standard profile runtime is also linked
 // in with its own definition.
-[[gnu::weak]] extern intptr_t INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = 0;
+[[gnu::weak]] extern uintptr_t INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = 0;
 
 // These are outcalls made by the value-profiling instrumentation.  This
 // runtime doesn't support value-profiling in any meaningful way.  But the
@@ -461,10 +461,10 @@ void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {
                 "cannot relocate %zu bytes of counters with only %zu bytes left!",
                 prof_counters.size_bytes(), data.size_bytes());
 
-  const intptr_t old_addr = reinterpret_cast<intptr_t>(prof_counters.data());
-  const intptr_t new_addr = reinterpret_cast<intptr_t>(data.data());
+  const uintptr_t old_addr = reinterpret_cast<uintptr_t>(prof_counters.data());
+  const uintptr_t new_addr = reinterpret_cast<uintptr_t>(data.data());
   ZX_ASSERT(new_addr % kAlign == 0);
-  const intptr_t counters_bias = new_addr - old_addr;
+  const uintptr_t counters_bias = new_addr - old_addr;
 
   // Now that the data has been copied (or merged), start updating the new
   // copy.  These compiler barriers should ensure we've finished all the
