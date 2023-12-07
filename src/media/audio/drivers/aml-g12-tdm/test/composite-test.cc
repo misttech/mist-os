@@ -79,6 +79,8 @@ class FakePlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_dev
 
   void MapMmio() { ASSERT_OK(mapped_mmio_.Map(mmio_)); }
 
+  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {}
+
   zx::vmo mmio_;
   fzl::VmoMapper mapped_mmio_;
 

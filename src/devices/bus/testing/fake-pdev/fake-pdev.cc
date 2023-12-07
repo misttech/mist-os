@@ -124,6 +124,11 @@ void FakePDevFidl::GetBoardInfo(GetBoardInfoCompleter::Sync& completer) {
                              .Build());
 }
 
+void FakePDevFidl::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {
+  // TODO(jmatt) provide mock implementation after API is in
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace fake_pdev
 
 zx_status_t ddk::PDevMakeMmioBufferWeak(const pdev_mmio_t& pdev_mmio,

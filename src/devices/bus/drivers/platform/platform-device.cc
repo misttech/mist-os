@@ -18,6 +18,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls/resource.h>
 
 #include <vector>
@@ -794,6 +795,10 @@ void PlatformDevice::GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& co
   } else {
     completer.ReplyError(status);
   }
+}
+
+void PlatformDevice::GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) {
+  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
 }
 
 void PlatformDevice::GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) {

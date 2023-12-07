@@ -4,8 +4,9 @@
 library fuchsia.hardware.platform.bus;
 
 using zx;
-using fuchsia.driver.framework;
 using fuchsia.device.manager;
+using fuchsia.driver.framework;
+using fuchsia.hardware.power;
 
 type Mmio = table {
     /// Physical address of MMIO region.
@@ -72,6 +73,8 @@ type BootloaderInfo = table {
     1: vendor string:MAX_INFO_STRING_LENGTH;
 };
 
+const MAX_POWER_CONFIGS uint32 = 32;
+
 type Node = table {
     /// Name of the node.
     1: name string:fuchsia.driver.framework.MAX_NODE_NAME_LENGTH;
@@ -100,6 +103,8 @@ type Node = table {
     /// Other node properties beyond BIND_PLATFORM_DEV_VID, BIND_PLATFORM_DEV_PID, and BIND_PLATFORM_DEV_DID.
    12: properties
             vector<fuchsia.driver.framework.NodeProperty>:fuchsia.driver.framework.MAX_PROPERTY_COUNT;
+   13: power_config
+            vector<fuchsia.hardware.power.PowerElementConfiguration>:MAX_INFO_STRING_LENGTH;
 };
 
 /// This is originally from the Banjo fuchsia.hardware.platform.device library,

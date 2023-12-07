@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.platform.device;
 
+using fuchsia.hardware.power;
 using zx;
 
 type DeviceInfo = table {
@@ -63,6 +64,10 @@ closed protocol Device {
         index uint32;
     }) -> (resource struct {
         smc zx.Handle:RESOURCE;
+    }) error zx.Status;
+
+    strict GetPowerConfiguration() -> (struct {
+        config vector<fuchsia.hardware.power.PowerElementConfiguration>:32;
     }) error zx.Status;
 
     strict GetDeviceInfo() -> (DeviceInfo) error zx.Status;

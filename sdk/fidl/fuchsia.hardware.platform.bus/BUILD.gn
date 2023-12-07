@@ -10,6 +10,7 @@ fidl("fuchsia.hardware.platform.bus") {
   public_deps = [
     "//sdk/fidl/fuchsia.device.manager",
     "//sdk/fidl/fuchsia.driver.framework",
+    "//sdk/fidl/fuchsia.hardware.power",
     "//zircon/vdso/zx",
   ]
 }

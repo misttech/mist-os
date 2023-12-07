@@ -124,6 +124,7 @@ class PlatformDevice : public PlatformDeviceType,
                     GetInterruptCompleter::Sync& completer) override;
   void GetBti(GetBtiRequestView request, GetBtiCompleter::Sync& completer) override;
   void GetSmc(GetSmcRequestView request, GetSmcCompleter::Sync& completer) override;
+  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override;
   void GetDeviceInfo(GetDeviceInfoCompleter::Sync& completer) override;
   void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override;
 
