@@ -49,3 +49,43 @@ class CommonUtilsTests(unittest.TestCase):
 
         mock_time.assert_called()
         mock_sleep.assert_called()
+
+    def test_retry_success_with_no_ret_val(self) -> None:
+        """Test case for common.retry() success case where fn() does not return
+        anything."""
+
+        def _fn() -> None:
+            return
+
+        common.retry(fn=_fn, timeout=60, wait_time=5)
+
+    def test_retry_success_with_ret_val(self) -> None:
+        """Test case for common.retry() success case where fn() returns an
+        object."""
+
+        def _fn() -> str:
+            return "some_string"
+
+        self.assertEqual(
+            common.retry(fn=_fn, timeout=60, wait_time=5), "some_string"
+        )
+
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch(
+        "time.time", side_effect=[0, 5, 10, 15, 20, 25, 30, 35], autospec=True
+    )
+    def test_retry_fail(self, mock_time, mock_sleep) -> None:
+        """Test case for common.retry() failure case where fn never succeeds."""
+
+        def _fn() -> None:
+            raise RuntimeError("Error")
+
+        with self.assertRaises(errors.HoneyDewTimeoutError):
+            common.retry(
+                fn=_fn,
+                timeout=30,
+                wait_time=5,
+            )
+
+        mock_time.assert_called()
+        mock_sleep.assert_called()

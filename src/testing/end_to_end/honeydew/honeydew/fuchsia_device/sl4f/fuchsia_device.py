@@ -44,7 +44,7 @@ from honeydew.interfaces.device_classes import (
     transports_capable,
 )
 from honeydew.transports import sl4f as sl4f_transport
-from honeydew.utils import properties
+from honeydew.utils import common, properties
 
 _SL4F_METHODS: dict[str, str] = {
     "GetDeviceInfo": "hwinfo_facade.HwinfoGetDeviceInfo",
@@ -209,8 +209,8 @@ class FuchsiaDevice(
         Raises:
             errors.Sl4fError: On SL4F communication failure.
         """
-        # Restart SL4F server on the device
-        self.sl4f.start_server()
+        # Restart SL4F server on the device with 60 sec retry in case of failure
+        common.retry(fn=self.sl4f.start_server, timeout=60, wait_time=5)
 
         # Ensure device is healthy
         self.health_check()
