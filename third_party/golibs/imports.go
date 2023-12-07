@@ -39,6 +39,7 @@ import (
 	_ "golang.org/x/sync/errgroup"
 	_ "golang.org/x/sys/unix"
 	_ "gonum.org/v1/gonum/dsp/fourier"
+	_ "gonum.org/v1/gonum/mathext"
 	_ "google.golang.org/api/iterator"
 	_ "google.golang.org/grpc"
 	_ "google.golang.org/grpc/codes"

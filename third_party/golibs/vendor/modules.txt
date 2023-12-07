@@ -237,6 +237,9 @@ golang.org/x/xerrors/internal
 ## explicit; go 1.18
 gonum.org/v1/gonum/dsp/fourier
 gonum.org/v1/gonum/dsp/fourier/internal/fftpack
+gonum.org/v1/gonum/mathext
+gonum.org/v1/gonum/mathext/internal/cephes
+gonum.org/v1/gonum/mathext/internal/gonum
 # google.golang.org/api v0.103.0
 ## explicit; go 1.19
 google.golang.org/api/googleapi
