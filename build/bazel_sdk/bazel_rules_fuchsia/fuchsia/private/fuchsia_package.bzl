@@ -425,10 +425,11 @@ def _build_fuchsia_package_impl(ctx):
             package_resources = package_resources,
             packaged_components = packaged_components,
             # TODO: Remove this field, change usages to FuchsiaDebugSymbolInfo.
-            build_id_dir = get_build_id_dirs(_debug_info)[0],
+            build_id_dir = (get_build_id_dirs(_debug_info) + [None])[0],
         ),
         collect_debug_symbols(
             _debug_info,
+            ctx.attr.subpackages,
             ctx.attr.test_components,
             ctx.attr.components,
             ctx.attr.resources,

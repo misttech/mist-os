@@ -20,6 +20,9 @@ def strip_resources(ctx, resources):
       and the second item is a FuchsiaDebugSymbolInfo provider for the
       corresponding .build-id directory.
     """
+    if not resources:
+        return [], FuchsiaDebugSymbolInfo(build_id_dirs = {})
+
     build_id_dir = ctx.actions.declare_directory(ctx.label.name + "/.build-id")
     stripped_resources = []
     all_maybe_elf_files = []
