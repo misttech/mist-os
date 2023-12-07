@@ -13,14 +13,12 @@ import (
 	"io"
 	"net/url"
 	"os"
-	"path/filepath"
 	"regexp"
 	"time"
 
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/avb"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/omaha_tool"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/packages"
-	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/util"
 	"go.fuchsia.dev/fuchsia/src/testing/host-target-testing/zbi"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 
@@ -292,7 +290,7 @@ func (u *SystemUpdater) Update(ctx context.Context, c client) error {
 	}
 
 	repoName := "download-ota"
-	dstUpdate, err := srcUpdate.RehostUpdatePackage(ctx, pkgPath, repoName)
+	dstUpdate, err := srcUpdate.RehostUpdatePackage(ctx, repoName, pkgPath)
 
 	logger.Infof(ctx, "published %q as %q to %q", pkgPath, dstUpdate.Merkle(), u.repo)
 
@@ -421,29 +419,10 @@ func (u *OmahaUpdater) Update(ctx context.Context, c client) error {
 	dstUpdate, err := srcUpdate.EditUpdatePackageWithVBMetaProperties(
 		ctx,
 		u.avbTool,
+		repoName,
 		"update_omaha/0",
 		propFiles,
 		u.useNewUpdateFormat,
-		func(tempDir string) error {
-			// Update packages.json in this package.
-			packagesJsonPath := filepath.Join(tempDir, "packages.json")
-			err = util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-				src, err := os.Open(packagesJsonPath)
-				if err != nil {
-					return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
-				}
-				if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
-					return fmt.Errorf("Failed to rehost packages.json: %w", err)
-				}
-
-				return nil
-			})
-			if err != nil {
-				return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
-			}
-
-			return nil
-		},
 	)
 	if err != nil {
 		return fmt.Errorf("failed to inject vbmeta properties into update package: %w", err)

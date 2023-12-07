@@ -281,36 +281,16 @@ func (u *UpdatePackage) EditUpdateImages(
 	return dstUpdate, dstUpdateImages, nil
 }
 
-// RehostUpdatePackage will rewrite the `packages.json` file to use `repoName`
-// path, to avoid collisions with the `fuchsia.com` repository name.
+// RehostUpdatePackage will rewrite the `packages.json` and `images.json files
+// to use `repoName` path, to avoid collisions with the `fuchsia.com`
+// repository name.
 func (u *UpdatePackage) RehostUpdatePackage(
 	ctx context.Context,
-	dstUpdatePath string,
 	repoName string,
+	dstUpdatePath string,
 ) (*UpdatePackage, error) {
 	return u.EditContents(ctx, dstUpdatePath, func(tempDir string) error {
-		packagesJsonPath := filepath.Join(tempDir, "packages.json")
-		logger.Infof(ctx, "setting host name in %q to %q", packagesJsonPath, repoName)
-
-		err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
-			src, err := os.Open(packagesJsonPath)
-			if err != nil {
-				return fmt.Errorf("failed to open packages.json %q: %w", packagesJsonPath, err)
-			}
-			defer src.Close()
-
-			if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
-				return fmt.Errorf("failed to rehost package.json: %w", err)
-			}
-
-			return nil
-		})
-
-		if err != nil {
-			return fmt.Errorf("failed to atomically overwrite %q: %w", packagesJsonPath, err)
-		}
-
-		return nil
+		return rehostUpdatePackageContents(ctx, tempDir, repoName)
 	})
 }
 
@@ -331,6 +311,7 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 			// Update the update package's zbi and vbmeta to point at this system image.
 			if err := u.editZbiAndVbmeta(
 				ctx,
+				repoName,
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
 				tempDir,
@@ -365,12 +346,16 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 
 			// Update the `system_image/0` entry for this new system image.
 			packagesJsonPath := filepath.Join(tempDir, "packages.json")
-			return util.UpdateHashValuePackagesJSON(
+			if err := util.UpdateHashValuePackagesJSON(
 				packagesJsonPath,
 				repoName,
 				"system_image/0",
 				systemImage.Merkle(),
-			)
+			); err != nil {
+				return err
+			}
+
+			return rehostUpdatePackageContents(ctx, tempDir, repoName)
 		},
 	)
 }
@@ -380,22 +365,19 @@ func (u *UpdatePackage) EditUpdatePackageWithNewSystemImage(
 func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 	ctx context.Context,
 	avbTool *avb.AVBTool,
+	repoName string,
 	dstUpdatePackagePath string,
 	vbmetaPropertyFiles map[string]string,
 	useNewUpdateFormat bool,
-	editFunc func(path string) error,
 ) (*UpdatePackage, error) {
 	return u.EditContents(
 		ctx,
 		dstUpdatePackagePath,
 		func(tempDir string) error {
-			if err := editFunc(tempDir); err != nil {
-				return err
-			}
-
 			// Update the update package's zbi and vbmeta to point at this system image.
 			if err := u.editZbiAndVbmeta(
 				ctx,
+				repoName,
 				dstUpdatePackagePath,
 				useNewUpdateFormat,
 				tempDir,
@@ -418,7 +400,7 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 				return err
 			}
 
-			return nil
+			return rehostUpdatePackageContents(ctx, tempDir, repoName)
 		},
 	)
 }
@@ -428,6 +410,7 @@ func (u *UpdatePackage) EditUpdatePackageWithVBMetaProperties(
 // the images.json file, or directly embedded in the update package.
 func (u *UpdatePackage) editZbiAndVbmeta(
 	ctx context.Context,
+	repoName string,
 	dstUpdatePackagePath string,
 	useNewUpdateFormat bool,
 	tempDir string,
@@ -443,6 +426,7 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 
 		return u.replaceUpdateImages(
 			ctx,
+			repoName,
 			dstUpdatePackagePath,
 			tempDir,
 			updateImages,
@@ -507,6 +491,7 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 
 	return u.replaceUpdateImages(
 		ctx,
+		repoName,
 		dstUpdatePackagePath,
 		tempDir,
 		updateImages,
@@ -516,6 +501,7 @@ func (u *UpdatePackage) editZbiAndVbmeta(
 
 func (u *UpdatePackage) replaceUpdateImages(
 	ctx context.Context,
+	repoName string,
 	dstUpdatePackagePath string,
 	tempDir string,
 	srcUpdateImages *UpdateImages,
@@ -534,6 +520,10 @@ func (u *UpdatePackage) replaceUpdateImages(
 		return err
 	}
 
+	if err := dstUpdateImages.Rehost(repoName); err != nil {
+		return err
+	}
+
 	imagesPath := filepath.Join(tempDir, "images.json")
 	if err := util.UpdateImagesJSON(imagesPath, dstUpdateImages.images); err != nil {
 		return err
@@ -547,4 +537,51 @@ func (u *UpdatePackage) replaceUpdateImages(
 // system image blobs.
 func (u *UpdatePackage) UpdatePackageSize(ctx context.Context) (uint64, error) {
 	return u.p.TransitiveBlobSize(ctx)
+}
+
+func rehostUpdatePackageContents(ctx context.Context, tempDir string, repoName string) error {
+	packagesJsonPath := filepath.Join(tempDir, "packages.json")
+	logger.Infof(ctx, "setting host name in %q to %q", packagesJsonPath, repoName)
+
+	// Rehost the rest of the packages.json urls.
+	if err := util.AtomicallyWriteFile(packagesJsonPath, 0600, func(f *os.File) error {
+		src, err := os.Open(packagesJsonPath)
+		if err != nil {
+			return fmt.Errorf("Failed to open packages.json %q: %w", packagesJsonPath, err)
+		}
+		if err := util.RehostPackagesJSON(bufio.NewReader(src), bufio.NewWriter(f), repoName); err != nil {
+			return fmt.Errorf("Failed to rehost packages.json: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return fmt.Errorf("Failed to atomically overwrite %q: %w", packagesJsonPath, err)
+	}
+
+	// Optionally rehost images.json if it exists.
+	imagesJsonPath := filepath.Join(tempDir, "images.json")
+	if _, err := os.Stat(imagesJsonPath); err == nil {
+		logger.Infof(ctx, "setting host name in %q to %q", imagesJsonPath, repoName)
+
+		src, err := os.Open(imagesJsonPath)
+		if err != nil {
+			return fmt.Errorf("failed to open %q: %w", imagesJsonPath, err)
+		}
+		defer src.Close()
+
+		images, err := util.ParseImagesJSON(src)
+		if err != nil {
+			return fmt.Errorf("failed to parse %q: %w", imagesJsonPath, err)
+		}
+
+		if err := images.Rehost(repoName); err != nil {
+			return fmt.Errorf("failed to rehost %q: %w", imagesJsonPath, err)
+		}
+
+		if err := util.UpdateImagesJSON(imagesJsonPath, images); err != nil {
+			return fmt.Errorf("failed write %q: %w", imagesJsonPath, err)
+		}
+	}
+
+	return nil
 }

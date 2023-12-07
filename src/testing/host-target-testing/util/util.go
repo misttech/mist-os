@@ -341,6 +341,34 @@ func (i *ImagesManifest) Clone() ImagesManifest {
 	}
 }
 
+func (i *ImagesManifest) Rehost(newHostName string) error {
+	for idx, p := range i.Contents.Partitions {
+		u, err := url.Parse(p.Url)
+		if err != nil {
+			return err
+		}
+
+		u.Host = newHostName
+		p.Url = u.String()
+
+		i.Contents.Partitions[idx] = p
+	}
+
+	for idx, f := range i.Contents.Firmware {
+		u, err := url.Parse(f.Url)
+		if err != nil {
+			return err
+		}
+
+		u.Host = newHostName
+		f.Url = u.String()
+
+		i.Contents.Firmware[idx] = f
+	}
+
+	return nil
+}
+
 func (i *ImagesManifest) GetPartition(slot string, typ string) (*url.URL, build.MerkleRoot, error) {
 	found := false
 	var partition ImagePartition

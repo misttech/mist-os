@@ -149,6 +149,10 @@ func (u *UpdateImages) vbmetaPath() string {
 	return u.vbmetaUrl.Fragment
 }
 
+func (u *UpdateImages) Rehost(newHostname string) error {
+	return u.images.Rehost(newHostname)
+}
+
 // Create a new zbi+vbmeta package
 func (u *UpdateImages) EditZbiAndVbmetaPackage(
 	ctx context.Context,
