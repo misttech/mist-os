@@ -23,6 +23,7 @@ use crate::{
         FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode, VecDirectory, VecDirectoryEntry,
     },
 };
+use bitflags::bitflags;
 use derivative::Derivative;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_posix as fposix;
@@ -1000,7 +1001,7 @@ impl<'a> BinderProcessGuard<'a> {
         &mut self,
         binder_thread: &Arc<BinderThread>,
         local: LocalBinderObject,
-        flags: u32,
+        flags: BinderObjectFlags,
     ) -> StrongRefGuard {
         if let Some(object) = self.find_object(&local) {
             // The ref count can grow back from 0 in this instance because the object is being
@@ -2205,6 +2206,30 @@ struct BinderObjectMutableState {
     strong_count: ObjectReferenceCount,
 }
 
+bitflags! {
+    struct BinderObjectFlags: u32 {
+        /// Not implemented.
+        const ACCEPTS_FDS = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_ACCEPTS_FDS;
+        /// Whether the binder transaction receiver wants access to the sender selinux context.
+        const TXN_SECURITY_CTX = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX;
+        /// Whether the binder transaction receiver inherit the scheduler priority of the caller.
+        const INHERIT_RT = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_INHERIT_RT;
+
+        /// Not implemented
+        const PRIORITY_MASK = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_PRIORITY_MASK;
+        /// Not implemented
+        const SCHED_POLICY_MASK = uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK;
+    }
+}
+impl BinderObjectFlags {
+    fn parse(value: u32) -> Result<Self, Errno> {
+        Self::from_bits(value).ok_or_else(|| {
+            log_error!("Unknown flag value for object: {:#}", value);
+            errno!(EINVAL)
+        })
+    }
+}
+
 /// A binder object, which is owned by a process. Process-local unique memory addresses identify it
 /// to the owner.
 #[derive(Debug)]
@@ -2216,9 +2241,7 @@ struct BinderObject {
     /// treated as opaque identifiers in the driver, and only have meaning to the owning process.
     local: LocalBinderObject,
     /// The flags for the binder object.
-    ///
-    ///The only flag currently implemented is FLAT_BINDER_FLAG_TXN_SECURITY_CTX.
-    flags: u32,
+    flags: BinderObjectFlags,
     /// Mutable state for the binder object, protected behind a mutex.
     state: Mutex<BinderObjectMutableState>,
 }
@@ -2323,7 +2346,7 @@ impl BinderObject {
     fn new(
         owner: &BinderProcess,
         local: LocalBinderObject,
-        flags: u32,
+        flags: BinderObjectFlags,
     ) -> (Arc<Self>, StrongRefGuard) {
         log_trace!(
             "New binder object {:?} in process {:?} with flags {:?}",
@@ -2344,7 +2367,10 @@ impl BinderObject {
         (object, guard)
     }
 
-    fn new_context_manager_marker(context_manager: &BinderProcess, flags: u32) -> Arc<Self> {
+    fn new_context_manager_marker(
+        context_manager: &BinderProcess,
+        flags: BinderObjectFlags,
+    ) -> Arc<Self> {
         Arc::new(Self {
             owner: context_manager.weak_self.clone(),
             local: Default::default(),
@@ -3070,9 +3096,9 @@ impl BinderDriver {
                     let user_ref = UserRef::<flat_binder_object>::new(user_arg);
                     let flat_binder_object =
                         binder_proc.get_resource_accessor(current_task).read_object(user_ref)?;
-                    flat_binder_object.flags
+                    BinderObjectFlags::parse(flat_binder_object.flags)?
                 } else {
-                    0
+                    BinderObjectFlags::empty()
                 };
 
                 log_trace!("binder setting context manager with flags {:x}", flags);
@@ -3330,17 +3356,15 @@ impl BinderDriver {
                 let target_proc = target_proc.ok_or(TransactionError::Dead)?;
                 let weak_task = current_task.get_task(target_proc.pid);
                 let target_task = weak_task.upgrade().ok_or_else(|| TransactionError::Dead)?;
-                let security_context: Option<FsString> = if object.flags
-                    & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
-                    == uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_TXN_SECURITY_CTX
-                {
-                    let mut security_context =
-                        target_task.thread_group.read().selinux.current_context.clone();
-                    security_context.push(b'\0');
-                    Some(security_context)
-                } else {
-                    None
-                };
+                let security_context: Option<FsString> =
+                    if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
+                        let mut security_context =
+                            target_task.thread_group.read().selinux.current_context.clone();
+                        security_context.push(b'\0');
+                        Some(security_context)
+                    } else {
+                        None
+                    };
 
                 // Copy the transaction data to the target process.
                 let (buffers, mut transaction_state) = self.copy_transaction_buffers(
@@ -4074,11 +4098,11 @@ fn find_parent_buffer<'a>(
 #[derive(Debug, PartialEq, Eq)]
 enum SerializedBinderObject {
     /// A `BINDER_TYPE_HANDLE` object. A handle to a remote binder object.
-    Handle { handle: Handle, flags: u32, cookie: binder_uintptr_t },
+    Handle { handle: Handle, flags: BinderObjectFlags, cookie: binder_uintptr_t },
     /// A `BINDER_TYPE_BINDER` object. The in-process representation of a binder object.
-    Object { local: LocalBinderObject, flags: u32 },
+    Object { local: LocalBinderObject, flags: BinderObjectFlags },
     /// A `BINDER_TYPE_FD` object. A file descriptor.
-    File { fd: FdNumber, flags: u32, cookie: binder_uintptr_t },
+    File { fd: FdNumber, flags: BinderObjectFlags, cookie: binder_uintptr_t },
     /// A `BINDER_TYPE_PTR` object. Identifies a pointer in the transaction data that needs to be
     /// fixed up when the payload is copied into the destination process. Part of the scatter-gather
     /// implementation.
@@ -4104,7 +4128,7 @@ impl SerializedBinderObject {
                         weak_ref_addr: UserAddress::from(unsafe { object.__bindgen_anon_1.binder }),
                         strong_ref_addr: UserAddress::from(object.cookie),
                     },
-                    flags: object.flags,
+                    flags: BinderObjectFlags::parse(object.flags)?,
                 })
             }
             BINDER_TYPE_HANDLE => {
@@ -4113,7 +4137,7 @@ impl SerializedBinderObject {
                 Ok(Self::Handle {
                     // SAFETY: Union read.
                     handle: unsafe { object.__bindgen_anon_1.handle }.into(),
-                    flags: object.flags,
+                    flags: BinderObjectFlags::parse(object.flags)?,
                     cookie: object.cookie,
                 })
             }
@@ -4123,7 +4147,7 @@ impl SerializedBinderObject {
                 Ok(Self::File {
                     // SAFETY: Union read.
                     fd: FdNumber::from_raw(unsafe { object.__bindgen_anon_1.handle } as i32),
-                    flags: object.flags,
+                    flags: BinderObjectFlags::parse(object.flags)?,
                     cookie: object.cookie,
                 })
             }
@@ -4162,7 +4186,7 @@ impl SerializedBinderObject {
                 struct_with_union_into_bytes!(flat_binder_object {
                     hdr.type_: BINDER_TYPE_HANDLE,
                     __bindgen_anon_1.handle: handle.into(),
-                    flags: flags,
+                    flags: flags.bits(),
                     cookie: cookie,
                 })
                 .write_to_prefix(data)
@@ -4171,7 +4195,7 @@ impl SerializedBinderObject {
                 struct_with_union_into_bytes!(flat_binder_object {
                     hdr.type_: BINDER_TYPE_BINDER,
                     __bindgen_anon_1.binder: local.weak_ref_addr.ptr() as u64,
-                    flags: flags,
+                    flags: flags.bits(),
                     cookie: local.strong_ref_addr.ptr() as u64,
                 })
                 .write_to_prefix(data)
@@ -4180,7 +4204,7 @@ impl SerializedBinderObject {
                 struct_with_union_into_bytes!(flat_binder_object {
                     hdr.type_: BINDER_TYPE_FD,
                     __bindgen_anon_1.handle: fd.raw() as u32,
-                    flags: flags,
+                    flags: flags.bits(),
                     cookie: cookie,
                 })
                 .write_to_prefix(data)
@@ -4493,8 +4517,11 @@ pub mod tests {
         weak_ref_addr: UserAddress,
         strong_ref_addr: UserAddress,
     ) -> (Arc<BinderObject>, StrongRefGuard) {
-        let (object, guard) =
-            BinderObject::new(owner, LocalBinderObject { weak_ref_addr, strong_ref_addr }, 0);
+        let (object, guard) = BinderObject::new(
+            owner,
+            LocalBinderObject { weak_ref_addr, strong_ref_addr },
+            BinderObjectFlags::empty(),
+        );
         owner.lock().objects.insert(weak_ref_addr, object.clone());
         (object, guard)
     }
@@ -4530,7 +4557,8 @@ pub mod tests {
     async fn handle_0_succeeds_when_context_manager_is_set() {
         let test = TranslateHandlesTestFixture::new();
         let sender = test.new_process();
-        let context_manager = BinderObject::new_context_manager_marker(&sender.proc, 0);
+        let context_manager =
+            BinderObject::new_context_manager_marker(&sender.proc, BinderObjectFlags::empty());
         *test.driver.context_manager.lock() = Some(context_manager.clone());
         let (object, owner) =
             test.driver.get_context_manager(&sender.task).expect("failed to find handle 0");
@@ -5119,9 +5147,13 @@ pub mod tests {
     fn serialize_binder_handle() {
         let mut output = [0u8; std::mem::size_of::<flat_binder_object>()];
 
-        SerializedBinderObject::Handle { handle: 2.into(), flags: 42, cookie: 99 }
-            .write_to(&mut output)
-            .expect("write handle");
+        SerializedBinderObject::Handle {
+            handle: 2.into(),
+            flags: BinderObjectFlags::parse(42).expect("parse"),
+            cookie: 99,
+        }
+        .write_to(&mut output)
+        .expect("write handle");
         assert_eq!(
             struct_with_union_into_bytes!(flat_binder_object {
                 hdr.type_: BINDER_TYPE_HANDLE,
@@ -5142,7 +5174,7 @@ pub mod tests {
                 weak_ref_addr: UserAddress::from(0xDEADBEEF),
                 strong_ref_addr: UserAddress::from(0xDEADDEAD),
             },
-            flags: 42,
+            flags: BinderObjectFlags::parse(42).expect("parse"),
         }
         .write_to(&mut output)
         .expect("write object");
@@ -5161,9 +5193,13 @@ pub mod tests {
     fn serialize_binder_fd() {
         let mut output = [0u8; std::mem::size_of::<flat_binder_object>()];
 
-        SerializedBinderObject::File { fd: FdNumber::from_raw(2), flags: 42, cookie: 99 }
-            .write_to(&mut output)
-            .expect("write fd");
+        SerializedBinderObject::File {
+            fd: FdNumber::from_raw(2),
+            flags: BinderObjectFlags::parse(42).expect("parse"),
+            cookie: 99,
+        }
+        .write_to(&mut output)
+        .expect("write fd");
         assert_eq!(
             struct_with_union_into_bytes!(flat_binder_object {
                 hdr.type_: BINDER_TYPE_FD,
@@ -5225,21 +5261,29 @@ pub mod tests {
     #[fuchsia::test]
     fn serialize_binder_buffer_too_small() {
         let mut output = [0u8; std::mem::size_of::<binder_uintptr_t>()];
-        SerializedBinderObject::Handle { handle: 2.into(), flags: 42, cookie: 99 }
-            .write_to(&mut output)
-            .expect_err("write handle should not succeed");
+        SerializedBinderObject::Handle {
+            handle: 2.into(),
+            flags: BinderObjectFlags::parse(42).expect("parse"),
+            cookie: 99,
+        }
+        .write_to(&mut output)
+        .expect_err("write handle should not succeed");
         SerializedBinderObject::Object {
             local: LocalBinderObject {
                 weak_ref_addr: UserAddress::from(0xDEADBEEF),
                 strong_ref_addr: UserAddress::from(0xDEADDEAD),
             },
-            flags: 42,
+            flags: BinderObjectFlags::parse(42).expect("parse"),
         }
         .write_to(&mut output)
         .expect_err("write object should not succeed");
-        SerializedBinderObject::File { fd: FdNumber::from_raw(2), flags: 42, cookie: 99 }
-            .write_to(&mut output)
-            .expect_err("write fd should not succeed");
+        SerializedBinderObject::File {
+            fd: FdNumber::from_raw(2),
+            flags: BinderObjectFlags::parse(42).expect("parse"),
+            cookie: 99,
+        }
+        .write_to(&mut output)
+        .expect_err("write fd should not succeed");
     }
 
     #[fuchsia::test]
@@ -5252,7 +5296,11 @@ pub mod tests {
         });
         assert_eq!(
             SerializedBinderObject::from_bytes(&input).expect("read handle"),
-            SerializedBinderObject::Handle { handle: 2.into(), flags: 42, cookie: 99 }
+            SerializedBinderObject::Handle {
+                handle: 2.into(),
+                flags: BinderObjectFlags::parse(42).expect("parse"),
+                cookie: 99
+            }
         );
     }
 
@@ -5271,7 +5319,7 @@ pub mod tests {
                     weak_ref_addr: UserAddress::from(0xDEADBEEF),
                     strong_ref_addr: UserAddress::from(0xDEADDEAD)
                 },
-                flags: 42
+                flags: BinderObjectFlags::parse(42).expect("parse")
             }
         );
     }
@@ -5286,7 +5334,11 @@ pub mod tests {
         });
         assert_eq!(
             SerializedBinderObject::from_bytes(&input).expect("read handle"),
-            SerializedBinderObject::File { fd: FdNumber::from_raw(2), flags: 42, cookie: 99 }
+            SerializedBinderObject::File {
+                fd: FdNumber::from_raw(2),
+                flags: BinderObjectFlags::parse(42).expect("parse"),
+                cookie: 99
+            }
         );
     }
 
@@ -5307,7 +5359,7 @@ pub mod tests {
                 length: 0x100,
                 parent: 1,
                 parent_offset: 20,
-                flags: 42
+                flags: 42,
             }
         );
     }
@@ -5637,7 +5689,7 @@ pub mod tests {
         const RECEIVING_HANDLE: Handle = Handle::from_raw(2);
 
         // Pretend the binder object was given to the sender earlier.
-        let (_, guard) = BinderObject::new(&owner.proc, binder_object, 0);
+        let (_, guard) = BinderObject::new(&owner.proc, binder_object, BinderObjectFlags::empty());
         let handle = sender
             .proc
             .lock()
@@ -5647,7 +5699,11 @@ pub mod tests {
 
         // Give the receiver another handle so that the input handle number and output handle
         // number aren't the same.
-        let (_, guard) = BinderObject::new(&owner.proc, LocalBinderObject::default(), 0);
+        let (_, guard) = BinderObject::new(
+            &owner.proc,
+            LocalBinderObject::default(),
+            BinderObjectFlags::empty(),
+        );
         receiver
             .proc
             .lock()
@@ -5730,8 +5786,10 @@ pub mod tests {
         const RECEIVING_HANDLE_OTHER: Handle = Handle::from_raw(3);
 
         // Add both objects (sender owned and other owned) to sender handle table.
-        let (_, sender_guard) = BinderObject::new(&sender.proc, binder_object_addr, 0);
-        let (_, other_guard) = BinderObject::new(&other_proc.proc, binder_object_addr, 0);
+        let (_, sender_guard) =
+            BinderObject::new(&sender.proc, binder_object_addr, BinderObjectFlags::empty());
+        let (_, other_guard) =
+            BinderObject::new(&other_proc.proc, binder_object_addr, BinderObjectFlags::empty());
         assert_eq!(
             sender
                 .proc
@@ -5751,7 +5809,11 @@ pub mod tests {
 
         // Give the receiver another handle so that the input handle numbers and output handle
         // numbers aren't the same.
-        let (_, guard) = BinderObject::new(&other_proc.proc, LocalBinderObject::default(), 0);
+        let (_, guard) = BinderObject::new(
+            &other_proc.proc,
+            LocalBinderObject::default(),
+            BinderObjectFlags::empty(),
+        );
         receiver
             .proc
             .lock()
@@ -6814,7 +6876,7 @@ pub mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
-            0,
+            BinderObjectFlags::empty(),
         );
 
         // Keep a weak reference to the object.
@@ -6889,7 +6951,7 @@ pub mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
-            0,
+            BinderObjectFlags::empty(),
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
@@ -6930,7 +6992,7 @@ pub mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
-            0,
+            BinderObjectFlags::empty(),
         );
 
         // Insert a handle to the object in the receiver. This also retains a strong reference.
@@ -6973,7 +7035,7 @@ pub mod tests {
                 weak_ref_addr: UserAddress::from(0x0000000000000001),
                 strong_ref_addr: UserAddress::from(0x0000000000000002),
             },
-            0,
+            BinderObjectFlags::empty(),
         );
 
         // Insert a handle to the object in the client. This also retains a strong reference.
