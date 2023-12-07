@@ -313,6 +313,10 @@ class RustAction(object):
         return "llvm-bc" in self.emit
 
     @property
+    def emit_metadata(self) -> bool:
+        return "metadata" in self.emit
+
+    @property
     def save_analysis(self) -> bool:
         return (
             cl_utils.last_value_of_dict_flag(
@@ -333,6 +337,12 @@ class RustAction(object):
     def depfile(self) -> Optional[Path]:
         d = cl_utils.last_value_of_dict_flag(self.emit, "dep-info", "")
         return Path(d) if d else None
+
+    @property
+    def rmeta(self) -> Optional[Path]:
+        if self.emit_metadata and self.output_file:
+            return Path(self._output_file_base + ".rmeta")
+        return None
 
     @property
     def use_ld(self) -> Optional[Path]:
@@ -427,6 +437,8 @@ class RustAction(object):
 
     def extra_output_files(self) -> Iterable[Path]:
         base = self._auxiliary_output_path
+        if self.emit_metadata:
+            yield self.rmeta
         if self.emit_llvm_ir:
             yield Path(base + ".ll")
         if self.emit_llvm_bc:

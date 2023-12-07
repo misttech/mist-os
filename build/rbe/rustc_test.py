@@ -48,6 +48,7 @@ class RustActionTests(unittest.TestCase):
         self.assertEqual(r.response_files, set())
         self.assertEqual(r.emit, {})
         self.assertIsNone(r.target)
+        self.assertFalse(r.emit_metadata)
         self.assertFalse(r.emit_llvm_ir)
         self.assertFalse(r.emit_llvm_bc)
         self.assertFalse(r.save_analysis)
@@ -176,6 +177,21 @@ class RustActionTests(unittest.TestCase):
         )
         self.assertEqual(r.emit, {"link": [], "dep-info": [str(depfile)]})
         self.assertEqual(r.depfile, depfile)
+
+    def test_emit_link_and_rmeta(self):
+        rmeta = Path("foo.rmeta")
+        r = rustc.RustAction(
+            [
+                "../tools/rustc",
+                f"--emit=metadata,link",
+                "../foo/lib.rs",
+                "-o",
+                "foo.rlib",
+            ]
+        )
+        self.assertEqual(r.emit, {"link": [], "metadata": []})
+        self.assertEqual(r.rmeta, rmeta)
+        self.assertIn(rmeta, set(r.extra_output_files()))
 
     def test_emit_llvm_ir(self):
         output = Path("obj/foo.rlib")
