@@ -9,7 +9,7 @@ use crate::{
         serve_component_runner, serve_container_controller, serve_graphical_presenter,
     },
     fs::{layeredfs::LayeredFs, tmpfs::TmpFs},
-    task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task, TaskBuilder},
+    task::{set_thread_role, CurrentTask, ExitStatus, Kernel},
     time::utc::update_utc_clock,
     vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount},
 };
@@ -383,16 +383,18 @@ async fn create_container(
         .open_file(argv[0].as_bytes(), OpenFlags::RDONLY)
         .with_source_context(|| format!("opening init: {:?}", &argv[0]))?;
 
-    let init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
+    let mut init_task = create_init_task(&kernel, init_pid, Arc::clone(&fs_context), config)
         .with_source_context(|| format!("creating init task: {:?}", &config.init))?;
-    execute_task(
-        init_task,
-        move |_, init_task| init_task.exec(executable, argv[0].clone(), argv.clone(), vec![]),
-        move |result| {
-            log_info!("Finished running init process: {:?}", result);
-            let _ = task_complete.send(result);
-        },
-    )?;
+    release_on_error!(init_task, (), {
+        init_task
+            .exec(executable, argv[0].clone(), argv.clone(), vec![])
+            .with_source_context(|| format!("executing init: {:?}", &argv))?;
+        Ok(())
+    });
+    execute_task(init_task, move |result| {
+        log_info!("Finished running init process: {:?}", result);
+        let _ = task_complete.send(result);
+    });
 
     if !config.startup_file_path.is_empty() {
         wait_for_init_file(&config.startup_file_path, &system_task).await?;
@@ -447,9 +449,13 @@ fn create_fs_context(
     Ok(FsContext::new(root_fs))
 }
 
-pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
+pub fn set_rlimits(current_task: &CurrentTask, rlimits: &[String]) -> Result<(), Error> {
     let set_rlimit = |resource, value| {
-        task.thread_group.limits.lock().set(resource, rlimit { rlim_cur: value, rlim_max: value });
+        current_task
+            .thread_group
+            .limits
+            .lock()
+            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
     };
 
     for rlimit in rlimits.iter() {
@@ -471,7 +477,7 @@ fn create_init_task(
     pid: pid_t,
     fs_context: Arc<FsContext>,
     config: &ConfigWrapper,
-) -> Result<TaskBuilder, Error> {
+) -> Result<CurrentTask, Error> {
     let credentials = Credentials::root();
     let initial_name = if config.init.is_empty() {
         CString::default()

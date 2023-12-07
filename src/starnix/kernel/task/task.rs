@@ -1257,7 +1257,7 @@ impl Releasable for Task {
         self.fs = None;
         self.mm = None;
         // Rebuild a temporary CurrentTask to run the release actions that requires a CurrentState.
-        let current_task = CurrentTask::new(OwnedRef::new(self), thread_state);
+        let current_task = CurrentTask { task: OwnedRef::new(self), thread_state };
 
         // Apply any delayed releasers left.
         current_task.trigger_delayed_releaser();

@@ -36,7 +36,7 @@ use starnix_uapi::{
     gid_t,
     kcmp::KcmpResource,
     open_flags::OpenFlags,
-    ownership::WeakRef,
+    ownership::{release_on_error, Releasable, WeakRef},
     pid_t,
     resource_limits::Resource,
     rlimit, rusage, sched_param,
@@ -81,32 +81,32 @@ where
         UserRef::<pid_t>::new(UserAddress::from(args.parent_tid)),
         UserRef::<pid_t>::new(UserAddress::from(args.child_tid)),
     )?;
-    // Set the result register to 0 for the return value from clone in the
-    // cloned process.
-    new_task.thread_state.registers.set_return_register(0);
+    let (tid, task_ref) = release_on_error!(new_task, (), {
+        let tid = new_task.id;
 
-    if args.stack != 0 {
-        // In clone() the `stack` argument points to the top of the stack, while in clone3()
-        // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
-        // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
-        new_task
-            .thread_state
-            .registers
-            .set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
-    }
-    if args.flags & (CLONE_SETTLS as u64) != 0 {
-        new_task.thread_state.registers.set_thread_pointer_register(args.tls);
-    }
+        // Clone the registers, setting the result register to 0 for the return value from clone in the
+        // cloned process.
+        new_task.thread_state.registers = current_task.thread_state.registers;
+        new_task.thread_state.registers.set_return_register(0);
 
-    let (tid, task_ref) = execute_task(
-        new_task,
-        |_, new_task| {
-            let tid = new_task.id;
-            let task_ref = new_task.weak_task();
-            Ok((tid, task_ref))
-        },
-        |_| {},
-    )?;
+        if args.stack != 0 {
+            // In clone() the `stack` argument points to the top of the stack, while in clone3()
+            // `stack` points to the bottom of the stack. Therefore, in clone3() we need to add
+            // `stack_size` to calculate the stack pointer. Note that in clone() `stack_size` is 0.
+            new_task
+                .thread_state
+                .registers
+                .set_stack_pointer_register(args.stack.wrapping_add(args.stack_size));
+        }
+        if args.flags & (CLONE_SETTLS as u64) != 0 {
+            new_task.thread_state.registers.set_thread_pointer_register(args.tls);
+        }
+
+        let task_ref = WeakRef::from(&new_task.task); // Keep reference for later waiting.
+        Ok((tid, task_ref))
+    });
+
+    execute_task(new_task, |_| {});
 
     if args.flags & (CLONE_VFORK as u64) != 0 {
         current_task.wait_for_execve(task_ref)?;

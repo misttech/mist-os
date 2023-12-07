@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::TaskBuilder;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
@@ -367,12 +366,6 @@ impl AutoReleasableTask {
 impl From<CurrentTask> for AutoReleasableTask {
     fn from(task: CurrentTask) -> Self {
         Self(Some(task))
-    }
-}
-
-impl From<TaskBuilder> for AutoReleasableTask {
-    fn from(builder: TaskBuilder) -> Self {
-        CurrentTask::from(builder).into()
     }
 }
 

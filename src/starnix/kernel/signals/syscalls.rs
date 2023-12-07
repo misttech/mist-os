@@ -1777,9 +1777,7 @@ mod tests {
     async fn test_waiting_for_child() {
         let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
 
-        let child = task
-            .clone_task(&mut locked, 0, Some(SIGCHLD), UserRef::default(), UserRef::default())
-            .expect("clone_task");
+        let child = task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         // No child is currently terminated.
         assert_eq!(
@@ -1796,7 +1794,6 @@ mod tests {
             move || {
                 // Create child
                 let task = task.upgrade().expect("task must be alive");
-                let child: AutoReleasableTask = child.into();
                 // Wait for the main thread to be blocked on waiting for a child.
                 while !task.read().signals.run_state.is_blocked() {
                     std::thread::sleep(std::time::Duration::from_millis(10));

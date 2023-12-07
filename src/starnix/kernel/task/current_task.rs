@@ -11,7 +11,7 @@ use lock_sequence::{LockBefore, Locked};
 use starnix_lock::{RwLock, RwLockWriteGuard};
 use starnix_sync::{EventWaitGuard, WakeReason};
 use starnix_uapi::signals::SIGCHLD;
-use std::{ffi::CString, fmt, marker::PhantomData, mem::MaybeUninit, sync::Arc};
+use std::{ffi::CString, fmt, mem::MaybeUninit, sync::Arc};
 
 use crate::{
     arch::{
@@ -54,40 +54,6 @@ use starnix_uapi::{
     SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SI_KERNEL,
 };
 
-pub struct TaskBuilder {
-    /// The underlying task object.
-    pub task: OwnedRef<Task>,
-
-    pub thread_state: ThreadState,
-}
-
-impl TaskBuilder {
-    pub fn new(task: Task) -> Self {
-        Self { task: OwnedRef::new(task), thread_state: Default::default() }
-    }
-}
-
-impl From<TaskBuilder> for CurrentTask {
-    fn from(builder: TaskBuilder) -> Self {
-        Self::new(builder.task, builder.thread_state)
-    }
-}
-
-impl Releasable for TaskBuilder {
-    type Context<'a> = ();
-
-    fn release(self, _: Self::Context<'_>) {
-        self.task.release(self.thread_state)
-    }
-}
-
-impl std::ops::Deref for TaskBuilder {
-    type Target = Task;
-    fn deref(&self) -> &Self::Target {
-        &self.task
-    }
-}
-
 /// The task object associated with the currently executing thread.
 ///
 /// We often pass the `CurrentTask` as the first argument to functions if those functions need to
@@ -105,9 +71,6 @@ pub struct CurrentTask {
     pub task: OwnedRef<Task>,
 
     pub thread_state: ThreadState,
-
-    /// Makes CurrentTask neither Sync not Send.
-    _local_marker: PhantomData<*mut u8>,
 }
 
 /// The thread related information of a `CurrentTask`. The information should never be used  outside
@@ -126,17 +89,6 @@ pub struct ThreadState {
     /// To use, call set_syscall_restart_func and return ERESTART_RESTARTBLOCK. sys_restart_syscall
     /// will eventually call it.
     pub syscall_restart_func: Option<Box<SyscallRestartFunc>>,
-}
-
-impl ThreadState {
-    /// Returns a new `ThreadState` with the same `registers` as this one.
-    fn snapshot(&self) -> Self {
-        Self {
-            registers: self.registers,
-            extended_pstate: Default::default(),
-            syscall_restart_func: None,
-        }
-    }
 }
 
 type SyscallRestartFunc =
@@ -166,8 +118,8 @@ impl fmt::Debug for CurrentTask {
 }
 
 impl CurrentTask {
-    pub fn new(task: OwnedRef<Task>, thread_state: ThreadState) -> Self {
-        Self { task, thread_state, _local_marker: Default::default() }
+    fn new(task: Task) -> CurrentTask {
+        CurrentTask { task: OwnedRef::new(task), thread_state: Default::default() }
     }
 
     pub fn trigger_delayed_releaser(&self) {
@@ -887,7 +839,7 @@ impl CurrentTask {
     pub fn create_init_child_process(
         kernel: &Arc<Kernel>,
         binary_path: &CString,
-    ) -> Result<TaskBuilder, Errno> {
+    ) -> Result<CurrentTask, Errno> {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let task = Self::create_process_without_parent(
@@ -916,7 +868,7 @@ impl CurrentTask {
         kernel: &Arc<Kernel>,
         initial_name: CString,
         fs: Arc<FsContext>,
-    ) -> Result<TaskBuilder, Errno> {
+    ) -> Result<CurrentTask, Errno> {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         Self::create_task(kernel, initial_name, fs, |pid, process_group| {
             create_zircon_process(
@@ -935,7 +887,7 @@ impl CurrentTask {
         pid: pid_t,
         initial_name: CString,
         fs: Arc<FsContext>,
-    ) -> Result<TaskBuilder, Errno> {
+    ) -> Result<CurrentTask, Errno> {
         let initial_name_bytes = initial_name.as_bytes().to_owned();
         let pids = kernel.pids.write();
         Self::create_task_with_pid(kernel, pids, pid, initial_name, fs, |pid, process_group| {
@@ -957,25 +909,19 @@ impl CurrentTask {
         kernel: &Arc<Kernel>,
         fs: Arc<FsContext>,
     ) -> Result<CurrentTask, Errno> {
-        let builder = Self::create_task(
-            kernel,
-            CString::new("[kthreadd]").unwrap(),
-            fs,
-            |pid, process_group| {
-                let process = zx::Process::from(zx::Handle::invalid());
-                let memory_manager = Arc::new(MemoryManager::new_empty());
-                let thread_group = ThreadGroup::new(
-                    kernel.clone(),
-                    process,
-                    None,
-                    pid,
-                    process_group,
-                    SignalActions::default(),
-                );
-                Ok(TaskInfo { thread: None, thread_group, memory_manager })
-            },
-        )?;
-        Ok(builder.into())
+        Self::create_task(kernel, CString::new("[kthreadd]").unwrap(), fs, |pid, process_group| {
+            let process = zx::Process::from(zx::Handle::invalid());
+            let memory_manager = Arc::new(MemoryManager::new_empty());
+            let thread_group = ThreadGroup::new(
+                kernel.clone(),
+                process,
+                None,
+                pid,
+                process_group,
+                SignalActions::default(),
+            );
+            Ok(TaskInfo { thread: None, thread_group, memory_manager })
+        })
     }
 
     fn create_task<F>(
@@ -983,7 +929,7 @@ impl CurrentTask {
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
-    ) -> Result<TaskBuilder, Errno>
+    ) -> Result<CurrentTask, Errno>
     where
         F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
     {
@@ -999,7 +945,7 @@ impl CurrentTask {
         initial_name: CString,
         root_fs: Arc<FsContext>,
         task_info_factory: F,
-    ) -> Result<TaskBuilder, Errno>
+    ) -> Result<CurrentTask, Errno>
     where
         F: FnOnce(i32, Arc<ProcessGroup>) -> Result<TaskInfo, Errno>,
     {
@@ -1018,40 +964,37 @@ impl CurrentTask {
         // > via fork(2), and is preserved across execve(2).
         // https://man7.org/linux/man-pages/man2/prctl.2.html
         let default_timerslack = 50_000;
-        let builder = TaskBuilder {
-            task: OwnedRef::new(Task::new(
-                pid,
-                initial_name,
-                thread_group,
-                thread,
-                FdTable::default(),
-                memory_manager,
-                root_fs,
-                Credentials::root(),
-                Arc::clone(&kernel.default_abstract_socket_namespace),
-                Arc::clone(&kernel.default_abstract_vsock_namespace),
-                Some(SIGCHLD),
-                Default::default(),
-                None,
-                Default::default(),
-                kernel.root_uts_ns.clone(),
-                false,
-                SeccompState::default(),
-                SeccompFilterContainer::default(),
-                UserAddress::NULL.into(),
-                default_timerslack,
-            )),
-            thread_state: Default::default(),
-        };
-        release_on_error!(builder, (), {
-            let temp_task = TempRef::from(&builder.task);
-            builder.thread_group.add(&temp_task)?;
+        let current_task = CurrentTask::new(Task::new(
+            pid,
+            initial_name,
+            thread_group,
+            thread,
+            FdTable::default(),
+            memory_manager,
+            root_fs,
+            Credentials::root(),
+            Arc::clone(&kernel.default_abstract_socket_namespace),
+            Arc::clone(&kernel.default_abstract_vsock_namespace),
+            Some(SIGCHLD),
+            Default::default(),
+            None,
+            Default::default(),
+            kernel.root_uts_ns.clone(),
+            false,
+            SeccompState::default(),
+            SeccompFilterContainer::default(),
+            UserAddress::NULL.into(),
+            default_timerslack,
+        ));
+        release_on_error!(current_task, (), {
+            let temp_task = current_task.temp_task();
+            current_task.thread_group.add(&temp_task)?;
 
             pids.add_task(&temp_task);
-            pids.add_thread_group(&builder.thread_group);
+            pids.add_thread_group(&current_task.thread_group);
             Ok(())
         });
-        Ok(builder)
+        Ok(current_task)
     }
 
     /// Create a kernel task in the same ThreadGroup as the given `system_task`.
@@ -1074,7 +1017,7 @@ impl CurrentTask {
             default_timerslack_ns = state.default_timerslack_ns;
         }
 
-        let current_task: CurrentTask = TaskBuilder::new(Task::new(
+        let current_task = CurrentTask::new(Task::new(
             pid,
             initial_name,
             Arc::clone(&system_task.thread_group),
@@ -1095,8 +1038,7 @@ impl CurrentTask {
             SeccompFilterContainer::default(),
             UserAddress::NULL.into(),
             default_timerslack_ns,
-        ))
-        .into();
+        ));
         release_on_error!(current_task, (), {
             let temp_task = current_task.temp_task();
             current_task.thread_group.add(&temp_task)?;
@@ -1122,7 +1064,7 @@ impl CurrentTask {
         child_exit_signal: Option<Signal>,
         user_parent_tid: UserRef<pid_t>,
         user_child_tid: UserRef<pid_t>,
-    ) -> Result<TaskBuilder, Errno>
+    ) -> Result<CurrentTask, Errno>
     where
         L: LockBefore<MmDumpable>,
     {
@@ -1267,7 +1209,7 @@ impl CurrentTask {
             None
         };
 
-        let mut child = TaskBuilder::new(Task::new(
+        let child = CurrentTask::new(Task::new(
             pid,
             command,
             thread_group,
@@ -1336,17 +1278,8 @@ impl CurrentTask {
             if flags & (CLONE_CHILD_SETTID as u64) != 0 {
                 child.mm().vmo_write_object(user_child_tid, &child.id)?;
             }
-            child.thread_state = self.thread_state.snapshot();
             Ok(())
         });
-        // Take the lock on thread group and task in the correct order to ensure any wrong ordering
-        // will trigger the tracing-mutex at the right call site.
-        #[cfg(any(test, debug_assertions))]
-        {
-            let _l1 = child.thread_group.read();
-            let _l2 = child.read();
-        }
-
         Ok(child)
     }
 
@@ -1365,6 +1298,13 @@ impl CurrentTask {
         let result = self
             .clone_task(locked, flags, exit_signal, UserRef::default(), UserRef::default())
             .expect("failed to create task in test");
+
+        // Take the lock on thread group and task in the correct order to ensure any wrong ordering
+        // will trigger the tracing-mutex at the right call site.
+        {
+            let _l1 = result.thread_group.read();
+            let _l2 = result.read();
+        }
 
         result.into()
     }
