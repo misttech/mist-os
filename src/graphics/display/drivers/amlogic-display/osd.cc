@@ -696,8 +696,8 @@ void Osd::HwInit() {
   vpu_mmio_->Write32(regVal, VPU_VIU_OSD1_FIFO_CTRL_STAT);
   vpu_mmio_->Write32(regVal, VPU_VIU_OSD2_FIFO_CTRL_STAT);
 
-  SET_MASK32(VPU, VPP_MISC, VPP_POSTBLEND_EN);
-  CLEAR_MASK32(VPU, VPP_MISC, VPP_PREBLEND_EN);
+  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) | VPP_POSTBLEND_EN, VPP_MISC);
+  vpu_mmio_->Write32(vpu_mmio_->Read32(VPP_MISC) & ~(VPP_PREBLEND_EN), VPP_MISC);
 
   osd1_registers.ctrl_stat.FromValue(0)
       .set_blk_en(1)

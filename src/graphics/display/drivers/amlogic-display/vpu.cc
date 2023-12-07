@@ -334,12 +334,16 @@ void Vpu::PowerOn() {
   // Reset VIU + VENC
   // Reset VENCI + VENCP + VADC + VENCL
   // Reset HDMI-APB + HDMI-SYS + HDMI-TX + HDMI-CEC
-  CLEAR_MASK32(RESET, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
-  CLEAR_MASK32(RESET, RESET1_LEVEL, (1 << 5));
-  CLEAR_MASK32(RESET, RESET2_LEVEL, (1 << 15));
-  CLEAR_MASK32(RESET, RESET4_LEVEL,
-               ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)));
-  CLEAR_MASK32(RESET, RESET7_LEVEL, (1 << 7));
+  reset_mmio_->Write32(
+      reset_mmio_->Read32(RESET0_LEVEL) & ~((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)),
+      RESET0_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET1_LEVEL) & ~(1 << 5), RESET1_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET2_LEVEL) & ~(1 << 15), RESET2_LEVEL);
+  reset_mmio_->Write32(
+      reset_mmio_->Read32(RESET4_LEVEL) &
+          ~((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)),
+      RESET4_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET7_LEVEL) & ~(1 << 7), RESET7_LEVEL);
 
   // TODO(fxbug.com/132123): The A311D and S905D3 power sequences disable output
   // isolation after VPU power ACK, and before changing the VPU memory power
@@ -352,12 +356,16 @@ void Vpu::PowerOn() {
   general_power.set_vpu_hdmi_isolation_enabled_s905d2_a311d(false).WriteTo(&aobus_mmio_.value());
 
   // release Reset
-  SET_MASK32(RESET, RESET0_LEVEL, ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)));
-  SET_MASK32(RESET, RESET1_LEVEL, (1 << 5));
-  SET_MASK32(RESET, RESET2_LEVEL, (1 << 15));
-  SET_MASK32(RESET, RESET4_LEVEL,
-             ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)));
-  SET_MASK32(RESET, RESET7_LEVEL, (1 << 7));
+  reset_mmio_->Write32(
+      reset_mmio_->Read32(RESET0_LEVEL) | ((1 << 5) | (1 << 10) | (1 << 19) | (1 << 13)),
+      RESET0_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET1_LEVEL) | (1 << 5), RESET1_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET2_LEVEL) | (1 << 15), RESET2_LEVEL);
+  reset_mmio_->Write32(
+      reset_mmio_->Read32(RESET4_LEVEL) |
+          ((1 << 6) | (1 << 7) | (1 << 13) | (1 << 5) | (1 << 9) | (1 << 4) | (1 << 12)),
+      RESET4_LEVEL);
+  reset_mmio_->Write32(reset_mmio_->Read32(RESET7_LEVEL) | (1 << 7), RESET7_LEVEL);
 
   ConfigureClock();
 }

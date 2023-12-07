@@ -62,10 +62,6 @@ constexpr uint32_t GetFieldValue32(uint32_t reg_value, int field_begin_bit, int 
   return (reg_value >> field_begin_bit) & field_mask_unshifted;
 }
 
-#define SET_MASK32(x, dest, mask) WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) | mask))
-
-#define CLEAR_MASK32(x, dest, mask) WRITE32_##x##_REG(dest, (READ32_##x##_REG(dest) & ~(mask)))
-
 // Should match display_mmios table in board driver
 enum {
   MMIO_VPU,                   // VPU (Video Processing Unit)
