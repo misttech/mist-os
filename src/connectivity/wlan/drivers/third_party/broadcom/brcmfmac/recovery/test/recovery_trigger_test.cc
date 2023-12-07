@@ -54,7 +54,7 @@ class RecoveryTriggerTest : public testing::Test {
   // The WorkItem here should live as long as the default workqueue thread, so that after the test
   // case function returns, the workqueue thread can still use the |signaler| inside this WorkItem
   // to indicate that it has finished the task in this WorkItem.
-  static WorkItem dummy_worker_;
+  WorkItem dummy_worker_;
 
   static uint16_t recovery_trigger_count_;
   // Mark that the dummy worker is executed.
@@ -66,8 +66,6 @@ class RecoveryTriggerTest : public testing::Test {
   std::unique_ptr<brcmf_pub> fake_drvr_;
 };
 
-WorkItem RecoveryTriggerTest::dummy_worker_ =
-    WorkItem(RecoveryTriggerTest::TestRecoveryDummyWorker);
 uint16_t RecoveryTriggerTest::recovery_trigger_count_ = 0;
 bool RecoveryTriggerTest::recovery_not_triggered_ = false;
 sync_completion_t RecoveryTriggerTest::wait_for_worker_;
@@ -107,6 +105,7 @@ void RecoveryTriggerTest::SetUp() {
 
   // Create WorkItem for the entry point worker of the recovery process.
   fake_drvr_->recovery_work = WorkItem(RecoveryTriggerTest::TestRecoveryWorker);
+  dummy_worker_ = WorkItem(RecoveryTriggerTest::TestRecoveryDummyWorker);
 
   // Initialize RecoveryTrigger class, note that this test includes the WorkQueue workflow to ensure
   // the cooperation between RecoveryTrigger and WorkQueue is going weLl.
@@ -116,6 +115,7 @@ void RecoveryTriggerTest::SetUp() {
 }
 
 void RecoveryTriggerTest::TearDown() {
+  WorkQueue::FlushDefault();
   // Resetting the recovery trigger flag.
   RecoveryTriggerTest::recovery_trigger_count_ = 0;
   RecoveryTriggerTest::recovery_not_triggered_ = false;
