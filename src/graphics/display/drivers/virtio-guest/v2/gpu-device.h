@@ -43,8 +43,20 @@ class GpuDevice : public virtio::Device {
 
   static uint64_t GetRequestSize(zx::vmo& vmo);
 
-  template <typename RequestType, typename ResponseType>
-  void send_command_response(const RequestType* request, ResponseType** response);
+  // Synchronous request/response exchange on the main virtqueue.
+  //
+  // The returned reference points to data owned by the GpuDevice instance, and
+  // is only valid until the method is called again.
+  //
+  // Call sites are expected to rely on partial template type inference. The
+  // argument type should not be specified twice.
+  //
+  //     const virtio_abi::EmptyRequest request = {...};
+  //     const auto& response =
+  //         device->ExchangeRequestResponse<virtio_abi::EmptyResponse>(
+  //             request);
+  template <typename ResponseType, typename RequestType>
+  const ResponseType& ExchangeRequestResponse(const RequestType& request);
 
  private:
   sem_t request_sem_ = {};
@@ -57,13 +69,12 @@ class GpuDevice : public virtio::Device {
   std::optional<uint32_t> capset_count_;
 };
 
-template <typename RequestType, typename ResponseType>
-void GpuDevice::send_command_response(const RequestType* request, ResponseType** response) {
+template <typename ResponseType, typename RequestType>
+const ResponseType& GpuDevice::ExchangeRequestResponse(const RequestType& request) {
   static constexpr size_t request_size = sizeof(RequestType);
   static constexpr size_t response_size = sizeof(ResponseType);
-  FDF_LOG(INFO,
-          "Sending request (%zu bytes at 0x%p) expecting response (%zu-byte buffer pointer at %p)",
-          request_size, request, response_size, response);
+  FDF_LOG(TRACE, "Sending %zu-byte request, expecting %zu-byte response", request_size,
+          response_size);
 
   // Keep this single message at a time
   sem_wait(&request_sem_);
@@ -75,7 +86,7 @@ void GpuDevice::send_command_response(const RequestType* request, ResponseType**
   ZX_ASSERT(request_ring_descriptor);
 
   uint8_t* const request_buffer = reinterpret_cast<uint8_t*>(request_virt_addr_);
-  std::memcpy(request_buffer, request, request_size);
+  std::memcpy(request_buffer, &request, request_size);
 
   const zx_paddr_t request_physical_address = request_phys_addr_;
   request_ring_descriptor->addr = request_physical_address;
@@ -88,7 +99,6 @@ void GpuDevice::send_command_response(const RequestType* request, ResponseType**
   ZX_ASSERT(response_ring_descriptor);
 
   uint8_t* const response_buffer = request_buffer + request_size;
-  *response = reinterpret_cast<ResponseType*>(response_buffer);
   std::memset(response_buffer, 0, response_size);
 
   const zx_paddr_t response_physical_address = request_physical_address + request_size;
@@ -101,6 +111,8 @@ void GpuDevice::send_command_response(const RequestType* request, ResponseType**
   vring_.SubmitChain(request_ring_descriptor_index);
   vring_.Kick();
   sem_wait(&response_sem_);
+
+  return *reinterpret_cast<ResponseType*>(response_buffer);
 }
 
 }  // namespace virtio_display

@@ -22,6 +22,7 @@
 #include <utility>
 
 #include "src/graphics/display/drivers/virtio-guest/v2/gpu-device.h"
+#include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -52,19 +53,17 @@ zx_status_t GpuDeviceDriver::get_display_info() {
   const virtio_abi::GetDisplayInfoCommand command = {
       .header = {.type = virtio_abi::ControlType::kGetDisplayInfoCommand},
   };
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::DisplayInfoResponse>(command);
 
-  virtio_abi::DisplayInfoResponse* response;
-  device_->send_command_response(&command, &response);
-
-  if (response->header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
+  if (response.header.type != virtio_abi::ControlType::kDisplayInfoResponse) {
     FDF_LOG(ERROR, "Expected DisplayInfo response, got %s (0x%04x)",
-            ControlTypeToString(response->header.type),
-            static_cast<unsigned int>(response->header.type));
+            ControlTypeToString(response.header.type),
+            static_cast<unsigned int>(response.header.type));
     return ZX_ERR_NOT_FOUND;
   }
 
   for (int i = 0; i < virtio_abi::kMaxScanouts; i++) {
-    const virtio_abi::ScanoutInfo& scanout = response->scanouts[i];
+    const virtio_abi::ScanoutInfo& scanout = response.scanouts[i];
     if (!scanout.enabled) {
       continue;
     }
@@ -79,7 +78,7 @@ zx_status_t GpuDeviceDriver::get_display_info() {
     }
 
     // Save the first valid pmode we see
-    pmode_ = response->scanouts[i];
+    pmode_ = response.scanouts[i];
     pmode_id_ = i;
   }
   return ZX_OK;
@@ -122,10 +121,8 @@ zx_status_t GpuDeviceDriver::allocate_2d_resource(uint32_t* resource_id, uint32_
   };
   *resource_id = command.resource_id;
 
-  virtio_abi::EmptyResponse* response;
-  device_->send_command_response(&command, &response);
-
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDeviceDriver::attach_backing(uint32_t resource_id, zx_paddr_t ptr, size_t buf_len) {
@@ -144,10 +141,8 @@ zx_status_t GpuDeviceDriver::attach_backing(uint32_t resource_id, zx_paddr_t ptr
           },
   };
 
-  virtio_abi::EmptyResponse* response;
-  device_->send_command_response(&command, &response);
-
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDeviceDriver::set_scanout(uint32_t scanout_id, uint32_t resource_id, uint32_t width,
@@ -169,9 +164,8 @@ zx_status_t GpuDeviceDriver::set_scanout(uint32_t scanout_id, uint32_t resource_
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  device_->send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDeviceDriver::flush_resource(uint32_t resource_id, uint32_t width, uint32_t height) {
@@ -184,9 +178,8 @@ zx_status_t GpuDeviceDriver::flush_resource(uint32_t resource_id, uint32_t width
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  device_->send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDeviceDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t width,
@@ -207,9 +200,8 @@ zx_status_t GpuDeviceDriver::transfer_to_host_2d(uint32_t resource_id, uint32_t 
       .resource_id = resource_id,
   };
 
-  virtio_abi::EmptyResponse* response;
-  device_->send_command_response(&command, &response);
-  return ResponseTypeToZxStatus(response->header.type);
+  const auto& response = device_->ExchangeRequestResponse<virtio_abi::EmptyResponse>(command);
+  return ResponseTypeToZxStatus(response.header.type);
 }
 
 zx_status_t GpuDeviceDriver::Stage2Init() {
