@@ -107,7 +107,7 @@ pub async fn build_component_sandbox(
                     continue;
                 };
                 let Some(receiver) = cap_dict.get_receiver().map(|r| r.clone()) else { continue };
-                new_terminating_router(receiver)
+                new_terminating_router(receiver.new_sender())
             }
             cm_rust::UseSource::Framework => {
                 let receiver = Receiver::new();
@@ -120,7 +120,7 @@ pub async fn build_component_sandbox(
                     }),
                     receiver_clone,
                 ));
-                new_terminating_router(receiver)
+                new_terminating_router(receiver.new_sender())
             }
             cm_rust::UseSource::Capability(_) => {
                 let receiver = Receiver::new();
@@ -133,7 +133,7 @@ pub async fn build_component_sandbox(
                     }),
                     receiver_clone,
                 ));
-                new_terminating_router(receiver)
+                new_terminating_router(receiver.new_sender())
             }
             _ => continue, // unsupported
         };
@@ -285,7 +285,7 @@ fn insert_receiver_into_target_dict(
     target_name: &Name,
     availability: cm_rust::Availability,
 ) {
-    let terminating_router = new_terminating_router(receiver);
+    let terminating_router = new_terminating_router(receiver.new_sender());
     let forwarding_router = terminating_router.availability(availability);
     target_dict.get_or_insert_protocol_mut(target_name).insert_router(forwarding_router);
 }

@@ -411,7 +411,7 @@ impl BuiltinDictBuilder {
             return;
         }
         let receiver = Receiver::new();
-        let router = new_terminating_router(receiver.clone());
+        let router = new_terminating_router(receiver.new_sender());
         self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
 
         let capability_source = CapabilitySource::Builtin {
@@ -1204,7 +1204,7 @@ impl BuiltinEnvironment {
         P: ProtocolMarker,
     {
         let receiver = Receiver::new();
-        let router = new_terminating_router(receiver.clone());
+        let router = new_terminating_router(receiver.new_sender());
         self.dict.get_or_insert_protocol_mut(&name).insert_router(router);
 
         let capability_source = CapabilitySource::Builtin {

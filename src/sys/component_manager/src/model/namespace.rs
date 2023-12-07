@@ -10,23 +10,25 @@ use {
             error::CreateNamespaceError,
             routing::{self, route_and_open_capability, OpenOptions},
         },
-        sandbox_util::{DictExt, Message},
+        sandbox_util::DictExt,
     },
     ::namespace::Entry as NamespaceEntry,
     ::routing::{
-        capability_source::ComponentCapability, component_instance::ComponentInstanceInterface,
-        mapper::NoopRouteMapper, rights::Rights, route_to_storage_decl,
-        verify_instance_in_component_id_index, Completer, Request, RouteRequest,
+        capability_source::ComponentCapability,
+        component_instance::{AnyWeakComponentInstance, ComponentInstanceInterface},
+        mapper::NoopRouteMapper,
+        rights::Rights,
+        route_to_storage_decl, verify_instance_in_component_id_index, Request, RouteRequest,
     },
     cm_rust::{self, ComponentDecl, UseDecl, UseStorageDecl},
     fidl::{endpoints::ClientEnd, prelude::*},
     fidl_fuchsia_io as fio,
-    fuchsia_zircon::{self as zx, HandleBased},
+    fuchsia_zircon::{self as zx},
     futures::{
         channel::mpsc::{unbounded, UnboundedSender},
         StreamExt,
     },
-    sandbox::{AnyCapability, Directory, Open, Sender},
+    sandbox::{AnyCapability, Directory, Open},
     serve_processargs::NamespaceBuilder,
     std::{collections::HashSet, sync::Arc},
     tracing::{error, warn},
@@ -273,7 +275,7 @@ async fn route_directory(
 /// `component` is a weak pointer, which is important because we don't want the VFS
 /// closure to hold a strong pointer to this component lest it create a reference cycle.
 fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> Box<Open> {
-    let route_open_fn = move |_scope: ExecutionScope,
+    let route_open_fn = move |scope: ExecutionScope,
                               flags: fio::OpenFlags,
                               relative_path: Path,
                               mut server_end: zx::Channel| {
@@ -298,23 +300,29 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                     // parent but the parent did not offer this capability.
                     let target_path = use_protocol_decl.target_path.split();
                     if let Some(router) = state.program_input_dict.get_router(target_path) {
-                        let (cap_receiver, completer) = Completer::new();
-                        router.route(
+                        let result = ::routing::route(
+                            &router,
                             Request {
-                                rights: Some(flags),
-                                relative_path: sandbox::Path::new(relative_path.as_str()),
+                                rights: None,
+                                relative_path: sandbox::Path::default(),
                                 target_moniker: weak_component.moniker.clone(),
                                 availability: use_protocol_decl.availability.clone(),
+                                target: Some(AnyWeakComponentInstance::new(weak_component.clone())),
                             },
-                            completer,
-                        );
-                        if let Ok(sender) = cap_receiver.await {
-                            let handle = server_end.into_handle();
-                            let sender: Sender<Message> = sender
-                                .try_into()
-                                .expect("router returned unexpected capability type");
-                            sender.send(Message { handle, flags, target: weak_component.clone() });
-                            return;
+                        )
+                        .await;
+                        match result {
+                            Ok(capability) => {
+                                let open: Open = capability
+                                    .try_into()
+                                    .expect("router returned unexpected capability type");
+                                open.open(scope, flags, relative_path, server_end);
+                                return;
+                            }
+                            Err(_) => {
+                                // Fallthrough to legacy routing below, which will attempt
+                                // routing again and report an error.
+                            }
                         }
                     }
                 }

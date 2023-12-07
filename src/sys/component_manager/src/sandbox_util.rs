@@ -6,7 +6,7 @@ use {
     crate::model::component::{ComponentInstance, WeakComponentInstance},
     ::routing::{
         capability_source::CapabilitySource, policy::GlobalPolicyChecker, Completer, Request,
-        Router,
+        Routable, Router,
     },
     async_trait::async_trait,
     cm_types::Name,
@@ -24,7 +24,7 @@ use {
     },
     lazy_static::lazy_static,
     moniker::Moniker,
-    sandbox::{AnyCapability, Capability, Dict, Receiver},
+    sandbox::{AnyCapability, Capability, Dict, Open, Receiver, Sender},
     std::sync::Arc,
     tracing::warn,
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
@@ -292,13 +292,47 @@ impl CapabilityDictMut {
     }
 }
 
-pub fn new_terminating_router(capability_provider: Receiver<Message>) -> Router {
-    Router::new(move |_request: Request, completer: Completer| {
-        let sender = capability_provider.new_sender();
-        // TODO: request has rights and a relative path, we could make a sender that constructs a
-        // message with these?
-        // TODO: target_moniker in Request is unused, because Message has a reference to the target
-        completer.complete(Ok(Box::new(sender)));
+// This is an adaptor from a `Sender<Message>` to `Router`.
+//
+// When the router receives a message, it will return an `Open` capability that will
+// send a message with a pipelined server endpoint via the `Sender`, along with
+// attribution information in the router `request`.
+//
+// TODO(b/310741884): This is a temporary adaptor to transition us from a one-step
+// capability request to two-steps (route and open). At the end of the transition,
+// `Sender<Message>` and `Receiver<Message>` would disappear. We'll only be left
+// with `Open`, which may represent a protocol capability.
+pub fn new_terminating_router(sender: Sender<Message>) -> Router {
+    Router::new(move |request: Request, completer: Completer| {
+        let sender = sender.clone();
+        let target = request.target.as_ref().unwrap().unwrap();
+        let open_fn = move |_scope: ExecutionScope,
+                            flags: fio::OpenFlags,
+                            path: Path,
+                            server_end: zx::Channel| {
+            // TODO(b/310741884): Right now we are haphazardly validating the
+            // path, but this operation should be handled automatically inside
+            // an `Open` which represents a protocol capability. To do that, a
+            // capability provider need to provide capabilities by vending
+            // `Open` objects.
+            //
+            // Furthermore, once we route other capability types via bedrock,
+            // sometimes those types do want to carry non-empty paths. The
+            // `Open` signature will provide a uniform interface for both.
+            if !path.is_empty() {
+                let moniker = &target.moniker;
+                warn!(
+                    "{moniker} accessed a protocol capability with non-empty path {path:?}. \
+                This is not supported."
+                );
+                let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
+                return;
+            }
+            sender.send(Message { handle: server_end.into_handle(), flags, target: target.clone() })
+        };
+        let open = Open::new(open_fn, fio::DirentType::Service);
+        let open = Box::new(open) as AnyCapability;
+        open.route(request, completer);
     })
 }
 
@@ -372,10 +406,8 @@ impl LaunchTaskOnReceive {
             // The open must be wrapped in a [vfs] to correctly implement the full
             // contract of `fuchsia.io`, including OPEN_FLAGS_DESCRIBE, etc.
             //
-            // TODO(fxbug.dev/296309292): This technically does not implement the full
-            // contract because it does not handle the path. Service vfs is supposed
-            // to reject the request if the path is nonempty. However, the path is
-            // currently not delivered in the message.
+            // The path is checked in the [`Open`] returned within [`new_terminating_router`],
+            // and the request is dropped in case of non-empty paths.
             let flags = message.flags;
             let target = message.target;
             let server_end = zx::Channel::from(message.handle).into();
@@ -478,11 +510,12 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_and_insert_router() {
+        use routing::component_instance::AnyWeakComponentInstance;
         let receiver = Receiver::new();
         let test_dict = Dict::new();
         test_dict.insert_router(
             vec!["svc".to_string(), "fuchsia.example.Router".to_string()],
-            new_terminating_router(receiver.clone()),
+            new_terminating_router(receiver.new_sender()),
         );
 
         assert_eq!(
@@ -509,6 +542,7 @@ pub mod tests {
                 relative_path: sandbox::Path::new(""),
                 target_moniker: vec![].try_into().unwrap(),
                 availability: cm_rust::Availability::Required,
+                target: Some(AnyWeakComponentInstance::new(WeakComponentInstance::invalid())),
             },
             completer,
         );

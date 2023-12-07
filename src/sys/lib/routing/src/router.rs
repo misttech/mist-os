@@ -20,6 +20,8 @@ use sandbox::{AnyCapability, Capability, Dict, Open, Path};
 use std::{fmt, sync::Arc};
 use vfs::execution_scope::ExecutionScope;
 
+use crate::component_instance::AnyWeakComponentInstance;
+
 /// Types that implement [`Routable`] let the holder asynchronously request
 /// capabilities from them.
 pub trait Routable {
@@ -55,10 +57,18 @@ pub struct Request {
     pub relative_path: Path,
 
     /// The moniker of the requesting component.
+    ///
+    /// TODO(fxbug.dev/311472077): This should be replaced by `target`.
     pub target_moniker: Moniker,
 
     /// The minimal availability strength of the capability demanded by the requestor.
     pub availability: Availability,
+
+    /// A reference to the requesting component.
+    ///
+    /// TODO(fxbug.dev/311472077): This should be always required. It's only absent in
+    /// tests and playground.
+    pub target: Option<AnyWeakComponentInstance>,
 }
 
 impl fmt::Debug for Router {
@@ -336,6 +346,7 @@ mod tests {
                 relative_path: Path::default(),
                 target_moniker: Moniker::default(),
                 availability: Availability::Optional,
+                target: None,
             },
         )
         .await
@@ -356,6 +367,7 @@ mod tests {
                 relative_path: Path::default(),
                 target_moniker: Moniker::default(),
                 availability: Availability::Required,
+                target: None,
             },
         )
         .await

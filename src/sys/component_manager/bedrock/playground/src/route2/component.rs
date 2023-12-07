@@ -426,6 +426,7 @@ mod test {
                 "child_b".try_into().unwrap(),
             ]),
             availability: use_availability,
+            target: None,
         };
         let cap = routing::route(&router, request).await.context("route")?;
         eprintln!("Obtained capability {:?}", cap);
@@ -614,6 +615,7 @@ mod test {
                             relative_path: sandbox::Path::new("fuchsia.echo.Echo"),
                             target_moniker: Moniker::try_from(vec!["child_b"]).unwrap(),
                             availability: Availability::Required,
+                            target: None,
                         },
                         fio::DirentType::Service,
                         errors,

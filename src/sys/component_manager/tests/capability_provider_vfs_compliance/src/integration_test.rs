@@ -48,6 +48,7 @@ async fn component_manager_namespace() {
             "Opening capability: {} with DESCRIBE|NODE_REFERENCE did not produce open stream.",
             node_path
         );
+        validate_open_with_extra_path_should_fail(node_path).await;
     });
 
     let () = futures::future::join_all(opens).await.into_iter().collect();
@@ -82,4 +83,13 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
     }
 
     Ok(())
+}
+
+async fn validate_open_with_extra_path_should_fail(path: &str) {
+    let node =
+        fuchsia_fs::node::open_in_namespace(&format!("{}/extra", path), fio::OpenFlags::empty())
+            .unwrap();
+    let mut events = node.take_event_stream();
+    let event = events.next().await.unwrap();
+    event.expect_err("Opening a protocol with a non-empty relative path should fail.");
 }
