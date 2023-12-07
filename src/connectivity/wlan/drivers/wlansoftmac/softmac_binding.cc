@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "device.h"
+#include "softmac_binding.h"
 
 #include <fidl/fuchsia.wlan.softmac/cpp/fidl.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
@@ -40,7 +40,7 @@
 #include "convert.h"
 #include "device_interface.h"
 
-namespace wlan::drivers {
+namespace wlan::drivers::wlansoftmac {
 
 wlansoftmac_in_buf_t IntoRustInBuf(std::unique_ptr<Buffer> owned_buffer) {
   auto* buffer = owned_buffer.release();
@@ -61,35 +61,6 @@ wlansoftmac_buffer_provider_ops_t rust_buffer_provider{
       return IntoRustInBuf(std::move(buffer));
     },
 };
-
-namespace {
-
-constexpr inline DeviceInterface* DEVICE(void* c) { return static_cast<DeviceInterface*>(c); }
-constexpr inline Device* DEV(void* ctx) { return static_cast<Device*>(ctx); }
-
-zx_protocol_device_t eth_device_ops = {
-    .version = DEVICE_OPS_VERSION,
-    .unbind = [](void* ctx) { DEV(ctx)->EthUnbind(); },
-    .release = [](void* ctx) { DEV(ctx)->EthReleaseAndDeleteThis(); },
-};
-
-ethernet_impl_protocol_ops_t ethernet_impl_ops = {
-    .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
-      return DEV(ctx)->EthernetImplQuery(options, info);
-    },
-    .stop = [](void* ctx) { DEV(ctx)->EthernetImplStop(); },
-    .start = [](void* ctx, const ethernet_ifc_protocol_t* ifc) -> zx_status_t {
-      return DEV(ctx)->EthernetImplStart(ifc);
-    },
-    .queue_tx =
-        [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
-           ethernet_impl_queue_tx_callback completion_cb,
-           void* cookie) { DEV(ctx)->EthernetImplQueueTx(options, netbuf, completion_cb, cookie); },
-    .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data, size_t data_size)
-        -> zx_status_t { return Device::EthernetImplSetParam(param, value, data, data_size); },
-};
-
-}  // namespace
 
 WlanSoftmacHandle::WlanSoftmacHandle(DeviceInterface* device)
     : device_(device),
@@ -267,37 +238,37 @@ zx_status_t WlanSoftmacHandle::Init(
       .start = [](void* device, const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
                   zx_handle_t* out_sme_channel) -> zx_status_t {
         zx::channel channel;
-        zx_status_t result = DEVICE(device)->Start(ifc, &channel);
+        zx_status_t result = AsDeviceInterface(device)->Start(ifc, &channel);
         *out_sme_channel = channel.release();
         return result;
       },
       .deliver_eth_frame = [](void* device, const uint8_t* data, size_t len) -> zx_status_t {
-        return DEVICE(device)->DeliverEthernet({data, len});
+        return AsDeviceInterface(device)->DeliverEthernet({data, len});
       },
       .queue_tx = [](void* device, uint32_t options, wlansoftmac_out_buf_t buf,
                      wlan_tx_info_t tx_info) -> zx_status_t {
-        return DEVICE(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
+        return AsDeviceInterface(device)->QueueTx(UsedBuffer::FromOutBuf(buf), tx_info);
       },
       .set_ethernet_status = [](void* device, uint32_t status) -> zx_status_t {
-        return DEVICE(device)->SetEthernetStatus(status);
+        return AsDeviceInterface(device)->SetEthernetStatus(status);
       },
       .set_key = [](void* device, wlan_key_configuration_t* key) -> zx_status_t {
-        return DEVICE(device)->InstallKey(key);
+        return AsDeviceInterface(device)->InstallKey(key);
       },
       .get_discovery_support = [](void* device) -> discovery_support_t {
-        return DEVICE(device)->GetDiscoverySupport();
+        return AsDeviceInterface(device)->GetDiscoverySupport();
       },
       .get_mac_sublayer_support = [](void* device) -> mac_sublayer_support_t {
-        return DEVICE(device)->GetMacSublayerSupport();
+        return AsDeviceInterface(device)->GetMacSublayerSupport();
       },
       .get_security_support = [](void* device) -> security_support_t {
-        return DEVICE(device)->GetSecuritySupport();
+        return AsDeviceInterface(device)->GetSecuritySupport();
       },
       .get_spectrum_management_support = [](void* device) -> spectrum_management_support_t {
-        return DEVICE(device)->GetSpectrumManagementSupport();
+        return AsDeviceInterface(device)->GetSpectrumManagementSupport();
       },
       .join_bss = [](void* device, join_bss_request_t* cfg) -> zx_status_t {
-        return DEVICE(device)->JoinBss(cfg);
+        return AsDeviceInterface(device)->JoinBss(cfg);
       },
   };
 
@@ -330,14 +301,14 @@ void WlanSoftmacHandle::QueueEthFrameTx(eth::BorrowedOperation<> op) {
   op.Complete(sta_queue_eth_frame_tx(inner_handle_, span));
 }
 
-Device::Device(zx_device_t* device) : parent_(device) {
+SoftmacBinding::SoftmacBinding(zx_device_t* device) : device_(device) {
   ldebug(0, nullptr, "Entering.");
   linfo("Creating a new WLAN device.");
   state_ = fbl::AdoptRef(new DeviceState);
   // Create a dispatcher to wait on the runtime channel.
   auto dispatcher = fdf::SynchronizedDispatcher::Create(
       fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "wlansoftmacifc_server",
-      [&](fdf_dispatcher_t*) { device_unbind_reply(ethdev_); });
+      [&](fdf_dispatcher_t*) { device_unbind_reply(child_device_); });
 
   if (dispatcher.is_error()) {
     ZX_ASSERT_MSG(false, "Creating server dispatcher error: %s",
@@ -359,154 +330,155 @@ Device::Device(zx_device_t* device) : parent_(device) {
   client_dispatcher_ = *std::move(dispatcher);
 }
 
-Device::~Device() { ldebug(0, nullptr, "Entering."); }
-
 // Disable thread safety analysis, as this is a part of device initialization.
 // All thread-unsafe work should occur before multiple threads are possible
 // (e.g., before MainLoop is started and before DdkAdd() is called), or locks
 // should be held.
-zx_status_t Device::Bind() __TA_NO_THREAD_SAFETY_ANALYSIS {
+zx::result<std::unique_ptr<SoftmacBinding>> SoftmacBinding::New(zx_device_t* device)
+    __TA_NO_THREAD_SAFETY_ANALYSIS {
   ldebug(0, nullptr, "Entering.");
   linfo("Binding our new WLAN softmac device.");
+  auto softmac_binding = std::unique_ptr<SoftmacBinding>(new SoftmacBinding(device));
 
   auto endpoints = fdf::CreateEndpoints<fuchsia_wlan_softmac::Service::WlanSoftmac::ProtocolType>();
   if (endpoints.is_error()) {
     lerror("Failed to create FDF endpoints: %s", zx_status_get_string(endpoints.status_value()));
-    return endpoints.status_value();
+    return fit::error(endpoints.status_value());
   }
 
   auto status = device_connect_runtime_protocol(
-      parent_, fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
+      softmac_binding->device_, fuchsia_wlan_softmac::Service::WlanSoftmac::ServiceName,
       fuchsia_wlan_softmac::Service::WlanSoftmac::Name, endpoints->server.TakeChannel().release());
   if (status != ZX_OK) {
     lerror("Failed to connect to WlanSoftmac service: %s", zx_status_get_string(status));
-    return status;
+    return fit::error(status);
   }
 
-  client_ = fdf::WireSharedClient(std::move(endpoints->client), client_dispatcher_.get());
+  softmac_binding->client_ = fdf::WireSharedClient(std::move(endpoints->client),
+                                                   softmac_binding->client_dispatcher_.get());
 
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
-  auto query_result = client_.sync().buffer(*std::move(arena))->Query();
+  auto query_result = softmac_binding->client_.sync().buffer(*std::move(arena))->Query();
   if (!query_result.ok()) {
     lerror("Failed getting query result (FIDL error %s)", query_result.status_string());
-    return query_result.status();
+    return fit::error(query_result.status());
   }
   if (query_result->is_error()) {
     lerror("Failed getting query result (status %s)",
            zx_status_get_string(query_result->error_value()));
-    return query_result->error_value();
+    return fit::error(query_result->error_value());
   }
   // Take ownership of the data in the wire representation's arena.
   if (!query_result->value()->has_sta_addr()) {
     lerror("Query result missing sta_addr.");
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
   auto discovery_arena = fdf::Arena::Create(0, 0);
   if (discovery_arena.is_error()) {
     lerror("Arena creation failed: %s", discovery_arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
   auto discovery_result =
-      client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
+      softmac_binding->client_.sync().buffer(*std::move(discovery_arena))->QueryDiscoverySupport();
   if (!discovery_result.ok()) {
     lerror("Failed getting discovery result (FIDL error %s)", discovery_result.status_string());
-    return discovery_result.status();
+    return fit::error(discovery_result.status());
   }
 
-  ConvertDiscoverySuppport(discovery_result->value()->resp, &discovery_support_);
+  ConvertDiscoverySuppport(discovery_result->value()->resp, &softmac_binding->discovery_support_);
 
   auto mac_sublayer_arena = fdf::Arena::Create(0, 0);
   if (mac_sublayer_arena.is_error()) {
     lerror("Arena creation failed: %s", mac_sublayer_arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
-  auto mac_sublayer_result =
-      client_.sync().buffer(*std::move(mac_sublayer_arena))->QueryMacSublayerSupport();
+  auto mac_sublayer_result = softmac_binding->client_.sync()
+                                 .buffer(*std::move(mac_sublayer_arena))
+                                 ->QueryMacSublayerSupport();
   if (!mac_sublayer_result.ok()) {
     lerror("Failed getting mac sublayer result (FIDL error %s)",
            mac_sublayer_result.status_string());
-    return mac_sublayer_result.status();
+    return fit::error(mac_sublayer_result.status());
   }
 
-  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp, &mac_sublayer_support_);
+  status = ConvertMacSublayerSupport(mac_sublayer_result->value()->resp,
+                                     &softmac_binding->mac_sublayer_support_);
   if (status != ZX_OK) {
     lerror("MacSublayerSupport conversion failed (%s)", zx_status_get_string(status));
-    return status;
+    return fit::error(status);
   }
 
   auto security_arena = fdf::Arena::Create(0, 0);
   if (security_arena.is_error()) {
     lerror("Arena creation failed: %s", security_arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
-  auto security_result = client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
+  auto security_result =
+      softmac_binding->client_.sync().buffer(*std::move(security_arena))->QuerySecuritySupport();
   if (!security_result.ok()) {
     lerror("Failed getting security result (FIDL error %s)", security_result.status_string());
-    return security_result.status();
+    return fit::error(security_result.status());
   }
 
-  ConvertSecuritySupport(security_result->value()->resp, &security_support_);
+  ConvertSecuritySupport(security_result->value()->resp, &softmac_binding->security_support_);
 
   auto spectrum_management_arena = fdf::Arena::Create(0, 0);
   if (spectrum_management_arena.is_error()) {
     lerror("Arena creation failed: %s", spectrum_management_arena.status_string());
-    return ZX_ERR_INTERNAL;
+    return fit::error(ZX_ERR_INTERNAL);
   }
 
-  auto spectrum_management_result = client_.sync()
+  auto spectrum_management_result = softmac_binding->client_.sync()
                                         .buffer(*std::move(spectrum_management_arena))
                                         ->QuerySpectrumManagementSupport();
 
   if (!spectrum_management_result.ok()) {
     lerror("Failed getting spectrum management result (FIDL error %s)",
            spectrum_management_result.status_string());
-    return spectrum_management_result.status();
+    return fit::error(spectrum_management_result.status());
   }
 
   ConvertSpectrumManagementSupport(spectrum_management_result->value()->resp,
-                                   &spectrum_management_support_);
+                                   &softmac_binding->spectrum_management_support_);
 
   /* End of data type conversion. */
 
-  softmac_handle_ = std::make_unique<WlanSoftmacHandle>(this);
-  status = softmac_handle_->Init(client_.Clone());
+  softmac_binding->softmac_handle_ = std::make_unique<WlanSoftmacHandle>(softmac_binding.get());
+  status = softmac_binding->softmac_handle_->Init(softmac_binding->client_.Clone());
   if (status != ZX_OK) {
     lerror("could not initialize Rust WlanSoftmac: %d", status);
-    return status;
+    return fit::error(status);
   }
 
-  status = AddEthDevice();
+  device_add_args_t args = {
+      .version = DEVICE_ADD_ARGS_VERSION,
+      .name = "wlansoftmac-ethernet",
+      .ctx = softmac_binding.get(),
+      .ops = &softmac_binding->eth_device_ops_,
+      .proto_id = ZX_PROTOCOL_ETHERNET_IMPL,
+      .proto_ops = &softmac_binding->ethernet_impl_ops_,
+  };
+  status = device_add(softmac_binding->device_, &args, &softmac_binding->child_device_);
+
   if (status != ZX_OK) {
     lerror("could not add eth device: %s", zx_status_get_string(status));
-    softmac_handle_->StopMainLoop();
-    return status;
+    softmac_binding->softmac_handle_->StopMainLoop();
+    return fit::error(status);
   }
 
-  debugf("device added");
-  return ZX_OK;
+  return fit::success(std::move(softmac_binding));
 }
 
-zx_status_t Device::AddEthDevice() {
-  device_add_args_t args = {};
-  args.version = DEVICE_ADD_ARGS_VERSION;
-  args.name = "wlansoftmac-ethernet";
-  args.ctx = this;
-  args.ops = &eth_device_ops;
-  args.proto_id = ZX_PROTOCOL_ETHERNET_IMPL;
-  args.proto_ops = &ethernet_impl_ops;
-  return device_add(parent_, &args, &ethdev_);
-}
-
-void Device::ShutdownMainLoop() {
+void SoftmacBinding::ShutdownMainLoop() {
   if (main_loop_dead_) {
     lerror("ShutdownMainLoop called while main loop was not running");
     return;
@@ -517,21 +489,20 @@ void Device::ShutdownMainLoop() {
 
 // ddk ethernet_impl_protocol_ops methods
 
-void Device::EthUnbind() {
+// See lib/ddk/device.h for documentation on when this method is called.
+void SoftmacBinding::Unbind() {
   ldebug(0, nullptr, "Entering.");
   ShutdownMainLoop();
   client_dispatcher_.ShutdownAsync();
 }
 
-void Device::EthReleaseAndDeleteThis() {
+// See lib/ddk/device.h for documentation on when this method is called.
+void SoftmacBinding::Release() {
   ldebug(0, nullptr, "Entering.");
-  // The lifetime of this device is managed by the parent ethernet device, but we don't
-  // have a mechanism to make this explicit. EthUnbind is already called at this point,
-  // so it's safe to clean up our memory usage.
   delete this;
 }
 
-zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
+zx_status_t SoftmacBinding::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   ldebug(0, nullptr, "Entering.");
   if (info == nullptr)
     return ZX_ERR_INVALID_ARGS;
@@ -580,7 +551,7 @@ zx_status_t Device::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
   return ZX_OK;
 }
 
-zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
+zx_status_t SoftmacBinding::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
   ldebug(0, nullptr, "Entering.");
   ZX_DEBUG_ASSERT(ifc != nullptr);
 
@@ -592,7 +563,7 @@ zx_status_t Device::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
   return ZX_OK;
 }
 
-void Device::EthernetImplStop() {
+void SoftmacBinding::EthernetImplStop() {
   ldebug(0, nullptr, "Entering.");
 
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
@@ -602,14 +573,15 @@ void Device::EthernetImplStop() {
   ethernet_proxy_.clear();
 }
 
-void Device::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                 ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
+void SoftmacBinding::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
+                                         ethernet_impl_queue_tx_callback completion_cb,
+                                         void* cookie) {
   eth::BorrowedOperation<> op(netbuf, completion_cb, cookie, sizeof(ethernet_netbuf_t));
   softmac_handle_->QueueEthFrameTx(std::move(op));
 }
 
-zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
-                                         size_t data_size) {
+zx_status_t SoftmacBinding::EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
+                                                 size_t data_size) {
   ldebug(0, nullptr, "Entering.");
   if (param == ETHERNET_SETPARAM_PROMISC) {
     // See fxbug.dev/28881: In short, the bridge mode doesn't require WLAN
@@ -625,8 +597,8 @@ zx_status_t Device::EthernetImplSetParam(uint32_t param, int32_t value, const vo
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
-                          zx::channel* out_sme_channel) {
+zx_status_t SoftmacBinding::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
+                                  zx::channel* out_sme_channel) {
   debugf("Start");
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -670,7 +642,7 @@ zx_status_t Device::Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
   return ZX_OK;
 }
 
-zx_status_t Device::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
+zx_status_t SoftmacBinding::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
   if (eth_frame.size() > ETH_FRAME_MAX_SIZE) {
     lerror("Attempted to deliver an ethernet frame of invalid length: %zu", eth_frame.size());
     return ZX_ERR_INVALID_ARGS;
@@ -683,7 +655,7 @@ zx_status_t Device::DeliverEthernet(cpp20::span<const uint8_t> eth_frame) {
   return ZX_OK;
 }
 
-zx_status_t Device::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
+zx_status_t SoftmacBinding::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
   ZX_DEBUG_ASSERT(used_buffer.size() <= std::numeric_limits<uint16_t>::max());
 
   auto arena = fdf::Arena::Create(0, 0);
@@ -714,7 +686,7 @@ zx_status_t Device::QueueTx(UsedBuffer used_buffer, wlan_tx_info_t tx_info) {
   return ZX_OK;
 }
 
-zx_status_t Device::SetEthernetStatus(uint32_t status) {
+zx_status_t SoftmacBinding::SetEthernetStatus(uint32_t status) {
   std::lock_guard<std::mutex> lock(ethernet_proxy_lock_);
   if (ethernet_proxy_.is_valid()) {
     ethernet_proxy_.Status(status);
@@ -722,7 +694,7 @@ zx_status_t Device::SetEthernetStatus(uint32_t status) {
   return ZX_OK;
 }
 
-zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
+zx_status_t SoftmacBinding::JoinBss(join_bss_request_t* cfg) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -749,7 +721,7 @@ zx_status_t Device::JoinBss(join_bss_request_t* cfg) {
   return ZX_OK;
 }
 
-zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
+zx_status_t SoftmacBinding::InstallKey(wlan_key_configuration_t* key_config) {
   auto arena = fdf::Arena::Create(0, 0);
   if (arena.is_error()) {
     lerror("Arena creation failed: %s", arena.status_string());
@@ -776,7 +748,8 @@ zx_status_t Device::InstallKey(wlan_key_configuration_t* key_config) {
   return ZX_OK;
 }
 
-void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Sync& completer) {
+void SoftmacBinding::Recv(RecvRequestView request, fdf::Arena& arena,
+                          RecvCompleter::Sync& completer) {
   wlan_rx_packet_t rx_packet;
 
   {
@@ -810,8 +783,8 @@ void Device::Recv(RecvRequestView request, fdf::Arena& arena, RecvCompleter::Syn
   completer.buffer(arena).Reply();
 }
 
-void Device::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
-                            ReportTxResultCompleter::Sync& completer) {
+void SoftmacBinding::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena,
+                                    ReportTxResultCompleter::Sync& completer) {
   wlan_tx_result_t tx_result;
   zx_status_t status = ConvertTxStatus(request->tx_result, &tx_result);
   if (status != ZX_OK) {
@@ -822,24 +795,26 @@ void Device::ReportTxResult(ReportTxResultRequestView request, fdf::Arena& arena
 
   completer.buffer(arena).Reply();
 }
-void Device::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
-                                NotifyScanCompleteCompleter::Sync& completer) {
+void SoftmacBinding::NotifyScanComplete(NotifyScanCompleteRequestView request, fdf::Arena& arena,
+                                        NotifyScanCompleteCompleter::Sync& completer) {
   wlan_softmac_ifc_protocol_->ops->notify_scan_complete(wlan_softmac_ifc_protocol_->ctx,
                                                         request->status(), request->scan_id());
   completer.buffer(arena).Reply();
 }
 
-fbl::RefPtr<DeviceState> Device::GetState() { return state_; }
+fbl::RefPtr<DeviceState> SoftmacBinding::GetState() { return state_; }
 
-const discovery_support_t& Device::GetDiscoverySupport() const { return discovery_support_; }
+const discovery_support_t& SoftmacBinding::GetDiscoverySupport() const {
+  return discovery_support_;
+}
 
-const mac_sublayer_support_t& Device::GetMacSublayerSupport() const {
+const mac_sublayer_support_t& SoftmacBinding::GetMacSublayerSupport() const {
   return mac_sublayer_support_;
 }
 
-const security_support_t& Device::GetSecuritySupport() const { return security_support_; }
+const security_support_t& SoftmacBinding::GetSecuritySupport() const { return security_support_; }
 
-const spectrum_management_support_t& Device::GetSpectrumManagementSupport() const {
+const spectrum_management_support_t& SoftmacBinding::GetSpectrumManagementSupport() const {
   return spectrum_management_support_;
 }
-}  // namespace wlan::drivers
+}  // namespace wlan::drivers::wlansoftmac

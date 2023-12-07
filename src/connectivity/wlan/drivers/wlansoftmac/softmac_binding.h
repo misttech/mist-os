@@ -18,6 +18,7 @@
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/operation/ethernet.h>
 #include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <zircon/compiler.h>
 
 #include <memory>
@@ -31,7 +32,7 @@
 #include "device_interface.h"
 #include "src/connectivity/wlan/drivers/wlansoftmac/rust_driver/c-binding/bindings.h"
 
-namespace wlan::drivers {
+namespace wlan::drivers::wlansoftmac {
 
 #define PRE_ALLOC_RECV_BUFFER_SIZE 2000
 
@@ -48,32 +49,22 @@ class WlanSoftmacHandle {
   DeviceInterface* device_;
   wlansoftmac_handle_t* inner_handle_;
 
+  static DeviceInterface* AsDeviceInterface(void* device) {
+    return static_cast<DeviceInterface*>(device);
+  }
+
   async::Loop wlan_softmac_bridge_server_loop_;
 };
 
-class Device : public DeviceInterface,
-               public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
+class SoftmacBinding : public DeviceInterface,
+                       public fdf::WireServer<fuchsia_wlan_softmac::WlanSoftmacIfc> {
  public:
-  explicit Device(zx_device_t* device);
-  ~Device();
+  static zx::result<std::unique_ptr<SoftmacBinding>> New(zx_device_t* device);
+  ~SoftmacBinding() override = default;
 
-  zx_status_t Bind();
-
-  // ddk device methods
-  void EthUnbind();
-  // Releases the corresponding Ethernet device and `delete`s the `Device`
-  // (`this`).
-  void EthReleaseAndDeleteThis();
-
-  // ddk ethernet_impl_protocol_ops methods
-  zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info);
-  zx_status_t EthernetImplStart(const ethernet_ifc_protocol_t* ifc)
-      __TA_EXCLUDES(ethernet_proxy_lock_);
-  void EthernetImplStop() __TA_EXCLUDES(ethernet_proxy_lock_);
-  void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                           ethernet_impl_queue_tx_callback completion_cb, void* cookie);
-  static zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
-                                          size_t data_size);
+  static constexpr inline SoftmacBinding* AsSoftmacBinding(void* ctx) {
+    return static_cast<SoftmacBinding*>(ctx);
+  }
 
   // DeviceInterface methods
   zx_status_t Start(const rust_wlan_softmac_ifc_protocol_copy_t* ifc,
@@ -97,6 +88,58 @@ class Device : public DeviceInterface,
                           NotifyScanCompleteCompleter::Sync& completer) override;
 
  private:
+  // Private constructor to require use of New().
+  explicit SoftmacBinding(zx_device_t* device);
+  zx_device_t* device_ = nullptr;
+
+  /////////////////////////////////////
+  // Member variables and methods to implement a child device
+  // supporting the ZX_PROTOCOL_ETHERNET_IMPL custom protocol.
+  zx_device_t* child_device_ = nullptr;
+  void Unbind();
+  void Release();
+
+  zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info);
+  zx_status_t EthernetImplStart(const ethernet_ifc_protocol_t* ifc)
+      __TA_EXCLUDES(ethernet_proxy_lock_);
+  void EthernetImplStop() __TA_EXCLUDES(ethernet_proxy_lock_);
+  void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
+                           ethernet_impl_queue_tx_callback completion_cb, void* cookie);
+  static zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const void* data,
+                                          size_t data_size);
+
+  const zx_protocol_device_t eth_device_ops_ = {
+      .version = DEVICE_OPS_VERSION,
+      .unbind = [](void* ctx) { AsSoftmacBinding(ctx)->Unbind(); },
+      .release = [](void* ctx) { AsSoftmacBinding(ctx)->Release(); },
+  };
+
+  const ethernet_impl_protocol_ops_t ethernet_impl_ops_ = {
+      .query = [](void* ctx, uint32_t options, ethernet_info_t* info) -> zx_status_t {
+        return AsSoftmacBinding(ctx)->EthernetImplQuery(options, info);
+      },
+      .stop = [](void* ctx) { AsSoftmacBinding(ctx)->EthernetImplStop(); },
+      .start = [](void* ctx, const ethernet_ifc_protocol_t* ifc) -> zx_status_t {
+        return AsSoftmacBinding(ctx)->EthernetImplStart(ifc);
+      },
+      .queue_tx =
+          [](void* ctx, uint32_t options, ethernet_netbuf_t* netbuf,
+             ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
+            AsSoftmacBinding(ctx)->EthernetImplQueueTx(options, netbuf, completion_cb, cookie);
+          },
+      .set_param = [](void* ctx, uint32_t param, int32_t value, const uint8_t* data,
+                      size_t data_size) -> zx_status_t {
+        return SoftmacBinding::EthernetImplSetParam(param, value, data, data_size);
+      },
+  };
+
+  std::mutex ethernet_proxy_lock_;
+  ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
+
+  /////////////////////////////////////
+  // Member variables and methods to support communication via SME,
+  // MLME, and WlanSoftmac protocols.
+
   enum class DevicePacket : uint64_t {
     kShutdown,
     kPacketQueued,
@@ -104,17 +147,10 @@ class Device : public DeviceInterface,
     kHwScanComplete,
   };
 
-  zx_status_t AddEthDevice();
-
   // Informs the message loop to shut down. Calling this function more than once
   // has no effect.
   void ShutdownMainLoop();
 
-  zx_device_t* parent_ = nullptr;
-  zx_device_t* ethdev_ = nullptr;
-
-  std::mutex ethernet_proxy_lock_;
-  ddk::EthernetIfcProtocolClient ethernet_proxy_ __TA_GUARDED(ethernet_proxy_lock_);
   bool main_loop_dead_ = false;
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
@@ -152,6 +188,6 @@ class Device : public DeviceInterface,
   std::mutex rx_lock_;
 };
 
-}  // namespace wlan::drivers
+}  // namespace wlan::drivers::wlansoftmac
 
 #endif  // SRC_CONNECTIVITY_WLAN_DRIVERS_WLANSOFTMAC_DEVICE_H_

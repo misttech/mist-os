@@ -11,33 +11,29 @@
 #include <wlan/drivers/log.h>
 #include <wlan/drivers/log_instance.h>
 
-#include "device.h"
+#include "softmac_binding.h"
 
-namespace wlan::drivers {
+namespace wlan::drivers::wlansoftmac {
 
-zx_status_t wlan_bind(void* ctx, zx_device_t* device) {
-  wlan::drivers::log::Instance::Init(0);
-  linfo("Binding wlansoftmac driver.");
+static constexpr zx_driver_ops_t driver_ops = {
+    .version = DRIVER_OPS_VERSION,
+    .bind = [](void* ctx, zx_device_t* device) -> zx_status_t {
+      wlan::drivers::log::Instance::Init(0);
+      linfo("Binding wlansoftmac driver.");
 
-  auto wlandev = std::make_unique<Device>(device);
-  auto status = wlandev->Bind();
-  if (status != ZX_OK) {
-    lerror("Failed to bind: %d\n", status);
-    return status;
-  }
-  // devhost is now responsible for the memory used by wlandev. It will be
-  // cleaned up in the Device::EthRelease() method.
-  [[maybe_unused]] auto _ = wlandev.release();
-  return ZX_OK;
-}
+      auto result = SoftmacBinding::New(device);
+      if (result.is_error()) {
+        auto status = result.error_value();
+        lerror("Failed to bind: %d\n", status);
+        return status;
+      }
 
-static constexpr zx_driver_ops_t wlan_driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = wlan_bind;
-  return ops;
-}();
+      // The release hook specified by zx_protocol_device will free this memory.
+      [[maybe_unused]] auto _ = result.value().release();
+      return ZX_OK;
+    },
+};
 
-}  // namespace wlan::drivers
+}  // namespace wlan::drivers::wlansoftmac
 
-ZIRCON_DRIVER(wlan, wlan::drivers::wlan_driver_ops, "zircon", "0.1");
+ZIRCON_DRIVER(wlan, wlan::drivers::wlansoftmac::driver_ops, "zircon", "0.1");
