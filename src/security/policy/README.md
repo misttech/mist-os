@@ -14,6 +14,8 @@ This directory is split up into:
 - `component_manager_policy.json5`: For restricting V2 (.cml) capabilities at
   runtime & compile time. This file is combined with `component_manager_policy_base.json5` for
   products defined in fuchsia.git.
+- `subsystems/`: Contains component manager policy for platform subsystems
+   included by products' platform Assembly configuration.
 - `build/`: For build time verification configuration such as policy exception,
   verifying goldens & structured configuration.
 - `pkgfs/`: For the set of pkgfs allowlists.

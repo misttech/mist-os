@@ -10,7 +10,6 @@
                 "/core/testing/**",
             ],
             create_raw_processes: [
-                "/core/starnix_runner/kernels:**",
                 "/core/test_manager/elf_test_create_raw_processes_ambient_exec_runner",
                 "/core/test_manager/elf_test_create_raw_processes_runner",
                 "/core/test_manager/starnix_unit_test_runner",
@@ -259,7 +258,6 @@
                     "/core/zircon-guest-manager/vmm",
                     "/core/debian-guest-manager/vmm",
                     "/core/termina-guest-manager/vmm",
-                    "/core/starnix_runner/kernels:**",
                     "/core/testing/starnix-tests:**",
                     "/core/testing/system-tests:**",
                     "/core/test_manager/system-tests:**",
@@ -620,8 +618,6 @@
                     "/core/network",
                     "/core/network/netstack",
                     "/core/lowpan-ot-driver",
-                    "/core/starnix_runner",
-                    "/core/starnix_runner/kernels:**",
                     "/core/test_manager",
                     "/core/testing/starnix-tests:**",
                 ],
@@ -635,8 +631,6 @@
                     "/core/network",
                     "/core/network/netstack",
                     "/core/network/test-components:**",
-                    "/core/starnix_runner",
-                    "/core/starnix_runner/kernels:**",
 
                     // TODO(https://fxbug.dev/111695): Move away from Root API.
                     "/core/weavestack",
@@ -653,8 +647,6 @@
                     "/core/network/netstack/dhcp-client",
                     "/core/network/netstack",
                     "/core/network/test-components:**",
-                    "/core/starnix_runner",
-                    "/core/starnix_runner/kernels:**",
                 ],
             },
             {

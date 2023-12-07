@@ -3218,6 +3218,7 @@ assembly_resources_directory("resources") {
     "//src/security/policy/component_manager_policy_eng.json5",
     "//src/security/policy/component_manager_policy_user.json5",
     "//src/security/policy/component_manager_policy_userdebug.json5",
+    "//src/security/policy/subsystems/component_manager_policy_starnix.json5",
     "//src/sys/component_manager/configs/bootfs_config.json5",
 
     # ICU resources.

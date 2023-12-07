@@ -5,6 +5,7 @@
 use crate::subsystems::prelude::*;
 use anyhow::Context;
 use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_config::starnix_config::PlatformStarnixConfig;
 use assembly_config_schema::product_config::ComponentPolicyConfig;
 use assembly_config_schema::FileEntry;
 use component_manager_config::{compile, Args};
@@ -13,6 +14,7 @@ use std::path::PathBuf;
 pub(crate) struct ComponentConfig<'a> {
     pub policy: &'a ComponentPolicyConfig,
     pub development_support: &'a DevelopmentSupportConfig,
+    pub starnix: &'a PlatformStarnixConfig,
 }
 
 pub(crate) struct ComponentSubsystem;
@@ -24,12 +26,19 @@ impl DefineSubsystemConfiguration<ComponentConfig<'_>> for ComponentSubsystem {
     ) -> anyhow::Result<()> {
         let gendir = context.get_gendir().context("Getting gendir for component subsystem")?;
 
-        // Collect the platform policies based on build-type.
+        // Add base policies.
         let mut input = vec![
             context.get_resource("component_manager_policy_base.json5"),
             context.get_resource("component_manager_policy_build_type_base.json5"),
             context.get_resource("bootfs_config.json5"),
         ];
+
+        // Apply platform policies specific to subsystems.
+        if config.starnix.enabled {
+            input.push(context.get_resource("component_manager_policy_starnix.json5"));
+        }
+
+        // Collect the platform policies based on build-type.
         match (context.build_type, config.development_support.include_sl4f) {
             // The eng policies are given to Eng and UserDebug builds that also include sl4f.
             (BuildType::Eng, _) | (BuildType::UserDebug, true) => {

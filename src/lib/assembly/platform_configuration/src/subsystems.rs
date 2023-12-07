@@ -226,6 +226,7 @@ fn configure_subsystems(
     let component_config = component::ComponentConfig {
         policy: &config.product.component_policy,
         development_support: &config.platform.development_support,
+        starnix: &config.platform.starnix,
     };
     component::ComponentSubsystem::define_configuration(context, &component_config, builder)
         .context("Configuring the 'component' subsystem")?;
