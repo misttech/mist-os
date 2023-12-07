@@ -62,6 +62,13 @@ fuchsia_unittest_package("nand-broker-test") {
     "//src/devices/nand/drivers/nand",
     "//src/devices/nand/drivers/ram-nand",
   ]
+
+  # There's expected error logs that happen due to the test not waiting for drivers to finish enumerating.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 fuchsia_unittest_package("nandpart-broker-test") {
@@ -75,4 +82,11 @@ fuchsia_unittest_package("nandpart-broker-test") {
     "//src/devices/nand/drivers/ram-nand",
     "//src/devices/nand/drivers/skip-block",
   ]
+
+  # There's expected error logs that happen due to the test not waiting for drivers to finish enumerating.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }

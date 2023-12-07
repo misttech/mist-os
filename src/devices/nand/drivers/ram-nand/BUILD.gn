@@ -123,6 +123,13 @@ fuchsia_unittest_package("ram-nand-test") {
     "//src/devices/nand/drivers/nandpart",
     "//src/devices/nand/drivers/ram-nand",
   ]
+
+  # There's expected error logs that happen due to the test not waiting for drivers to finish enumerating.
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {
