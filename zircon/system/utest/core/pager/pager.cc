@@ -1892,6 +1892,75 @@ TEST(Pager, MappedSupplyPages) {
   EXPECT_EQ(*reinterpret_cast<volatile uint8_t*>(addr), 0u);
 }
 
+// Tests that supply_pages works when the destination has some pinned pages.
+TEST(Pager, PinnedSupplyPages) {
+  zx::unowned_resource root_resource = maybe_standalone::GetRootResource();
+  if (!root_resource->is_valid()) {
+    return;
+  }
+
+  zx::pager pager;
+  ASSERT_OK(zx::pager::create(0, &pager));
+
+  zx::port port;
+  ASSERT_OK(zx::port::create(0, &port));
+
+  zx::vmo vmo;
+  const size_t kNumPages = 3;
+  ASSERT_OK(pager.create_vmo(0, port, 0, kNumPages * zx_system_get_page_size(), &vmo));
+
+  zx::vmo aux_vmo;
+  ASSERT_OK(zx::vmo::create(kNumPages * zx_system_get_page_size(), 0, &aux_vmo));
+  ASSERT_OK(
+      aux_vmo.op_range(ZX_VMO_OP_COMMIT, 0, kNumPages * zx_system_get_page_size(), nullptr, 0));
+
+  // Supply only the middle page, this will be pinned below.
+  ASSERT_OK(zx_pager_supply_pages(pager.get(), vmo.get(), zx_system_get_page_size(),
+                                  zx_system_get_page_size(), aux_vmo.get(), 0));
+
+  // Verify contents of the supplied page.
+  uint8_t buf[zx_system_get_page_size()];
+  ASSERT_OK(vmo.read(&buf[0], zx_system_get_page_size(), sizeof(buf)));
+  uint8_t expected[zx_system_get_page_size()];
+  memset(&expected[0], 0, zx_system_get_page_size());
+  ASSERT_EQ(0, memcmp(buf, expected, zx_system_get_page_size()));
+
+  // Overwrite the supplied page that we can check for later.
+  memset(&buf[0], 0xa, zx_system_get_page_size());
+  memset(&expected[0], 0xa, zx_system_get_page_size());
+  ASSERT_OK(vmo.write(&buf[0], zx_system_get_page_size(), sizeof(buf)));
+
+  // Now pin the middle page.
+  zx::iommu iommu;
+  zx::bti bti;
+  zx::pmt pmt;
+  zx_iommu_desc_dummy_t desc;
+  ASSERT_OK(zx_iommu_create(root_resource->get(), ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc),
+                            iommu.reset_and_get_address()));
+  ASSERT_OK(zx::bti::create(iommu, 0, 0xdeadbeef, &bti));
+  zx_paddr_t addr;
+  ASSERT_OK(bti.pin(ZX_BTI_PERM_READ, vmo, zx_system_get_page_size(), zx_system_get_page_size(),
+                    &addr, 1, &pmt));
+  auto unpin = fit::defer([&]() { pmt.unpin(); });
+
+  // Try to supply the entire VMO now. This should skip the middle page which was pinned.
+  ASSERT_OK(
+      aux_vmo.op_range(ZX_VMO_OP_COMMIT, 0, kNumPages * zx_system_get_page_size(), nullptr, 0));
+  ASSERT_OK(zx_pager_supply_pages(pager.get(), vmo.get(), 0, kNumPages * zx_system_get_page_size(),
+                                  aux_vmo.get(), 0));
+
+  // Verify that the middle page hasn't been overwritten.
+  ASSERT_OK(vmo.read(&buf[0], zx_system_get_page_size(), sizeof(buf)));
+  ASSERT_EQ(0, memcmp(buf, expected, zx_system_get_page_size()));
+
+  // Verify that the remaining pages have been supplied with zeros from the aux_vmo.
+  memset(&expected[0], 0, zx_system_get_page_size());
+  ASSERT_OK(vmo.read(&buf[0], 0, sizeof(buf)));
+  ASSERT_EQ(0, memcmp(buf, expected, zx_system_get_page_size()));
+  ASSERT_OK(vmo.read(&buf[0], 2 * zx_system_get_page_size(), sizeof(buf)));
+  ASSERT_EQ(0, memcmp(buf, expected, zx_system_get_page_size()));
+}
+
 // Tests that resizing a non-resizable pager vmo fails.
 TEST(Pager, ResizeNonresizableVmo) {
   zx::pager pager;
