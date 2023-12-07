@@ -36,15 +36,6 @@ declare_args() {
   starnix_enable_alternate_anon_allocs = false
 }
 
-rust_proto_library("perfetto_consumer_proto") {
-  sources = [
-    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
-    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
-  ]
-  packages = [ "perfetto.protos" ]
-  include_dirs = [ "//third_party/perfetto" ]
-}
-
 group("kernel") {
   deps = [ ":starnix_kernel_package" ]
 }
@@ -53,10 +44,6 @@ group("tests") {
   testonly = true
 
   deps = [ ":starnix-tests" ]
-}
-
-static_library("restricted_trampoline") {
-  sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
 rustc_binary("starnix_kernel_bin") {
@@ -423,15 +410,73 @@ rustc_binary("starnix_kernel_bin") {
   disable_rustdoc = false
 }
 
-# The starnix kernel manifest, used by all containers.
-fuchsia_component_manifest("starnix_kernel_manifest") {
-  manifest = "meta/starnix_kernel.cml"
-  component_name = "starnix_kernel"
+rustc_library("starnix_lifecycle") {
+  name = "starnix_lifecycle"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "lifecycle/lib.rs"
+
+  sources = [
+    "lifecycle/atomic_counter.rs",
+    "lifecycle/delayed_releaser.rs",
+    "lifecycle/drop_notifier.rs",
+    "lifecycle/lib.rs",
+  ]
+
+  deps = [
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:paste",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
 }
 
-# The starnix kernel configuration library, used by the Rust binary to parse configuration.
-fuchsia_structured_config_rust_lib("starnix_kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
+rustc_library("starnix_logging") {
+  name = "starnix_logging"
+  edition = "2021"
+  version = "0.1.0"
+  with_unit_tests = true
+  source_root = "logging/lib.rs"
+
+  sources = [
+    "logging/core_dump_list.rs",
+    "logging/lib.rs",
+    "logging/logging.rs",
+    "logging/trace.rs",
+  ]
+
+  deps = [
+    "//src/lib/diagnostics/inspect/contrib/rust",
+    "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/trace/rust:trace",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-lock",
+    "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:tracing",
+  ]
+
+  test_deps = [ "//src/lib/fuchsia" ]
+
+  if (starnix_disable_logging) {
+    features = [ "disable_logging" ]
+  }
+}
+
+rust_proto_library("perfetto_consumer_proto") {
+  sources = [
+    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
+    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
+  ]
+  packages = [ "perfetto.protos" ]
+  include_dirs = [ "//third_party/perfetto" ]
+}
+
+static_library("restricted_trampoline") {
+  sources = [ "execution/trampoline_${current_cpu}.S" ]
 }
 
 resource("starnix-test-files") {
@@ -442,21 +487,7 @@ resource("starnix-test-files") {
   outputs = [ "data/{{source_file_part}}" ]
 }
 
-fuchsia_unittest_package("starnix-tests") {
-  manifest = "meta/starnix-tests.cml"
-  deps = [
-    ":starnix-test-files",
-    ":starnix_kernel_bin_test",
-    "//src/starnix/examples/hello_starnix:bin",
-  ]
-  test_specs = {
-    log_settings = {
-      # Tests exercise failure cases, so ERROR logs are expected.
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
-}
+# vDSO
 
 config("vdso_config") {
   cflags = [ "-fPIC" ]
@@ -530,6 +561,19 @@ resource("vdso-data") {
   deps = [ ":vdso" ]
 }
 
+# Components
+
+# The starnix kernel manifest, used by all containers.
+fuchsia_component_manifest("starnix_kernel_manifest") {
+  manifest = "meta/starnix_kernel.cml"
+  component_name = "starnix_kernel"
+}
+
+# The starnix kernel configuration library, used by the Rust binary to parse configuration.
+fuchsia_structured_config_rust_lib("starnix_kernel_config") {
+  cm_label = ":starnix_kernel_manifest"
+}
+
 fuchsia_component("starnix_kernel") {
   cm_label = ":starnix_kernel_manifest"
   deps = [ ":starnix_kernel_bin" ]
@@ -540,69 +584,7 @@ fuchsia_structured_config_values("kernel_config") {
   values_source = "//src/starnix/kernel/meta/config.json5"
 }
 
-rustc_library("starnix_lifecycle") {
-  name = "starnix_lifecycle"
-  edition = "2021"
-  version = "0.1.0"
-  with_unit_tests = true
-  source_root = "lifecycle/lib.rs"
-
-  sources = [
-    "lifecycle/atomic_counter.rs",
-    "lifecycle/delayed_releaser.rs",
-    "lifecycle/drop_notifier.rs",
-    "lifecycle/lib.rs",
-  ]
-
-  deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/lib/starnix-uapi",
-    "//third_party/rust_crates:paste",
-  ]
-
-  test_deps = [ "//src/lib/fuchsia" ]
-}
-
-fuchsia_unittest_package("starnix_lifecycle-tests") {
-  deps = [ ":starnix_lifecycle_test" ]
-}
-
-rustc_library("starnix_logging") {
-  name = "starnix_logging"
-  edition = "2021"
-  version = "0.1.0"
-  with_unit_tests = true
-  source_root = "logging/lib.rs"
-
-  sources = [
-    "logging/core_dump_list.rs",
-    "logging/lib.rs",
-    "logging/logging.rs",
-    "logging/trace.rs",
-  ]
-
-  deps = [
-    "//src/lib/diagnostics/inspect/contrib/rust",
-    "//src/lib/diagnostics/inspect/rust",
-    "//src/lib/trace/rust:trace",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/lib/starnix-lock",
-    "//src/starnix/lib/starnix-uapi",
-    "//third_party/rust_crates:tracing",
-  ]
-
-  test_deps = [ "//src/lib/fuchsia" ]
-
-  if (starnix_disable_logging) {
-    features = [ "disable_logging" ]
-  }
-}
-
-fuchsia_unittest_package("starnix_logging-tests") {
-  deps = [ ":starnix_logging_test" ]
-}
+# Packages
 
 fuchsia_package("starnix_kernel_package") {
   package_name = "starnix_kernel"
@@ -612,4 +594,28 @@ fuchsia_package("starnix_kernel_package") {
     ":starnix_kernel_manifest",
     "//src/starnix/containers:default_init",
   ]
+}
+
+fuchsia_unittest_package("starnix-tests") {
+  manifest = "meta/starnix-tests.cml"
+  deps = [
+    ":starnix-test-files",
+    ":starnix_kernel_bin_test",
+    "//src/starnix/examples/hello_starnix:bin",
+  ]
+  test_specs = {
+    log_settings = {
+      # Tests exercise failure cases, so ERROR logs are expected.
+      max_severity = "ERROR"
+    }
+  }
+  test_type = "system"
+}
+
+fuchsia_unittest_package("starnix_lifecycle-tests") {
+  deps = [ ":starnix_lifecycle_test" ]
+}
+
+fuchsia_unittest_package("starnix_logging-tests") {
+  deps = [ ":starnix_logging_test" ]
 }
