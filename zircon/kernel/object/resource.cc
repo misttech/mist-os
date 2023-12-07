@@ -42,6 +42,31 @@ zx_status_t validate_resource(zx_handle_t handle, zx_rsrc_kind_t kind) {
   return ZX_ERR_WRONG_TYPE;
 }
 
+// Check if the resource referenced by |handle| is of kind |kind| AND base |base|,
+// OR ZX_RSRC_KIND_ROOT.
+//
+// Possible errors:
+// ++ ZX_ERR_ACCESS_DENIED: |handle| is not the right |kind| of handle.
+// ++ ZX_ERR_WRONG_TYPE: |handle| is not a valid handle.
+zx_status_t validate_resource_kind_base(zx_handle_t handle, zx_rsrc_kind_t kind,
+                                        zx_rsrc_system_base_t base) {
+  auto up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<ResourceDispatcher> resource;
+  auto status = up->handle_table().GetDispatcher(*up, handle, &resource);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  auto res_kind = resource->get_kind();
+  auto res_base = resource->get_base();
+
+  if ((res_kind == kind && res_base == base) || res_kind == ZX_RSRC_KIND_ROOT) {
+    return ZX_OK;
+  }
+
+  return ZX_ERR_WRONG_TYPE;
+}
+
 zx_status_t validate_ranged_resource(fbl::RefPtr<ResourceDispatcher> resource, zx_rsrc_kind_t kind,
                                      uintptr_t base, size_t size) {
   // Root gets access to almost everything, but there are still resource ranges

@@ -44,11 +44,11 @@ zx_status_t X86::EarlyInit() {
   if (status != ZX_OK) {
     return status;
   }
-  // Please do not use get_root_resource() in new code. See fxbug.dev/31358.
-  zx::unowned_resource root_resource(get_root_resource(parent()));
+
+  zx::unowned_resource iommu_resource(get_iommu_resource(parent()));
   // Now initialize the IOMMU manager. Any failures in setting it up we consider non-fatal and do
   // not propagate.
-  status = iommu_manager_.Init(std::move(root_resource), use_hardware_iommu(parent()));
+  status = iommu_manager_.Init(std::move(iommu_resource), use_hardware_iommu(parent()));
   if (status != ZX_OK) {
     zxlogf(INFO, "acpi: Failed to initialize IOMMU manager: %s", zx_status_get_string(status));
   }

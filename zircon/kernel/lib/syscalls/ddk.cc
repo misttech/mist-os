@@ -242,9 +242,9 @@ zx_status_t sys_framebuffer_set_range(zx_handle_t hrsrc, zx_handle_t vmo_handle,
 // zx_status_t zx_iommu_create
 zx_status_t sys_iommu_create(zx_handle_t resource, uint32_t type, user_in_ptr<const void> desc,
                              size_t desc_size, zx_handle_t* out) {
-  // TODO: finer grained validation
   zx_status_t status;
-  if ((status = validate_resource(resource, ZX_RSRC_KIND_ROOT)) < 0) {
+  if ((status = validate_resource_kind_base(resource, ZX_RSRC_KIND_SYSTEM,
+                                            ZX_RSRC_SYSTEM_IOMMU_BASE)) < 0) {
     return status;
   }
 
