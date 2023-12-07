@@ -131,20 +131,24 @@ macro_rules! log_error {
     };
 }
 
+#[doc(hidden)]
+#[inline]
+pub fn __not_implemented_inner(message: &'static str, context: Option<(&'static str, u64)>) {
+    if let Some((name, value)) = context {
+        log_warn!(tag = "not_implemented", "{} {}: 0x{:x}", message, name, value);
+    } else {
+        log_warn!(tag = "not_implemented", "{}", message);
+    }
+}
+
 #[macro_export]
 macro_rules! not_implemented {
-    ($message:expr, $context:expr) => {{
-        $crate::log_warn!(
-            tag = "not_implemented",
-            "{} {}: {:?}",
-            $message,
-            stringify!($context),
-            $context,
-        );
-    }};
-    ($message:expr) => {{
-        $crate::log_warn!(tag = "not_implemented", "{}", $message);
-    }};
+    ($message:expr, $context:expr) => {
+        $crate::__not_implemented_inner($message, Some((stringify!($context), $context.into())));
+    };
+    ($message:expr) => {
+        $crate::__not_implemented_inner($message, None);
+    };
 }
 
 #[macro_export]

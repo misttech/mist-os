@@ -819,7 +819,7 @@ pub fn sys_wait4(
     } else if raw_selector < -1 {
         ProcessSelector::Pgid(negate_pid(raw_selector)?)
     } else {
-        not_implemented!("wait4", raw_selector);
+        not_implemented!("wait4", raw_selector as u64);
         return error!(ENOSYS);
     };
 

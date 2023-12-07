@@ -1660,9 +1660,32 @@ pub fn sys_syslog(
             not_implemented!("syslog: size_buffer");
             Ok(0)
         }
-        _ => {
-            // Other actions aren't necessary yet.
-            not_implemented!("syslog", action);
+        SyslogAction::Close => {
+            not_implemented!("syslog: close");
+            Ok(0)
+        }
+        SyslogAction::Open => {
+            not_implemented!("syslog: open");
+            Ok(0)
+        }
+        SyslogAction::ReadClear => {
+            not_implemented!("syslog: read clear");
+            Ok(0)
+        }
+        SyslogAction::Clear => {
+            not_implemented!("syslog: clear");
+            Ok(0)
+        }
+        SyslogAction::ConsoleOff => {
+            not_implemented!("syslog: console off");
+            Ok(0)
+        }
+        SyslogAction::ConsoleOn => {
+            not_implemented!("syslog: console on");
+            Ok(0)
+        }
+        SyslogAction::ConsoleLevel => {
+            not_implemented!("syslog: console level");
             Ok(0)
         }
     }

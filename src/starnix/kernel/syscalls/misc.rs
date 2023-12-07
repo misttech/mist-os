@@ -13,7 +13,7 @@ use crate::{
     mm::{MemoryAccessor, MemoryAccessorExt},
     task::CurrentTask,
 };
-use starnix_logging::{log_error, log_info, not_implemented};
+use starnix_logging::{log_error, log_info, log_warn, not_implemented};
 use starnix_syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS};
 use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
@@ -231,7 +231,8 @@ pub fn sys_reboot(
             {
                 fpower::RebootReason::UserRequest
             } else {
-                not_implemented!("Unsupported reboot args", String::from_utf8_lossy(&arg_bytes));
+                log_warn!("Unknown reboot args: {}", String::from_utf8_lossy(&arg_bytes));
+                not_implemented!("unknown reboot args, see logs for strings");
                 return error!(ENOSYS);
             };
             match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
@@ -263,7 +264,8 @@ pub fn sys_unknown(
     _current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    not_implemented!("unknown syscall", SyscallDecl::from_number(syscall_number));
+    let decl = SyscallDecl::from_number(syscall_number);
+    not_implemented!(decl.name, decl.number);
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }
