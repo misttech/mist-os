@@ -4,6 +4,11 @@
 
 pub use fuchsia_trace::Scope as TraceScope;
 
+// This needs to be available to the macros in this module without clients having to depend on
+// fuchsia_trace themselves.
+#[doc(hidden)]
+pub use fuchsia_trace as __fuchsia_trace;
+
 // The trace category used for starnix-related traces.
 fuchsia_trace::string_name_macro!(trace_category_starnix, "starnix");
 
@@ -44,43 +49,31 @@ fuchsia_trace::string_name_macro!(trace_name_check_task_exit, "CheckTaskExit");
 // The argument used to track the name of a syscall.
 fuchsia_trace::string_name_macro!(trace_arg_name, "name");
 
-#[macro_export]
-macro_rules! ignore_unused_variables_if_disable_tracing {
-    ($($val:expr),*) => {
-        $(
-            #[cfg(not(feature = "tracing"))]
-            { let _ = &$val; }
-        )*
-    };
+#[inline]
+pub const fn regular_tracing_enabled() -> bool {
+    cfg!(feature = "tracing")
 }
 
-#[macro_export]
-macro_rules! ignore_unused_variables_if_disable_firehose {
-    ($($val:expr),*) => {
-        $(
-            #[cfg(not(feature = "tracing_firehose"))]
-            { let _ = &$val; }
-        )*
-    };
+#[inline]
+pub const fn firehose_tracing_enabled() -> bool {
+    cfg!(feature = "tracing_firehose")
 }
 
 #[macro_export]
 macro_rules! trace_instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::instant!($category, $name, $scope $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::instant!($category, $name, $scope $(, $key => $val)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! firehose_trace_instant {
     ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing_firehose")]
-        $crate::trace_instant($category, $name, $scope $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+        if $crate::firehose_tracing_enabled() {
+            $crate::trace_instant!($category, $name, $scope $(, $key => $val)*);
+        }
     }
 }
 
@@ -89,97 +82,95 @@ macro_rules! firehose_trace_instant {
 #[macro_export]
 macro_rules! trace_duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing")]
-        let _args = [$(fuchsia_trace::ArgValue::of($key, $val)),*];
-        #[cfg(feature = "tracing")]
-        let _scope = fuchsia_trace::duration(fuchsia_trace::cstr!($category), fuchsia_trace::cstr!($name), &_args);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        let _args = if $crate::regular_tracing_enabled() {
+            Some([$($crate::__fuchsia_trace::ArgValue::of($key, $val)),*])
+        } else {
+            None
+        };
+        let _scope = if $crate::regular_tracing_enabled() {
+            Some($crate::__fuchsia_trace::duration(
+                $crate::__fuchsia_trace::cstr!($category),
+                $crate::__fuchsia_trace::cstr!($name),
+                _args.as_ref().unwrap()
+            ))
+        } else {
+            None
+        };
     }
 }
 
 #[macro_export]
 macro_rules! firehose_trace_duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing_firehose")]
-        $crate::trace_duration!($category, $name $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+        if $crate::firehose_tracing_enabled() {
+            $crate::trace_duration!($category, $name $(, $key => $val)*);
+        }
     }
 }
 
 #[macro_export]
 macro_rules! trace_duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::duration_begin!($category, $name $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::duration_begin!($category, $name $(, $key => $val)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! firehose_trace_duration_begin {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing_firehose")]
-        $crate::trace_duration_begin!($category, $name $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+        if $crate::firehose_tracing_enabled() {
+            $crate::trace_duration_begin!($category, $name $(, $key => $val)*);
+        }
     }
 }
 
 #[macro_export]
 macro_rules! trace_duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::duration_end!($category, $name $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::duration_end!($category, $name $(, $key => $val)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! firehose_trace_duration_end {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        #[cfg(feature = "tracing_firehose")]
-        $crate::trace_duration_end!($category, $name $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_firehose!($($val),*);
+        if $crate::firehose_tracing_enabled() {
+            $crate::trace_duration_end!($category, $name $(, $key => $val)*);
+        }
     }
 }
 
 #[macro_export]
 macro_rules! trace_flow_begin {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        let _flow_id: fuchsia_trace::Id = $flow_id;
-
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::flow_begin!($category, $name, _flow_id $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::flow_begin!($category, $name, _flow_id $(, $key => $val)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! trace_flow_step {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        let _flow_id: fuchsia_trace::Id = $flow_id;
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
 
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::flow_step!($category, $name, _flow_id $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::flow_step!($category, $name, _flow_id $(, $key => $val)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! trace_flow_end {
     ($category:expr, $name:expr, $flow_id:expr $(, $key:expr => $val:expr)*) => {
-        let _flow_id: fuchsia_trace::Id = $flow_id;
-
-        #[cfg(feature = "tracing")]
-        fuchsia_trace::flow_end!($category, $name, _flow_id $(, $key => $val)*);
-
-        $crate::ignore_unused_variables_if_disable_tracing!($($val),*);
+        let _flow_id: $crate::__fuchsia_trace::Id = $flow_id;
+        if $crate::regular_tracing_enabled() {
+            $crate::__fuchsia_trace::flow_end!($category, $name, _flow_id $(, $key => $val)*);
+        }
     };
 }

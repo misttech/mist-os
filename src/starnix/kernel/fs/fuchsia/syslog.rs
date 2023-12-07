@@ -9,7 +9,7 @@ use crate::{
         default_ioctl, fileops_impl_nonseekable, Anon, FileHandle, FileObject, FileOps,
     },
 };
-use starnix_logging::log;
+use starnix_logging::log_info;
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{errors::Errno, open_flags::OpenFlags};
 
@@ -33,7 +33,7 @@ impl FileOps for SyslogFile {
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
         data.read_each(&mut |bytes| {
-            log!(level = info, tag = "stdio", "{}", String::from_utf8_lossy(bytes));
+            log_info!(tag = "stdio", "{}", String::from_utf8_lossy(bytes));
             Ok(bytes.len())
         })
     }

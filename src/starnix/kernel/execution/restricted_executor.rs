@@ -22,8 +22,11 @@ use fuchsia_zircon::{
 use lock_sequence::{Locked, Unlocked};
 use starnix_logging::{
     firehose_trace_duration, firehose_trace_duration_begin, firehose_trace_duration_end,
-    firehose_trace_instant, log_warn, set_zx_name, trace_category_starnix, trace_instant,
-    CoreDumpInfo, TraceScope, MAX_ARGV_LENGTH,
+    firehose_trace_instant, log_warn, set_zx_name, trace_arg_name, trace_category_starnix,
+    trace_instant, trace_name_check_task_exit, trace_name_execute_syscall,
+    trace_name_handle_exception, trace_name_read_restricted_state, trace_name_restricted_kick,
+    trace_name_run_task, trace_name_write_restricted_state, CoreDumpInfo, TraceScope,
+    MAX_ARGV_LENGTH,
 };
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_uapi::{

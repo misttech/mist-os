@@ -17,7 +17,7 @@ use crate::{
 use fuchsia_zircon::{
     cprng_draw_uninit, {self as zx},
 };
-use starnix_logging::{log, log_info};
+use starnix_logging::log_info;
 use starnix_uapi::{
     auth::FsCred, device_type::DeviceType, error, errors::Errno, file_mode::FileMode,
     open_flags::OpenFlags, user_address::UserAddress,
@@ -232,12 +232,7 @@ impl FileOps for DevKmsg {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let bytes = data.read_all()?;
-        log!(
-            level = info,
-            tag = "kmsg",
-            "{}",
-            String::from_utf8_lossy(&bytes).trim_end_matches('\n')
-        );
+        log_info!(tag = "kmsg", "{}", String::from_utf8_lossy(&bytes).trim_end_matches('\n'));
         Ok(bytes.len())
     }
 }

@@ -6,6 +6,11 @@ use fuchsia_zircon as zx;
 use starnix_uapi::{errors::Errno, pid_t};
 use std::{ffi::CString, fmt};
 
+// This needs to be available to the macros in this module without clients having to depend on
+// tracing themselves.
+#[doc(hidden)]
+pub use tracing as __tracing;
+
 /// Used to track the current thread's logical context.
 /// The thread with this set is used to service syscalls for a specific user thread, and this
 /// describes the user thread's identity.
@@ -77,26 +82,23 @@ pub use enabled::*;
 #[cfg(feature = "disable_logging")]
 pub use disabled::*;
 
-#[macro_export]
-macro_rules! log {
-    (level = $level:ident, $($arg:tt)*) => {{
-        if !cfg!(feature = "disable_logging") {
-            tracing::$level!($($arg)*);
-        }
-    }};
+#[inline]
+pub const fn logs_enabled() -> bool {
+    !cfg!(feature = "disable_logging")
 }
 
-pub const fn should_allow_trace_debug_logs() -> bool {
+#[inline]
+pub const fn trace_debug_logs_enabled() -> bool {
     // Allow trace and debug logs if we are in a debug (non-release) build
     // or feature `trace_and_debug_logs_in_release` is enabled.
-    cfg!(debug_assertions) || cfg!(feature = "trace_and_debug_logs_in_release")
+    logs_enabled() && (cfg!(debug_assertions) || cfg!(feature = "trace_and_debug_logs_in_release"))
 }
 
 #[macro_export]
 macro_rules! log_trace {
     ($($arg:tt)*) => {
-        if $crate::should_allow_trace_debug_logs() {
-            $crate::log!(level = trace, $($arg)*)
+        if $crate::trace_debug_logs_enabled() {
+            $crate::__tracing::trace!($($arg)*);
         }
     };
 }
@@ -104,8 +106,8 @@ macro_rules! log_trace {
 #[macro_export]
 macro_rules! log_debug {
     ($($arg:tt)*) => {
-        if $crate::should_allow_trace_debug_logs() {
-            $crate::log!(level = debug, $($arg)*)
+        if $crate::trace_debug_logs_enabled() {
+            $crate::__tracing::debug!($($arg)*);
         }
     };
 }
@@ -113,21 +115,27 @@ macro_rules! log_debug {
 #[macro_export]
 macro_rules! log_info {
     ($($arg:tt)*) => {
-        $crate::log!(level = info, $($arg)*)
+        if $crate::logs_enabled() {
+            $crate::__tracing::info!($($arg)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! log_warn {
     ($($arg:tt)*) => {
-        $crate::log!(level = warn, $($arg)*)
+        if $crate::logs_enabled() {
+            $crate::__tracing::warn!($($arg)*);
+        }
     };
 }
 
 #[macro_export]
 macro_rules! log_error {
     ($($arg:tt)*) => {
-        $crate::log!(level = error, $($arg)*)
+        if $crate::logs_enabled() {
+            $crate::__tracing::error!($($arg)*);
+        }
     };
 }
 
@@ -157,7 +165,7 @@ macro_rules! not_implemented_log_once {
         {
             static DID_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
             if !DID_LOG.swap(true, std::sync::atomic::Ordering::AcqRel) {
-                not_implemented!($($arg)*);
+                $crate::not_implemented!($($arg)*);
             }
         }
     )

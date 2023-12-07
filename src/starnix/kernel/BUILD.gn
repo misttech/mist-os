@@ -177,7 +177,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:slab",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
-    "//third_party/rust_crates:tracing",
     "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
     "//third_party/rust_crates:vk-sys",
@@ -386,15 +385,6 @@ rustc_binary("starnix_kernel_bin") {
   ]
 
   features = []
-  if (starnix_enable_tracing) {
-    features += [ "tracing" ]
-  }
-  if (starnix_enable_tracing_firehose) {
-    features += [ "tracing_firehose" ]
-  }
-  if (starnix_enable_trace_and_debug_logs_in_release) {
-    features += [ "trace_and_debug_logs_in_release" ]
-  }
   if (starnix_syscall_stats) {
     features += [ "syscall_stats" ]
   }
@@ -461,8 +451,18 @@ rustc_library("starnix_logging") {
 
   test_deps = [ "//src/lib/fuchsia" ]
 
+  features = []
   if (starnix_disable_logging) {
-    features = [ "disable_logging" ]
+    features += [ "disable_logging" ]
+  }
+  if (starnix_enable_tracing) {
+    features += [ "tracing" ]
+  }
+  if (starnix_enable_tracing_firehose) {
+    features += [ "tracing_firehose" ]
+  }
+  if (starnix_enable_trace_and_debug_logs_in_release) {
+    features += [ "trace_and_debug_logs_in_release" ]
   }
 }
 
