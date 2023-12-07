@@ -888,7 +888,20 @@ impl<'a> Transaction<'a> {
                     Operation::Merge => {}
                 },
                 ObjectKeyData::ExtendedAttribute { .. } => {
-                    // TODO(fxbug.dev/122975): Check lock requirements.
+                    let id = key.object_id;
+                    if !self.txn_locks.contains(&LockKey::object(*store_object_id, id))
+                        && !self.new_objects.contains(&(*store_object_id, id))
+                    {
+                        debug_assert!(
+                            false,
+                            "Not holding required lock for object {id} \
+                                in store {store_object_id} while mutating extented attribute"
+                        );
+                        error!(
+                            "Not holding required lock for object {id} in store \
+                                {store_object_id} while mutating extended attribute"
+                        )
+                    }
                 }
             }
         }
