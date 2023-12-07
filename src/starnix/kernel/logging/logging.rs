@@ -133,9 +133,18 @@ macro_rules! log_error {
 
 #[macro_export]
 macro_rules! not_implemented {
-    ($($arg:tt)*) => (
-        $crate::log!(level = warn, tag = "not_implemented", $($arg)*)
-    )
+    ($message:expr, $context:expr) => {{
+        $crate::log_warn!(
+            tag = "not_implemented",
+            "{} {}: {:?}",
+            $message,
+            stringify!($context),
+            $context,
+        );
+    }};
+    ($message:expr) => {{
+        $crate::log_warn!(tag = "not_implemented", "{}", $message);
+    }};
 }
 
 #[macro_export]

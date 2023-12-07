@@ -1120,12 +1120,12 @@ impl CurrentTask {
                 log_warn!("CLONE_VM set without CLONE_THREAD. Ignoring CLONE_VM (doing a fork).");
             }
         } else if clone_thread && !clone_vm {
-            not_implemented!("CLONE_THREAD without CLONE_VM is not implemented");
+            not_implemented!("CLONE_THREAD without CLONE_VM");
             return error!(ENOSYS);
         }
 
         if flags & !IMPLEMENTED_FLAGS != 0 {
-            not_implemented!("clone does not implement flags: 0x{:x}", flags & !IMPLEMENTED_FLAGS);
+            not_implemented!("clone", flags & !IMPLEMENTED_FLAGS);
             return error!(ENOSYS);
         }
 

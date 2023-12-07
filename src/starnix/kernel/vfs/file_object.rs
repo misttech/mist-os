@@ -641,14 +641,14 @@ pub fn default_ioctl(
             Ok(fsverity::ioctl::read_metadata(current_task, UserAddress::from(arg).into(), file)?)
         }
         _ => {
-            not_implemented!("ioctl: request=0x{:x}", request);
+            not_implemented!("ioctl", request);
             error!(ENOTTY)
         }
     }
 }
 
 pub fn default_fcntl(cmd: u32) -> Result<SyscallResult, Errno> {
-    not_implemented!("fcntl: command=0x{:x}", cmd);
+    not_implemented!("fcntl", cmd);
     error!(EINVAL)
 }
 

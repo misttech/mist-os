@@ -408,7 +408,7 @@ pub fn ptrace_dispatch(
             Ok(())
         }
         _ => {
-            not_implemented!("ptrace: {} not implemented", request);
+            not_implemented!("ptrace", request);
             error!(ENOSYS)
         }
     }

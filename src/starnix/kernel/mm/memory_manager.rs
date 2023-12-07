@@ -1143,17 +1143,14 @@ impl MemoryManagerState {
                         // Note, we cannot simply implemented MADV_DONTNEED with
                         // zx::VmoOp::DONT_NEED because they have different
                         // semantics.
-                        not_implemented_log_once!(
-                            "madvise advise {} with file-backed mapping not implemented",
-                            advice
-                        );
+                        not_implemented_log_once!("MADV_DONTNEED with file-backed mapping");
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
                     MADV_WILLNEED => zx::VmoOp::COMMIT,
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
-                        not_implemented_log_once!("madvise advice {} not implemented", advice);
+                        not_implemented_log_once!("madvise", advice);
                         return error!(EINVAL);
                     }
                 };

@@ -642,7 +642,7 @@ impl WaitingOptions {
     pub fn new_for_waitid(options: u32) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WNOWAIT | WSTOPPED | WEXITED | WCONTINUED) != 0
         {
-            not_implemented!("unsupported waitid options: {:#x}", options);
+            not_implemented!("waitid", options);
             return error!(EINVAL);
         }
         if options & (WEXITED | WSTOPPED | WCONTINUED) == 0 {
@@ -654,7 +654,7 @@ impl WaitingOptions {
     /// Build a `WaitingOptions` from the waiting flags of wait4.
     pub fn new_for_wait4(options: u32, waiter_pid: pid_t) -> Result<Self, Errno> {
         if options & !(__WCLONE | __WALL | WNOHANG | WUNTRACED | WCONTINUED) != 0 {
-            not_implemented!("unsupported wait4 options: {:#x}", options);
+            not_implemented!("wait4", options);
             return error!(EINVAL);
         }
         let mut result = Self::new(options | WEXITED);
@@ -803,23 +803,23 @@ pub fn sys_waitid(
 pub fn sys_wait4(
     _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
-    pid: pid_t,
+    raw_selector: pid_t,
     user_wstatus: UserRef<i32>,
     options: u32,
     user_rusage: UserRef<rusage>,
 ) -> Result<pid_t, Errno> {
     let waiting_options = WaitingOptions::new_for_wait4(options, current_task.get_pid())?;
 
-    let selector = if pid == 0 {
+    let selector = if raw_selector == 0 {
         ProcessSelector::Pgid(current_task.thread_group.read().process_group.leader)
-    } else if pid == -1 {
+    } else if raw_selector == -1 {
         ProcessSelector::Any
-    } else if pid > 0 {
-        ProcessSelector::Pid(pid)
-    } else if pid < -1 {
-        ProcessSelector::Pgid(negate_pid(pid)?)
+    } else if raw_selector > 0 {
+        ProcessSelector::Pid(raw_selector)
+    } else if raw_selector < -1 {
+        ProcessSelector::Pgid(negate_pid(raw_selector)?)
     } else {
-        not_implemented!("unimplemented wait4 pid selector {}", pid);
+        not_implemented!("wait4", raw_selector);
         return error!(ENOSYS);
     };
 

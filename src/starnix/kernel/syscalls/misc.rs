@@ -231,10 +231,7 @@ pub fn sys_reboot(
             {
                 fpower::RebootReason::UserRequest
             } else {
-                not_implemented!(
-                    "Unsupported reboot args: '{}'",
-                    String::from_utf8_lossy(&arg_bytes)
-                );
+                not_implemented!("Unsupported reboot args", String::from_utf8_lossy(&arg_bytes));
                 return error!(ENOSYS);
             };
             match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
@@ -266,7 +263,7 @@ pub fn sys_unknown(
     _current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    not_implemented!("unknown syscall {:?}", SyscallDecl::from_number(syscall_number));
+    not_implemented!("unknown syscall", SyscallDecl::from_number(syscall_number));
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }

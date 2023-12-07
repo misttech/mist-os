@@ -568,7 +568,7 @@ impl FileOps for Arc<InputFile> {
                 Ok(SUCCESS)
             }
             _ => {
-                not_implemented!("ioctl() {} on input device", request);
+                not_implemented!("ioctl() on input device", request);
                 error!(EOPNOTSUPP)
             }
         }

@@ -87,7 +87,7 @@ pub fn sys_arch_prctl(
             Ok(())
         }
         _ => {
-            not_implemented!("arch_prctl: Unknown code: code=0x{:x} addr={}", code, addr);
+            not_implemented!("arch_prctl", code);
             error!(ENOSYS)
         }
     }

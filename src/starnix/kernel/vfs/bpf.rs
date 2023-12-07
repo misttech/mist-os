@@ -394,7 +394,7 @@ pub fn sys_bpf(
         }
 
         _ => {
-            not_implemented!("bpf command {}", cmd);
+            not_implemented!("bpf", cmd);
             error!(EINVAL)
         }
     }

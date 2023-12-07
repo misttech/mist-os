@@ -341,7 +341,7 @@ fn do_readv(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        not_implemented!("preadv2: flags: 0x{:x}", flags);
+        not_implemented!("preadv2", flags);
     }
     let file = current_task.files.get(fd)?;
     let iovec = current_task.read_iovec(iovec_addr, iovec_count)?;
@@ -400,7 +400,7 @@ fn do_writev(
         return error!(EOPNOTSUPP);
     }
     if flags != 0 {
-        not_implemented!("pwritev2: flags: 0x{:x}", flags);
+        not_implemented!("pwritev2", flags);
     }
     // TODO(fxbug.dev/117677) Allow partial writes.
     let file = current_task.files.get(fd)?;
@@ -712,7 +712,7 @@ pub fn sys_newfstatat(
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_NOFOLLOW | AT_EMPTY_PATH) != 0 {
         // TODO(fxbug.dev/91430): Support the `AT_NO_AUTOMOUNT` flag.
-        not_implemented!("newfstatat: flags 0x{:x}", flags);
+        not_implemented!("newfstatat", flags);
         return error!(ENOSYS);
     }
     let flags = LookupFlags::from_bits(flags, AT_EMPTY_PATH | AT_SYMLINK_NOFOLLOW)?;
@@ -848,7 +848,7 @@ pub fn sys_linkat(
     flags: u32,
 ) -> Result<(), Errno> {
     if flags & !(AT_SYMLINK_FOLLOW | AT_EMPTY_PATH) != 0 {
-        not_implemented!("linkat: flags 0x{:x}", flags);
+        not_implemented!("linkat", flags);
         return error!(EINVAL);
     }
 
@@ -1420,7 +1420,7 @@ pub fn sys_memfd_create(
     };
 
     if flags & !(MFD_CLOEXEC | MFD_ALLOW_SEALING) != 0 {
-        not_implemented!("memfd_create: flags: {}", flags);
+        not_implemented!("memfd_create", flags);
     }
 
     let name = current_task
@@ -1459,10 +1459,7 @@ pub fn sys_mount(
     }
 
     let flags = MountFlags::from_bits(flags).ok_or_else(|| {
-        not_implemented!(
-            "unsupported mount flags: {:#x}",
-            flags & !MountFlags::from_bits_truncate(flags).bits()
-        );
+        not_implemented!("mount", flags & !MountFlags::from_bits_truncate(flags).bits());
         errno!(EINVAL)
     })?;
 
@@ -1704,7 +1701,7 @@ pub fn sys_timerfd_create(
         _ => return error!(EINVAL),
     };
     if flags & !(TFD_NONBLOCK | TFD_CLOEXEC) != 0 {
-        not_implemented!("timerfd_create: flags {:#x}", flags);
+        not_implemented!("timerfd_create", flags);
         return error!(EINVAL);
     }
     log_trace!("timerfd_create(clock_id={:?}, flags={:#x})", clock_id, flags);
@@ -1747,13 +1744,13 @@ pub fn sys_timerfd_settime(
     user_old_value: UserRef<itimerspec>,
 ) -> Result<(), Errno> {
     if flags & !(TFD_TIMER_ABSTIME | TFD_TIMER_CANCEL_ON_SET) != 0 {
-        not_implemented!("timerfd_settime: flags {:#x}", flags);
+        not_implemented!("timerfd_settime", flags);
         return error!(EINVAL);
     }
 
     if flags & TFD_TIMER_CANCEL_ON_SET != 0 {
         // TODO(fxbug.dev/121607): Respect the cancel on set.
-        not_implemented!("timerfd_settime: TFD_TIMER_CANCEL_ON_SET accepted, but not implemented",);
+        not_implemented!("timerfd_settime: TFD_TIMER_CANCEL_ON_SET");
     }
 
     let file = current_task.files.get(fd)?;

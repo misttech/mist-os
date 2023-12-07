@@ -136,8 +136,16 @@ pub fn sys_clock_nanosleep(
     // timers accordingly.
     match which_clock {
         CLOCK_REALTIME | CLOCK_MONOTONIC => {}
-        CLOCK_TAI | CLOCK_BOOTTIME | CLOCK_PROCESS_CPUTIME_ID => {
-            not_implemented!("clock_nanosleep, clock {:?}, flags {:?}", which_clock, flags);
+        CLOCK_TAI => {
+            not_implemented!("clock_nanosleep, CLOCK_TAI", flags);
+            return error!(EINVAL);
+        }
+        CLOCK_BOOTTIME => {
+            not_implemented!("clock_nanosleep, CLOCK_BOOTTIME", flags);
+            return error!(EINVAL);
+        }
+        CLOCK_PROCESS_CPUTIME_ID => {
+            not_implemented!("clock_nanosleep, CLOCK_PROCESS_CPUTIME_ID", flags);
             return error!(EINVAL);
         }
         _ => return error!(EOPNOTSUPP),

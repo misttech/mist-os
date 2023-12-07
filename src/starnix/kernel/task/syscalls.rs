@@ -846,7 +846,7 @@ pub fn sys_prctl(
     match option {
         PR_SET_VMA => {
             if arg2 != PR_SET_VMA_ANON_NAME as u64 {
-                not_implemented!("prctl: PR_SET_VMA: Unknown arg2: 0x{:x}", arg2);
+                not_implemented!("prctl PR_SET_VMA", arg2);
                 return error!(ENOSYS);
             }
             let addr = UserAddress::from(arg3);
@@ -999,7 +999,7 @@ pub fn sys_prctl(
             }
 
             let securebits = SecureBits::from_bits(arg2 as u32).ok_or_else(|| {
-                not_implemented!("PR_SET_SECUREBITS: bits 0x{:x}", arg2);
+                not_implemented!("PR_SET_SECUREBITS", arg2);
                 errno!(ENOSYS)
             })?;
             creds.securebits = securebits;
@@ -1075,7 +1075,7 @@ pub fn sys_prctl(
             Ok(().into())
         }
         _ => {
-            not_implemented!("prctl: Unknown option: 0x{:x}", option);
+            not_implemented!("prctl", option);
             error!(ENOSYS)
         }
     }
@@ -1515,7 +1515,7 @@ pub fn sys_unshare(
 ) -> Result<(), Errno> {
     const IMPLEMENTED_FLAGS: u32 = CLONE_FILES | CLONE_NEWNS | CLONE_NEWUTS;
     if flags & !IMPLEMENTED_FLAGS != 0 {
-        not_implemented!("unshare does not implement flags: 0x{:x}", flags & !IMPLEMENTED_FLAGS);
+        not_implemented!("unshare", flags & !IMPLEMENTED_FLAGS);
         return error!(EINVAL);
     }
 
@@ -1662,7 +1662,7 @@ pub fn sys_syslog(
         }
         _ => {
             // Other actions aren't necessary yet.
-            not_implemented!(?action, "syslog: unsupported action");
+            not_implemented!("syslog", action);
             Ok(0)
         }
     }

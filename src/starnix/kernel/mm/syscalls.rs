@@ -80,7 +80,7 @@ pub fn do_mmap(
     offset: u64,
 ) -> Result<UserAddress, Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        not_implemented!("mmap: prot: 0x{:x}", prot);
+        not_implemented!("mmap", prot);
         errno!(EINVAL)
     })?;
 
@@ -96,7 +96,7 @@ pub fn do_mmap(
         | MAP_DENYWRITE
         | MAP_GROWSDOWN;
     if flags & !valid_flags != 0 {
-        not_implemented!("mmap: flags: 0x{:x}", flags);
+        not_implemented!("mmap", flags);
         return error!(EINVAL);
     }
 
@@ -163,7 +163,7 @@ pub fn sys_mprotect(
     prot: u32,
 ) -> Result<(), Errno> {
     let prot_flags = ProtectionFlags::from_bits(prot).ok_or_else(|| {
-        not_implemented!("mmap: prot: 0x{:x}", prot);
+        not_implemented!("mprotect", prot);
         errno!(EINVAL)
     })?;
     current_task.mm().protect(addr, length, prot_flags)?;
@@ -330,16 +330,11 @@ pub fn sys_membarrier(
     _locked: &mut Locked<'_, Unlocked>,
     _current_task: &CurrentTask,
     cmd: uapi::membarrier_cmd,
-    flags: u32,
-    cpu_id: i32,
+    _flags: u32,
+    _cpu_id: i32,
 ) -> Result<u32, Errno> {
     // TODO(fxbug.dev/103867): This membarrier implementation does not do any real work.
-    not_implemented_log_once!(
-        "membarrier: cmd: 0x{:x}, flags: 0x{:x}, cpu_id: 0x{:x}",
-        cmd,
-        flags,
-        cpu_id
-    );
+    not_implemented_log_once!("membarrier", cmd);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),
@@ -419,7 +414,7 @@ fn do_futex<Key: FutexKey>(
             Ok(0)
         }
         _ => {
-            not_implemented!("futex: command 0x{:x} not implemented.", cmd);
+            not_implemented!("futex", cmd);
             error!(ENOSYS)
         }
     }
