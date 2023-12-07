@@ -441,7 +441,7 @@ def _fuchsia_api_level_constraint(api_level):
     return "//fuchsia/constraints:api_level_%s" % _to_fuchsia_api_level_name(api_level)
 
 def _to_fuchsia_api_level_name(api_level):
-    return "unspecified" if api_level == "-1" else api_level
+    return "unspecified" if api_level == -1 else api_level
 
 # We can't just do f"//:{file}" for file srcs, since the relative dir may have a
 # BUILD.bazel file, making that subdir its own Bazel package.
@@ -564,7 +564,7 @@ def _generate_package_build_rules(ctx, meta, relative_dir, build_file, process_c
     _merge_template(ctx, build_file, select_alias, {
         "{{name}}": name,
         "{{select_map}}": _get_starlark_dict({
-            variant.constraint: variant.name
+            ":%s" % variant.constraint: ":%s" % variant.name
             for variant in package_variants
         }),
     })

@@ -19,8 +19,9 @@ constraint_setting(
 )
 
 # Target API level constraints.
-config_setting(
+alias(
     name = "api_level_unspecified",
+    actual = "@platforms//os:fuchsia",
     deprecation = "Warning: Dependencies with unspecified API levels are being used, incompatibility may occur.",
 )
 
