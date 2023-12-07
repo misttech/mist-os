@@ -794,7 +794,7 @@ template <typename F>
 zx_status_t zxio_remote_do_vector(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                                   size_t* out_actual, F fn) {
   return zxio_do_vector(vector, vector_count, out_actual,
-                        [&](void* data, size_t capacity, size_t* out_actual) {
+                        [&](void* data, size_t capacity, size_t total_so_far, size_t* out_actual) {
                           auto buffer = static_cast<uint8_t*>(data);
                           size_t total = 0;
                           while (capacity > 0) {
@@ -1641,14 +1641,15 @@ class Directory : public Remote<fio::Directory> {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
-    return zxio_do_vector(vector, vector_count, out_actual,
-                          [](void* buffer, size_t capacity, size_t* out_actual) {
-                            if (capacity > 0) {
-                              return ZX_ERR_WRONG_TYPE;
-                            }
-                            *out_actual = 0;
-                            return ZX_OK;
-                          });
+    return zxio_do_vector(
+        vector, vector_count, out_actual,
+        [](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
+          if (capacity > 0) {
+            return ZX_ERR_WRONG_TYPE;
+          }
+          *out_actual = 0;
+          return ZX_OK;
+        });
   }
 
   zx_status_t ReadvAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,

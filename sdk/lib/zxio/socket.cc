@@ -3200,25 +3200,26 @@ static constexpr zxio_ops_t zxio_stream_socket_ops = []() {
 
       uint8_t* data = buf.get();
       size_t remaining = actual;
-      return zxio_do_vector(vector, vector_count, out_actual,
-                            [&](void* buffer, size_t capacity, size_t* out_actual) {
-                              size_t actual = std::min(capacity, remaining);
-                              memcpy(buffer, data, actual);
-                              data += actual;
-                              remaining -= actual;
-                              *out_actual = actual;
-                              return ZX_OK;
-                            });
+      return zxio_do_vector(
+          vector, vector_count, out_actual,
+          [&](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
+            size_t actual = std::min(capacity, remaining);
+            memcpy(buffer, data, actual);
+            data += actual;
+            remaining -= actual;
+            *out_actual = actual;
+            return ZX_OK;
+          });
     }
 
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
-    return zxio_do_vector(vector, vector_count, out_actual,
-                          [&](void* buffer, size_t capacity, size_t* out_actual) {
-                            return socket.read(0, buffer, capacity, out_actual);
-                          });
+    return zxio_stream_do_vector(vector, vector_count, out_actual,
+                                 [&](void* buffer, size_t capacity, size_t* out_actual) {
+                                   return socket.read(0, buffer, capacity, out_actual);
+                                 });
   };
   ops.writev = [](zxio_t* io, const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                   size_t* out_actual) {

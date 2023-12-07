@@ -82,7 +82,7 @@ zx_status_t Debuglog::Writev(const zx_iovec_t* vector, size_t vector_count, zxio
     return status;
   };
 
-  auto write = [&](void* buffer, size_t capacity, size_t* out_actual) {
+  auto write = [&](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
     // Convince the compiler that the lock is held here. This is safe because the lock is held over
     // the call to zxio_do_vector and zxio_do_vector is synchronous, so it cannot extend the life of
     // this lambda.

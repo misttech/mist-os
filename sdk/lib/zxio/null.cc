@@ -245,22 +245,24 @@ static constexpr zxio_ops_t zxio_null_ops = []() {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-    return zxio_do_vector(vector, vector_count, out_actual,
-                          [](void* buffer, size_t capacity, size_t* out_actual) {
-                            *out_actual = 0;
-                            return ZX_OK;
-                          });
+    return zxio_do_vector(
+        vector, vector_count, out_actual,
+        [](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
+          *out_actual = 0;
+          return ZX_OK;
+        });
   };
   ops.writev = [](zxio_t* io, const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                   size_t* out_actual) {
     if (flags) {
       return ZX_ERR_NOT_SUPPORTED;
     }
-    return zxio_do_vector(vector, vector_count, out_actual,
-                          [](void* buffer, size_t capacity, size_t* out_actual) {
-                            *out_actual = capacity;
-                            return ZX_OK;
-                          });
+    return zxio_do_vector(
+        vector, vector_count, out_actual,
+        [](void* buffer, size_t capacity, size_t total_so_far, size_t* out_actual) {
+          *out_actual = capacity;
+          return ZX_OK;
+        });
   };
   return ops;
 }();
