@@ -145,6 +145,7 @@ rustc_binary("bin") {
     "src/builtin/debug_resource.rs",
     "src/builtin/energy_info_resource.rs",
     "src/builtin/factory_items.rs",
+    "src/builtin/framebuffer_resource.rs",
     "src/builtin/fuchsia_boot_resolver.rs",
     "src/builtin/hypervisor_resource.rs",
     "src/builtin/info_resource.rs",

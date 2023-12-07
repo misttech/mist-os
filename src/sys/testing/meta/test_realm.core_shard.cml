@@ -201,6 +201,7 @@
                 "fuchsia.kernel.CpuResource",
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.EnergyInfoResource",
+                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",

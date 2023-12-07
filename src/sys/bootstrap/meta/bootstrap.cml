@@ -374,6 +374,7 @@
                 "fuchsia.boot.Items",
                 "fuchsia.boot.RootResource",
                 "fuchsia.boot.WriteOnlyLog",
+                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IoportResource",

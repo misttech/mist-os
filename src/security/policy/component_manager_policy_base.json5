@@ -56,6 +56,17 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
+                source_name: "fuchsia.kernel.FramebufferResource",
+                capability: "protocol",
+                target_monikers: [
+                    "/bootstrap",
+                    "/bootstrap/boot-drivers:**",
+                    "/bootstrap/driver_manager",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
                 source_name: "fuchsia.kernel.HypervisorResource",
                 capability: "protocol",
                 target_monikers: [

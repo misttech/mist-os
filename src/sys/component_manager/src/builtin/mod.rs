@@ -11,6 +11,7 @@ pub mod crash_introspect;
 pub mod debug_resource;
 pub mod energy_info_resource;
 pub mod factory_items;
+pub mod framebuffer_resource;
 pub mod fuchsia_boot_resolver;
 pub mod hypervisor_resource;
 pub mod info_resource;

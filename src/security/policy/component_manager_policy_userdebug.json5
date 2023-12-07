@@ -42,6 +42,17 @@
             {
                 source_moniker: "<component_manager>",
                 source: "component",
+                source_name: "fuchsia.kernel.FramebufferResource",
+                capability: "protocol",
+                target_monikers: [
+                    // TODO(fxbug.dev/130576): Remove once the shell tools that use this
+                    // capability no longer run in the sshd realm.
+                    "/core/sshd-host/shell:**",
+                ],
+            },
+            {
+                source_moniker: "<component_manager>",
+                source: "component",
                 source_name: "fuchsia.kernel.HypervisorResource",
                 capability: "protocol",
                 target_monikers: [

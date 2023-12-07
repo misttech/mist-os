@@ -19,6 +19,7 @@ use {
             debug_resource::DebugResource,
             energy_info_resource::EnergyInfoResource,
             factory_items::FactoryItems,
+            framebuffer_resource::FramebufferResource,
             fuchsia_boot_resolver::{FuchsiaBootResolverBuiltinCapability, SCHEME as BOOT_SCHEME},
             hypervisor_resource::HypervisorResource,
             info_resource::InfoResource,
@@ -745,6 +746,28 @@ impl BuiltinEnvironment {
         if let Some(debug_resource) = debug_resource {
             builtin_dict_builder.add_protocol_if_enabled::<fkernel::DebugResourceMarker>(
                 move |stream| debug_resource.clone().serve(stream).boxed(),
+            );
+        }
+
+        // Set up the FramebufferResource service.
+        let framebuffer_resource = system_resource_handle
+            .as_ref()
+            .and_then(|handle| {
+                handle
+                    .create_child(
+                        zx::ResourceKind::SYSTEM,
+                        None,
+                        zx::sys::ZX_RSRC_SYSTEM_FRAMEBUFFER_BASE,
+                        1,
+                        b"framebuffer",
+                    )
+                    .ok()
+            })
+            .map(FramebufferResource::new)
+            .and_then(Result::ok);
+        if let Some(framebuffer_resource) = framebuffer_resource {
+            builtin_dict_builder.add_protocol_if_enabled::<fkernel::FramebufferResourceMarker>(
+                move |stream| framebuffer_resource.clone().serve(stream).boxed(),
             );
         }
 

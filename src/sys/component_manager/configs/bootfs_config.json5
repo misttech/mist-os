@@ -24,6 +24,7 @@
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.boot.Items",
                 "fuchsia.boot.FactoryItems",
+                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",

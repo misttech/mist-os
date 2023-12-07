@@ -110,6 +110,7 @@
                 "fuchsia.kernel.Counter",
                 "fuchsia.kernel.DebugBroker",
                 "fuchsia.kernel.DebugResource",
+                "fuchsia.kernel.FramebufferResource",
                 "fuchsia.kernel.HypervisorResource",
                 "fuchsia.kernel.InfoResource",
                 "fuchsia.kernel.IommuResource",
