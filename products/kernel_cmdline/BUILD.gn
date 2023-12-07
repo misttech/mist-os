@@ -39,13 +39,6 @@ kernel_cmdline("kernel.render-dlog-to-crashlog--true") {
   args = [ "kernel.render-dlog-to-crashlog=true" ]
 }
 
-# TODO(b/314321904): Remove when all users stop using.
-group("virtcon.hide-on-boot") {
-}
-
-group("virtcon.disable--true") {
-}
-
 kernel_cmdline("virtcon.keep-log-visible--true") {
   args = [ "virtcon.keep-log-visible=true" ]
 }
