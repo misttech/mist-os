@@ -177,7 +177,8 @@ def update_golden(args):
     import subprocess
 
     c = update_cmd(args.current, args.golden)
-    subprocess.run(c.split())
+    if c is not None:
+        subprocess.run(c.split())
     return None
 
 
