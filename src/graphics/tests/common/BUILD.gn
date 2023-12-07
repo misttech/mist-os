@@ -4,6 +4,14 @@
 import("//build/components.gni")
 import("//src/lib/vulkan/vulkan.gni")
 
+fuchsia_component_manifest("config-manifest") {
+  manifest = "meta/config.shard.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("config") {
+  cm_label = ":config-manifest"
+}
+
 source_set("common") {
   testonly = true
 
@@ -17,6 +25,18 @@ source_set("common") {
     "//src/lib/vulkan",
     "//third_party/googletest:gtest",
   ]
+}
+
+if (is_fuchsia) {
+  # This target can set the gpu vendor ID from a config exactly matching the one in meta/config.shard.cml.
+  source_set("config_query") {
+    testonly = true
+    sources = [ "config_query.cc" ]
+    deps = [
+      ":common",
+      ":config",
+    ]
+  }
 }
 
 executable("vkcontext_bin") {

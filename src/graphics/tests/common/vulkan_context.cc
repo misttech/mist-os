@@ -14,6 +14,10 @@
 
 #include "vulkan/vulkan.hpp"
 
+// This is a default implementation that returns no value. It's weak and can be overridden by
+// config_query.cc or other implementations.
+__attribute__((weak)) std::optional<uint32_t> GetGpuVendorId() { return {}; }
+
 static inline uint32_t to_uint32(uint64_t val) {
   assert(val <= std::numeric_limits<uint32_t>::max());
   return static_cast<uint32_t>(val);
@@ -28,7 +32,7 @@ vk::DebugUtilsMessengerCreateInfoEXT VulkanContext::default_debug_info_s_(
 VulkanContext::ContextWithUserData VulkanContext::default_debug_callback_user_data_s_;
 
 VulkanContext::VulkanContext(const vk::InstanceCreateInfo &instance_info,
-                             uint32_t physical_device_index,
+                             std::optional<uint32_t> physical_device_index,
                              const vk::DeviceCreateInfo &device_info,
                              const vk::DeviceQueueCreateInfo &queue_info,
                              const vk::QueueFlags &queue_flags,
@@ -51,7 +55,8 @@ VulkanContext::VulkanContext(const vk::InstanceCreateInfo &instance_info,
          "Debug callback user data must be only set in |debug_callback_user_data|.");
 }
 
-VulkanContext::VulkanContext(uint32_t physical_device_index, const vk::QueueFlags &queue_flags,
+VulkanContext::VulkanContext(std::optional<uint32_t> physical_device_index,
+                             const vk::QueueFlags &queue_flags,
                              vk::Optional<const vk::AllocationCallbacks> allocator)
     : physical_device_index_(physical_device_index),
       queue_family_index_(kInvalidQueueFamily),
@@ -157,7 +162,24 @@ bool VulkanContext::InitQueueFamily() {
     RTN_MSG(false, "VK Error - No physical device found: %d (%s)\n",
             static_cast<int>(r_physical_devices), vk::to_string(r_physical_devices).data());
   }
-  physical_device_ = physical_devices[physical_device_index_];
+  if (!physical_device_index_) {
+    auto gpu_vendor_id = GetGpuVendorId();
+    if (gpu_vendor_id) {
+      for (size_t i = 0; i < physical_devices.size(); i++) {
+        auto properties = physical_devices[i].getProperties();
+        if (properties.vendorID == *gpu_vendor_id) {
+          physical_device_index_ = {i};
+          break;
+        }
+      }
+      if (!physical_device_index_) {
+        RTN_MSG(false, "Couldn't find GPU with vendor ID %d\n", *gpu_vendor_id);
+      }
+    } else {
+      physical_device_index_ = {0};
+    }
+  }
+  physical_device_ = physical_devices[*physical_device_index_];
 
   const auto queue_families = physical_device_.getQueueFamilyProperties();
   queue_family_index_ = to_uint32(queue_families.size());
@@ -318,10 +340,8 @@ const vk::Queue &VulkanContext::queue() const {
 }
 
 VulkanContext::Builder::Builder()
-    : physical_device_index_(0),
-      queue_priority_(0.0f),
-      queue_info_(vk::DeviceQueueCreateFlags(), physical_device_index_, 1 /* queueCount */,
-                  &queue_priority_),
+    : queue_priority_(0.0f),
+      queue_info_(vk::DeviceQueueCreateFlags(), 0, 1 /* queueCount */, &queue_priority_),
       device_info_(vk::DeviceCreateFlags(), 1 /* queueCreateInfoCount */, &queue_info_),
       queue_flags_(kDefaultQueueFlags),
       allocator_(nullptr),

@@ -3,11 +3,27 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/sys/test_runners/gtest/default.shard.cml",
+        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
-        "vulkan/client.shard.cml",
     ],
-    program: {
-        binary: "test/vkreadback_test",
-    },
+    children: [
+        {
+            name: "test",
+            url: "vkreadback-test#meta/vkreadback_child.cm",
+        },
+    ],
+    offer: [
+        {
+            from: "void",
+            to: "#test",
+            config: "fuchsia.gpu.test.GpuVendorId",
+            availability: "optional",
+        },
+    ],
+    expose: [
+        {
+            protocol: "fuchsia.test.Suite",
+            from: "#test",
+        },
+    ],
 }

@@ -10,6 +10,11 @@
 
 #include <vulkan/vulkan.hpp>
 
+// Returns the default GPU vendor ID to use when choosing the physical device. May be overloaded by
+// clients (ideally based on structured config) to set the value. If nullopt is returned, physical
+// device 0 is selected.
+std::optional<uint32_t> GetGpuVendorId();
+
 //
 // VulkanContext is a convenience class for handling boilerplate vulkan setup code.
 // It creates / encapsulates vulkan:
@@ -54,7 +59,8 @@ class VulkanContext {
   static ContextWithUserData default_debug_callback_user_data_s_;
 
   // All struct arguments are shallow copied.
-  VulkanContext(const vk::InstanceCreateInfo &instance_info, uint32_t physical_device_index,
+  VulkanContext(const vk::InstanceCreateInfo &instance_info,
+                std::optional<uint32_t> physical_device_index,
                 const vk::DeviceCreateInfo &device_info,
                 const vk::DeviceQueueCreateInfo &queue_info,
                 const vk::QueueFlags &queue_flags = vk::QueueFlagBits::eGraphics,
@@ -63,7 +69,7 @@ class VulkanContext {
                 vk::Optional<const vk::AllocationCallbacks> allocator = nullptr,
                 bool validation_layers_enabled = true, bool validation_layers_ignored_ = false);
 
-  explicit VulkanContext(uint32_t physical_device_index,
+  explicit VulkanContext(std::optional<uint32_t> physical_device_index,
                          const vk::QueueFlags &queue_flags = vk::QueueFlagBits::eGraphics,
                          vk::Optional<const vk::AllocationCallbacks> allocator = nullptr);
 
@@ -133,7 +139,7 @@ class VulkanContext {
   vk::InstanceCreateInfo instance_info_;
 
   vk::PhysicalDevice physical_device_;
-  uint32_t physical_device_index_;
+  std::optional<uint32_t> physical_device_index_;
 
   float queue_priority_ = 0.0f;
   int queue_family_index_;
@@ -204,7 +210,7 @@ class VulkanContext::Builder {
 
  private:
   vk::InstanceCreateInfo instance_info_;
-  uint32_t physical_device_index_;
+  std::optional<uint32_t> physical_device_index_;
   float queue_priority_;
   vk::DeviceQueueCreateInfo queue_info_;
   vk::DeviceCreateInfo device_info_;

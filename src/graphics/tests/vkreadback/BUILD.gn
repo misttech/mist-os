@@ -38,19 +38,48 @@ test("vkreadback_test") {
     "//src/lib/fxl/test:gtest_main",
   ]
 
+  if (is_fuchsia) {
+    deps += [ "//src/graphics/tests/common:config_query" ]
+  }
+
   # TODO(fxbug.dev/102268): Add macOS support to VulkanContext and remove this.
   if (is_host) {
     environments = [ linux_env ]
   }
 }
 
-fuchsia_test_component("vkreadback_test_component") {
-  component_name = "vkreadback_test"
+fuchsia_component_manifest("vkreadback-manifest") {
+  component_name = "vkreadback_child"
+  manifest = "meta/vkreadback_child.cml"
+}
+
+fuchsia_component("vkreadback_test_child_component") {
+  testonly = true
+  component_name = "vkreadback_child"
   deps = [
     ":vkreadback_test",
     "//src/lib/vulkan/validation_layers",
   ]
+  cm_label = ":vkreadback-manifest"
+}
 
+fuchsia_structured_config_values("default_config") {
+  cm_label = ":vkreadback-manifest"
+  values = {
+    gpu_vendor_id = ""
+  }
+}
+
+fuchsia_package("vkreadback_test_child_package") {
+  package_name = "vkreadback-test"
+  testonly = true
+  deps = [ ":vkreadback_test_child_component" ]
+  deps += [ ":default_config" ]
+  validate_structured_config = false
+}
+
+fuchsia_test_component("vkreadback_test_component") {
+  component_name = "vkreadback_test"
   manifest = "meta/vkreadback.cml"
   test_type = "vulkan"
 }
@@ -58,6 +87,7 @@ fuchsia_test_component("vkreadback_test_component") {
 fuchsia_test_package("vkreadback_test_package") {
   package_name = "vkreadback_test"
   test_components = [ ":vkreadback_test_component" ]
+  subpackages = [ ":vkreadback_test_child_package" ]
   test_specs = {
     # TODO(fxbug.dev/47373): Restore astro_env when fxbug.dev/44570 is fixed.
     environments = vulkan_envs + [ astro_env ] - [ astro_env ]
