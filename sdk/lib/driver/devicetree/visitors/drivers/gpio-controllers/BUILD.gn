@@ -3,9 +3,6 @@
 # found in the LICENSE file.
 
 group("tests") {
-  deps = [
-    "gpio-controllers:tests",
-    "interrupt-controllers:tests",
-  ]
+  deps = [ "gpioimpl-visitor:tests" ]
   testonly = true
 }

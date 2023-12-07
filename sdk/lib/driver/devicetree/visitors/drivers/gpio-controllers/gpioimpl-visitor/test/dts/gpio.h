@@ -1,0 +1,20 @@
+// Copyright 2023 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+#ifndef LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_GPIO_CONTROLLERS_GPIOIMPL_VISITOR_TEST_DTS_GPIO_H_
+#define LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_GPIO_CONTROLLERS_GPIOIMPL_VISITOR_TEST_DTS_GPIO_H_
+
+#define PIN1 12
+#define PIN1_NAME "SOC_AUDIO_ENABLE"
+
+#define PIN2 30
+#define PIN2_NAME "SOC_AUDIO_FAULT"
+
+#define HOG_PIN1 6
+#define HOG_PIN2 8
+#define HOG_PIN3 23
+#define HOG_PIN2_FLAG 1
+#define HOG_PIN3_FLAG 2
+
+#endif  // LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_GPIO_CONTROLLERS_GPIOIMPL_VISITOR_TEST_DTS_GPIO_H_
