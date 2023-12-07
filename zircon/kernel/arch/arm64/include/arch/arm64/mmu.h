@@ -35,6 +35,10 @@
 #define MMU_USER_SIZE_SHIFT 48
 #endif
 
+#ifndef MMU_USER_RESTRICTED_SIZE_SHIFT
+#define MMU_USER_RESTRICTED_SIZE_SHIFT (MMU_USER_SIZE_SHIFT - 1)
+#endif
+
 // See ARM DDI 0487B.b, Table D4-25 for the maximum IPA range that can be used.
 // This size is based on a 4KB granule and a starting level of 1. We chose this
 // size due to the 40-bit physical address range on Cortex-A53.
@@ -296,6 +300,12 @@
                         MMU_TCR_ORGN0(MMU_RGN_WRITE_BACK_ALLOCATE) | \
                         MMU_TCR_IRGN0(MMU_RGN_WRITE_BACK_ALLOCATE) | \
                         MMU_TCR_T0SZ(64 - MMU_USER_SIZE_SHIFT))
+#define MMU_TCR_FLAGS0_RESTRICTED \
+                       (MMU_TCR_TG0(MMU_TG0(MMU_USER_PAGE_SIZE_SHIFT)) | \
+                        MMU_TCR_SH0(MMU_SH_INNER_SHAREABLE) | \
+                        MMU_TCR_ORGN0(MMU_RGN_WRITE_BACK_ALLOCATE) | \
+                        MMU_TCR_IRGN0(MMU_RGN_WRITE_BACK_ALLOCATE) | \
+                        MMU_TCR_T0SZ(64 - MMU_USER_RESTRICTED_SIZE_SHIFT))
 #define MMU_TCR_FLAGS0_IDENT \
                        (MMU_TCR_TG0(MMU_TG0(MMU_IDENT_PAGE_SIZE_SHIFT)) | \
                         MMU_TCR_SH0(MMU_SH_INNER_SHAREABLE) | \
@@ -325,6 +335,13 @@
 #define MMU_TCR_FLAGS_USER (MMU_TCR_IPS_DEFAULT | \
                             MMU_TCR_FLAGS1 | \
                             MMU_TCR_FLAGS0 | \
+                            MMU_TCR_TBI0 | \
+                            MMU_TCR_AS)
+
+// TCR while a user mode thread is active in restricted mode.
+#define MMU_TCR_FLAGS_USER_RESTRICTED (MMU_TCR_IPS_DEFAULT | \
+                            MMU_TCR_FLAGS1 | \
+                            MMU_TCR_FLAGS0_RESTRICTED | \
                             MMU_TCR_TBI0 | \
                             MMU_TCR_AS)
 
@@ -435,6 +452,12 @@ const uint16_t MMU_ARM64_FIRST_USER_ASID = 2;
 // User asids should not overlap with the unused or global asid sentinels.
 static_assert(MMU_ARM64_FIRST_USER_ASID > MMU_ARM64_UNUSED_ASID);
 static_assert(MMU_ARM64_FIRST_USER_ASID > MMU_ARM64_GLOBAL_ASID);
+
+// Assert that a restricted address space covers exactly half of a top level
+// page table. This also indirectly verifies that `MMU_TCR_FLAGS0_RESTRICTED`
+// contains the right value of T0SZ.
+static_assert(((USER_ASPACE_BASE + USER_RESTRICTED_ASPACE_SIZE) &
+               ~((uint64_t)1 << MMU_USER_RESTRICTED_SIZE_SHIFT)) == 0);
 
 // max address space id for 8 and 16 bit asid ranges
 const uint16_t MMU_ARM64_MAX_USER_ASID_8 = (1u << 8) - 1;

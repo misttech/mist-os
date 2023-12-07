@@ -24,12 +24,20 @@ enum class ArmAspaceType {
   kHypervisor,  // EL2 hypervisor address space.
 };
 
+enum class ArmAspaceRole : uint8_t {
+  kIndependent,
+  kRestricted,
+  kShared,
+  kUnified,
+};
+
 class ArmArchVmAspace final : public ArchVmAspaceInterface {
  public:
   ArmArchVmAspace(vaddr_t base, size_t size, ArmAspaceType type, page_alloc_fn_t paf = nullptr);
   ArmArchVmAspace(vaddr_t base, size_t size, uint mmu_flags, page_alloc_fn_t paf = nullptr);
   virtual ~ArmArchVmAspace();
 
+  // See comments on `ArchVmAspaceInterface` where these methods are declared.
   zx_status_t Init() override;
   zx_status_t InitShared() override;
   zx_status_t InitRestricted() override;
@@ -142,8 +150,10 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   zx_status_t DebugFindFirstLeafMapping(vaddr_t* out_pt, vaddr_t* out_vaddr, pte_t* out_pte) const;
 
   void FlushTLBEntry(vaddr_t vaddr, bool terminal) const TA_REQ(lock_);
+  void FlushTLBEntryForAllAsids(vaddr_t vaddr, bool terminal) const TA_REQ(lock_);
 
   void FlushAsid() const TA_REQ(lock_);
+  void FlushAllAsids() const TA_REQ(lock_);
 
   uint MmuFlagsFromPte(pte_t pte);
 
@@ -160,6 +170,25 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   //
   // The caller must be holding |lock_|.
   void AssertEmptyLocked() const TA_REQ(lock_);
+
+  // Return if an aspace is shared.
+  bool IsShared() const { return role_ == ArmAspaceRole::kShared; }
+
+  // Return if an aspace is restricted.
+  bool IsRestricted() const { return role_ == ArmAspaceRole::kRestricted; }
+
+  // Return if an aspace is unified.
+  bool IsUnified() const { return role_ == ArmAspaceRole::kUnified; }
+
+  // The `DestroyIndividual` and `DestroyUnified` functions are called by the public `Destroy`
+  // function depending on whether this address space is unified or not. Note that unified aspaces
+  // must be destroyed prior to destroying their constituent aspaces. In other words, the shared
+  // and restricted aspaces must have a longer lifetime than the unified aspaces they are part of.
+  zx_status_t DestroyIndividual();
+  zx_status_t DestroyUnified();
+
+  // Returns the value to set the TCR register to during a context switch.
+  uint64_t Tcr() const;
 
   // data fields
   fbl::Canary<fbl::magic("VAAS")> canary_;
@@ -217,6 +246,20 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   // Whether not this has been active since |ActiveSinceLastCheck| was called.
   ktl::atomic<bool> active_since_last_check_ = false;
+
+  // The number of times entries in the top level page are referenced by other page tables.
+  // Unified page tables increment and decrement this value on their associated shared and
+  // restricted page tables, so we must hold the lock_ when doing so.
+  uint32_t num_references_ TA_GUARDED(lock_) = 0;
+
+  // The role this aspace plays in unified aspaces, if any. This should only set by the `Init*`
+  // functions and should not be modified anywhere else.
+  ArmAspaceRole role_ = ArmAspaceRole::kIndependent;
+
+  // Pointers to the shared and restricted aspaces referenced by this aspace if it is unified.
+  // These fields are set by InitUnified and should not be modified anywhere else.
+  ArmArchVmAspace* shared_aspace_ = nullptr;
+  ArmArchVmAspace* restricted_aspace_ = nullptr;
 };
 
 inline ArmArchVmAspace::AutoPendingAccessFault::AutoPendingAccessFault(ArmArchVmAspace* aspace)

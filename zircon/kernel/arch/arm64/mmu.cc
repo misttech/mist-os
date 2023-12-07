@@ -452,7 +452,8 @@ class ArmArchVmAspace::ConsistencyManager {
     }
   }
 
-  // Queue a TLB entry for flushing. This may get turned into a complete ASID flush.
+  // Queue a TLB entry for flushing. This may get turned into a complete ASID flush, or even a
+  // complete TLB (all ASID) flush if the associated aspace is a shared one.
   void FlushEntry(vaddr_t va, bool terminal) {
     AssertHeld(aspace_.lock_);
     // Check we have queued too many entries already.
@@ -490,10 +491,17 @@ class ArmArchVmAspace::ConsistencyManager {
     __dsb(ARM_MB_ISHST);
 
     // Check if we should just be performing a full ASID invalidation.
+    // If the associate aspace is shared, this will be upgraded to a full TLB invalidation across
+    // all ASIDs.
     if (num_pending_tlbs_ > kMaxPendingTlbs || aspace_.type_ == ArmAspaceType::kHypervisor) {
       cm_flush_all.Add(1);
       cm_flush_all_replacing.Add(num_pending_tlbs_);
-      aspace_.FlushAsid();
+      // If we're a shared aspace, we should be invalidating across all ASIDs.
+      if (aspace_.IsShared()) {
+        aspace_.FlushAllAsids();
+      } else {
+        aspace_.FlushAsid();
+      }
     } else {
       for (size_t i = 0; i < num_pending_tlbs_; i++) {
         const vaddr_t va = pending_tlbs_[i].va_shifted << 1;
@@ -541,6 +549,13 @@ class ArmArchVmAspace::ConsistencyManager {
   // The aspace we are invalidating TLBs for.
   const ArmArchVmAspace& aspace_;
 };
+
+uint64_t ArmArchVmAspace::Tcr() const {
+  if (IsRestricted()) {
+    return MMU_TCR_FLAGS_USER_RESTRICTED;
+  }
+  return MMU_TCR_FLAGS_USER;
+}
 
 uint ArmArchVmAspace::MmuFlagsFromPte(pte_t pte) {
   switch (type_) {
@@ -709,27 +724,35 @@ zx_status_t ArmArchVmAspace::SplitLargePage(vaddr_t vaddr, const uint index_shif
   return ZX_OK;
 }
 
+void ArmArchVmAspace::FlushTLBEntryForAllAsids(vaddr_t vaddr, bool terminal) const {
+  if (terminal) {
+    ARM64_TLBI(vaale1is, (vaddr >> 12) & TLBI_VADDR_MASK);
+  } else {
+    ARM64_TLBI(vaae1is, (vaddr >> 12) & TLBI_VADDR_MASK);
+  }
+}
+
 // use the appropriate TLB flush instruction to globally flush the modified entry
 // terminal is set when flushing at the final level of the page table.
 void ArmArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
   switch (type_) {
     case ArmAspaceType::kUser: {
-      // flush this address for the specific asid
-      if (terminal) {
-        ARM64_TLBI(vale1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
+      if (IsShared()) {
+        // If this is a shared aspace, we need to flush this address for all ASIDs.
+        FlushTLBEntryForAllAsids(vaddr, terminal);
       } else {
-        ARM64_TLBI(vae1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
+        // Otherwise, flush this address for the specific ASID.
+        if (terminal) {
+          ARM64_TLBI(vale1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
+        } else {
+          ARM64_TLBI(vae1is, ((vaddr >> 12) & TLBI_VADDR_MASK) | (vaddr_t)asid_ << 48);
+        }
       }
       return;
     }
     case ArmAspaceType::kKernel: {
       DEBUG_ASSERT(asid_ == MMU_ARM64_GLOBAL_ASID);
-      // flush this address on all ASIDs
-      if (terminal) {
-        ARM64_TLBI(vaale1is, (vaddr >> 12) & TLBI_VADDR_MASK);
-      } else {
-        ARM64_TLBI(vaae1is, (vaddr >> 12) & TLBI_VADDR_MASK);
-      }
+      FlushTLBEntryForAllAsids(vaddr, terminal);
       return;
     }
     case ArmAspaceType::kGuest: {
@@ -743,6 +766,12 @@ void ArmArchVmAspace::FlushTLBEntry(vaddr_t vaddr, bool terminal) const {
       return;
   }
   __UNREACHABLE;
+}
+
+void ArmArchVmAspace::FlushAllAsids() const {
+  DEBUG_ASSERT(type_ == ArmAspaceType::kUser);
+  DEBUG_ASSERT(IsShared());
+  ARM64_TLBI_NOADDR(vmalle1is);
 }
 
 void ArmArchVmAspace::FlushAsid() const {
@@ -821,9 +850,12 @@ ssize_t ArmArchVmAspace::UnmapPageTable(vaddr_t vaddr, vaddr_t vaddr_rel, size_t
         return result;
       }
 
-      // if we unmapped an entire page table leaf and/or the unmap made the level below us empty,
-      // free the page table
-      if (chunk_size == block_size || page_table_is_clear(next_page_table, page_size_shift_)) {
+      // If we unmapped an entire page table leaf and/or the unmap made the level below us empty,
+      // and we are not in the top page of an aspace with a prepopulated top page, free the page
+      // table.
+      bool in_prepopulated_pt = IsShared() && index_shift == top_index_shift_;
+      if (!in_prepopulated_pt &&
+          (chunk_size == block_size || page_table_is_clear(next_page_table, page_size_shift_))) {
         LTRACEF("pte %p[0x%lx] = 0 (was page table phys %#lx)\n", page_table, index,
                 page_table_paddr);
         update_pte(&page_table[index], MMU_PTE_DESCRIPTOR_INVALID);
@@ -1064,6 +1096,10 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
     volatile pte_t* page_table, ConsistencyManager& cm, bool* unmapped_out) {
   const vaddr_t block_size = 1UL << index_shift;
   const vaddr_t block_mask = block_size - 1;
+  // We always want to recursively call `HarvestAccessedPageTable` on entries in the top level page
+  // of shared address spaces. We have to do this because entries in these aspaces will be accessed
+  // via the unified aspace, which will not set the accessed bits on those entries.
+  const bool always_recurse = index_shift == top_index_shift_ && IsShared();
 
   vaddr_t vaddr_rel = vaddr_rel_in;
 
@@ -1099,7 +1135,8 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
       // Check for our emulated non-terminal AF so we can potentially skip the recursion.
       // TODO: make this optional when hardware AF is supported (see todo on
       // MMU_PTE_ATTR_RES_SOFTWARE_AF for details)
-      if (pte & MMU_PTE_ATTR_RES_SOFTWARE_AF) {
+      bool should_recurse = always_recurse || (pte & MMU_PTE_ATTR_RES_SOFTWARE_AF);
+      if (should_recurse) {
         bool unmapped = false;
         chunk_size = HarvestAccessedPageTable(
             entry_limit, vaddr, vaddr_rem, chunk_size, index_shift - (page_size_shift_ - 3),
@@ -1115,6 +1152,11 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
           pte &= ~MMU_PTE_ATTR_RES_SOFTWARE_AF;
           update_pte(&page_table[index], pte);
         }
+      }
+      // We can't unmap any top level page table entries in an address space with a prepopulated
+      // top level page.
+      if (index_shift == top_index_shift_ && IsShared()) {
+        do_unmap = false;
       }
       if (do_unmap) {
         // Unmapping an exact block, which should not need enlarging and hence should never be able
@@ -1772,11 +1814,109 @@ zx_status_t ArmArchVmAspace::Init() {
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::InitShared() { return ZX_ERR_NOT_SUPPORTED; }
-zx_status_t ArmArchVmAspace::InitRestricted() { return ZX_ERR_NOT_SUPPORTED; }
-zx_status_t ArmArchVmAspace::InitUnified(ArchVmAspaceInterface& shared,
-                                         ArchVmAspaceInterface& restricted) {
-  return ZX_ERR_NOT_SUPPORTED;
+zx_status_t ArmArchVmAspace::InitRestricted() {
+  role_ = ArmAspaceRole::kRestricted;
+  return Init();
+}
+
+zx_status_t ArmArchVmAspace::InitShared() {
+  zx_status_t status = Init();
+  if (status != ZX_OK) {
+    return status;
+  }
+  role_ = ArmAspaceRole::kShared;
+
+  Guard<CriticalMutex> a{&lock_};
+
+  // Prepopulate the portion of the top level page table spanned by this aspace by allocating the
+  // necessary second level entries.
+  const ulong start = base_ >> top_index_shift_;
+  const ulong end = (base_ + size_ - 1) >> top_index_shift_;
+  for (ulong i = start; i <= end; i++) {
+    DEBUG_ASSERT((tt_virt_[i] & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_DESCRIPTOR_INVALID);
+    paddr_t page_table_paddr = 0;
+    status = AllocPageTable(&page_table_paddr);
+    if (status != ZX_OK) {
+      return status;
+    }
+    void* pt_vaddr = paddr_to_physmap(page_table_paddr);
+    arch_zero_page(pt_vaddr);
+    __dsb(ARM_MB_ISHST);
+    tt_virt_[i] = page_table_paddr | MMU_PTE_L012_DESCRIPTOR_TABLE | MMU_PTE_ATTR_RES_SOFTWARE_AF;
+  }
+  return ZX_OK;
+}
+
+zx_status_t ArmArchVmAspace::InitUnified(ArchVmAspaceInterface& s, ArchVmAspaceInterface& r) {
+  canary_.Assert();
+  LTRACEF("unified aspace %p, base %#" PRIxPTR ", size 0x%zx, type %*s\n", this, base_, size_,
+          static_cast<int>(ArmAspaceTypeName(type_).size()), ArmAspaceTypeName(type_).data());
+
+  ArmArchVmAspace& shared = static_cast<ArmArchVmAspace&>(s);
+  ArmArchVmAspace& restricted = static_cast<ArmArchVmAspace&>(r);
+
+  // Initialize this aspace.
+  {
+    Guard<CriticalMutex> a{&lock_};
+    DEBUG_ASSERT(base_ + size_ <= 1UL << MMU_USER_SIZE_SHIFT);
+
+    vaddr_base_ = 0;
+    top_size_shift_ = MMU_USER_SIZE_SHIFT;
+    top_index_shift_ = MMU_USER_TOP_SHIFT;
+    page_size_shift_ = MMU_USER_PAGE_SIZE_SHIFT;
+
+    // Assign the restricted address space's ASID to this address space.
+    if (feat_asid_enabled) {
+      asid_ = restricted.asid_;
+    } else {
+      // Initialize to a valid value even when disabled to distinguish from the destroyed case.
+      asid_ = MMU_ARM64_FIRST_USER_ASID;
+    }
+
+    // Unified aspaces use the same page table root that the restricted page table does.
+    tt_virt_ = restricted.tt_virt_;
+    tt_phys_ = restricted.tt_phys_;
+
+    // Set up our pointers to the restricted and shared aspaces.
+    restricted_aspace_ = &restricted;
+    shared_aspace_ = &shared;
+    role_ = ArmAspaceRole::kUnified;
+
+    LTRACEF("tt_phys %#" PRIxPTR " tt_virt %p\n", tt_phys_, tt_virt_);
+  }
+
+  const ulong restricted_start = restricted.base_ >> top_index_shift_;
+  const ulong restricted_end = (restricted.base_ + restricted.size_ - 1) >> top_index_shift_;
+  const ulong shared_start = shared.base_ >> top_index_shift_;
+  const ulong shared_end = (shared.base_ + shared.size_ - 1) >> top_index_shift_;
+  DEBUG_ASSERT(restricted_end < shared_start);
+
+  // Validate that the restricted aspace is empty and set its metadata.
+  {
+    Guard<CriticalMutex> a{&restricted.lock_};
+    DEBUG_ASSERT(restricted.tt_virt_);
+    DEBUG_ASSERT(restricted.num_references_ == 0);
+    DEBUG_ASSERT(!restricted.IsUnified());
+    for (ulong i = restricted_start; i <= restricted_end; i++) {
+      DEBUG_ASSERT((restricted.tt_virt_[i] & MMU_PTE_DESCRIPTOR_MASK) ==
+                   MMU_PTE_DESCRIPTOR_INVALID);
+    }
+    restricted.num_references_++;
+  }
+
+  // Copy all mappings from the shared aspace and set its metadata.
+  {
+    Guard<CriticalMutex> a{&shared.lock_};
+    DEBUG_ASSERT(shared.tt_virt_);
+    DEBUG_ASSERT(shared.IsShared());
+    DEBUG_ASSERT(!restricted.IsUnified());
+    for (ulong i = shared_start; i <= shared_end; i++) {
+      DEBUG_ASSERT((shared.tt_virt_[i] & MMU_PTE_DESCRIPTOR_MASK) == MMU_PTE_L012_DESCRIPTOR_TABLE);
+      tt_virt_[i] = shared.tt_virt_[i];
+    }
+    shared.num_references_++;
+  }
+  return ZX_OK;
 }
 
 zx_status_t ArmArchVmAspace::DebugFindFirstLeafMapping(vaddr_t* out_pt, vaddr_t* out_vaddr,
@@ -1836,8 +1976,13 @@ zx_status_t ArmArchVmAspace::DebugFindFirstLeafMapping(vaddr_t* out_pt, vaddr_t*
 
 void ArmArchVmAspace::AssertEmptyLocked() const {
   // Check to see if the top level page table is empty. If not the user didn't
-  // properly unmap everything before destroying the aspace
-  if (const int index = first_used_page_table_entry(tt_virt_, page_size_shift_); index != -1) {
+  // properly unmap everything before destroying the aspace.
+  const int index = first_used_page_table_entry(tt_virt_, page_size_shift_);
+  // Restricted aspaces share their top level page with their associated unified aspace, which
+  // maintain shared mappings after base_ + size_. We ignore these mappings when validating that
+  // the restricted aspace is empty.
+  const int end_index = (int)((base_ + size_ - 1) >> top_index_shift_);
+  if (index != -1 && index <= end_index) {
     vaddr_t pt_addr = 0;
     vaddr_t entry_vaddr = 0;
     pte_t pte = 0;
@@ -1868,22 +2013,32 @@ void ArmArchVmAspace::DisableUpdates() {
     // Initialization must not have succeeded.
     return;
   }
-  AssertEmptyLocked();
+  if (!IsShared() && !IsUnified()) {
+    AssertEmptyLocked();
+  }
 }
 
-zx_status_t ArmArchVmAspace::Destroy() {
-  canary_.Assert();
-  LTRACEF("aspace %p\n", this);
+zx_status_t ArmArchVmAspace::DestroyIndividual() {
+  DEBUG_ASSERT(!IsUnified());
 
   Guard<CriticalMutex> a{&lock_};
+  DEBUG_ASSERT(num_references_ == 0);
 
-  // Not okay to destroy the kernel address space
-  DEBUG_ASSERT(type_ != ArmAspaceType::kKernel);
-
-  if (!tt_virt_) {
-    // Initialization must not have succeeded.
-    DEBUG_ASSERT(!tt_phys_);
-    return ZX_OK;
+  // If this page table has a prepopulated top level, we need to manually clean up the entries we
+  // created in InitPrepopulated. We know for sure that these entries are no longer referenced by
+  // other page tables because we expect those page tables to have been destroyed before this one.
+  if (IsShared()) {
+    const ulong start = base_ >> top_index_shift_;
+    const ulong end = (base_ + size_ - 1) >> top_index_shift_;
+    for (ulong i = start; i <= end; i++) {
+      const paddr_t paddr = tt_virt_[i] & MMU_PTE_OUTPUT_ADDR_MASK;
+      vm_page_t* page = paddr_to_vm_page(paddr);
+      DEBUG_ASSERT(page);
+      DEBUG_ASSERT(page->state() == vm_page_state::MMU);
+      CacheFreePage(page);
+      pt_pages_--;
+      tt_virt_[i] = MMU_PTE_DESCRIPTOR_INVALID;
+    }
   }
 
   AssertEmptyLocked();
@@ -1921,6 +2076,47 @@ zx_status_t ArmArchVmAspace::Destroy() {
   return ZX_OK;
 }
 
+zx_status_t ArmArchVmAspace::DestroyUnified() {
+  {
+    Guard<CriticalMutex> a{&shared_aspace_->lock_};
+    // The shared page table should be referenced by at least this page table, and could be
+    // referenced by many other unified page tables.
+    DEBUG_ASSERT(shared_aspace_->num_references_ > 0);
+    shared_aspace_->num_references_--;
+  }
+  {
+    Guard<CriticalMutex> a{&restricted_aspace_->lock_};
+    // The restricted_aspace_ page table can only be referenced by a singular unified page table.
+    DEBUG_ASSERT(restricted_aspace_->num_references_ == 1);
+    restricted_aspace_->num_references_--;
+  }
+  shared_aspace_ = nullptr;
+  restricted_aspace_ = nullptr;
+  asid_ = MMU_ARM64_UNUSED_ASID;
+  tt_phys_ = 0;
+  tt_virt_ = nullptr;
+  return ZX_OK;
+}
+
+zx_status_t ArmArchVmAspace::Destroy() {
+  canary_.Assert();
+  LTRACEF("aspace %p\n", this);
+
+  // We cannot destroy the kernel address space.
+  DEBUG_ASSERT(type_ != ArmAspaceType::kKernel);
+
+  // Make sure initialization succeeded.
+  if (!tt_virt_) {
+    DEBUG_ASSERT(!tt_phys_);
+    return ZX_OK;
+  }
+
+  if (IsUnified()) {
+    return DestroyUnified();
+  }
+  return DestroyIndividual();
+}
+
 // Called during context switches between threads with different address spaces. Swaps the
 // mmu context on hardware. Assumes old_aspace != aspace and optimizes as such.
 void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace* aspace) {
@@ -1941,17 +2137,30 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
     DEBUG_ASSERT(aspace->type_ == ArmAspaceType::kUser);
     DEBUG_ASSERT(aspace->asid_ >= MMU_ARM64_FIRST_USER_ASID);
 
-    // Load the user space TTBR with the translation table and user space ASID.
+    // Compute the user space TTBR with the translation table and user space ASID.
     ttbr = ((uint64_t)aspace->asid_ << 48) | aspace->tt_phys_;
-    __arm_wsr64("ttbr0_el1", ttbr);
-    __isb(ARM_MB_SY);
+    tcr = aspace->Tcr();
 
-    // If we're switching away from the kernel aspace, load TCR with the user flags.
-    tcr = MMU_TCR_FLAGS_USER;
+    // Update TCR and TTBR0 if the new aspace uses different values, or if we're switching away
+    // from the kernel aspace.
     if (unlikely(!old_aspace)) {
+      __arm_wsr64("ttbr0_el1", ttbr);
       __arm_wsr64("tcr_el1", tcr);
       __isb(ARM_MB_SY);
     } else {
+      uint64_t old_ttbr = ((uint64_t)old_aspace->asid_ << 48) | old_aspace->tt_phys_;
+      bool needs_isb = false;
+      if (old_ttbr != ttbr) {
+        __arm_wsr64("ttbr0_el1", ttbr);
+        needs_isb = true;
+      }
+      if (old_aspace->Tcr() != aspace->Tcr()) {
+        __arm_wsr64("tcr_el1", tcr);
+        needs_isb = true;
+      }
+      if (needs_isb) {
+        __isb(ARM_MB_SY);
+      }
       [[maybe_unused]] uint32_t prev =
           old_aspace->num_active_cpus_.fetch_sub(1, ktl::memory_order_relaxed);
       DEBUG_ASSERT(prev > 0);
@@ -1960,7 +2169,12 @@ void ArmArchVmAspace::ContextSwitch(ArmArchVmAspace* old_aspace, ArmArchVmAspace
         aspace->num_active_cpus_.fetch_add(1, ktl::memory_order_relaxed);
     DEBUG_ASSERT(prev < SMP_MAX_CPUS);
     aspace->active_since_last_check_.store(true, ktl::memory_order_relaxed);
-
+    // If we are switching to a unified aspace, we need to mark the associated shared and
+    // restricted aspaces as active since the last check as well.
+    if (aspace->IsUnified()) {
+      aspace->shared_aspace_->MarkAspaceModified();
+      aspace->restricted_aspace_->MarkAspaceModified();
+    }
   } else {
     // Switching to the null aspace, which means kernel address space only.
     // Load a null TTBR0 and disable page table walking for user space.
