@@ -1507,7 +1507,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:115
+From //BUILD.gn:117
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -1515,7 +1515,7 @@ From //out/not-default/args.gn:29
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:115
+From //BUILD.gn:117
 
 ### devicetree_board_driver
 
@@ -3564,13 +3564,15 @@ If you add labels to this variable, these will be included in the 'host'
 artifact set, which represents an additional set of host-only software that
 is produced by the build.
 
+These will be added to the build using the host toolchain.
+
 **Current value for `target_cpu = "arm64"`:** `[]`
 
 From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:120
+From //BUILD.gn:124
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3578,7 +3580,7 @@ From //out/not-default/args.gn:8
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:120
+From //BUILD.gn:124
 
 ### host_os
 
@@ -3589,13 +3591,15 @@ From //BUILD.gn:120
 Host-only tests.  These cannot have any dependency on an assembled platform
 image, or the compiled OS itself, not even for their host_test_data().
 
+These will be added to the build using the host toolchain.
+
 **Current value for `target_cpu = "arm64"`:** `[]`
 
 From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:110
+From //BUILD.gn:112
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -3603,7 +3607,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:110
+From //BUILD.gn:112
 
 ### host_tools_dir
 
@@ -4242,7 +4246,7 @@ From //BUILD.gn:57
 
 **Current value (from the default):** `[]`
 
-From //BUILD.gn:121
+From //BUILD.gn:125
 
 ### legacy_product_bootfs_labels
 
@@ -7490,7 +7494,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:132
+From //BUILD.gn:136
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -7498,7 +7502,7 @@ From //products/bringup.gni:16
 
 **Overridden from the default:** `[]`
 
-From //BUILD.gn:132
+From //BUILD.gn:136
 
 ### sdk_cross_compile_host_tools
 
@@ -8103,7 +8107,7 @@ afterwards.
 
 **Current value (from the default):** `""`
 
-From //BUILD.gn:127
+From //BUILD.gn:131
 
 ### test_package_labels
 
