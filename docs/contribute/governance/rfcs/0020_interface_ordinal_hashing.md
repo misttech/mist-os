@@ -463,7 +463,7 @@ different enough to justify hard-coding the hash algorithm.
       opportunities for interface extension, and that overloading maps poorly
       onto many programming languages.
 - Since ordinal hashing should resolve ordinals clashing when interface inheritance
-  is used, the [FragileBase] attribute could also be removed.
+  is used, the `FragileBase` attribute could also be removed.
     - Code Search shows ~9 uses of `FragileBase`.
 - The authors were concerned that an interface that has evolved significantly
   over time may become hard to read if many methods have `Selector` attributes on them.

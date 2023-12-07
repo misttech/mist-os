@@ -112,7 +112,7 @@ cipd install fuchsia/third_party/sysroot/linux integration -root ${SYSROOT_DIR}
 
 {% dynamic if user.is_googler %}
 
-### [Googlers only] Goma
+### \[Googlers only\] Goma
 
 Goma is a service for accelerating builds by distributing compilations across
 many machines. Googlers should ensure Goma is installed on your machine for faster
@@ -443,7 +443,7 @@ specifying different a different `check-<component>`.
 
 {% dynamic if user.is_googler %}
 
-## [Googlers only] Building Fuchsia with custom Clang on bots
+## [\Googlers only\] Building Fuchsia with custom Clang on bots
 
 Fuchsia's infrastructure has support for using a non-default version of Clang
 to build. Only Clang instances that have been uploaded to CIPD or Isolate are
@@ -478,7 +478,7 @@ It will provide you with a link to the BuildBucket page to track your build.
 You will need to run `led auth-login` prior to triggering any builds, and may need to
 file an infra ticket to request access to run led jobs.
 
-## [Googlers Only] Downloading Toolchains from CAS
+## \[Googlers Only\] Downloading Toolchains from CAS
 
 Our Clang Toolchain CI builders upload all build artifacts to Content Addressed Storage (CAS).
 It provides a convenient way to quickly download a specific toolchain without having to build from scratch.

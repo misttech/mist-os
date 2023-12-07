@@ -808,7 +808,7 @@ Conformant FIDL bindings must check all of the following integrity constraints:
 
 #### Header Flags {#flags}
 
-*Flags[0]*
+`Flags[0]`
 
 | Bit     | Current Usage                                                | Past Usages |
 |---------|--------------------------------------------------------------|-------------|
@@ -821,7 +821,7 @@ Conformant FIDL bindings must check all of the following integrity constraints:
 | 1       | Indicates whether the v2 wire format is used ([RFC-0114])    |             |
 | 0       | Unused | Indicates whether static unions should be encoded as xunions ([RFC-0061]) |
 
-*Flags[1]*
+`Flags[1]`
 
 | Bit     | Current Usage                                                | Past Usages |
 |---------|--------------------------------------------------------------|-------------|
@@ -834,7 +834,7 @@ Conformant FIDL bindings must check all of the following integrity constraints:
 | 1       | Unused                                                       |             |
 | 0       | Unused                                                       |             |
 
-*Flags[2]*
+`Flags[2]`
 
 | Bit     | Current Usage                                                | Past Usages |
 |---------|--------------------------------------------------------------|-------------|

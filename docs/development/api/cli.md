@@ -573,7 +573,7 @@ user, the tool may do so with the express permission of the user.
 
 ## Execution Success and Failure
 
-Command line tools return an integer value in the range [0..127] when they exit.
+Command line tools return an integer value in the range \[0..127\] when they exit.
 A zero represents success (no error) and 1-127 are various forms of error. The
 value 1 is used as a general error. Any values other than 0 and 1 that may be
 returned must be documented for the user.

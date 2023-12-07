@@ -578,26 +578,26 @@ The following questions are explored:
 
 #### Discussion
 
-* [ianloic] But what about component manifests?  Why not use FIDL to
+* \[ianloic\] But what about component manifests?  Why not use FIDL to
   describe those too?
-* [jeffbrown] component manifests describe concepts that go well beyond IPC
+* \[jeffbrown\] component manifests describe concepts that go well beyond IPC
   concerns
-* [abdulla] describing services in component manifests would lead to
+* \[abdulla\] describing services in component manifests would lead to
   duplication of the description of those services
-* [ianloic] could we generate the skeleton of a component from its manifest?
-* [drees] putting service declarations in FIDL is imposing a specific
+* \[ianloic\] could we generate the skeleton of a component from its manifest?
+* \[drees\] putting service declarations in FIDL is imposing a specific
   structure, does this make sense on other platforms?
-* [jeffbrown] we want declarations of services to be external to components
+* \[jeffbrown\] we want declarations of services to be external to components
   because they need to be shared between components, it is the point of
   agreement for service exchange
-* [ianloic] service declarations for overnet likely to be similar
-* [pascallouis] Is it is good to start simple based on what we know we need
+* \[ianloic\] service declarations for overnet likely to be similar
+* \[pascallouis\] Is it is good to start simple based on what we know we need
   now. We can adapt later as needed.
-* [pascallouis] FIDL is Fuchsia first so it makes sense to introduce
+* \[pascallouis\] FIDL is Fuchsia first so it makes sense to introduce
   features that only make sense in that context given the information we
   have today but that over time could be generalized for other contexts
-* [dustingreen] what about a separate file?
-* [pascallouis] those files would be very small and lonely, opportunities
+* \[dustingreen\] what about a separate file?
+* \[pascallouis\] those files would be very small and lonely, opportunities
   for static type checking if we keep them in FIDL, seems low risk to move
   it later if needed
 
@@ -654,15 +654,15 @@ The following questions are explored:
 
 #### Discussion
 
-* [ianloic] what guidance should we offer for choosing protocol composition
+* \[ianloic\] what guidance should we offer for choosing protocol composition
   vs. service declarations?
-* [abdulla] protocol composition indicates that the protocol themselves are
+* \[abdulla\] protocol composition indicates that the protocol themselves are
   highly related vs. service is indicating that a set of capabilities
   (possibly unrelated) are being jointly offered
-* [pascallouis] compose multiplexes protocols over a single channel so has
+* \[pascallouis\] compose multiplexes protocols over a single channel so has
   implications for message ordering vs. individual protocols of a service
   have different channels
-* [jeffbrown] can delegate in different places, not related, composition
+* \[jeffbrown\] can delegate in different places, not related, composition
   doesn't get you this functionality, services allow "discovery" at runtime,
   e.g. listing which protocols are available
 
