@@ -21,11 +21,11 @@
 
 namespace {
 
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 constexpr bool kUseUnifiedAspace = true;
 #else
 constexpr bool kUseUnifiedAspace = false;
-#endif  // defined(__x86_64__)
+#endif  // defined(__x86_64__) || defined(__arch64__)
 
 void RunRestrictedMode(zx_vaddr_t cs_addr, zx_vaddr_t stack_addr,
                        std::optional<zx_excp_type_t> expected_exception, zx_status_t* result) {

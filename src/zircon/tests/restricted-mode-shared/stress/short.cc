@@ -11,8 +11,8 @@ TEST(RestrictedModeUnifiedStress, SharedRegionTestShort) {
 }
 
 // TODO(https://fxbug.dev/132980): Enable on other architectures as they support unified aspaces.
-#if defined(__x86_64__)
+#if defined(__x86_64__) || defined(__aarch64__)
 TEST(RestrictedModeUnifiedStress, RestrictedRegionTestShort) {
   Orchestrator(zx::sec(10), zx::sec(1), TestMode::Restricted);
 }
-#endif  // defined(__x86_64__)
+#endif  // defined(__x86_64__) || defined(__aarch64__)
