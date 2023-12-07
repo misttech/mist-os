@@ -10,8 +10,6 @@ import sys
 import plasa_differ
 from enum import Enum
 
-# TODO(kjharland): Write unit tests.
-
 
 class Policy(Enum):
     # update_golden tells this script to overwrite the existing golden with
@@ -237,7 +235,12 @@ def fail_on_changes(args):
 
 
 def update_cmd(current, golden):
-    return "cp {} {}".format(os.path.abspath(current), os.path.abspath(golden))
+    # Disable shallow comparison which doesn't prevent unnecessary writes. It
+    # ignores file contents and only compares file type, size and mod time.
+    if not filecmp.cmp(current, golden, shallow=False):
+        return "cp {} {}".format(
+            os.path.abspath(current), os.path.abspath(golden)
+        )
 
 
 if __name__ == "__main__":
