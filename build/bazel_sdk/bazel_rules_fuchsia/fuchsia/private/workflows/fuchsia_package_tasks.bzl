@@ -195,6 +195,7 @@ def fuchsia_package_tasks(
             "remove",
             anonymous_repo_name,
         ],
+        default_argument_scope = "explicit",
         **kwargs
     )
     publish_only_task = "%s_only" % publish_task
