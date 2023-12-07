@@ -12,7 +12,6 @@
 #include <cstdlib>
 #include <memory>
 
-#include "src/developer/debug/debug_agent/posix/eintr_wrapper.h"
 #include "src/developer/debug/ipc/protocol.h"
 #include "src/developer/debug/shared/buffered_bidi_pipe.h"
 #include "src/developer/debug/shared/logging/logging.h"
@@ -25,7 +24,6 @@
 #include "src/developer/debug/zxdb/console/command_sequence.h"
 #include "src/developer/debug/zxdb/console/console_impl.h"
 #include "src/developer/debug/zxdb/console/console_noninteractive.h"
-#include "src/developer/debug/zxdb/console/fd_streamer.h"
 #include "src/developer/debug/zxdb/console/output_buffer.h"
 #include "src/developer/debug/zxdb/console/verbs.h"
 #include "src/developer/debug/zxdb/debug_adapter/server.h"
@@ -231,17 +229,6 @@ int ConsoleMain(int argc, const char* argv[]) {
       }
     } else {
       console = std::make_unique<ConsoleImpl>(session.get());
-    }
-
-    std::vector<std::unique_ptr<debug::BufferedFD>> file_streamers;
-    for (auto& path : options.stream_files) {
-      fbl::unique_fd fd(HANDLE_EINTR(open(path.c_str(), O_RDONLY | O_NONBLOCK)));
-      if (!fd.is_valid()) {
-        LOGS(Error) << "Failed to open file for streaming: " << path;
-        loop.Cleanup();
-        return EXIT_FAILURE;
-      }
-      file_streamers.emplace_back(StreamFDToConsole(std::move(fd)));
     }
 
     // Run the actions and then initialize the console to enter interactive mode. Errors in
