@@ -91,19 +91,9 @@ class PlatformBuffer : public PlatformObject {
 
   virtual bool MapAtCpuAddr(uint64_t addr, uint64_t offset, uint64_t length) = 0;
 
-  // Maps the buffer to a VA constrained by |upper_limit|. The value of
-  // |upper_limit| must be large enough to accommodate the size of the buffer
-  // with alignment. When |alignment| is not zero, it must be a power of 2 and
-  // page-aligned.
-  virtual bool MapCpuConstrained(void** va_out, uint64_t length, uint64_t upper_limit,
-                                 uint64_t alignment = 0) = 0;
-
   // |flags| is a set of elements of Flags, above.
   virtual bool MapCpuWithFlags(uint64_t offset, uint64_t length, uint64_t flags,
                                std::unique_ptr<Mapping>* mapping_out) = 0;
-
-  // |padding| is the count of bytes after any CPU mapping that will be allocated and left empty.
-  virtual bool SetPadding(uint64_t padding) = 0;
 
   virtual bool CleanCache(uint64_t offset, uint64_t size, bool invalidate) = 0;
 

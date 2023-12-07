@@ -12,13 +12,6 @@
 
 #include <gtest/gtest.h>
 
-// Some tests don't support ASAN
-#if defined(__has_feature)
-#if __has_feature(address_sanitizer) || __has_feature(hwaddress_sanitizer)
-#define HAS_FEATURE_ASAN
-#endif
-#endif
-
 #if defined(__Fuchsia__)
 
 #include <lib/zx/vmar.h>
@@ -139,42 +132,6 @@ class TestPlatformBuffer {
     }
 
     EXPECT_LT(i, 100u);
-  }
-
-  static void MapConstrained() {
-    const uint64_t kPageSize = magma::page_size();
-    const uint64_t kLength = kPageSize * 2;
-    const uint64_t kDefaultAlignment = 0;
-    const uint64_t kNoLimit = std::numeric_limits<uint64_t>::max();
-    const uint64_t k4GLimit = uint64_t{1} << 32;
-    void* va_out;
-
-    std::unique_ptr<magma::PlatformBuffer> buffer = magma::PlatformBuffer::Create(kLength, "test");
-
-    // Test argument validation.
-    EXPECT_FALSE(buffer->MapCpuConstrained(nullptr, kPageSize, kNoLimit, kDefaultAlignment));
-    EXPECT_FALSE(
-        buffer->MapCpuConstrained(&va_out, kLength + kPageSize, kNoLimit, kDefaultAlignment));
-    EXPECT_FALSE(buffer->MapCpuConstrained(&va_out, kPageSize + 1, kNoLimit, kDefaultAlignment));
-    EXPECT_FALSE(buffer->MapCpuConstrained(&va_out, kPageSize, k4GLimit + 1, kDefaultAlignment));
-    EXPECT_FALSE(buffer->MapCpuConstrained(&va_out, kPageSize, k4GLimit, kDefaultAlignment + 1));
-    EXPECT_FALSE(buffer->MapCpuConstrained(&va_out, kPageSize, k4GLimit, kPageSize + 1));
-    EXPECT_FALSE(buffer->MapCpuConstrained(&va_out, kPageSize, k4GLimit, kPageSize * 2 + 1));
-
-    // Test basic mapping.
-    EXPECT_TRUE(buffer->MapCpuConstrained(&va_out, kLength, k4GLimit, kDefaultAlignment));
-    EXPECT_NE(nullptr, va_out);
-    EXPECT_LT(reinterpret_cast<uint64_t>(va_out), k4GLimit);
-    EXPECT_LE(reinterpret_cast<uint64_t>(va_out) + kLength, k4GLimit);
-
-    // Test map counting.
-    void* const original_va = va_out;
-    uint32_t i;
-    for (i = 0; i < 100; i++) {
-      ASSERT_TRUE(buffer->MapCpuConstrained(&va_out, kLength, k4GLimit, kDefaultAlignment));
-      EXPECT_EQ(original_va, va_out);
-    }
-    EXPECT_EQ(100u, i);
   }
 
   enum class CreateConfig { kCreate, kImport };
@@ -470,41 +427,6 @@ class TestPlatformBuffer {
     EXPECT_TRUE(buffer->SetMappingAddressRange(magma::PlatformBuffer::MappingAddressRange::Create(
         magma::PlatformHandle::Create(GetVmarHandle(kVmarLength)))));
   }
-
-  static void Padding() {
-    std::unique_ptr<magma::PlatformBuffer> buffer =
-        magma::PlatformBuffer::Create(magma::page_size(), "test");
-    EXPECT_FALSE(buffer->SetPadding(1));
-    EXPECT_TRUE(buffer->SetPadding(magma::page_size()));
-
-    void* va;
-    EXPECT_TRUE(buffer->MapCpuConstrained(&va, buffer->size(), 1ul << 38));
-
-    std::unique_ptr<magma::PlatformBuffer> probe_buffer =
-        magma::PlatformBuffer::Create(magma::page_size(), "prove");
-    // Check that a buffer can't be mapped immediately after.
-    EXPECT_FALSE(probe_buffer->MapAtCpuAddr(reinterpret_cast<uint64_t>(va) + buffer->size(), 0,
-                                            probe_buffer->size()));
-
-    EXPECT_TRUE(buffer->UnmapCpu());
-
-    EXPECT_TRUE(buffer->MapCpu(&va));
-    EXPECT_FALSE(probe_buffer->MapAtCpuAddr(reinterpret_cast<uint64_t>(va) + buffer->size(), 0,
-                                            probe_buffer->size()));
-    EXPECT_TRUE(buffer->UnmapCpu());
-
-    // This is an address that probably won't be used by any other allocation, even with the ASAN
-    // shadow enabled.
-    constexpr uint64_t kMappedAddr = 1ul << 46;
-    if (buffer->MapAtCpuAddr(kMappedAddr, 0, buffer->size())) {
-      EXPECT_FALSE(
-          probe_buffer->MapAtCpuAddr(kMappedAddr + buffer->size(), 0, probe_buffer->size()));
-      EXPECT_TRUE(buffer->UnmapCpu());
-
-    } else {
-      printf("Warning: MapAtCpuAddr failed, skipping probe test.");
-    }
-  }
 #endif
 
   static void ReadWrite() {
@@ -669,13 +591,6 @@ TEST(PlatformBuffer, AddressRegionSize) { TestPlatformBuffer::CheckAddressRegion
 TEST(PlatformBuffer, MappingAddressRange) { TestPlatformBuffer::MappingAddressRange(); }
 
 TEST(PlatformBuffer, MapSpecific) { TestPlatformBuffer::MapSpecific(); }
-
-// TODO(fxbug.dev/57091)
-#if !defined(HAS_FEATURE_ASAN)
-TEST(PlatformBuffer, MapConstrained) { TestPlatformBuffer::MapConstrained(); }
-
-TEST(PlatformBuffer, Padding) { TestPlatformBuffer::Padding(); }
-#endif
 
 TEST(PlatformBuffer, Name) { TestPlatformBuffer::Name(); }
 

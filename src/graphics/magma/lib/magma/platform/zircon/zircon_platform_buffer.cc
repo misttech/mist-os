@@ -106,7 +106,7 @@ bool ZirconPlatformBuffer::MapAtCpuAddr(uint64_t addr, uint64_t offset, uint64_t
   zx::vmar child_vmar;
   zx_status_t status = parent_vmar_->get()->allocate(
       ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC | ZX_VM_SPECIFIC,
-      addr - vmar_base, length + padding_size_, &child_vmar, &child_addr);
+      addr - vmar_base, length, &child_vmar, &child_addr);
   // This may happen often if there happens to be another allocation already there, so don't DRET
   if (status != ZX_OK)
     return false;
@@ -141,7 +141,6 @@ bool ZirconPlatformBuffer::MapCpu(void** addr_out, uint64_t alignment) {
     // If alignment is needed, allocate a vmar that's large enough so that
     // the buffer will fit at an aligned address inside it.
     uintptr_t vmar_size = alignment ? size() + alignment : size();
-    vmar_size += padding_size_;
     zx::vmar child_vmar;
     zx_status_t status = parent_vmar_->get()->allocate(
         ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC, 0, vmar_size,
@@ -161,96 +160,6 @@ bool ZirconPlatformBuffer::MapCpu(void** addr_out, uint64_t alignment) {
   DASSERT(!alignment || (reinterpret_cast<uintptr_t>(virt_addr_) & (alignment - 1)) == 0);
 
   *addr_out = virt_addr_;
-  map_count_++;
-
-  DLOG("mapped vmo %p got %p, map_count_ = %u", this, virt_addr_, map_count_);
-
-  return true;
-}
-
-bool ZirconPlatformBuffer::MapCpuConstrained(void** va_out, uint64_t length, uint64_t upper_limit,
-                                             uint64_t alignment) {
-  TRACE_DURATION("magma", "MapCpuConstrained", "size", TA_UINT64(size()), "length",
-                 TA_UINT64(length), "upper_limit", TA_UINT64(upper_limit), "alignment",
-                 TA_UINT64(alignment));
-
-  if (!va_out) {
-    return DRETF(false, "va_out is nullptr");
-  }
-  if (!magma::is_page_aligned(length)) {
-    return DRETF(false, "length %lx isn't page aligned", length);
-  }
-  if (length > size()) {
-    return DRETF(false, "length %lx > size %lx", length, size());
-  }
-  if (!magma::is_page_aligned(alignment)) {
-    return DRETF(false, "alignment 0x%lx isn't page aligned", alignment);
-  }
-  // The combination of this test and the previous alignment test ensures that
-  // alignment is power of 2 of at least PAGE_SIZE or zero.
-  uint64_t alignment_log2 = 0;
-  if (alignment && !magma::get_pow2(alignment, &alignment_log2)) {
-    return DRETF(false, "alignment 0x%lx isn't power of 2", alignment);
-  }
-  if ((alignment_log2 << ZX_VM_ALIGN_BASE) > ZX_VM_ALIGN_4GB) {
-    return DRETF(false, "alignment 0x%lx is too large", alignment);
-  }
-  const uint64_t base_addr = parent_vmar_->Base();
-  if (upper_limit < base_addr) {
-    return DRETF(false, "upper_limit 0x%lx is below the base_addr 0x%lx of the mapping range",
-                 upper_limit, base_addr);
-  }
-  if (upper_limit < length || (upper_limit - length) < base_addr) {
-    return DRETF(false,
-                 "upper_limit 0x%lx incompatible with mapping length 0x%lx above base_addr 0x%lx",
-                 upper_limit, length, base_addr);
-  }
-
-  if (map_count_ == 0) {
-    DASSERT(!virt_addr_);
-    DASSERT(!vmar_);
-    uintptr_t child_addr;
-    zx::vmar child_vmar;
-
-    const uint64_t upper_limit_max = parent_vmar_->Length();
-    const uint64_t upper_limit_offset = std::min(upper_limit - base_addr, upper_limit_max);
-
-    DLOG("upper_limit=0x%lx upper_limit_max=0x%lx upper_limit_offset=0x%lx", upper_limit,
-         upper_limit_max, upper_limit_offset);
-
-    const zx_vm_option_t alignment_flag =
-        static_cast<zx_vm_option_t>(alignment_log2 << ZX_VM_ALIGN_BASE);
-    const zx_vm_option_t flags = ZX_VM_CAN_MAP_READ | ZX_VM_CAN_MAP_WRITE | ZX_VM_CAN_MAP_SPECIFIC |
-                                 ZX_VM_OFFSET_IS_UPPER_LIMIT | alignment_flag;
-    zx_status_t status = parent_vmar_->get()->allocate(
-        flags, upper_limit_offset, length + padding_size_, &child_vmar, &child_addr);
-    if (status != ZX_OK) {
-      return DRETF(false,
-                   "failed to make vmar: base_addr=0x%zx upper_limit=0x%zx size=0x%zx "
-                   "alignment=%zx status=%d",
-                   base_addr, upper_limit, length, alignment, status);
-    }
-
-    DLOG(
-        "allocated vmar: base_addr=0x%zx child_addr=0x%zx length=0x%zx alignment=0x%zx "
-        "upper_limit=0x%zx",
-        base_addr, child_addr, length, alignment, upper_limit);
-
-    uintptr_t ptr;
-    status = child_vmar.map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_SPECIFIC, 0, vmo_, 0, length,
-                            &ptr);
-    if (status != ZX_OK)
-      return DRETF(false, "failed to map vmo");
-
-    DASSERT(ptr == child_addr);
-
-    virt_addr_ = reinterpret_cast<void*>(ptr);
-    vmar_ = std::move(child_vmar);
-  }
-
-  DASSERT(!alignment || (reinterpret_cast<uintptr_t>(virt_addr_) & (alignment - 1)) == 0);
-
-  *va_out = virt_addr_;
   map_count_++;
 
   DLOG("mapped vmo %p got %p, map_count_ = %u", this, virt_addr_, map_count_);
@@ -346,13 +255,6 @@ bool ZirconPlatformBuffer::GetBufferInfo(magma_buffer_info_t* buffer_info_out) c
     return DRETF(false, "vmo_.get_info failed: %d", status);
   }
   buffer_info_out->committed_byte_count = info.committed_bytes;
-  return true;
-}
-
-bool ZirconPlatformBuffer::SetPadding(uint64_t padding) {
-  if (!magma::is_page_aligned(padding))
-    return DRETF(false, "Padding size %ld not page aligned", padding);
-  padding_size_ = padding;
   return true;
 }
 

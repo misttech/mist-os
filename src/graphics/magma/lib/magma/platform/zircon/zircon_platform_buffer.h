@@ -94,13 +94,10 @@ class ZirconPlatformBuffer : public PlatformBuffer {
   magma::Status DecommitPages(uint64_t start_page_index, uint64_t page_count) const override;
   bool GetBufferInfo(magma_buffer_info_t* buffer_info_out) const override;
   bool MapCpu(void** addr_out, uintptr_t alignment) override;
-  bool MapCpuConstrained(void** va_out, uint64_t length, uint64_t upper_limit,
-                         uint64_t alignment) override;
   bool UnmapCpu() override;
   bool MapAtCpuAddr(uint64_t addr, uint64_t offset, uint64_t length) override;
   bool MapCpuWithFlags(uint64_t offset, uint64_t length, uint64_t flags,
                        std::unique_ptr<Mapping>* mapping_out) override;
-  bool SetPadding(uint64_t padding) override;
 
   bool CleanCache(uint64_t offset, uint64_t size, bool invalidate) override;
   bool SetCachePolicy(magma_cache_policy_t cache_policy) override;
@@ -128,7 +125,6 @@ class ZirconPlatformBuffer : public PlatformBuffer {
   zx::vmo vmo_;
   zx::vmar vmar_;
   uint64_t size_;
-  uint64_t padding_size_ = 0;
   uint64_t koid_;
   uint64_t local_id_ = 0;
   void* virt_addr_{};
