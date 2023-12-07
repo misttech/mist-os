@@ -871,6 +871,7 @@ pub fn add_and_register_input_device(system_task: &CurrentTask, dev_ops: impl De
 
     let device_id = get_next_device_id();
     let attr = KObjectDeviceAttribute::new(
+        None,
         input_class,
         format!("event{}", device_id).as_bytes(),
         // TODO(b/310963779): file name should not include /, need another way

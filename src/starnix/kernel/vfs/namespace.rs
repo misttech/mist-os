@@ -968,7 +968,7 @@ pub enum PathWithReachability {
 }
 
 impl PathWithReachability {
-    fn into_path(self) -> FsString {
+    pub fn into_path(self) -> FsString {
         match self {
             PathWithReachability::Reachable(path) => path,
             PathWithReachability::Unreachable(path) => path,

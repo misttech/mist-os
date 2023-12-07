@@ -132,6 +132,7 @@ pub fn zram_device_init(system_task: &CurrentTask) {
     registry.add_device_with_directory(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             virtual_block_class,
             b"zram0",
             b"zram0",

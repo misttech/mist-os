@@ -245,6 +245,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class.clone(),
             b"null",
             b"null",
@@ -256,6 +257,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class.clone(),
             b"zero",
             b"zero",
@@ -267,6 +269,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class.clone(),
             b"full",
             b"full",
@@ -278,6 +281,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class.clone(),
             b"random",
             b"random",
@@ -289,6 +293,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class.clone(),
             b"urandom",
             b"urandom",
@@ -300,6 +305,7 @@ pub fn mem_device_init(system_task: &CurrentTask) {
     registry.add_and_register_device(
         system_task,
         KObjectDeviceAttribute::new(
+            None,
             mem_class,
             b"kmsg",
             b"kmsg",

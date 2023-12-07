@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use starnix_lock::Mutex;
 use std::{
     collections::BTreeMap,
@@ -40,6 +41,7 @@ pub enum KType {
 
 #[derive(Clone, Debug)]
 pub struct DeviceMetadata {
+    pub bus: Option<Weak<KObject>>,
     pub class: Weak<KObject>,
     /// Name of the device in /dev.
     pub name: FsString,
@@ -49,12 +51,19 @@ pub struct DeviceMetadata {
 
 impl DeviceMetadata {
     pub fn new(
+        bus: Option<&KObjectHandle>,
         class: &KObjectHandle,
         name: &FsStr,
         device_type: DeviceType,
         mode: DeviceMode,
     ) -> Self {
-        Self { class: Arc::downgrade(class), name: name.to_vec(), device_type, mode }
+        Self {
+            bus: bus.map(Arc::downgrade),
+            class: Arc::downgrade(class),
+            name: name.to_vec(),
+            device_type,
+            mode,
+        }
     }
 }
 
@@ -67,30 +76,36 @@ impl PartialEq for DeviceMetadata {
 /// Attributes that are used to create a KType::Device kobject.
 #[derive(Clone, Debug)]
 pub struct KObjectDeviceAttribute {
+    /// Physical bus kobject that the device belongs to.
+    ///
+    ///  - `None` means it is a virtual device.
+    pub bus: Option<KObjectHandle>,
     /// Class kobject that the device belongs to.
     pub class: KObjectHandle,
     /// Name in /sys.
     pub name: FsString,
-    pub device: DeviceMetadata,
+    pub metadata: DeviceMetadata,
 }
 
 impl KObjectDeviceAttribute {
     pub fn new(
+        bus: Option<KObjectHandle>,
         class: KObjectHandle,
         kobject_name: &FsStr,
         device_name: &FsStr,
         device_type: DeviceType,
         mode: DeviceMode,
     ) -> Self {
-        match class.ktype() {
-            KType::Class => Self {
-                device: DeviceMetadata::new(&class, device_name, device_type, mode),
-                class,
-                name: kobject_name.to_vec(),
-            },
-            _ => {
-                panic!("Invalid class kobject")
-            }
+        assert_matches!(class.ktype(), KType::Class);
+        if let Some(bus) = &bus {
+            assert_matches!(bus.ktype(), KType::Bus);
+        }
+
+        Self {
+            name: kobject_name.to_vec(),
+            metadata: DeviceMetadata::new(bus.as_ref(), &class, device_name, device_type, mode),
+            bus,
+            class,
         }
     }
 }

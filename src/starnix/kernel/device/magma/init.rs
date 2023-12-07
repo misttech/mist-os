@@ -30,6 +30,7 @@ pub fn magma_device_init(current_task: &CurrentTask) {
     registry.add_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             starnix_class,
             b"magma0",
             b"magma0",

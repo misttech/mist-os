@@ -11,7 +11,7 @@ use crate::{
     task::{CurrentTask, NetstackDevicesDirectory},
     vfs::{
         CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-        FsNodeInfo, FsNodeOps, FsStr, StaticDirectoryBuilder,
+        FsNodeInfo, FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, SymlinkNode,
     },
 };
 use starnix_uapi::{auth::FsCred, errors::Errno, file_mode::mode, statfs, SYSFS_MAGIC};
@@ -57,6 +57,12 @@ impl SysFs {
         );
         dir.entry(
             current_task,
+            b"bus",
+            kernel.device_registry.bus_subsystem_kobject().ops(),
+            dir_mode,
+        );
+        dir.entry(
+            current_task,
             b"block",
             kernel.device_registry.block_collection().ops(),
             dir_mode,
@@ -97,4 +103,15 @@ pub fn sys_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSy
 
 pub trait SysFsOps: FsNodeOps {
     fn kobject(&self) -> KObjectHandle;
+}
+
+/// Creates a relative path from a subsystem kobject to the kobject in the devices tree.
+pub fn sysfs_create_link(from: KObjectHandle, to: KObjectHandle) -> SymlinkNode {
+    let mut path = PathBuilder::new();
+    path.prepend_element(&to.path());
+    // "../devices" is the relative path from subsystem root to the devices tree.
+    path.prepend_element(b"../devices");
+    path.prepend_element(&from.path_to_root());
+    // Build a symlink with the relative path.
+    SymlinkNode::new(&path.build()[1..])
 }

@@ -18,13 +18,14 @@ use crate::{
     task::{CurrentTask, Kernel, Task},
     vfs::{
         buffers::{InputBuffer, OutputBuffer},
-        fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, FdNumber, FileHandle, FileObject,
-        FileOps, FileSystemHandle, FileSystemOptions, FsContext, FsNode, FsNodeOps,
+        fileops_impl_nonseekable, fs_node_impl_not_dir, Anon, CacheMode, FdNumber, FileHandle,
+        FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+        FsContext, FsNode, FsNodeOps, FsStr,
     },
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
-    errors::Errno, open_flags::OpenFlags, ownership::Releasable, user_address::UserAddress,
+    errors::Errno, open_flags::OpenFlags, ownership::Releasable, statfs, user_address::UserAddress,
     MAP_ANONYMOUS, MAP_PRIVATE, PROT_READ, PROT_WRITE,
 };
 
@@ -452,4 +453,25 @@ impl MemoryAccessor for AutoReleasableTask {
     fn zero(&self, addr: UserAddress, length: usize) -> Result<usize, Errno> {
         (**self).zero(addr, length)
     }
+}
+
+struct TestFs;
+impl FileSystemOps for TestFs {
+    fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
+        Ok(statfs::default(0))
+    }
+    fn name(&self) -> &'static FsStr {
+        b"test"
+    }
+
+    fn generate_node_ids(&self) -> bool {
+        false
+    }
+}
+
+pub fn create_fs(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
+    let test_fs = FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default());
+    let bus_dir_node = FsNode::new_root(ops);
+    test_fs.set_root_node(bus_dir_node);
+    test_fs
 }

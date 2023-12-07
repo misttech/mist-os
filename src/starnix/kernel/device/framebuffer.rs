@@ -285,6 +285,7 @@ pub fn fb_device_init(system_task: &CurrentTask) {
 
     let graphics_class = registry.add_class(b"graphics", registry.virtual_bus());
     let fb_attr = KObjectDeviceAttribute::new(
+        None,
         graphics_class,
         b"fb0",
         b"fb0",

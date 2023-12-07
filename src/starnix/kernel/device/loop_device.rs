@@ -137,6 +137,7 @@ impl LoopDevice {
         registry.add_device(
             current_task,
             KObjectDeviceAttribute::new(
+                None,
                 virtual_block_class,
                 loop_device_name.as_bytes(),
                 loop_device_name.as_bytes(),

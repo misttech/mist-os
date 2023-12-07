@@ -262,6 +262,7 @@ rustc_binary("starnix_kernel_bin") {
     "fs/proc/pid_directory.rs",
     "fs/proc/proc_directory.rs",
     "fs/proc/sysctl.rs",
+    "fs/sysfs/bus_collection_directory.rs",
     "fs/sysfs/cgroup.rs",
     "fs/sysfs/class_collection_directory.rs",
     "fs/sysfs/cpu_class_directory.rs",

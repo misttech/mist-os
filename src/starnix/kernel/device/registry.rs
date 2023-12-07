@@ -8,7 +8,10 @@ use crate::{
     },
     fs::{
         devtmpfs::{devtmpfs_create_device, devtmpfs_remove_child},
-        sysfs::{BlockDeviceDirectory, ClassCollectionDirectory, DeviceDirectory, SysFsDirectory},
+        sysfs::{
+            BlockDeviceDirectory, BusCollectionDirectory, ClassCollectionDirectory,
+            DeviceDirectory, SysFsDirectory,
+        },
     },
     task::CurrentTask,
     vfs::{FileOps, FsNode, FsNodeOps, FsStr},
@@ -194,6 +197,7 @@ impl MajorDevices {
 pub struct DeviceRegistry {
     root_kobject: KObjectHandle,
     class_subsystem_kobject: KObjectHandle,
+    bus_subsystem_kobject: KObjectHandle,
     state: Mutex<DeviceRegistryState>,
 }
 
@@ -217,6 +221,10 @@ impl DeviceRegistry {
         self.root_kobject.clone()
     }
 
+    pub fn bus_subsystem_kobject(&self) -> KObjectHandle {
+        self.bus_subsystem_kobject.clone()
+    }
+
     pub fn class_subsystem_kobject(&self) -> KObjectHandle {
         self.class_subsystem_kobject.clone()
     }
@@ -234,6 +242,16 @@ impl DeviceRegistry {
         self.root_kobject.get_or_create_child(b"virtual", KType::Bus, SysFsDirectory::new)
     }
 
+    pub fn add_bus(&self, name: &FsStr) -> KObjectHandle {
+        let bus = self.root_kobject.get_or_create_child(name, KType::Bus, SysFsDirectory::new);
+        self.bus_subsystem_kobject.get_or_create_child(
+            name,
+            KType::Collection,
+            BusCollectionDirectory::new,
+        );
+        bus
+    }
+
     pub fn add_class(&self, name: &FsStr, bus: KObjectHandle) -> KObjectHandle {
         let class = bus.get_or_create_child(name, KType::Class, SysFsDirectory::new);
         self.class_subsystem_kobject.get_or_create_child(
@@ -249,7 +267,7 @@ impl DeviceRegistry {
         current_task: &CurrentTask,
         dev_attr: KObjectDeviceAttribute,
     ) -> KObjectHandle {
-        match dev_attr.device.mode {
+        match dev_attr.metadata.mode {
             DeviceMode::Char => {
                 self.add_device_with_directory(current_task, dev_attr, DeviceDirectory::new)
             }
@@ -269,16 +287,22 @@ impl DeviceRegistry {
         F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
-        let ktype = KType::Device(dev_attr.device.clone());
+        let ktype = KType::Device(dev_attr.metadata.clone());
         let kobj_device =
             dev_attr.class.get_or_create_child(&dev_attr.name, ktype, create_fs_node_ops);
         self.class_subsystem_kobject
             .get_child(&dev_attr.class.name())
             .expect("no associated collection exists")
             .insert_child(kobj_device.clone());
+        if let Some(bus) = dev_attr.bus {
+            self.bus_subsystem_kobject
+                .get_child(&bus.name())
+                .expect("no associated collection exists")
+                .insert_child(kobj_device.clone());
+        }
 
-        if let Err(err) = devtmpfs_create_device(current_task, dev_attr.device.clone()) {
-            log_error!("Cannot add device {:?} in devtmpfs ({:?})", dev_attr.device, err);
+        if let Err(err) = devtmpfs_create_device(current_task, dev_attr.metadata.clone()) {
+            log_error!("Cannot add device {:?} in devtmpfs ({:?})", dev_attr.metadata, err);
         }
 
         self.dispatch_uevent(UEventAction::Add, kobj_device.clone());
@@ -292,13 +316,13 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> KObjectHandle {
         if let Err(err) = self.register_device(
-            dev_attr.device.device_type.major(),
-            dev_attr.device.device_type.minor(),
+            dev_attr.metadata.device_type.major(),
+            dev_attr.metadata.device_type.minor(),
             1,
             dev_ops,
-            dev_attr.device.mode,
+            dev_attr.metadata.mode,
         ) {
-            log_error!("Cannot register device {:?} ({:?})", dev_attr.device, err);
+            log_error!("Cannot register device {:?} ({:?})", dev_attr.metadata, err);
         }
         self.add_device(current_task, dev_attr)
     }
@@ -306,11 +330,17 @@ impl DeviceRegistry {
     pub fn remove_device(&self, current_task: &CurrentTask, device: KObjectHandle) {
         assert_matches!(device.ktype(), KType::Device(_));
         if let KType::Device(metadata) = device.ktype() {
-            device.remove();
             self.class_subsystem_kobject
                 .get_child(&metadata.class.upgrade().expect("class kobject should be valid").name())
                 .expect("associated collection should exist")
                 .remove_child(&device.name());
+            if let Some(bus) = &metadata.bus {
+                self.bus_subsystem_kobject
+                    .get_child(&bus.upgrade().expect("bus kobject should be valid").name())
+                    .expect("associated collection should exist")
+                    .remove_child(&device.name());
+            }
+            device.remove();
             self.dispatch_uevent(UEventAction::Remove, device.clone());
 
             devtmpfs_remove_child(current_task, &metadata.name);
@@ -437,6 +467,7 @@ impl Default for DeviceRegistry {
         Self {
             root_kobject: KObject::new_root(),
             class_subsystem_kobject: KObject::new_root(),
+            bus_subsystem_kobject: KObject::new_root(),
             state: Mutex::new(state),
         }
     }
@@ -542,7 +573,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_dynamic_misc() {
+    async fn registry_dynamic_misc() {
         let (_kernel, current_task) = create_kernel_and_task();
 
         fn create_test_device(
@@ -565,7 +596,7 @@ mod tests {
     }
 
     #[::fuchsia::test]
-    async fn test_add_class() {
+    async fn registery_add_class() {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
@@ -573,6 +604,7 @@ mod tests {
         registry.add_device(
             &current_task,
             KObjectDeviceAttribute::new(
+                None,
                 input_class,
                 b"mice",
                 b"mice",
@@ -590,14 +622,42 @@ mod tests {
     }
 
     #[::fuchsia::test]
+    async fn registry_add_bus() {
+        let (kernel, current_task) = create_kernel_and_task();
+        let registry = &kernel.device_registry;
+
+        let bus = registry.add_bus(b"bus");
+        let class = registry.add_class(b"class", bus.clone());
+        registry.add_device(
+            &current_task,
+            KObjectDeviceAttribute::new(
+                Some(bus),
+                class,
+                b"device",
+                b"device",
+                DeviceType::new(0, 0),
+                DeviceMode::Char,
+            ),
+        );
+        assert!(registry.bus_subsystem_kobject().has_child(b"bus"));
+        assert!(registry
+            .bus_subsystem_kobject()
+            .get_child(b"bus")
+            .and_then(|collection| collection.get_child(b"device"))
+            .is_some());
+    }
+
+    #[::fuchsia::test]
     async fn registry_remove_device() {
         let (kernel, current_task) = create_kernel_and_task();
         let registry = &kernel.device_registry;
 
-        let input_class = registry.add_class(b"input", registry.virtual_bus());
+        let pci_bus = registry.add_bus(b"pci");
+        let input_class = registry.add_class(b"input", pci_bus.clone());
         let mice_dev = registry.add_device(
             &current_task,
             KObjectDeviceAttribute::new(
+                Some(pci_bus),
                 input_class.clone(),
                 b"mice",
                 b"mice",
@@ -608,6 +668,11 @@ mod tests {
 
         registry.remove_device(&current_task, mice_dev);
         assert!(!input_class.has_child(b"mice"));
+        assert!(!registry
+            .bus_subsystem_kobject()
+            .get_child(b"pci")
+            .expect("get pci collection")
+            .has_child(b"mice"));
         assert!(!registry
             .class_subsystem_kobject()
             .get_child(b"input")

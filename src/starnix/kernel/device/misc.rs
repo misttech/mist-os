@@ -20,6 +20,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             misc_class.clone(),
             b"hwrng",
             b"hwrng",
@@ -31,6 +32,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             misc_class.clone(),
             b"fuse",
             b"fuse",
@@ -42,6 +44,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             misc_class.clone(),
             b"device-mapper",
             b"mapper/control",
@@ -53,6 +56,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             misc_class.clone(),
             b"loop-control",
             b"loop-control",
@@ -64,6 +68,7 @@ pub fn misc_device_init(current_task: &CurrentTask) {
     registry.add_and_register_device(
         current_task,
         KObjectDeviceAttribute::new(
+            None,
             misc_class,
             b"uinput",
             b"uinput",

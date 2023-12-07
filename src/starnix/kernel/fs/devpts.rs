@@ -113,6 +113,7 @@ pub fn tty_device_init(current_task: &CurrentTask) {
     let registry = &kernel.device_registry;
     let tty_class = registry.add_class(b"tty", registry.virtual_bus());
     let tty = KObjectDeviceAttribute::new(
+        None,
         tty_class.clone(),
         b"tty",
         b"tty",
@@ -120,6 +121,7 @@ pub fn tty_device_init(current_task: &CurrentTask) {
         DeviceMode::Char,
     );
     let ptmx = KObjectDeviceAttribute::new(
+        None,
         tty_class,
         b"ptmx",
         b"ptmx",
