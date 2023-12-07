@@ -10,6 +10,8 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/graphics/display/drivers/amlogic-display/clock-regs.h"
+#include "src/graphics/display/drivers/amlogic-display/common.h"
+#include "src/graphics/display/drivers/amlogic-display/hhi-regs.h"
 
 namespace amlogic_display {
 
@@ -117,13 +119,18 @@ zx::result<> Clock::WaitForHdmiPllToLock() {
     // The configurations used in retries are from Amlogic-provided code which
     // is undocumented.
     if (lock_attempts == 1) {
-      SET_BIT32(HHI, HHI_HDMI_PLL_CNTL3, 1, 31, 1);
+      hhi_mmio_->Write32(
+          SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL3), /*field_begin_bit=*/31,
+                          /*field_size_bits=*/1, /*field_value=*/1),
+          HHI_HDMI_PLL_CNTL3);
     } else if (lock_attempts == 2) {
       hhi_mmio_->Write32(0x55540000, HHI_HDMI_PLL_CNTL6);  // more magic
     }
 
     int retries = 1000;
-    while ((pll_lock = GET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, LCD_PLL_LOCK_HPLL_G12A, 1)) != 1 &&
+    while ((pll_lock = GetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
+                                       /*field_begin_bit=*/LCD_PLL_LOCK_HPLL_G12A,
+                                       /*field_size_bits=*/1)) != 1 &&
            retries--) {
       zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
     }
@@ -246,7 +253,10 @@ void Clock::Disable() {
   VideoClock2Control::Get().ReadFrom(&*hhi_mmio_).set_clock_enabled(false).WriteTo(&*hhi_mmio_);
 
   // disable pll
-  SET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, 0, LCD_PLL_EN_HPLL_G12A, 1);
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
+                                     /*field_begin_bit=*/LCD_PLL_EN_HPLL_G12A,
+                                     /*field_size_bits=*/1, /*field_value=*/0),
+                     HHI_HDMI_PLL_CNTL0);
   clock_enabled_ = false;
 }
 
@@ -286,10 +296,16 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   hhi_mmio_->Write32(useFrac ? 0x56540000 : 0x56540000, HHI_HDMI_PLL_CNTL6);
 
   // reset dpll
-  SET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, 1, LCD_PLL_RST_HPLL_G12A, 1);
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
+                                     /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
+                                     /*field_size_bits=*/1, /*field_value=*/1),
+                     HHI_HDMI_PLL_CNTL0);
   zx_nanosleep(zx_deadline_after(ZX_USEC(100)));
   // release from reset
-  SET_BIT32(HHI, HHI_HDMI_PLL_CNTL0, 0, LCD_PLL_RST_HPLL_G12A, 1);
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_HDMI_PLL_CNTL0),
+                                     /*field_begin_bit=*/LCD_PLL_RST_HPLL_G12A,
+                                     /*field_size_bits=*/1, /*field_value=*/0),
+                     HHI_HDMI_PLL_CNTL0);
 
   zx_nanosleep(zx_deadline_after(ZX_USEC(50)));
   zx::result<> wait_for_pll_lock_result = WaitForHdmiPllToLock();
@@ -303,13 +319,21 @@ zx::result<> Clock::Enable(const display_setting_t& d) {
   zx_nanosleep(zx_deadline_after(ZX_USEC(5)));
 
   // Disable the div output clock
-  SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 0, 19, 1);
-  SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 0, 15, 1);
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/19,
+                                     /*field_size_bits=*/1, /*field_value=*/0),
+                     HHI_VID_PLL_CLK_DIV);
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/15,
+                                     /*field_size_bits=*/1, /*field_value=*/0),
+                     HHI_VID_PLL_CLK_DIV);
 
-  SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 1, 18, 1);  // Undocumented register bit
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/18,
+                                     /*field_size_bits=*/1, /*field_value=*/1),
+                     HHI_VID_PLL_CLK_DIV);  // Undocumented register bit
 
   // Enable the final output clock
-  SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 1, 19, 1);  // Undocumented register bit
+  hhi_mmio_->Write32(SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/19,
+                                     /*field_size_bits=*/1, /*field_value=*/1),
+                     HHI_VID_PLL_CLK_DIV);  // Undocumented register bit
 
   // Enable DSI measure clocks.
   VideoInputMeasureClockControl::Get()

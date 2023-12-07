@@ -273,12 +273,18 @@ zx::result<> DsiHost::PerformPowerOpSequence(cpp20::span<const PowerOp> commands
 
 zx::result<> DsiHost::ConfigureDsiHostController(const display_setting_t& disp_setting) {
   // Setup relevant TOP_CNTL register -- Undocumented --
-  SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, SUPPORTED_DPI_FORMAT, TOP_CNTL_DPI_CLR_MODE_START,
-            TOP_CNTL_DPI_CLR_MODE_BITS);
-  SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, SUPPORTED_VENC_DATA_WIDTH, TOP_CNTL_IN_CLR_MODE_START,
-            TOP_CNTL_IN_CLR_MODE_BITS);
-  SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, 0, TOP_CNTL_CHROMA_SUBSAMPLE_START,
-            TOP_CNTL_CHROMA_SUBSAMPLE_BITS);
+  mipi_dsi_mmio_->Write32(
+      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_DPI_CLR_MODE_START,
+                      TOP_CNTL_DPI_CLR_MODE_BITS, SUPPORTED_DPI_FORMAT),
+      MIPI_DSI_TOP_CNTL);
+  mipi_dsi_mmio_->Write32(
+      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_IN_CLR_MODE_START,
+                      TOP_CNTL_IN_CLR_MODE_BITS, SUPPORTED_VENC_DATA_WIDTH),
+      MIPI_DSI_TOP_CNTL);
+  mipi_dsi_mmio_->Write32(
+      SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), TOP_CNTL_CHROMA_SUBSAMPLE_START,
+                      TOP_CNTL_CHROMA_SUBSAMPLE_BITS, 0),
+      MIPI_DSI_TOP_CNTL);
 
   // setup dsi config
   dsi_config_t dsi_cfg;
@@ -319,12 +325,21 @@ void DsiHost::PhyDisable() {
 void DsiHost::SetSignalPower(bool on) {
   // These bits latch after vsync.
   if (on) {
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, 1, 2, 1);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
+                        /*field_size_bits=*/1, /*field_value=*/1),
+        MIPI_DSI_TOP_CNTL);
     zx::nanosleep(zx::deadline_after(zx::msec(20)));
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, 0, 2, 1);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
+                        /*field_size_bits=*/1, /*field_value=*/0),
+        MIPI_DSI_TOP_CNTL);
     zx::nanosleep(zx::deadline_after(zx::msec(20)));
   } else {
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, 0, 2, 1);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/2,
+                        /*field_size_bits=*/1, /*field_value=*/0),
+        MIPI_DSI_TOP_CNTL);
     zx::nanosleep(zx::deadline_after(zx::msec(20)));
   }
 }
@@ -374,13 +389,25 @@ zx::result<> DsiHost::Enable(const display_setting_t& disp_setting, uint32_t bit
     }
 
     // Enable dwc mipi_dsi_host's clock
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CNTL, 0x3, 4, 2);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CNTL), /*field_begin_bit=*/4,
+                        /*field_size_bits=*/2, /*field_value=*/0x3),
+        MIPI_DSI_TOP_CNTL);
     // mipi_dsi_host's reset
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_SW_RESET, 0xf, 0, 4);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/4, /*field_value=*/0xf),
+        MIPI_DSI_TOP_SW_RESET);
     // Release mipi_dsi_host's reset
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_SW_RESET, 0x0, 0, 4);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_SW_RESET), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/4, /*field_value=*/0x0),
+        MIPI_DSI_TOP_SW_RESET);
     // Enable dwc mipi_dsi_host's clock
-    SET_BIT32(MIPI_DSI, MIPI_DSI_TOP_CLK_CNTL, 0x3, 0, 2);
+    mipi_dsi_mmio_->Write32(
+        SetFieldValue32(mipi_dsi_mmio_->Read32(MIPI_DSI_TOP_CLK_CNTL), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/2, /*field_value=*/0x3),
+        MIPI_DSI_TOP_CLK_CNTL);
 
     mipi_dsi_mmio_->Write32(0, MIPI_DSI_TOP_MEM_PD);
     zx::nanosleep(zx::deadline_after(zx::msec(10)));

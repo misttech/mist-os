@@ -239,10 +239,22 @@ zx_status_t HdmiHost::Init() {
 
 zx_status_t HdmiHost::HostOn() {
   /* Step 1: Initialize various clocks related to the HDMI Interface*/
-  SET_BIT32(GPIO_MUX, PAD_PULL_UP_EN_REG3, 0, 0, 2);
-  SET_BIT32(GPIO_MUX, PAD_PULL_UP_REG3, 0, 0, 2);
-  SET_BIT32(GPIO_MUX, P_PREG_PAD_GPIO3_EN_N, 3, 0, 2);
-  SET_BIT32(GPIO_MUX, PERIPHS_PIN_MUX_B, 0x11, 0, 8);
+  gpio_mux_mmio_->Write32(
+      SetFieldValue32(gpio_mux_mmio_->Read32(PAD_PULL_UP_EN_REG3), /*field_begin_bit=*/0,
+                      /*field_size_bits=*/2, /*field_value=*/0),
+      PAD_PULL_UP_EN_REG3);
+  gpio_mux_mmio_->Write32(
+      SetFieldValue32(gpio_mux_mmio_->Read32(PAD_PULL_UP_REG3), /*field_begin_bit=*/0,
+                      /*field_size_bits=*/2, /*field_value=*/0),
+      PAD_PULL_UP_REG3);
+  gpio_mux_mmio_->Write32(
+      SetFieldValue32(gpio_mux_mmio_->Read32(P_PREG_PAD_GPIO3_EN_N), /*field_begin_bit=*/0,
+                      /*field_size_bits=*/2, /*field_value=*/3),
+      P_PREG_PAD_GPIO3_EN_N);
+  gpio_mux_mmio_->Write32(
+      SetFieldValue32(gpio_mux_mmio_->Read32(PERIPHS_PIN_MUX_B), /*field_begin_bit=*/0,
+                      /*field_size_bits=*/8, /*field_value=*/0x11),
+      PERIPHS_PIN_MUX_B);
 
   // enable clocks
   HdmiClockControl::Get()
@@ -328,7 +340,10 @@ zx_status_t HdmiHost::ModeSet(const display::DisplayTiming& timing) {
   vpu_mmio_->Write32(encoder_timing.vtotal - 1, VPU_ENCP_VIDEO_MAX_LNCNT);
 
   if (encoder_timing.venc_pixel_repeat) {
-    SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE_ADV, 1, 0, 1);
+    vpu_mmio_->Write32(
+        SetFieldValue32(vpu_mmio_->Read32(VPU_ENCP_VIDEO_MODE_ADV), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/1, /*field_value=*/1),
+        VPU_ENCP_VIDEO_MODE_ADV);
   }
 
   // Configure Encoder with detailed timing info (based on resolution)
@@ -523,7 +538,9 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   int venc_hsync = timings.hsync / kHdmiTransmitterPixelRepeatDivisionFactor *
                    kEncoderPixelRepeatMultiplicationFactor;
 
-  SET_BIT32(VPU, VPU_ENCP_VIDEO_MODE, 1, 14, 1);  // DE Signal polarity
+  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPU_ENCP_VIDEO_MODE), /*field_begin_bit=*/14,
+                                     /*field_size_bits=*/1, /*field_value=*/1),
+                     VPU_ENCP_VIDEO_MODE);  // DE Signal polarity
   vpu_mmio_->Write32(timings.hsync + timings.hback, VPU_ENCP_VIDEO_HAVON_BEGIN);
   vpu_mmio_->Write32(timings.hsync + timings.hback + timings.hactive - 1, VPU_ENCP_VIDEO_HAVON_END);
 
@@ -602,7 +619,9 @@ void HdmiHost::ConfigEncoder(const cea_timing& timings) {
   vpu_mmio_->Write32(vpu_hdmi_setting, VPU_HDMI_SETTING);
 
   if (timings.venc_pixel_repeat) {
-    SET_BIT32(VPU, VPU_HDMI_SETTING, 1, 8, 1);
+    vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPU_HDMI_SETTING), /*field_begin_bit=*/8,
+                                       /*field_size_bits=*/1, /*field_value=*/1),
+                       VPU_HDMI_SETTING);
   }
 
   // Select ENCP data to HDMI

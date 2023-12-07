@@ -133,10 +133,14 @@ void Vpu::SetupPostProcessorOutputInterface() {
   ZX_DEBUG_ASSERT(initialized_);
 
   // init vpu fifo control register
-  SET_BIT32(VPU, VPP_OFIFO_SIZE, 0xFFF, 0, 12);
+  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPP_OFIFO_SIZE), /*field_begin_bit=*/0,
+                                     /*field_size_bits=*/12, /*field_value=*/0xFFF),
+                     VPP_OFIFO_SIZE);
   vpu_mmio_->Write32(0x08080808, VPP_HOLD_LINES);
   // default probe_sel, for highlight en
-  SET_BIT32(VPU, VPP_MATRIX_CTRL, 0x7, 12, 3);
+  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(VPP_MATRIX_CTRL), /*field_begin_bit=*/12,
+                                     /*field_size_bits=*/3, /*field_value=*/0x7),
+                     VPP_MATRIX_CTRL);
 }
 
 void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
@@ -149,7 +153,10 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
       // This deviates from the Amlogic-provided code which does an RGB ->
       // YUV conversion for all OSDs and a YUV -> RGB conversion after
       // blending.
-      SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 0, 0, 1);
+      vpu_mmio_->Write32(
+          SetFieldValue32(vpu_mmio_->Read32(VPP_WRAP_OSD1_MATRIX_EN_CTRL), /*field_begin_bit=*/0,
+                          /*field_size_bits=*/1, /*field_value=*/0),
+          VPP_WRAP_OSD1_MATRIX_EN_CTRL);
       break;
     case ColorSpaceConversionMode::kRgbInternalYuvOut: {
       // setting up os1 for rgb -> yuv limit
@@ -169,7 +176,10 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
       vpu_mmio_->Write32(m[11] & 0x1fff, VPP_WRAP_OSD1_MATRIX_COEF22);
       vpu_mmio_->Write32(((m[18] & 0xfff) << 16) | (m[19] & 0xfff), VPP_WRAP_OSD1_MATRIX_OFFSET0_1);
       vpu_mmio_->Write32(m[20] & 0xfff, VPP_WRAP_OSD1_MATRIX_OFFSET2);
-      SET_BIT32(VPU, VPP_WRAP_OSD1_MATRIX_EN_CTRL, 1, 0, 1);
+      vpu_mmio_->Write32(
+          SetFieldValue32(vpu_mmio_->Read32(VPP_WRAP_OSD1_MATRIX_EN_CTRL), /*field_begin_bit=*/0,
+                          /*field_size_bits=*/1, /*field_value=*/1),
+          VPP_WRAP_OSD1_MATRIX_EN_CTRL);
       break;
     }
     default:
@@ -179,7 +189,10 @@ void Vpu::SetupPostProcessorColorConversion(ColorSpaceConversionMode mode) {
   vpu_mmio_->Write32(0xf, DOLBY_PATH_CTRL);
 
   // Disables VPP POST2 matrix.
-  SET_BIT32(VPU, VPP_POST2_MATRIX_EN_CTRL, 0, 0, 1);
+  vpu_mmio_->Write32(
+      SetFieldValue32(vpu_mmio_->Read32(VPP_POST2_MATRIX_EN_CTRL), /*field_begin_bit=*/0,
+                      /*field_size_bits=*/1, /*field_value=*/0),
+      VPP_POST2_MATRIX_EN_CTRL);
 }
 
 void Vpu::ConfigureClock() {

@@ -306,7 +306,10 @@ void HdmiHost::ConfigureOd3Div(uint32_t div_sel) {
   }
 
   if (shift_val == 0xffff) {  // if divide by 1
-    SET_BIT32(HHI, HHI_VID_PLL_CLK_DIV, 1, 18, 1);
+    hhi_mmio_->Write32(
+        SetFieldValue32(hhi_mmio_->Read32(HHI_VID_PLL_CLK_DIV), /*field_begin_bit=*/18,
+                        /*field_size_bits=*/1, /*field_value=*/1),
+        HHI_VID_PLL_CLK_DIV);
     HhiVidPllClkDivReg::Get().ReadFrom(&(*hhi_mmio_)).set_clk_div1(1).WriteTo(&(*hhi_mmio_));
   } else {
     HhiVidPllClkDivReg::Get()

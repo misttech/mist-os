@@ -121,8 +121,14 @@ void MipiPhy::PhyInit() {
                          MIPI_DSI_PHY_CTRL);
 
   // Toggle PHY CTRL RST
-  SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 1, PHY_CTRL_RST_START, PHY_CTRL_RST_BITS);
-  SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 0, PHY_CTRL_RST_START, PHY_CTRL_RST_BITS);
+  dsi_phy_mmio_->Write32(SetFieldValue32(dsi_phy_mmio_->Read32(MIPI_DSI_PHY_CTRL),
+                                         /*field_begin_bit=*/PHY_CTRL_RST_START,
+                                         /*field_size_bits=*/PHY_CTRL_RST_BITS, /*field_value=*/1),
+                         MIPI_DSI_PHY_CTRL);
+  dsi_phy_mmio_->Write32(SetFieldValue32(dsi_phy_mmio_->Read32(MIPI_DSI_PHY_CTRL),
+                                         /*field_begin_bit=*/PHY_CTRL_RST_START,
+                                         /*field_size_bits=*/PHY_CTRL_RST_BITS, /*field_value=*/0),
+                         MIPI_DSI_PHY_CTRL);
 
   dsi_phy_mmio_->Write32((dsi_phy_cfg_.clk_trail | (dsi_phy_cfg_.clk_post << 8) |
                           (dsi_phy_cfg_.clk_zero << 16) | (dsi_phy_cfg_.clk_prepare << 24)),
@@ -157,7 +163,10 @@ void MipiPhy::Shutdown() {
   // Power down DSI
   dsiimpl_.PowerDown();
   dsi_phy_mmio_->Write32(0x1f, MIPI_DSI_CHAN_CTRL);
-  SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 0, 7, 1);
+  dsi_phy_mmio_->Write32(
+      SetFieldValue32(dsi_phy_mmio_->Read32(MIPI_DSI_PHY_CTRL), /*field_begin_bit=*/7,
+                      /*field_size_bits=*/1, /*field_value=*/0),
+      MIPI_DSI_PHY_CTRL);
   phy_enabled_ = false;
 }
 
@@ -189,7 +198,10 @@ zx::result<> MipiPhy::Startup() {
   }
 
   // Trigger a sync active for esc_clk
-  SET_BIT32(DSI_PHY, MIPI_DSI_PHY_CTRL, 1, 1, 1);
+  dsi_phy_mmio_->Write32(
+      SetFieldValue32(dsi_phy_mmio_->Read32(MIPI_DSI_PHY_CTRL), /*field_begin_bit=*/1,
+                      /*field_size_bits=*/1, /*field_value=*/1),
+      MIPI_DSI_PHY_CTRL);
 
   phy_enabled_ = true;
   return zx::ok();

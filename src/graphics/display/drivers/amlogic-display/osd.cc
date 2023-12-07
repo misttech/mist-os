@@ -492,7 +492,9 @@ void Osd::DefaultSetup() {
 
   vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND0_SIZE);
   vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VIU_OSD_BLEND_BLEND1_SIZE);
-  SET_BIT32(VPU, DOLBY_PATH_CTRL, 0x3, 2, 2);
+  vpu_mmio_->Write32(SetFieldValue32(vpu_mmio_->Read32(DOLBY_PATH_CTRL), /*field_begin_bit=*/2,
+                                     /*field_size_bits=*/2, /*field_value=*/0x3),
+                     DOLBY_PATH_CTRL);
 
   vpu_mmio_->Write32(fb_height_ << 16 | fb_width_, VPP_OSD1_IN_SIZE);
 
@@ -581,9 +583,18 @@ void Osd::EnableScaling(bool enable) {
   data32 = 0x0;
   if (enable) {
     data32 |= (bot_ini_phase & 0xffff) << 16;
-    SET_BIT32(VPU, VPU_VPP_OSD_HSC_PHASE_STEP, hf_phase_step, 0, 28);
-    SET_BIT32(VPU, VPU_VPP_OSD_HSC_INI_PHASE, 0, 0, 16);
-    SET_BIT32(VPU, VPU_VPP_OSD_VSC_PHASE_STEP, vf_phase_step, 0, 28);
+    vpu_mmio_->Write32(
+        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_HSC_PHASE_STEP), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/28, /*field_value=*/hf_phase_step),
+        VPU_VPP_OSD_HSC_PHASE_STEP);
+    vpu_mmio_->Write32(
+        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_HSC_INI_PHASE), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/16, /*field_value=*/0),
+        VPU_VPP_OSD_HSC_INI_PHASE);
+    vpu_mmio_->Write32(
+        SetFieldValue32(vpu_mmio_->Read32(VPU_VPP_OSD_VSC_PHASE_STEP), /*field_begin_bit=*/0,
+                        /*field_size_bits=*/28, /*field_value=*/vf_phase_step),
+        VPU_VPP_OSD_VSC_PHASE_STEP);
     vpu_mmio_->Write32(data32, VPU_VPP_OSD_VSC_INI_PHASE);
   }
 }
