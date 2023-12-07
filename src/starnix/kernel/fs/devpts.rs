@@ -479,6 +479,30 @@ impl FileOps for DevPtsFile {
     }
 }
 
+macro_rules! not_implemented_ioctl_requests {
+    ($request:ident, $($($context:literal,)? $unsupported:ident)|*) => {{
+        match $request {
+            $(
+                $unsupported => {
+                    not_implemented!(concat!("ioctl ", $($context, " ",)? stringify!($unsupported)));
+                    error!(ENOSYS)
+                }
+            )+
+            _ => error!(EINVAL),
+        }
+    }};
+}
+
+macro_rules! devpts_not_implemented_ioctl_requests  {
+    ($request:ident, $is_main:expr, $($unsupported:ident)|*) => {{
+        if $is_main {
+            not_implemented_ioctl_requests!($request, $("ptmx", $unsupported)|*)
+        } else {
+            not_implemented_ioctl_requests!($request, $("pts", $unsupported)|*)
+        }
+    }};
+}
+
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl(
     terminal: &Arc<Terminal>,
@@ -586,32 +610,26 @@ fn shared_ioctl(
             terminal.set_termios(termios);
             Ok(SUCCESS)
         }
-
         TIOCSETD => {
-            not_implemented!(
-                "{}: setting line discipline not implemented",
-                if is_main { "ptmx" } else { "pts" }
-            );
+            if is_main {
+                not_implemented!("ptmx setting line discipline");
+            } else {
+                not_implemented!("pts setting line discipline");
+            }
             error!(EINVAL)
         }
-
-        TCGETA | TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL | TIOCNXCL
-        | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET | TIOCGSOFTCAR
-        | TIOCSSOFTCAR | TIOCLINUX | TIOCCONS | TIOCGSERIAL | TIOCSSERIAL | TIOCPKT | FIONBIO
-        | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485 | TIOCSRS485
-        | TCGETX | TCSETX | TCSETXF | TCSETXW | TIOCVHANGUP | FIONCLEX | FIOCLEX | FIOASYNC
-        | TIOCSERCONFIG | TIOCSERGWILD | TIOCSERSWILD | TIOCGLCKTRMIOS | TIOCSLCKTRMIOS
-        | TIOCSERGSTRUCT | TIOCSERGETLSR | TIOCSERGETMULTI | TIOCSERSETMULTI | TIOCMIWAIT
-        | TIOCGICOUNT | FIOQSIZE => {
-            not_implemented!(
-                "{}: ioctl request 0x{:08x} not implemented",
-                if is_main { "ptmx" } else { "pts" },
-                request
-            );
-            error!(ENOSYS)
-        }
-
-        _ => error!(EINVAL),
+        #[rustfmt::skip]
+        unsupported => devpts_not_implemented_ioctl_requests!(
+            unsupported, is_main,
+            TCGETA | TCSETA | TCSETAW | TCSETAF | TCSBRK | TCXONC | TCFLSH | TIOCEXCL
+            | TIOCNXCL | TIOCOUTQ | TIOCSTI | TIOCMGET | TIOCMBIS | TIOCMBIC | TIOCMSET
+            | TIOCGSOFTCAR | TIOCSSOFTCAR | TIOCLINUX | TIOCCONS | TIOCGSERIAL | TIOCSSERIAL
+            | TIOCPKT | FIONBIO | TIOCGETD | TCSBRKP | TIOCSBRK | TIOCCBRK | TIOCGSID | TIOCGRS485
+            | TIOCSRS485 | TCGETX | TCSETX | TCSETXF | TCSETXW | TIOCVHANGUP | FIONCLEX | FIOCLEX
+            | FIOASYNC | TIOCSERCONFIG | TIOCSERGWILD | TIOCSERSWILD | TIOCGLCKTRMIOS
+            | TIOCSLCKTRMIOS | TIOCSERGSTRUCT | TIOCSERGETLSR | TIOCSERGETMULTI | TIOCSERSETMULTI
+            | TIOCMIWAIT | TIOCGICOUNT | FIOQSIZE
+        ),
     }
 }
 
