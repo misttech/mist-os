@@ -39,7 +39,7 @@ source_set("app") {
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_cpp",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
     "//sdk/fidl/fuchsia.hardware.goldfish:fuchsia.hardware.goldfish_cpp",
-    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/lib/json_parser",
     "//src/storage/lib/vfs/cpp",
   ]
@@ -76,7 +76,7 @@ executable("bin") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",
-    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

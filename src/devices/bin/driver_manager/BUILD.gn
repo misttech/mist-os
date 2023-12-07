@@ -60,7 +60,7 @@ source_set("inspect") {
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
   ]
-  deps = [ "//sdk/lib/inspect/component/cpp:inspect_component_cpp" ]
+  deps = [ "//sdk/lib/inspect/component/cpp" ]
 }
 
 source_set("driver_host_loader_service") {

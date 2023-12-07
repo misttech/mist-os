@@ -62,7 +62,7 @@ source_set("driver_runner") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
     "//sdk/lib/async_patterns/cpp",
-    "//sdk/lib/inspect/component/cpp:inspect_component_cpp",
+    "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/vfs/cpp",
     "//src/devices/bin/driver_manager:inspect",
     "//src/devices/bin/driver_manager/devfs",
