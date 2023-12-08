@@ -51,7 +51,7 @@ use crate::{
     context::{CounterContext, InstantContext, RngContext},
     counters::Counter,
     data_structures::{socketmap::IterShadows as _, token_bucket::TokenBucket},
-    device::{FrameDestination, Id, WeakId},
+    device::{DeviceId, FrameDestination, Id, WeakId},
     error::{LocalAddressError, SocketError},
     ip::{
         device::{
@@ -3771,7 +3771,7 @@ pub fn connect<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
     remote_id: u16,
 ) -> Result<(), datagram::ConnectError> {
     let IpInvariant(result) = net_types::map_ip_twice!(
@@ -3798,7 +3798,7 @@ pub fn bind<I: Ip, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    local_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
+    local_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
     icmp_id: Option<NonZeroU16>,
 ) -> Result<(), Either<ExpectedUnboundError, LocalAddressError>> {
     let IpInvariant(result) = net_types::map_ip_twice!(
@@ -3841,7 +3841,7 @@ pub fn send_to<I: Ip, B: BufferMut, C: NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    remote_ip: Option<SocketZonedIpAddr<I::Addr, crate::DeviceId<C>>>,
+    remote_ip: Option<SocketZonedIpAddr<I::Addr, DeviceId<C>>>,
     body: B,
 ) -> Result<
     (),
@@ -3917,7 +3917,7 @@ pub fn set_device<I: Ip, C: crate::NonSyncContext>(
     sync_ctx: &SyncCtx<C>,
     ctx: &mut C,
     id: &SocketId<I>,
-    device_id: Option<&crate::DeviceId<C>>,
+    device_id: Option<&DeviceId<C>>,
 ) -> Result<(), SocketError> {
     let IpInvariant(result) = net_types::map_ip_twice!(
         I,

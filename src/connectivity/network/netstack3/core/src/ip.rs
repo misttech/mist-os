@@ -3476,7 +3476,8 @@ mod tests {
     use crate::{
         context::testutil::{handle_timer_helper_with_sc_ref, FakeInstant, FakeTimerCtxExt as _},
         device::{
-            self, testutil::set_forwarding_enabled, update_ipv6_configuration, FrameDestination,
+            self, testutil::set_forwarding_enabled, update_ipv6_configuration, DeviceId,
+            FrameDestination,
         },
         ip::{
             device::{
@@ -3493,7 +3494,6 @@ mod tests {
             FakeEventDispatcherBuilder, FakeNonSyncCtx, TestIpExt, DEFAULT_INTERFACE_METRIC,
             FAKE_CONFIG_V4, FAKE_CONFIG_V6, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
-        DeviceId,
     };
 
     // Some helper functions

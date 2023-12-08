@@ -272,7 +272,7 @@ mod tests {
         },
         device::{
             testutil::{FakeDeviceId, FakeWeakDeviceId},
-            update_ipv6_configuration, FrameDestination,
+            update_ipv6_configuration, DeviceId, FrameDestination,
         },
         ip::{
             device::{
@@ -289,7 +289,7 @@ mod tests {
             DEFAULT_INTERFACE_METRIC, IPV6_MIN_IMPLIED_MAX_FRAME_SIZE,
         },
         time::TimerIdInner,
-        DeviceId, TimerId,
+        TimerId,
     };
 
     #[derive(Default)]

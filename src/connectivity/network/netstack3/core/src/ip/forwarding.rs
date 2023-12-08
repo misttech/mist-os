@@ -16,7 +16,7 @@ use thiserror::Error;
 use tracing::debug;
 
 use crate::{
-    device::DeviceLayerTypes,
+    device::{DeviceId, DeviceLayerTypes},
     ip::{
         types::{
             AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
@@ -24,7 +24,7 @@ use crate::{
         AnyDevice, DeviceIdContext, IpExt, IpLayerEvent, IpLayerIpExt, IpLayerNonSyncContext,
         IpStateContext,
     },
-    DeviceId, NonSyncContext, SyncCtx,
+    NonSyncContext, SyncCtx,
 };
 
 /// Provides access to a device for the purposes of IP forwarding.

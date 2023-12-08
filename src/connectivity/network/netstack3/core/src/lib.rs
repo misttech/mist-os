@@ -116,7 +116,7 @@ pub mod types {
     pub use crate::work_queue::WorkQueueReport;
 }
 
-use crate::{context::RngContext, device::DeviceId};
+use crate::context::RngContext;
 pub use context::{BindingsTypes, NonSyncContext, ReferenceNotifiers, SyncCtx};
 pub use ip::forwarding::{select_device_for_gateway, set_routes};
 pub use time::{handle_timer, Instant, TimerId};

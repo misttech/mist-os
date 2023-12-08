@@ -2772,7 +2772,10 @@ mod tests {
             FakeCtxWithSyncCtx, FakeFrameCtx, FakeNonSyncCtx, FakeSyncCtx, Wrapped,
             WrappedFakeSyncCtx,
         },
-        device::testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+        device::{
+            testutil::{FakeDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId},
+            DeviceId,
+        },
         error::RemoteAddressError,
         ip::{
             device::state::IpDeviceStateIpExt,
@@ -7674,7 +7677,7 @@ mod tests {
         const HELLO: &'static [u8] = b"Hello";
         let (mut ctx, local_device_ids) = I::FAKE_CONFIG.into_builder().build();
         let crate::testutil::Ctx { sync_ctx, non_sync_ctx } = &mut ctx;
-        let loopback_device_id: crate::DeviceId<crate::testutil::FakeNonSyncCtx> =
+        let loopback_device_id: DeviceId<crate::testutil::FakeNonSyncCtx> =
             crate::device::add_loopback_device(
                 sync_ctx,
                 net_types::ip::Mtu::new(u16::MAX as u32),

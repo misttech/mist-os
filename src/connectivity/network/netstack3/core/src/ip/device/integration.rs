@@ -29,7 +29,7 @@ use packet_formats::{
 
 use crate::{
     context::{CounterContext, InstantContext, SendFrameContext},
-    device::{AnyDevice, DeviceIdContext},
+    device::{AnyDevice, DeviceId, DeviceIdContext},
     error::{ExistsError, NotFoundError},
     ip::{
         self,
@@ -68,7 +68,6 @@ use crate::{
         AddressStatus, IpLayerIpExt, IpStateContext, Ipv4PresentAddressStatus,
         Ipv6PresentAddressStatus, NonSyncContext, SyncCtx, DEFAULT_TTL,
     },
-    DeviceId,
 };
 
 pub(crate) struct SlaacAddrs<'a, C: NonSyncContext> {
@@ -589,7 +588,7 @@ impl<'a, I: gmp::IpExt + IpDeviceIpExt, C: NonSyncContext>
     >
 where
     Locked<&'a SyncCtx<C>, crate::lock_ordering::IpDeviceConfiguration<I>>:
-        device::IpDeviceStateContext<I, C, DeviceId = crate::DeviceId<C>>,
+        device::IpDeviceStateContext<I, C, DeviceId = DeviceId<C>>,
     for<'s> SyncCtxWithIpDeviceConfiguration<
         's,
         &'s I::Configuration,
