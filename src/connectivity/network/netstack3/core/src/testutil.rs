@@ -57,7 +57,7 @@ use crate::{
         TracingContext,
     },
     device::{
-        ethernet, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
+        ethernet::MaxEthernetFrameSize, link::LinkDevice, loopback::LoopbackDeviceId, DeviceId,
         DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
         EthernetWeakDeviceId, WeakDeviceId,
     },
@@ -1362,8 +1362,8 @@ pub(crate) fn handle_timer(
     crate::time::handle_timer(sync_ctx, non_sync_ctx, id)
 }
 
-pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: ethernet::MaxFrameSize =
-    const_unwrap::const_unwrap_option(ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
+pub(crate) const IPV6_MIN_IMPLIED_MAX_FRAME_SIZE: MaxEthernetFrameSize =
+    const_unwrap::const_unwrap_option(MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU));
 
 /// Add a route directly to the forwarding table.
 #[cfg(any(test, feature = "testutils"))]

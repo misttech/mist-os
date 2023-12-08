@@ -20,7 +20,8 @@ use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
     device::{
-        ethernet, update_ipv4_configuration, update_ipv6_configuration, EthernetWeakDeviceId,
+        ethernet::MaxEthernetFrameSize, update_ipv4_configuration, update_ipv6_configuration,
+        EthernetWeakDeviceId,
     },
     ip::{
         device::{
@@ -391,7 +392,7 @@ impl DeviceHandler {
             })
             .transpose()?;
 
-        let max_frame_size = ethernet::MaxFrameSize::new(max_eth_frame_size)
+        let max_frame_size = MaxEthernetFrameSize::new(max_eth_frame_size)
             .ok_or(Error::ConfigurationNotSupported)?;
         let core_id = netstack3_core::device::add_ethernet_device_with_state(
             sync_ctx,

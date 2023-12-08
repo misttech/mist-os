@@ -442,13 +442,14 @@ impl<'a, NonSyncCtx: NonSyncContext, L: LockBefore<crate::lock_ordering::AllDevi
 /// the 4 bytes from FCS (frame check sequence) as we don't calculate CRC and it
 /// is normally handled by the device.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct MaxFrameSize(NonZeroU32);
+pub struct MaxEthernetFrameSize(NonZeroU32);
 
-impl MaxFrameSize {
+impl MaxEthernetFrameSize {
     /// The minimum ethernet frame size.
     ///
     /// We don't care about FCS, so the minimum frame size for us is 64 - 4.
-    pub(crate) const MIN: MaxFrameSize = MaxFrameSize(const_unwrap_option(NonZeroU32::new(60)));
+    pub(crate) const MIN: MaxEthernetFrameSize =
+        MaxEthernetFrameSize(const_unwrap_option(NonZeroU32::new(60)));
 
     /// Creates from the maximum size of ethernet header and ethernet payload,
     /// checks that it is valid, i.e., larger than the minimum frame size.
@@ -471,7 +472,7 @@ impl MaxFrameSize {
     }
 
     /// Creates the maximum ethernet frame size from MTU.
-    pub const fn from_mtu(mtu: Mtu) -> Option<MaxFrameSize> {
+    pub const fn from_mtu(mtu: Mtu) -> Option<MaxEthernetFrameSize> {
         let frame_size = mtu.get().saturating_add(ETHERNET_HDR_LEN_NO_TAG_U32);
         Self::new(frame_size)
     }
@@ -480,7 +481,7 @@ impl MaxFrameSize {
 /// Builder for [`EthernetDeviceState`].
 pub(crate) struct EthernetDeviceStateBuilder {
     mac: UnicastAddr<Mac>,
-    max_frame_size: MaxFrameSize,
+    max_frame_size: MaxEthernetFrameSize,
     metric: RawMetric,
 }
 
@@ -488,12 +489,12 @@ impl EthernetDeviceStateBuilder {
     /// Create a new `EthernetDeviceStateBuilder`.
     pub(crate) fn new(
         mac: UnicastAddr<Mac>,
-        max_frame_size: MaxFrameSize,
+        max_frame_size: MaxEthernetFrameSize,
         metric: RawMetric,
     ) -> Self {
         // TODO(https://fxbug.dev/121480): Add a minimum frame size for all
         // Ethernet devices such that you can't create an `EthernetDeviceState`
-        // with a `MaxFrameSize` smaller than the minimum. The absolute minimum
+        // with a `MaxEthernetFrameSize` smaller than the minimum. The absolute minimum
         // needs to be at least the minimum body size of an Ethernet frame. For
         // IPv6-capable devices, the minimum needs to be higher - the frame size
         // implied by the IPv6 minimum MTU. The easy path is to simply use that
@@ -525,7 +526,7 @@ impl EthernetDeviceStateBuilder {
 
 pub(crate) struct DynamicEthernetDeviceState {
     /// The value this netstack assumes as the device's maximum frame size.
-    max_frame_size: MaxFrameSize,
+    max_frame_size: MaxEthernetFrameSize,
 
     /// A flag indicating whether the device will accept all ethernet frames
     /// that it receives, regardless of the ethernet frame's destination MAC
@@ -537,7 +538,7 @@ pub(crate) struct DynamicEthernetDeviceState {
 }
 
 impl DynamicEthernetDeviceState {
-    fn new(max_frame_size: MaxFrameSize) -> Self {
+    fn new(max_frame_size: MaxEthernetFrameSize) -> Self {
         Self { max_frame_size, promiscuous_mode: false, link_multicast_groups: Default::default() }
     }
 }
@@ -547,7 +548,7 @@ pub(crate) struct StaticEthernetDeviceState {
     mac: UnicastAddr<Mac>,
 
     /// The maximum frame size allowed by the hardware.
-    max_frame_size: MaxFrameSize,
+    max_frame_size: MaxEthernetFrameSize,
 
     /// The routing metric of the device this state is for.
     metric: RawMetric,
@@ -1338,7 +1339,7 @@ pub(super) fn set_mtu<
     mtu: Mtu,
 ) {
     sync_ctx.with_ethernet_state_mut(device_id, |static_state, dynamic_state| {
-        if let Some(mut frame_size ) = MaxFrameSize::from_mtu(mtu) {
+        if let Some(mut frame_size ) = MaxEthernetFrameSize::from_mtu(mtu) {
             // If `frame_size` is greater than what the device supports, set it
             // to maximum frame size the device supports.
             if frame_size > static_state.max_frame_size {
@@ -1465,7 +1466,7 @@ mod tests {
     }
 
     impl FakeEthernetCtx {
-        fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxFrameSize) -> FakeEthernetCtx {
+        fn new(mac: UnicastAddr<Mac>, max_frame_size: MaxEthernetFrameSize) -> FakeEthernetCtx {
             FakeEthernetCtx {
                 static_state: StaticEthernetDeviceState {
                     max_frame_size,

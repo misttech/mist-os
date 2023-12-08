@@ -559,7 +559,7 @@ mod tests {
             testutil::{handle_timer_helper_with_sc_ref_mut, FakeInstant, FakeTimerCtxExt},
             InstantContext as _,
         },
-        device::{ethernet, testutil::FakeDeviceId, DeviceId},
+        device::{ethernet::MaxEthernetFrameSize, testutil::FakeDeviceId, DeviceId},
         ip::{
             device::{IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate},
             gmp::{
@@ -1310,7 +1310,7 @@ mod tests {
         let eth_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id: DeviceId<_> = eth_device_id.clone().into();

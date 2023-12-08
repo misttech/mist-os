@@ -27,7 +27,10 @@ use crate::{
     counters::Counter,
     device::{
         arp::ArpCounters,
-        ethernet::{self, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId},
+        ethernet::{
+            self, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId,
+            MaxEthernetFrameSize,
+        },
         id::{
             BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
             StrongId, WeakId,
@@ -531,7 +534,7 @@ impl<C: DeviceLayerTypes + socket::NonSyncContext<DeviceId<C>>> DeviceLayerState
     >(
         &self,
         mac: UnicastAddr<Mac>,
-        max_frame_size: ethernet::MaxFrameSize,
+        max_frame_size: MaxEthernetFrameSize,
         metric: RawMetric,
         bindings_state: F,
     ) -> EthernetDeviceId<C> {
@@ -828,7 +831,7 @@ pub fn add_ethernet_device_with_state<
 >(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
-    max_frame_size: ethernet::MaxFrameSize,
+    max_frame_size: MaxEthernetFrameSize,
     metric: RawMetric,
     bindings_state: F,
 ) -> EthernetDeviceId<NonSyncCtx> {
@@ -840,7 +843,7 @@ pub fn add_ethernet_device_with_state<
 pub(crate) fn add_ethernet_device<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     mac: UnicastAddr<Mac>,
-    max_frame_size: ethernet::MaxFrameSize,
+    max_frame_size: MaxEthernetFrameSize,
     metric: RawMetric,
 ) -> EthernetDeviceId<NonSyncCtx>
 where
@@ -1488,7 +1491,7 @@ mod tests {
         let _ethernet_device: EthernetDeviceId<_> = crate::device::add_ethernet_device(
             &sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            ethernet::MaxFrameSize::MIN,
+            MaxEthernetFrameSize::MIN,
             DEFAULT_INTERFACE_METRIC,
         );
         assert_eq!(crate::ip::get_all_routes(&sync_ctx), []);
@@ -1501,7 +1504,7 @@ mod tests {
         let ethernet_device = crate::device::add_ethernet_device(
             &sync_ctx,
             UnicastAddr::new(net_mac!("aa:bb:cc:dd:ee:ff")).expect("MAC is unicast"),
-            ethernet::MaxFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Mtu::new(1500)).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         );
 

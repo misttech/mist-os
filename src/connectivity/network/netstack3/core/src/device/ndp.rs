@@ -147,7 +147,8 @@ mod tests {
             InstantContext as _, RngContext as _, TimerContext,
         },
         device::{
-            add_ip_addr_subnet, del_ip_addr, ethernet,
+            add_ip_addr_subnet, del_ip_addr,
+            ethernet::MaxEthernetFrameSize,
             link::LinkAddress,
             remove_ethernet_device,
             testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
@@ -1249,7 +1250,7 @@ mod tests {
         let device = crate::device::add_ethernet_device(
             &sync_ctx,
             local_mac(),
-            ethernet::MaxFrameSize::from_mtu(hw_mtu).unwrap(),
+            MaxEthernetFrameSize::from_mtu(hw_mtu).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         )
         .into();

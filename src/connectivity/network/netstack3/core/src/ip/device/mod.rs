@@ -2157,7 +2157,10 @@ mod tests {
 
     use crate::{
         context::testutil::FakeInstant,
-        device::{ethernet, update_ipv4_configuration, update_ipv6_configuration, DeviceId},
+        device::{
+            ethernet::MaxEthernetFrameSize, update_ipv4_configuration, update_ipv6_configuration,
+            DeviceId,
+        },
         ip::{
             device::{
                 nud::{LinkResolutionResult, NudHandler},
@@ -2185,7 +2188,7 @@ mod tests {
         let ethernet_device_id = crate::device::add_ethernet_device(
             sync_ctx,
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         );
         let device_id = ethernet_device_id.clone().into();
@@ -2848,7 +2851,7 @@ mod tests {
         let device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Ipv4::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
@@ -2967,7 +2970,7 @@ mod tests {
         let device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         )
         .into();
@@ -3117,7 +3120,7 @@ mod tests {
         let device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             local_mac,
-            ethernet::MaxFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
+            MaxEthernetFrameSize::from_mtu(Ipv6::MINIMUM_LINK_MTU).unwrap(),
             DEFAULT_INTERFACE_METRIC,
         )
         .into();

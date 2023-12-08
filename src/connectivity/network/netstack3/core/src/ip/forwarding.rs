@@ -1233,7 +1233,7 @@ mod tests {
         let device_id: DeviceId<_> = crate::device::add_ethernet_device(
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
-            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            crate::device::ethernet::MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             crate::testutil::DEFAULT_INTERFACE_METRIC,
         )
         .into();
@@ -1327,7 +1327,7 @@ mod tests {
         let device_id: DeviceId<_> = crate::device::add_ethernet_device(
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
-            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            crate::device::ethernet::MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             crate::testutil::DEFAULT_INTERFACE_METRIC,
         )
         .into();
@@ -1401,7 +1401,7 @@ mod tests {
         let device_id = crate::device::add_ethernet_device(
             &sync_ctx,
             I::FAKE_CONFIG.local_mac,
-            crate::device::ethernet::MaxFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
+            crate::device::ethernet::MaxEthernetFrameSize::from_mtu(I::MINIMUM_LINK_MTU).unwrap(),
             metric,
         );
         assert_eq!(
