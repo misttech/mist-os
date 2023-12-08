@@ -16,8 +16,12 @@
 #include <fbl/string.h>
 #include <fbl/string_printf.h>
 #include <fbl/unique_fd.h>
+#include <src/diagnostics/lib/cpp-log-tester/log_tester.h>
 #include <zxtest/zxtest.h>
 
+#include "lib/syslog/cpp/log_settings.h"
+#include "lib/syslog/cpp/logging_backend.h"
+#include "lib/syslog/logger.h"
 #include "zircon/system/ulib/syslog/helpers.h"
 
 namespace {
@@ -25,18 +29,26 @@ namespace {
 const char* kFileName = syslog::internal::StripPath(__FILE__);
 const char* kFilePath = syslog::internal::StripDots(__FILE__);
 
-inline zx_status_t init_helper(zx_handle_t handle, const char** tags, size_t num_tags) {
+inline zx_status_t init_helper(zx_handle_t handle, const char** tags, size_t num_tags,
+                               fx_log_severity_t severity = FX_LOG_INFO) {
   fx_logger_config_t config = {
-      .min_severity = FX_LOG_INFO,
+      .min_severity = severity,
       .log_sink_socket = handle,
       .tags = tags,
       .num_tags = num_tags,
   };
-
+  fuchsia_logging::LogSettings settings;
+  settings.min_log_level = severity;
+  settings.disable_interest_listener = true;
+  syslog_backend::SetLogSettings(settings);
   return fx_log_reconfigure(&config);
 }
 
 inline zx_status_t init_helper(zx_handle_t handle) { return init_helper(handle, nullptr, 0); }
+
+inline zx_status_t init_helper(zx_handle_t handle, fx_log_severity_t severity) {
+  return init_helper(handle, nullptr, 0, severity);
+}
 
 template <size_t N>
 inline zx_status_t init_helper(zx_handle_t handle, const char* (&tags)[N]) {
@@ -55,22 +67,16 @@ bool ends_with(const char* str, const fbl::String& suffix) {
 
 void output_compare_helper(const zx::socket& local, fx_log_severity_t severity, const char* msg,
                            const char** tags, size_t num_tags, int line) {
-  fx_log_packet_t packet;
-  ASSERT_OK(local.read(0, &packet, sizeof(packet), nullptr));
-  EXPECT_EQ(severity, packet.metadata.severity);
-  int pos = 0;
-  for (size_t i = 0; i < num_tags; i++) {
-    const char* tag = tags[i];
-    auto tag_len = static_cast<int8_t>(strlen(tag));
-    ASSERT_EQ(tag_len, packet.data[pos]);
-    pos++;
-    ASSERT_BYTES_EQ((uint8_t*)tag, (uint8_t*)packet.data + pos, tag_len, "");
-    pos += tag_len;
-  }
-  ASSERT_EQ(0, packet.data[pos]);
-  pos++;
+  auto messages = log_tester::RetrieveLogsAsLogMessage(local);
+  ASSERT_EQ(messages.size(), 1);
+  ASSERT_EQ(messages[0].metadata().tags.size(), num_tags);
   const char* file = severity > FX_LOG_INFO ? kFilePath : kFileName;
-  EXPECT_STREQ(fbl::StringPrintf("[%s(%d)] %s", file, line, msg), packet.data + pos, "");
+  for (size_t i = 0; i < num_tags; i++) {
+    ASSERT_EQ(messages[0].metadata().tags[i], tags[i]);
+  }
+  EXPECT_EQ(messages[0].message(), std::string(msg));
+  EXPECT_EQ(messages[0].metadata().file, std::string(file));
+  EXPECT_EQ(messages[0].metadata().line, line);
 }
 
 void output_compare_helper(const zx::socket& local, fx_log_severity_t severity, const char* msg,
@@ -214,85 +220,11 @@ TEST(SyslogSocketTests, TestLogFallback) {
       "%s", buf);
 }
 
-TEST(SyslogSocketTestsEdgeCases, TestMsgLengthLimit) {
-  zx::socket local, remote;
-  EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  const char* gtags[] = {"gtag", "gtag2"};
-  ASSERT_OK(init_helper(remote.release(), gtags));
-  char msg[FX_LOG_MAX_DATAGRAM_LEN + 4 + 12] = {0};
-  memset(msg, 'a', sizeof(msg) - 1);
-  int line = __LINE__ + 1;
-  FX_LOGF(INFO, "tag", "%s", msg);
-  fx_log_packet_t packet;
-  fbl::String prefix = fbl::StringPrintf("[%s(%d) ]", kFileName, line);
-  int msg_size = sizeof(packet.data) - 4 - 12 - static_cast<int>(prefix.size());
-  char expected[msg_size];
-  memset(expected, 'a', msg_size - 4);
-  memset(expected + msg_size - 4, '.', 3);
-  expected[msg_size - 1] = 0;
-  const char* tags[] = {"gtag", "gtag2", "tag"};
-  output_compare_helper(local, FX_LOG_INFO, expected, tags, 3, line);
-}
-
-TEST(SyslogSocketTestsEdgeCases, TestMsgLengthLimitForPreprocessedMsg) {
-  zx::socket local, remote;
-  EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  const char* gtags[] = {"gtag", "gtag2"};
-  ASSERT_OK(init_helper(remote.release(), gtags, 2));
-  char msg[FX_LOG_MAX_DATAGRAM_LEN + 4 + 12] = {0};
-  memset(msg, 'a', sizeof(msg) - 1);
-  msg[0] = '%';
-  msg[1] = 's';
-  int line = __LINE__ + 1;
-  FX_LOG(INFO, "tag", msg);
-  fx_log_packet_t packet;
-  fbl::String prefix = fbl::StringPrintf("[%s(%d) ]", kFileName, line);
-  int msg_size = sizeof(packet.data) - 4 - 12 - static_cast<int>(prefix.size());
-  char expected[msg_size];
-  memset(expected, 'a', msg_size - 4);
-  expected[0] = '%';
-  expected[1] = 's';
-  memset(expected + msg_size - 4, '.', 3);
-  expected[msg_size - 1] = 0;
-  const char* tags[] = {"gtag", "gtag2", "tag"};
-  output_compare_helper(local, FX_LOG_INFO, expected, tags, 3, line);
-}
-
-TEST(SyslogSocketTestsEdgeCases, TestTagLengthLimit) {
-  zx::socket local, remote;
-  EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  char gtags_buffer[FX_LOG_MAX_TAGS][FX_LOG_MAX_TAG_LEN + 1];
-  memset(gtags_buffer, 't', sizeof(gtags_buffer));
-  const char* gtags[FX_LOG_MAX_TAGS];
-  for (int i = 0; i < FX_LOG_MAX_TAGS; i++) {
-    gtags_buffer[i][0] = static_cast<char>(49 + i);  // '1' + i
-    gtags_buffer[i][FX_LOG_MAX_TAG_LEN] = 0;
-    gtags[i] = gtags_buffer[i];
-  }
-  ASSERT_OK(init_helper(remote.release(), gtags, FX_LOG_MAX_TAGS));
-
-  char tag[FX_LOG_MAX_TAG_LEN + 1];
-  memcpy(tag, gtags[FX_LOG_MAX_TAGS - 1], sizeof(tag));
-  tag[0]++;
-  char msg[] = "some text";
-  int line = __LINE__ + 1;
-  FX_LOGF(INFO, tag, "%s", msg);
-  const char* tags[FX_LOG_MAX_TAGS + 1];
-  for (int i = 0; i < FX_LOG_MAX_TAGS; i++) {
-    gtags_buffer[i][FX_LOG_MAX_TAG_LEN - 1] = 0;
-    tags[i] = gtags_buffer[i];
-  }
-  tag[FX_LOG_MAX_TAG_LEN - 1] = 0;
-  tags[FX_LOG_MAX_TAGS] = tag;
-  output_compare_helper(local, FX_LOG_INFO, msg, tags, FX_LOG_MAX_TAGS + 1, line);
-}
-
 TEST(SyslogSocketTests, TestVlogSimpleWrite) {
   zx::socket local, remote;
   EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  ASSERT_OK(init_helper(remote.release()));
+  ASSERT_OK(init_helper(remote.release(), 1));  // 1 is INFO-1
   const char* msg = "test message";
-  FX_LOG_SET_VERBOSITY(1);  // INFO - 1
   int line = __LINE__ + 1;
   FX_VLOG(1, nullptr, msg);
   output_compare_helper(local, (FX_LOG_INFO - 1), msg, line);
@@ -301,8 +233,7 @@ TEST(SyslogSocketTests, TestVlogSimpleWrite) {
 TEST(SyslogSocketTests, TestVlogWrite) {
   zx::socket local, remote;
   EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  ASSERT_OK(init_helper(remote.release()));
-  FX_LOG_SET_VERBOSITY(1);  // INFO - 1
+  ASSERT_OK(init_helper(remote.release(), 1));  // 1 is INFO-1
   int line = __LINE__ + 1;
   FX_VLOGF(1, nullptr, "%d, %s", 10, "just some number");
   output_compare_helper(local, (FX_LOG_INFO - 1), "10, just some number", line);
@@ -311,8 +242,7 @@ TEST(SyslogSocketTests, TestVlogWrite) {
 TEST(SyslogSocketTests, TestVlogWriteWithTag) {
   zx::socket local, remote;
   EXPECT_OK(zx::socket::create(ZX_SOCKET_DATAGRAM, &local, &remote));
-  ASSERT_OK(init_helper(remote.release()));
-  FX_LOG_SET_VERBOSITY(5);  // INFO - 5
+  ASSERT_OK(init_helper(remote.release(), 5));  // INFO-5
   int line = __LINE__ + 1;
   FX_VLOGF(5, "tag", "%d, %s", 10, "just some string");
   const char* tags[] = {"tag"};
@@ -335,6 +265,10 @@ TEST(SyslogSocketTests, TestLogVerbosity) {
   EXPECT_EQ(0u, outstanding_bytes);
 
   FX_LOG_SET_VERBOSITY(1);  // INFO - 1
+  fuchsia_logging::LogSettings settings;
+  settings.min_log_level = 1;
+  settings.disable_interest_listener = true;
+  fuchsia_logging::SetLogSettings(settings);
   int line = __LINE__ + 1;
   FX_VLOGF(1, nullptr, "%d, %s", 10, "just some number");
   output_compare_helper(local, (FX_LOG_INFO - 1), "10, just some number", line);

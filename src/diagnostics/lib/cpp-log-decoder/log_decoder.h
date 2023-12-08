@@ -8,7 +8,7 @@
 extern "C" {
 // Decodes a structured logging packet to JSON
 // The returned string must be freed with fuchsia_free_decoded_log_message.
-const char* fuchsia_decode_log_message_to_json(uint8_t* str, uint64_t size);
+const char* fuchsia_decode_log_message_to_json(const uint8_t* bytes, uint64_t size);
 
 // Frees a message allocated by fuchsia_decode_log_message_to_json
 void fuchsia_free_decoded_log_message(const char* str);

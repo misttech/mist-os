@@ -32,6 +32,7 @@ source_set("cpp_log_tester") {
     "//sdk/lib/syslog/cpp:logging_cpp_unittests",
     "//src/diagnostics/lib/cpp-log-tester:cpp-log-tester-unittest",
     "//src/storage/lib/watchdog:watchdog_unittest",
+    "//zircon/system/ulib/syslog:syslog-test",
   ]
 
   deps = [
@@ -48,7 +49,9 @@ source_set("cpp_log_tester") {
   ]
   public_deps = [
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/lib/diagnostics/reader/cpp:archive_reader",
     "//src/lib/diagnostics/accessor2logger",
+    "//third_party/rapidjson",
   ]
 }
 

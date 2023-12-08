@@ -6,15 +6,19 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/dispatcher.h>
 #include <lib/async/wait.h>
+#include <lib/diagnostics/reader/cpp/logs.h>
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <rapidjson/document.h>
 #include <src/diagnostics/lib/cpp-log-decoder/log_decoder.h>
 #include <src/lib/diagnostics/accessor2logger/log_message.h>
 #include <src/lib/fsl/vmo/sized_vmo.h>
 #include <src/lib/fsl/vmo/strings.h>
 #include <src/lib/uuid/uuid.h>
+
+constexpr size_t kMaxDatagramSize = 65536;
 
 namespace log_tester {
 class FakeLogSink : public fuchsia::logger::LogSink {
@@ -44,7 +48,19 @@ class FakeLogSink : public fuchsia::logger::LogSink {
     Wait* prev = this;
   };
 
-  static std::string DecodeMessageToString(uint8_t* data, size_t len) {
+  static fuchsia::diagnostics::FormattedContent BytesToVmo(const uint8_t* bytes, size_t len) {
+    std::string msg = DecodeMessageToString(bytes, len);
+    fsl::SizedVmo vmo;
+    fsl::VmoFromString(msg, &vmo);
+    fuchsia::diagnostics::FormattedContent content;
+    fuchsia::mem::Buffer buffer;
+    buffer.vmo = std::move(vmo.vmo());
+    buffer.size = msg.size();
+    content.set_json(std::move(buffer));
+    return content;
+  }
+
+  static std::string DecodeMessageToString(const uint8_t* data, size_t len) {
     auto raw_message = fuchsia_decode_log_message_to_json(data, len);
     std::string ret = raw_message;
     fuchsia_free_decoded_log_message(raw_message);
@@ -54,22 +70,14 @@ class FakeLogSink : public fuchsia::logger::LogSink {
   void OnPeerClosed() { callback_.value()(std::nullopt, ZX_ERR_PEER_CLOSED); }
 
   void OnDataAvailable(zx_handle_t socket) {
-    constexpr size_t kSize = 65536;
-    std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(kSize);
+    std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(kMaxDatagramSize);
     size_t actual = 0;
-    zx_status_t status = zx_socket_read(socket, 0, data.get(), kSize, &actual);
+    zx_status_t status = zx_socket_read(socket, 0, data.get(), kMaxDatagramSize, &actual);
     if (status != ZX_OK) {
       callback_.value()(std::nullopt, status);
       return;
     }
-    std::string msg = DecodeMessageToString(data.get(), actual);
-    fsl::SizedVmo vmo;
-    fsl::VmoFromString(msg, &vmo);
-    fuchsia::diagnostics::FormattedContent content;
-    fuchsia::mem::Buffer buffer;
-    buffer.vmo = std::move(vmo.vmo());
-    buffer.size = msg.size();
-    content.set_json(std::move(buffer));
+    auto content = BytesToVmo(data.get(), actual);
     callback_.value()(std::make_optional(std::move(content)), ZX_OK);
   }
 
@@ -124,6 +132,17 @@ class FakeLogSink : public fuchsia::logger::LogSink {
   async_dispatcher_t* dispatcher_;
 };
 
+void ParseFormattedContent(fuchsia::diagnostics::FormattedContent content,
+                           std::vector<fuchsia::logger::LogMessage>& output) {
+  auto chunk_result =
+      diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(content));
+  auto messages = chunk_result.take_value();  // throws exception if conversion fails.
+  for (auto& msg : messages) {
+    std::string formatted = msg.value().msg;
+    output.push_back(msg.take_value());
+  }
+}
+
 std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel remote) {
   // Close channel (reset to default Archivist)
   fuchsia_logging::LogSettings settings;
@@ -137,13 +156,8 @@ std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel re
           loop.Quit();
           return;
         }
-        auto chunk_result =
-            diagnostics::accessor2logger::ConvertFormattedContentToLogMessages(std::move(*content));
-        auto messages = chunk_result.take_value();  // throws exception if conversion fails.
-        for (auto& msg : messages) {
-          std::string formatted = msg.value().msg;
-          ret.push_back(msg.value());
-        }
+        assert(content.has_value());
+        ParseFormattedContent(std::move(*content), ret);
       });
   loop.Run();
   return ret;
@@ -155,6 +169,24 @@ std::string RetrieveLogs(zx::channel remote) {
     stream << value.msg << std::endl;
   }
   return stream.str();
+}
+
+/// Converts logs in the structured socket to LogMessages in feedback format.
+std::vector<diagnostics::reader::LogsData> RetrieveLogsAsLogMessage(const zx::socket& remote) {
+  std::unique_ptr<unsigned char[]> data = std::make_unique<unsigned char[]>(kMaxDatagramSize);
+  size_t actual = 0;
+  remote.read(0, data.get(), kMaxDatagramSize, &actual);
+  rapidjson::Document d;
+  d.Parse(FakeLogSink::DecodeMessageToString(data.get(), actual));
+  std::vector<diagnostics::reader::LogsData> ret;
+  auto logs = d.GetArray();
+  ret.reserve(logs.Size());
+  for (auto& log : logs) {
+    rapidjson::Document log_document;
+    log_document.CopyFrom(log, d.GetAllocator());
+    ret.emplace_back(std::move(log_document));
+  }
+  return ret;
 }
 
 zx::channel SetupFakeLog(fuchsia_logging::LogSettings settings) {

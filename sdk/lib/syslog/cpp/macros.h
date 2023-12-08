@@ -61,35 +61,31 @@ class NullSafeStringView {
 #define WEAK __attribute__((weak))
 
 #ifdef __Fuchsia__
-WEAK void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                                NullSafeStringView file_name, unsigned int line,
-                                NullSafeStringView msg, NullSafeStringView condition,
-                                zx_handle_t socket);
-WEAK void SetInterestChangedListener(void (*callback)(void* context,
-                                                      fuchsia_logging::LogSeverity severity),
-                                     void* context);
+void BeginRecordWithSocket(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
+                           NullSafeStringView file_name, unsigned int line, NullSafeStringView msg,
+                           NullSafeStringView condition, zx_handle_t socket);
+void SetInterestChangedListener(void (*callback)(void* context,
+                                                 fuchsia_logging::LogSeverity severity),
+                                void* context);
 #endif
-WEAK void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity,
-                      NullSafeStringView file, unsigned int line, NullSafeStringView msg,
-                      NullSafeStringView condition);
+void BeginRecord(LogBuffer* buffer, fuchsia_logging::LogSeverity severity, NullSafeStringView file,
+                 unsigned int line, NullSafeStringView msg, NullSafeStringView condition);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, cpp17::string_view value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value);
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, int64_t value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, uint64_t value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value);
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, double value);
 
-WEAK void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
+void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, bool value);
 
 static void WriteKeyValue(LogBuffer* buffer, cpp17::string_view key, const char* value) {
   WriteKeyValue(buffer, key, cpp17::string_view(value));
 }
 
-WEAK bool FlushRecord(LogBuffer* buffer);
-
-WEAK bool HasStructuredBackend();
+bool FlushRecord(LogBuffer* buffer);
 
 #undef WEAK
 

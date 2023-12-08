@@ -4,6 +4,7 @@
 #ifndef SRC_DIAGNOSTICS_LIB_CPP_LOG_TESTER_LOG_TESTER_H_
 #define SRC_DIAGNOSTICS_LIB_CPP_LOG_TESTER_LOG_TESTER_H_
 #include <fuchsia/logger/cpp/fidl.h>
+#include <lib/diagnostics/reader/cpp/logs.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
@@ -24,6 +25,10 @@ std::string RetrieveLogs(zx::channel remote);
 
 /// Converts logs in the LogSink channel to LogMessages in feedback format.
 std::vector<fuchsia::logger::LogMessage> RetrieveLogsAsLogMessage(zx::channel remote);
+
+/// Converts logs in the structured socket to LogMessages in feedback format.
+std::vector<diagnostics::reader::LogsData> RetrieveLogsAsLogMessage(const zx::socket& remote);
+
 }  // namespace log_tester
 
 #endif  // SRC_DIAGNOSTICS_LIB_CPP_LOG_TESTER_LOG_TESTER_H_

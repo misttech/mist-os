@@ -79,13 +79,6 @@ TEST(SyslogTests, test_log_enabled_macro) {
   }
 }
 
-TEST(SyslogTests, test_log_severity_invalid) {
-  fx_logger_t* logger = fx_log_get_logger();
-  EXPECT_EQ(FX_LOG_INFO, fx_logger_get_min_severity(logger));
-  EXPECT_STATUS(ZX_ERR_INVALID_ARGS, fx_logger_set_min_severity(logger, FX_LOG_FATAL + 1));
-  EXPECT_EQ(FX_LOG_INFO, fx_logger_get_min_severity(logger));
-}
-
 TEST(SyslogTestsEdgeCases, test_global_tag_limit) {
   fx_logger_config_t config = {
       .num_tags = FX_LOG_MAX_TAGS + 1,

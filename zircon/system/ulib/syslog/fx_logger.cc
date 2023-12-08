@@ -140,7 +140,7 @@ cpp17::optional<cpp17::string_view> ViewFromC(const char* c_str) {
 zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char* tag,
                                          const char* file, uint32_t line, const char* msg,
                                          va_list args, bool perform_format) {
-  if (syslog_backend::HasStructuredBackend() && this->socket_.is_valid()) {
+  if (this->socket_.is_valid()) {
     std::unique_ptr<syslog_backend::LogBuffer> buf_ptr =
         std::make_unique<syslog_backend::LogBuffer>();
     syslog_backend::LogBuffer& buffer = *buf_ptr;
@@ -172,9 +172,6 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
     }
     syslog_backend::BeginRecordWithSocket(&buffer, severity, file, line, fmt_string, nullptr,
                                           this->socket_.get());
-    if (tag) {
-      syslog_backend::WriteKeyValue(&buffer, "tag", tag);
-    }
     {
       fbl::AutoLock tag_lock(&tags_mutex_);
       for (const auto& tag : tags_) {
@@ -183,58 +180,13 @@ zx_status_t fx_logger::VLogWriteToSocket(fx_log_severity_t severity, const char*
         syslog_backend::WriteKeyValue(&buffer, "tag", tag.data());
       }
     }
+    if (tag) {
+      syslog_backend::WriteKeyValue(&buffer, "tag", tag);
+    }
     if (!syslog_backend::FlushRecord(&buffer)) {
       return ZX_ERR_IO;
     }
     return ZX_OK;
-  }
-  if (is_structured_ && !syslog_backend::HasStructuredBackend() && this->socket_.is_valid()) {
-    std::unique_ptr<fuchsia_syslog::LogBuffer> buf_ptr =
-        std::make_unique<fuchsia_syslog::LogBuffer>();
-    constexpr size_t kFormatStringLength = 1024;
-    char fmt_string[kFormatStringLength];
-    fmt_string[kFormatStringLength - 1] = 0;
-    int n = kFormatStringLength;
-    // Format
-    // Number of bytes written not including null terminator
-    int count = 0;
-    if (perform_format) {
-      count = vsnprintf(fmt_string, n, msg, args) + 1;
-      if (count < 0) {
-        return ZX_ERR_INVALID_ARGS;
-      }
-    } else {
-      count = snprintf(fmt_string, kFormatStringLength, "%s", msg);
-    }
-
-    if (count >= n) {
-      // truncated
-      constexpr char kEllipsis[] = "...";
-      constexpr size_t kEllipsisSize = sizeof(kEllipsis);
-      snprintf(fmt_string + kFormatStringLength - 1 - kEllipsisSize, kEllipsisSize, kEllipsis);
-    }
-
-    if (file) {
-      file = syslog::internal::StripFile(file, severity);
-    }
-    buf_ptr->BeginRecord(severity, ViewFromC(file), line, ViewFromC(fmt_string),
-                         this->socket_.borrow(), 0, pid_, GetCurrentThreadKoid());
-    if (tag) {
-      buf_ptr->WriteKeyValue("tag", tag);
-    }
-    {
-      fbl::AutoLock tags_lock(&tags_mutex_);
-      for (const auto& tag : tags_) {
-        size_t len = tag.length();
-        ZX_DEBUG_ASSERT(len < 128);
-        buf_ptr->WriteKeyValue("tag", tag.data());
-      }
-    }
-    if (buf_ptr->FlushRecord()) {
-      return ZX_OK;
-    }
-    ActivateFallback(-1);
-    return ZX_ERR_ASYNC;
   }
   zx_time_t time = zx_clock_get_monotonic();
   fx_log_packet_t packet;
