@@ -13,6 +13,7 @@
 #include <lib/virtio/device.h>
 #include <lib/virtio/ring.h>
 #include <lib/zx/bti.h>
+#include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <semaphore.h>
 #include <zircon/compiler.h>
@@ -33,7 +34,7 @@ class GpuDevice : public virtio::Device {
   GpuDevice(zx::bti bti, std::unique_ptr<virtio::Backend> backend);
   ~GpuDevice() override;
 
-  static fit::result<zx_status_t, std::unique_ptr<GpuDevice>> Create(
+  static zx::result<std::unique_ptr<GpuDevice>> Create(
       fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end);
 
   zx_status_t Init() override;

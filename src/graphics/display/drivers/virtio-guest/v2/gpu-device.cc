@@ -12,6 +12,8 @@
 #include <memory>
 #include <utility>
 
+#include <fbl/alloc_checker.h>
+
 #include "src/graphics/display/drivers/virtio-guest/v2/virtio-abi.h"
 
 namespace virtio_display {
@@ -32,22 +34,26 @@ GpuDevice::~GpuDevice() {
 }
 
 // static
-fit::result<zx_status_t, std::unique_ptr<GpuDevice>> GpuDevice::Create(
+zx::result<std::unique_ptr<GpuDevice>> GpuDevice::Create(
     fidl::ClientEnd<fuchsia_hardware_pci::Device> client_end) {
-  zx::bti bti;
-  std::unique_ptr<virtio::Backend> backend;
-  {
-    auto result = virtio::GetBtiAndBackend(ddk::Pci(std::move(client_end)));
-    if (!result.is_ok()) {
-      FDF_LOG(ERROR, "GetBtiAndBackend failed");
-      return result.take_error();
-    }
-    bti = std::move(result.value().first);
-    backend = std::move(result.value().second);
+  zx::result<std::pair<zx::bti, std::unique_ptr<virtio::Backend>>> bti_and_backend_result =
+      virtio::GetBtiAndBackend(ddk::Pci(std::move(client_end)));
+  if (!bti_and_backend_result.is_ok()) {
+    FDF_LOG(ERROR, "GetBtiAndBackend failed: %s", bti_and_backend_result.status_string());
+    return bti_and_backend_result.take_error();
   }
 
-  auto device = std::make_unique<GpuDevice>(std::move(bti), std::move(backend));
-  if (zx_status_t status = device->Init(); status != ZX_OK) {
+  fbl::AllocChecker alloc_checker;
+  auto& [bti, backend] = bti_and_backend_result.value();
+  auto device =
+      fbl::make_unique_checked<GpuDevice>(&alloc_checker, std::move(bti), std::move(backend));
+  if (!alloc_checker.check()) {
+    FDF_LOG(ERROR, "Failed to allocate memory for GpuDevice");
+    return zx::error(ZX_ERR_NO_MEMORY);
+  }
+
+  zx_status_t status = device->Init();
+  if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to initialize device");
     return zx::error(status);
   }
