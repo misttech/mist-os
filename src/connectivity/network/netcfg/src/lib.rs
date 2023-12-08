@@ -88,9 +88,6 @@ impl From<Metric> for u32 {
     }
 }
 
-/// File that stores persistent interface configurations.
-const PERSISTED_INTERFACE_CONFIG_FILEPATH: &str = "/data/net_interfaces.cfg.json";
-
 /// A node that represents the directory it is in.
 ///
 /// `/dir` and `/dir/.` point to the same directory.
@@ -594,8 +591,6 @@ pub struct NetCfg<'a> {
     dhcpv4_client_provider: Option<fnet_dhcp::ClientProviderProxy>,
     dhcpv6_client_provider: Option<fnet_dhcpv6::ClientProviderProxy>,
 
-    persisted_interface_config: interface::FileBackedConfig<'a>,
-
     filter_enabled_state: FilterEnabledState,
 
     // TODO(https://fxbug.dev/67407): These hashmaps are all indexed by
@@ -616,7 +611,7 @@ pub struct NetCfg<'a> {
     dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap,
 
     // Policy configuration to determine the name of an interface.
-    interface_naming_policy: Vec<interface::NamingRule>,
+    interface_naming_config: interface::InterfaceNamingConfig,
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 }
@@ -849,9 +844,8 @@ impl<'a> NetCfg<'a> {
         let installer = svc_connect::<fnet_interfaces_admin::InstallerMarker>(&svc_dir)
             .await
             .context("could not connect to installer")?;
-        let persisted_interface_config =
-            interface::FileBackedConfig::load(&PERSISTED_INTERFACE_CONFIG_FILEPATH)
-                .context("error loading persistent interface configurations")?;
+        let interface_naming_config =
+            interface::InterfaceNamingConfig::from_naming_rules(interface_naming_policy);
 
         Ok(NetCfg {
             stack,
@@ -862,7 +856,7 @@ impl<'a> NetCfg<'a> {
             installer,
             dhcpv4_client_provider,
             dhcpv6_client_provider,
-            persisted_interface_config,
+            interface_naming_config,
             filter_enabled_state: FilterEnabledState::new(filter_enabled_interface_types),
             interface_properties: Default::default(),
             interface_states: Default::default(),
@@ -873,7 +867,6 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefix_provider_handler: None,
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
-            interface_naming_policy,
             interface_provisioning_policy,
         })
     }
@@ -1968,26 +1961,12 @@ impl<'a> NetCfg<'a> {
         }
         .into();
         let (interface_name, persistent_id) = if stable_name {
-            match self.persisted_interface_config.generate_stable_name(
+            match self.interface_naming_config.generate_stable_name(
                 &topological_path,
                 &mac,
                 *device_class,
-                &self.interface_naming_policy,
             ) {
                 Ok((name, persistent_id)) => (name.to_string(), Some(persistent_id)),
-                Err(interface::NameGenerationError::FileUpdateError {
-                    name,
-                    persistent_id,
-                    err,
-                }) => {
-                    warn!(
-                        "failed to update interface \
-                            (topo path = {}, mac = {}, interface_type = {:?}) \
-                            with new name = {}: {}",
-                        topological_path, mac, interface_type, name, err
-                    );
-                    (name.to_string(), Some(persistent_id))
-                }
                 Err(interface::NameGenerationError::GenerationError(e)) => {
                     return Err(devices::AddDeviceError::Other(errors::Error::Fatal(
                         e.context("error getting stable name"),
@@ -1995,7 +1974,7 @@ impl<'a> NetCfg<'a> {
                 }
             }
         } else {
-            self.persisted_interface_config.generate_temporary_name(interface_type)
+            self.interface_naming_config.generate_temporary_name(interface_type)
         };
 
         info!("adding {:?} to stack with name = {}", device_instance, interface_name);
@@ -3073,9 +3052,6 @@ mod tests {
         let (installer, _installer_server) =
             fidl::endpoints::create_proxy::<fidl_fuchsia_net_interfaces_admin::InstallerMarker>()
                 .context("error creating installer endpoints")?;
-        let persisted_interface_config =
-            interface::FileBackedConfig::load(&PERSISTED_INTERFACE_CONFIG_FILEPATH)
-                .context("error loading persistent interface configurations")?;
 
         Ok((
             NetCfg {
@@ -3088,7 +3064,6 @@ mod tests {
                 dhcpv4_client_provider: with_dhcpv4_client_provider
                     .then_some(dhcpv4_client_provider),
                 dhcpv6_client_provider: Some(dhcpv6_client_provider),
-                persisted_interface_config,
                 filter_enabled_state: Default::default(),
                 interface_properties: Default::default(),
                 interface_states: Default::default(),
@@ -3099,7 +3074,9 @@ mod tests {
                 allowed_upstream_device_classes: &DEFAULT_ALLOWED_UPSTREAM_DEVICE_CLASSES,
                 dhcpv4_configuration_streams: dhcpv4::ConfigurationStreamMap::empty(),
                 dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
-                interface_naming_policy: Default::default(),
+                interface_naming_config: interface::InterfaceNamingConfig::from_naming_rules(
+                    vec![],
+                ),
                 interface_provisioning_policy: Default::default(),
             },
             ServerEnds {
