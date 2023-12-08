@@ -1,5 +1,17 @@
 # Get started with the Fuchsia SDK
 
+**Read This First!**
+
+If you only want copies of Fuchsia's host tools, please
+visit [this download page][download-idk]. From there
+you can get the latest/newest builds of Fuchsia's host
+tools.
+
+**Note**
+
+These docs are stable and are using a copy of Fuchsia's SDK with Bazel
+from early 2023.
+
 This guide provides step-by-step instructions on setting up the Fuchsia SDK
 development environment on your host machine using a terminal or
 Visual Studio Code (VS Code). Then the guide walks through the basic workflows
@@ -395,3 +407,4 @@ enable KVM hardware virtualization:
 [sdk-bug]: https://bugs.fuchsia.dev/p/fuchsia/issues/entry?template=Bazel
 [using-the-sdk]: /docs/development/sdk/index.md
 [vscode-install]: https://code.visualstudio.com/Download
+[download-idk]: /docs/development/idk/download.md
