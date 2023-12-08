@@ -64,6 +64,12 @@ class SymbolizerImpl : public Symbolizer,
   // Output the backtrace in batch mode.
   void OutputBatchedBacktrace();
 
+  // If we receive invalid markup, we need to flush all of the buffered stack frames in
+  // |frames_in_batch_mode_|, which must be destructed in the same order they were constructed. The
+  // rest of the associated frames from this backtrace will not be symbolized.
+  // |context| will be logged to stderr as a warning.
+  void FlushBufferedFramesWithContext(const std::string& context);
+
   // Helper to convert a string_view to a rapidjson string.
   rapidjson::Value ToJSONString(std::string_view str);
 

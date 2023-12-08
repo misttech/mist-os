@@ -148,6 +148,14 @@ SymbolizerImpl::~SymbolizerImpl() {
 }
 
 void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn output) {
+  // We got a reset:begin before a previous begin tag had a corresponding end tag. For instance,
+  // this can happen when many rust components crash at the same time, with each panic handler
+  // outputting the respective process' backtrace. If they become interleaved in the log, then
+  // symbolizer cannot disambiguate between the stack traces, and must abandon the old one.
+  if (in_batch_mode_ && type == ResetType::kBegin) {
+    FlushBufferedFramesWithContext("got a reset:begin tag while processing another backtrace");
+  }
+
   // Try to output upon reset first.
   if (!frames_in_batch_mode_.empty()) {
     OutputBatchedBacktrace();
@@ -182,6 +190,10 @@ void SymbolizerImpl::Reset(bool symbolizing_dart, ResetType type, OutputFn outpu
 
 void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view build_id,
                             OutputFn output) {
+  if (!frames_in_batch_mode_.empty()) {
+    FlushBufferedFramesWithContext("got a module tag, expected bt");
+  }
+
   modules_[id].name = name;
   modules_[id].build_id = build_id;
 
@@ -197,6 +209,10 @@ void SymbolizerImpl::Module(uint64_t id, std::string_view name, std::string_view
 
 void SymbolizerImpl::MMap(uint64_t address, uint64_t size, uint64_t module_id,
                           std::string_view flags, uint64_t module_offset, OutputFn output) {
+  if (!frames_in_batch_mode_.empty()) {
+    FlushBufferedFramesWithContext("got a mmap tag, expected bt");
+  }
+
   if (modules_.find(module_id) == modules_.end()) {
     analytics_builder_.SetAtLeastOneInvalidInput();
     output("symbolizer: Invalid module id.");
@@ -545,6 +561,15 @@ rapidjson::Value SymbolizerImpl::ToJSONString(std::string_view str) {
   string.SetString(str.data(), static_cast<uint32_t>(str.size()),
                    dumpfile_document_.GetAllocator());
   return string;
+}
+
+void SymbolizerImpl::FlushBufferedFramesWithContext(const std::string& context) {
+  std::cerr
+      << "WARN: " << context
+      << " symbolization is incomplete due to interleaved stack traces! Logging what we have!\n";
+
+  // Consume all the frames we were buffering.
+  OutputBatchedBacktrace();
 }
 
 }  // namespace symbolizer
