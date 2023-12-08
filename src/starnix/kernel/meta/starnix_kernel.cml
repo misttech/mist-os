@@ -48,6 +48,7 @@
         },
         {
             protocol: [
+                "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.hardware.power.statecontrol.Admin",
                 "fuchsia.kernel.VmexResource",
             ],
