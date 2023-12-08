@@ -18,6 +18,7 @@ use crate::{
         Device, DeviceIdContext,
     },
     sync::Mutex,
+    work_queue::WorkQueueReport,
 };
 
 /// The state used to hold a queue of received frames to be handled at a later
@@ -147,7 +148,7 @@ where
         sync_ctx: &mut SC,
         ctx: &mut C,
         device_id: &SC::DeviceId,
-    ) -> crate::WorkQueueReport {
+    ) -> WorkQueueReport {
         sync_ctx.with_dequed_frames_and_rx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames }, rx_queue_ctx| {
@@ -326,7 +327,7 @@ mod tests {
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
                     ),
-                    crate::WorkQueueReport::Pending
+                    WorkQueueReport::Pending
                 );
                 assert_eq!(
                     core::mem::take(&mut sync_ctx.get_mut().handled_frames),
@@ -342,7 +343,7 @@ mod tests {
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
                 ),
-                crate::WorkQueueReport::AllDone
+                WorkQueueReport::AllDone
             );
             assert_eq!(
                 core::mem::take(&mut sync_ctx.get_mut().handled_frames),

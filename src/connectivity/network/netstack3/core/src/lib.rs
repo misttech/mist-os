@@ -111,10 +111,14 @@ pub mod device_socket {
     };
 }
 
+/// Miscellaneous and common types.
+pub mod types {
+    pub use crate::work_queue::WorkQueueReport;
+}
+
 use crate::{context::RngContext, device::DeviceId};
 pub use context::{BindingsTypes, NonSyncContext, ReferenceNotifiers, SyncCtx};
 pub use ip::forwarding::{select_device_for_gateway, set_routes};
 pub use time::{handle_timer, Instant, TimerId};
-pub use work_queue::WorkQueueReport;
 
 pub(crate) use trace::trace_duration;

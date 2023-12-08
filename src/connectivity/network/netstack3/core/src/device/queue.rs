@@ -11,7 +11,7 @@ pub mod tx;
 use alloc::collections::VecDeque;
 use core::convert::From;
 
-use crate::device::DeviceSendFrameError;
+use crate::{device::DeviceSendFrameError, work_queue::WorkQueueReport};
 
 /// The maximum number of elements that can be in the RX queue.
 const MAX_RX_QUEUED_LEN: usize = 10000;
@@ -56,7 +56,7 @@ enum DequeueResult {
     NoMoreLeft,
 }
 
-impl From<DequeueResult> for crate::WorkQueueReport {
+impl From<DequeueResult> for WorkQueueReport {
     fn from(value: DequeueResult) -> Self {
         match value {
             DequeueResult::MoreStillQueued => Self::Pending,

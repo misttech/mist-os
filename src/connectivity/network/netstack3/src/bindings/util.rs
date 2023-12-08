@@ -42,6 +42,7 @@ use netstack3_core::{
         address::SocketZonedIpAddr,
         datagram::{MulticastInterfaceSelector, MulticastMembershipInterfaceSelector},
     },
+    types::WorkQueueReport,
 };
 
 use crate::bindings::{
@@ -251,9 +252,7 @@ impl TaskWaitGroupSpawner {
 /// Extracts common bounded work operations performed on [`NeedsDataWatcher`].
 ///
 /// Runs the watcher loop until `watcher` is finished or `f` returns `None`.
-pub(crate) async fn yielding_data_notifier_loop<
-    F: FnMut() -> Option<netstack3_core::WorkQueueReport>,
->(
+pub(crate) async fn yielding_data_notifier_loop<F: FnMut() -> Option<WorkQueueReport>>(
     mut watcher: NeedsDataWatcher,
     mut f: F,
 ) {
@@ -266,8 +265,8 @@ pub(crate) async fn yielding_data_notifier_loop<
         };
 
         match r.and_then(|()| f()) {
-            Some(netstack3_core::WorkQueueReport::AllDone) => (),
-            Some(netstack3_core::WorkQueueReport::Pending) => {
+            Some(WorkQueueReport::AllDone) => (),
+            Some(WorkQueueReport::Pending) => {
                 // Yield the task to the executor once.
                 yield_fut = Some(async_utils::futures::YieldToExecutorOnce::new()).into();
             }

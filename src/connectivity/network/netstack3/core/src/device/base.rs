@@ -64,7 +64,9 @@ use crate::{
         types::RawMetric,
     },
     sync::{PrimaryRc, RwLock},
-    trace_duration, Instant, NonSyncContext, SyncCtx,
+    trace_duration,
+    work_queue::WorkQueueReport,
+    Instant, NonSyncContext, SyncCtx,
 };
 
 /// A device.
@@ -686,7 +688,7 @@ pub fn transmit_queued_tx_frames<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &DeviceId<NonSyncCtx>,
-) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>> {
+) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
     let sync_ctx = &mut Locked::new(sync_ctx);
     match device {
         DeviceId::Ethernet(id) => {
@@ -708,7 +710,7 @@ pub fn handle_queued_rx_packets<NonSyncCtx: NonSyncContext>(
     sync_ctx: &SyncCtx<NonSyncCtx>,
     ctx: &mut NonSyncCtx,
     device: &LoopbackDeviceId<NonSyncCtx>,
-) -> crate::WorkQueueReport {
+) -> WorkQueueReport {
     ReceiveQueueApi::<_, _, LoopbackDevice>::handle_queued_rx_frames(
         &mut Locked::new(sync_ctx),
         ctx,
@@ -1667,7 +1669,7 @@ mod tests {
             );
             assert_eq!(
                 crate::device::transmit_queued_tx_frames(&sync_ctx, &mut non_sync_ctx, &device),
-                Ok(crate::WorkQueueReport::AllDone)
+                Ok(WorkQueueReport::AllDone)
             );
         }
 

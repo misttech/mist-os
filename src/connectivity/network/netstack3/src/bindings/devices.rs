@@ -23,6 +23,7 @@ use netstack3_core::{
         LoopbackDeviceId,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
+    types::WorkQueueReport,
 };
 use tracing::warn;
 
@@ -195,7 +196,7 @@ pub(crate) fn spawn_tx_task(
                             "TODO(https://fxbug.dev/105921): Support waiting for TX buffers to be \
                             available, dropping packet for now on device={device_id:?}",
                         );
-                        netstack3_core::WorkQueueReport::AllDone
+                        WorkQueueReport::AllDone
                     },
                 )
             })

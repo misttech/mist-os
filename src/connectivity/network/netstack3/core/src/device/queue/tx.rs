@@ -24,6 +24,7 @@ use crate::{
         Device, DeviceIdContext, DeviceSendFrameError,
     },
     sync::Mutex,
+    work_queue::WorkQueueReport,
 };
 
 #[derive(Derivative)]
@@ -144,7 +145,7 @@ impl<
         sync_ctx: &mut SC,
         ctx: &mut C,
         device_id: &SC::DeviceId,
-    ) -> Result<crate::WorkQueueReport, DeviceSendFrameError<()>> {
+    ) -> Result<WorkQueueReport, DeviceSendFrameError<()>> {
         sync_ctx.with_dequed_packets_and_tx_queue_ctx(
             device_id,
             |DequeueState { dequeued_frames: dequed_packets }, tx_queue_ctx| {
@@ -162,7 +163,7 @@ impl<
 
                 // If we don't have a transmit queue installed, report no work
                 // left to be done.
-                let Some(ret) = ret else { return Ok(crate::WorkQueueReport::AllDone) };
+                let Some(ret) = ret else { return Ok(WorkQueueReport::AllDone) };
 
                 while let Some((meta, p)) = dequed_packets.pop_front() {
                     deliver_to_device_sockets(tx_queue_ctx, ctx, device_id, &p);
@@ -510,7 +511,7 @@ mod tests {
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
             ),
-            Ok(crate::WorkQueueReport::AllDone),
+            Ok(WorkQueueReport::AllDone),
         );
         assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), []);
@@ -574,7 +575,7 @@ mod tests {
                         &mut non_sync_ctx,
                         &FakeLinkDeviceId,
                     ),
-                    Ok(crate::WorkQueueReport::Pending),
+                    Ok(WorkQueueReport::Pending),
                 );
                 assert_eq!(
                     core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
@@ -590,7 +591,7 @@ mod tests {
                     &mut non_sync_ctx,
                     &FakeLinkDeviceId,
                 ),
-                Ok(crate::WorkQueueReport::AllDone),
+                Ok(WorkQueueReport::AllDone),
             );
             assert_eq!(
                 core::mem::take(&mut sync_ctx.get_mut().transmitted_packets),
@@ -671,7 +672,7 @@ mod tests {
                 &mut non_sync_ctx,
                 &FakeLinkDeviceId,
             ),
-            Ok(crate::WorkQueueReport::AllDone),
+            Ok(WorkQueueReport::AllDone),
         );
         assert_eq!(non_sync_ctx.state().woken_tx_tasks, []);
         assert_eq!(core::mem::take(&mut sync_ctx.get_mut().transmitted_packets), [body]);
