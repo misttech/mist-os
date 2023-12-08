@@ -119,7 +119,8 @@ impl<const N: usize> BoundedName<N> {
     /// Creates a `BoundedName` from a `String`, returning an `Err` if the string
     /// fails validation. The string must be non-empty, no more than `N`
     /// characters in length, and consist of one or more of the
-    /// following characters: `a-z`, `0-9`, `_`, `.`, `-`.
+    /// following characters: `A-Z`, `a-z`, `0-9`, `_`, `.`, `-`. It may not start
+    /// with `.` or `-`.
     pub fn new(name: impl AsRef<str> + Into<String>) -> Result<Self, ParseError> {
         Self::validate(name.as_ref())?;
         Ok(Self(FlyStr::new(name)))

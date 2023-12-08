@@ -1008,8 +1008,10 @@ impl Right {
 ///
 /// ### Names {#names}
 ///
-/// Both capabilities and a component's children are named. A name string must consist of one or
-/// more of the following characters: `a-z`, `0-9`, `_`, `.`, `-`.
+/// Both capabilities and a component's children are named. A name string may
+/// consist of one or more of the following characters: `A-Z`, `a-z`, `0-9`,
+/// `_`, `.`, `-`. It must not exceed 100 characters in length and may not start
+/// with `.` or `-`.
 ///
 /// ### References {#references}
 ///
