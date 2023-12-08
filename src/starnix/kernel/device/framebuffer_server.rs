@@ -27,21 +27,24 @@ use flatland_frame_scheduling_lib::{
 };
 use fuchsia_async as fasync;
 use fuchsia_component::{
-    client::{connect_to_protocol_at_dir_root, connect_to_protocol_sync},
+    client::{connect_to_protocol, connect_to_protocol_at_dir_root, connect_to_protocol_sync},
     server::ServiceFs,
 };
 use fuchsia_framebuffer::{sysmem::BufferCollectionAllocator, FrameUsage};
 use fuchsia_scenic::{flatland::ViewCreationTokenPair, BufferCollectionTokenPair};
 use fuchsia_zircon as zx;
-use futures::{StreamExt, TryStreamExt};
+use futures::{
+    channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
+    FutureExt, StreamExt, TryStreamExt,
+};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_lock::Mutex;
 use std::{
-    ops::DerefMut,
+    ops::{Deref, DerefMut},
     sync::{mpsc::channel, Arc},
 };
 
-use starnix_logging::log_warn;
+use starnix_logging::{log_error, log_warn};
 use starnix_uapi::{errno, errors::Errno};
 
 /// The offset at which the framebuffer will be placed.
@@ -59,16 +62,23 @@ enum ExposedProtocols {
 }
 
 /// The Scene states that `FramebufferServer` may serve.
+#[derive(Copy, Clone)]
 pub enum SceneState {
     Fb,
     Viewport,
 }
 
+/// Unbounded sender used for presentation messages.
+pub type PresentationSender = UnboundedSender<SceneState>;
+
+/// Unbounded receiver used for presentation messages.
+pub type PresentationReceiver = UnboundedReceiver<SceneState>;
+
 /// A `FramebufferServer` contains initialized proxies to Flatland, as well as a buffer collection
 /// that is registered with Flatland.
 pub struct FramebufferServer {
     /// The Flatland proxy associated with this server.
-    flatland: fuicomposition::FlatlandSynchronousProxy,
+    flatland: fuicomposition::FlatlandProxy,
 
     /// The buffer collection that is registered with Flatland.
     collection: fsysmem::BufferCollectionInfo2,
@@ -84,6 +94,12 @@ pub struct FramebufferServer {
 
     /// Keeps track of the Flatland viewport ID.
     viewport_id: AtomicU64Counter,
+
+    /// Channel to send Present requests on.
+    presentation_sender: PresentationSender,
+
+    /// Channel to receive Present requests on.
+    presentation_receiver: Arc<Mutex<Option<PresentationReceiver>>>,
 }
 
 impl FramebufferServer {
@@ -92,13 +108,14 @@ impl FramebufferServer {
     pub fn new(width: u32, height: u32) -> Result<Self, Errno> {
         let allocator = connect_to_protocol_sync::<fuicomposition::AllocatorMarker>()
             .map_err(|_| errno!(ENOENT))?;
-        let flatland = connect_to_protocol_sync::<fuicomposition::FlatlandMarker>()
-            .map_err(|_| errno!(ENOENT))?;
+        let flatland =
+            connect_to_protocol::<fuicomposition::FlatlandMarker>().map_err(|_| errno!(ENOENT))?;
         flatland.set_debug_name("StarnixFrameBufferServer").map_err(|_| errno!(EINVAL))?;
 
         let collection =
             init_fb_scene(&flatland, &allocator, width, height).map_err(|_| errno!(EINVAL))?;
 
+        let (presentation_sender, presentation_receiver) = unbounded();
         Ok(Self {
             flatland,
             collection,
@@ -106,6 +123,8 @@ impl FramebufferServer {
             image_height: height,
             scene_state: Arc::new(Mutex::new(SceneState::Fb)),
             viewport_id: (FB_IMAGE_ID.value + 1).into(),
+            presentation_sender: presentation_sender,
+            presentation_receiver: Arc::new(Mutex::new(Some(presentation_receiver))),
         })
     }
 
@@ -118,6 +137,13 @@ impl FramebufferServer {
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(|_| errno!(EINVAL))
     }
+
+    // Present according to the scene state.
+    pub fn present(&self) {
+        let scene_state = self.scene_state.lock();
+        let scene_state = scene_state.deref();
+        self.presentation_sender.unbounded_send(*scene_state).expect("send failed");
+    }
 }
 
 /// Initializes the flatland scene, and returns the associated buffer collection.
@@ -125,7 +151,7 @@ impl FramebufferServer {
 /// SAFETY: This function `.expect`'s a lot, because it isn't meant to be used in the long time and
 /// most of the failures would be unexpected and unrecoverable.
 fn init_fb_scene(
-    flatland: &fuicomposition::FlatlandSynchronousProxy,
+    flatland: &fuicomposition::FlatlandProxy,
     allocator: &fuicomposition::AllocatorSynchronousProxy,
     width: u32,
     height: u32,
@@ -222,21 +248,6 @@ pub fn init_viewport_scene(
     server: Arc<FramebufferServer>,
     viewport_token: fuiviews::ViewportCreationToken,
 ) {
-    let mut scene_state = server.scene_state.lock();
-    let scene_state = scene_state.deref_mut();
-    // This handles multiple calls to init_viewport_scene and cleans fb resources.
-    // TODO(b/282895335): Break the present loop if already started. Note that we still need to
-    // present once, taking into account the present credits
-    match scene_state {
-        SceneState::Fb => {
-            server.flatland.release_image(&FB_IMAGE_ID).expect("failed to release image");
-        }
-        SceneState::Viewport => {
-            // TODO(b/282895335): Release viewport depends on a concurrent Present to return.
-            // Refactor the present loop to handle.
-        }
-    }
-
     let (_, child_view_watcher_request) = create_proxy::<fuicomposition::ChildViewWatcherMarker>()
         .expect("failed to create child view watcher channel");
     let viewport_properties = fuicomposition::ViewportProperties {
@@ -244,6 +255,7 @@ pub fn init_viewport_scene(
         ..Default::default()
     };
     let new_viewport = fuicomposition::ContentId { value: server.viewport_id.next() };
+    let old_viewport = fuicomposition::ContentId { value: new_viewport.value - 1 };
     server
         .flatland
         .create_viewport(
@@ -255,7 +267,26 @@ pub fn init_viewport_scene(
         .expect("failed to create child viewport");
     server.flatland.set_content(&ROOT_TRANSFORM_ID, &new_viewport).expect("error setting content");
 
-    *scene_state = SceneState::Viewport;
+    {
+        let mut scene_state = server.scene_state.lock();
+        let scene_state = scene_state.deref_mut();
+        match scene_state {
+            // We are switching from Fb presentation to Viewport. We can clean up resources as this
+            // change only happens once and there is no switching back to Fb.
+            SceneState::Fb => {
+                server.flatland.release_image(&FB_IMAGE_ID).expect("failed to release image");
+            }
+            SceneState::Viewport => {
+                let _ = server
+                    .flatland
+                    .release_viewport(&old_viewport)
+                    .check()
+                    .expect("failed to release child viewport");
+            }
+        }
+        *scene_state = SceneState::Viewport;
+    }
+    server.present();
 }
 
 /// Spawns a thread to serve a `ViewProvider` in `outgoing_dir`.
@@ -263,12 +294,13 @@ pub fn init_viewport_scene(
 /// SAFETY: This function `.expect`'s a lot, because it isn't meant to be used in the long time and
 /// most of the failures would be unexpected and unrecoverable.
 pub fn spawn_view_provider(
+    kernel: &Arc<Kernel>,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
     outgoing_dir: fidl::endpoints::ServerEnd<fidl_fuchsia_io::DirectoryMarker>,
 ) {
-    std::thread::Builder::new().name("kthread-view-provider".to_string()).spawn(|| {
+    kernel.kthreads.spawner().spawn(|_, _| {
         let mut executor = fasync::LocalExecutor::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
         let mut view_identity = Some(view_identity);
@@ -299,7 +331,7 @@ pub fn spawn_view_provider(
                                 .expect("FIDL error");
 
                             // Now that the view has been created, start presenting.
-                            start_presenting(server.clone());
+                            server.present();
                         }
                         r => {
                             log_warn!("Got unexpected view provider request: {:?}", r);
@@ -308,10 +340,10 @@ pub fn spawn_view_provider(
                 }
             }
         });
-    }).expect("able to create threads");
+    });
 }
 
-pub fn present_view(
+pub fn send_view_to_graphical_presenter(
     kernel: &Arc<Kernel>,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
@@ -345,7 +377,7 @@ pub fn present_view(
                 .expect("FIDL error");
 
             // Now that the view has been created, start presenting.
-            start_presenting(server.clone());
+            server.present();
 
             let graphical_presenter = connect_to_protocol_at_dir_root::<
                 felement::GraphicalPresenterMarker,
@@ -382,76 +414,85 @@ pub fn present_view(
 }
 
 /// Starts a flatland presentation loop, using the flatland proxy in `server`.
-fn start_presenting(server: Arc<FramebufferServer>) {
-    fasync::Task::local(async move {
-        let sched_lib = ThroughputScheduler::new();
-        // Request an initial presentation.
-        sched_lib.request_present();
-
-        loop {
-            let present_parameters = sched_lib.wait_to_update().await;
-            sched_lib.request_present();
-            server
-                .flatland
-                .present(fuicomposition::PresentArgs {
-                    requested_presentation_time: Some(
-                        present_parameters.requested_presentation_time.into_nanos(),
-                    ),
-                    acquire_fences: None,
-                    release_fences: None,
-                    unsquashable: Some(present_parameters.unsquashable),
-                    ..Default::default()
-                })
-                .unwrap_or(());
-
-            // Wait for events from flatland. If the event is `OnFramePresented` we notify the
-            // scheduler and then wait for a `OnNextFrameBegin` before continuing.
-            while match server.flatland.wait_for_event(zx::Time::INFINITE) {
-                Ok(event) => match event {
-                    fuicomposition::FlatlandEvent::OnNextFrameBegin { values } => {
-                        let fuicomposition::OnNextFrameBeginValues {
-                            additional_present_credits,
-                            future_presentation_infos,
-                            ..
-                        } = values;
-                        let infos = future_presentation_infos
-                            .unwrap()
-                            .iter()
-                            .map(|x| PresentationInfo {
-                                latch_point: zx::Time::from_nanos(x.latch_point.unwrap()),
-                                presentation_time: zx::Time::from_nanos(
-                                    x.presentation_time.unwrap(),
-                                ),
-                            })
-                            .collect();
-                        sched_lib.on_next_frame_begin(additional_present_credits.unwrap(), infos);
-                        false
+pub fn start_flatland_presentation_loop(kernel: &Arc<Kernel>, server: Arc<FramebufferServer>) {
+    let flatland = server.flatland.clone();
+    let mut flatland_event_stream = flatland.take_event_stream();
+    let mut presentation_receiver = server.presentation_receiver.lock();
+    let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
+    kernel.kthreads.spawner().spawn(|_, _| {
+        let mut executor = fasync::LocalExecutor::new();
+        let scheduler = ThroughputScheduler::new();
+        executor.run_singlethreaded(async move {
+            let mut scene_state = None;
+            loop {
+                futures::select! {
+                    message = presentation_receiver.next() => {
+                        if message.is_some() {
+                            scene_state = message;
+                            scheduler.request_present();
+                        }
                     }
-                    fuicomposition::FlatlandEvent::OnFramePresented { frame_presented_info } => {
-                        let presented_infos = frame_presented_info
-                            .presentation_infos
-                            .iter()
-                            .map(|info| PresentedInfo {
-                                present_received_time: zx::Time::from_nanos(
-                                    info.present_received_time.unwrap(),
-                                ),
-                                actual_latch_point: zx::Time::from_nanos(
-                                    info.latched_time.unwrap(),
-                                ),
-                            })
-                            .collect();
-
-                        sched_lib.on_frame_presented(
-                            zx::Time::from_nanos(frame_presented_info.actual_presentation_time),
-                            presented_infos,
-                        );
-                        true
+                    flatland_event = flatland_event_stream.next() => {
+                        match flatland_event {
+                            Some(Ok(fuicomposition::FlatlandEvent::OnNextFrameBegin{ values })) => {
+                                let credits = values
+                                            .additional_present_credits
+                                            .expect("Present credits must exist");
+                                let infos = values
+                                    .future_presentation_infos
+                                    .expect("Future presentation infos must exist")
+                                    .iter()
+                                    .map(
+                                    |x| PresentationInfo{
+                                        latch_point: zx::Time::from_nanos(x.latch_point.unwrap()),
+                                        presentation_time: zx::Time::from_nanos(
+                                                            x.presentation_time.unwrap())
+                                    })
+                                    .collect();
+                                scheduler.on_next_frame_begin(credits, infos);
+                                // Keep presenting as long as we are in Fb state.
+                                match scene_state {
+                                    Some(SceneState::Fb) => {
+                                        scheduler.request_present();
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            Some(Ok(fuicomposition::FlatlandEvent::OnFramePresented{ frame_presented_info })) => {
+                                let actual_presentation_time =
+                                    zx::Time::from_nanos(frame_presented_info.actual_presentation_time);
+                                let presented_infos: Vec<PresentedInfo> =
+                                    frame_presented_info.presentation_infos
+                                    .into_iter()
+                                    .map(|x| x.into())
+                                    .collect();
+                                scheduler.on_frame_presented(actual_presentation_time, presented_infos);
+                            }
+                            Some(Ok(fuicomposition::FlatlandEvent::OnError{ error })) => {
+                                log_error!(
+                                    "Received FlatlandError code: {}; exiting listener loop",
+                                    error.into_primitive()
+                                );
+                                return;
+                            }
+                            _ => {}
+                        }
                     }
-                    fuicomposition::FlatlandEvent::OnError { .. } => false,
-                },
-                Err(_) => false,
-            } {}
-        }
-    })
-    .detach();
+                    present_parameters = scheduler.wait_to_update().fuse() => {
+                        flatland
+                        .present(fuicomposition::PresentArgs {
+                            requested_presentation_time: Some(
+                                present_parameters.requested_presentation_time.into_nanos(),
+                            ),
+                            acquire_fences: None,
+                            release_fences: None,
+                            unsquashable: Some(present_parameters.unsquashable),
+                            ..Default::default()
+                        })
+                        .unwrap_or(());
+                    }
+                }
+            }
+        })
+    });
 }

@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use super::framebuffer_server::{
-    init_viewport_scene, present_view, spawn_view_provider, FramebufferServer,
+    init_viewport_scene, send_view_to_graphical_presenter, spawn_view_provider,
+    start_flatland_presentation_loop, FramebufferServer,
 };
 use crate::{
     device::{features::AspectRatio, kobject::KObjectDeviceAttribute, DeviceMode, DeviceOps},
@@ -119,6 +120,9 @@ impl Framebuffer {
         maybe_svc: Option<fio::DirectorySynchronousProxy>,
     ) -> Result<(), anyhow::Error> {
         if let Some(server) = &self.server {
+            // Start presentation loop to prepare for display updates.
+            start_flatland_presentation_loop(kernel, server.clone());
+
             // Attempt to find and connect to GraphicalPresenter.
             //
             // TODO: b/307788344 - DirectorySynchronousProxy is not ideal,
@@ -137,7 +141,7 @@ impl Framebuffer {
                 {
                     if entry.name == "fuchsia.element.GraphicalPresenter" {
                         log_info!("Presenting view using GraphicalPresenter");
-                        present_view(
+                        send_view_to_graphical_presenter(
                             kernel,
                             server.clone(),
                             view_bound_protocols,
@@ -151,7 +155,13 @@ impl Framebuffer {
 
             // Fallback to serving ViewProvider.
             log_info!("Serving ViewProvider");
-            spawn_view_provider(server.clone(), view_bound_protocols, view_identity, outgoing_dir);
+            spawn_view_provider(
+                kernel,
+                server.clone(),
+                view_bound_protocols,
+                view_identity,
+                outgoing_dir,
+            );
         }
 
         Ok(())
