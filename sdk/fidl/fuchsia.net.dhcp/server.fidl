@@ -38,7 +38,7 @@ type Parameter = flexible union {
         /// The starting address, inclusive, of the range of addresses which the
         /// DHCP server will lease to clients.
         2: range_start fuchsia.net.Ipv4Address;
-        /// The ending address, inclusive, of the range of addresses which the
+        /// The ending address, exclusive, of the range of addresses which the
         /// server will lease to clients.
         3: range_stop fuchsia.net.Ipv4Address;
     };
