@@ -26,23 +26,25 @@ extern crate fakestd as std;
 mod macros;
 
 mod algorithm;
+mod convert;
+mod data_structures;
+mod lock_ordering;
+mod trace;
+
 #[cfg(test)]
 pub mod benchmarks;
+#[cfg(any(test, feature = "testutils"))]
+pub mod testutil;
+
 pub mod context;
-pub(crate) mod convert;
 pub mod counters;
-pub mod data_structures;
 pub mod device;
 pub mod error;
 pub mod ip;
-mod lock_ordering;
 pub mod socket;
 pub mod state;
 pub mod sync;
-#[cfg(any(test, feature = "testutils"))]
-pub mod testutil;
 pub mod time;
-mod trace;
 pub mod transport;
 pub mod work_queue;
 
