@@ -83,8 +83,8 @@ class FakeSdmmcDevice : public ddk::SdmmcProtocol<FakeSdmmcDevice> {
     erase_group_start_.reset();
     erase_group_end_.reset();
 
-    for (size_t i = 0; i < std::size(registered_vmos_); i++) {
-      registered_vmos_[i].reset();
+    for (auto& store : registered_vmos_) {
+      store.emplace(vmo_store::Options{});
     }
   }
 

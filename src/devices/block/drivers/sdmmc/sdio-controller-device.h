@@ -101,12 +101,6 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   }
   SdmmcRootDevice* parent() { return parent_; }
 
-  // Visible for testing.
-  zx_status_t Init(bool use_fidl = false) TA_EXCL(lock_) {
-    fbl::AutoLock _(&lock_);
-    return sdmmc_->Init(use_fidl);
-  }
-
   zx_status_t StartSdioIrqThreadIfNeeded() TA_EXCL(irq_thread_lock_);
   void StopSdioIrqThread() TA_EXCL(irq_thread_lock_);
 

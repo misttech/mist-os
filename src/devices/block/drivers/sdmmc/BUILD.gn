@@ -87,10 +87,9 @@ fuchsia_driver_package("package") {
   driver_components = [ ":sdmmc" ]
 }
 
-# TODO(b/301004279): Add back sdio-controller-device-test.
-test("sdmmc-test-bin") {
+test("sdmmc-block-test-bin") {
   configs += [ "//build/config:all_source" ]
-  output_name = "sdmmc-test"
+  output_name = "sdmmc-block-test"
   sources = [
     "fake-sdmmc-device.cc",
     "mmc.cc",
@@ -113,8 +112,43 @@ test("sdmmc-test-bin") {
          ]
 }
 
-fuchsia_unittest_package("sdmmc-test") {
-  deps = [ ":sdmmc-test-bin" ]
+fuchsia_unittest_package("sdmmc-block-test") {
+  deps = [ ":sdmmc-block-test-bin" ]
+  test_specs = {
+    environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
+}
+
+test("sdio-controller-test-bin") {
+  configs += [ "//build/config:all_source" ]
+  output_name = "sdio-controller-test"
+  sources = [
+    "fake-sdmmc-device.cc",
+    "mmc.cc",
+    "sd.cc",
+    "sdio-controller-device-test.cc",
+    "sdio-controller-device.cc",
+    "sdio-function-device.cc",
+    "sdmmc-block-device.cc",
+    "sdmmc-device.cc",
+    "sdmmc-partition-device.cc",
+    "sdmmc-root-device.cc",
+    "sdmmc-rpmb-device.cc",
+  ]
+  deps = common_deps + [
+           "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_cpp",
+           "//sdk/lib/async_patterns/testing/cpp",
+           "//sdk/lib/driver/testing/cpp:cpp",
+           "//sdk/lib/inspect/testing/cpp:zxtest",
+           "//zircon/system/ulib/zxtest",
+         ]
+}
+
+fuchsia_unittest_package("sdio-controller-test") {
+  deps = [ ":sdio-controller-test-bin" ]
   test_specs = {
     environments = basic_envs
     log_settings = {
@@ -126,7 +160,8 @@ fuchsia_unittest_package("sdmmc-test") {
 group("tests") {
   testonly = true
   deps = [
+    ":sdio-controller-test",
     ":sdmmc-bind_test",
-    ":sdmmc-test",
+    ":sdmmc-block-test",
   ]
 }
