@@ -23,10 +23,12 @@ pub type DropWaiter = fasync::RWHandle<zx::EventPair>;
 impl DropNotifier {
     /// Get a new waiter on this notifier. It will be notified when this object is dropped.
     pub fn waiter(&self) -> DropWaiter {
-        fasync::RWHandle::new(
-            self.notified_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate event"),
-        )
-        .expect("RWHandle::new")
+        fasync::RWHandle::new(self.event()).expect("RWHandle::new")
+    }
+
+    /// Get an event pair that will receive a PEER_CLOSED signal when this object is dropped.
+    pub fn event(&self) -> zx::EventPair {
+        self.notified_event.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("duplicate event")
     }
 }
 

@@ -181,6 +181,11 @@ struct WaitCancelerZxio {
     inner: HandleWaitCanceler,
 }
 
+struct WaitCancelerEventPair {
+    event_pair: Weak<zx::EventPair>,
+    inner: HandleWaitCanceler,
+}
+
 struct WaitCancelerTimer {
     timer: Weak<zx::Timer>,
     inner: HandleWaitCanceler,
@@ -193,8 +198,9 @@ struct WaitCancelerVmo {
 
 enum WaitCancelerInner {
     Zxio(WaitCancelerZxio),
-    Timer(WaitCancelerTimer),
     Queue(WaitCancelerQueue),
+    EventPair(WaitCancelerEventPair),
+    Timer(WaitCancelerTimer),
     Vmo(WaitCancelerVmo),
 }
 
@@ -221,6 +227,10 @@ impl WaitCanceler {
 
     pub fn new_zxio(zxio: Weak<Zxio>, inner: HandleWaitCanceler) -> Self {
         Self::new_inner(WaitCancelerInner::Zxio(WaitCancelerZxio { zxio, inner }))
+    }
+
+    pub fn new_event_pair(event_pair: Weak<zx::EventPair>, inner: HandleWaitCanceler) -> Self {
+        Self::new_inner(WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }))
     }
 
     pub fn new_timer(timer: Weak<zx::Timer>, inner: HandleWaitCanceler) -> Self {
@@ -272,10 +282,6 @@ impl WaitCanceler {
                     inner.cancel(handle);
                     zxio.wait_end(signals);
                 }
-                WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }) => {
-                    let Some(timer) = timer.upgrade() else { return };
-                    inner.cancel(timer.as_handle_ref());
-                }
                 WaitCancelerInner::Queue(WaitCancelerQueue {
                     wait_queue,
                     waiter,
@@ -296,6 +302,14 @@ impl WaitCanceler {
                             }
                         }
                     };
+                }
+                WaitCancelerInner::EventPair(WaitCancelerEventPair { event_pair, inner }) => {
+                    let Some(event_pair) = event_pair.upgrade() else { return };
+                    inner.cancel(event_pair.as_handle_ref());
+                }
+                WaitCancelerInner::Timer(WaitCancelerTimer { timer, inner }) => {
+                    let Some(timer) = timer.upgrade() else { return };
+                    inner.cancel(timer.as_handle_ref());
                 }
                 WaitCancelerInner::Vmo(WaitCancelerVmo { vmo, inner }) => {
                     let Some(vmo) = vmo.upgrade() else { return };
