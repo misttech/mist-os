@@ -305,7 +305,7 @@ impl CapabilityDictMut {
 pub fn new_terminating_router(sender: Sender<Message>) -> Router {
     Router::new(move |request: Request, completer: Completer| {
         let sender = sender.clone();
-        let target = request.target.as_ref().unwrap().unwrap();
+        let target = request.target.unwrap();
         let open_fn = move |_scope: ExecutionScope,
                             flags: fio::OpenFlags,
                             path: Path,
@@ -540,9 +540,8 @@ pub mod tests {
             Request {
                 rights: Some(fio::OpenFlags::empty()),
                 relative_path: sandbox::Path::new(""),
-                target_moniker: vec![].try_into().unwrap(),
                 availability: cm_rust::Availability::Required,
-                target: Some(AnyWeakComponentInstance::new(WeakComponentInstance::invalid())),
+                target: AnyWeakComponentInstance::new(WeakComponentInstance::invalid()),
             },
             completer,
         );

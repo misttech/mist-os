@@ -305,9 +305,8 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
                             Request {
                                 rights: None,
                                 relative_path: sandbox::Path::default(),
-                                target_moniker: weak_component.moniker.clone(),
                                 availability: use_protocol_decl.availability.clone(),
-                                target: Some(AnyWeakComponentInstance::new(weak_component.clone())),
+                                target: AnyWeakComponentInstance::new(weak_component.clone()),
                             },
                         )
                         .await;

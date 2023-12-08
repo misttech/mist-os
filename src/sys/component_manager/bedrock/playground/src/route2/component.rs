@@ -5,7 +5,6 @@
 use anyhow::Result;
 use cm_types::Availability;
 use futures::channel::oneshot::{self};
-use moniker::Moniker;
 use replace_with::replace_with;
 use routing::{Routable, Router};
 use sandbox::{Data, Dict, Opaque, Open};
@@ -289,7 +288,7 @@ mod test {
     use fidl_fuchsia_io as fio;
     use fuchsia_async as fasync;
     use futures::{channel::mpsc, StreamExt};
-    use moniker::MonikerBase;
+    use routing::component_instance::AnyWeakComponentInstance;
     use serve_processargs::{ignore_not_found, NamespaceBuilder};
     use vfs::{
         directory::{entry::DirectoryEntry, helper::DirectlyMutable, immutable::simple as pfs},
@@ -421,12 +420,8 @@ mod test {
         let request = routing::Request {
             rights: None,
             relative_path: sandbox::Path::new("cap"),
-            target_moniker: Moniker::new(vec![
-                "root".try_into().unwrap(),
-                "child_b".try_into().unwrap(),
-            ]),
             availability: use_availability,
-            target: None,
+            target: AnyWeakComponentInstance::invalid_for_tests(),
         };
         let cap = routing::route(&router, request).await.context("route")?;
         eprintln!("Obtained capability {:?}", cap);
@@ -613,9 +608,8 @@ mod test {
                         routing::Request {
                             rights: None,
                             relative_path: sandbox::Path::new("fuchsia.echo.Echo"),
-                            target_moniker: Moniker::try_from(vec!["child_b"]).unwrap(),
                             availability: Availability::Required,
-                            target: None,
+                            target: AnyWeakComponentInstance::invalid_for_tests(),
                         },
                         fio::DirentType::Service,
                         errors,

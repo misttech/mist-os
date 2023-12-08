@@ -2134,6 +2134,7 @@ impl DictDispatcher {
 
 #[cfg(test)]
 pub mod tests {
+
     use {
         super::*,
         crate::model::{
@@ -2146,6 +2147,7 @@ pub mod tests {
                 test_helpers::{component_decl_with_test_runner, ActionsTest, ComponentInfo},
             },
         },
+        ::routing::component_instance::AnyWeakComponentInstance,
         assert_matches::assert_matches,
         cm_rust::{
             Availability, CapabilityDecl, ChildRef, DependencyType, ExposeDecl, ExposeProtocolDecl,
@@ -3245,5 +3247,26 @@ pub mod tests {
 
         // Wait for the logger to connect to LogSink.
         connect_rx.next().await.unwrap();
+    }
+
+    #[fuchsia::test]
+    fn test_unwrap_invalid_component_instance() {
+        let instance = AnyWeakComponentInstance::invalid_for_tests();
+        let unwrapped: WeakComponentInstanceInterface<ComponentInstance> = instance.unwrap();
+        assert!(unwrapped.upgrade().is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_unwrap_valid_component_instance() {
+        let component = ComponentInstance::new_root(
+            Environment::empty(),
+            Arc::new(ModelContext::new_for_test()),
+            Weak::new(),
+            "test:///root".to_string(),
+        );
+        let weak = WeakComponentInstanceInterface::new(&component);
+        let instance = AnyWeakComponentInstance::new(weak);
+        let unwrapped: WeakComponentInstanceInterface<ComponentInstance> = instance.unwrap();
+        assert_eq!(unwrapped.upgrade().unwrap().component_url, "test:///root".to_string());
     }
 }

@@ -34,7 +34,6 @@ rustc_test("bin") {
     "//src/sys/component_manager/lib/sandbox",
     "//src/sys/component_manager/lib/serve_processargs",
     "//src/sys/lib/cm_types",
-    "//src/sys/lib/moniker",
     "//src/sys/lib/namespace",
     "//src/sys/lib/routing",
     "//third_party/rust_crates:anyhow",
