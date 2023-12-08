@@ -120,10 +120,20 @@ then
   build_dir_file_contents="$(cat "$build_dir_file")"
   # In some cases, .fx-build-dir might contain an absolute path.
   # We want only the relative-path.
-  build_subdir="$(relpath "$project_root" "$build_dir_file_contents")"
+  if [[ "$build_dir_file_contents" == /* ]]
+  then build_subdir="$(relpath "$project_root" "$build_dir_file_contents")"
+  else build_subdir="$build_dir_file_contents"
+  fi
 fi
 # assume build_subdir path has depth=2
 IFS=/ read -r -a build_subdir_arr <<< "$build_subdir"
+
+[[ "${#build_subdir_arr[@]}" == 2 ]] || {
+  cat <<EOF
+Warning: expected a relative build subdir with 2 components, but got ${build_subdir_arr[@]}.
+If you see this, file a go/fx-build-bug.
+EOF
+}
 
 readonly old_logs_root="$project_root/$build_subdir/.reproxy_logs"
 # Move the reproxy logs outside of $build_subdir so they do not get cleaned,
