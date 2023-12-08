@@ -80,6 +80,7 @@ common_test_deps = [
 ]
 
 common_sources = [
+  "src/bindings.rs",
   "src/bindings/debug_fidl_worker.rs",
   "src/bindings/devices.rs",
   "src/bindings/filter_worker.rs",
@@ -87,16 +88,15 @@ common_sources = [
   "src/bindings/integration_tests.rs",
   "src/bindings/interfaces_admin.rs",
   "src/bindings/interfaces_watcher.rs",
-  "src/bindings/mod.rs",
   "src/bindings/name_worker.rs",
   "src/bindings/neighbor_worker.rs",
   "src/bindings/netdevice_worker.rs",
   "src/bindings/root_fidl_worker.rs",
+  "src/bindings/routes.rs",
   "src/bindings/routes/admin.rs",
-  "src/bindings/routes/mod.rs",
   "src/bindings/routes/state.rs",
+  "src/bindings/socket.rs",
   "src/bindings/socket/datagram.rs",
-  "src/bindings/socket/mod.rs",
   "src/bindings/socket/packet.rs",
   "src/bindings/socket/queue.rs",
   "src/bindings/socket/raw.rs",
