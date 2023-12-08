@@ -229,8 +229,8 @@ Status StreamingChunkedCompressor::AppendToFrame(const void* data, size_t len) {
 
   size_t r = ZSTD_compressStream(context_->inner_, &out_buf, &in_buf);
   if (ZSTD_isError(r)) {
-    FX_SLOG(ERROR, "ZSTD_compressStream failed", KV("status", r),
-            KV("status_str", ZSTD_getErrorName(r)));
+    FX_SLOG(ERROR, "ZSTD_compressStream failed", FX_KV("status", r),
+            FX_KV("status_str", ZSTD_getErrorName(r)));
     return kStatusErrInternal;
   } else if (in_buf.pos < in_buf.size) {
     FX_SLOG(ERROR, "Partial read");
@@ -240,8 +240,8 @@ Status StreamingChunkedCompressor::AppendToFrame(const void* data, size_t len) {
   if (will_finish_frame) {
     r = ZSTD_endStream(context_->inner_, &out_buf);
     if (ZSTD_isError(r)) {
-      FX_SLOG(ERROR, "ZSTD_endStream failed", KV("status", r),
-              KV("status_str", ZSTD_getErrorName(r)));
+      FX_SLOG(ERROR, "ZSTD_endStream failed", FX_KV("status", r),
+              FX_KV("status_str", ZSTD_getErrorName(r)));
       return kStatusErrInternal;
     }
   }

@@ -88,11 +88,11 @@ Status ChunkedDecompressor::Decompress(const SeekTable& table, const void* input
 Status ChunkedDecompressor::DecompressFrame(const void* compressed_buffer,
                                             size_t compressed_buffer_len, void* dst, size_t dst_len,
                                             size_t* bytes_written_out) {
-  size_t decompressed_size = ZSTD_decompressDCtx(context_->inner_, dst, dst_len,
-                                                 compressed_buffer, compressed_buffer_len);
+  size_t decompressed_size =
+      ZSTD_decompressDCtx(context_->inner_, dst, dst_len, compressed_buffer, compressed_buffer_len);
   if (ZSTD_isError(decompressed_size)) {
-    FX_SLOG(ERROR, "Decompression failed", KV("status", decompressed_size),
-            KV("status_str", ZSTD_getErrorName(decompressed_size)));
+    FX_SLOG(ERROR, "Decompression failed", FX_KV("status", decompressed_size),
+            FX_KV("status_str", ZSTD_getErrorName(decompressed_size)));
     if (LikelyCorrupton(ZSTD_getErrorCode(decompressed_size))) {
       return kStatusErrIoDataIntegrity;
     }
@@ -100,8 +100,8 @@ Status ChunkedDecompressor::DecompressFrame(const void* compressed_buffer,
   }
 
   if (decompressed_size != dst_len) {
-    FX_SLOG(ERROR, "Decompressed too few bytes", KV("bytes", decompressed_size),
-            KV("expected", dst_len));
+    FX_SLOG(ERROR, "Decompressed too few bytes", FX_KV("bytes", decompressed_size),
+            FX_KV("expected", dst_len));
     return kStatusErrIoDataIntegrity;
   }
 
@@ -121,8 +121,8 @@ Status ChunkedDecompressor::DecompressFrame(const SeekTable& table, unsigned tab
     return kStatusErrBufferTooSmall;
   }
 
-  return DecompressFrame(
-      compressed_buffer, entry.compressed_size, dst, entry.decompressed_size, bytes_written_out);
+  return DecompressFrame(compressed_buffer, entry.compressed_size, dst, entry.decompressed_size,
+                         bytes_written_out);
 }
 
 }  // namespace chunked_compression

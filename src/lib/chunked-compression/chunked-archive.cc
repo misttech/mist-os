@@ -137,7 +137,8 @@ Status HeaderReader::CheckVersion(const uint8_t* data, size_t len) {
   const ArchiveVersionType& version =
       reinterpret_cast<const ArchiveVersionType*>(data + kChunkArchiveVersionOffset)[0];
   if (version != kVersion) {
-    FX_SLOG(ERROR, "Unsupported archive version", KV("actual", version), KV("expected", kVersion));
+    FX_SLOG(ERROR, "Unsupported archive version", FX_KV("actual", version),
+            FX_KV("expected", kVersion));
     return kStatusErrInvalidArgs;
   }
   return kStatusOk;
@@ -198,7 +199,7 @@ Status HeaderReader::CheckSeekTable(const fbl::Array<SeekTableEntry>& table, siz
     const SeekTableEntry* prev = i > 0 ? &table[i - 1] : nullptr;
     Status status;
     if ((status = CheckSeekTableEntry(table[i], prev, header_end, file_length)) != kStatusOk) {
-      FX_SLOG(ERROR, "Invalid archive. Bad seek table entry", KV("entry", i));
+      FX_SLOG(ERROR, "Invalid archive. Bad seek table entry", FX_KV("entry", i));
       return status;
     }
   }
