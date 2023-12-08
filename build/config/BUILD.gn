@@ -261,7 +261,6 @@ config("relative_paths") {
 }
 
 config("debug") {
-  rustflags = [ "-Cdebug-assertions=yes" ]
 }
 
 config("release") {

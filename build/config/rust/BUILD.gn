@@ -27,6 +27,9 @@ declare_args() {
   # Enable incremental rust compilation. Takes a path to the directory to use
   # as the cache.
   rust_incremental = ""
+
+  # Enable debug assertions, e.g. for overflow checking.
+  rust_debug_assertions = is_debug
 }
 
 # Turns on the rust compilation analysis generator. This will produce a
@@ -87,6 +90,22 @@ config("codegen_units_16") {
   # https://doc.rust-lang.org/rustc/codegen-options/index.html#lto
   if (rust_incremental == "") {
     rustflags = [ "-Ccodegen-units=16" ]
+  }
+}
+
+config("debug_assertions") {
+  rustflags = [ "-Cdebug-assertions=yes" ]
+}
+
+config("no_debug_assertions") {
+  rustflags = [ "-Cdebug-assertions=no" ]
+}
+
+config("default_debug_assertions") {
+  if (rust_debug_assertions) {
+    configs = [ ":debug_assertions" ]
+  } else {
+    configs = [ ":no_debug_assertions" ]
   }
 }
 
