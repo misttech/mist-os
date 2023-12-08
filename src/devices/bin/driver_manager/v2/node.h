@@ -301,6 +301,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     fidl::WireClient<fuchsia_driver_host::Driver> driver;
     std::string driver_url;
 
+    bool is_bind_complete = false;
+
     // Set to true when the component is destroyed.
     bool is_destroyed = false;
   };
@@ -355,6 +357,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
 
   // Start the node's driver back up.
   void FinishRestart();
+
+  // Clear out the values associated with the driver on the driver host.
+  void ClearHostDriver();
+
   // Call `callback` once child node with the name `name` has been removed.
   // Returns an error if a child node with the name `name` exists and is not in
   // the process of being removed.

@@ -423,6 +423,13 @@ void Node::CompleteBind(zx::result<> result) {
     LOGF(WARNING, "Bind failed for node '%s'", MakeComponentMoniker().c_str());
     driver_component_.reset();
   }
+
+  if (driver_component_) {
+    ZX_ASSERT_MSG(!driver_component_->is_bind_complete,
+                  "CompleteBind() called multiple times for node %s", name().c_str());
+    driver_component_->is_bind_complete = true;
+  }
+
   auto completer = std::move(pending_bind_completer_);
   pending_bind_completer_.reset();
   if (completer.has_value()) {
@@ -530,6 +537,13 @@ void Node::FinishRestart() {
       node_manager_.value()->StartDriver(*this, previous_url, driver_package_type_);
   if (start_result.is_error()) {
     LOGF(ERROR, "Failed to start driver '%s': %s", name().c_str(), start_result.status_string());
+  }
+}
+
+void Node::ClearHostDriver() {
+  if (driver_component_) {
+    driver_component_->driver = {};
+    driver_component_->is_bind_complete = false;
   }
 }
 
@@ -983,6 +997,8 @@ void Node::StartDriver(fuchsia_component_runner::wire::ComponentStartInfo start_
         }
 
         if (result.is_error()) {
+          LOGF(WARNING, "Failed to start driver host for %s",
+               node_ptr->MakeComponentMoniker().c_str());
           node_ptr->driver_component_.reset();
           node_ptr->GetShutdownHelper().CheckNodeState();
         }
@@ -1027,6 +1043,11 @@ void Node::StopDriver() {
     return;
   }
 
+  if (!driver_component_->is_bind_complete) {
+    LOGF(WARNING, "Stopping driver '%s' for node '%s' while bind is in process",
+         driver_component_->driver_url.c_str(), MakeComponentMoniker().c_str());
+  }
+
   fidl::OneWayStatus result = driver_component_->driver->Stop();
   if (result.ok()) {
     return;  // We'll now wait for the channel to close
@@ -1035,7 +1056,7 @@ void Node::StopDriver() {
   LOGF(ERROR, "Node: %s failed to stop driver: %s", name().c_str(),
        result.FormatDescription().data());
   // Continue to clear out the driver, since we can't talk to it.
-  driver_component_->driver = {};
+  ClearHostDriver();
 }
 
 void Node::StopDriverComponent() {
@@ -1076,9 +1097,7 @@ void Node::StopDriverComponent() {
 }
 
 void Node::on_fidl_error(fidl::UnbindInfo info) {
-  if (driver_component_) {
-    driver_component_->driver = {};
-  }
+  ClearHostDriver();
 
   // The only valid way a driver host should shut down the Driver channel
   // is with the ZX_OK epitaph.
