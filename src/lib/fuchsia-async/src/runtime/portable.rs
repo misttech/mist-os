@@ -2,7 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::cell::RefCell;
+use std::rc::Rc;
+use tokio::task::LocalSet;
+
+thread_local!(
+    static LOCAL_EXECUTOR: RefCell<Option<Rc<LocalSet>>> = RefCell::new(None)
+);
+
 pub mod task {
+    use super::LOCAL_EXECUTOR;
     use core::task::{Context, Poll};
     use std::future::Future;
     use std::pin::Pin;
@@ -32,7 +41,14 @@ pub mod task {
         where
             T: Send,
         {
-            Self { task: tokio::task::spawn(fut), abort_on_drop: true }
+            let task = LOCAL_EXECUTOR.with(|e| {
+                if let Some(e) = e.borrow().as_ref() {
+                    e.spawn_local(fut)
+                } else {
+                    tokio::task::spawn(fut)
+                }
+            });
+            Self { task, abort_on_drop: true }
         }
 
         /// Spawn a new non-`Send` task onto the single threaded executor.
@@ -42,7 +58,10 @@ pub mod task {
         /// `local` may panic if not called in the context of a local executor
         /// (e.g. within a call to `run` or `run_singlethreaded`).
         pub fn local<'a>(fut: impl Future<Output = T> + 'static) -> Self {
-            Self { task: tokio::task::spawn_local(fut), abort_on_drop: true }
+            let task = LOCAL_EXECUTOR.with(|e| {
+                e.borrow().as_ref().expect("Executor must be created first").spawn_local(fut)
+            });
+            Self { task, abort_on_drop: true }
         }
 
         /// detach the Task handle. The contained future will be polled until completion.
@@ -129,12 +148,19 @@ pub mod task {
 }
 
 pub mod executor {
+    use super::LOCAL_EXECUTOR;
+
     use crate::runtime::WakeupTime;
-    use std::future::Future;
+    use std::{
+        future::Future,
+        ops::{Deref, DerefMut},
+        rc::Rc,
+    };
 
     pub use std::time::Duration;
     /// A time relative to the executor's clock.
     pub use std::time::Instant as Time;
+    use tokio::task::LocalSet;
 
     impl WakeupTime for Time {
         fn into_time(self) -> Time {
@@ -144,10 +170,13 @@ pub mod executor {
 
     /// A multi-threaded executor.
     ///
-    /// API-compatible with the Fuchsia variant.
+    /// Mostly API-compatible with the Fuchsia variant.  This differs from Fuchsia in one important
+    /// regard: tasks can only be spawned whilst the executor is running, whereas Fuchsia will allow
+    /// you to spawn tasks before the executor is running.  LocalExecutor does not have this
+    /// limitation.
     ///
-    /// The current implementation of Executor does not isolate work
-    /// (as the underlying executor is not yet capable of this).
+    /// The current implementation of Executor does not isolate work (as the underlying executor is
+    /// not yet capable of this).
     pub struct SendExecutor {
         num_threads: usize,
     }
@@ -180,12 +209,19 @@ pub mod executor {
     ///
     /// The current implementation of Executor does not isolate work
     /// (as the underlying executor is not yet capable of this).
-    pub struct LocalExecutor {}
+    pub struct LocalExecutor(Rc<LocalSet>);
 
     impl LocalExecutor {
         /// Create a new executor.
         pub fn new() -> Self {
-            Self {}
+            let local_set = Rc::new(LocalSet::new());
+            LOCAL_EXECUTOR.with(|e| {
+                assert!(
+                    e.borrow_mut().replace(local_set.clone()).is_none(),
+                    "Cannot create multiple executors"
+                );
+            });
+            Self(local_set)
         }
 
         /// Run a single future to completion on a single thread.
@@ -197,7 +233,13 @@ pub mod executor {
                 .enable_io()
                 .build()
                 .expect("Could not start tokio runtime on current thread");
-            tokio::task::LocalSet::new().block_on(&rt, main_future)
+            self.0.block_on(&rt, main_future)
+        }
+    }
+
+    impl Drop for LocalExecutor {
+        fn drop(&mut self) {
+            LOCAL_EXECUTOR.with(|e| e.borrow_mut().take());
         }
     }
 
@@ -205,20 +247,28 @@ pub mod executor {
     ///
     /// The current implementation of Executor does not isolate work
     /// (as the underlying executor is not yet capable of this).
-    pub struct TestExecutor {}
+    pub struct TestExecutor {
+        executor: LocalExecutor,
+    }
 
     impl TestExecutor {
         /// Create a new executor for testing.
         pub fn new() -> Self {
-            Self {}
+            Self { executor: LocalExecutor::new() }
         }
+    }
 
-        /// Run a single future to completion on a single thread.
-        pub fn run_singlethreaded<F>(&mut self, main_future: F) -> F::Output
-        where
-            F: Future,
-        {
-            LocalExecutor {}.run_singlethreaded(main_future)
+    impl Deref for TestExecutor {
+        type Target = LocalExecutor;
+
+        fn deref(&self) -> &Self::Target {
+            &self.executor
+        }
+    }
+
+    impl DerefMut for TestExecutor {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.executor
         }
     }
 }
