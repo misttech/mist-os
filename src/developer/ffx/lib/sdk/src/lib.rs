@@ -4,7 +4,6 @@
 
 use anyhow::{anyhow, Context, Result};
 use errors::{ffx_bail, ffx_error};
-use sdk_metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -14,6 +13,9 @@ use std::{
     process::Command,
 };
 use tracing::warn;
+
+use metadata::{CpuArchitecture, ElementType, FfxTool, HostTool, Manifest, Part};
+pub use sdk_metadata as metadata;
 
 pub const SDK_MANIFEST_PATH: &str = "meta/manifest.json";
 pub const SDK_BUILD_MANIFEST_PATH: &str = "sdk/manifest/core";
@@ -281,13 +283,14 @@ impl Sdk {
         self.get_host_tool_relative_path(name).map(|path| self.path_prefix.join(path))
     }
 
-    fn get_host_tools(&self) -> impl Iterator<Item = HostTool> + '_ {
+    /// Get the metadata for all host tools
+    pub fn get_all_host_tools_metadata(&self) -> impl Iterator<Item = HostTool> + '_ {
         self.metadata_for(&[ElementType::HostTool, ElementType::CompanionHostTool])
     }
 
     fn get_host_tool_relative_path(&self, name: &str) -> Result<PathBuf> {
         let found_tool = self
-            .get_host_tools()
+            .get_all_host_tools_metadata()
             .filter(|tool| tool.name == name)
             .map(|tool| match &tool.files.as_deref() {
                 Some([tool_path]) => Ok(tool_path.to_owned()),

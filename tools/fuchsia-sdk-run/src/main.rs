@@ -239,7 +239,7 @@ async fn run(
     Err(Exit::from_failed_exec(&sdk, &exe_path, command.exec()))
 }
 
-#[fuchsia::main]
+#[fuchsia::main(logging_minimum_severity = "warn")]
 async fn main() {
     let exit_code = match run(std::env::args(), std::env::vars()).await {
         Ok(()) => {

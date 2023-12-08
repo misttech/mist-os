@@ -1,4 +1,5 @@
 ffx/sdk.golden
+ffx/sdk/populate-path.golden
 ffx/sdk/run.golden
 ffx/sdk/set.golden
 ffx/sdk/set/root.golden

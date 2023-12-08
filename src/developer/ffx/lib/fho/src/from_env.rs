@@ -209,6 +209,15 @@ impl TryFromEnv for ffx_config::Sdk {
         env.context.get_sdk().await.user_message("Could not load currently active SDK")
     }
 }
+
+/// Gets the actively configured SDK from the environment
+#[async_trait(?Send)]
+impl TryFromEnv for ffx_config::SdkRoot {
+    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
+        env.context.get_sdk_root().await.user_message("Could not load currently active SDK")
+    }
+}
+
 /// The implementation of the decorator returned by [`moniker`] and [`moniker_timeout`]
 pub struct WithMoniker<P> {
     moniker: String,

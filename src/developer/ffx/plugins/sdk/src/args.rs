@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
+use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
 use std::path::PathBuf;
 
@@ -20,6 +21,7 @@ pub enum SubCommand {
     Version(VersionCommand),
     Set(SetCommand),
     Run(RunCommand),
+    PopulatePath(PopulatePathCommand),
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
@@ -56,4 +58,16 @@ pub struct SetRootCommand {
     #[argh(positional)]
     /// path to the sdk root
     pub path: PathBuf,
+}
+
+#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[argh(
+    subcommand,
+    name = "populate-path",
+    description = "Populates the given path with symlinks to the `fuchsha-sdk-run` tool to run project-specific sdk tools"
+)]
+pub struct PopulatePathCommand {
+    #[argh(positional)]
+    /// path to the location to install the `fuchsia-sdk-run` links
+    pub path: Utf8PathBuf,
 }
