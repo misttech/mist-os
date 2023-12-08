@@ -33,7 +33,7 @@ class FakeComponentResolver final
     if (!cpp20::starts_with(relative_path, kBootPrefix) &&
         !cpp20::starts_with(relative_path, kPkgPrefix)) {
       FX_SLOG(ERROR, "FakeComponentResolver request not supported.",
-              KV("url", std::string(relative_path).c_str()));
+              FX_KV("url", std::string(relative_path).c_str()));
       completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
       return;
     }
