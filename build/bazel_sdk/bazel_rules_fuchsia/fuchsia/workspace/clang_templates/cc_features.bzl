@@ -166,7 +166,9 @@ _flag_groups = struct(
             "-Wno-sign-conversion",
             "-Wno-unused-parameter",
             "-Wnonportable-system-include-path",
-            "-Wshadow",
+            # TODO(b/315062126) Some in-tree builds are failing because we
+            # are shadowing variables.
+            #"-Wshadow",
             "-Wstrict-prototypes",
             "-Wwrite-strings",
             "-Wthread-safety",
