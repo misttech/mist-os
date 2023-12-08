@@ -31,7 +31,7 @@ use crate::bindings::{
     BindingsNonSyncCtxImpl, Ctx, StackTime,
 };
 use netstack3_core::{
-    device::id::EthernetWeakDeviceId,
+    device::EthernetWeakDeviceId,
     error::{NeighborRemovalError, NotFoundError, NotSupportedError, StaticNeighborInsertionError},
     ip::device::nud,
 };

@@ -17,13 +17,13 @@ use net_types::{
     SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr,
 };
 use netstack3_core::{
-    device::{
-        ndp::testutil::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
-        socket::{Protocol, TargetDevice},
-    },
+    device_socket::{Protocol, TargetDevice},
     ip::types::{AddableEntry, AddableMetric, RawMetric},
     sync::Mutex,
-    testutil::{FakeCtx, FakeEventDispatcherBuilder},
+    testutil::{
+        ndp::{neighbor_advertisement_ip_packet, neighbor_solicitation_ip_packet},
+        FakeCtx, FakeEventDispatcherBuilder,
+    },
 };
 use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
 use packet_formats::{
@@ -61,8 +61,8 @@ fn packet_socket_change_device_and_protocol_atomic() {
         let devs = dev_indexes.map(|i| indexes_to_device_ids[i].clone());
         drop(indexes_to_device_ids);
 
-        let socket = netstack3_core::device::socket::create(&*sync_ctx, Mutex::new(Vec::new()));
-        netstack3_core::device::socket::set_device_and_protocol(
+        let socket = netstack3_core::device_socket::create(&*sync_ctx, Mutex::new(Vec::new()));
+        netstack3_core::device_socket::set_device_and_protocol(
             &*sync_ctx,
             &socket,
             TargetDevice::SpecificDevice(&devs[0].clone().into()),
@@ -91,7 +91,7 @@ fn packet_socket_change_device_and_protocol_atomic() {
 
         let change_device = loom::thread::spawn(move || {
             let (sync_ctx, dev, socket) = thread_vars;
-            netstack3_core::device::socket::set_device_and_protocol(
+            netstack3_core::device_socket::set_device_and_protocol(
                 &*sync_ctx,
                 &socket,
                 TargetDevice::SpecificDevice(&dev.clone().into()),

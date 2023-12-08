@@ -71,8 +71,8 @@ use netstack3_core::{
         TracingContext,
     },
     device::{
-        loopback::LoopbackDeviceId, update_ipv4_configuration, update_ipv6_configuration, DeviceId,
-        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId,
+        update_ipv4_configuration, update_ipv6_configuration, DeviceId, DeviceLayerEventDispatcher,
+        DeviceLayerStateTypes, DeviceSendFrameError, EthernetDeviceId, LoopbackDeviceId,
     },
     error::NetstackError,
     handle_timer,

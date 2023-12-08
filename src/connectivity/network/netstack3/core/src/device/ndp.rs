@@ -19,6 +19,7 @@
 //! [RFC 4861]: https://tools.ietf.org/html/rfc4861
 
 /// Test utilities for NDP.
+#[cfg(any(test, feature = "testutils"))]
 pub mod testutil {
     use crate::ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT;
     use alloc::vec::Vec;

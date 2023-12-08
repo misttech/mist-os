@@ -87,6 +87,11 @@ use crate::{
     SyncCtx,
 };
 
+/// Re-export NDP module test utilities.
+pub mod ndp {
+    pub use crate::device::ndp::testutil::*;
+}
+
 /// The default interface routing metric for test interfaces.
 pub(crate) const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
 

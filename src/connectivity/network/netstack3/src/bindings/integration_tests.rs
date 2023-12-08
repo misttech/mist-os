@@ -24,8 +24,8 @@ use net_types::{
 };
 use netstack3_core::{
     device::{
-        ethernet::resolve_ethernet_link_addr, insert_static_neighbor_entry,
-        update_ipv6_configuration, DeviceId,
+        insert_static_neighbor_entry, resolve_ethernet_link_addr, update_ipv6_configuration,
+        DeviceId,
     },
     error::AddressResolutionFailed,
     ip::{

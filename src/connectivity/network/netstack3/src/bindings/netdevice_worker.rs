@@ -20,8 +20,8 @@ use net_types::ip::{Ip, Ipv4, Ipv6, Ipv6Addr, Subnet};
 use netstack3_core::{
     context::RngContext as _,
     device::{
-        ethernet::MaxEthernetFrameSize, update_ipv4_configuration, update_ipv6_configuration,
-        EthernetWeakDeviceId,
+        update_ipv4_configuration, update_ipv6_configuration, EthernetWeakDeviceId,
+        MaxEthernetFrameSize,
     },
     ip::{
         device::{
@@ -455,7 +455,7 @@ impl DeviceHandler {
             sync_ctx,
             non_sync_ctx,
             &core_id,
-            netstack3_core::device::queue::tx::TransmitQueueConfiguration::Fifo,
+            netstack3_core::device::TransmitQueueConfiguration::Fifo,
         );
         add_initial_routes(non_sync_ctx, &core_id).await;
 

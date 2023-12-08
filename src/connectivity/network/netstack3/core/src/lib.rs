@@ -51,18 +51,64 @@ pub mod work_queue;
 pub mod device {
     pub(crate) mod arp;
     pub(crate) mod base;
-    pub mod ethernet;
-    pub mod id;
+    pub(crate) mod ethernet;
+    pub(crate) mod id;
     pub(crate) mod integration;
     pub(crate) mod link;
-    pub mod loopback;
-    pub mod ndp;
-    pub mod queue;
-    pub mod socket;
+    pub(crate) mod loopback;
+    pub(crate) mod ndp;
+    pub(crate) mod queue;
+    pub(crate) mod socket;
     mod state;
 
-    pub use base::*;
-    pub use id::*;
+    pub(crate) use base::*;
+    pub(crate) use id::*;
+
+    // Re-exported freestanding functions.
+    //
+    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // objects.
+    pub use base::{
+        add_ethernet_device_with_state, add_ip_addr_subnet, add_loopback_device_with_state,
+        del_ip_addr, flush_neighbor_table, get_all_ip_addr_subnets,
+        get_ipv4_configuration_and_flags, get_ipv6_configuration_and_flags, get_routing_metric,
+        handle_queued_rx_packets, insert_static_neighbor_entry, inspect_devices, inspect_neighbors,
+        receive_frame, remove_ethernet_device, remove_loopback_device, remove_neighbor_table_entry,
+        set_ip_addr_properties, set_tx_queue_configuration, transmit_queued_tx_frames,
+        update_ipv4_configuration, update_ipv6_configuration,
+    };
+    pub use ethernet::resolve_ethernet_link_addr;
+
+    // Re-exported types.
+    pub use base::{
+        DeviceLayerEventDispatcher, DeviceLayerStateTypes, DeviceSendFrameError, DevicesVisitor,
+        InspectDeviceState, NeighborVisitor, RemoveDeviceResult, RemoveDeviceResultWithContext,
+    };
+    pub use ethernet::{EthernetLinkDevice, MaxEthernetFrameSize};
+    pub use id::{DeviceId, EthernetDeviceId, EthernetWeakDeviceId, WeakDeviceId};
+    pub use loopback::LoopbackDeviceId;
+    pub use queue::tx::TransmitQueueConfiguration;
+}
+
+/// Device socket API.
+pub mod device_socket {
+    // Re-exported functions.
+    //
+    // TODO(https://fxbug.dev/133996): Replace freestanding functions with API
+    // objects.
+    pub use crate::device::socket::{
+        create, get_info, remove, send_datagram, send_frame, set_device, set_device_and_protocol,
+    };
+
+    // Re-exported types.
+    pub use crate::device::{
+        base::FrameDestination,
+        socket::{
+            DeviceSocketTypes, EthernetFrame, Frame, NonSyncContext, Protocol, ReceivedFrame,
+            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SentFrame,
+            SocketId, SocketInfo, TargetDevice,
+        },
+    };
 }
 
 use crate::{context::RngContext, device::DeviceId};

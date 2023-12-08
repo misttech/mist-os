@@ -24,7 +24,7 @@ use net_types::{
     SpecifiedAddr,
 };
 use netstack3_core::{
-    device::{ethernet::EthernetLinkDevice, DeviceId, EthernetDeviceId},
+    device::{DeviceId, EthernetDeviceId, EthernetLinkDevice},
     error::AddressResolutionFailed,
     ip::{
         device::nud::{LinkResolutionContext, LinkResolutionResult},
@@ -158,7 +158,7 @@ async fn resolve_ethernet_link_addr<A: IpAddress>(
     device: &EthernetDeviceId<BindingsNonSyncCtxImpl>,
     remote: &SpecifiedAddr<A>,
 ) -> Result<Mac, zx::Status> {
-    match netstack3_core::device::ethernet::resolve_ethernet_link_addr::<A::Version, _>(
+    match netstack3_core::device::resolve_ethernet_link_addr::<A::Version, _>(
         sync_ctx,
         non_sync_ctx,
         device,

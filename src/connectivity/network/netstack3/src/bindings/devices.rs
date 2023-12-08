@@ -19,8 +19,8 @@ use net_types::{
 };
 use netstack3_core::{
     device::{
-        handle_queued_rx_packets, loopback::LoopbackDeviceId, transmit_queued_tx_frames, DeviceId,
-        DeviceSendFrameError,
+        handle_queued_rx_packets, transmit_queued_tx_frames, DeviceId, DeviceSendFrameError,
+        LoopbackDeviceId,
     },
     sync::{Mutex as CoreMutex, RwLock as CoreRwLock},
 };

@@ -16,13 +16,11 @@ use fuchsia_zircon::{self as zx, HandleBased as _};
 use futures::StreamExt as _;
 use net_types::ethernet::Mac;
 use netstack3_core::{
-    device::{
-        socket::{
-            DeviceSocketTypes, EthernetFrame, Frame, NonSyncContext, Protocol, ReceivedFrame,
-            SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams, SentFrame,
-            SocketId, SocketInfo, TargetDevice,
-        },
-        DeviceId, FrameDestination, WeakDeviceId,
+    device::{DeviceId, WeakDeviceId},
+    device_socket::{
+        DeviceSocketTypes, EthernetFrame, Frame, FrameDestination, NonSyncContext, Protocol,
+        ReceivedFrame, SendDatagramError, SendDatagramParams, SendFrameError, SendFrameParams,
+        SentFrame, SocketId, SocketInfo, TargetDevice,
     },
     sync::Mutex,
     SyncCtx,
@@ -224,7 +222,7 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let id = netstack3_core::device::socket::create(
+        let id = netstack3_core::device_socket::create(
             sync_ctx,
             SocketState { queue: Mutex::new(MessageQueue::new(local_event)), kind },
         );
@@ -261,7 +259,7 @@ impl worker::SocketWorkerHandler for BindingData {
         _non_sync_ctx: &mut BindingsNonSyncCtxImpl,
     ) {
         let Self { peer_event: _, id } = self;
-        netstack3_core::device::socket::remove(sync_ctx, id)
+        netstack3_core::device_socket::remove(sync_ctx, id)
     }
 }
 
@@ -313,13 +311,13 @@ impl<'a> RequestHandler<'a> {
         };
 
         match protocol {
-            Some(protocol) => netstack3_core::device::socket::set_device_and_protocol(
+            Some(protocol) => netstack3_core::device_socket::set_device_and_protocol(
                 sync_ctx,
                 id,
                 device_selector,
                 protocol,
             ),
-            None => netstack3_core::device::socket::set_device(sync_ctx, id, device_selector),
+            None => netstack3_core::device_socket::set_device(sync_ctx, id, device_selector),
         }
         Ok(())
     }
@@ -333,8 +331,7 @@ impl<'a> RequestHandler<'a> {
         let Self { ctx, data: BindingData { peer_event: _, id } } = self;
         let (sync_ctx, non_sync_ctx) = ctx.contexts_mut();
 
-        let SocketInfo { device, protocol } =
-            netstack3_core::device::socket::get_info(sync_ctx, id);
+        let SocketInfo { device, protocol } = netstack3_core::device_socket::get_info(sync_ctx, id);
         let SocketState { queue: _, kind } = *id.socket_state();
 
         let interface = match device {
@@ -389,7 +386,7 @@ impl<'a> RequestHandler<'a> {
         match kind {
             fppacket::Kind::Network => {
                 let params = packet_info.try_into_core_with_ctx(non_sync_ctx)?;
-                netstack3_core::device::socket::send_datagram(
+                netstack3_core::device_socket::send_datagram(
                     sync_ctx,
                     non_sync_ctx,
                     id,
@@ -402,7 +399,7 @@ impl<'a> RequestHandler<'a> {
                 let params = packet_info
                     .try_into_core_with_ctx(non_sync_ctx)
                     .map_err(IntoErrno::into_errno)?;
-                netstack3_core::device::socket::send_frame(sync_ctx, non_sync_ctx, id, params, data)
+                netstack3_core::device_socket::send_frame(sync_ctx, non_sync_ctx, id, params, data)
                     .map_err(|(_, e): (Buf<Vec<u8>>, _)| e.into_errno())
             }
         }
