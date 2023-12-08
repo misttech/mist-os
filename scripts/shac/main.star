@@ -32,24 +32,39 @@ def _gn_format(ctx):
 
     gn = "%s/prebuilt/third_party/gn/%s/gn" % (get_fuchsia_dir(ctx), cipd_platform_name(ctx))
 
-    unformatted_files = os_exec(
+    result = os_exec(
         ctx,
         [gn, "format", "--dry-run"] + gn_files,
-        ok_retcodes = [0, 2],
-    ).wait().stdout.splitlines()
+        ok_retcodes = [0, 1, 2],
+    ).wait()
 
-    for f in unformatted_files:
-        formatted_contents = os_exec(
-            ctx,
-            [gn, "format", "--stdin"],
-            stdin = ctx.io.read_file(f),
-        ).wait().stdout
-        ctx.emit.finding(
-            level = "error",
-            message = FORMATTER_MSG,
-            filepath = f,
-            replacements = [formatted_contents],
-        )
+    if result.retcode in [0, 2]:
+        unformatted_files = result.stdout.splitlines()
+        for f in unformatted_files:
+            formatted_contents = os_exec(
+                ctx,
+                [gn, "format", "--stdin"],
+                stdin = ctx.io.read_file(f),
+            ).wait().stdout
+            ctx.emit.finding(
+                level = "error",
+                message = FORMATTER_MSG,
+                filepath = f,
+                replacements = [formatted_contents],
+            )
+
+        # If gn format --dry-run command fails, we can't filter a list of unformatted files, so we iterate over all the files
+    elif result.retcode == 1:
+        for f in gn_files:
+            res = os_exec(
+                ctx,
+                [gn, "format", "--stdin"],
+                stdin = ctx.io.read_file(f),
+                ok_retcodes = [0, 1, 2],
+            ).wait()
+            if res.retcode == 1:
+                finding = res.stdout
+                fail("%s: %s", f, finding)
 
 def register_all_checks():
     """Register all checks that should run.
