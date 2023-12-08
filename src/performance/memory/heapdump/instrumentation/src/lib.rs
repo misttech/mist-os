@@ -11,6 +11,7 @@ mod allocations_table;
 mod profiler;
 mod recursion_guard;
 mod resources_table;
+mod waiter_list;
 
 // Do not include the hooks in the tests' executable, to avoid instrumenting the test framework.
 #[cfg(not(test))]

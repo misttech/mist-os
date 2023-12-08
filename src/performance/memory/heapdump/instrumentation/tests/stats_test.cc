@@ -7,6 +7,14 @@
 #include <gtest/gtest.h>
 #include <heapdump/stats.h>
 
+namespace {
+
+// Prevent the compiler from observing that we don't use the allocated memory block and optimizing
+// our allocations away.
+void DoNotOptimize(void *&ptr) { __asm__("" : "=r"(ptr) : "0"(ptr)); }
+
+}  // namespace
+
 // Verify that malloc and free calls are intercepted by the instrumentation by observing heapdump's
 // counters.
 // - The global counters may also be incremented as a result of other threads allocating or
@@ -20,10 +28,7 @@ TEST(StatsTest, CountersReflectMallocAndFree) {
 
   const size_t kAllocSize = 1'000'000;
   void *ptr = malloc(kAllocSize);
-
-  // Prevent the compiler from observing that we don't use the allocated memory block and optimizing
-  // our malloc+free calls away.
-  __asm__("" : "=r"(ptr) : "0"(ptr));
+  DoNotOptimize(ptr);
 
   heapdump_global_stats after_malloc_global_stats;
   heapdump_thread_local_stats after_malloc_local_stats;
@@ -59,6 +64,34 @@ TEST(StatsTest, CountersReflectMallocAndFree) {
             after_malloc_local_stats.total_allocated_bytes);
   EXPECT_EQ(after_free_local_stats.total_deallocated_bytes,
             after_malloc_local_stats.total_deallocated_bytes + kAllocSize);
+}
+
+// Verify that calling realloc with the same size as the original allocation does not make the
+// counters change.
+//
+// This indirectly verifies that realloc() is being reported by Scudo through the reallocation hooks
+// (__scudo_realloc_deallocate_hook and __scudo_realloc_allocate_hook) instead of the general hooks
+// (__scudo_deallocate_hook and __scudo_allocate_hook).
+TEST(StatsTest, ReallocSameSizeIsNop) {
+  const size_t kAllocSize = 1'000'000;
+  void *ptr = malloc(kAllocSize);
+  DoNotOptimize(ptr);
+
+  heapdump_thread_local_stats before_realloc;
+  heapdump_get_stats(nullptr, &before_realloc);
+
+  void *ptr2 = realloc(ptr, kAllocSize);
+  DoNotOptimize(ptr2);
+  ASSERT_EQ(ptr2, ptr);
+
+  heapdump_thread_local_stats after_realloc;
+  heapdump_get_stats(nullptr, &after_realloc);
+
+  free(ptr2);
+
+  // Verify that the counters have not increased.
+  EXPECT_EQ(before_realloc.total_allocated_bytes, after_realloc.total_allocated_bytes);
+  EXPECT_EQ(before_realloc.total_deallocated_bytes, after_realloc.total_deallocated_bytes);
 }
 
 TEST(StatsTest, GlobalNullDoesNotCrash) {

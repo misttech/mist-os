@@ -126,6 +126,9 @@ impl AllocationsTableWriter {
     }
 
     /// Inserts a new entry in the hash table.
+    ///
+    /// Returns Ok(true) if it has been inserted, Ok(false) if a previous entry with the same
+    /// address already existed, or an error if no free nodes are available.
     pub fn insert_allocation(
         &mut self,
         address: u64,

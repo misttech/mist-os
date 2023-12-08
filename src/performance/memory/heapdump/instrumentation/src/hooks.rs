@@ -41,6 +41,7 @@ fn with_profiler_and_call_site(f: impl FnOnce(&Profiler, &mut PerThreadData, zx:
     })
 }
 
+// Called by Scudo after new memory has been allocated by malloc/calloc/...
 #[no_mangle]
 pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
     with_profiler_and_call_site(|profiler, thread_data, timestamp, compressed_stack_trace| {
@@ -54,11 +55,42 @@ pub extern "C" fn __scudo_allocate_hook(ptr: *mut c_void, size: usize) {
     });
 }
 
+// Called by Scudo before memory is deallocated by free.
 #[no_mangle]
 pub extern "C" fn __scudo_deallocate_hook(ptr: *mut c_void) {
     with_profiler(|profiler, thread_data| {
         if ptr != std::ptr::null_mut() {
             profiler.forget_allocation(thread_data, ptr as u64);
+        }
+    });
+}
+
+// Called by Scudo at the beginning of realloc.
+#[no_mangle]
+pub extern "C" fn __scudo_realloc_deallocate_hook(_old_ptr: *mut c_void) {
+    // We don't do anything at this stage. All our work happens in __scudo_realloc_allocate_hook.
+}
+
+// Called by Scudo at the end of realloc.
+#[no_mangle]
+pub extern "C" fn __scudo_realloc_allocate_hook(
+    old_ptr: *mut c_void,
+    new_ptr: *mut c_void,
+    size: usize,
+) {
+    with_profiler_and_call_site(|profiler, thread_data, timestamp, compressed_stack_trace| {
+        // Has the memory block been reallocated in-place?
+        if old_ptr == new_ptr {
+            // TODO(b/315316408): Update the size associated to this memory block.
+        } else {
+            profiler.record_allocation(
+                thread_data,
+                new_ptr as u64,
+                size as u64,
+                compressed_stack_trace,
+                timestamp.into_nanos(),
+            );
+            profiler.forget_allocation(thread_data, old_ptr as u64);
         }
     });
 }

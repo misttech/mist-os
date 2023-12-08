@@ -46,19 +46,17 @@ impl AllocationsTable {
             .expect("failed to snapshot allocations VMO")
     }
 
-    pub fn record_allocation(
+    pub fn try_record_allocation(
         &mut self,
         address: u64,
         size: u64,
         thread_info_key: ResourceKey,
         stack_trace_key: ResourceKey,
         timestamp: i64,
-    ) {
-        let inserted = self
-            .writer
+    ) -> bool {
+        self.writer
             .insert_allocation(address, size, thread_info_key, stack_trace_key, timestamp)
-            .expect("out of space");
-        assert!(inserted, "Block 0x{:x} was already allocated", address);
+            .expect("out of space")
     }
 
     pub fn forget_allocation(&mut self, address: u64) -> u64 {

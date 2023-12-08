@@ -7,13 +7,21 @@ use fidl::AsHandleRef;
 use fidl_fuchsia_memory_heapdump_process as fheapdump_process;
 use fuchsia_zircon as zx;
 use std::sync::Mutex;
+use std::time::Duration;
 
 use crate::allocations_table::AllocationsTable;
 use crate::resources_table::{ResourceKey, ResourcesTable};
+use crate::waiter_list::WaiterList;
 use crate::{
     heapdump_global_stats as HeapdumpGlobalStats,
     heapdump_thread_local_stats as HeapdumpThreadLocalStats,
 };
+
+/// A long timeout that will definitely never trigger if everything is working as intended.
+///
+/// Its only purpose if to prevent tests from hanging indefinitely if something is broken and a
+/// waited address is never signaled.
+const WAIT_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// The global instrumentation state for the current process (singleton).
 ///
@@ -30,6 +38,7 @@ struct ProfilerInner {
     resources_table: ResourcesTable,
     global_stats: HeapdumpGlobalStats,
     snapshot_sink_server: Option<ServerEnd<fheapdump_process::SnapshotSinkV1Marker>>,
+    waiters: WaiterList,
 }
 
 /// Per-thread instrumentation data.
@@ -114,13 +123,19 @@ impl Profiler {
             }
         };
         let stack_trace_key = inner.resources_table.intern_stack_trace(compressed_stack_trace);
-        inner.allocations_table.record_allocation(
+
+        // Insert the new entry. If a duplicate is found, it means that this allocation is recycling
+        // a block that was just deallocated by realloc, but for which __scudo_realloc_allocate_hook
+        // (i.e. the realloc end notification) has not been executed yet.
+        while !inner.allocations_table.try_record_allocation(
             address,
             size,
             thread_info_key,
             stack_trace_key,
             timestamp,
-        );
+        ) {
+            inner = WaiterList::wait(inner, |inner| &mut inner.waiters, address, WAIT_TIMEOUT);
+        }
 
         inner.global_stats.total_allocated_bytes += size;
         thread_data.local_stats.total_allocated_bytes += size;
@@ -132,6 +147,9 @@ impl Profiler {
 
         inner.global_stats.total_deallocated_bytes += size;
         thread_data.local_stats.total_deallocated_bytes += size;
+
+        // Notify the waiter (if any).
+        inner.waiters.notify_one(address);
     }
 
     pub fn publish_named_snapshot(&self, name: &str) {
