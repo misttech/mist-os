@@ -37,13 +37,15 @@ class StressTest {
   //
   // If overridden in a subclass, call through to this version first.
   virtual zx_status_t Init(bool verbose, const zx_info_kmem_stats& stats,
-                           zx::unowned_resource root_resource) {
+                           zx::unowned_resource iommu_resource,
+                           zx::unowned_resource info_resource) {
     verbose_ = verbose;
 
     // gather some info about the system
     kmem_stats_ = stats;
     num_cpus_ = zx_system_get_num_cpus();
-    root_resource_ = root_resource;
+    iommu_resource_ = iommu_resource;
+    info_resource_ = info_resource;
     return ZX_OK;
   }
 
@@ -101,8 +103,9 @@ class StressTest {
   bool verbose_{false};
   zx_info_kmem_stats_t kmem_stats_{};
   uint32_t num_cpus_{};
-  // Optional root resource.
-  zx::unowned_resource root_resource_;
+
+  zx::unowned_resource iommu_resource_;
+  zx::unowned_resource info_resource_;
 };
 
 // factories for local tests

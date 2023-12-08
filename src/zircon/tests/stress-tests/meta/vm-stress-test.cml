@@ -16,6 +16,11 @@
         use_next_vdso: "true",
     },
     use: [
-        { protocol: "fuchsia.boot.RootResource" },
+        {
+            protocol: [
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IommuResource",
+            ],
+        },
     ],
 }

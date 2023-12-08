@@ -5,7 +5,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.boot/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <getopt.h>
 #include <inttypes.h>
 #include <lib/component/incoming/cpp/protocol.h>
@@ -30,8 +30,8 @@
 
 namespace {
 
-zx_status_t get_root_resource(zx::resource* root_resource) {
-  zx::result client_end = component::Connect<fuchsia_boot::RootResource>();
+zx_status_t get_iommu_resource(zx::resource* iommu_resource) {
+  zx::result client_end = component::Connect<fuchsia_kernel::IommuResource>();
   if (!client_end.is_ok()) {
     return client_end.status_value();
   }
@@ -42,22 +42,44 @@ zx_status_t get_root_resource(zx::resource* root_resource) {
 
   if (!result.is_ok()) {
     zx_status_t fidl_status = result.error_value().status();
-    fprintf(stderr, "ERROR: Cannot obtain root resource: %s (%d)\n",
+    fprintf(stderr, "ERROR: Cannot obtain iommu resource: %s (%d)\n",
             result.error_value().status_string(), fidl_status);
     return fidl_status;
   }
 
-  *root_resource = std::move(result->resource());
+  *iommu_resource = std::move(result->resource());
 
   return ZX_OK;
 }
 
-zx_status_t get_kmem_stats(zx::resource& root_resource, zx_info_kmem_stats_t* kmem_stats) {
-  if (!root_resource) {
+zx_status_t get_info_resource(zx::resource* info_resource) {
+  zx::result client_end = component::Connect<fuchsia_kernel::InfoResource>();
+  if (!client_end.is_ok()) {
+    return client_end.status_value();
+  }
+
+  fidl::SyncClient client{std::move(*client_end)};
+
+  fidl::Result result = client->Get();
+
+  if (!result.is_ok()) {
+    zx_status_t fidl_status = result.error_value().status();
+    fprintf(stderr, "ERROR: Cannot obtain info resource: %s (%d)\n",
+            result.error_value().status_string(), fidl_status);
+    return fidl_status;
+  }
+
+  *info_resource = std::move(result->resource());
+
+  return ZX_OK;
+}
+
+zx_status_t get_kmem_stats(zx::resource& info_resource, zx_info_kmem_stats_t* kmem_stats) {
+  if (!info_resource) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  zx_status_t err = zx_object_get_info(root_resource.get(), ZX_INFO_KMEM_STATS, kmem_stats,
+  zx_status_t err = zx_object_get_info(info_resource.get(), ZX_INFO_KMEM_STATS, kmem_stats,
                                        sizeof(*kmem_stats), nullptr, nullptr);
   if (err != ZX_OK) {
     fprintf(stderr, "ZX_INFO_KMEM_STATS returns %d (%s)\n", err, zx_status_get_string(err));
@@ -109,12 +131,13 @@ int main(int argc, char** argv) {
     }
   }
 
-  zx::resource root_resource;
-  get_root_resource(&root_resource);
+  zx::resource iommu_resource, info_resource;
+  get_iommu_resource(&iommu_resource);
+  get_info_resource(&info_resource);
 
   // read some system stats for each test to use
   zx_info_kmem_stats_t kmem_stats;
-  status = get_kmem_stats(root_resource, &kmem_stats);
+  status = get_kmem_stats(info_resource, &kmem_stats);
   if (status != ZX_OK) {
     fprintf(stderr, "error reading kmem stats\n");
     return 1;
@@ -129,7 +152,7 @@ int main(int argc, char** argv) {
   // initialize all the tests
   for (auto& test : StressTest::tests()) {
     printf("Initializing %s test\n", test->name());
-    status = test->Init(verbose, kmem_stats, root_resource.borrow());
+    status = test->Init(verbose, kmem_stats, iommu_resource.borrow(), info_resource.borrow());
     if (status != ZX_OK) {
       fprintf(stderr, "error initializing test\n");
       return 1;

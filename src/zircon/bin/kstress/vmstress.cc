@@ -99,7 +99,7 @@ class VmStressTest : public StressTest {
 
   virtual const char* name() const { return "VM Stress"; }
 
-  zx::unowned_resource RootResource() { return zx::unowned_resource{root_resource_}; }
+  zx::unowned_resource IommuResource() { return zx::unowned_resource{iommu_resource_}; }
 
  private:
   int test_thread();
@@ -118,7 +118,7 @@ class TestInstance {
   virtual zx_status_t Start() = 0;
   virtual zx_status_t Stop() = 0;
 
-  zx::unowned_resource RootResource() { return test_->RootResource(); }
+  zx::unowned_resource IommuResource() { return test_->IommuResource(); }
 
  protected:
   // TODO: scale based on the number of cores in the system and/or command line arg
@@ -1047,11 +1047,11 @@ class MultiVmoTestInstance : public TestInstance {
       return ZX_ERR_INTERNAL;
     }
 
-    zx::unowned_resource root_resource = RootResource();
-    if (*root_resource) {
+    zx::unowned_resource iommu_resource = IommuResource();
+    if (*iommu_resource) {
       zx_iommu_desc_dummy_t desc;
       zx_status_t result =
-          zx::iommu::create(*root_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu_);
+          zx::iommu::create(*iommu_resource, ZX_IOMMU_TYPE_DUMMY, &desc, sizeof(desc), &iommu_);
       if (result != ZX_OK) {
         return result;
       }
@@ -1547,8 +1547,7 @@ class MultiVmoTestInstance : public TestInstance {
         }
         case 41 ... 50: {  // vmo_set_cache_policy
           Printf("P");
-          static const uint32_t policies[] = {
-            ZX_CACHE_POLICY_CACHED,
+          static const uint32_t policies[] = {ZX_CACHE_POLICY_CACHED,
 
           // TODO(fxbug.dev/131108): On arm64, unaligned access to Device memory generates an
           // alignment exception.  Our current memcpy/memset implementations are designed to
@@ -1556,9 +1555,9 @@ class MultiVmoTestInstance : public TestInstance {
           // are not aligned.  We should fix vmstress to never issue unaligned memcpy/memset to
           // Device memory.
 #if !defined(__aarch64__)
-            ZX_CACHE_POLICY_UNCACHED,
-            ZX_CACHE_POLICY_UNCACHED_DEVICE,
-            ZX_CACHE_POLICY_WRITE_COMBINING
+                                              ZX_CACHE_POLICY_UNCACHED,
+                                              ZX_CACHE_POLICY_UNCACHED_DEVICE,
+                                              ZX_CACHE_POLICY_WRITE_COMBINING
 #endif
           };
           vmo.set_cache_policy(policies[uniform_rand(std::size(policies), rng)]);
@@ -1755,7 +1754,7 @@ class MultiVmoTestInstance : public TestInstance {
   // Number of alive threads. Used to coordinate shutdown.
   std::atomic<uint64_t> living_threads_ = 0;
 
-  // Valid if we got the root resource.
+  // Valid if we got the iommu resource.
   zx::iommu iommu_;
   zx::bti bti_;
 
