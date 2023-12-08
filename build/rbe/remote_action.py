@@ -413,7 +413,7 @@ class ReproxyLogEntry(object):
 
     def make_download_stub_info(
         self, path: Path, build_id: str
-    ) -> "DownloadStubInfo":
+    ) -> Optional["DownloadStubInfo"]:
         type = "file"
         if path in self.output_file_digests:
             digest = self.output_file_digests[path]
@@ -421,7 +421,11 @@ class ReproxyLogEntry(object):
             digest = self.output_directory_digests[path]
             type = "dir"
         else:
-            raise KeyError(f"{path} not found as an output file or directory")
+            # Named outputs are not required to exist remotely,
+            # for example, crash-report dirs are only created under certain
+            # conditions.  re-client treats all outputs as optional,
+            # and does not consider missing outputs an error.
+            return None
         return DownloadStubInfo(
             path=path,
             type=type,
@@ -447,24 +451,21 @@ class ReproxyLogEntry(object):
           Dictionary of paths to their stubs objects.
         """
         stubs = dict()
-        stubs.update(
-            {
-                f: self.make_download_stub_info(
-                    path=f,
-                    build_id=build_id,
-                )
-                for f in files
-            }
-        )
-        stubs.update(
-            {
-                d: self.make_download_stub_info(
-                    path=d,
-                    build_id=build_id,
-                )
-                for d in dirs
-            }
-        )
+        for f in files:
+            stub_info = self.make_download_stub_info(
+                path=f,
+                build_id=build_id,
+            )
+            if stub_info is not None:
+                stubs[f] = stub_info
+
+        for d in dirs:
+            stub_info = self.make_download_stub_info(
+                path=d,
+                build_id=build_id,
+            )
+            if stub_info is not None:
+                stubs[d] = stub_info
         return stubs
 
     @staticmethod
@@ -1437,9 +1438,13 @@ class RemoteAction(object):
         # this remote action (as a step of a full build)
         # is the sole producer of its outputs.
         downloader = self.downloader()
+        # Declared outputs are not required to exist remotely.
+        available_downloads = [
+            path for path in self.always_download if path in stub_infos
+        ]
         download_args = [
             (self, stub_infos[path], downloader)  # for _download_for_mp
-            for path in self.always_download
+            for path in available_downloads
         ]
         try:
             with multiprocessing.Pool() as pool:

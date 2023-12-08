@@ -2151,6 +2151,28 @@ class DownloadStubsTests(unittest.TestCase):
             }
         )
 
+    def test_create_stub_for_nonexistent_ignored(self):
+        with tempfile.TemporaryDirectory() as td:
+            tdp = Path(td)
+            p = Path("crash_logs/optional-log.txt")
+            (tdp / p.parent).mkdir(parents=True, exist_ok=True)
+            rrpl = tdp / "action_log.rrpl"
+            rrpl_contents = """
+command: {
+}
+remote_metadata: {
+  action_digest: "bef09123babc23/2037"
+}
+"""
+            _write_file_contents(rrpl, rrpl_contents)
+            build_id = "xyzzy"
+            log_record = remote_action.ReproxyLogEntry.parse_action_log(rrpl)
+            stub_infos = log_record.make_download_stubs(
+                files=[p], dirs=[], build_id=build_id
+            )
+            # `p` was an optional output that was not created by the action.
+            self.assertEqual(stub_infos, {})
+
     def test_create_file_stub_and_download(self):
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)
@@ -2728,6 +2750,7 @@ remote_metadata: {{
         fake_log_record = FakeReproxyLogEntry(
             completion_status="SUCCESS",
             output_file_digests={self.output: output_digest},
+            output_directory_digests={},
             action_digest="765321/44",
         )
         return action, fake_log_record
@@ -2841,6 +2864,18 @@ remote_metadata: {{
             # old file is left untouched
             mock_remove.assert_not_called()
             mock_create_stub.assert_not_called()
+
+    def test_make_download_stub_info_not_found(self):
+        with tempfile.TemporaryDirectory() as td:
+            action, fake_log_record = self._setup_update_stub_test(
+                Path(td), output_contents="h3llo"
+            )
+            # Reference some path that is not among the recorded
+            # output file/directory digests.
+            stub_info = fake_log_record.make_download_stub_info(
+                Path("some/optional/output"), build_id="new-build-id"
+            )
+            self.assertIsNone(stub_info)
 
     def test_update_stub_preserve_unchanged_output_mtime_existing_file_mismatches_digest_with_backup_stub(
         self,
