@@ -15,7 +15,7 @@ use lock_order::{
 use const_unwrap::const_unwrap_option;
 use net_types::{
     ethernet::Mac,
-    ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr},
+    ip::{Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Mtu},
     BroadcastAddress, MulticastAddr, SpecifiedAddr, UnicastAddr, Witness,
 };
 use packet::{Buf, BufferMut, InnerPacketBuilder as _, Nested, Serializer};
@@ -60,7 +60,7 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceSendFrameError, EthernetDeviceId, FrameDestination, Mtu, RecvIpFrameMeta,
+        DeviceSendFrameError, EthernetDeviceId, FrameDestination, RecvIpFrameMeta,
     },
     ip::{
         device::nud::{

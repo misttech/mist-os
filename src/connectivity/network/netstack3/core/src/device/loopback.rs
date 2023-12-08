@@ -11,7 +11,11 @@ use lock_order::{
     relation::LockBefore,
     Locked,
 };
-use net_types::{ethernet::Mac, ip::IpAddress, SpecifiedAddr};
+use net_types::{
+    ethernet::Mac,
+    ip::{IpAddress, Mtu},
+    SpecifiedAddr,
+};
 use packet::{Buf, Buffer as _, BufferMut, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
@@ -42,7 +46,7 @@ use crate::{
         },
         state::{DeviceStateSpec, IpLinkDeviceState},
         Device, DeviceCounters, DeviceIdContext, DeviceLayerEventDispatcher, DeviceLayerTypes,
-        DeviceSendFrameError, FrameDestination, Mtu,
+        DeviceSendFrameError, FrameDestination,
     },
     ip::types::RawMetric,
     NonSyncContext, SyncCtx,
@@ -561,11 +565,11 @@ mod tests {
     use assert_matches::assert_matches;
     use ip_test_macro::ip_test;
     use lock_order::{Locked, Unlocked};
-    use net_types::ip::{AddrSubnet, AddrSubnetEither, Ip, Ipv4, Ipv6};
+    use net_types::ip::{AddrSubnet, AddrSubnetEither, Ip, Ipv4, Ipv6, Mtu};
     use packet::ParseBuffer;
 
     use crate::{
-        device::{DeviceId, Mtu},
+        device::DeviceId,
         error::NotFoundError,
         ip::device::{IpAddressId as _, IpDeviceIpExt, IpDeviceStateContext},
         testutil::{

@@ -38,7 +38,6 @@ pub mod testutil;
 
 pub mod context;
 pub mod counters;
-pub mod device;
 pub mod error;
 pub mod ip;
 pub mod socket;
@@ -47,6 +46,24 @@ pub mod sync;
 pub mod time;
 pub mod transport;
 pub mod work_queue;
+
+/// The device layer.
+pub mod device {
+    pub(crate) mod arp;
+    pub(crate) mod base;
+    pub mod ethernet;
+    pub mod id;
+    pub(crate) mod integration;
+    pub(crate) mod link;
+    pub mod loopback;
+    pub mod ndp;
+    pub mod queue;
+    pub mod socket;
+    mod state;
+
+    pub use base::*;
+    pub use id::*;
+}
 
 use crate::{context::RngContext, device::DeviceId};
 pub use context::{BindingsTypes, NonSyncContext, ReferenceNotifiers, SyncCtx};

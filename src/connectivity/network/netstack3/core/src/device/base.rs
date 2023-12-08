@@ -2,19 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-//! The device layer.
-
-pub(crate) mod arp;
-pub mod ethernet;
-pub mod id;
-pub(crate) mod integration;
-pub(crate) mod link;
-pub mod loopback;
-pub mod ndp;
-pub mod queue;
-pub mod socket;
-mod state;
-
 use alloc::{collections::HashMap, vec::Vec};
 use core::{
     convert::Infallible as Never,
@@ -36,27 +23,28 @@ use smallvec::SmallVec;
 use tracing::{debug, trace};
 
 use crate::{
-    context::{CounterContext, InstantBindingsTypes, InstantContext, RecvFrameContext},
+    context::{CounterContext, InstantBindingsTypes, InstantContext},
     counters::Counter,
     device::{
         arp::ArpCounters,
-        ethernet::{
-            EthernetDeviceStateBuilder, EthernetIpLinkDeviceDynamicStateContext,
-            EthernetLinkDevice, EthernetTimerId,
+        ethernet::{self, EthernetDeviceStateBuilder, EthernetLinkDevice, EthernetTimerId},
+        id::{
+            BaseDeviceId, BasePrimaryDeviceId, DeviceId, EthernetDeviceId, EthernetPrimaryDeviceId,
+            StrongId, WeakId,
         },
+        integration,
         loopback::{
-            LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
+            self, LoopbackDevice, LoopbackDeviceId, LoopbackDeviceState, LoopbackPrimaryDeviceId,
         },
         queue::{
             rx::ReceiveQueueApi,
-            tx::{TransmitQueueApi, TransmitQueueConfiguration, TransmitQueueHandler},
+            tx::{TransmitQueueApi, TransmitQueueConfiguration},
         },
-        socket::HeldSockets,
-        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceState, IpLinkDeviceStateInner},
+        socket::{self, HeldSockets},
+        state::{BaseDeviceState, DeviceStateSpec, IpLinkDeviceStateInner},
     },
-    error,
     error::{
-        ExistsError, NeighborRemovalError, NotSupportedError, SetIpAddressPropertiesError,
+        self, ExistsError, NeighborRemovalError, NotSupportedError, SetIpAddressPropertiesError,
         StaticNeighborInsertionError,
     },
     ip::{
@@ -75,8 +63,6 @@ use crate::{
     sync::{PrimaryRc, RwLock},
     trace_duration, Instant, NonSyncContext, SyncCtx,
 };
-
-pub use id::*;
 
 /// A device.
 ///
@@ -108,14 +94,14 @@ pub(crate) trait DeviceIdContext<D: Device> {
         -> Option<Self::DeviceId>;
 }
 
-struct RecvIpFrameMeta<D, I: Ip> {
-    device: D,
-    frame_dst: FrameDestination,
+pub(super) struct RecvIpFrameMeta<D, I: Ip> {
+    pub(super) device: D,
+    pub(super) frame_dst: FrameDestination,
     _marker: PhantomData<I>,
 }
 
 impl<D, I: Ip> RecvIpFrameMeta<D, I> {
-    fn new(device: D, frame_dst: FrameDestination) -> RecvIpFrameMeta<D, I> {
+    pub(super) fn new(device: D, frame_dst: FrameDestination) -> RecvIpFrameMeta<D, I> {
         RecvIpFrameMeta { device, frame_dst, _marker: PhantomData }
     }
 }
@@ -126,9 +112,9 @@ impl<D, I: Ip> RecvIpFrameMeta<D, I> {
 /// and ethernet device ID iterators. This struct only exists as a named type
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub(crate) struct DevicesIter<'s, C: NonSyncContext> {
-    ethernet:
+    pub(super) ethernet:
         alloc::collections::hash_map::Values<'s, EthernetDeviceId<C>, EthernetPrimaryDeviceId<C>>,
-    loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<C>>,
+    pub(super) loopback: core::option::Iter<'s, LoopbackPrimaryDeviceId<C>>,
 }
 
 impl<'s, C: NonSyncContext> Iterator for DevicesIter<'s, C> {
@@ -171,8 +157,8 @@ pub fn get_routing_metric<NonSyncCtx: NonSyncContext>(
 ) -> RawMetric {
     let mut sync_ctx = Locked::new(sync_ctx);
     match device_id {
-        DeviceId::Ethernet(id) => self::ethernet::get_routing_metric(&mut sync_ctx, id),
-        DeviceId::Loopback(id) => self::loopback::get_routing_metric(&mut sync_ctx, id),
+        DeviceId::Ethernet(id) => ethernet::get_routing_metric(&mut sync_ctx, id),
+        DeviceId::Loopback(id) => loopback::get_routing_metric(&mut sync_ctx, id),
     }
 }
 
@@ -397,17 +383,17 @@ impl From<MulticastAddr<Mac>> for FrameDestination {
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub(crate) struct Devices<C: DeviceLayerTypes> {
-    ethernet: HashMap<EthernetDeviceId<C>, EthernetPrimaryDeviceId<C>>,
-    loopback: Option<LoopbackPrimaryDeviceId<C>>,
+    pub(super) ethernet: HashMap<EthernetDeviceId<C>, EthernetPrimaryDeviceId<C>>,
+    pub(super) loopback: Option<LoopbackPrimaryDeviceId<C>>,
 }
 
 /// The state associated with the device layer.
 pub(crate) struct DeviceLayerState<C: DeviceLayerTypes> {
-    devices: RwLock<Devices<C>>,
-    origin: OriginTracker,
-    shared_sockets: HeldSockets<C>,
-    counters: DeviceCounters,
-    arp_counters: ArpCounters,
+    pub(super) devices: RwLock<Devices<C>>,
+    pub(super) origin: OriginTracker,
+    pub(super) shared_sockets: HeldSockets<C>,
+    pub(super) counters: DeviceCounters,
+    pub(super) arp_counters: ArpCounters,
 }
 
 impl<C: DeviceLayerTypes> DeviceLayerState<C> {
@@ -1285,7 +1271,7 @@ pub(crate) mod testutil {
         type Strong = D;
     }
 
-    impl<D: Id> Id for FakeWeakDeviceId<D> {
+    impl<D: crate::device::Id> crate::device::Id for FakeWeakDeviceId<D> {
         fn is_loopback(&self) -> bool {
             let Self(inner) = self;
             inner.is_loopback()
@@ -1300,7 +1286,7 @@ pub(crate) mod testutil {
         type Weak = FakeWeakDeviceId<Self>;
     }
 
-    impl Id for FakeDeviceId {
+    impl crate::device::Id for FakeDeviceId {
         fn is_loopback(&self) -> bool {
             false
         }
@@ -1417,7 +1403,7 @@ pub(crate) mod testutil {
     }
 
     #[cfg(test)]
-    impl Id for MultipleDevicesId {
+    impl crate::device::Id for MultipleDevicesId {
         fn is_loopback(&self) -> bool {
             false
         }

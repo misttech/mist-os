@@ -113,7 +113,7 @@ mod tests {
     use net_declare::net::{mac, subnet_v6};
     use net_types::{
         ethernet::Mac,
-        ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Subnet},
+        ip::{AddrSubnet, Ip as _, Ipv6, Ipv6Addr, Ipv6Scope, Mtu, Subnet},
         ScopeableAddress as _, UnicastAddr, Witness as _,
     };
     use packet::{Buf, EmptyBuf, InnerPacketBuilder as _, Serializer as _};
@@ -152,7 +152,7 @@ mod tests {
             remove_ethernet_device,
             testutil::{is_forwarding_enabled, receive_frame, set_forwarding_enabled},
             update_ipv6_configuration, DeviceId, EthernetDeviceId, EthernetWeakDeviceId,
-            FrameDestination, Mtu,
+            FrameDestination,
         },
         ip::{
             device::{

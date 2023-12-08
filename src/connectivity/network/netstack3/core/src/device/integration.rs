@@ -21,15 +21,19 @@ use packet::{BufferMut, Serializer};
 use packet_formats::{ethernet::EthernetIpExt, utils::NonZeroDuration};
 
 use crate::{
-    context::{CounterContext, SendFrameContext},
+    context::{CounterContext, RecvFrameContext, SendFrameContext},
     device::{
-        ethernet::{self, EthernetLinkDevice, SyncCtxWithDeviceId},
+        ethernet::{
+            self, EthernetIpLinkDeviceDynamicStateContext, EthernetLinkDevice, SyncCtxWithDeviceId,
+        },
         loopback::{self, LoopbackDevice, LoopbackDeviceId},
-        socket, AnyDevice, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher,
+        queue::tx::TransmitQueueHandler,
+        socket,
+        state::IpLinkDeviceState,
+        AnyDevice, DeviceCounters, DeviceId, DeviceIdContext, DeviceLayerEventDispatcher,
         DeviceLayerState, DeviceLayerTypes, Devices, DevicesIter, EthernetDeviceId,
-        EthernetIpLinkDeviceDynamicStateContext, EthernetWeakDeviceId, IpLinkDeviceState,
-        Ipv6DeviceLinkLayerAddr, OriginTracker, RecvFrameContext, RecvIpFrameMeta,
-        TransmitQueueHandler, WeakDeviceId,
+        EthernetWeakDeviceId, Ipv6DeviceLinkLayerAddr, OriginTracker, RecvIpFrameMeta,
+        WeakDeviceId,
     },
     error::{ExistsError, NotFoundError},
     ip::device::{
