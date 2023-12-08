@@ -610,7 +610,7 @@ impl AdvertisingProxyInner {
                     let subtypes = srp_service
                         .subtypes()
                         .filter_map(|x: &CStr| match x.to_str() {
-                            Ok(x) => Some(x.to_string()),
+                            Ok(x) => Some(x[0..x.find('.').unwrap_or(x.len())].to_string()),
                             Err(err) => {
                                 warn!(
                                     tag = "srp_advertising_proxy",
