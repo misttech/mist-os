@@ -68,6 +68,7 @@ class TestHarness : public fio_test::Io1Harness {
     config.set_supports_unlink(false);
     config.set_supports_get_attributes(false);
     config.set_supports_update_attributes(false);
+    config.set_supports_directory_watchers(false);
 
     callback(std::move(config));
   }

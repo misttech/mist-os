@@ -76,6 +76,7 @@ rustc_test("io1_conformance_test") {
     "tests/directory/open.rs",
     "tests/directory/rename.rs",
     "tests/directory/unlink.rs",
+    "tests/directory/watch.rs",
     "tests/file.rs",
     "tests/file/get_backing_memory.rs",
     "tests/file/link_into.rs",

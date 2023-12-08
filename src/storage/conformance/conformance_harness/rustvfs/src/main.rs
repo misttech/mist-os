@@ -128,6 +128,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_set_attr: Some(false),
                     // TODO(fxbug.dev/72801): same issue as SetAttr not working.
                     supports_update_attributes: Some(false),
+                    // TODO(fxbug.dev/315357754): Pseudo-directories don't seem to generate watch
+                    // events even though the machinery is available.
+                    supports_directory_watchers: Some(false),
 
                     ..Default::default()
                 };

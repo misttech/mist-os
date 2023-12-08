@@ -9,3 +9,4 @@ mod link;
 mod open;
 mod rename;
 mod unlink;
+mod watch;
