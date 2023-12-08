@@ -4,8 +4,8 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/inspect/component/cpp/component.h>
 #include <lib/sys/cpp/component_context.h>
-#include <lib/sys/inspect/cpp/component.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
@@ -27,9 +27,9 @@ int run_a11y_manager(int argc, const char** argv) {
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
 
   auto context = sys::ComponentContext::Create();
-  auto inspector = std::make_unique<sys::ComponentInspector>(context.get());
-  inspector->Health().StartingUp();
-  inspector->Health().Ok();
+  auto inspector = inspect::ComponentInspector(loop.dispatcher(), {});
+  inspector.Health().StartingUp();
+  inspector.Health().Ok();
 
   std::unique_ptr<a11y::ViewManager> view_manager;
   std::unique_ptr<a11y_manager::App> app;
@@ -62,7 +62,7 @@ int run_a11y_manager(int argc, const char** argv) {
 
   view_manager = std::make_unique<a11y::ViewManager>(
       std::make_unique<a11y::SemanticTreeServiceFactory>(
-          inspector->root().CreateChild("semantic_trees")),
+          inspector.root().CreateChild("semantic_trees")),
       std::make_unique<a11y::A11yViewSemanticsFactory>(),
       std::make_unique<a11y::ViewInjectorFactory>(),
       std::make_unique<a11y::A11ySemanticsEventManager>(), a11y_view, context.get());
@@ -70,7 +70,7 @@ int run_a11y_manager(int argc, const char** argv) {
   app = std::make_unique<a11y_manager::App>(context.get(), view_manager.get(), &tts_manager,
                                             &color_transform_manager, &gesture_listener_registry,
                                             &boot_info_manager, &screen_reader_context_factory,
-                                            inspector->root().CreateChild("a11y_manager_app"));
+                                            inspector.root().CreateChild("a11y_manager_app"));
   context->outgoing()->ServeFromStartupInfo();
 
   loop.Run();
