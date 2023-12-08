@@ -62,6 +62,13 @@ enum class CloneType {
   SnapshotModified,
 };
 
+// Argument that specifies the context in which we are supplying pages.
+enum class SupplyOptions : uint8_t {
+  PagerSupply,
+  TransferData,
+  PhysicalPageProvider,
+};
+
 namespace internal {
 struct ChildListTag {};
 struct GlobalListTag {};
@@ -103,8 +110,8 @@ class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
  private:
   bool running_delete_ TA_GUARDED(lock_) = false;
   mutable DECLARE_CRITICAL_MUTEX(VmHierarchyState) lock_;
-  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>, internal::DeferredDeleteTraits>
-      delete_list_ TA_GUARDED(lock_);
+  fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<VmHierarchyBase>,
+                                    internal::DeferredDeleteTraits> delete_list_ TA_GUARDED(lock_);
 
   // Each VMO hierarchy has a generation count, which is incremented on any change to the hierarchy
   // - either in the VMO tree, or the page lists of VMO's.
@@ -447,9 +454,12 @@ class VmObject : public VmHierarchyBase,
   }
 
   // Supplies this vmo with pages for the range [offset, offset + len). If this vmo
-  // already has pages in the target range, the corresponding pages in |pages| will be
-  // freed, instead of being moved into this vmo. |offset| and |len| must be page aligned.
-  virtual zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
+  // already has pages in the target range, the |options| field will dictate what happens:
+  // If options is SupplyOptions::TransferData, the pages in the target range will be overwritten,
+  // Otherwise, the corresponding pages in |pages| will be freed.
+  // |offset| and |len| must be page aligned.
+  virtual zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                                  SupplyOptions options) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 

@@ -197,6 +197,7 @@ Symbols:
   - { Name: _zx_vmo_replace_as_executable, Type: Func }
   - { Name: _zx_vmo_set_cache_policy, Type: Func }
   - { Name: _zx_vmo_set_size, Type: Func }
+  - { Name: _zx_vmo_transfer_data, Type: Func }
   - { Name: _zx_vmo_write, Type: Func }
   - { Name: zx_bti_create, Type: Func, Weak: true }
   - { Name: zx_bti_pin, Type: Func, Weak: true }
@@ -393,5 +394,6 @@ Symbols:
   - { Name: zx_vmo_replace_as_executable, Type: Func, Weak: true }
   - { Name: zx_vmo_set_cache_policy, Type: Func, Weak: true }
   - { Name: zx_vmo_set_size, Type: Func, Weak: true }
+  - { Name: zx_vmo_transfer_data, Type: Func, Weak: true }
   - { Name: zx_vmo_write, Type: Func, Weak: true }
 ...

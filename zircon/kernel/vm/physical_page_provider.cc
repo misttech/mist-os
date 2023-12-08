@@ -299,7 +299,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
     // need to allocate or otherwise perform a partial success that would generate a page request.
     zx_status_t supply_result =
         cow_pages_->SupplyPages(request_offset, request_length, &splice_list,
-                                /*new_zeroed_pages=*/true, &supplied_len, nullptr);
+                                SupplyOptions::PhysicalPageProvider, &supplied_len, nullptr);
     ASSERT(supplied_len == request_length || supply_result != ZX_OK);
     if (supply_result != ZX_OK) {
       DEBUG_ASSERT(supply_result == ZX_ERR_NO_MEMORY);

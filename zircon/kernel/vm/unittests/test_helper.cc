@@ -97,7 +97,7 @@ zx_status_t make_committed_pager_vmo(size_t num_pages, bool trap_dirty, bool res
     return status;
   }
 
-  status = vmo->SupplyPages(0, num_pages * PAGE_SIZE, &splice_list);
+  status = vmo->SupplyPages(0, num_pages * PAGE_SIZE, &splice_list, SupplyOptions::PagerSupply);
   if (status != ZX_OK) {
     return status;
   }

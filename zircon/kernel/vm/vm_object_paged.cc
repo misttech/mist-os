@@ -1773,10 +1773,6 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
 
   Guard<CriticalMutex> src_guard{lock()};
 
-  // This is only used by the userpager API, which has significant restrictions on
-  // what sorts of vmos are acceptable. If splice starts being used in more places,
-  // then this restriction might need to be lifted.
-  //
   // TODO: Check that the region is locked once locking is implemented
   if (is_contiguous()) {
     return ZX_ERR_NOT_SUPPORTED;
@@ -1787,16 +1783,23 @@ zx_status_t VmObjectPaged::TakePages(uint64_t offset, uint64_t len, VmPageSplice
   return cow_pages_locked()->TakePagesLocked(offset, len, pages);
 }
 
-zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) {
+zx_status_t VmObjectPaged::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                                       SupplyOptions options) {
   canary_.Assert();
+
+  // We need this check here instead of in SupplyPagesLocked, as we do use that
+  // function to provide pages to contiguous VMOs as well.
+  if (is_contiguous()) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
 
   __UNINITIALIZED LazyPageRequest page_request;
   while (len > 0) {
     Guard<CriticalMutex> guard{lock()};
 
     uint64_t supply_len = 0;
-    zx_status_t status = cow_pages_locked()->SupplyPagesLocked(
-        offset, len, pages, /*new_zeroed_pages=*/false, &supply_len, &page_request);
+    zx_status_t status = cow_pages_locked()->SupplyPagesLocked(offset, len, pages, options,
+                                                               &supply_len, &page_request);
     if (status != ZX_ERR_SHOULD_WAIT && status != ZX_OK) {
       return status;
     }

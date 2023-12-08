@@ -107,6 +107,51 @@ zx_status_t sys_vmo_write(zx_handle_t handle, user_in_ptr<const void> _data, uin
   return vmo->Write(_data.reinterpret<const char>(), len, offset, nullptr);
 }
 
+// zx_status_t zx_vmo_transfer_data
+zx_status_t sys_vmo_transfer_data(zx_handle_t dst_vmo_handle, uint32_t options, uint64_t offset,
+                                  uint64_t length, zx_handle_t src_vmo_handle,
+                                  uint64_t src_offset) {
+  // Currently, there are no supported options. This may change in the future.
+  if (options) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!IS_PAGE_ALIGNED(offset) || !IS_PAGE_ALIGNED(length) || !IS_PAGE_ALIGNED(src_offset)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
+  auto up = ProcessDispatcher::GetCurrent();
+  fbl::RefPtr<VmObjectDispatcher> dst_vmo_dispatcher;
+  zx_status_t status = up->handle_table().GetDispatcherWithRights(
+      *up, dst_vmo_handle, ZX_RIGHT_WRITE, &dst_vmo_dispatcher);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  fbl::RefPtr<VmObjectDispatcher> src_vmo_dispatcher;
+  status = up->handle_table().GetDispatcherWithRights(
+      *up, src_vmo_handle, ZX_RIGHT_READ | ZX_RIGHT_WRITE, &src_vmo_dispatcher);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // Short circuit out if src_vmo and dst_vmo are identical and the src_offset is the same as
+  // the destination offset.
+  if (src_vmo_dispatcher->get_koid() == dst_vmo_dispatcher->get_koid() && src_offset == offset) {
+    return ZX_OK;
+  }
+
+  VmPageSpliceList pages;
+  status = src_vmo_dispatcher->vmo()->TakePages(src_offset, length, &pages);
+  if (status != ZX_OK) {
+    return status;
+  }
+
+  // TODO(https://fxbug.dev/132304): Stop decompressing compressed pages from the source range.
+  return dst_vmo_dispatcher->vmo()->SupplyPages(offset, length, &pages,
+                                                SupplyOptions::TransferData);
+}
+
 // zx_status_t zx_vmo_get_size
 zx_status_t sys_vmo_get_size(zx_handle_t handle, user_out_ptr<uint64_t> _size) {
   LTRACEF("handle %x, sizep %p\n", handle, _size.get());

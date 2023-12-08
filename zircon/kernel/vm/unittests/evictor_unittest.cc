@@ -167,7 +167,7 @@ static zx_status_t create_precommitted_pager_backed_vmo(uint64_t size,
     return status;
   }
 
-  status = vmo->SupplyPages(0, size, &page_list);
+  status = vmo->SupplyPages(0, size, &page_list, SupplyOptions::PagerSupply);
   if (status != ZX_OK) {
     return status;
   }

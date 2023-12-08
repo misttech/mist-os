@@ -176,6 +176,28 @@ impl Vmo {
         }
     }
 
+    /// Efficiently transfers data from one VMO to another.
+    pub fn transfer_data(
+        &self,
+        options: TransferDataOptions,
+        offset: u64,
+        length: u64,
+        src_vmo: &Vmo,
+        src_offset: u64,
+    ) -> Result<(), Status> {
+        let status = unsafe {
+            sys::zx_vmo_transfer_data(
+                self.raw_handle(),
+                options.bits(),
+                offset,
+                length,
+                src_vmo.raw_handle(),
+                src_offset,
+            )
+        };
+        ok(status)
+    }
+
     /// Get the size of a virtual memory object.
     ///
     /// Wraps the `zx_vmo_get_size` syscall.
@@ -286,6 +308,13 @@ bitflags! {
         const SLICE = sys::ZX_VMO_CHILD_SLICE;
         const NO_WRITE = sys::ZX_VMO_CHILD_NO_WRITE;
         const REFERENCE = sys::ZX_VMO_CHILD_REFERENCE;
+    }
+}
+
+bitflags! {
+    /// Options that may be used when transferring data between VMOs.
+    #[repr(transparent)]
+    pub struct TransferDataOptions: u32 {
     }
 }
 

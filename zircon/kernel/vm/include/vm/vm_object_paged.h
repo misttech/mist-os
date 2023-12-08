@@ -174,7 +174,8 @@ class VmObjectPaged final : public VmObject {
                         const OnWriteBytesTransferredCallback& on_bytes_transferred) override;
 
   zx_status_t TakePages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) override;
-  zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages) override;
+  zx_status_t SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
+                          SupplyOptions options) override;
   zx_status_t FailPageRequests(uint64_t offset, uint64_t len, zx_status_t error_status) override {
     Guard<CriticalMutex> guard{lock()};
     return cow_pages_locked()->FailPageRequestsLocked(offset, len, error_status);

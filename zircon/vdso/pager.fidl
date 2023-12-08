@@ -317,7 +317,7 @@ closed protocol Pager {
     /// **ZX_ERR_BAD_STATE** *aux_vmo* is not in a state where it can supply the required pages, or
     /// *pager_vmo* has been detached from the *pager*.
     ///
-    /// **ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical VMO or a contiguous VMO.
+    /// **ZX_ERR_NOT_SUPPORTED** *aux_vmo* is a physical, contiguous, or pager-backed VMO.
     ///
     /// **ZX_ERR_OUT_OF_RANGE** The specified range in *pager_vmo* or *aux_vmo* is invalid.
     ///

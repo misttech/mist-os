@@ -186,7 +186,7 @@ zx_status_t sys_pager_supply_pages(zx_handle_t pager, zx_handle_t pager_vmo, uin
     return status;
   }
 
-  return pager_vmo_dispatcher->vmo()->SupplyPages(offset, size, &pages);
+  return pager_vmo_dispatcher->vmo()->SupplyPages(offset, size, &pages, SupplyOptions::PagerSupply);
 }
 
 // zx_status_t zx_pager_op_range

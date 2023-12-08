@@ -2392,7 +2392,7 @@ static bool vmo_attribution_pager_test() {
             verify_object_page_attribution(vmo.get(), expected_gen_count, AttributionCounts{}));
 
   // Supplying pages to the pager-backed vmo should increment the generation count.
-  status = vmo->SupplyPages(0, PAGE_SIZE, &page_list);
+  status = vmo->SupplyPages(0, PAGE_SIZE, &page_list, SupplyOptions::PagerSupply);
   ASSERT_EQ(ZX_OK, status);
   ++expected_gen_count;
   EXPECT_EQ(true, verify_object_page_attribution(vmo.get(), expected_gen_count,
@@ -3749,7 +3749,7 @@ static bool vmo_supply_compressed_pages_test() {
   EXPECT_TRUE((VmObject::AttributionCounts{}) == vmo->AttributedPages());
 
   // After being supplied the pager backed VMO should not have compressed pages.
-  EXPECT_OK(vmop->SupplyPages(0, PAGE_SIZE, &pl));
+  EXPECT_OK(vmop->SupplyPages(0, PAGE_SIZE, &pl, SupplyOptions::PagerSupply));
   EXPECT_TRUE((VmObject::AttributionCounts{1, 0}) == vmop->AttributedPages());
 
   END_TEST;

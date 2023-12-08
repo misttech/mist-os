@@ -4851,13 +4851,14 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (AnyPagesPinnedLocked(offset, len) || parent_ || page_source_) {
+  if (page_source_) {
+    return ZX_ERR_NOT_SUPPORTED;
+  }
+
+  if (AnyPagesPinnedLocked(offset, len) || parent_) {
     return ZX_ERR_BAD_STATE;
   }
 
-  // This is only used by the userpager API, which has significant restrictions on
-  // what sorts of vmos are acceptable. If splice starts being used in more places,
-  // then this restriction might need to be lifted.
   // TODO: Check that the region is locked once locking is implemented
   if (children_list_len_) {
     return ZX_ERR_BAD_STATE;
@@ -4910,30 +4911,42 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
 }
 
 zx_status_t VmCowPages::SupplyPages(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                                    bool new_zeroed_pages, uint64_t* supplied_len,
+                                    SupplyOptions options, uint64_t* supplied_len,
                                     LazyPageRequest* page_request) {
   canary_.Assert();
   Guard<CriticalMutex> guard{lock()};
-  return SupplyPagesLocked(offset, len, pages, new_zeroed_pages, supplied_len, page_request);
+  return SupplyPagesLocked(offset, len, pages, options, supplied_len, page_request);
 }
 
 zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
-                                          bool new_zeroed_pages, uint64_t* supplied_len,
+                                          SupplyOptions options, uint64_t* supplied_len,
                                           LazyPageRequest* page_request) {
   canary_.Assert();
 
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
   DEBUG_ASSERT(supplied_len);
-
-  ASSERT(page_source_);
+  ASSERT(options != SupplyOptions::PagerSupply || page_source_);
 
   if (!InRange(offset, len, size_)) {
     *supplied_len = 0;
     return ZX_ERR_OUT_OF_RANGE;
   }
 
-  if (page_source_->is_detached()) {
+  if (options == SupplyOptions::TransferData) {
+    if (page_source_) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+    if (AnyPagesPinnedLocked(offset, len)) {
+      return ZX_ERR_BAD_STATE;
+    }
+  }
+
+  if (page_source_ && page_source_->is_detached()) {
+    return ZX_ERR_BAD_STATE;
+  }
+
+  if (parent_) {
     return ZX_ERR_BAD_STATE;
   }
 
@@ -4994,7 +5007,7 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
       // checking these in the if condition for now.
       DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
       DEBUG_ASSERT(!src_page.Page()->is_loaned());
-      DEBUG_ASSERT(!new_zeroed_pages);
+      DEBUG_ASSERT(options != SupplyOptions::PhysicalPageProvider);
       // Try to replace src_page with a loaned page.  We allocate the loaned page one page at a time
       // to avoid failing the allocation due to asking for more loaned pages than there are free
       // loaned pages. Loaned page allocations will always precisely succeed or fail and the
@@ -5018,13 +5031,17 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
     }
 
     // Defer individual range updates so we can do them in blocks.
-    if (new_zeroed_pages) {
-      // When new_zeroed_pages is true, we need to call InitializeVmPage(), which AddNewPageLocked()
-      // will do.
+    const CanOverwriteContent overwrite_policy = options == SupplyOptions::TransferData
+                                                     ? CanOverwriteContent::NonZero
+                                                     : CanOverwriteContent::None;
+    VmPageOrMarker old_page;
+    if (options == SupplyOptions::PhysicalPageProvider) {
+      // When being called from the physical page provider, we need to call InitializeVmPage(),
+      // which AddNewPageLocked() will do.
       // We only want to populate offsets that have true absence of content, so do not overwrite
       // anything in the page list.
       DEBUG_ASSERT(src_page.IsPage());
-      status = AddNewPageLocked(offset, src_page.Page(), CanOverwriteContent::None, nullptr,
+      status = AddNewPageLocked(offset, src_page.Page(), overwrite_policy, &old_page,
                                 /*zero=*/false, /*do_range_update=*/false);
       if (status == ZX_OK) {
         // The page was successfully added, but we still have a copy in the src_page, so we need to
@@ -5033,13 +5050,34 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
         [[maybe_unused]] vm_page_t* unused = src_page.ReleasePage();
       }
     } else {
-      // When new_zeroed_pages is false, we don't need InitializeVmPage(), so we use
-      // AddPageLocked().
+      // When not being called from the physical page provider, we don't need InitializeVmPage(),
+      // so we use AddPageLocked().
       // We only want to populate offsets that have true absence of content, so do not overwrite
       // anything in the page list.
-      status = AddPageLocked(&src_page, offset, CanOverwriteContent::None, nullptr,
+      status = AddPageLocked(&src_page, offset, overwrite_policy, &old_page,
                              /*do_range_update=*/false);
     }
+
+    // If the content overwrite policy was None, the old page should be empty.
+    DEBUG_ASSERT(overwrite_policy != CanOverwriteContent::None || old_page.IsEmpty());
+
+    // Clean up the old_page if necessary. The action taken is different depending on the state of
+    // old_page:
+    // 1. Page: If old_page is backed by an actual page, remove it from the page queues and free
+    //          the page.
+    // 2. Reference: If old_page is a reference, free the reference.
+    // 3. Interval: We should not be overwriting data in a pager-backed VMO, so assert that
+    //              old_page is not an interval.
+    // 4. Marker: There are no resources to free here, so do nothing.
+    if (old_page.IsPage()) {
+      vm_page_t* released_page = old_page.ReleasePage();
+      PQRemoveLocked(released_page);
+      DEBUG_ASSERT(!list_in_list(&released_page->queue_node));
+      list_add_tail(&freed_list, &released_page->queue_node);
+    } else if (old_page.IsReference()) {
+      FreeReference(old_page.ReleaseReference());
+    }
+    DEBUG_ASSERT(!old_page.IsInterval());
 
     if (status == ZX_OK) {
       new_pages_len += PAGE_SIZE;
@@ -5058,7 +5096,9 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
         // of any new pages that were added and reset the tracking variables.
         if (new_pages_len) {
           RangeChangeUpdateLocked(new_pages_start, new_pages_len, RangeChangeOp::Unmap);
-          page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+          if (page_source_) {
+            page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+          }
         }
         new_pages_start = offset + PAGE_SIZE;
         new_pages_len = 0;
@@ -5075,7 +5115,9 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   DEBUG_ASSERT(offset == end || status != ZX_OK);
   if (new_pages_len) {
     RangeChangeUpdateLocked(new_pages_start, new_pages_len, RangeChangeOp::Unmap);
-    page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+    if (page_source_) {
+      page_source_->OnPagesSupplied(new_pages_start, new_pages_len);
+    }
   }
 
   if (!list_is_empty(&freed_list)) {

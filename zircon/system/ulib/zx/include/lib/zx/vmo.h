@@ -45,6 +45,11 @@ class vmo final : public object<vmo> {
     return zx_vmo_write(get(), data, offset, len);
   }
 
+  zx_status_t transfer_data(uint32_t options, uint64_t offset, uint64_t length, vmo* src_vmo,
+                            uint64_t src_offset) {
+    return zx_vmo_transfer_data(get(), options, offset, length, src_vmo->get(), src_offset);
+  }
+
   zx_status_t get_size(uint64_t* size) const ZX_AVAILABLE_SINCE(7) {
     return zx_vmo_get_size(get(), size);
   }
