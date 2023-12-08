@@ -120,7 +120,7 @@ then
   build_dir_file_contents="$(cat "$build_dir_file")"
   # In some cases, .fx-build-dir might contain an absolute path.
   # We want only the relative-path.
-  if [[ "$build_dir_file_contents" == /* ]]
+  if [[ "$build_dir_file_contents" =~ ^/ ]]
   then build_subdir="$(relpath "$project_root" "$build_dir_file_contents")"
   else build_subdir="$build_dir_file_contents"
   fi
