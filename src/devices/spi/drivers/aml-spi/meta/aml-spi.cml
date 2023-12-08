@@ -10,13 +10,13 @@
     program: {
         runner: "driver",
         bind: "meta/bind/aml-spi.bindbc",
-        colocate: "true",
         compat: "driver/aml-spi.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         fallback: "false",
     },
     use: [
         { protocol: "fuchsia.scheduler.ProfileProvider" },
+        { service: "fuchsia.hardware.gpio.Service" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.hardware.registers.Service" },
     ],

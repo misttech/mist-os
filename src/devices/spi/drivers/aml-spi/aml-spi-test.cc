@@ -5,7 +5,6 @@
 #include "aml-spi.h"
 
 #include <endian.h>
-#include <fuchsia/hardware/gpio/cpp/banjo-mock.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
@@ -15,6 +14,7 @@
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/vmo.h>
+#include <zircon/errors.h>
 
 #include <memory>
 
@@ -23,6 +23,7 @@
 
 #include "registers.h"
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/registers/testing/mock-registers/mock-registers.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
 
@@ -31,14 +32,21 @@ namespace spi {
 struct IncomingNamespace {
   fake_pdev::FakePDevFidl pdev_server;
   mock_registers::MockRegisters registers{async_get_default_dispatcher()};
+  std::queue<std::pair<zx_status_t, uint8_t>> gpio_writes;
+  fake_gpio::FakeGpio gpio;
   component::OutgoingDirectory outgoing{async_get_default_dispatcher()};
 };
 
 class AmlSpiTest : public zxtest::Test {
  public:
-  AmlSpiTest()
-      : mmio_region_(sizeof(uint32_t), 17),
-        root_(MockDevice::FakeRootParent()) {}
+  AmlSpiTest() : mmio_region_(sizeof(uint32_t), 17), root_(MockDevice::FakeRootParent()) {}
+
+  ~AmlSpiTest() {
+    incoming_.~TestDispatcherBound<IncomingNamespace>();
+    libsync::Completion completion;
+    async::PostTask(incoming_loop_.dispatcher(), [&]() { completion.Signal(); });
+    completion.Wait();
+  }
 
   virtual void SetUpInterrupt(fake_pdev::FakePDevFidl::Config& config) {
     ASSERT_OK(zx::interrupt::create({}, 0, ZX_INTERRUPT_VIRTUAL, &interrupt_));
@@ -71,18 +79,48 @@ class AmlSpiTest : public zxtest::Test {
     ASSERT_OK(pdev_endpoints);
     zx::result registers_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
     ASSERT_OK(registers_endpoints);
+    zx::result gpio_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(gpio_endpoints);
+    zx::result gpio_endpoints2 = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(gpio_endpoints2);
+    zx::result gpio_endpoints3 = fidl::CreateEndpoints<fuchsia_io::Directory>();
+    ASSERT_OK(gpio_endpoints3);
     ASSERT_OK(incoming_loop_.StartThread("incoming-ns-thread"));
-    incoming_.SyncCall([config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
-                        registers_server = std::move(registers_endpoints->server)](
-                           IncomingNamespace* incoming) mutable {
-      incoming->pdev_server.SetConfig(std::move(config));
-      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
-          incoming->pdev_server.GetInstanceHandler()));
-      ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
-          incoming->registers.GetInstanceHandler()));
-      ASSERT_OK(incoming->outgoing.Serve(std::move(pdev_server)));
-      ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
-    });
+    incoming_.SyncCall(
+        [config = std::move(config), pdev_server = std::move(pdev_endpoints->server),
+         registers_server = std::move(registers_endpoints->server),
+         gpio_server = std::move(gpio_endpoints->server),
+         gpio_server2 = std::move(gpio_endpoints2->server),
+         gpio_server3 = std::move(gpio_endpoints3->server)](IncomingNamespace* incoming) mutable {
+          incoming->pdev_server.SetConfig(std::move(config));
+          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_platform_device::Service>(
+              incoming->pdev_server.GetInstanceHandler()));
+          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_registers::Service>(
+              incoming->registers.GetInstanceHandler()));
+          ASSERT_OK(incoming->outgoing.AddService<fuchsia_hardware_gpio::Service>(
+              incoming->gpio.CreateInstanceHandler()));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(pdev_server)));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(registers_server)));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server)));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server2)));
+          ASSERT_OK(incoming->outgoing.Serve(std::move(gpio_server3)));
+
+          incoming->gpio.SetCurrentState(
+              fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
+                               .sub_state = fake_gpio::WriteSubState{.value = 0}});
+          incoming->gpio.SetWriteCallback([incoming](fake_gpio::FakeGpio& gpio) {
+            if (incoming->gpio_writes.empty()) {
+              EXPECT_FALSE(incoming->gpio_writes.empty());
+              return ZX_ERR_INTERNAL;
+            }
+            auto [status, value] = incoming->gpio_writes.front();
+            incoming->gpio_writes.pop();
+            if (status != ZX_OK) {
+              EXPECT_EQ(value, gpio.GetWriteValue());
+            }
+            return status;
+          });
+        });
     ASSERT_NO_FATAL_FAILURE();
     root_->AddFidlService(fuchsia_hardware_platform_device::Service::Name,
                           std::move(pdev_endpoints->client), "pdev");
@@ -92,9 +130,12 @@ class AmlSpiTest : public zxtest::Test {
                             std::move(registers_endpoints->client), "reset");
     }
 
-    root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-2");
-    root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-3");
-    root_->AddProtocol(ZX_PROTOCOL_GPIO, gpio_.GetProto()->ops, gpio_.GetProto()->ctx, "gpio-cs-5");
+    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints->client),
+                          "gpio-cs-2");
+    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints2->client),
+                          "gpio-cs-3");
+    root_->AddFidlService(fuchsia_hardware_gpio::Service::Name, std::move(gpio_endpoints3->client),
+                          "gpio-cs-5");
 
     root_->SetMetadata(DEVICE_METADATA_AMLSPI_CONFIG, kSpiConfig, sizeof(kSpiConfig));
 
@@ -109,7 +150,19 @@ class AmlSpiTest : public zxtest::Test {
   }
 
   MockDevice* root() { return root_.get(); }
-  ddk::MockGpio& gpio() { return gpio_; }
+
+  void ExpectGpioWrite(zx_status_t status, uint8_t value) {
+    incoming_.SyncCall(
+        [&](IncomingNamespace* incoming) { incoming->gpio_writes.emplace(status, value); });
+  }
+
+  void VerifyGpioAndClear() {
+    incoming_.SyncCall([&](IncomingNamespace* incoming) {
+      EXPECT_EQ(incoming->gpio_writes.size(), 0);
+      incoming->gpio_writes = {};
+    });
+  }
+
   ddk_fake::FakeMmioRegRegion& mmio() { return mmio_region_; }
   bool ControllerReset() {
     zx_status_t status;
@@ -136,11 +189,10 @@ class AmlSpiTest : public zxtest::Test {
       },
   };
 
-  ddk_fake::FakeMmioRegRegion mmio_region_; // Must be destructed after root_.
+  ddk_fake::FakeMmioRegRegion mmio_region_;  // Must be destructed after root_.
   std::shared_ptr<MockDevice> root_;
   zx::vmo mmio_;
   fzl::VmoMapper mmio_mapper_;
-  ddk::MockGpio gpio_;
   async::Loop incoming_loop_{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{incoming_loop_.dispatcher(),
                                                                    std::in_place};
@@ -185,7 +237,8 @@ TEST_F(AmlSpiTest, Exchange) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
@@ -197,7 +250,7 @@ TEST_F(AmlSpiTest, Exchange) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
@@ -225,7 +278,7 @@ TEST_F(AmlSpiTest, ExchangeCsManagedByClient) {
   EXPECT_FALSE(ControllerReset());
 
   // There should be no GPIO calls as the client manages CS for this device.
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, RegisterVmo) {
@@ -281,7 +334,8 @@ TEST_F(AmlSpiTest, Transmit) {
         spi1->SpiImplRegisterVmo(0, 1, std::move(vmo), 256, PAGE_SIZE - 256, SPI_VMO_RIGHT_READ));
   }
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
@@ -294,7 +348,7 @@ TEST_F(AmlSpiTest, Transmit) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ReceiveVmo) {
@@ -317,7 +371,8 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 
   mmio()[AML_SPI_RXDATA].SetReadCallback([]() { return kExpectedRxData[0]; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi1->SpiImplReceiveVmo(0, 1, 512, sizeof(kExpectedRxData)));
 
@@ -327,7 +382,7 @@ TEST_F(AmlSpiTest, ReceiveVmo) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ExchangeVmo) {
@@ -354,7 +409,8 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(test_vmo.write(kTxData, 512, sizeof(kTxData)));
 
@@ -368,7 +424,7 @@ TEST_F(AmlSpiTest, ExchangeVmo) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, TransfersOutOfRange) {
@@ -387,14 +443,16 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
                                        SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 2, 2));
   EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 3, 2));
   EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 3, 1, 0, 2));
   EXPECT_NOT_OK(spi0->SpiImplExchangeVmo(1, 1, 0, 1, 2, 3));
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplTransmitVmo(1, 1, 0, 4));
   EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 0, 5));
@@ -402,17 +460,19 @@ TEST_F(AmlSpiTest, TransfersOutOfRange) {
   EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 4, 1));
   EXPECT_NOT_OK(spi0->SpiImplTransmitVmo(1, 1, 5, 1));
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
   EXPECT_OK(spi0->SpiImplReceiveVmo(1, 1, 0, 4));
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
   EXPECT_OK(spi0->SpiImplReceiveVmo(1, 1, 3, 1));
 
   EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 3, 2));
   EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 4, 1));
   EXPECT_NOT_OK(spi0->SpiImplReceiveVmo(1, 1, 5, 1));
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, VmoBadRights) {
@@ -437,14 +497,15 @@ TEST_F(AmlSpiTest, VmoBadRights) {
                                        SPI_VMO_RIGHT_READ | SPI_VMO_RIGHT_WRITE));
   }
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi1->SpiImplExchangeVmo(0, 1, 0, 2, 128, 128));
   EXPECT_EQ(spi1->SpiImplExchangeVmo(0, 2, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
   EXPECT_EQ(spi1->SpiImplExchangeVmo(0, 1, 0, 1, 128, 128), ZX_ERR_ACCESS_DENIED);
   EXPECT_EQ(spi1->SpiImplReceiveVmo(0, 1, 0, 128), ZX_ERR_ACCESS_DENIED);
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, Exchange64BitWords) {
@@ -468,7 +529,8 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
@@ -481,7 +543,7 @@ TEST_F(AmlSpiTest, Exchange64BitWords) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
@@ -504,7 +566,8 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t rxbuf[sizeof(kTxData)] = {};
   size_t rx_actual;
@@ -516,7 +579,7 @@ TEST_F(AmlSpiTest, Exchange64Then8BitWords) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ExchangeResetsController) {
@@ -525,7 +588,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
   ASSERT_EQ(root()->child_count(), 1);
   auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[17] = {};
   size_t rx_actual;
@@ -533,7 +597,8 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
   EXPECT_EQ(rx_actual, 17);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   // Controller should be reset because a 64-bit transfer was preceded by a transfer of an odd
   // number of bytes.
@@ -541,25 +606,28 @@ TEST_F(AmlSpiTest, ExchangeResetsController) {
   EXPECT_EQ(rx_actual, 16);
   EXPECT_TRUE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 3, buf, 3, &rx_actual));
   EXPECT_EQ(rx_actual, 3);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 6, buf, 6, &rx_actual));
   EXPECT_EQ(rx_actual, 6);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 8, buf, 8, &rx_actual));
   EXPECT_EQ(rx_actual, 8);
   EXPECT_TRUE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 TEST_F(AmlSpiTest, ReleaseVmos) {
@@ -822,7 +890,8 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDma) {
   mmio()[AML_SPI_DRADDR].SetWriteCallback([&tx_paddr](uint64_t value) { tx_paddr = value; });
   mmio()[AML_SPI_DWADDR].SetWriteCallback([&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[24] = {};
   memcpy(buf, kTxData, sizeof(buf));
@@ -885,7 +954,8 @@ TEST_F(AmlSpiBtiEmptyTest, ExchangeFallBackToPio) {
   uint64_t tx_data = 0;
   mmio()[AML_SPI_TXDATA].SetWriteCallback([&tx_data](uint64_t value) { tx_data = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[15] = {};
   memcpy(buf, kTxData, sizeof(buf));
@@ -947,7 +1017,8 @@ TEST_F(AmlSpiBtiPaddrTest, ExchangeDmaClientReversesBuffer) {
   mmio()[AML_SPI_DRADDR].SetWriteCallback([&tx_paddr](uint64_t value) { tx_paddr = value; });
   mmio()[AML_SPI_DWADDR].SetWriteCallback([&rx_paddr](uint64_t value) { rx_paddr = value; });
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[sizeof(kTxData)] = {};
   memcpy(buf, kTxData, sizeof(buf));
@@ -977,7 +1048,8 @@ TEST_F(AmlSpiTest, Shutdown) {
   ASSERT_EQ(root()->child_count(), 1);
   auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[16] = {};
   size_t rx_actual;
@@ -1002,7 +1074,7 @@ TEST_F(AmlSpiTest, Shutdown) {
 
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 class AmlSpiNoResetFragmentTest : public AmlSpiTest {
@@ -1016,7 +1088,8 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   ASSERT_EQ(root()->child_count(), 1);
   auto* spi0 = root()->GetLatestChild()->GetDeviceContext<AmlSpi>();
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   uint8_t buf[17] = {};
   size_t rx_actual;
@@ -1024,32 +1097,36 @@ TEST_F(AmlSpiNoResetFragmentTest, ExchangeWithNoResetFragment) {
   EXPECT_EQ(rx_actual, 17);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   // Controller should not be reset because no reset fragment was provided.
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 16, buf, 16, &rx_actual));
   EXPECT_EQ(rx_actual, 16);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 3, buf, 3, &rx_actual));
   EXPECT_EQ(rx_actual, 3);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 6, buf, 6, &rx_actual));
   EXPECT_EQ(rx_actual, 6);
   EXPECT_FALSE(ControllerReset());
 
-  gpio().ExpectWrite(ZX_OK, 0).ExpectWrite(ZX_OK, 1);
+  ExpectGpioWrite(ZX_OK, 0);
+  ExpectGpioWrite(ZX_OK, 1);
 
   EXPECT_OK(spi0->SpiImplExchange(0, buf, 8, buf, 8, &rx_actual));
   EXPECT_EQ(rx_actual, 8);
   EXPECT_FALSE(ControllerReset());
 
-  ASSERT_NO_FATAL_FAILURE(gpio().VerifyAndClear());
+  ASSERT_NO_FATAL_FAILURE(VerifyGpioAndClear());
 }
 
 class AmlSpiNoIrqTest : public AmlSpiTest {

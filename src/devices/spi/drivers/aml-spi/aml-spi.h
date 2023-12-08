@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-#include <fuchsia/hardware/gpio/cpp/banjo.h>
 #include <fuchsia/hardware/spiimpl/cpp/banjo.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/fzl/vmo-mapper.h>
@@ -68,7 +68,7 @@ class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_
     ChipInfo() : registered_vmos(vmo_store::Options{}) {}
     ~ChipInfo() = default;
 
-    ddk::GpioProtocolClient gpio;
+    fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio> gpio;
     std::optional<SpiVmoStore> registered_vmos;
   };
 
@@ -127,7 +127,8 @@ class AmlSpi : public DeviceType, public ddk::SpiImplProtocol<AmlSpi, ddk::base_
   void Shutdown();
 
   // Shims to support thread annotations on ChipInfo members.
-  const ddk::GpioProtocolClient& gpio(uint32_t chip_select) TA_REQ(bus_lock_) {
+  const fidl::WireSyncClient<fuchsia_hardware_gpio::Gpio>& gpio(uint32_t chip_select)
+      TA_REQ(bus_lock_) {
     return chips_[chip_select].gpio;
   }
 

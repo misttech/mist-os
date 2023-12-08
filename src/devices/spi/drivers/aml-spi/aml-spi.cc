@@ -322,7 +322,9 @@ zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t t
   IntReg::Get().FromValue(0).set_tcen(1).WriteTo(&mmio_);
 
   if (gpio(cs).is_valid()) {
-    gpio(cs).Write(0);
+    [[maybe_unused]] auto result = gpio(cs)->Write(0);
+    ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
+    ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
   }
 
   zx_status_t status = ZX_OK;
@@ -339,7 +341,9 @@ zx_status_t AmlSpi::SpiImplExchange(uint32_t cs, const uint8_t* txdata, size_t t
   IntReg::Get().FromValue(0).WriteTo(&mmio_);
 
   if (gpio(cs).is_valid()) {
-    gpio(cs).Write(1);
+    [[maybe_unused]] auto result = gpio(cs)->Write(1);
+    ZX_ASSERT_MSG(result.ok(), "error: %s", result.FormatDescription().c_str());
+    ZX_ASSERT_MSG(result->is_ok(), "error: %s", zx_status_get_string(result->error_value()));
   }
 
   if (out_rxdata && out_rxdata_actual) {
@@ -611,11 +615,13 @@ fbl::Array<AmlSpi::ChipInfo> AmlSpi::InitChips(amlogic_spi::amlspi_config_t* con
 
     char fragment_name[32] = {};
     snprintf(fragment_name, 32, "gpio-cs-%d", index);
-    chips[i].gpio = ddk::GpioProtocolClient(device, fragment_name);
-    if (!chips[i].gpio.is_valid()) {
+    zx::result client = DdkConnectFragmentFidlProtocol<fuchsia_hardware_gpio::Service::Device>(
+        device, fragment_name);
+    if (client.is_error()) {
       zxlogf(ERROR, "Failed to get GPIO fragment %u", i);
       return fbl::Array<ChipInfo>();
     }
+    chips[i].gpio = fidl::WireSyncClient(std::move(*client));
   }
 
   return chips;
