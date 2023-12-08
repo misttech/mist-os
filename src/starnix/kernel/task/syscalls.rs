@@ -766,6 +766,7 @@ pub fn sys_sched_getaffinity(
     // sched_setaffinity() is not implemented. Fake affinity mask based on the number of CPUs.
     let mask = get_default_cpumask();
     current_task.write_memory(user_mask, &mask.to_ne_bytes())?;
+    not_implemented!("sched_getaffinity");
     Ok(CPU_AFFINITY_MASK_SIZE as usize)
 }
 
@@ -798,6 +799,7 @@ pub fn sys_sched_setaffinity(
 
     // Currently, we ignore the mask and act as if the system reset the mask
     // immediately to allowing all CPUs.
+    not_implemented!("sched_setaffinity");
     Ok(())
 }
 
@@ -815,6 +817,29 @@ pub fn sys_sched_getparam(
     let target_task = Task::from_weak(&weak)?;
     let param_value = target_task.read().scheduler_policy.raw_params();
     current_task.write_object(param.into(), &param_value)?;
+    Ok(())
+}
+
+pub fn sys_sched_setparam(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    pid: pid_t,
+    param: UserAddress,
+) -> Result<(), Errno> {
+    if pid < 0 || param.is_null() {
+        return error!(EINVAL);
+    }
+
+    let new_params: sched_param = current_task.read_object(param.into())?;
+    let weak = get_task_or_current(current_task, pid);
+    let target_task = Task::from_weak(&weak)?;
+    let current_policy = target_task.read().scheduler_policy;
+
+    let rlimit = target_task.thread_group.get_rlimit(Resource::RTPRIO);
+
+    let policy = SchedulerPolicy::from_raw(current_policy.raw_policy(), new_params, rlimit)?;
+    target_task.set_scheduler_policy(policy)?;
+
     Ok(())
 }
 
