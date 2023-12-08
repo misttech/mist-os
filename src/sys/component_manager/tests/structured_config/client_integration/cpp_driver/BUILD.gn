@@ -45,7 +45,7 @@ fuchsia_driver_component("receiver_component") {
   info = "receiver-info.json"
 }
 
-fuchsia_structured_config_cpp_driver_lib("receiver_config") {
+fuchsia_structured_config_cpp_elf_lib("receiver_config") {
   testonly = true
   cm_label = ":receiver_manifest"
 }

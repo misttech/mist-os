@@ -21,15 +21,6 @@ struct IsStructuredConfig<T, std::void_t<decltype(T::kIsStructuredConfig)>>
 template <typename T>
 constexpr inline auto IsStructuredConfigV = IsStructuredConfig<T>::value;
 
-// This is for driver components where the config comes from driver start args.
-template <typename T, typename = void>
-struct IsDriverStructuredConfig : public ::std::false_type {};
-template <typename T>
-struct IsDriverStructuredConfig<T, std::void_t<decltype(T::kIsDriverStructuredConfig)>>
-    : public std::true_type {};
-
-template <typename T>
-constexpr inline auto IsDriverStructuredConfigV = IsDriverStructuredConfig<T>::value;
 }  // namespace component
 
 #endif  // LIB_COMPONENT_OUTGOING_CPP_STRUCTURED_CONFIG_H_

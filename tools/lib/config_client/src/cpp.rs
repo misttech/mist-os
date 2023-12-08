@@ -13,9 +13,6 @@ static H_ELF_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf.h.hbs");
 
 static CC_ELF_HLCPP_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_elf_hlcpp.cc.hbs");
 
-static CC_DRIVER_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_driver.cc.hbs");
-static H_DRIVER_SOURCE_TEMPLATE: &str = include_str!("../templates/cpp_driver.h.hbs");
-
 static HELPERS_SOURCE_TEMPLATE: &str = include_str!("../templates/helpers.cc.hbs");
 static TYPEDEF_SOURCE_TEMPLATE: &str = include_str!("../templates/typedef.h.hbs");
 static VMO_PARSE_SOURCE_TEMPLATE: &str = include_str!("../templates/vmo_parse.cc.hbs");
@@ -32,12 +29,11 @@ pub enum Flavor {
     ElfProcess,
     // TODO(https://fxbug.dev/108880) delete once unified FIDL available OOT
     ElfHlcpp,
-    Driver,
 }
 
 #[derive(Debug, thiserror::Error)]
 pub enum FlavorParseError {
-    #[error("Unknown flavor '{_0}', expected 'elf' or 'driver'")]
+    #[error("Unknown flavor '{_0}', expected 'elf'")]
     UnknownFlavor(String),
 }
 
@@ -50,7 +46,6 @@ impl FromStr for Flavor {
         match string.as_str() {
             "elf" => Ok(Flavor::ElfProcess),
             "elf-hlcpp" => Ok(Flavor::ElfHlcpp),
-            "driver" => Ok(Flavor::Driver),
             _ => Err(FlavorParseError::UnknownFlavor(string)),
         }
     }
@@ -65,7 +60,6 @@ pub fn create_cpp_wrapper(
     let (cc_source_template, h_source_template) = match flavor {
         Flavor::ElfProcess => (CC_ELF_SOURCE_TEMPLATE, H_ELF_SOURCE_TEMPLATE),
         Flavor::ElfHlcpp => (CC_ELF_HLCPP_SOURCE_TEMPLATE, H_ELF_SOURCE_TEMPLATE),
-        Flavor::Driver => (CC_DRIVER_SOURCE_TEMPLATE, H_DRIVER_SOURCE_TEMPLATE),
     };
 
     let vars = TemplateVars::from_decl(config_decl, cpp_namespace, fidl_library_name, flavor);

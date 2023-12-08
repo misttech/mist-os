@@ -42,7 +42,7 @@ pub struct GenerateCppSource {
     #[argh(option)]
     clang_format: PathBuf,
 
-    /// runner flavor to use ('elf' or 'driver')
+    /// runner flavor to use ('elf')
     #[argh(option)]
     flavor: Flavor,
 }

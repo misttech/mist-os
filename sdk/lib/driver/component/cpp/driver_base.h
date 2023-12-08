@@ -145,10 +145,13 @@ class DriverBase {
 
   template <typename StructuredConfig>
   StructuredConfig take_config() {
-    static_assert(component::IsDriverStructuredConfigV<StructuredConfig>,
-                  "Invalid type supplied. StructuredConfig must be a driver flavored "
+    static_assert(component::IsStructuredConfigV<StructuredConfig>,
+                  "Invalid type supplied. StructuredConfig must be a "
                   "structured config type. Example usage: take_config<my_driverconfig::Config>().");
-    return StructuredConfig::TakeFromStartArgs(start_args_);
+    std::optional config_vmo = std::move(start_args_.config());
+    ZX_ASSERT_MSG(config_vmo.has_value(),
+                  "Config VMO handle must be provided and cannot already have been taken.");
+    return StructuredConfig::CreateFromVmo(std::move(config_vmo.value()));
   }
 
   // The name of the driver that is given to the DriverBase constructor.
