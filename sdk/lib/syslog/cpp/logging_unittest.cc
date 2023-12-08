@@ -389,7 +389,7 @@ TEST_F(LoggingFixture, LogEveryN) {
   LogState state = SetupLogs(new_settings);
   int32_t counter = 0;
   auto emit_log = [&]() {
-    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", KV("key", counter));
+    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", counter));
     counter++;
   };
   emit_log();
@@ -409,7 +409,7 @@ TEST_F(LoggingFixture, LogEveryNWithCounter) {
   LogState state = SetupLogs(new_settings);
   int32_t counter = 0;
   auto emit_log = [&]() {
-    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", KV("key", COUNTER));
+    FX_SLOG_EVERY_N_SECONDS(INFO, 5, "test", FX_KV("key", COUNTER));
     counter++;
   };
   emit_log();
@@ -424,14 +424,14 @@ TEST_F(LoggingFixture, LogEveryNWithCounter) {
 
 TEST_F(LoggingFixture, MacroCompilationTest) {
   uint8_t zero = 0;
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<uint16_t>(zero)));
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<uint32_t>(zero)));
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<uint64_t>(zero)));
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<size_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<uint16_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<uint32_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<uint64_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<size_t>(zero)));
 
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<int16_t>(zero)));
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<int32_t>(zero)));
-  FX_SLOG(DEBUG, "test log", KV("key", static_cast<int64_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<int16_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<int32_t>(zero)));
+  FX_SLOG(DEBUG, "test log", FX_KV("key", static_cast<int64_t>(zero)));
 }
 
 TEST(StructuredLogging, LOGS) {
