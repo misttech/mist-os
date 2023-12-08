@@ -2406,9 +2406,9 @@ def auto_relaunch_with_reproxy(
     # this is typically used for one-off commands during debug.
     # Normal builds should already be wrapped, and should not require auto-re-launching.
     reproxy_wrap = [cl_utils.qualify_tool_path(fuchsia.REPROXY_WRAP), "-v"]
-    if args.verbose:
-        cmd_str = cl_utils.command_quoted_str(reproxy_wrap + relaunch_args)
-        msg(f"Automatically re-launching: {cmd_str}")
+
+    cmd_str = cl_utils.command_quoted_str(reproxy_wrap + relaunch_args)
+    msg(f"Automatically re-launching: {cmd_str}")
     cl_utils.exec_relaunch(reproxy_wrap + relaunch_args)
     assert False, "exec_relaunch() should never return"
 

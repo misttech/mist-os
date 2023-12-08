@@ -109,11 +109,14 @@ else
   exit 1
 fi
 
-if [[ -z "$RBE_server_address" ]]
+if [[ "${RBE_server_address-NOT_SET}" == "NOT_SET" ]]
 then
   # Uncommon case: manual repro.  Automatically start/shutdown reproxy.
-  dmsg "No env RBE_server_address found.  Re-launching with $reproxy_wrap"
-  exec "$reproxy_wrap" -- "$0" "$@"
+  cat <<EOF
+Environment variable 'RBE_server_address' is required, but not set.
+Assuming this is a manual invocation and re-launching with $reproxy_wrap ...
+EOF
+  exec "$reproxy_wrap" -v -- "$0" "$@"
   # no return
 else
   # Common case: already inside `fx build`
