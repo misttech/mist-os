@@ -49,6 +49,8 @@ class Driver : public fdf::DriverBase {
 
   zx_handle_t GetIommuResource();
 
+  zx_handle_t GetFramebufferResource();
+
   zx_handle_t GetMmioResource();
 
   zx_handle_t GetPowerResource();
@@ -157,6 +159,7 @@ class Driver : public fdf::DriverBase {
   zx::resource smc_resource_;
   zx::resource info_resource_;
   zx::resource iommu_resource_;
+  zx::resource framebuffer_resource_;
 
   fidl::WireClient<fuchsia_driver_compat::Device> parent_client_;
   std::unordered_map<std::string, fidl::WireClient<fuchsia_driver_compat::Device>> parent_clients_;

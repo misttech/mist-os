@@ -258,6 +258,9 @@ __EXPORT
 zx_handle_t get_iommu_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT
+zx_handle_t get_framebuffer_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
+
+__EXPORT
 zx_handle_t get_irq_resource(zx_device_t* parent) { return ZX_HANDLE_INVALID; }
 
 __EXPORT

@@ -14,6 +14,7 @@
     device_get_protocol;
     get_root_resource;
     get_iommu_resource;
+    get_framebuffer_resource;
     get_ioport_resource;
     get_mmio_resource;
     get_irq_resource;

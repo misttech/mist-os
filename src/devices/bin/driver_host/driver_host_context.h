@@ -30,7 +30,8 @@ class DriverHostContext {
   explicit DriverHostContext(const async_loop_config_t* config, zx::resource root_resource = {},
                              zx::resource mmio_resource = {}, zx::resource ioport_resource = {},
                              zx::resource irq_resource = {}, zx::resource info_resource = {},
-                             zx::resource smc_resource = {}, zx::resource iommu_resource = {})
+                             zx::resource smc_resource = {}, zx::resource iommu_resource = {},
+                             zx::resource framebuffer_resource = {})
       : loop_(config),
         root_resource_(std::move(root_resource)),
         mmio_resource_(std::move(mmio_resource)),
@@ -38,7 +39,8 @@ class DriverHostContext {
         irq_resource_(std::move(irq_resource)),
         info_resource_(std::move(info_resource)),
         smc_resource_(std::move(smc_resource)),
-        iommu_resource_(std::move(iommu_resource)) {}
+        iommu_resource_(std::move(iommu_resource)),
+        framebuffer_resource_(std::move(framebuffer_resource)) {}
 
   ~DriverHostContext();
 
@@ -136,6 +138,7 @@ class DriverHostContext {
   const zx::resource& info_resource() { return info_resource_; }
   const zx::resource& smc_resource() { return smc_resource_; }
   const zx::resource& iommu_resource() { return iommu_resource_; }
+  const zx::resource& framebuffer_resource() { return framebuffer_resource_; }
   const zx::resource& irq_resource() { return irq_resource_; }
 
   ApiLock& api_lock() TA_RET_CAP(api_lock_) { return api_lock_; }
@@ -179,6 +182,7 @@ class DriverHostContext {
   zx::resource info_resource_;
   zx::resource smc_resource_;
   zx::resource iommu_resource_;
+  zx::resource framebuffer_resource_;
 
   DriverHostInspect inspect_;
 
