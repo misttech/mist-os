@@ -14,51 +14,15 @@ const INTERFACE_PREFIX_WLAN: &str = "wlan";
 const INTERFACE_PREFIX_ETHERNET: &str = "eth";
 const INTERFACE_PREFIX_AP: &str = "ap";
 
-// TODO(https://fxbug.dev/137184): Use only MAC address for the
-// interface naming identifier.
 #[derive(PartialEq, Eq, Debug, Clone, Hash)]
-pub(crate) enum PersistentIdentifier {
-    MacAddress(fidl_fuchsia_net_ext::MacAddress),
-    TopologicalPath(String),
+pub(crate) struct InterfaceNamingIdentifier {
+    mac: fidl_fuchsia_net_ext::MacAddress,
 }
 
-// We use MAC addresses to identify USB devices; USB devices are those devices whose
-// topological path contains "/usb/". We use topological paths to identify on-board
-// devices; on-board devices are those devices whose topological path does not
-// contain "/usb". Topological paths of both device types are expected to
-// contain "/PCI0"; devices whose topological path does not contain "/PCI0" are
-// identified by their MAC address.
-//
-// At the time of writing, typical topological paths appear similar to:
-//
-// PCI:
-// "/dev/sys/platform/pt/PCI0/bus/02:00.0/02:00.0/e1000/ethernet"
-//
-// USB:
-// "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
-// 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
-//
-// SDIO
-// "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy"
-// 05:00:6 following "platform" represents
-// vid(vendor id):pid(product id):did(device id) and are defined in each board file
-//
-// Ethernet Jack for VIM2
-// "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet"
-// Though it is not a sdio device, it has the vid:pid:did info following "/platform/",
-// it's handled the same way as a sdio device.
-fn generate_identifier(
-    topological_path: &str,
+pub(crate) fn generate_identifier(
     mac_address: &fidl_fuchsia_net_ext::MacAddress,
-) -> PersistentIdentifier {
-    match get_bus_type_for_topological_path(&topological_path) {
-        // Use the MacAddress as an identifier for the device if the
-        // BusType is currently not in the known list.
-        Ok(BusType::USB) | Err(_) => PersistentIdentifier::MacAddress(*mac_address),
-        Ok(BusType::PCI) | Ok(BusType::SDIO) => {
-            PersistentIdentifier::TopologicalPath(topological_path.to_string())
-        }
-    }
+) -> InterfaceNamingIdentifier {
+    InterfaceNamingIdentifier { mac: *mac_address }
 }
 
 // Get the NormalizedMac using the last octet of the MAC address. The offset
@@ -85,6 +49,24 @@ fn get_mac_identifier_from_octets(
 
 // Get the normalized bus path for a topological path.
 // For example, a PCI device at `02:00.1` becomes `02001`.
+// At the time of writing, typical topological paths appear similar to:
+//
+// PCI:
+// "/dev/sys/platform/pt/PCI0/bus/02:00.0/02:00.0/e1000/ethernet"
+//
+// USB:
+// "/dev/sys/platform/pt/PCI0/bus/00:14.0/00:14.0/xhci/usb/007/ifc-000/<snip>/wlan/wlan-ethernet/ethernet"
+// 00:14:0 following "/PCI0/bus/" represents BDF (Bus Device Function)
+//
+// SDIO
+// "/dev/sys/platform/05:00:6/aml-sd-emmc/sdio/broadcom-wlanphy/wlanphy"
+// 05:00:6 following "platform" represents
+// vid(vendor id):pid(product id):did(device id) and are defined in each board file
+//
+// Ethernet Jack for VIM2
+// "/dev/sys/platform/04:02:7/aml-ethernet/Designware-MAC/ethernet"
+// Though it is not a sdio device, it has the vid:pid:did info following "/platform/",
+// it's handled the same way as a sdio device.
 fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<String, anyhow::Error> {
     let pattern = match get_bus_type_for_topological_path(topological_path)? {
         BusType::USB | BusType::PCI => "/PCI0/bus/",
@@ -117,7 +99,7 @@ fn get_normalized_bus_path_for_topo_path(topological_path: &str) -> Result<Strin
 #[derive(Debug)]
 pub struct InterfaceNamingConfig {
     naming_rules: Vec<NamingRule>,
-    interfaces: HashMap<PersistentIdentifier, String>,
+    interfaces: HashMap<InterfaceNamingIdentifier, String>,
     temp_id: u64,
 }
 
@@ -132,48 +114,50 @@ impl InterfaceNamingConfig {
         topological_path: &str,
         mac: &fidl_fuchsia_net_ext::MacAddress,
         device_class: fidl_fuchsia_hardware_network::DeviceClass,
-    ) -> Result<(&str, PersistentIdentifier), NameGenerationError> {
-        let persistent_id = generate_identifier(topological_path, mac);
+    ) -> Result<(&str, InterfaceNamingIdentifier), NameGenerationError> {
+        let interface_naming_id = generate_identifier(mac);
         let info = DeviceInfoRef { topological_path, mac, device_class };
 
         // Interfaces that are named using the NormalizedMac naming rule are
         // named to avoid MAC address final octet collisions. When a device
         // with the same identifier is re-installed, re-attempt name generation
         // since the MAC identifiers used may have changed.
-        match self.interfaces.remove(&persistent_id) {
+        match self.interfaces.remove(&interface_naming_id) {
             Some(name) => tracing::info!(
                 "{name} already existed for this identifier\
-            {persistent_id:?}. inserting a new one."
+            {interface_naming_id:?}. inserting a new one."
             ),
             None => {
-                // This persistent id will have a new entry
+                // This interface naming id will have a new entry
             }
         }
 
         let generated_name = self.generate_name(&info)?;
-        if let Some(name) = self.interfaces.insert(persistent_id.clone(), generated_name.clone()) {
+        if let Some(name) =
+            self.interfaces.insert(interface_naming_id.clone(), generated_name.clone())
+        {
             tracing::error!(
-                "{name} was unexpectly found for {persistent_id:?} \
+                "{name} was unexpectedly found for {interface_naming_id:?} \
             when inserting a new name"
             );
         }
 
         // Need to grab a reference to appease the borrow checker.
-        let generated_name = match self.interfaces.get(&persistent_id) {
+        let generated_name = match self.interfaces.get(&interface_naming_id) {
             Some(name) => Ok(name),
             None => Err(NameGenerationError::GenerationError(anyhow::format_err!(
                 "expected to see name {generated_name} present since it was just added"
             ))),
         }?;
 
-        Ok((generated_name, persistent_id))
+        Ok((generated_name, interface_naming_id))
     }
 
     /// Returns a temporary name for an interface.
     pub(crate) fn generate_temporary_name(
         &mut self,
         interface_type: crate::InterfaceType,
-    ) -> (String, Option<PersistentIdentifier>) {
+    ) -> (String, Option<InterfaceNamingIdentifier>) {
         let id = self.temp_id;
         self.temp_id += 1;
 
@@ -422,7 +406,7 @@ impl NamingRule {
     // interface name cannot be generated.
     fn generate_name(
         &self,
-        interfaces: &HashMap<PersistentIdentifier, String>,
+        interfaces: &HashMap<InterfaceNamingIdentifier, String>,
         info: &DeviceInfoRef<'_>,
     ) -> Result<String, NameGenerationError> {
         // When a bus type cannot be found for a path, use the USB
@@ -502,7 +486,7 @@ impl NamingRule {
 // construct a name from the provided `NameCompositionRule`s.
 fn generate_name_from_naming_rules(
     naming_rules: &[NamingRule],
-    interfaces: &HashMap<PersistentIdentifier, String>,
+    interfaces: &HashMap<InterfaceNamingIdentifier, String>,
     info: &DeviceInfoRef<'_>,
 ) -> Result<String, NameGenerationError> {
     // TODO(fxbug.dev/136397): Consider adding an option to the rules to allow
@@ -725,10 +709,8 @@ mod tests {
         expected_size: 1 }];
         "single_interface"
     )]
-    // TODO(https://fxbug.dev/56559): Change the expected values
-    // once devices are identified by their MAC address.
-    // Test case that shares the same topo path and interface name, with
-    // different MAC address. New interface should not be added.
+    // Test case that shares the same topo path and different MAC, but same
+    // last octet. Expect to see second interface added with different name.
     #[test_case([StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
         mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
@@ -739,8 +721,8 @@ mod tests {
         mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
         interface_type: crate::InterfaceType::Ap,
         want_name: "app0014",
-        expected_size: 1 }];
-        "two_interfaces_different_mac"
+        expected_size: 2 }];
+        "two_interfaces_same_topo_path_different_mac"
     )]
     #[test_case([StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/00:14.0_/00:14.0/ethernet",
@@ -749,7 +731,7 @@ mod tests {
         want_name: "wlanp0014",
         expected_size: 1}, StableNameTestCase {
         topological_path: "/dev/sys/platform/pt/PCI0/bus/01:00.0/01:00.0/iwlwifi-wlan-softmac/wlan-ethernet/ethernet",
-        mac: [0x01, 0x01, 0x01, 0x01, 0x01, 0x01],
+        mac: [0xFE, 0x01, 0x01, 0x01, 0x01, 0x01],
         interface_type: crate::InterfaceType::Ethernet,
         want_name: "ethp01",
         expected_size: 2 }];
@@ -822,8 +804,8 @@ mod tests {
         for n in 0u8..255u8 {
             let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
 
-            let persistent_id =
-                generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
+            let interface_naming_id =
+                generate_identifier(&fidl_fuchsia_net_ext::MacAddress { octets });
 
             let name = config
                 .generate_name(&DeviceInfoRef {
@@ -833,7 +815,7 @@ mod tests {
                 })
                 .expect("failed to generate the name");
             assert_eq!(name, format!("{}{:x}", "wlanx", n));
-            assert_matches!(config.interfaces.insert(persistent_id, name), None);
+            assert_matches!(config.interfaces.insert(interface_naming_id, name), None);
         }
 
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
@@ -862,8 +844,8 @@ mod tests {
         let mut config = InterfaceNamingConfig::from_naming_rules(vec![naming_rule]);
         for n in 0u8..255u8 {
             let octets = [n, 0x01, 0x01, 0x01, 0x01, 00];
-            let persistent_id =
-                generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
+            let interface_naming_id =
+                generate_identifier(&fidl_fuchsia_net_ext::MacAddress { octets });
 
             let info = DeviceInfoRef {
                 device_class: fhwnet::DeviceClass::Ethernet,
@@ -876,7 +858,7 @@ mod tests {
             // should simply be the NormalizedMac itself.
             assert_eq!(name, format!("{n:x}{n:x}"));
 
-            assert_matches!(config.interfaces.insert(persistent_id, name), None);
+            assert_matches!(config.interfaces.insert(interface_naming_id, name), None);
         }
 
         let octets = [0x00, 0x00, 0x01, 0x01, 0x01, 00];
@@ -1365,9 +1347,11 @@ mod tests {
         let mut interfaces = HashMap::new();
         assert_matches!(
             interfaces.insert(
-                PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
-                    octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1]
-                },),
+                InterfaceNamingIdentifier {
+                    mac: fidl_fuchsia_net_ext::MacAddress {
+                        octets: [0x1, 0x1, 0x1, 0x1, 0x1, 0x1]
+                    },
+                },
                 shared_interface_name.clone(),
             ),
             None
@@ -1403,8 +1387,8 @@ mod tests {
 
         for n in 0u8..255u8 {
             let octets = [0x01, 0x01, 0x01, 0x01, 0x01, n];
-            let persistent_id =
-                generate_identifier(topo_usb, &fidl_fuchsia_net_ext::MacAddress { octets });
+            let interface_naming_id =
+                generate_identifier(&fidl_fuchsia_net_ext::MacAddress { octets });
             let info = DeviceInfoRef {
                 device_class: fhwnet::DeviceClass::Ethernet,
                 mac: &fidl_fuchsia_net_ext::MacAddress { octets },
@@ -1415,7 +1399,7 @@ mod tests {
                 naming_rule.generate_name(&interfaces, &info).expect("failed to generate the name");
             assert_eq!(name, format!("{n:x}"));
 
-            assert_matches!(interfaces.insert(persistent_id, name.clone()), None);
+            assert_matches!(interfaces.insert(interface_naming_id, name.clone()), None);
         }
     }
 

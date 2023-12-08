@@ -362,7 +362,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::{
-        interface::{PersistentIdentifier, ProvisioningAction},
+        interface::{generate_identifier, InterfaceNamingIdentifier, ProvisioningAction},
         DeviceClass, HostInterfaceState, InterfaceConfigState, InterfaceState,
     };
 
@@ -381,7 +381,7 @@ mod tests {
 
     impl InterfaceState {
         fn new_host_with_state(
-            persistent_id: Option<PersistentIdentifier>,
+            interface_naming_id: Option<InterfaceNamingIdentifier>,
             control: fidl_fuchsia_net_interfaces_ext::admin::Control,
             device_class: DeviceClass,
             dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
@@ -389,7 +389,7 @@ mod tests {
             provisioning: ProvisioningAction,
         ) -> Self {
             Self {
-                persistent_id,
+                interface_naming_id,
                 control,
                 config: InterfaceConfigState::Host(HostInterfaceState {
                     dhcpv4_client: None,
@@ -508,7 +508,7 @@ mod tests {
                     fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                         .expect("create endpoints");
                 InterfaceState::new_host_with_state(
-                    Some(PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
+                    Some(generate_identifier(&fidl_fuchsia_net_ext::MacAddress {
                         octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
                     })),
                     control,

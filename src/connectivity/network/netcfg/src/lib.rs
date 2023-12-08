@@ -457,7 +457,7 @@ struct InterfaceState {
     // TODO(fxb/56559): Use this field in the removal of
     // the temporary naming policy, and drop the Option
     #[allow(unused)]
-    persistent_id: Option<interface::PersistentIdentifier>,
+    interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
     // Hold on to control to enforce interface ownership, even if unused.
     control: fidl_fuchsia_net_interfaces_ext::admin::Control,
     device_class: DeviceClass,
@@ -485,14 +485,14 @@ struct WlanApInterfaceState {}
 
 impl InterfaceState {
     fn new_host(
-        persistent_id: Option<interface::PersistentIdentifier>,
+        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         dhcpv6_pd_config: Option<fnet_dhcpv6::PrefixDelegationConfig>,
         provisioning: interface::ProvisioningAction,
     ) -> Self {
         Self {
-            persistent_id,
+            interface_naming_id,
             control,
             config: InterfaceConfigState::Host(HostInterfaceState {
                 dhcpv4_client: None,
@@ -505,13 +505,13 @@ impl InterfaceState {
     }
 
     fn new_wlan_ap(
-        persistent_id: Option<interface::PersistentIdentifier>,
+        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         device_class: DeviceClass,
         provisioning: interface::ProvisioningAction,
     ) -> Self {
         Self {
-            persistent_id,
+            interface_naming_id,
             control,
             device_class,
             config: InterfaceConfigState::WlanAp(WlanApInterfaceState {}),
@@ -2007,7 +2007,7 @@ impl<'a> NetCfg<'a> {
         interface_id: NonZeroU64,
         control: fidl_fuchsia_net_interfaces_ext::admin::Control,
         interface_name: String,
-        persistent_id: Option<interface::PersistentIdentifier>,
+        interface_naming_id: Option<interface::InterfaceNamingIdentifier>,
         // TODO(fxbug.dev/136874): Use DeviceInfoRef directly when the
         // same functions are  implemented for `is_wlan_ap`, `interface_type`
         device_info: &DeviceInfo,
@@ -2078,7 +2078,7 @@ impl<'a> NetCfg<'a> {
                     );
                 }
                 Entry::Vacant(entry) => entry.insert(InterfaceState::new_wlan_ap(
-                    persistent_id,
+                    interface_naming_id,
                     control,
                     class,
                     provisioning_action,
@@ -2143,7 +2143,7 @@ impl<'a> NetCfg<'a> {
                         )
                     };
                     entry.insert(InterfaceState::new_host(
-                        persistent_id,
+                        interface_naming_id,
                         control,
                         class,
                         dhcpv6_pd_config,
@@ -3217,8 +3217,8 @@ mod tests {
         )
     }
 
-    fn test_persistent_id() -> interface::PersistentIdentifier {
-        interface::PersistentIdentifier::MacAddress(fidl_fuchsia_net_ext::MacAddress {
+    fn test_interface_naming_id() -> interface::InterfaceNamingIdentifier {
+        interface::generate_identifier(&fidl_fuchsia_net_ext::MacAddress {
             octets: [0x1, 0x2, 0x3, 0x4, 0x5, 0x6],
         })
     }
@@ -3247,7 +3247,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_persistent_id()),
+                    Some(test_interface_naming_id()),
                     control,
                     device_class.into(),
                     None,
@@ -3409,7 +3409,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_persistent_id()),
+                    Some(test_interface_naming_id()),
                     control,
                     device_class.into(),
                     None,
@@ -3669,7 +3669,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_persistent_id()),
+                    Some(test_interface_naming_id()),
                     control,
                     device_class.into(),
                     None,
@@ -3812,7 +3812,7 @@ mod tests {
             netcfg.interface_states.insert(
                 INTERFACE_ID,
                 InterfaceState::new_host(
-                    Some(test_persistent_id()),
+                    Some(test_interface_naming_id()),
                     control,
                     device_class.into(),
                     None,
@@ -4114,7 +4114,7 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_wlan_ap(
-                                Some(test_persistent_id()),
+                                Some(test_interface_naming_id()),
                                 control,
                                 device_class,
                                 interface::ProvisioningAction::Local
@@ -4137,7 +4137,7 @@ mod tests {
                         netcfg.interface_states.insert(
                             id.try_into().expect("interface ID should be nonzero"),
                             InterfaceState::new_host(
-                                Some(test_persistent_id()),
+                                Some(test_interface_naming_id()),
                                 control,
                                 device_class,
                                 None,
@@ -4536,7 +4536,7 @@ mod tests {
                 netcfg.interface_states.insert(
                     id,
                     InterfaceState::new_host(
-                        Some(test_persistent_id()),
+                        Some(test_interface_naming_id()),
                         control,
                         device_class,
                         upstream.then_some(fnet_dhcpv6::PrefixDelegationConfig::Empty(
