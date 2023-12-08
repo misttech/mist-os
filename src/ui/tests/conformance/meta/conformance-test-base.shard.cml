@@ -5,7 +5,7 @@
     children: [
         {
             name: "context-factory",
-            url: "#meta/ui-context-factory.cm",
+            url: "ui-context-factory#meta/ui-context-factory.cm",
         },
     ],
     capabilities: [

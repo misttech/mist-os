@@ -9,7 +9,7 @@
     children: [
         {
             name: "validator",
-            url: "#meta/mouse-validator.cm",
+            url: "mouse-test-suite#meta/mouse-validator.cm",
         },
     ],
 }

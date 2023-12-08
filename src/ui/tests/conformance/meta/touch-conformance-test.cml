@@ -9,7 +9,7 @@
     children: [
         {
             name: "validator",
-            url: "#meta/touch-validator.cm",
+            url: "touch-test-suite#meta/touch-validator.cm",
         },
     ],
 }

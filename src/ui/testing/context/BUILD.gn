@@ -47,3 +47,9 @@ fuchsia_component("ui-context-factory-component") {
     "//src/ui/testing/test_ui_stack:test-ui-stack-component",
   ]
 }
+
+fuchsia_package("ui-context-factory") {
+  package_name = "ui-context-factory"
+  testonly = true
+  deps = [ ":ui-context-factory-component" ]
+}

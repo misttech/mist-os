@@ -37,6 +37,12 @@ fuchsia_component("touch-validator") {
   deps = [ ":touch-validator-bin" ]
 }
 
+fuchsia_package("touch-test-suite") {
+  package_name = "touch-test-suite"
+  testonly = true
+  deps = [ ":touch-validator" ]
+}
+
 fuchsia_test_component("touch-conformance-test-component") {
   testonly = true
   component_name = "touch-conformance-test"
@@ -46,9 +52,9 @@ fuchsia_test_component("touch-conformance-test-component") {
 
 fuchsia_test_package("touch-conformance-test") {
   test_components = [ ":touch-conformance-test-component" ]
-  deps = [
-    ":touch-validator",
-    "//src/ui/testing/context:ui-context-factory-component",
+  subpackages = [
+    ":touch-test-suite",
+    "//src/ui/testing/context:ui-context-factory",
   ]
   test_specs = {
     log_settings = {
@@ -89,6 +95,12 @@ fuchsia_component("mouse-validator") {
   deps = [ ":mouse-validator-bin" ]
 }
 
+fuchsia_package("mouse-test-suite") {
+  package_name = "mouse-test-suite"
+  testonly = true
+  deps = [ ":mouse-validator" ]
+}
+
 fuchsia_test_component("mouse-conformance-test-component") {
   testonly = true
   component_name = "mouse-conformance-test"
@@ -98,9 +110,9 @@ fuchsia_test_component("mouse-conformance-test-component") {
 
 fuchsia_test_package("mouse-conformance-test") {
   test_components = [ ":mouse-conformance-test-component" ]
-  deps = [
-    ":mouse-validator",
-    "//src/ui/testing/context:ui-context-factory-component",
+  subpackages = [
+    ":mouse-test-suite",
+    "//src/ui/testing/context:ui-context-factory",
   ]
   test_specs = {
     log_settings = {
