@@ -526,8 +526,7 @@ where
                 FormattedContent::Json(data) => {
                     let mut buf = vec![0; data.size as usize];
                     data.vmo.read(&mut buf, 0).map_err(Error::ReadVmo)?;
-                    let hierarchy_json = std::str::from_utf8(&buf).unwrap();
-                    serde_json::from_str(&hierarchy_json).map_err(Error::ReadJson)?
+                    serde_json::from_slice(&buf).map_err(Error::ReadJson)?
                 }
                 FormattedContent::Cbor(vmo) => {
                     let mut buf =
