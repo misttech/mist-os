@@ -56,7 +56,6 @@ test("nandpart-broker") {
 fuchsia_unittest_package("nand-broker-test") {
   deps = [
     ":nand-broker",
-    "//src/devices/board/drivers/integration-test",
     "//src/devices/bus/drivers/platform",
     "//src/devices/nand/drivers/broker:nand-broker",
     "//src/devices/nand/drivers/nand",
@@ -74,7 +73,6 @@ fuchsia_unittest_package("nand-broker-test") {
 fuchsia_unittest_package("nandpart-broker-test") {
   deps = [
     ":nandpart-broker",
-    "//src/devices/board/drivers/integration-test",
     "//src/devices/bus/drivers/platform",
     "//src/devices/nand/drivers/broker:nand-broker",
     "//src/devices/nand/drivers/nand",
