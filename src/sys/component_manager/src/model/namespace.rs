@@ -295,33 +295,30 @@ fn service_or_protocol_use(use_: UseDecl, component: WeakComponentInstance) -> B
         let target = component.clone();
         let task = async move {
             if let UseDecl::Protocol(use_protocol_decl) = &use_ {
-                if let Ok(state) = target.lock_resolved_state().await {
-                    // The capability dict can be missing if we used a capability from our
-                    // parent but the parent did not offer this capability.
-                    let target_path = use_protocol_decl.target_path.split();
-                    if let Some(router) = state.program_input_dict.get_router(target_path) {
-                        let result = ::routing::route(
-                            &router,
-                            Request {
-                                rights: None,
-                                relative_path: sandbox::Path::default(),
-                                availability: use_protocol_decl.availability.clone(),
-                                target: AnyWeakComponentInstance::new(weak_component.clone()),
-                            },
-                        )
-                        .await;
-                        match result {
-                            Ok(capability) => {
-                                let open: Open = capability
-                                    .try_into()
-                                    .expect("router returned unexpected capability type");
-                                open.open(scope, flags, relative_path, server_end);
-                                return;
-                            }
-                            Err(_) => {
-                                // Fallthrough to legacy routing below, which will attempt
-                                // routing again and report an error.
-                            }
+                if let Some(router) = target.lock_resolved_state().await.ok().and_then(|state| {
+                    state.program_input_dict.get_router(use_protocol_decl.target_path.split())
+                }) {
+                    let result = ::routing::route(
+                        &router,
+                        Request {
+                            rights: None,
+                            relative_path: sandbox::Path::default(),
+                            availability: use_protocol_decl.availability.clone(),
+                            target: AnyWeakComponentInstance::new(weak_component.clone()),
+                        },
+                    )
+                    .await;
+                    match result {
+                        Ok(capability) => {
+                            let open: Open = capability
+                                .try_into()
+                                .expect("router returned unexpected capability type");
+                            open.open(scope, flags, relative_path, server_end);
+                            return;
+                        }
+                        Err(_) => {
+                            // Fallthrough to legacy routing below, which will attempt
+                            // routing again and report an error.
                         }
                     }
                 }

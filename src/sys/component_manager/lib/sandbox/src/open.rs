@@ -223,7 +223,7 @@ impl From<ClientEnd<fio::DirectoryMarker>> for Open {
 impl<M: Capability + From<zx::Handle>> From<Sender<M>> for Open {
     fn from(value: Sender<M>) -> Open {
         let connect_fn = move |_scope: ExecutionScope, channel: fasync::Channel| {
-            value.send_handle(channel.into_zx_channel().into_handle());
+            let _ = value.send_handle(channel.into_zx_channel().into_handle());
         };
         let service = service::endpoint(connect_fn);
 

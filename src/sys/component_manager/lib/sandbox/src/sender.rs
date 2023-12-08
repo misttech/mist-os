@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, ServerEnd};
+use fidl::endpoints::{create_request_stream, ClientEnd, ControlHandle, ServerEnd, RequestStream};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use fuchsia_async as fasync;
 use fuchsia_zircon::{self as zx, AsHandleRef};
@@ -35,17 +35,16 @@ impl<T: Capability + From<zx::Handle>> Sender<T> {
         Self { inner: sender, client_end: None }
     }
 
-    pub fn send(&self, capability: T) {
+    pub fn send(&self, capability: T) -> Result<(), mpsc::TrySendError<T>> {
         self.send_internal(capability)
     }
 
-    pub fn send_handle(&self, handle: zx::Handle) {
+    pub fn send_handle(&self, handle: zx::Handle) -> Result<(), mpsc::TrySendError<T>> {
         self.send_internal(T::from(handle))
     }
 
-    fn send_internal(&self, capability: T) {
-        // TODO: what lifecycle transitions would cause a receiver to be destroyed and leave a sender?
-        self.inner.unbounded_send(capability).expect("Sender has no corresponding Receiver")
+    fn send_internal(&self, capability: T) -> Result<(), mpsc::TrySendError<T>> {
+        self.inner.unbounded_send(capability)
     }
 
     async fn serve_sender(self, mut stream: fsandbox::SenderRequestStream) {
@@ -60,7 +59,10 @@ impl<T: Capability + From<zx::Handle>> Sender<T> {
                         control_handle.shutdown();
                         return;
                     };
-                    self.send(capability);
+                    if let Err(_err) = self.send(capability) {
+                        stream.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
+                        return;
+                    }
                 }
                 fsandbox::SenderRequest::Open {
                     flags: _,
@@ -69,7 +71,10 @@ impl<T: Capability + From<zx::Handle>> Sender<T> {
                     object,
                     control_handle: _,
                 } => {
-                    self.send_handle(object.into());
+                    if let Err(_err) = self.send_handle(object.into()) {
+                        stream.control_handle().shutdown_with_epitaph(zx::Status::PEER_CLOSED);
+                        return;
+                    }
                 }
                 fsandbox::SenderRequest::Clone2 { request, control_handle: _ } => {
                     // The clone is registered under the koid of the client end.
@@ -156,7 +161,7 @@ mod tests {
 
         // Send a OneShotHandle through the Sender.
         let event = zx::Event::create();
-        sender.send(OneShotHandle::from(event.into_handle()));
+        sender.send(OneShotHandle::from(event.into_handle())).unwrap();
 
         // Convert the Sender to a FIDL proxy.
         let client_end: ClientEnd<fsandbox::SenderMarker> = sender.into();

@@ -411,6 +411,18 @@ impl RoutingError {
         }
     }
 
+    pub fn use_from_child_expose_not_found(
+        child_moniker: &ChildName,
+        moniker: &Moniker,
+        capability_id: impl Into<String>,
+    ) -> Self {
+        Self::UseFromChildExposeNotFound {
+            child_moniker: child_moniker.clone(),
+            moniker: moniker.clone(),
+            capability_id: capability_id.into(),
+        }
+    }
+
     pub fn expose_from_child_instance_not_found(
         child_moniker: &ChildName,
         moniker: &Moniker,

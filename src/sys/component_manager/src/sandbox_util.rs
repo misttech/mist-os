@@ -26,7 +26,7 @@ use {
     moniker::Moniker,
     sandbox::{AnyCapability, Capability, Dict, Open, Receiver, Sender},
     std::sync::Arc,
-    tracing::warn,
+    tracing::{info, warn},
     vfs::{directory::entry::DirectoryEntry, execution_scope::ExecutionScope, path::Path},
 };
 
@@ -279,6 +279,7 @@ impl CapabilityDictMut {
         self.inner.lock_entries().remove(&ROUTER.as_str().to_string());
     }
 
+    #[allow(unused)]
     pub fn get_receiver(&self) -> Option<Receiver<Message>> {
         self.inner
             .lock_entries()
@@ -328,7 +329,13 @@ pub fn new_terminating_router(sender: Sender<Message>) -> Router {
                 let _ = server_end.close_with_epitaph(zx::Status::NOT_DIR);
                 return;
             }
-            sender.send(Message { handle: server_end.into_handle(), flags, target: target.clone() })
+            if let Err(_e) = sender.send(Message {
+                handle: server_end.into_handle(),
+                flags,
+                target: target.clone(),
+            }) {
+                info!("failed to send capability: receiver has been destroyed");
+            }
         };
         let open = Open::new(open_fn, fio::DirentType::Service);
         let open = Box::new(open) as AnyCapability;
