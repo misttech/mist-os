@@ -141,13 +141,17 @@ async fn main() -> Result<(), Error> {
         .add_fidl_service(KernelServices::ComponentRunner)
         .add_fidl_service(KernelServices::ContainerController);
 
+    let inspector = fuchsia_inspect::component::inspector();
     #[cfg(target_arch = "x86_64")]
     {
-        fuchsia_inspect::component::inspector().root().record_string(
+        inspector.root().record_string(
             "x86_64_extended_pstate_strategy",
             format!("{:?}", *extended_pstate::x86_64::PREFERRED_STRATEGY),
         );
     }
+    inspector
+        .root()
+        .record_lazy_child("not_implemented", starnix_logging::not_implemented_lazy_node_callback);
 
     log_debug!("Serving kernel services on outgoing directory handle.");
     fs.take_and_serve_directory_handle()?;

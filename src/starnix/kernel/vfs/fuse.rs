@@ -16,7 +16,7 @@ use crate::{
 };
 use bstr::B;
 use starnix_lock::{Mutex, MutexGuard, RwLock, RwLockReadGuard, RwLockWriteGuard};
-use starnix_logging::{log_error, log_trace, log_warn, not_implemented, not_implemented_log_once};
+use starnix_logging::{log_error, log_trace, log_warn, not_implemented};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::{
     auth::FsCred,
@@ -549,7 +549,7 @@ impl FileOps for FuseFileObject {
         request: u32,
         arg: SyscallArg,
     ) -> Result<SyscallResult, Errno> {
-        not_implemented_log_once!("ioctl is using default implementation for use.");
+        not_implemented!("ioctl is using default implementation for fuse.");
         default_ioctl(file, current_task, request, arg)
     }
 
@@ -560,7 +560,7 @@ impl FileOps for FuseFileObject {
         cmd: u32,
         _arg: u64,
     ) -> Result<SyscallResult, Errno> {
-        not_implemented_log_once!("fcntl is using default implementation for use.");
+        not_implemented!("fcntl is using default implementation for fuse.");
         default_fcntl(cmd)
     }
 }

@@ -139,38 +139,6 @@ macro_rules! log_error {
     };
 }
 
-#[doc(hidden)]
-#[inline]
-pub fn __not_implemented_inner(message: &'static str, context: Option<(&'static str, u64)>) {
-    if let Some((name, value)) = context {
-        log_warn!(tag = "not_implemented", "{} {}: 0x{:x}", message, name, value);
-    } else {
-        log_warn!(tag = "not_implemented", "{}", message);
-    }
-}
-
-#[macro_export]
-macro_rules! not_implemented {
-    ($message:expr, $context:expr) => {
-        $crate::__not_implemented_inner($message, Some((stringify!($context), $context.into())));
-    };
-    ($message:expr) => {
-        $crate::__not_implemented_inner($message, None);
-    };
-}
-
-#[macro_export]
-macro_rules! not_implemented_log_once {
-    ($($arg:tt)*) => (
-        {
-            static DID_LOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-            if !DID_LOG.swap(true, std::sync::atomic::Ordering::AcqRel) {
-                $crate::not_implemented!($($arg)*);
-            }
-        }
-    )
-}
-
 // Call this when you get an error that should "never" happen, i.e. if it does that means the
 // kernel was updated to produce some other error after this match was written.
 // TODO(tbodt): find a better way to handle this than a panic.

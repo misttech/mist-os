@@ -18,9 +18,7 @@ use crate::{
         FdNumber,
     },
 };
-use starnix_logging::{
-    log_trace, not_implemented, not_implemented_log_once, trace_category_starnix_mm, trace_duration,
-};
+use starnix_logging::{log_trace, not_implemented, trace_category_starnix_mm, trace_duration};
 use starnix_uapi::{
     auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS},
     errno, error,
@@ -202,7 +200,7 @@ pub fn sys_msync(
     length: usize,
     _flags: u32,
 ) -> Result<(), Errno> {
-    not_implemented_log_once!("msync not implemented");
+    not_implemented!("msync not implemented");
     // Perform some basic validation of the address range given to satisfy gvisor tests that
     // use msync as a way to probe whether a page is mapped or not.
     current_task.mm().ensure_mapped(addr, length)?;
@@ -334,7 +332,7 @@ pub fn sys_membarrier(
     _cpu_id: i32,
 ) -> Result<u32, Errno> {
     // TODO(fxbug.dev/103867): This membarrier implementation does not do any real work.
-    not_implemented_log_once!("membarrier", cmd);
+    not_implemented!("membarrier", cmd);
     match cmd {
         uapi::membarrier_cmd_MEMBARRIER_CMD_QUERY => Ok(0),
         uapi::membarrier_cmd_MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ => Ok(0),

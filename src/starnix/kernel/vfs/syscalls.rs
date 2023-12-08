@@ -24,7 +24,7 @@ use crate::{
 use fuchsia_zircon as zx;
 use lock_sequence::{Locked, Unlocked};
 use starnix_lock::Mutex;
-use starnix_logging::{log_trace, not_implemented, not_implemented_log_once};
+use starnix_logging::{log_trace, not_implemented};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::{
     __kernel_fd_set,
@@ -551,7 +551,7 @@ impl LookupFlags {
         let automount =
             if allowed_flags & AT_NO_AUTOMOUNT != 0 { flags & AT_NO_AUTOMOUNT == 0 } else { false };
         if automount {
-            not_implemented_log_once!("LookupFlags::automount is not implemented");
+            not_implemented!("LookupFlags::automount is not implemented");
         }
         Ok(LookupFlags {
             allow_empty_path: flags & AT_EMPTY_PATH != 0,

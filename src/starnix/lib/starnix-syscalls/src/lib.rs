@@ -9,3 +9,8 @@ pub mod decls;
 
 pub use syscall_arg::*;
 pub use syscall_result::*;
+
+// This needs to be available to the macros in this library without clients having to depend on
+// paste themselves.
+#[doc(hidden)]
+pub use paste as __paste;

@@ -14,7 +14,9 @@ use crate::{
     task::CurrentTask,
 };
 use starnix_logging::{log_error, log_info, log_warn, not_implemented};
-use starnix_syscalls::{decls::SyscallDecl, SyscallResult, SUCCESS};
+use starnix_syscalls::{
+    for_each_syscall, syscall_number_to_name_literal_callback, SyscallResult, SUCCESS,
+};
 use starnix_uapi::{
     auth::{CAP_SYS_ADMIN, CAP_SYS_BOOT},
     errno, error,
@@ -264,8 +266,7 @@ pub fn sys_unknown(
     _current_task: &CurrentTask,
     syscall_number: u64,
 ) -> Result<SyscallResult, Errno> {
-    let decl = SyscallDecl::from_number(syscall_number);
-    not_implemented!(decl.name, decl.number);
+    not_implemented!(for_each_syscall! { syscall_number_to_name_literal_callback, syscall_number });
     // TODO: We should send SIGSYS once we have signals.
     error!(ENOSYS)
 }

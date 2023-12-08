@@ -4,8 +4,6 @@
 
 #![allow(non_upper_case_globals)]
 
-use paste::paste;
-
 use crate::SyscallArg;
 
 /// Helper for for_each_syscall! that adds any architecture-specific syscalls.
@@ -455,16 +453,14 @@ impl std::fmt::Debug for Syscall {
     }
 }
 
-/// A macro for the body of SyscallDecl::from_number.
-///
-/// Evaluates to the &'static SyscallDecl for the given number or to
-/// &DECL_UNKNOWN if the number is unknown.
-macro_rules! syscall_match {
+/// Evaluates to a string literal for the given syscall number when called back by for_each_syscall.
+#[macro_export]
+macro_rules! syscall_number_to_name_literal_callback {
     {$number:ident; $($name:ident,)*} => {
-        paste! {
+        $crate::__paste::paste! {
             match $number as u32 {
                 $(starnix_uapi::[<__NR_ $name>] => stringify!($name),)*
-                _ => "<unknown>",
+                _ => "<unknown syscall>",
             }
         }
     }
@@ -475,7 +471,7 @@ impl SyscallDecl {
     ///
     /// Returns &DECL_UNKNOWN if the given syscall number is not known.
     pub fn from_number(number: u64) -> SyscallDecl {
-        let name = for_each_syscall! { syscall_match, number };
+        let name = for_each_syscall! { syscall_number_to_name_literal_callback, number };
         Self { number, name }
     }
 }

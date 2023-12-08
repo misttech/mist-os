@@ -23,8 +23,8 @@ use once_cell::sync::{Lazy, OnceCell};
 use range_map::RangeMap;
 use starnix_lock::{OrderedMutex, RwLock};
 use starnix_logging::{
-    impossible_error, log_warn, not_implemented, not_implemented_log_once, set_zx_name,
-    trace_category_starnix_mm, trace_duration,
+    impossible_error, log_warn, not_implemented, set_zx_name, trace_category_starnix_mm,
+    trace_duration,
 };
 use starnix_uapi::{
     errno, error,
@@ -1143,14 +1143,14 @@ impl MemoryManagerState {
                         // Note, we cannot simply implemented MADV_DONTNEED with
                         // zx::VmoOp::DONT_NEED because they have different
                         // semantics.
-                        not_implemented_log_once!("MADV_DONTNEED with file-backed mapping");
+                        not_implemented!("MADV_DONTNEED with file-backed mapping");
                         return error!(EINVAL);
                     }
                     MADV_DONTNEED => zx::VmoOp::ZERO,
                     MADV_WILLNEED => zx::VmoOp::COMMIT,
                     MADV_NOHUGEPAGE => return Ok(()),
                     advice => {
-                        not_implemented_log_once!("madvise", advice);
+                        not_implemented!("madvise", advice);
                         return error!(EINVAL);
                     }
                 };

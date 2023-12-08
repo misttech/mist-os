@@ -437,6 +437,7 @@ rustc_library("starnix_logging") {
     "logging/core_dump_list.rs",
     "logging/lib.rs",
     "logging/logging.rs",
+    "logging/not_implemented.rs",
     "logging/trace.rs",
   ]
 
@@ -447,6 +448,9 @@ rustc_library("starnix_logging") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/starnix-lock",
     "//src/starnix/lib/starnix-uapi",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:tracing",
   ]
 
