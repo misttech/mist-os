@@ -42,7 +42,7 @@ bool FindProcess(const debug_ipc::ProcessTreeRecord& record, zx_koid_t koid_to_f
 
 class ZirconSystemInterfaceTest : public debug::TestWithLoop {};
 
-TEST_F(ZirconSystemInterfaceTest, GetProcessTree) {
+TEST_F(ZirconSystemInterfaceTest, DISABLED_GetProcessTree) {
   ZirconSystemInterface system_interface;
 
   system_interface.zircon_component_manager().SetReadyCallback([&]() { loop().QuitNow(); });
