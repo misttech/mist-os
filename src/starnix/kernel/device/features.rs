@@ -31,6 +31,8 @@ pub struct Features {
 
     pub framebuffer: bool,
 
+    pub gralloc: bool,
+
     pub magma: bool,
 
     pub test_data: bool,
@@ -80,6 +82,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             }
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("framebuffer", _) => features.framebuffer = true,
+            ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
             ("perfetto", Some(socket_path)) => {
                 features.perfetto = Some(socket_path.to_string());
